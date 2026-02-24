@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # OpenExec Web Dashboard
+  web:
+    build:
+      context: ../openexec-web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_EXECUTION_URL=http://execution:8080
+      - NEXT_PUBLIC_INTERFACE_URL=http://interface:8090
+      - NEXT_PUBLIC_SSE_ENABLED=true
+    depends_on:
+      - execution
+      - interface
+    networks:
+      - openexec
+
+  # Execution Engine (Go)
+  execution:
+    build:
+      context: ../openexec-execution
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - execution-data:/data
+      - ./projects:/projects:ro
+    environment:
+      - OPENEXEC_AUDIT_ENABLED=true
+      - OPENEXEC_AUDIT_DB_PATH=/data/audit.db
+    networks:
+      - openexec
+
+  # Interface Gateway (HITL via Telegram/WhatsApp)
+  interface:
+    build:
+      context: ../openexec-interface
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - EXECUTION_ENDPOINT=http://execution:8080
+    networks:
+      - openexec
+
+  # Python CLI (for daemon mode)
+  cli:
+    build:
+      context: ../initial
+      dockerfile: Dockerfile
+    volumes:
+      - ./projects:/projects
+    working_dir: /projects
+    environment:
+      - OPENEXEC_EXECUTION_URL=http://execution:8080
+    networks:
+      - openexec
+    profiles:
+      - cli  # Only start with: docker compose --profile cli up
+
+networks:
+  openexec:
+    driver: bridge
+
+volumes:
+  execution-data:

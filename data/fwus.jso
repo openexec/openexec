@@ -1,0 +1,145 @@
+{
+  "version": "1",
+  "fwus": [
+    {
+      "id": "FWU-01.1.01",
+      "feature_id": "F-01.1",
+      "name": "Plan from PRD into a Goal Tree and FWUs, then schedule execu",
+      "status": "pending",
+      "intent": "Plan from PRD into a Goal Tree and FWUs, then schedule execution (via Tract MCP tools or Initial/OpenExec).",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.01:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    },
+    {
+      "id": "FWU-01.1.02",
+      "feature_id": "F-01.2",
+      "name": "Execute FWUs with an auditable loop and live status (SSE), s",
+      "status": "pending",
+      "intent": "Execute FWUs with an auditable loop and live status (SSE), starting with Axon.",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.02:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    },
+    {
+      "id": "FWU-01.1.03",
+      "feature_id": "F-01.3",
+      "name": "Enforce quality via stack\u2011aware gates (Python/JS/Go/Rust) wi",
+      "status": "pending",
+      "intent": "Enforce quality via stack\u2011aware gates (Python/JS/Go/Rust) with structured results.",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.03:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    },
+    {
+      "id": "FWU-01.1.04",
+      "feature_id": "F-01.4",
+      "name": "Support approvals via Telegram/WhatsApp webhooks and apply d",
+      "status": "pending",
+      "intent": "Support approvals via Telegram/WhatsApp webhooks and apply decisions to execution.",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.04:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    },
+    {
+      "id": "FWU-01.1.05",
+      "feature_id": "F-01.5",
+      "name": "Provide a unified CLI (init/plan/start/status/tui) and a web",
+      "status": "pending",
+      "intent": "Provide a unified CLI (init/plan/start/status/tui) and a web dashboard for observability.",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.05:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    },
+    {
+      "id": "FWU-01.1.06",
+      "feature_id": "F-01.6",
+      "name": "Keep an immutable audit trail with optional encryption and e",
+      "status": "pending",
+      "intent": "Keep an immutable audit trail with optional encryption and export.",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.06:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    },
+    {
+      "id": "FWU-01.1.07",
+      "feature_id": "F-01.7",
+      "name": "Deliver a pragmatic bootstrap that works now, then migrate t",
+      "status": "pending",
+      "intent": "Deliver a pragmatic bootstrap that works now, then migrate to native UAOS services.",
+      "addresses_acs": [],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [],
+      "design_decisions": [],
+      "interface_contracts": [],
+      "verification_gates": [
+        {
+          "id": "FWU-01.1.07:VG:tests",
+          "gate": "tests",
+          "expectation": "Baseline tests passing"
+        }
+      ]
+    }
+  ]
+}

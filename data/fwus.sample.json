@@ -1,0 +1,48 @@
+{
+  "version": "1",
+  "fwus": [
+    {
+      "id": "FWU-01.1.01",
+      "feature_id": "F-01.1",
+      "name": "Provenance Validation",
+      "status": "pending",
+      "intent": "Implement provenance validation for all data points",
+      "addresses_acs": [{"ac": "AC1", "coverage": "full"}],
+      "planning_version": 1,
+      "boundaries": [
+        {"id": "FWU-01.1.01:BN:1", "scope": "in_scope", "description": "Validation middleware"}
+      ],
+      "dependencies": [],
+      "design_decisions": [
+        {"id": "FWU-01.1.01:PD:1", "decision": "Validation strategy", "resolution": "Reject invalid data at ingestion", "rationale": "Data integrity over availability"}
+      ],
+      "interface_contracts": [
+        {"id": "FWU-01.1.01:CT:1", "direction": "produces", "counterpart_fwu_id": "FWU-01.1.02", "description": "Validated data points"}
+      ],
+      "verification_gates": [
+        {"id": "FWU-01.1.01:VG:tests", "gate": "tests", "expectation": "All validation rules tested"}
+      ]
+    },
+    {
+      "id": "FWU-01.1.02",
+      "feature_id": "F-01.2",
+      "name": "Schema Enforcement",
+      "status": "pending",
+      "intent": "Enforce data schemas at ingestion boundary",
+      "addresses_acs": [{"ac": "AC2", "coverage": "full"}],
+      "planning_version": 1,
+      "boundaries": [],
+      "dependencies": [
+        {"id": "FWU-01.1.02:DP:1", "dependency_type": "fwu", "target_fwu_id": "FWU-01.1.01", "description": "Needs validated data from provenance FWU"}
+      ],
+      "design_decisions": [],
+      "interface_contracts": [
+        {"id": "FWU-01.1.02:CT:1", "direction": "consumes", "counterpart_fwu_id": "FWU-01.1.01", "description": "Validated data points"}
+      ],
+      "verification_gates": [
+        {"id": "FWU-01.1.02:VG:tests", "gate": "tests", "expectation": "Schema enforcement tested"}
+      ]
+    }
+  ]
+}
+

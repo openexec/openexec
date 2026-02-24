@@ -1,0 +1,60 @@
+services:
+  axon:
+    image: golang:1.25
+    container_name: uaos_axon
+    env_file:
+      - .env
+    environment:
+      - TRACT_STORE=${TRACT_STORE:-uaos}
+      - TRACT_HOME=/tract-home
+      - PORT=8080
+    command: ["serve", "--tract-store", "${TRACT_STORE:-uaos}", "--workdir", "/workspace", "--port", "8080"]
+    entrypoint: ["go", "run", "./cmd/axon"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../..:/workspace:cached
+      - ./tract-home:/tract-home
+    working_dir: /workspace/axon
+
+  tract:
+    image: golang:1.25
+    container_name: uaos_tract
+    env_file:
+      - .env
+    environment:
+      - TRACT_STORE=${TRACT_STORE:-uaos}
+      - GO111MODULE=on
+      - GOTOOLCHAIN=auto
+      - TRACT_HOME=/tract-home
+    volumes:
+      - ../..:/workspace:cached
+      - ./tract-home:/tract-home
+    working_dir: /workspace/tract
+    entrypoint: ["go", "run", "./cmd/tract"]
+    # usage: docker compose -f code/docker-compose.dev.yml run --rm tract <cmd>
+
+  gateway:
+    image: golang:1.25
+    container_name: uaos_gateway
+    env_file:
+      - .env
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_SECRET_TOKEN=${TELEGRAM_SECRET_TOKEN:-}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-local-secret}
+      - PORT=${GATEWAY_PORT:-8090}
+    entrypoint: ["go", "run", "./cmd/gateway"]
+    ports:
+      - "8090:8090"
+    volumes:
+      - ../..:/workspace:cached
+    working_dir: /workspace/message-gateway
+    depends_on:
+      - axon
+
+networks:
+  default:
+    name: uaos_net
