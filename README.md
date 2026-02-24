@@ -18,7 +18,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
-  <img src="https://img.shields.io/badge/python-3.11+-green.svg" alt="Python"/>
   <img src="https://img.shields.io/badge/go-1.23+-00ADD8.svg" alt="Go"/>
   <img src="https://img.shields.io/badge/node-20+-339933.svg" alt="Node"/>
 </p>
@@ -62,13 +61,15 @@ openexec daemon start
 ### Installation
 
 ```bash
-# Install OpenExec (Python)
-pip install openexec
+# Clone the CLI repository
+git clone https://github.com/openexec/openexec-cli.git
+cd openexec-cli
 
-# Or clone and install from source
-git clone https://github.com/openexec/openexec.git
-cd openexec/initial
-pip install -e .
+# Build and install the CLI
+go build -o bin/openexec .
+
+# (Optional) Add to your PATH
+# sudo mv bin/openexec /usr/local/bin/
 ```
 
 ### Install an AI Agent
@@ -323,14 +324,14 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
 # Clone the repo
-git clone https://github.com/openexec/openexec.git
+git clone https://github.com/openexec/openexec-cli.git
+cd openexec-cli
 
-# Install development dependencies
-cd openexec/initial
-pip install -e ".[dev]"
+# Build with development flags
+go build -v .
 
 # Run tests
-pytest
+go test ./...
 ```
 
 ## License
