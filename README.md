@@ -83,38 +83,30 @@ npm install -g @google/gemini-cli          # Gemini
 go install github.com/opencode-ai/opencode@latest  # OpenCode (local)
 ```
 
-### Initialize Your Project
-
-```bash
-cd your-project
-
-# 1. Guided interactive setup (Recommended)
-# This will interview you and create INTENT.md
-openexec wizard
-
-# OR classic interactive setup (if you already have INTENT.md)
-openexec onboard
-```
-
 ### Execution Flow
 
 Follow these steps in order to process your project:
 
 ```bash
-# 2. Generate a plan from your INTENT.md
-# (Required if you didn't use 'wizard')
+# 1. Initialize your project (Setup config and choose models)
+openexec onboard
+
+# 2. Guided interactive interview (Uses configured model to create INTENT.md)
+openexec wizard
+
+# 3. Generate a plan from your INTENT.md
 openexec plan INTENT.md
 
-# 3. Import generated tasks into the tracking system
+# 4. Import generated tasks into the tracking system
 openexec story import
 
-# 4. Start the background execution engine (Daemon)
+# 5. Start the background execution engine (Daemon)
 openexec start --daemon
 
-# 5. Execute pending tasks
+# 6. Execute pending tasks
 openexec run
 
-# 6. Check progress and status
+# 7. Check progress and status
 openexec status
 ```
 
