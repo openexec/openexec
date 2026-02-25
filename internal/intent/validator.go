@@ -331,6 +331,48 @@ func (v *Validator) validateConstraints(result *ValidationResult) {
 		return
 	}
 
+	contentLower := strings.ToLower(strings.Join(v.lines, "\n"))
+
+	// Mandatory: Platform check
+	platforms := []string{"macos", "windows", "linux", "ios", "android", "web", "cross-platform", "docker"}
+	hasPlatform := false
+	for _, p := range platforms {
+		if strings.Contains(contentLower, p) {
+			hasPlatform = true
+			break
+		}
+	}
+
+	if !hasPlatform {
+		result.Critical = append(result.Critical, ValidationIssue{
+			Rule:     "platform_missing",
+			Severity: SeverityCritical,
+			Message:  "Target platform not explicitly defined",
+			Hint:     "Add target platform (e.g., macOS, Linux, Web, Docker) to Constraints or Requirements",
+			Section:  "Constraints",
+		})
+	}
+
+	// Mandatory: App Shape check
+	shapes := []string{"cli", "web app", "mobile app", "desktop app", "api", "library", "plugin", "microservice"}
+	hasShape := false
+	for _, s := range shapes {
+		if strings.Contains(contentLower, s) {
+			hasShape = true
+			break
+		}
+	}
+
+	if !hasShape {
+		result.Critical = append(result.Critical, ValidationIssue{
+			Rule:     "shape_missing",
+			Severity: SeverityCritical,
+			Message:  "Application shape/type not defined",
+			Hint:     "Specify if this is a CLI, Web App, Mobile App, API, etc.",
+			Section:  "Constraints",
+		})
+	}
+
 	if len(section.Items) == 0 {
 		result.Critical = append(result.Critical, ValidationIssue{
 			Rule:     "constraints_content",

@@ -57,6 +57,10 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 	case loop.EventOperatorAttention:
 		info.Status = StatusPaused
 
+	case loop.EventPlanningMismatch:
+		info.Status = StatusPaused
+		info.Error = "Planning Mismatch: " + event.Text
+
 	case loop.EventPaused:
 		info.Status = StatusPaused
 

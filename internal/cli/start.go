@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/release"
 	"github.com/spf13/cobra"
 )
 
@@ -287,8 +288,14 @@ Examples:
 		fmt.Printf("   Workers:  %d\n", startWorkers)
 		fmt.Println()
 
+		// Load release manager for status updates
+		mgr, err := getReleaseManager(cmd)
+		if err != nil {
+			return err
+		}
+
 		// Execute tasks in parallel using DAG scheduler
-		err = executeTasksParallel(config.ProjectDir, tasks, startWorkers)
+		err = executeTasksParallel(config.ProjectDir, tasks, startWorkers, mgr)
 		if err != nil {
 			return err
 		}
@@ -314,7 +321,7 @@ type TaskNode struct {
 	DependsOn map[string]bool
 }
 
-func executeTasksParallel(projectDir string, tasks []Task, workerCount int) error {
+func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr *release.Manager) error {
 	if workerCount <= 0 {
 		workerCount = 4
 	}
@@ -380,21 +387,26 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int) erro
 		go func(workerID int) {
 			defer wg.Done()
 			for node := range readyTasks {
+				// Check if we should abort due to other worker errors
 				mu.Lock()
+				if len(errors) > 0 {
+					mu.Unlock()
+					return
+				}
 				node.Status = StatusRunning
 				mu.Unlock()
 
 				fmt.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
 
 				// Create execution loop
-				loopID, err := createExecutionLoop(projectDir, node.Task)
+				loopID, err := createExecutionLoop(projectDir, node.Task, mgr)
 				if err != nil {
 					fmt.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
 					mu.Lock()
 					node.Status = StatusFailed
 					mu.Unlock()
-					errors <- err
-					return
+					errors <- fmt.Errorf("task %s failed to start: %w", node.Task.ID, err)
+					continue
 				}
 
 				fmt.Printf("[Worker %d]    Loop: %s\n", workerID, loopID)
@@ -407,8 +419,16 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int) erro
 					fmt.Printf("[Worker %d] ⚠ Error in %s: %v\n", workerID, node.Task.ID, err)
 					node.Status = StatusFailed
 					mu.Unlock()
-					errors <- err
-					return
+					errors <- fmt.Errorf("task %s failed: %w", node.Task.ID, err)
+					continue
+				}
+
+				// Update status in release manager (SQLite)
+				if mgr != nil {
+					_, updateErr := mgr.CompleteTask(node.Task.ID)
+					if updateErr != nil {
+						fmt.Printf("[Worker %d] ⚠ Warning: failed to update status for %s: %v\n", workerID, node.Task.ID, updateErr)
+					}
 				}
 
 				node.Status = StatusCompleted
@@ -434,8 +454,12 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int) erro
 
 	// Check for errors
 	select {
-	case err := <-errors:
-		return err
+	case <-errors:
+		// We have errors. Collect them all.
+		// Note: we can't iterate over channel if it's not closed, 
+		// but since waitgroup is done, we know no more errors will be sent.
+		count := len(errors) + 1 // +1 for the one we just read
+		return fmt.Errorf("%d task(s) failed during parallel execution", count)
 	default:
 		return nil
 	}
@@ -612,24 +636,46 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 		return sf.Stories[i].ID < sf.Stories[j].ID
 	})
 
-	// Extract tasks from stories in order
+	// Map story ID to its task IDs for barrier injection
+	storyTaskIDs := make(map[string][]string)
+	for _, story := range sf.Stories {
+		for _, task := range story.Tasks {
+			if task.ID != "" {
+				storyTaskIDs[story.ID] = append(storyTaskIDs[story.ID], task.ID)
+			}
+		}
+	}
+
+	// Extract tasks from stories
 	for _, story := range sf.Stories {
 		if story.Status == "pending" || story.Status == "" {
+			var prevTaskInStory string
+			
 			for _, genTask := range story.Tasks {
 				taskID := genTask.ID
 				if taskID == "" {
-					// Fallback if ID missing
 					continue
 				}
 
-				// Combine story dependencies into task dependencies for simpler DAG
+				// Start with explicit task-level dependencies
 				deps := genTask.DependsOn
 				if deps == nil {
 					deps = []string{}
 				}
 				
-				// Also implicitly depend on previous stories if needed?
-				// Actually, the LLM should have made this explicit in depends_on.
+				// 1. Intra-story sequence: Each task depends on the previous task in the SAME story
+				// This ensures story progress is linear by default.
+				if prevTaskInStory != "" {
+					deps = append(deps, prevTaskInStory)
+				}
+				
+				// 2. Inter-story barriers: This task depends on ALL tasks of prerequisite stories.
+				// This ensures architectural layers are respected.
+				for _, depStoryID := range story.DependsOn {
+					if prerequisiteTasks, ok := storyTaskIDs[depStoryID]; ok {
+						deps = append(deps, prerequisiteTasks...)
+					}
+				}
 				
 				tasks = append(tasks, Task{
 					ID:          taskID,
@@ -639,6 +685,8 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 					Status:      "pending",
 					DependsOn:   deps,
 				})
+				
+				prevTaskInStory = taskID
 			}
 		}
 	}
@@ -647,9 +695,9 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 }
 
 // createExecutionLoop creates a new execution loop for a task
-func createExecutionLoop(projectDir string, task Task) (string, error) {
+func createExecutionLoop(projectDir string, task Task, mgr *release.Manager) (string, error) {
 	// Build prompt for the task
-	prompt := buildTaskPrompt(task)
+	prompt := buildTaskPrompt(task, mgr)
 
 	// Ensure MCP config is present
 	mcpPath, err := ensureMCPConfig(projectDir)
@@ -699,24 +747,44 @@ func createExecutionLoop(projectDir string, task Task) (string, error) {
 }
 
 // buildTaskPrompt builds a Claude Code prompt for a task
-func buildTaskPrompt(task Task) string {
+func buildTaskPrompt(task Task, mgr *release.Manager) string {
 	var sb strings.Builder
 
-	sb.WriteString("You are executing a development task.\n\n")
+	// Try to get rich story context
+	var story *release.Story
+	if mgr != nil {
+		story = mgr.GetStory(task.StoryID)
+	}
+
+	sb.WriteString("You are executing a development task within the OpenExec orchestration engine.\n\n")
 	sb.WriteString(fmt.Sprintf("TASK ID: %s\n", task.ID))
-	sb.WriteString(fmt.Sprintf("TITLE: %s\n", task.Title))
+	sb.WriteString(fmt.Sprintf("TITLE:   %s\n", task.Title))
+	
 	if task.Description != "" {
 		sb.WriteString(fmt.Sprintf("DESCRIPTION: %s\n", task.Description))
 	}
-	if task.StoryID != "" {
-		sb.WriteString(fmt.Sprintf("STORY: %s\n", task.StoryID))
+
+	if story != nil {
+		sb.WriteString("\nSTORY CONTEXT:\n")
+		sb.WriteString(fmt.Sprintf("ID:    %s\n", story.ID))
+		sb.WriteString(fmt.Sprintf("Title: %s\n", story.Title))
+		if story.Description != "" {
+			sb.WriteString(fmt.Sprintf("Scope: %s\n", story.Description))
+		}
+		
+		if len(story.AcceptanceCriteria) > 0 {
+			sb.WriteString("\nACCEPTANCE CRITERIA (Definition of Done):\n")
+			for _, ac := range story.AcceptanceCriteria {
+				sb.WriteString(fmt.Sprintf("- %s\n", ac))
+			}
+		}
 	}
-	sb.WriteString("\n")
-	sb.WriteString("INSTRUCTIONS:\n")
-	sb.WriteString("1. Analyze the task requirements\n")
-	sb.WriteString("2. Implement the necessary changes\n")
-	sb.WriteString("3. Verify your implementation works\n")
-	sb.WriteString("4. When complete, signal completion using the axon_signal tool with type 'phase-complete'\n")
+
+	sb.WriteString("\nINSTRUCTIONS:\n")
+	sb.WriteString("1. Analyze the task requirements and story context.\n")
+	sb.WriteString("2. Implement the necessary changes idiomatic to the project.\n")
+	sb.WriteString("3. Verify your implementation works using existing tests or by creating new ones.\n")
+	sb.WriteString("4. When complete and verified, signal completion using the axon_signal tool with type 'phase-complete'.\n")
 	sb.WriteString("\n")
 	sb.WriteString("Work autonomously and make reasonable decisions. Do not ask for clarification.\n")
 

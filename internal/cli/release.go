@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/spf13/cobra"
 	"github.com/openexec/openexec/internal/release"
@@ -815,10 +816,30 @@ Examples:
 			return fmt.Errorf("failed to read %s: %w", inputFile, err)
 		}
 
-		var stories []GeneratedStory
-		if err := json.Unmarshal(data, &stories); err != nil {
-			return fmt.Errorf("failed to parse stories: %w", err)
+		var sf struct {
+			SchemaVersion string           `json:"schema_version"`
+			Stories       []GeneratedStory `json:"stories"`
 		}
+
+		if err := json.Unmarshal(data, &sf); err != nil {
+			// Try old format (bare array) for one last time
+			var bareStories []GeneratedStory
+			if errArray := json.Unmarshal(data, &bareStories); errArray == nil {
+				sf.Stories = bareStories
+				sf.SchemaVersion = "legacy"
+			} else {
+				return fmt.Errorf("failed to parse stories (invalid schema): %w", err)
+			}
+		}
+
+		// Version validation
+		if sf.SchemaVersion == "" {
+			fmt.Println("Warning: missing schema_version in stories file")
+		} else if sf.SchemaVersion != "1.0" && sf.SchemaVersion != "legacy" {
+			return fmt.Errorf("unsupported stories schema version: %s (expected 1.0)", sf.SchemaVersion)
+		}
+
+		stories := sf.Stories
 
 		if len(stories) == 0 {
 			fmt.Println("No stories found in file.")
@@ -853,7 +874,15 @@ Examples:
 
 		fmt.Printf("Importing %d stories from %s...\n\n", len(stories), inputFile)
 
+		storyIDPattern := regexp.MustCompile(`^(US|REQ)-\d{3}$`)
+
 		for _, genStory := range stories {
+			// Validate ID format
+			if !storyIDPattern.MatchString(genStory.ID) {
+				fmt.Printf("  [error] %s: invalid ID format (expected US-### or REQ-###)\n", genStory.ID)
+				continue
+			}
+
 			// Check if story already exists
 			existing := mgr.GetStory(genStory.ID)
 			if existing != nil {
@@ -864,12 +893,13 @@ Examples:
 
 			// Create story
 			story := &release.Story{
-				ID:          genStory.ID,
-				Title:       genStory.Title,
-				Description: genStory.Description,
-				StoryType:   "feature",
-				DependsOn:   genStory.DependsOn,
-				Tasks:       []string{},
+				ID:                 genStory.ID,
+				Title:              genStory.Title,
+				Description:        genStory.Description,
+				AcceptanceCriteria: genStory.AcceptanceCriteria,
+				StoryType:          "feature",
+				DependsOn:          genStory.DependsOn,
+				Tasks:              []string{},
 			}
 
 			if err := mgr.CreateStory(story); err != nil {

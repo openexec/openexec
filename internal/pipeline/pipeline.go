@@ -316,6 +316,18 @@ func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loo
 				ReviewCycle: p.sm.ReviewCycles(),
 				Text:        sr.Reason,
 			})
+
+		case ActionReplan:
+			blocked = true
+			l.Pause()
+			p.emit(loop.Event{
+				Type:        loop.EventPlanningMismatch,
+				Phase:       string(phase),
+				FWUID:       p.cfg.FWUID,
+				Agent:       phaseCfg.Agent,
+				ReviewCycle: p.sm.ReviewCycles(),
+				Text:        sr.Reason,
+			})
 		}
 
 		// Forward event to pipeline channel.

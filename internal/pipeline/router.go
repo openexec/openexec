@@ -10,6 +10,7 @@ const (
 	ActionPhaseComplete              // phase finished normally
 	ActionRoute                      // Blade routing decision
 	ActionPause                      // needs operator attention
+	ActionReplan                     // trigger re-planning workflow
 )
 
 // SignalResult is the outcome of interpreting a signal event.
@@ -38,13 +39,18 @@ func HandleSignal(event loop.Event) SignalResult {
 			RouteTarget: event.SignalTarget,
 			Reason:      event.Text,
 		}
+	case "planning-mismatch", "scope-discovery":
+		return SignalResult{
+			Action: ActionReplan,
+			Reason: event.Text,
+		}
 	case "blocked", "decision-point":
 		return SignalResult{
 			Action: ActionPause,
 			Reason: event.Text,
 		}
 	default:
-		// progress, planning-mismatch, scope-discovery → no pipeline action
+		// progress → no pipeline action
 		return SignalResult{Action: ActionNone}
 	}
 }

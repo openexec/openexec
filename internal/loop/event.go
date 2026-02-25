@@ -31,6 +31,9 @@ const (
 	EventGatesPassed      EventType = "gates_passed"
 	EventGatesFailed      EventType = "gates_failed"
 	EventGatesFixing      EventType = "gates_fixing"
+
+	// Specialized conflict events.
+	EventPlanningMismatch EventType = "planning_mismatch"
 )
 
 // Event represents a single occurrence in the loop lifecycle.
