@@ -140,6 +140,7 @@ OpenExec operates on a **recursive autonomous loop**:
 
 | Agent | Best For |
 | :--- | :--- |
+| **OpenCode** | The Unified Operator. Can act as a local replacement or manage other agents. |
 | **Claude Code** | Complex reasoning, large refactors, and architectural changes. |
 | **Codex** | High-speed code completion and standard REST API implementation. |
 | **Gemini** | Fast iteration and large-context codebase analysis. |
