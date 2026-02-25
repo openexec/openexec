@@ -316,15 +316,15 @@ daemon:
 
 | Command | Description |
 |---------|-------------|
-| `openexec wizard` | Guided, interactive project intent gathering (Recommended) |
+| `openexec config show` | Display configuration |
 | `openexec onboard` | Classic interactive project setup |
 | `openexec plan <file>` | Generate stories and tasks from INTENT.md |
-| `openexec story import` | Import generated stories/tasks into tracker |
-| `openexec start --daemon` | Start the background execution engine |
 | `openexec run [task]` | Execute pending tasks |
+| `openexec start --daemon` | Start the background execution engine |
 | `openexec status` | Show project and task status |
 | `openexec stop` | Stop the execution daemon |
-| `openexec config show` | Display configuration |
+| `openexec story import` | Import generated stories/tasks into tracker |
+| `openexec wizard` | Guided, interactive project intent gathering (Recommended) |
 
 ## Documentation
 
