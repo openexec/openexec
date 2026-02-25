@@ -783,6 +783,7 @@ type GeneratedStory struct {
 	Title              string          `json:"title"`
 	Description        string          `json:"description"`
 	AcceptanceCriteria []string        `json:"acceptance_criteria"`
+	GoalID             string          `json:"goal_id,omitempty"`
 	DependsOn          []string        `json:"depends_on,omitempty"`
 	VerificationScript string          `json:"verification_script,omitempty"`
 	Contract           string          `json:"contract,omitempty"`
@@ -897,6 +898,7 @@ Examples:
 			// Create story
 			story := &release.Story{
 				ID:                 genStory.ID,
+				GoalID:             genStory.GoalID,
 				Title:              genStory.Title,
 				Description:        genStory.Description,
 				AcceptanceCriteria: genStory.AcceptanceCriteria,
@@ -1280,8 +1282,80 @@ var taskApproveCmd = &cobra.Command{
 	},
 }
 
+var goalCmd = &cobra.Command{
+	Use:   "goal",
+	Short: "Manage project goals",
+}
+
+var goalVerifyCmd = &cobra.Command{
+	Use:   "verify [goal-id]",
+	Short: "Verify implementation against goals",
+	Long: `Run high-level verification scripts to confirm that project goals
+have been met by the current implementation.
+
+Examples:
+  openexec goal verify G-001
+  openexec goal verify`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		mgr, err := getReleaseManager(cmd)
+		if err != nil {
+			return err
+		}
+
+		stories := mgr.GetStories()
+		goalMap := make(map[string][]*release.Story)
+		for _, s := range stories {
+			if s.GoalID != "" {
+				goalMap[s.GoalID] = append(goalMap[s.GoalID], s)
+			}
+		}
+
+		fmt.Println("📋 Goal Verification Report")
+		fmt.Println("==========================")
+
+		if len(args) > 0 {
+			goalID := args[0]
+			if targetStories, ok := goalMap[goalID]; ok {
+				fmt.Printf("Goal %s:\n", goalID)
+				for _, s := range targetStories {
+					fmt.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
+					if s.VerificationScript != "" {
+						fmt.Printf("    Verification: %s\n", s.VerificationScript)
+					}
+				}
+			} else {
+				fmt.Printf("Goal %s not found or has no supporting stories.\n", goalID)
+			}
+		} else {
+			if len(goalMap) == 0 {
+				fmt.Println("No goals tracked in current stories.")
+				return nil
+			}
+			for goalID, targetStories := range goalMap {
+				fmt.Printf("\nGoal %s [%d stories]:\n", goalID, len(targetStories))
+				allDone := true
+				for _, s := range targetStories {
+					fmt.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
+					if s.Status != "done" && s.Status != "completed" && s.Status != "approved" {
+						allDone = false
+					}
+				}
+				if allDone {
+					fmt.Printf("  ✨ Goal %s is implementations-complete.\n", goalID)
+				}
+			}
+		}
+
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(releaseCmd)
+
+	// Goal subcommands
+	rootCmd.AddCommand(goalCmd)
+	goalCmd.AddCommand(goalVerifyCmd)
 
 	// Release subcommands
 	releaseCmd.AddCommand(releaseCreateCmd)

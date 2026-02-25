@@ -770,6 +770,9 @@ func buildTaskPrompt(task Task, mgr *release.Manager) string {
 	if story != nil {
 		sb.WriteString("\nSTORY CONTEXT:\n")
 		sb.WriteString(fmt.Sprintf("ID:    %s\n", story.ID))
+		if story.GoalID != "" {
+			sb.WriteString(fmt.Sprintf("Goal:  %s\n", story.GoalID))
+		}
 		sb.WriteString(fmt.Sprintf("Title: %s\n", story.Title))
 		if story.Description != "" {
 			sb.WriteString(fmt.Sprintf("Scope: %s\n", story.Description))

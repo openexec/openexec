@@ -51,6 +51,7 @@ type Story struct {
 	// Core fields
 	ID          string   `json:"id"`                      // e.g., "US-001"
 	EpicID      *string  `json:"epic_id,omitempty"`       // Parent epic if any
+	GoalID      string   `json:"goal_id,omitempty"`       // Parent goal if any
 	Title       string   `json:"title"`
 	Description string   `json:"description,omitempty"`   // Short description
 	Role        string   `json:"role,omitempty"`          // As a <role>
