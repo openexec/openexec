@@ -415,6 +415,22 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				// Wait for loop to complete
 				err = waitForLoop(loopID)
 				
+				if err == nil && node.Task.VerificationScript != "" {
+					fmt.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
+					
+					// Execute the verification script
+					verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
+					verifyCmd.Dir = projectDir
+					
+					output, verifyErr := verifyCmd.CombinedOutput()
+					if verifyErr != nil {
+						fmt.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
+						err = fmt.Errorf("verification script failed: %w", verifyErr)
+					} else {
+						fmt.Printf("[Worker %d] ✓ Verification passed for %s\n", workerID, node.Task.ID)
+					}
+				}
+
 				mu.Lock()
 				if err != nil {
 					fmt.Printf("[Worker %d] ⚠ Error in %s: %v\n", workerID, node.Task.ID, err)
@@ -640,10 +656,18 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 
 	// Map story ID to its task IDs for barrier injection
 	storyTaskIDs := make(map[string][]string)
+	storyContractTaskIDs := make(map[string][]string)
+	
 	for _, story := range sf.Stories {
 		for _, task := range story.Tasks {
 			if task.ID != "" {
 				storyTaskIDs[story.ID] = append(storyTaskIDs[story.ID], task.ID)
+				
+				// Identify Contract/Schema tasks for Interface-First Parallelism
+				titleLower := strings.ToLower(task.Title)
+				if strings.Contains(titleLower, "contract") || strings.Contains(titleLower, "schema") {
+					storyContractTaskIDs[story.ID] = append(storyContractTaskIDs[story.ID], task.ID)
+				}
 			}
 		}
 	}
@@ -671,10 +695,14 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 					deps = append(deps, prevTaskInStory)
 				}
 				
-				// 2. Inter-story barriers: This task depends on ALL tasks of prerequisite stories.
-				// This ensures architectural layers are respected.
+				// 2. Interface-First / Story Barrier injection:
 				for _, depStoryID := range story.DependsOn {
-					if prerequisiteTasks, ok := storyTaskIDs[depStoryID]; ok {
+					contracts, hasContracts := storyContractTaskIDs[depStoryID]; 
+					if hasContracts && len(contracts) > 0 {
+						// INTERFACE-FIRST: This story only waits for the CONTRACT tasks of the prerequisite story.
+						deps = append(deps, contracts...)
+					} else if prerequisiteTasks, ok := storyTaskIDs[depStoryID]; ok {
+						// FALLBACK: Wait for all tasks (Story Barrier) if no explicit contract task identified.
 						deps = append(deps, prerequisiteTasks...)
 					}
 				}

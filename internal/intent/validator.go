@@ -373,6 +373,26 @@ func (v *Validator) validateConstraints(result *ValidationResult) {
 		})
 	}
 
+	// Mandatory: Data Source Mapping check
+	dataKeywords := []string{"data source", "source of truth", "database", "supabase", "postgres", "storage", "api", "external service"}
+	hasDataSource := false
+	for _, k := range dataKeywords {
+		if strings.Contains(contentLower, k) {
+			hasDataSource = true
+			break
+		}
+	}
+
+	if !hasDataSource {
+		result.Critical = append(result.Critical, ValidationIssue{
+			Rule:     "data_source_missing",
+			Severity: SeverityCritical,
+			Message:  "Data source mapping / source of truth not defined",
+			Hint:     "Define where your data lives (e.g., 'Users stored in Supabase Auth', 'Logs in local SQLite')",
+			Section:  "Requirements",
+		})
+	}
+
 	if len(section.Items) == 0 {
 		result.Critical = append(result.Critical, ValidationIssue{
 			Rule:     "constraints_content",
