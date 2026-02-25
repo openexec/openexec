@@ -46,6 +46,15 @@ type ReleaseGitInfo struct {
 	HeadCommit  string `json:"head_commit,omitempty"`   // Latest commit on release branch
 }
 
+// Goal represents a high-level project objective.
+type Goal struct {
+	ID                 string `json:"id"`
+	Title              string `json:"title,omitempty"`
+	Description        string `json:"description"`
+	SuccessCriteria    string `json:"success_criteria"`
+	VerificationMethod string `json:"verification_method,omitempty"`
+}
+
 // Story represents a user story with git and approval tracking.
 type Story struct {
 	// Core fields

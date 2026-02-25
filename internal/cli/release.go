@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 
 	"github.com/spf13/cobra"
@@ -822,6 +823,7 @@ Examples:
 
 		var sf struct {
 			SchemaVersion string           `json:"schema_version"`
+			Goals         []release.Goal   `json:"goals"`
 			Stories       []GeneratedStory `json:"stories"`
 		}
 
@@ -839,8 +841,8 @@ Examples:
 		// Version validation
 		if sf.SchemaVersion == "" {
 			fmt.Println("Warning: missing schema_version in stories file")
-		} else if sf.SchemaVersion != "1.0" && sf.SchemaVersion != "legacy" {
-			return fmt.Errorf("unsupported stories schema version: %s (expected 1.0)", sf.SchemaVersion)
+		} else if sf.SchemaVersion != "1.0" && sf.SchemaVersion != "1.1" && sf.SchemaVersion != "legacy" {
+			return fmt.Errorf("unsupported stories schema version: %s (expected 1.0 or 1.1)", sf.SchemaVersion)
 		}
 
 		stories := sf.Stories
@@ -850,10 +852,39 @@ Examples:
 			return nil
 		}
 
-		if dryRun {
-			fmt.Printf("Would import %d stories:\n\n", len(stories))
+		// PLANNING GATE: Enforce goal coverage and verifiability
+		if len(sf.Goals) > 0 {
+			fmt.Println("Running Planning Gate checks...")
+			goalStoryCount := make(map[string]int)
+			goalVerifyCount := make(map[string]int)
+
 			for _, s := range stories {
-				fmt.Printf("  %s: %s\n", s.ID, s.Title)
+				if s.GoalID != "" {
+					goalStoryCount[s.GoalID]++
+					if s.VerificationScript != "" {
+						goalVerifyCount[s.GoalID]++
+					}
+				}
+			}
+
+			for _, g := range sf.Goals {
+				if goalStoryCount[g.ID] == 0 {
+					return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no supporting stories", g.ID, g.Title)
+				}
+				if goalVerifyCount[g.ID] == 0 {
+					return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script", g.ID, g.Title)
+				}
+			}
+			fmt.Println("✓ Planning Gate passed.")
+		}
+
+		if dryRun {
+			fmt.Printf("Would import %d goals and %d stories:\n\n", len(sf.Goals), len(stories))
+			for _, g := range sf.Goals {
+				fmt.Printf("  Goal %s: %s\n", g.ID, g.Description)
+			}
+			for _, s := range stories {
+				fmt.Printf("  %s [%s]: %s\n", s.ID, s.GoalID, s.Title)
 				for _, t := range s.Tasks {
 					id := t.ID
 					if id == "" {
@@ -869,6 +900,21 @@ Examples:
 		mgr, err := getReleaseManager(cmd)
 		if err != nil {
 			return err
+		}
+
+		// Import goals
+		goalsCreated := 0
+		for _, g := range sf.Goals {
+			existing := mgr.GetGoal(g.ID)
+			if existing == nil {
+				// We need a copy to pass by pointer
+				newGoal := g
+				if err := mgr.CreateGoal(&newGoal); err != nil {
+					fmt.Printf("  [error] %s: %v\n", g.ID, err)
+					continue
+				}
+				goalsCreated++
+			}
 		}
 
 		// Track counts
@@ -1301,6 +1347,8 @@ Examples:
 		if err != nil {
 			return err
 		}
+		
+		execute, _ := cmd.Flags().GetBool("execute")
 
 		stories := mgr.GetStories()
 		goalMap := make(map[string][]*release.Story)
@@ -1317,12 +1365,7 @@ Examples:
 			goalID := args[0]
 			if targetStories, ok := goalMap[goalID]; ok {
 				fmt.Printf("Goal %s:\n", goalID)
-				for _, s := range targetStories {
-					fmt.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
-					if s.VerificationScript != "" {
-						fmt.Printf("    Verification: %s\n", s.VerificationScript)
-					}
-				}
+				verifyStories(targetStories, execute)
 			} else {
 				fmt.Printf("Goal %s not found or has no supporting stories.\n", goalID)
 			}
@@ -1333,15 +1376,11 @@ Examples:
 			}
 			for goalID, targetStories := range goalMap {
 				fmt.Printf("\nGoal %s [%d stories]:\n", goalID, len(targetStories))
-				allDone := true
-				for _, s := range targetStories {
-					fmt.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
-					if s.Status != "done" && s.Status != "completed" && s.Status != "approved" {
-						allDone = false
-					}
-				}
-				if allDone {
+				allDone := verifyStories(targetStories, execute)
+				if allDone && !execute {
 					fmt.Printf("  ✨ Goal %s is implementations-complete.\n", goalID)
+				} else if allDone && execute {
+					fmt.Printf("  ✨ Goal %s PASSES all verification scripts.\n", goalID)
 				}
 			}
 		}
@@ -1350,12 +1389,42 @@ Examples:
 	},
 }
 
+func verifyStories(stories []*release.Story, execute bool) bool {
+	allDone := true
+	for _, s := range stories {
+		fmt.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
+		
+		if s.Status != "done" && s.Status != "completed" && s.Status != "approved" {
+			allDone = false
+		}
+		
+		if s.VerificationScript != "" {
+			fmt.Printf("    Verification: %s\n", s.VerificationScript)
+			if execute {
+				fmt.Printf("    Running verification...\n")
+				verifyCmd := exec.Command("bash", "-c", s.VerificationScript)
+				output, err := verifyCmd.CombinedOutput()
+				if err != nil {
+					fmt.Printf("    ✗ FAILED:\n%s\n", string(output))
+					allDone = false
+				} else {
+					fmt.Printf("    ✓ PASSED\n")
+				}
+			}
+		} else if execute {
+			fmt.Printf("    ⚠ No verification script provided. Skipping execution.\n")
+		}
+	}
+	return allDone
+}
+
 func init() {
 	rootCmd.AddCommand(releaseCmd)
 
 	// Goal subcommands
 	rootCmd.AddCommand(goalCmd)
 	goalCmd.AddCommand(goalVerifyCmd)
+	goalVerifyCmd.Flags().Bool("execute", false, "Execute verification scripts locally")
 
 	// Release subcommands
 	releaseCmd.AddCommand(releaseCreateCmd)

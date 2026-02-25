@@ -21,6 +21,7 @@ type Manager struct {
 
 	// Cached data
 	release *Release
+	goals   map[string]*Goal
 	stories map[string]*Story
 	tasks   map[string]*Task
 }
@@ -68,6 +69,7 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 	m := &Manager{
 		baseDir: baseDir,
 		config:  cfg,
+		goals:   make(map[string]*Goal),
 		stories: make(map[string]*Story),
 		tasks:   make(map[string]*Task),
 	}
@@ -119,15 +121,29 @@ func (m *Manager) Load() error {
 		}
 	}
 
-	// Load stories
+	// Load stories and goals
 	storiesPath := filepath.Join(openexecDir, "stories.json")
 	if data, err := os.ReadFile(storiesPath); err == nil {
-		var storiesData struct {
-			Stories []Story `json:"stories"`
+		var sf struct {
+			SchemaVersion string  `json:"schema_version"`
+			Goals         []Goal  `json:"goals"`
+			Stories       []Story `json:"stories"`
 		}
-		if err := json.Unmarshal(data, &storiesData); err == nil {
-			for i := range storiesData.Stories {
-				m.stories[storiesData.Stories[i].ID] = &storiesData.Stories[i]
+
+		if err := json.Unmarshal(data, &sf); err == nil {
+			for i := range sf.Goals {
+				m.goals[sf.Goals[i].ID] = &sf.Goals[i]
+			}
+			for i := range sf.Stories {
+				m.stories[sf.Stories[i].ID] = &sf.Stories[i]
+			}
+		} else {
+			// Fallback for legacy format
+			var bareStories []Story
+			if errArray := json.Unmarshal(data, &bareStories); errArray == nil {
+				for i := range bareStories {
+					m.stories[bareStories[i].ID] = &bareStories[i]
+				}
 			}
 		}
 	}
@@ -170,16 +186,28 @@ func (m *Manager) Save() error {
 		}
 	}
 
-	// Save stories
+	// Save stories and goals
 	storiesPath := filepath.Join(openexecDir, "stories.json")
 	storiesList := make([]Story, 0, len(m.stories))
 	for _, s := range m.stories {
 		storiesList = append(storiesList, *s)
 	}
-	storiesData := struct {
-		Stories []Story `json:"stories"`
-	}{Stories: storiesList}
-	data, err := json.MarshalIndent(storiesData, "", "  ")
+	goalsList := make([]Goal, 0, len(m.goals))
+	for _, g := range m.goals {
+		goalsList = append(goalsList, *g)
+	}
+
+	sf := struct {
+		SchemaVersion string  `json:"schema_version"`
+		Goals         []Goal  `json:"goals"`
+		Stories       []Story `json:"stories"`
+	}{
+		SchemaVersion: "1.1",
+		Goals:         goalsList,
+		Stories:       storiesList,
+	}
+
+	data, err := json.MarshalIndent(sf, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -256,6 +284,34 @@ func (m *Manager) CreateRelease(name, version, description string) (*Release, er
 
 	m.release = release
 	return release, m.saveUnlocked()
+}
+
+// GetGoal returns a goal by ID.
+func (m *Manager) GetGoal(id string) *Goal {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.goals[id]
+}
+
+// GetGoals returns all goals.
+func (m *Manager) GetGoals() []*Goal {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	goals := make([]*Goal, 0, len(m.goals))
+	for _, g := range m.goals {
+		goals = append(goals, g)
+	}
+	return goals
+}
+
+// CreateGoal creates a new goal.
+func (m *Manager) CreateGoal(goal *Goal) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.goals[goal.ID] = goal
+	return m.saveUnlocked()
 }
 
 // GetStory returns a story by ID.
@@ -657,16 +713,28 @@ func (m *Manager) saveUnlocked() error {
 		}
 	}
 
-	// Save stories
+	// Save stories and goals
 	storiesPath := filepath.Join(openexecDir, "stories.json")
 	storiesList := make([]Story, 0, len(m.stories))
 	for _, s := range m.stories {
 		storiesList = append(storiesList, *s)
 	}
-	storiesData := struct {
-		Stories []Story `json:"stories"`
-	}{Stories: storiesList}
-	data, err := json.MarshalIndent(storiesData, "", "  ")
+	goalsList := make([]Goal, 0, len(m.goals))
+	for _, g := range m.goals {
+		goalsList = append(goalsList, *g)
+	}
+
+	sf := struct {
+		SchemaVersion string  `json:"schema_version"`
+		Goals         []Goal  `json:"goals"`
+		Stories       []Story `json:"stories"`
+	}{
+		SchemaVersion: "1.1",
+		Goals:         goalsList,
+		Stories:       storiesList,
+	}
+
+	data, err := json.MarshalIndent(sf, "", "  ")
 	if err != nil {
 		return err
 	}
