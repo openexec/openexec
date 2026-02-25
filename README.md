@@ -31,12 +31,13 @@
 Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in a structured pipeline. It doesn't just write code; it **plans, reviews, executes, and validates** every change through a recursive autonomous loop.
 
 ### Why OpenExec?
-*   **Structured Planning:** High-level goals are decomposed into hierarchical Goal Trees and User Stories.
-*   **Constraint-First:** A guided interview process (Wizard) pins down platform, shape, and contracts before a single line of code is written.
-*   **Dependency-Aware Parallel Execution:** Tasks are automatically scheduled using a DAG (Directed Acyclic Graph) to run independent work in parallel while respecting prerequisites.
+*   **Structural Derivation:** Move beyond "generative guessing." OpenExec derives technical tasks from Measurable Goals and Interface Contracts.
+*   **Goal-Based Validation:** Every story is linked to a primary project goal. Implementation success is measured by executable verification scripts tied directly to these goals.
+*   **Constraint-First:** A guided interview process (Wizard) pins down platform, shape, data source mapping, and contracts before a single line of code is written.
+*   **Interface-First Parallelism:** Tasks are automatically scheduled using an enhanced DAG. Dependent stories unlock as soon as their prerequisite's **Interface Contract** is defined, enabling maximum parallel performance.
 *   **Headless Execution:** Agents run in a non-interactive daemon mode, managed by a Go-based execution engine.
 *   **Senior Architect Reviews:** Built-in multi-iteration self-review cycles ensure implementation readiness.
-*   **Quality Gates:** Automated pre-flight checks and post-task validation (lint, test, build) act as permanent guardrails.
+*   **Autonomous Verification Gates:** The engine automatically executes local verification scripts after every task to ensure the "Definition of Done" is met.
 
 ## How It Works
 
@@ -45,20 +46,20 @@ Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in
 │   INTENT    │────▶│   PLANNING   │────▶│    TASKS    │
 │  (PRD/Spec) │     │ (Goal Tree)  │     │  (stories)  │
 └─────────────┘     └──────────────┘     └──────┬──────┘
-                                                │
-                    ┌───────────────────────────┘
-                    ▼
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  EXECUTION  │────▶│   QUALITY    │────▶│   REVIEW    │
-│ (AI Agent)  │     │   GATES      │     │  (optional) │
-└─────────────┘     └──────────────┘     └──────┬──────┘
-                                                │
-                    ┌───────────────────────────┘
-                    ▼
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   HITL      │────▶│    MERGE     │────▶│    DONE     │
-│ (approval)  │     │  (optional)  │     │             │
-└─────────────┘     └──────────────┘     └─────────────┘
+       ▲                   │                    │
+       │            ┌──────▼──────┐             │
+       └────────────┤    GOALS    │◀────────────┘
+                    └──────┬──────┘
+                           │
+                    ┌──────▼───────┐     ┌─────────────┐
+                    │  EXECUTION   │────▶│   QUALITY    │
+                    │ (AI Agent)   │     │   GATES      │
+                    └──────┬───────┘     └──────┬──────┘
+                           │                    │
+                    ┌──────▼───────┐     ┌──────▼──────┐
+                    │   HITL       │────▶│    VERIFY    │
+                    │ (approval)   │     │ (Goal-Based) │
+                    └──────────────┘     └──────────────┘
 ```
 
 ---
@@ -121,6 +122,8 @@ Follow these steps to transform an idea into a verified project:
     The agents begin implementing your tasks (concurrently by default), signaling completion via `axon_signal`.
 7.  **Monitor (`openexec status` or `openexec tui`)**
     Watch the real-time progress and logs through the terminal dashboard.
+8.  **Verify Goals (`openexec goal verify --execute`)**
+    Run the high-level verification scripts to prove that the project's primary goals have been met.
 
 ---
 
