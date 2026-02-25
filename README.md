@@ -39,6 +39,7 @@ openexec daemon start
 
 ## Features
 
+- **Guided Intent Interview** — Interactive chat-based project onboarding to pin constraints early
 - **Multi-Agent Support** — Use Claude, Codex, Gemini, or local models via Ollama
 - **Quality Gates** — Automated linting, type checking, testing, and security scans
 - **Human-in-the-Loop** — Telegram/WhatsApp approvals for critical operations
@@ -87,7 +88,10 @@ go install github.com/opencode-ai/opencode@latest  # OpenCode (local)
 ```bash
 cd your-project
 
-# Interactive setup (recommended)
+# Guided interactive setup (recommended)
+openexec wizard
+
+# Or classic interactive setup
 openexec onboard
 
 # Or quick setup with defaults
@@ -97,14 +101,17 @@ openexec onboard --quickstart
 ### Run Tasks
 
 ```bash
-# Run a specific task
-openexec run T-001
+# Generate a plan (if you used 'onboard' instead of 'wizard')
+openexec plan INTENT.md
 
-# Run all pending tasks
-openexec daemon start
+# Import generated tasks
+openexec story import
 
-# Check status
-openexec status
+# Start the execution daemon
+openexec start --daemon
+
+# Execute tasks
+openexec run
 ```
 
 ## How It Works
@@ -305,13 +312,15 @@ daemon:
 
 | Command | Description |
 |---------|-------------|
-| `openexec onboard` | Interactive project setup |
-| `openexec run <task>` | Execute a specific task |
-| `openexec daemon start` | Start background task processor |
-| `openexec status` | Show task status |
-| `openexec gates` | Run quality gates |
+| `openexec wizard` | Guided, interactive project intent gathering (Recommended) |
+| `openexec onboard` | Classic interactive project setup |
+| `openexec plan <file>` | Generate stories and tasks from INTENT.md |
+| `openexec story import` | Import generated stories/tasks into tracker |
+| `openexec start --daemon` | Start the background execution engine |
+| `openexec run [task]` | Execute pending tasks |
+| `openexec status` | Show project and task status |
+| `openexec stop` | Stop the execution daemon |
 | `openexec config show` | Display configuration |
-| `openexec agents --all` | List available agents |
 
 ## Documentation
 
