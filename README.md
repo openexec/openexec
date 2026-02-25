@@ -88,30 +88,34 @@ go install github.com/opencode-ai/opencode@latest  # OpenCode (local)
 ```bash
 cd your-project
 
-# Guided interactive setup (recommended)
+# 1. Guided interactive setup (Recommended)
+# This will interview you and create INTENT.md
 openexec wizard
 
-# Or classic interactive setup
+# OR classic interactive setup (if you already have INTENT.md)
 openexec onboard
-
-# Or quick setup with defaults
-openexec onboard --quickstart
 ```
 
-### Run Tasks
+### Execution Flow
+
+Follow these steps in order to process your project:
 
 ```bash
-# Generate a plan (if you used 'onboard' instead of 'wizard')
+# 2. Generate a plan from your INTENT.md
+# (Required if you didn't use 'wizard')
 openexec plan INTENT.md
 
-# Import generated tasks
+# 3. Import generated tasks into the tracking system
 openexec story import
 
-# Start the execution daemon
+# 4. Start the background execution engine (Daemon)
 openexec start --daemon
 
-# Execute tasks
+# 5. Execute pending tasks
 openexec run
+
+# 6. Check progress and status
+openexec status
 ```
 
 ## How It Works
