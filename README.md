@@ -5,110 +5,37 @@
 <h1 align="center">OpenExec</h1>
 
 <p align="center">
-  <strong>AI-Powered Task Orchestration for Software Development</strong>
+  <strong>From Intent to Production: Managed Autonomous Development</strong>
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#supported-agents">Agents</a> •
-  <a href="#documentation">Docs</a> •
+  <a href="#what-is-openexec">Overview</a> •
+  <a href="#how-to-start">Quick Start</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#the-workflow">Workflow</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
-  <img src="https://img.shields.io/badge/go-1.23+-00ADD8.svg" alt="Go"/>
-  <img src="https://img.shields.io/badge/node-20+-339933.svg" alt="Node"/>
+  <img src="https://img.shields.io/badge/status-active-success.svg" alt="Status"/>
+  <img src="https://img.shields.io/badge/platform-cross--platform-informational.svg" alt="Platform"/>
 </p>
 
 ---
 
-**OpenExec** transforms how you build software with AI. Define your intent, and let AI agents write, test, and ship production-ready code — with built-in quality gates, human approvals, and full audit trails.
+## What is OpenExec?
 
-```bash
-# Initialize a new project
-openexec onboard
+**OpenExec** is a task orchestration framework designed to close the gap between human high-level intent and verified, production-ready code.
 
-# Run a task
-openexec run T-001
+Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in a structured pipeline. It doesn't just write code; it **plans, reviews, executes, and validates** every change through a recursive autonomous loop.
 
-# Or let the daemon handle everything
-openexec daemon start
-```
-
-## Features
-
-- **Guided Intent Interview** — Interactive chat-based project onboarding to pin constraints early
-- **Multi-Agent Support** — Use Claude, Codex, Gemini, or local models via Ollama
-- **Quality Gates** — Automated linting, type checking, testing, and security scans
-- **Human-in-the-Loop** — Telegram/WhatsApp approvals for critical operations
-- **Auto-Fix** — Automatically generates fix tasks when quality gates fail
-- **Full Audit Trail** — Every action logged for compliance and debugging
-- **Multi-Project** — Orchestrate multiple repositories from a single daemon
-- **Language Agnostic** — Works with Python, Go, TypeScript, Rust, and more
-
-## Supported AI Agents
-
-| Agent | CLI | Provider | Models | Best For |
-|-------|-----|----------|--------|----------|
-| **Claude Code** | `claude` | Anthropic | sonnet, opus | Complex reasoning, large codebases |
-| **Codex** | `codex` | OpenAI | gpt-4.1, gpt-5 | Code completion, refactoring |
-| **Gemini** | `gemini` | Google | 3.1-pro-preview, 3.1-flash-preview | Multi-modal, fast iteration |
-| **OpenCode** | `opencode` | Ollama | Any local model | Privacy, offline, cost-free |
-
-## Quick Start
-
-### Installation
-
-```bash
-# Clone the CLI repository
-git clone https://github.com/openexec/openexec-cli.git
-cd openexec-cli
-
-# Build and install the CLI
-go build -o bin/openexec .
-
-# (Optional) Add to your PATH
-# sudo mv bin/openexec /usr/local/bin/
-```
-
-### Install an AI Agent
-
-```bash
-# Pick one (or more)
-npm install -g @anthropic-ai/claude-code   # Claude Code
-npm install -g @openai/codex               # Codex
-npm install -g @google/gemini-cli          # Gemini
-go install github.com/opencode-ai/opencode@latest  # OpenCode (local)
-```
-
-### Execution Flow
-
-Follow these steps in order to process your project:
-
-```bash
-# 1. Initialize your project (Setup config and choose models)
-openexec onboard
-
-# 2. Guided interactive interview (Uses configured model to create INTENT.md)
-openexec wizard
-
-# 3. Generate a plan from your INTENT.md
-openexec plan INTENT.md
-
-# 4. Import generated tasks into the tracking system
-openexec story import
-
-# 5. Start the background execution engine (Daemon)
-openexec start --daemon
-
-# 6. Execute pending tasks
-openexec run
-
-# 7. Check progress and status
-openexec status
-```
+### Why OpenExec?
+*   **Structured Planning:** High-level goals are decomposed into hierarchical Goal Trees and User Stories.
+*   **Constraint-First:** A guided interview process (Wizard) pins down platform, shape, and contracts before a single line of code is written.
+*   **Headless Execution:** Agents run in a non-interactive daemon mode, managed by a Go-based execution engine.
+*   **Senior Architect Reviews:** Built-in multi-iteration self-review cycles ensure implementation readiness.
+*   **Quality Gates:** Automated pre-flight checks and post-task validation (lint, test, build) act as permanent guardrails.
 
 ## How It Works
 
@@ -133,218 +60,94 @@ openexec status
 └─────────────┘     └──────────────┘     └─────────────┘
 ```
 
-## Configuration
+---
 
-Create `openexec.yaml` in your project root:
+## GitFlow Integration & Traceability
 
-```yaml
-project:
-  name: my-project
+OpenExec enforces a strict GitFlow architecture to ensure every code change is traceable back to its original requirement.
 
-agents:
-  default: claude
-  claude:
-    model: sonnet
-    timeout: 600
-  codex:
-    model: gpt-5
-    timeout: 600
+1.  **Release Mapping:** An `INTENT.md` represents a high-level release (e.g., `v1.0.0`). OpenExec creates a **Release Branch** (`release/1.0.0`) from your base branch (`main` or `develop`).
+2.  **Story Branches:** Each user story (e.g., `US-001`) is isolated in its own **Feature Branch** (`feature/US-001`), branched from the active Release Branch.
+3.  **Task Commits:** Every technical task (e.g., `T-001`) results in a dedicated **Commit**. If multiple iterations (fixes) are required to pass quality gates, each fix is its own commit, providing a full audit trail of the agent's reasoning.
+4.  **Auto-Merge Cascade:** When all tasks for a story are complete and approved, OpenExec automatically merges the Feature Branch into the Release Branch.
+5.  **Release Finalization:** Once all stories are merged, the Release Branch is merged back into the base branch (`main`), tagged (e.g., `v1.0.0`), and ready for deployment.
 
-review:
-  review_agent: codex    # Different agent for code review
-  require_review: true
+---
 
-quality:
-  gates:
-    - lint
-    - typecheck
-    - test
+## Architecture
 
-execution:
-  auto_fix: true         # Auto-generate fix tasks on failure
-  max_fix_iterations: 3
-```
+OpenExec is a modular system distributed across specialized repositories:
 
-Or configure interactively:
+| Module | Repository | Role | Language |
+| :--- | :--- | :--- | :--- |
+| **CLI** | [`openexec-cli`](../openexec-cli) | The user interface & TUI dashboard. | Go |
+| **Orchestrator** | [`openexec-orchestration`](../openexec-orchestration) | The "Brain" - handles planning & the Wizard. | Python |
+| **Execution** | [`openexec-execution`](../openexec-execution) | The "Body" - manages autonomous agent loops. | Go |
+| **Signal Server** | [`axon`](../axon) | MCP server allowing agents to communicate status. | Go |
+
+---
+
+## How to Start
+
+### 1. Installation
+The quickest way to get started is using the unified install script:
 
 ```bash
-openexec config set agents.default codex
-openexec config set review.review_agent claude
-openexec config show
+git clone https://github.com/openexec/openexec-cli.git
+# ... clone other repos as needed
+cd openexec-cli
+./scripts/install.sh
 ```
 
-## Quality Gates by Language
+### 2. The Execution Flow
+Follow these steps to transform an idea into a verified project:
 
-<details>
-<summary><strong>Python</strong></summary>
+1.  **Initialize (`openexec init`)**
+    Set up your project configuration and select your preferred AI models (Claude, Codex, Gemini).
+2.  **Guided Interview (`openexec wizard`)**
+    Chat with the AI Architect to define your project shape, platform, and integration contracts. It generates a verified `INTENT.md`.
+3.  **Plan (`openexec plan INTENT.md`)**
+    OpenExec decomposes your intent into a structured set of technical stories and tasks.
+4.  **Import (`openexec story import`)**
+    Synchronize the AI-generated plan into the local SQLite tracking system.
+5.  **Start Daemon (`openexec start --daemon`)**
+    Launch the background engine that manages the autonomous agents.
+6.  **Run (`openexec run`)**
+    The agents begin implementing your tasks one by one, signaling completion via `axon_signal`.
+7.  **Monitor (`openexec status` or `openexec tui`)**
+    Watch the real-time progress and logs through the terminal dashboard.
 
-```yaml
-quality:
-  gates: [lint, typecheck, test]
-  custom:
-    - name: lint
-      command: "ruff check src/"
-    - name: typecheck
-      command: "mypy src/"
-    - name: test
-      command: "pytest --cov=src"
-```
-</details>
+---
 
-<details>
-<summary><strong>Go</strong></summary>
+## The Managed Loop
 
-```yaml
-quality:
-  gates: [go_fmt, go_lint, go_test, go_sec]
-  custom:
-    - name: go_fmt
-      command: "go fmt ./... && git diff --exit-code -- '*.go'"
-    - name: go_lint
-      command: "golangci-lint run ./..."
-    - name: go_test
-      command: "go test -v -race ./..."
-    - name: go_sec
-      command: "gosec ./..."
-```
-</details>
+OpenExec operates on a **recursive autonomous loop**:
 
-<details>
-<summary><strong>TypeScript / JavaScript</strong></summary>
+1.  **Context Construction:** The engine builds a rich prompt containing the task, relevant files, and system constraints.
+2.  **Autonomous Action:** The agent (e.g., Claude Code) implements changes locally.
+3.  **Verification:** The agent runs local tests or uses quality gates to verify the fix.
+4.  **Signaling:** When complete, the agent uses the **Axon tool** to signal `phase-complete`.
+5.  **Review:** An independent reviewer agent validates the work against the original acceptance criteria.
 
-```yaml
-quality:
-  gates: [lint, typecheck, test, audit]
-  custom:
-    - name: lint
-      command: "npm run lint"
-    - name: typecheck
-      command: "npm run type-check"
-    - name: test
-      command: "npm test"
-    - name: audit
-      command: "npm audit --omit=dev"
-```
-</details>
+---
 
-<details>
-<summary><strong>Rust</strong></summary>
+## Multi-Agent Support
 
-```yaml
-quality:
-  gates: [fmt, clippy, test]
-  custom:
-    - name: fmt
-      command: "cargo fmt --check"
-    - name: clippy
-      command: "cargo clippy -- -D warnings"
-    - name: test
-      command: "cargo test"
-```
-</details>
+| Agent | Best For |
+| :--- | :--- |
+| **Claude Code** | Complex reasoning, large refactors, and architectural changes. |
+| **Codex** | High-speed code completion and standard REST API implementation. |
+| **Gemini** | Fast iteration and large-context codebase analysis. |
 
-## Project Structure
-
-```
-openexec/
-├── initial/                 # Core Python CLI (pip install)
-├── openexec-cli/            # Go CLI with TUI dashboard
-├── openexec-execution/      # Go execution engine
-├── openexec-interface/      # Telegram/WhatsApp HITL
-├── openexec-orchestration/  # Planning & Goal Tree
-└── openexec-web/            # Next.js dashboard
-```
-
-## Environment Variables
-
-```bash
-# Agent selection
-export OPENEXEC_DEFAULT_AGENT=claude
-export OPENEXEC_AGENT_CLAUDE_MODEL=opus
-export OPENEXEC_REVIEW_AGENT=codex
-
-# Execution
-export OPENEXEC_EXECUTION_TIMEOUT=900
-export OPENEXEC_EXECUTION_AUTO_FIX=true
-
-# Daemon
-export OPENEXEC_DAEMON_MAX_PARALLEL=4
-```
-
-See [Configuration Guide](docs/CONFIGURATION.md) for all options.
-
-## Human-in-the-Loop (HITL)
-
-Enable approval workflows via Telegram or WhatsApp:
-
-```yaml
-# .env
-TELEGRAM_BOT_TOKEN=your-bot-token
-TELEGRAM_WEBHOOK_SECRET=your-secret
-```
-
-Operators can approve, reject, or pause tasks directly from their phone.
-
-## Multi-Project Orchestration
-
-Manage multiple projects from a single daemon:
-
-```yaml
-project:
-  name: my-orchestrator
-  type: meta
-
-daemon:
-  multi_project: true
-  projects_path: "/path/to/projects"
-  project_filter:
-    - frontend
-    - backend
-    - shared-lib
-  max_parallel: 2
-```
-
-## CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `openexec config show` | Display configuration |
-| `openexec onboard` | Classic interactive project setup |
-| `openexec plan <file>` | Generate stories and tasks from INTENT.md |
-| `openexec run [task]` | Execute pending tasks |
-| `openexec start --daemon` | Start the background execution engine |
-| `openexec status` | Show project and task status |
-| `openexec stop` | Stop the execution daemon |
-| `openexec story import` | Import generated stories/tasks into tracker |
-| `openexec wizard` | Guided, interactive project intent gathering (Recommended) |
-
-## Documentation
-
-- [Configuration Guide](docs/CONFIGURATION.md) — All settings and options
-- [INTENT.md](INTENT.md) — Project vision and goals
+---
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-```bash
-# Clone the repo
-git clone https://github.com/openexec/openexec-cli.git
-cd openexec-cli
-
-# Build with development flags
-go build -v .
-
-# Run tests
-go test ./...
-```
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
+We welcome engineers, architects, and AI enthusiasts to help evolve the orchestration plane.
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
 <p align="center">
-  Built with AI, for AI-assisted development
+  Built with AI, for AI-assisted development.
 </p>
