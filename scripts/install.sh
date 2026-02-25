@@ -45,6 +45,9 @@ build_go() {
     echo "      Building openexec-engine (Daemon)..."
     go build -trimpath -ldflags="-s -w" -o bin/openexec-engine ./cmd/openexec-engine
     
+    echo "      Building openexec-interface (Gateway)..."
+    go build -trimpath -ldflags="-s -w" -o bin/openexec-interface ./cmd/openexec-interface
+    
     # Note: axon is now a subcommand of openexec, but we keep the binary for backwards compat if needed
     echo "      Building axon (Legacy)..."
     go build -trimpath -ldflags="-s -w" -o bin/axon ./cmd/axon

@@ -21,9 +21,7 @@ func newTestDB(t *testing.T) *sql.DB {
 func TestNewSQLiteStore(t *testing.T) {
 	t.Run("creates store with valid db", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, err := NewSQLiteStore(db)
 		if err != nil {
@@ -45,9 +43,7 @@ func TestNewSQLiteStore(t *testing.T) {
 func TestSQLiteStore_Create(t *testing.T) {
 	t.Run("creates user successfully", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, err := NewSQLiteStore(db)
 		if err != nil {
@@ -82,9 +78,7 @@ func TestSQLiteStore_Create(t *testing.T) {
 
 	t.Run("returns error for duplicate ID", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, err := NewSQLiteStore(db)
 		if err != nil {
@@ -104,9 +98,7 @@ func TestSQLiteStore_Create(t *testing.T) {
 
 	t.Run("returns error for duplicate TelegramID", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, err := NewSQLiteStore(db)
 		if err != nil {
@@ -125,9 +117,7 @@ func TestSQLiteStore_Create(t *testing.T) {
 
 	t.Run("returns error for invalid user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, err := NewSQLiteStore(db)
 		if err != nil {
@@ -145,9 +135,7 @@ func TestSQLiteStore_Create(t *testing.T) {
 func TestSQLiteStore_GetByID(t *testing.T) {
 	t.Run("retrieves existing user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 		user, _ := NewUser(12345, RoleExecutor)
@@ -165,9 +153,7 @@ func TestSQLiteStore_GetByID(t *testing.T) {
 
 	t.Run("returns ErrUserNotFound for non-existent user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 
@@ -181,9 +167,7 @@ func TestSQLiteStore_GetByID(t *testing.T) {
 func TestSQLiteStore_GetByTelegramID(t *testing.T) {
 	t.Run("retrieves user by telegram ID", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 		user, _ := NewUser(12345, RoleProvider)
@@ -200,9 +184,7 @@ func TestSQLiteStore_GetByTelegramID(t *testing.T) {
 
 	t.Run("returns ErrUserNotFound for non-existent telegram ID", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 
@@ -216,9 +198,7 @@ func TestSQLiteStore_GetByTelegramID(t *testing.T) {
 func TestSQLiteStore_Update(t *testing.T) {
 	t.Run("updates existing user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 		user, _ := NewUser(12345, RoleCustomer)
@@ -242,9 +222,7 @@ func TestSQLiteStore_Update(t *testing.T) {
 
 	t.Run("returns ErrUserNotFound for non-existent user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 		user := &User{ID: "non-existent", TelegramID: 12345, Role: RoleAdmin}
@@ -257,9 +235,7 @@ func TestSQLiteStore_Update(t *testing.T) {
 
 	t.Run("returns error for duplicate TelegramID", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 
@@ -278,9 +254,7 @@ func TestSQLiteStore_Update(t *testing.T) {
 
 	t.Run("returns error for invalid user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 		user, _ := NewUser(12345, RoleAdmin)
@@ -297,9 +271,7 @@ func TestSQLiteStore_Update(t *testing.T) {
 func TestSQLiteStore_Delete(t *testing.T) {
 	t.Run("deletes existing user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 		user, _ := NewUser(12345, RoleAdmin)
@@ -318,9 +290,7 @@ func TestSQLiteStore_Delete(t *testing.T) {
 
 	t.Run("returns ErrUserNotFound for non-existent user", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 
@@ -334,9 +304,7 @@ func TestSQLiteStore_Delete(t *testing.T) {
 func TestSQLiteStore_List(t *testing.T) {
 	t.Run("returns empty slice when no users", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 
@@ -354,9 +322,7 @@ func TestSQLiteStore_List(t *testing.T) {
 
 	t.Run("returns all users", func(t *testing.T) {
 		db := newTestDB(t)
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		store, _ := NewSQLiteStore(db)
 
@@ -384,9 +350,7 @@ func TestSQLiteStore_Persistence(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
-		defer func() {
-			_ = db.Close()
-		}()
+		defer db.Close()
 
 		// Create first store and add a user
 		store1, _ := NewSQLiteStore(db)

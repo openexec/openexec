@@ -188,9 +188,7 @@ func (s *SQLiteStore) List(ctx context.Context) ([]*User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
-	defer func() {
-		_ = rows.Close()
-	}()
+	defer func() { _ = rows.Close() }()
 
 	var users []*User
 	for rows.Next() {

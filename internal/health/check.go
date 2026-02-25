@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 )
@@ -181,92 +179,6 @@ func (c *Checker) UpdateCheck(name string, status Status, message string) {
 	}
 }
 
-// Common checks
-
-// CheckEnvVar creates a check for required environment variable.
-func CheckEnvVar(name string, critical bool) Check {
-	return Check{
-		Name:     fmt.Sprintf("env_%s", name),
-		Critical: critical,
-		Run: func(ctx context.Context) (Status, string, error) {
-			val := os.Getenv(name)
-			if val == "" {
-				if critical {
-					return StatusFailed, fmt.Sprintf("required env var %s not set", name), nil
-				}
-				return StatusDegraded, fmt.Sprintf("optional env var %s not set", name), nil
-			}
-			return StatusOK, fmt.Sprintf("%s is set", name), nil
-		},
-		Remediation: fmt.Sprintf("Set the %s environment variable", name),
-	}
-}
-
-// CheckDirectory creates a check for directory existence and write access.
-func CheckDirectory(path string, needWrite bool, critical bool) Check {
-	return Check{
-		Name:     fmt.Sprintf("dir_%s", filepath.Base(path)),
-		Critical: critical,
-		Run: func(ctx context.Context) (Status, string, error) {
-			info, err := os.Stat(path)
-			if os.IsNotExist(err) {
-				return StatusFailed, fmt.Sprintf("directory %s does not exist", path), nil
-			}
-			if err != nil {
-				return StatusFailed, fmt.Sprintf("cannot access %s: %v", path, err), nil
-			}
-			if !info.IsDir() {
-				return StatusFailed, fmt.Sprintf("%s is not a directory", path), nil
-			}
-
-			if needWrite {
-				// Test write access
-				testFile := filepath.Join(path, ".health_check_test")
-				f, err := os.Create(testFile)
-				if err != nil {
-					return StatusFailed, fmt.Sprintf("cannot write to %s: %v", path, err), nil
-				}
-				_ = f.Close()
-				_ = os.Remove(testFile)
-			}
-
-			return StatusOK, fmt.Sprintf("directory %s accessible", path), nil
-		},
-		Remediation: fmt.Sprintf("Ensure directory %s exists and is writable", path),
-	}
-}
-
-// CheckHTTPEndpoint creates a check for HTTP endpoint availability.
-func CheckHTTPEndpoint(name, url string, timeout time.Duration, critical bool) Check {
-	return Check{
-		Name:     fmt.Sprintf("http_%s", name),
-		Critical: critical,
-		Run: func(ctx context.Context) (Status, string, error) {
-			ctx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			if err != nil {
-				return StatusFailed, fmt.Sprintf("invalid URL %s: %v", url, err), nil
-			}
-
-			client := &http.Client{Timeout: timeout}
-			resp, err := client.Do(req)
-			if err != nil {
-				return StatusFailed, fmt.Sprintf("cannot reach %s: %v", url, err), nil
-			}
-			defer func() { _ = resp.Body.Close() }()
-
-			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-				return StatusOK, fmt.Sprintf("%s reachable (status %d)", name, resp.StatusCode), nil
-			}
-
-			return StatusDegraded, fmt.Sprintf("%s returned status %d", name, resp.StatusCode), nil
-		},
-		Remediation: fmt.Sprintf("Ensure %s is running and accessible at %s", name, url),
-	}
-}
-
 // HealthResponse is the JSON response for health endpoints.
 type HealthResponse struct {
 	Status  Status                 `json:"status"`
@@ -315,5 +227,36 @@ func (c *Checker) ReadyHandler() http.HandlerFunc {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"status":"not_ready"}`))
 		}
+	}
+}
+
+// CheckHTTPEndpoint creates a check for HTTP endpoint availability.
+func CheckHTTPEndpoint(name, url string, timeout time.Duration, critical bool) Check {
+	return Check{
+		Name:     fmt.Sprintf("http_%s", name),
+		Critical: critical,
+		Run: func(ctx context.Context) (Status, string, error) {
+			ctx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			if err != nil {
+				return StatusFailed, fmt.Sprintf("invalid URL %s: %v", url, err), nil
+			}
+
+			client := &http.Client{Timeout: timeout}
+			resp, err := client.Do(req)
+			if err != nil {
+				return StatusFailed, fmt.Sprintf("cannot reach %s: %v", url, err), nil
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				return StatusOK, fmt.Sprintf("%s reachable (status %d)", name, resp.StatusCode), nil
+			}
+
+			return StatusDegraded, fmt.Sprintf("%s returned status %d", name, resp.StatusCode), nil
+		},
+		Remediation: fmt.Sprintf("Ensure %s is running and accessible at %s", name, url),
 	}
 }
