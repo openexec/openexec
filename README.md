@@ -77,26 +77,28 @@ OpenExec enforces a strict GitFlow architecture to ensure every code change is t
 
 ## Architecture
 
-OpenExec is a modular system distributed across specialized repositories:
+OpenExec is now consolidated into two primary repositories for simplified management and atomic deployment:
 
 | Module | Repository | Role | Language |
 | :--- | :--- | :--- | :--- |
-| **CLI** | [`openexec-cli`](../openexec-cli) | The user interface & TUI dashboard. | Go |
-| **Orchestrator** | [`openexec-orchestration`](../openexec-orchestration) | The "Brain" - handles planning & the Wizard. | Python |
-| **Execution** | [`openexec-execution`](../openexec-execution) | The "Body" - manages autonomous agent loops. | Go |
-| **Signal Server** | [`axon`](../axon) | MCP server allowing agents to communicate status. | Go |
+| **OpenExec Core** | [`openexec`](../openexec) | The "Body" & "Interface" - contains CLI, Execution Engine, and MCP Signal Server. | Go |
+| **Orchestrator** | [`openexec-orchestration`](../openexec-orchestration) | The "Brain" - handles planning, dependency modeling, and the Wizard. | Python |
+
+### Key Components (Consolidated):
+*   **CLI (`openexec`):** Unified interface for project management, dashboards, and execution control.
+*   **Execution Engine (`openexec start`):** Subcommand that launches the autonomous task daemon.
+*   **MCP Server (`openexec mcp-serve`):** Built-in tool server that allows agents to communicate status directly to the core.
 
 ---
 
 ## How to Start
 
 ### 1. Installation
-The quickest way to get started is using the unified install script:
+The quickest way to get started is using the unified install script in the core repository:
 
 ```bash
-git clone https://github.com/openexec/openexec-cli.git
-# ... clone other repos as needed
-cd openexec-cli
+git clone https://github.com/openexec/openexec.git
+cd openexec
 ./scripts/install.sh
 ```
 

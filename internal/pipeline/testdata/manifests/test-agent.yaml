@@ -1,0 +1,11 @@
+name: test-agent
+description: "Minimal test agent for pipeline tests"
+title: "Test Agent"
+persona: test-agent
+
+workflows:
+  - id: technical-design
+  - id: implement
+  - id: review
+  - id: refactor
+  - id: feedback-loop

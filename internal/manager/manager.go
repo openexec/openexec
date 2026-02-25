@@ -1,0 +1,227 @@
+package manager
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/pipeline"
+)
+
+// PipelineStatus represents the lifecycle state of a managed pipeline.
+type PipelineStatus string
+
+const (
+	StatusStarting PipelineStatus = "starting"
+	StatusRunning  PipelineStatus = "running"
+	StatusPaused   PipelineStatus = "paused"
+	StatusComplete PipelineStatus = "complete"
+	StatusError    PipelineStatus = "error"
+	StatusStopped  PipelineStatus = "stopped"
+)
+
+// Config holds server-level configuration set once at startup.
+type Config struct {
+	WorkDir              string
+	TractStore           string
+	AgentsDir            string
+	Pipeline             *pipeline.PipelineDef                   // pipeline config (nil = default)
+	Phases               map[pipeline.Phase]pipeline.PhaseConfig // test override (nil = DefaultPhaseConfigs)
+	Order                []pipeline.Phase                        // test override (nil = DefaultPhaseOrder)
+	DefaultMaxIterations int
+	MaxRetries           int
+	MaxReviewCycles      int
+	ThrashThreshold      int
+	RetryBackoff         []time.Duration
+	CommandName          string                // test override
+	CommandArgs          []string              // test override
+	BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
+}
+
+// PipelineInfo is the external status snapshot of a managed pipeline.
+type PipelineInfo struct {
+	FWUID        string         `json:"fwu_id"`
+	Status       PipelineStatus `json:"status"`
+	Phase        string         `json:"phase,omitempty"`
+	Agent        string         `json:"agent,omitempty"`
+	Iteration    int            `json:"iteration,omitempty"`
+	ReviewCycles int            `json:"review_cycles,omitempty"`
+	StartedAt    time.Time      `json:"started_at"`
+	Elapsed      string         `json:"elapsed"`
+	Error        string         `json:"error,omitempty"`
+}
+
+type entry struct {
+	pipeline *pipeline.Pipeline
+	info     PipelineInfo
+	cancel   context.CancelFunc
+	subs     []chan loop.Event
+	subsMu   sync.Mutex
+}
+
+// Manager orchestrates multiple concurrent FWU pipelines.
+type Manager struct {
+	cfg       Config
+	pipelines map[string]*entry
+	mu        sync.RWMutex
+}
+
+// New creates a Manager with the given server-level config.
+func New(cfg Config) *Manager {
+	if cfg.DefaultMaxIterations == 0 {
+		cfg.DefaultMaxIterations = 10
+	}
+	if cfg.MaxRetries == 0 {
+		cfg.MaxRetries = 3
+	}
+	if cfg.MaxReviewCycles == 0 {
+		cfg.MaxReviewCycles = 3
+	}
+	if cfg.ThrashThreshold == 0 {
+		cfg.ThrashThreshold = 3
+	}
+	if cfg.RetryBackoff == nil {
+		cfg.RetryBackoff = []time.Duration{0, 5 * time.Second, 15 * time.Second}
+	}
+	return &Manager{
+		cfg:       cfg,
+		pipelines: make(map[string]*entry),
+	}
+}
+
+// isTerminal returns true if the status represents a finished pipeline.
+func isTerminal(s PipelineStatus) bool {
+	return s == StatusComplete || s == StatusError || s == StatusStopped
+}
+
+// Start launches a new pipeline for the given FWU ID.
+// Returns error if the pipeline is already active (non-terminal state).
+// Allows re-start after complete/error/stopped.
+func (m *Manager) Start(ctx context.Context, fwuID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if e, ok := m.pipelines[fwuID]; ok && !isTerminal(e.info.Status) {
+		return fmt.Errorf("pipeline %s already active (status: %s)", fwuID, e.info.Status)
+	}
+
+	pCfg := pipeline.Config{
+		FWUID:                fwuID,
+		WorkDir:              m.cfg.WorkDir,
+		TractStore:           m.cfg.TractStore,
+		AgentsDir:            m.cfg.AgentsDir,
+		Pipeline:             m.cfg.Pipeline,
+		Phases:               m.cfg.Phases,
+		Order:                m.cfg.Order,
+		DefaultMaxIterations: m.cfg.DefaultMaxIterations,
+		MaxRetries:           m.cfg.MaxRetries,
+		MaxReviewCycles:      m.cfg.MaxReviewCycles,
+		ThrashThreshold:      m.cfg.ThrashThreshold,
+		RetryBackoff:         m.cfg.RetryBackoff,
+		CommandName:          m.cfg.CommandName,
+		CommandArgs:          m.cfg.CommandArgs,
+		BriefingFunc:         m.cfg.BriefingFunc,
+	}
+
+	p, events := pipeline.New(pCfg)
+
+	pipeCtx, cancel := context.WithCancel(ctx)
+
+	e := &entry{
+		pipeline: p,
+		info: PipelineInfo{
+			FWUID:     fwuID,
+			Status:    StatusStarting,
+			StartedAt: time.Now(),
+		},
+		cancel: cancel,
+	}
+	m.pipelines[fwuID] = e
+
+	// Start event consumer before pipeline run.
+	go m.consumeEvents(fwuID, events)
+
+	// Run pipeline in background.
+	go func() {
+		err := p.Run(pipeCtx)
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if e, ok := m.pipelines[fwuID]; ok {
+			if err != nil && !isTerminal(e.info.Status) {
+				e.info.Status = StatusError
+				e.info.Error = err.Error()
+			}
+			// If status is still "starting" or "running" and no error,
+			// the pipeline finished via events (complete/paused/stopped) —
+			// consumeEvents will have set the status.
+		}
+	}()
+
+	return nil
+}
+
+// Stop terminates the pipeline for the given FWU ID.
+func (m *Manager) Stop(fwuID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	e, ok := m.pipelines[fwuID]
+	if !ok {
+		return fmt.Errorf("pipeline %s not found", fwuID)
+	}
+	if isTerminal(e.info.Status) {
+		return fmt.Errorf("pipeline %s already in terminal state: %s", fwuID, e.info.Status)
+	}
+
+	e.info.Status = StatusStopped
+	e.pipeline.Stop()
+	return nil
+}
+
+// Pause signals the pipeline for the given FWU ID to pause after the current iteration.
+func (m *Manager) Pause(fwuID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	e, ok := m.pipelines[fwuID]
+	if !ok {
+		return fmt.Errorf("pipeline %s not found", fwuID)
+	}
+	if isTerminal(e.info.Status) {
+		return fmt.Errorf("pipeline %s already in terminal state: %s", fwuID, e.info.Status)
+	}
+
+	e.pipeline.Pause()
+	return nil
+}
+
+// Status returns the current info snapshot for a pipeline.
+func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	e, ok := m.pipelines[fwuID]
+	if !ok {
+		return PipelineInfo{}, fmt.Errorf("pipeline %s not found", fwuID)
+	}
+
+	info := e.info
+	info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
+	return info, nil
+}
+
+// List returns info snapshots for all known pipelines.
+func (m *Manager) List() []PipelineInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make([]PipelineInfo, 0, len(m.pipelines))
+	for _, e := range m.pipelines {
+		info := e.info
+		info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
+		result = append(result, info)
+	}
+	return result
+}

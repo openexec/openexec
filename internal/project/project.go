@@ -1,0 +1,172 @@
+package project
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+// ProjectConfig holds project-specific configuration
+type ProjectConfig struct {
+	Name        string `json:"name"`
+	ProjectDir  string `json:"project_dir,omitempty"`
+	TractStore  string `json:"tract_store"`
+	EngramStore string `json:"engram_store"`
+	GitEnabled  bool   `json:"git_enabled,omitempty"`
+	BaseBranch  string `json:"base_branch,omitempty"`
+
+	// Execution settings
+	Execution ExecutionConfig `json:"execution,omitempty"`
+}
+
+// ExecutionConfig holds execution engine settings
+type ExecutionConfig struct {
+	// ExecutorModel is the model to use for task execution
+	ExecutorModel string `json:"executor_model,omitempty"`
+	// ReviewEnabled enables code review after task execution
+	ReviewEnabled bool `json:"review_enabled"`
+	// ReviewerModel is the model to use for code review
+	ReviewerModel string `json:"reviewer_model,omitempty"`
+	// MaxIterations is the maximum iterations per task
+	MaxIterations int `json:"max_iterations,omitempty"`
+	// Port is the execution engine port
+	Port int `json:"port,omitempty"`
+	// ParallelEnabled enables parallel task execution
+	ParallelEnabled bool `json:"parallel_enabled"`
+	// WorkerCount is the number of concurrent workers for parallel execution
+	WorkerCount int `json:"worker_count,omitempty"`
+}
+
+// Initialize initializes a new OpenExec project
+func Initialize(projectName string) (*ProjectConfig, error) {
+	// Get current working directory
+	projectDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine project directory: %w", err)
+	}
+
+	// Validate project name
+	if projectName == "" {
+		projectName = filepath.Base(projectDir)
+	}
+	if err := validateProjectName(projectName); err != nil {
+		return nil, err
+	}
+
+	// Create .openexec directory structure
+	openexecDir := filepath.Join(projectDir, ".openexec")
+	if err := os.MkdirAll(openexecDir, 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create .openexec directory: %w", err)
+	}
+
+	// Create engram subdirectory
+	engramDir := filepath.Join(openexecDir, "engram")
+	if err := os.MkdirAll(engramDir, 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create engram directory: %w", err)
+	}
+
+	// Create project config
+	config := &ProjectConfig{
+		Name:        projectName,
+		ProjectDir:  projectDir,
+		TractStore:  ".openexec",
+		EngramStore: ".openexec/engram",
+		GitEnabled:  true,
+		BaseBranch:  "main",
+	}
+
+	// Save config to file
+	if err := saveProjectConfig(openexecDir, config); err != nil {
+		return nil, fmt.Errorf("failed to save project configuration: %w", err)
+	}
+
+	return config, nil
+}
+
+// LoadProjectConfig loads the project configuration from .openexec directory
+func LoadProjectConfig(projectDir string) (*ProjectConfig, error) {
+	// Try .openexec first, then fall back to .uaos for backwards compatibility
+	openexecDir := filepath.Join(projectDir, ".openexec")
+	configFile := filepath.Join(openexecDir, "config.json")
+
+	// Check .openexec/config.json
+	if _, err := os.Stat(configFile); err != nil {
+		// Try legacy .uaos/project.json
+		uaosDir := filepath.Join(projectDir, ".uaos")
+		legacyConfig := filepath.Join(uaosDir, "project.json")
+		if _, err := os.Stat(legacyConfig); err == nil {
+			configFile = legacyConfig
+		} else {
+			return nil, fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+	}
+
+	// Load configuration from file
+	config, err := loadProjectConfigFromFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	config.ProjectDir = projectDir
+	return config, nil
+}
+
+// validateProjectName validates the project name
+func validateProjectName(name string) error {
+	if name == "" {
+		return fmt.Errorf("project name cannot be empty")
+	}
+	if len(name) > 255 {
+		return fmt.Errorf("project name too long (max 255 characters)")
+	}
+	// Allow alphanumeric, hyphens, underscores
+	for _, r := range name {
+		isLower := r >= 'a' && r <= 'z'
+		isUpper := r >= 'A' && r <= 'Z'
+		isDigit := r >= '0' && r <= '9'
+		isHyphen := r == '-'
+		isUnderscore := r == '_'
+
+		if !isLower && !isUpper && !isDigit && !isHyphen && !isUnderscore {
+			return fmt.Errorf("project name contains invalid characters: only alphanumeric, hyphens, and underscores allowed")
+		}
+	}
+	return nil
+}
+
+// saveProjectConfig saves the project configuration to a JSON file (internal)
+func saveProjectConfig(openexecDir string, config *ProjectConfig) error {
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	configFile := filepath.Join(openexecDir, "config.json")
+	if err := os.WriteFile(configFile, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write project config: %w", err)
+	}
+
+	return nil
+}
+
+// SaveProjectConfig saves the project configuration (public)
+func SaveProjectConfig(config *ProjectConfig) error {
+	openexecDir := filepath.Join(config.ProjectDir, ".openexec")
+	return saveProjectConfig(openexecDir, config)
+}
+
+// loadProjectConfigFromFile loads the project configuration from a JSON file
+func loadProjectConfigFromFile(configFile string) (*ProjectConfig, error) {
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read project config: %w", err)
+	}
+
+	config := &ProjectConfig{}
+	if err := json.Unmarshal(data, config); err != nil {
+		return nil, fmt.Errorf("failed to parse project config: %w", err)
+	}
+
+	return config, nil
+}

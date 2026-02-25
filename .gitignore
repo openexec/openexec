@@ -1,0 +1,29 @@
+# Documentation build artifacts
+_build/
+site/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local development
+.env
+.env.local
+*.local
+
+# OpenExec specific
+.openexec/
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/

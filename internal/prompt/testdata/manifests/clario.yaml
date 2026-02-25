@@ -1,0 +1,12 @@
+name: clario
+description: "Architecture Agent - Technical Design Specialist"
+title: "Architecture Agent - Technical Design Specialist"
+persona: clario
+
+workflows:
+  - id: technical-design
+  - id: feedback-loop
+  - id: mutation-testing
+    params:
+      intent: "Validate test quality for architecture"
+      stopping_criteria: "mutation score meets standards"

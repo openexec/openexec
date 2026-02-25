@@ -1,0 +1,124 @@
+package loop
+
+import (
+	"context"
+	"time"
+)
+
+// Uploader defines the interface for uploading session artifacts.
+type Uploader interface {
+	UploadSession(ctx context.Context, localDir, fwuID, timestamp string) error
+}
+
+// UploaderFactory creates a new Uploader instance.
+type UploaderFactory func(ctx context.Context, cfg UploaderConfig) (Uploader, error)
+
+// UploaderConfig holds S3 configuration for evidence uploads.
+type UploaderConfig struct {
+	Bucket   string
+	Region   string
+	Endpoint string
+	Prefix   string
+}
+
+// Config controls loop behavior.
+type Config struct {
+	// UploaderFactory creates the evidence uploader.
+	// If nil, no uploader is used.
+	UploaderFactory UploaderFactory `json:"-"`
+
+	// Prompt is the system prompt passed to Claude Code via -p flag.
+	Prompt string
+
+	// WorkDir is the working directory for the Claude Code process.
+	WorkDir string
+
+	// ReviewerModel is the model to use for code review (optional).
+	// If set, a secondary Claude instance will review the output.
+	ReviewerModel string
+
+	// TaskID is the unique identifier for this task (optional).
+	TaskID string
+
+	// MaxIterations is the safety limit. 0 means no limit.
+	MaxIterations int
+
+	// MaxRetries is the number of retry attempts on non-zero exit. Default 3.
+	MaxRetries int
+
+	// RetryBackoff is the sequence of delays between retries. Default [0s, 5s, 15s].
+	RetryBackoff []time.Duration
+
+	// LogDir is the directory for stderr log files. Default: WorkDir.
+	LogDir string
+
+	// CommandName overrides the binary to execute (default "claude").
+	// Used by tests to inject a mock command.
+	CommandName string
+
+	// CommandArgs overrides the argument list (default built from Prompt).
+	// Used by tests to inject a mock command.
+	CommandArgs []string
+
+	// MCPConfigPath is the path to the MCP config JSON file.
+	// When set, --mcp-config is added to the Claude Code command.
+	MCPConfigPath string
+
+	// ThrashThreshold is the number of iterations without a progress signal
+	// before emitting ThrashingDetected. Default 3. 0 disables.
+	ThrashThreshold int
+
+	// FwuID is the firmware update ID for this session (used for evidence).
+	FwuID string
+
+	// EvidenceDir is the base directory for storing session evidence.
+	// If empty, evidence capturing is disabled.
+	EvidenceDir string
+
+	// EvidenceBucket is the S3 bucket for evidence uploads.
+	EvidenceBucket string
+
+	// EvidenceRegion is the AWS region for the bucket.
+	EvidenceRegion string
+
+	// EvidenceEndpoint is the custom S3 endpoint URL.
+	EvidenceEndpoint string
+
+	// EvidencePrefix is the key prefix for uploaded files.
+	EvidencePrefix string
+
+	// DeepTraceCfg configures the Deep-Trace middleware for ISO 27001 compliance.
+	// If nil, middleware is disabled.
+	DeepTraceCfg *DeepTraceConfig
+
+	// QualityGates enables quality gate validation after task completion.
+	// When enabled, gates from openexec.yaml are run after each phase-complete signal.
+	QualityGates bool
+
+	// GateTimeout is the timeout for running quality gates. Default 5 minutes.
+	GateTimeout time.Duration
+
+	// MaxGateRetries is the number of times to let executor fix gate failures. Default 3.
+	MaxGateRetries int
+
+	// PreflightChecks enables preflight validation before task starts.
+	PreflightChecks bool
+
+	// TaskTitle is the task title (used for preflight check detection).
+	TaskTitle string
+}
+
+// DefaultConfig returns a Config with sensible defaults.
+func DefaultConfig() Config {
+	return Config{
+		MaxIterations:   10,
+		MaxRetries:      3,
+		RetryBackoff:    []time.Duration{0, 5 * time.Second, 15 * time.Second},
+		ThrashThreshold: 3,
+		DeepTraceCfg:    nil,
+		QualityGates:    true,
+		GateTimeout:     5 * time.Minute,
+		MaxGateRetries:  3,
+		PreflightChecks: true,
+	}
+}

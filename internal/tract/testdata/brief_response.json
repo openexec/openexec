@@ -1,0 +1,138 @@
+{
+  "fwu": {
+    "id": "FWU-01.1.01",
+    "name": "Database infrastructure",
+    "status": "pending",
+    "intent": "Establish the SQLite database layer with GORM, WAL mode, and migration framework.",
+    "feature_id": "F-01.1"
+  },
+  "boundaries": [
+    {
+      "id": "BN:1",
+      "scope": "in_scope",
+      "description": "Pure Go SQLite driver setup and GORM integration"
+    },
+    {
+      "id": "BN:2",
+      "scope": "in_scope",
+      "description": "Migration framework with versioned SQL files"
+    },
+    {
+      "id": "BN:3",
+      "scope": "in_scope",
+      "description": "WAL mode configuration and FK enforcement"
+    },
+    {
+      "id": "BN:4",
+      "scope": "out_of_scope",
+      "description": "Table definitions for domain entities (owned by FWU-01.1.02)"
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "DP:1",
+      "dependency_type": "fwu",
+      "target_fwu_id": "FWU-01.1.02",
+      "description": "Depends on database layer being available"
+    }
+  ],
+  "design_decisions": [
+    {
+      "id": "PD:1",
+      "decision": "Which SQLite driver?",
+      "resolution": "modernc.org/sqlite — pure Go, no CGO requirement",
+      "rationale": "NFR14 mandates no CGO for deployment simplicity"
+    }
+  ],
+  "interface_contracts": [
+    {
+      "id": "CT:1",
+      "direction": "produces",
+      "counterpart_fwu_id": "FWU-01.1.02",
+      "description": "Database connection handle and migration runner"
+    }
+  ],
+  "verification_gates": [
+    {
+      "id": "VG:1",
+      "gate": "tests",
+      "expectation": "Database opens with WAL mode and FK enforcement verified by test"
+    },
+    {
+      "id": "VG:2",
+      "gate": "quality",
+      "expectation": "No CGO required — verified by build constraint"
+    }
+  ],
+  "reasoning_chain": {
+    "feature": {
+      "id": "F-01.1",
+      "name": "Core data layer",
+      "description": "Foundation database and persistence infrastructure"
+    },
+    "epic": {
+      "id": "E-01",
+      "name": "Data platform",
+      "description": "All persistence and data management capabilities"
+    },
+    "capability": {
+      "id": "CAP-01",
+      "name": "Structured storage",
+      "description": "Ability to store and retrieve structured data reliably"
+    },
+    "so": {
+      "id": "SO-01",
+      "name": "Operational excellence",
+      "description": "Reliable and maintainable system operations"
+    },
+    "ncs": [
+      {
+        "id": "NC-01",
+        "name": "Data persistence",
+        "description": "System must persist data across restarts"
+      }
+    ],
+    "csfs": [
+      {
+        "id": "CSF-01",
+        "name": "Zero-downtime deployments",
+        "description": "Database migrations must not cause downtime"
+      }
+    ],
+    "goals": [
+      {
+        "id": "G-01",
+        "name": "Production readiness",
+        "description": "System ready for production workloads"
+      }
+    ]
+  },
+  "dependency_status": [
+    {
+      "dependency_id": "DP:1",
+      "target_fwu_id": "FWU-01.1.02",
+      "target_fwu_name": "Domain models",
+      "target_status": "pending",
+      "description": "Depends on database layer being available"
+    }
+  ],
+  "predecessor_specs": [
+    {
+      "source_fwu_id": "FWU-01.1.01",
+      "source_ic_id": "IC:1",
+      "entity_name": "DatabaseConfig",
+      "entity_type": "model",
+      "parent_class": "config",
+      "code_block": "type DatabaseConfig struct {\n\tPath     string\n\tWALMode  bool\n\tFKEnable bool\n}"
+    }
+  ],
+  "prior_ics": [
+    {
+      "ic_id": "IC:1",
+      "attempt": 1,
+      "status": "abandoned",
+      "planning_version": 1
+    }
+  ],
+  "prior_ic_count": 1
+}
