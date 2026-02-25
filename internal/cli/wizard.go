@@ -74,7 +74,9 @@ and contracts before generating your INTENT.md and stories.`,
 			}
 
 			// Call orchestration wizard
+			fmt.Print(color.CyanString("Thinking... "))
 			resp, err := callOrchestrationWizard(message, stateJSON, model)
+			fmt.Print("\r") // Clear Thinking line
 			if err != nil {
 				return err
 			}
