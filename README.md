@@ -33,6 +33,7 @@ Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in
 ### Why OpenExec?
 *   **Structured Planning:** High-level goals are decomposed into hierarchical Goal Trees and User Stories.
 *   **Constraint-First:** A guided interview process (Wizard) pins down platform, shape, and contracts before a single line of code is written.
+*   **Dependency-Aware Parallel Execution:** Tasks are automatically scheduled using a DAG (Directed Acyclic Graph) to run independent work in parallel while respecting prerequisites.
 *   **Headless Execution:** Agents run in a non-interactive daemon mode, managed by a Go-based execution engine.
 *   **Senior Architect Reviews:** Built-in multi-iteration self-review cycles ensure implementation readiness.
 *   **Quality Gates:** Automated pre-flight checks and post-task validation (lint, test, build) act as permanent guardrails.
@@ -113,7 +114,7 @@ Follow these steps to transform an idea into a verified project:
 5.  **Start Daemon (`openexec start --daemon`)**
     Launch the background engine that manages the autonomous agents.
 6.  **Run (`openexec run`)**
-    The agents begin implementing your tasks one by one, signaling completion via `axon_signal`.
+    The agents begin implementing your tasks (concurrently by default), signaling completion via `axon_signal`.
 7.  **Monitor (`openexec status` or `openexec tui`)**
     Watch the real-time progress and logs through the terminal dashboard.
 
