@@ -33,12 +33,13 @@ var (
 
 // Task represents a task to execute
 type Task struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	StoryID     string   `json:"story_id,omitempty"`
-	Status      string   `json:"status"`
-	DependsOn   []string `json:"depends_on,omitempty"`
+	ID                 string   `json:"id"`
+	Title              string   `json:"title"`
+	Description        string   `json:"description"`
+	StoryID            string   `json:"story_id,omitempty"`
+	Status             string   `json:"status"`
+	DependsOn          []string `json:"depends_on,omitempty"`
+	VerificationScript string   `json:"verification_script,omitempty"`
 }
 
 // TasksFile represents the tasks.json structure
@@ -621,10 +622,11 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 
 	// Reuse GeneratedTask from release.go if possible, or define here
 	type GeneratedTask struct {
-		ID          string   `json:"id"`
-		Title       string   `json:"title"`
-		Description string   `json:"description"`
-		DependsOn   []string `json:"depends_on"`
+		ID                 string   `json:"id"`
+		Title              string   `json:"title"`
+		Description        string   `json:"description"`
+		DependsOn          []string `json:"depends_on"`
+		VerificationScript string   `json:"verification_script,omitempty"`
 	}
 
 	if err := json.Unmarshal(data, &sf); err != nil {
@@ -678,12 +680,13 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 				}
 				
 				tasks = append(tasks, Task{
-					ID:          taskID,
-					Title:       genTask.Title,
-					Description: genTask.Description,
-					StoryID:     story.ID,
-					Status:      "pending",
-					DependsOn:   deps,
+					ID:                 taskID,
+					Title:              genTask.Title,
+					Description:        genTask.Description,
+					StoryID:            story.ID,
+					Status:             "pending",
+					DependsOn:          deps,
+					VerificationScript: genTask.VerificationScript,
 				})
 				
 				prevTaskInStory = taskID
@@ -778,12 +781,22 @@ func buildTaskPrompt(task Task, mgr *release.Manager) string {
 				sb.WriteString(fmt.Sprintf("- %s\n", ac))
 			}
 		}
+
+		if story.Contract != "" {
+			sb.WriteString("\nINTERFACE CONTRACT:\n")
+			sb.WriteString(fmt.Sprintf("%s\n", story.Contract))
+		}
 	}
 
 	sb.WriteString("\nINSTRUCTIONS:\n")
 	sb.WriteString("1. Analyze the task requirements and story context.\n")
 	sb.WriteString("2. Implement the necessary changes idiomatic to the project.\n")
 	sb.WriteString("3. Verify your implementation works using existing tests or by creating new ones.\n")
+	
+	if task.VerificationScript != "" {
+		sb.WriteString(fmt.Sprintf("   -> MANDATORY VERIFICATION SCRIPT: Run '%s' to prove the task is complete.\n", task.VerificationScript))
+	}
+
 	sb.WriteString("4. When complete and verified, signal completion using the axon_signal tool with type 'phase-complete'.\n")
 	sb.WriteString("\n")
 	sb.WriteString("Work autonomously and make reasonable decisions. Do not ask for clarification.\n")

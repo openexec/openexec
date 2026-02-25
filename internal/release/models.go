@@ -59,6 +59,8 @@ type Story struct {
 
 	// Acceptance criteria
 	AcceptanceCriteria []string `json:"acceptance_criteria"`
+	VerificationScript string   `json:"verification_script,omitempty"`
+	Contract           string   `json:"contract,omitempty"`
 
 	// Task references
 	Tasks []string `json:"tasks"` // Task IDs
@@ -100,6 +102,9 @@ type Task struct {
 	Title       string  `json:"title"`
 	Description string  `json:"description,omitempty"`
 	StoryID     string  `json:"story_id"`     // Parent story
+
+	// Verification
+	VerificationScript string `json:"verification_script,omitempty"`
 
 	// Dependencies
 	DependsOn []string `json:"depends_on,omitempty"` // Task IDs this depends on
