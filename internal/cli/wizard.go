@@ -36,8 +36,11 @@ and contracts before generating your INTENT.md and stories.`,
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
-		// Use executor model from project config
-		model := config.Execution.ExecutorModel
+		// Use planner model from project config, fallback to executor
+		model := config.Execution.PlannerModel
+		if model == "" {
+			model = config.Execution.ExecutorModel
+		}
 		if model == "" {
 			model = "sonnet" // default
 		}

@@ -107,10 +107,13 @@ Examples:
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
-		// Use executor model from project config
-		executorModel := config.Execution.ExecutorModel
-		if executorModel == "" {
-			executorModel = "sonnet" // default
+		// Use planner model from project config, fallback to executor
+		plannerModel := config.Execution.PlannerModel
+		if plannerModel == "" {
+			plannerModel = config.Execution.ExecutorModel
+		}
+		if plannerModel == "" {
+			plannerModel = "sonnet" // default
 		}
 
 		// Check if review is enabled
@@ -118,7 +121,7 @@ Examples:
 		reviewerModel := config.Execution.ReviewerModel
 
 		fmt.Printf("Generating plan from: %s\n", intentFile)
-		fmt.Printf("  Executor model: %s\n", executorModel)
+		fmt.Printf("  Planner model:  %s\n", plannerModel)
 		if reviewEnabled {
 			fmt.Printf("  Review enabled: yes (reviewer: %s)\n", reviewerModel)
 		} else {
@@ -137,7 +140,7 @@ Examples:
 		storiesPath := filepath.Join(config.TractStore, "stories.json")
 
 		// Build orchestration command arguments
-		orchestrationArgs := []string{"generate", absIntentFile, "--output", storiesPath, "--model", executorModel}
+		orchestrationArgs := []string{"generate", absIntentFile, "--output", storiesPath, "--model", plannerModel}
 		if reviewEnabled && reviewerModel != "" {
 			orchestrationArgs = append(orchestrationArgs, "--reviewer", reviewerModel)
 		}

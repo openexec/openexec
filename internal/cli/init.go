@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	initPlannerModel   string
 	initExecutorModel  string
 	initReviewEnabled  bool
 	initReviewerModel  string
@@ -106,15 +107,20 @@ Examples:
 		}
 
 		// Configure execution settings
-		executorModel := initExecutorModel
-		reviewEnabled := initReviewEnabled
-		reviewerModel := initReviewerModel
-		parallelEnabled := true
-		workerCount := 4
+		var plannerModel, executorModel, reviewerModel string
+		var reviewEnabled, parallelEnabled bool
+		var workerCount int
 
 		// Interactive mode if not explicitly set via flags
 		if !initNonInteractive {
-			executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount = promptExecutionConfig(cmd)
+			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount = promptExecutionConfig(cmd)
+		} else {
+			plannerModel = initPlannerModel
+			executorModel = initExecutorModel
+			reviewEnabled = initReviewEnabled
+			reviewerModel = initReviewerModel
+			parallelEnabled = true
+			workerCount = 4
 		}
 
 		// Initialize the project
@@ -125,6 +131,7 @@ Examples:
 
 		// Set execution config
 		cfg.Execution = project.ExecutionConfig{
+			PlannerModel:    plannerModel,
 			ExecutorModel:   executorModel,
 			ReviewEnabled:   reviewEnabled,
 			ReviewerModel:   reviewerModel,
@@ -147,6 +154,7 @@ Examples:
 		fmt.Printf("  Engram memory context: %s\n", cfg.EngramStore)
 		fmt.Printf("\n")
 		fmt.Printf("  Execution settings:\n")
+		fmt.Printf("    Planner model:  %s\n", cfg.Execution.PlannerModel)
 		fmt.Printf("    Executor model: %s\n", cfg.Execution.ExecutorModel)
 		if cfg.Execution.ReviewEnabled {
 			fmt.Printf("    Code review: enabled\n")
@@ -171,6 +179,7 @@ Examples:
 }
 
 func init() {
+	initCmd.Flags().StringVar(&initPlannerModel, "planner", "sonnet", "Model to use for planning phase")
 	initCmd.Flags().StringVar(&initExecutorModel, "executor", "sonnet", "Model to use for task execution")
 	initCmd.Flags().BoolVar(&initReviewEnabled, "review", false, "Enable code review after task execution")
 	initCmd.Flags().BoolVar(&initNonInteractive, "no-review", false, "Disable code review (non-interactive)")
@@ -181,18 +190,30 @@ func init() {
 }
 
 // promptExecutionConfig interactively prompts for execution configuration
-func promptExecutionConfig(cmd *cobra.Command) (executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int) {
+func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int) {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println("\n=== Execution Settings ===")
 
-	// Executor model selection
-	executorModel = selectModel(reader, "executor", cmd.Flags().Changed("executor"), initExecutorModel)
+	// Planner model selection
+	plannerModel = selectModel(reader, "planner", cmd.Flags().Changed("planner"), initPlannerModel)
+
+	// Ask if same model should be used for execution
+	fmt.Println()
+	fmt.Printf("Use same model '%s' for task execution? [Y/n]: ", plannerModel)
+	answer, _ := reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+
+	if answer == "n" || answer == "no" {
+		executorModel = selectModel(reader, "executor", cmd.Flags().Changed("executor"), plannerModel)
+	} else {
+		executorModel = plannerModel
+	}
 
 	// Review configuration
 	fmt.Println()
 	fmt.Print("Enable code review after task execution? [Y/n]: ")
-	answer, _ := reader.ReadString('\n')
+	answer, _ = reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 
 	reviewEnabled = true
@@ -228,7 +249,7 @@ func promptExecutionConfig(cmd *cobra.Command) (executorModel string, reviewEnab
 		}
 	}
 
-	return executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount
+	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount
 }
 
 // selectModel prompts user to select a model

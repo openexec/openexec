@@ -22,6 +22,8 @@ type ProjectConfig struct {
 
 // ExecutionConfig holds execution engine settings
 type ExecutionConfig struct {
+	// PlannerModel is the model to use for the planning phase
+	PlannerModel string `json:"planner_model,omitempty"`
 	// ExecutorModel is the model to use for task execution
 	ExecutorModel string `json:"executor_model,omitempty"`
 	// ReviewEnabled enables code review after task execution
