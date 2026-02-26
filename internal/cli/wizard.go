@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
@@ -53,11 +54,20 @@ and contracts before generating your INTENT.md and stories.`,
 		fmt.Println(color.CyanString("=== OpenExec Guided Intent Interviewer ==="))
 		fmt.Printf("   Project: %s\n", config.Name)
 		fmt.Printf("   Model:   %s\n", model)
+		
+		statePath := filepath.Join(".openexec", "wizard_state.json")
+		stateJSON := ""
+		
+		// Try to resume existing session
+		if data, err := os.ReadFile(statePath); err == nil {
+			fmt.Println(color.YellowString("   [Resuming existing session from %s]", statePath))
+			stateJSON = string(data)
+		}
+
 		fmt.Println("Tell me about your project (free-form dump, or type 'exit' to quit):")
 		fmt.Println()
 
 		reader := bufio.NewReader(os.Stdin)
-		stateJSON := ""
 
 		for {
 			fmt.Print(color.GreenString("> "))
@@ -68,7 +78,7 @@ and contracts before generating your INTENT.md and stories.`,
 
 			message := strings.TrimSpace(input)
 			if message == "exit" || message == "quit" {
-				fmt.Println("Goodbye!")
+				fmt.Println("Goodbye! Your progress is saved in " + statePath)
 				return nil
 			}
 
@@ -87,6 +97,9 @@ and contracts before generating your INTENT.md and stories.`,
 			// Update state for next turn
 			stateBytes, _ := json.Marshal(resp.UpdatedState)
 			stateJSON = string(stateBytes)
+			
+			// Persist state to disk
+			_ = os.WriteFile(statePath, stateBytes, 0644)
 
 			// Show feedback
 			if resp.Acknowledgement != "" {
