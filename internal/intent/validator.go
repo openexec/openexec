@@ -354,7 +354,7 @@ func (v *Validator) validateConstraints(result *ValidationResult) {
 	}
 
 	// Mandatory: App Shape check
-	shapes := []string{"cli", "web app", "mobile app", "desktop app", "api", "library", "plugin", "microservice"}
+	shapes := []string{"cli", "web", "mobile", "desktop", "api", "library", "plugin", "microservice"}
 	hasShape := false
 	for _, s := range shapes {
 		if strings.Contains(contentLower, s) {
