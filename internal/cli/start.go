@@ -486,6 +486,32 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				// Persist completion back to tasks.json
 				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
 				
+				// ADAPTIVE DISCOVERY: Re-scan for new tasks
+				mu.Lock()
+				newTasks, err := loadPendingTasks(projectDir)
+				if err == nil {
+					for _, nt := range newTasks {
+						if _, exists := nodes[nt.ID]; !exists {
+							fmt.Printf("[Worker %d] ✨ Discovered new task: %s\n", workerID, nt.ID)
+							newNode := &TaskNode{
+								Task:      nt,
+								Status:    StatusPending,
+								DependsOn: make(map[string]bool),
+							}
+							if nt.Status == "completed" || nt.Status == "done" {
+								newNode.Status = StatusCompleted
+							}
+							for _, dep := range nt.DependsOn {
+								newNode.DependsOn[dep] = true
+							}
+							for _, dep := range nt.Dependencies {
+								newNode.DependsOn[dep] = true
+							}
+							nodes[nt.ID] = newNode
+							totalCount++
+						}
+					}
+				}
 				mu.Unlock()
 
 				// Re-check for new ready tasks
