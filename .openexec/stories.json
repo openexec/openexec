@@ -5,1220 +5,1024 @@
       "id": "G-001",
       "title": "PRD to Goal Tree Planning",
       "description": "Plan from PRD into a Goal Tree and FWUs, then schedule execution",
-      "success_criteria": "openexec plan command parses intent and outputs valid JSON task structure",
-      "verification_method": "Run openexec plan with sample intent and validate JSON output"
+      "success_criteria": "CLI can parse intent document and generate valid task JSON with dependencies",
+      "verification_method": "Run 'openexec plan' on sample intent and validate JSON output structure"
     },
     {
       "id": "G-002",
-      "title": "Auditable Execution with Live Status",
+      "title": "Auditable Execution Loop",
       "description": "Execute FWUs with an auditable loop and live status via SSE",
-      "success_criteria": "Execution produces SSE events and writes immutable audit records",
-      "verification_method": "Subscribe to /events endpoint and verify audit.db entries"
+      "success_criteria": "Tasks execute with real-time SSE events and all actions logged to audit trail",
+      "verification_method": "Subscribe to /events endpoint during execution and verify event stream"
     },
     {
       "id": "G-003",
       "title": "Stack-Aware Quality Gates",
       "description": "Enforce quality via stack-aware gates (Python/JS/Go/Rust) with structured results",
-      "success_criteria": "Quality gates run automatically and produce structured pass/fail results",
-      "verification_method": "Run gates on sample code and verify JSON output structure"
+      "success_criteria": "Quality gates run appropriate linters/tests per language and block on failures",
+      "verification_method": "Trigger gates on multi-language project and verify structured JSON results"
     },
     {
       "id": "G-004",
       "title": "HITL Approval Webhooks",
       "description": "Support approvals via Telegram/WhatsApp webhooks and apply decisions to execution",
-      "success_criteria": "Webhook endpoints accept approve/reject/pause commands and affect execution state",
-      "verification_method": "Send webhook payloads and verify execution state changes"
+      "success_criteria": "Webhook endpoints receive approval/reject signals and modify execution state",
+      "verification_method": "Send test webhook payloads and verify execution state changes"
     },
     {
       "id": "G-005",
-      "title": "Unified CLI and Web Dashboard",
-      "description": "Provide a unified CLI (init/plan/start/status/tui) and a web dashboard for observability",
-      "success_criteria": "All CLI commands functional and dashboard displays live execution data",
-      "verification_method": "Execute each CLI command and verify dashboard SSE connectivity"
+      "title": "Unified CLI Experience",
+      "description": "Provide a unified CLI (init/plan/start/status/tui) for all operations",
+      "success_criteria": "All CLI commands work end-to-end with consistent UX",
+      "verification_method": "Execute full CLI workflow: init -> plan -> start -> status"
     },
     {
       "id": "G-006",
       "title": "ISO-Compliant Audit Trail",
       "description": "Keep an immutable audit trail with automated evidence export for ISO compliance",
-      "success_criteria": "openexec export --evidence produces complete, verifiable audit package",
-      "verification_method": "Run export and validate package contains all required artifacts"
+      "success_criteria": "Evidence export includes audit SQLite, verification logs, model versions, and gate reports",
+      "verification_method": "Run 'openexec export --evidence' and validate archive contents"
     }
   ],
   "stories": [
     {
       "id": "US-001",
-      "title": "Discovery: Analyze Existing OpenExec Codebase",
-      "description": "As a developer, I want to understand the existing codebase structure so that I can safely extend it without breaking existing functionality",
-      "requirement_id": "REQ-DISCOVERY",
+      "title": "Project Initialization & Directory Structure",
+      "description": "As a developer, I want 'openexec init' to create the .openexec directory and initialize required stores so that I have a valid project structure",
+      "requirement_id": "REQ-CLI-INIT",
       "goal_id": "G-005",
       "depends_on": [],
       "acceptance_criteria": [
-        "Environment variables and dependencies documented",
-        "API surface area mapped with inputs/outputs",
-        "Local build verified for all components"
+        ".openexec directory is created with config.yaml",
+        "SQLite audit database is initialized with schema",
+        "tasks.json is created with empty array",
+        "Command is idempotent (re-running does not corrupt existing data)"
       ],
-      "verification_script": "ls -la openexec-*/go.mod openexec-*/go.sum 2>/dev/null || echo 'Go modules found'; ls -la openexec-orchestration/pyproject.toml 2>/dev/null || echo 'Python project found'",
+      "verification_script": "rm -rf .openexec && openexec init && test -f .openexec/config.yaml && test -f .openexec/audit.db && test -f .openexec/tasks.json",
       "contract": "",
       "tasks": [
         {
           "id": "T-US-001-001",
-          "title": "Extract environment variables and dependencies",
-          "description": "Document all environment variables, Go modules, and Python dependencies across components",
-          "technical_strategy": "Parse go.mod files for Go dependencies, pyproject.toml/requirements.txt for Python. Document in DEPENDENCIES.md. Check for .env.example files.",
+          "title": "Define init command schema and flags",
+          "description": "Define CLI flags (--force, --template) and config.yaml schema",
+          "technical_strategy": "Use cobra for CLI framework. Define Config struct with yaml tags. Include version field for schema migrations.",
           "depends_on": [],
-          "verification_script": "test -f DEPENDENCIES.md && grep -q 'go.mod' DEPENDENCIES.md"
+          "verification_script": "go build ./cmd/openexec && ./bin/openexec init --help"
         },
         {
           "id": "T-US-001-002",
-          "title": "Map existing API surface area",
-          "description": "Document all existing CLI commands, HTTP endpoints, and their inputs/outputs",
-          "technical_strategy": "Scan cmd/ directories for cobra commands, main.go for HTTP handlers. Create API_SURFACE.md with endpoint paths, methods, request/response schemas.",
+          "title": "Implement directory creation and config generation",
+          "description": "Create .openexec directory and write default config.yaml",
+          "technical_strategy": "Use os.MkdirAll with 0755 permissions. Marshal Config struct to YAML. Check os.IsExist for idempotency.",
           "depends_on": [
             "T-US-001-001"
           ],
-          "verification_script": "test -f API_SURFACE.md && grep -q 'endpoint' API_SURFACE.md"
+          "verification_script": "go test ./cmd/openexec/... -run TestInit -v"
         },
         {
           "id": "T-US-001-003",
-          "title": "Verify local buildability of all components",
-          "description": "Ensure all existing components build successfully in local environment",
-          "technical_strategy": "Run go build ./... for Go components, pip install -e . for Python. Document any build issues. Create build verification script.",
+          "title": "Implement SQLite audit schema initialization",
+          "description": "Create audit.db with events, evidence, and runs tables",
+          "technical_strategy": "Use database/sql with modernc.org/sqlite for pure Go. Execute CREATE TABLE IF NOT EXISTS. Add indexes on run_id and timestamp.",
           "depends_on": [
             "T-US-001-002"
           ],
-          "verification_script": "cd openexec-cli && go build -o /dev/null ./... 2>&1 | head -5"
+          "verification_script": "sqlite3 .openexec/audit.db '.tables' | grep -q events"
+        },
+        {
+          "id": "T-US-001-004",
+          "title": "Add unit tests for init command",
+          "description": "Test init in clean directory, existing directory, and with --force flag",
+          "technical_strategy": "Use t.TempDir() for isolated tests. Assert file existence and content. Test error cases for permission denied.",
+          "depends_on": [
+            "T-US-001-003"
+          ],
+          "verification_script": "go test ./cmd/openexec/... -cover -coverprofile=coverage.out && go tool cover -func=coverage.out | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-002",
       "title": "Orchestration Plan CLI",
-      "description": "As a developer, I want to run openexec plan <intent> to generate a JSON task structure so that I can preview and validate the execution plan",
+      "description": "As a developer, I want 'openexec plan <intent>' to parse an intent document and generate a JSON task tree so that execution can be scheduled",
       "requirement_id": "REQ-PLAN-CLI",
       "goal_id": "G-001",
       "depends_on": [
         "US-001"
       ],
       "acceptance_criteria": [
-        "openexec plan <intent-file> outputs valid JSON to stdout",
-        "Plan supports ordering parameter (parallel/sequential)",
-        "Plan supports timeout_mode parameter",
-        "Tasks are written to .openexec/tasks.json"
+        "CLI accepts intent file path or reads from stdin",
+        "Outputs JSON summary to stdout",
+        "Writes tasks.json to .openexec directory",
+        "Supports --ordering (parallel|sequential) and --timeout-mode flags"
       ],
-      "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec plan --help",
-      "contract": {
-        "command": "openexec plan <intent-file>",
-        "flags": [
-          "--ordering parallel|sequential",
-          "--timeout-mode strict|lenient"
-        ],
-        "output": {
-          "format": "JSON",
-          "schema": {
-            "goals": "array",
-            "stories": "array",
-            "tasks": "array"
-          }
-        }
-      },
+      "verification_script": "echo '# Test Intent' | openexec plan - && cat .openexec/tasks.json | jq '.stories | length'",
+      "contract": "{ \"schema_version\": \"1.1\", \"goals\": [], \"stories\": [] }",
       "tasks": [
         {
           "id": "T-US-002-001",
-          "title": "Define Plan CLI schema and error codes",
-          "description": "Define the JSON output schema for plan command and error code constants",
-          "technical_strategy": "Create pkg/schema/plan.go with struct types for PlanOutput, Goal, Story, Task. Use json tags. Define error codes in pkg/errors/codes.go. Import encoding/json.",
+          "title": "Define plan command API contract",
+          "description": "Define input schema (intent markdown) and output schema (stories JSON)",
+          "technical_strategy": "Create IntentDoc and StoryOutput structs. Use json schema tags. Document supported markdown headers.",
           "depends_on": [],
-          "verification_script": "test -f openexec-cli/pkg/schema/plan.go && grep -q 'PlanOutput' openexec-cli/pkg/schema/plan.go"
+          "verification_script": "go build ./cmd/openexec && ./bin/openexec plan --help | grep -q 'ordering'"
         },
         {
           "id": "T-US-002-002",
-          "title": "Implement plan command with mock handler",
-          "description": "Create cobra command for plan with mock response and unit tests",
-          "technical_strategy": "Use cobra.Command in cmd/plan.go. Accept intent file as arg. Add --ordering and --timeout-mode flags with defaults. Return mock JSON for testing. Test with go test.",
+          "title": "Implement intent document parser",
+          "description": "Parse markdown intent into structured IntentDoc with goals, features, constraints",
+          "technical_strategy": "Use goldmark for markdown parsing. Extract headers via AST walk. Map ## Feature: to feature structs.",
           "depends_on": [
             "T-US-002-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./cmd/... -run TestPlan"
+          "verification_script": "go test ./internal/parser/... -run TestParseIntent -v"
         },
         {
           "id": "T-US-002-003",
-          "title": "Integrate orchestration service for plan generation",
-          "description": "Connect plan command to orchestration service for actual plan generation",
-          "technical_strategy": "Create internal/orchestration/client.go with HTTP client. Call orchestration /plan endpoint. Parse response into PlanOutput. Handle errors with defined codes.",
+          "title": "Implement story generation from parsed intent",
+          "description": "Transform IntentDoc into stories with tasks, dependencies, and verification scripts",
+          "technical_strategy": "Create StoryGenerator with configurable templates. Generate task IDs with T-US-XXX-YYY format. Infer depends_on from feature order.",
           "depends_on": [
             "T-US-002-002"
           ],
-          "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec plan --help | grep -q 'ordering'"
+          "verification_script": "go test ./internal/planner/... -run TestGenerateStories -v"
         },
         {
           "id": "T-US-002-004",
-          "title": "Write tasks to .openexec/tasks.json",
-          "description": "Persist generated tasks to project directory",
-          "technical_strategy": "Create internal/project/tasks.go with WriteTasks function. Ensure .openexec directory exists. Use json.MarshalIndent for readable output. Add file permission 0644.",
+          "title": "Implement JSON output and file writing",
+          "description": "Marshal stories to JSON, print summary to stdout, write to tasks.json",
+          "technical_strategy": "Use json.MarshalIndent for readable output. Atomic write via temp file + rename. Print story count and dependency graph summary.",
           "depends_on": [
             "T-US-002-003"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./internal/project/... -run TestWriteTasks"
+          "verification_script": "go test ./cmd/openexec/... -run TestPlanOutput -v && go test -cover ./internal/planner/... | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-003",
-      "title": "Non-Bypassable Audit System",
-      "description": "As a compliance officer, I want all execution events to be immutably recorded so that I have a complete audit trail for ISO compliance",
-      "requirement_id": "REQ-AUDIT",
+      "title": "Non-Bypassable Audit Writer",
+      "description": "As a system operator, I want all execution events written to an immutable audit trail so that I have ISO-compliant evidence",
+      "requirement_id": "REQ-AUDIT-WRITE",
       "goal_id": "G-006",
       "depends_on": [
         "US-001"
       ],
       "acceptance_criteria": [
-        "All execution events written to SQLite audit.db",
-        "Audit write failures halt execution immediately",
-        "Audit records include timestamp, event type, and payload",
-        "Audit writes cannot be bypassed by application code"
+        "All events are written to audit.db before execution proceeds",
+        "Write failures halt execution with explicit error",
+        "Events include timestamp, run_id, event_type, and payload",
+        "Audit writes cannot be bypassed or disabled"
       ],
-      "verification_script": "cd openexec-execution && go test -v ./internal/audit/... -cover",
-      "contract": {
-        "interface": "AuditWriter",
-        "methods": [
-          "Write(event AuditEvent) error",
-          "Query(filter AuditFilter) ([]AuditEvent, error)"
-        ],
-        "storage": "SQLite audit.db"
-      },
+      "verification_script": "go test ./internal/audit/... -v && sqlite3 .openexec/audit.db 'SELECT COUNT(*) FROM events'",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-003-001",
-          "title": "Define audit schema and event types",
-          "description": "Create SQLite schema and Go structs for audit events",
-          "technical_strategy": "Create internal/audit/schema.go with AuditEvent struct (ID, Timestamp, EventType, Payload, RunID). Define EventType constants. Use database/sql for schema creation.",
+          "title": "Define audit event schema and error types",
+          "description": "Define Event struct, EventType enum, and AuditWriteError type",
+          "technical_strategy": "Use iota for EventType enum. Include EventTypeTaskStart, EventTypeTaskComplete, EventTypeGateResult. Add Unwrap() to AuditWriteError.",
           "depends_on": [],
-          "verification_script": "test -f openexec-execution/internal/audit/schema.go && grep -q 'AuditEvent' openexec-execution/internal/audit/schema.go"
+          "verification_script": "go build ./internal/audit/..."
         },
         {
           "id": "T-US-003-002",
-          "title": "Implement AuditWriter with SQLite backend",
-          "description": "Create audit writer that persists events to SQLite with transaction safety",
-          "technical_strategy": "Create internal/audit/writer.go. Use modernc.org/sqlite for pure Go SQLite. Wrap writes in transactions. Return error on any failure - do not swallow errors.",
+          "title": "Implement synchronous audit writer",
+          "description": "Write events to SQLite with transaction per event, return error on failure",
+          "technical_strategy": "Use sql.Tx with Commit/Rollback. Set WAL mode for concurrency. Use prepared statements for performance.",
           "depends_on": [
             "T-US-003-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/audit/... -run TestAuditWriter"
+          "verification_script": "go test ./internal/audit/... -run TestWriteEvent -v"
         },
         {
           "id": "T-US-003-003",
           "title": "Implement execution halt on audit failure",
-          "description": "Ensure audit write failures stop execution immediately",
-          "technical_strategy": "Create internal/loop/audit.go middleware. Check Write return error. If error, call loop.Halt() with audit error. Do not use defer for critical audit writes.",
+          "description": "Wrap audit writer in executor middleware that halts on error",
+          "technical_strategy": "Create AuditMiddleware wrapping Executor. Check error from WriteEvent before proceeding. Log and return wrapped error.",
           "depends_on": [
             "T-US-003-002"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/loop/... -run TestAuditHalt"
+          "verification_script": "go test ./internal/audit/... -run TestHaltOnFailure -v"
         },
         {
           "id": "T-US-003-004",
-          "title": "Add audit unit tests with 90%+ coverage",
-          "description": "Comprehensive unit tests for audit system including failure scenarios",
-          "technical_strategy": "Create internal/audit/writer_test.go. Test successful writes, transaction rollback, concurrent writes, disk full simulation. Use t.Parallel() for concurrent tests.",
+          "title": "Add comprehensive unit tests for audit system",
+          "description": "Test successful writes, failure scenarios, and concurrent access",
+          "technical_strategy": "Use t.Parallel() for concurrency tests. Mock sql.DB for failure injection. Assert event ordering with timestamps.",
           "depends_on": [
             "T-US-003-003"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/audit/... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep total"
+          "verification_script": "go test ./internal/audit/... -cover -race | grep -q '95'"
         }
       ]
     },
     {
       "id": "US-004",
-      "title": "Execution SSE Events Endpoint",
-      "description": "As a developer, I want to subscribe to GET /events to receive real-time execution updates so that I can monitor execution progress",
-      "requirement_id": "REQ-SSE",
+      "title": "Execution Engine with SSE Events",
+      "description": "As a developer, I want real-time execution status via SSE so that I can monitor task progress",
+      "requirement_id": "REQ-EXEC-SSE",
       "goal_id": "G-002",
       "depends_on": [
         "US-003"
       ],
       "acceptance_criteria": [
-        "GET /events returns SSE stream with Content-Type text/event-stream",
-        "Heartbeat events sent every 30 seconds",
-        "Iteration and phase events emitted during execution",
-        "Connection handles client disconnect gracefully"
+        "GET /events endpoint streams SSE with heartbeats every 30s",
+        "Events include iteration start/end and phase transitions",
+        "Supports --harness, --provider, --model flags",
+        "Connection maintains keep-alive and handles client disconnect gracefully"
       ],
-      "verification_script": "curl -s -N -H 'Accept: text/event-stream' http://localhost:8080/events | head -5",
-      "contract": {
-        "endpoint": "GET /events",
-        "content_type": "text/event-stream",
-        "events": [
-          "heartbeat",
-          "iteration_start",
-          "iteration_complete",
-          "phase_change",
-          "error"
-        ]
-      },
+      "verification_script": "curl -N http://localhost:8080/events --max-time 5 | grep -q 'event:'",
+      "contract": "event: heartbeat\\ndata: {\"timestamp\": \"2024-01-01T00:00:00Z\"}\\n\\n",
       "tasks": [
         {
           "id": "T-US-004-001",
-          "title": "Define SSE event schema and types",
-          "description": "Create event type definitions and JSON schemas for SSE events",
-          "technical_strategy": "Create pkg/sse/events.go with HeartbeatEvent, IterationEvent, PhaseEvent structs. Use json tags. Define event name constants matching contract.",
+          "title": "Define SSE event types and message format",
+          "description": "Define SSEEvent struct with event type, data payload, and ID",
+          "technical_strategy": "Use text/event-stream content type. Include retry field for reconnection. Define EventTypeHeartbeat, EventTypeIterationStart, EventTypePhaseChange.",
           "depends_on": [],
-          "verification_script": "test -f openexec-execution/pkg/sse/events.go && grep -q 'HeartbeatEvent' openexec-execution/pkg/sse/events.go"
+          "verification_script": "go build ./internal/sse/..."
         },
         {
           "id": "T-US-004-002",
-          "title": "Implement SSE handler with heartbeat",
-          "description": "Create HTTP handler for /events endpoint with heartbeat mechanism",
-          "technical_strategy": "Create pkg/sse/handler.go. Set Content-Type, Cache-Control, Connection headers. Use time.Ticker for 30s heartbeats. Write 'event: heartbeat\\ndata: {}\\n\\n' format.",
+          "title": "Implement SSE broadcaster with fan-out",
+          "description": "Create broadcaster that manages multiple SSE clients",
+          "technical_strategy": "Use sync.Map for client registry. Channel per client with buffer. Remove client on channel close or context cancel.",
           "depends_on": [
             "T-US-004-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/sse/... -run TestSSEHandler"
+          "verification_script": "go test ./internal/sse/... -run TestBroadcaster -v"
         },
         {
           "id": "T-US-004-003",
-          "title": "Integrate execution loop with SSE emitter",
-          "description": "Connect execution loop phases to SSE event emission",
-          "technical_strategy": "Create internal/loop/emitter.go. Use channels for event passing. Emit iteration_start at loop begin, phase_change on state transitions. Use select with context.Done().",
+          "title": "Implement /events HTTP handler",
+          "description": "Create HTTP handler for SSE endpoint with heartbeat ticker",
+          "technical_strategy": "Set Cache-Control: no-cache, Connection: keep-alive headers. Use time.Ticker for heartbeats. Flush after each write.",
           "depends_on": [
             "T-US-004-002"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/loop/... -run TestEmitter"
+          "verification_script": "go test ./internal/api/... -run TestEventsHandler -v"
         },
         {
           "id": "T-US-004-004",
-          "title": "Handle client disconnect and cleanup",
-          "description": "Properly handle SSE client disconnection and resource cleanup",
-          "technical_strategy": "Use http.CloseNotifier or request.Context().Done(). Stop heartbeat ticker on disconnect. Remove client from subscribers map. Log disconnect events.",
+          "title": "Integrate SSE with execution loop",
+          "description": "Emit events at iteration boundaries and phase transitions",
+          "technical_strategy": "Inject Broadcaster into Executor via constructor. Emit before and after each task. Include task ID and status in payload.",
           "depends_on": [
             "T-US-004-003"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/sse/... -run TestDisconnect"
+          "verification_script": "go test ./internal/executor/... -run TestSSEIntegration -v"
+        },
+        {
+          "id": "T-US-004-005",
+          "title": "Add unit and integration tests for SSE",
+          "description": "Test event streaming, client disconnect, and reconnection",
+          "technical_strategy": "Use httptest.NewServer for integration tests. Test concurrent clients. Verify heartbeat timing with time.Sleep.",
+          "depends_on": [
+            "T-US-004-004"
+          ],
+          "verification_script": "go test ./internal/sse/... ./internal/api/... -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-005",
-      "title": "Execution Start with Provider Flags",
-      "description": "As a developer, I want to run openexec start with --harness, --provider, and --model flags so that I can configure execution runtime",
-      "requirement_id": "REQ-START-CLI",
-      "goal_id": "G-002",
-      "depends_on": [
-        "US-002",
-        "US-004"
-      ],
-      "acceptance_criteria": [
-        "openexec start begins execution of tasks from .openexec/tasks.json",
-        "--harness flag selects execution harness (docker/local)",
-        "--provider flag selects LLM provider (anthropic/openai)",
-        "--model flag overrides default model"
-      ],
-      "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec start --help | grep -q 'harness'",
-      "contract": {
-        "command": "openexec start",
-        "flags": [
-          "--harness docker|local",
-          "--provider anthropic|openai",
-          "--model string"
-        ]
-      },
-      "tasks": [
-        {
-          "id": "T-US-005-001",
-          "title": "Define start command flags and config schema",
-          "description": "Create configuration struct and flag definitions for start command",
-          "technical_strategy": "Create internal/config/execution.go with ExecutionConfig struct. Include Harness, Provider, Model fields with defaults. Use viper for config binding.",
-          "depends_on": [],
-          "verification_script": "test -f openexec-cli/internal/config/execution.go && grep -q 'ExecutionConfig' openexec-cli/internal/config/execution.go"
-        },
-        {
-          "id": "T-US-005-002",
-          "title": "Implement start command with mock execution",
-          "description": "Create cobra command for start with flag parsing and mock execution",
-          "technical_strategy": "Create cmd/start.go with cobra.Command. Parse flags into ExecutionConfig. Validate harness/provider values. Return mock success for initial testing.",
-          "depends_on": [
-            "T-US-005-001"
-          ],
-          "verification_script": "cd openexec-cli && go test -v ./cmd/... -run TestStart"
-        },
-        {
-          "id": "T-US-005-003",
-          "title": "Integrate with execution service",
-          "description": "Connect start command to execution service API",
-          "technical_strategy": "Create internal/execution/client.go. POST to /execution/start with config. Subscribe to SSE for progress. Handle 4xx/5xx errors with user-friendly messages.",
-          "depends_on": [
-            "T-US-005-002"
-          ],
-          "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec start --help | grep -q 'provider'"
-        }
-      ]
-    },
-    {
-      "id": "US-006",
       "title": "Stack-Aware Quality Gates",
-      "description": "As a developer, I want quality gates that understand my tech stack so that I get relevant linting, testing, and security checks",
-      "requirement_id": "REQ-GATES",
+      "description": "As a developer, I want quality gates that run appropriate checks per language so that code quality is enforced",
+      "requirement_id": "REQ-QUALITY-GATES",
       "goal_id": "G-003",
       "depends_on": [
         "US-003"
       ],
       "acceptance_criteria": [
-        "Gates detect project type (Python/JS/Go/Rust) from files",
-        "Each stack runs appropriate linters and test commands",
-        "Gate results output as structured JSON",
-        "Failed gates include specific error locations and messages"
+        "Detects project language(s) from file extensions and config files",
+        "Runs appropriate linters: Python (black, mypy), JS (eslint), Go (golangci-lint), Rust (clippy)",
+        "Returns structured JSON results with pass/fail and details",
+        "Gate failures halt execution pipeline"
       ],
-      "verification_script": "cd openexec-execution && go test -v ./pkg/gates/... -cover",
-      "contract": {
-        "input": {
-          "project_path": "string",
-          "stack": "python|javascript|go|rust|auto"
+      "verification_script": "openexec gates --project . | jq '.results[] | select(.passed == false)'",
+      "contract": "{ \"results\": [{ \"gate\": \"lint\", \"language\": \"go\", \"passed\": true, \"details\": {} }] }",
+      "tasks": [
+        {
+          "id": "T-US-005-001",
+          "title": "Define quality gate interface and result schema",
+          "description": "Define Gate interface and GateResult struct with structured output",
+          "technical_strategy": "Use interface{ Run(ctx, path) (GateResult, error) }. Include Duration, Output, and Errors fields in GateResult.",
+          "depends_on": [],
+          "verification_script": "go build ./internal/gates/..."
         },
-        "output": {
-          "passed": "boolean",
-          "checks": [
-            {
-              "name": "string",
-              "passed": "boolean",
-              "errors": "array"
-            }
-          ]
+        {
+          "id": "T-US-005-002",
+          "title": "Implement language detection",
+          "description": "Detect languages from file extensions and config files (go.mod, package.json, etc.)",
+          "technical_strategy": "Walk directory with filepath.WalkDir. Check for marker files first, then count extensions. Return []Language sorted by file count.",
+          "depends_on": [
+            "T-US-005-001"
+          ],
+          "verification_script": "go test ./internal/gates/... -run TestDetectLanguage -v"
+        },
+        {
+          "id": "T-US-005-003",
+          "title": "Implement Go quality gate",
+          "description": "Run go fmt, go vet, and golangci-lint with structured output",
+          "technical_strategy": "Use exec.CommandContext with timeout. Parse golangci-lint JSON output. Map issues to GateResult.Errors.",
+          "depends_on": [
+            "T-US-005-002"
+          ],
+          "verification_script": "go test ./internal/gates/... -run TestGoGate -v"
+        },
+        {
+          "id": "T-US-005-004",
+          "title": "Implement Python quality gate",
+          "description": "Run black --check, flake8, and mypy with structured output",
+          "technical_strategy": "Check tool availability with exec.LookPath. Parse flake8 output line by line. Use mypy --output=json for structured errors.",
+          "depends_on": [
+            "T-US-005-002"
+          ],
+          "verification_script": "go test ./internal/gates/... -run TestPythonGate -v"
+        },
+        {
+          "id": "T-US-005-005",
+          "title": "Implement JavaScript/TypeScript quality gate",
+          "description": "Run eslint and tsc with structured output",
+          "technical_strategy": "Use eslint --format=json. Parse tsc output for TS errors. Handle both npm and yarn projects.",
+          "depends_on": [
+            "T-US-005-002"
+          ],
+          "verification_script": "go test ./internal/gates/... -run TestJSGate -v"
+        },
+        {
+          "id": "T-US-005-006",
+          "title": "Implement gate orchestrator with failure handling",
+          "description": "Run all applicable gates and aggregate results, halt on failure",
+          "technical_strategy": "Run gates concurrently with errgroup. Collect all results before halting. Return aggregate GateReport with overall status.",
+          "depends_on": [
+            "T-US-005-003",
+            "T-US-005-004",
+            "T-US-005-005"
+          ],
+          "verification_script": "go test ./internal/gates/... -run TestOrchestrator -v && go test ./internal/gates/... -cover | grep -q '90'"
         }
-      },
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Telegram Webhook Integration",
+      "description": "As an operator, I want to approve/reject tasks via Telegram so that I can manage execution remotely",
+      "requirement_id": "REQ-HITL-TELEGRAM",
+      "goal_id": "G-004",
+      "depends_on": [
+        "US-004"
+      ],
+      "acceptance_criteria": [
+        "POST /webhook/telegram validates secret token",
+        "Parses approve/reject/pause commands from message text",
+        "Updates execution state via internal API",
+        "Sends confirmation message back to user"
+      ],
+      "verification_script": "curl -X POST http://localhost:8080/webhook/telegram -H 'X-Telegram-Bot-Api-Secret-Token: test' -d '{\"message\":{\"text\":\"/approve T-001\"}}' | grep -q 'approved'",
+      "contract": "POST /webhook/telegram { \"message\": { \"text\": \"/approve T-001\", \"chat\": { \"id\": 123 } } }",
       "tasks": [
         {
           "id": "T-US-006-001",
-          "title": "Define gate result schema and stack detection",
-          "description": "Create structs for gate results and stack detection logic",
-          "technical_strategy": "Create pkg/gates/schema.go with GateResult, CheckResult structs. Create pkg/gates/detect.go to detect stack from file patterns (pyproject.toml, package.json, go.mod, Cargo.toml).",
+          "title": "Define Telegram webhook schema and commands",
+          "description": "Define TelegramUpdate struct and supported commands (approve, reject, pause, status)",
+          "technical_strategy": "Use Telegram Bot API types. Define CommandType enum. Include regex patterns for command parsing.",
           "depends_on": [],
-          "verification_script": "test -f openexec-execution/pkg/gates/schema.go && grep -q 'GateResult' openexec-execution/pkg/gates/schema.go"
+          "verification_script": "go build ./internal/webhook/..."
         },
         {
           "id": "T-US-006-002",
-          "title": "Implement Python quality gate",
-          "description": "Create quality gate for Python projects with pytest, black, mypy",
-          "technical_strategy": "Create pkg/gates/python.go. Run pytest --tb=short, black --check, mypy. Parse output into CheckResult. Capture stderr for error details.",
+          "title": "Implement webhook authentication",
+          "description": "Validate X-Telegram-Bot-Api-Secret-Token header",
+          "technical_strategy": "Use constant-time comparison with subtle.ConstantTimeCompare. Return 401 on mismatch. Log failed attempts.",
           "depends_on": [
             "T-US-006-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/gates/... -run TestPythonGate"
+          "verification_script": "go test ./internal/webhook/... -run TestTelegramAuth -v"
         },
         {
           "id": "T-US-006-003",
-          "title": "Implement JavaScript/TypeScript quality gate",
-          "description": "Create quality gate for JS/TS projects with npm test, eslint",
-          "technical_strategy": "Create pkg/gates/javascript.go. Run npm test, npx eslint. Parse JSON output from eslint --format=json. Handle node_modules existence check.",
+          "title": "Implement command parser and executor",
+          "description": "Parse command from message text and execute against execution API",
+          "technical_strategy": "Use regexp.MustCompile for command patterns. Inject ExecutionService interface. Return user-friendly error messages.",
           "depends_on": [
-            "T-US-006-001"
+            "T-US-006-002"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/gates/... -run TestJSGate"
+          "verification_script": "go test ./internal/webhook/... -run TestTelegramCommands -v"
         },
         {
           "id": "T-US-006-004",
-          "title": "Implement Go quality gate",
-          "description": "Create quality gate for Go projects with go test, golangci-lint",
-          "technical_strategy": "Create pkg/gates/golang.go. Run go test ./..., golangci-lint run --out-format=json. Parse golangci-lint JSON for error locations.",
+          "title": "Implement confirmation message sender",
+          "description": "Send confirmation messages back to Telegram chat",
+          "technical_strategy": "Use Telegram sendMessage API. Include task ID and new status. Handle rate limiting with retry.",
           "depends_on": [
-            "T-US-006-001"
+            "T-US-006-003"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/gates/... -run TestGoGate"
+          "verification_script": "go test ./internal/webhook/... -run TestTelegramResponse -v"
         },
         {
           "id": "T-US-006-005",
-          "title": "Implement Rust quality gate",
-          "description": "Create quality gate for Rust projects with cargo test, clippy",
-          "technical_strategy": "Create pkg/gates/rust.go. Run cargo test, cargo clippy --message-format=json. Parse cargo JSON messages for error extraction.",
+          "title": "Add integration tests for Telegram webhook",
+          "description": "Test full webhook flow with mock Telegram API",
+          "technical_strategy": "Use httptest.NewServer for mock Telegram. Test approve/reject/pause commands. Verify state changes in mock execution service.",
           "depends_on": [
-            "T-US-006-001"
+            "T-US-006-004"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/gates/... -run TestRustGate"
-        },
-        {
-          "id": "T-US-006-006",
-          "title": "Add comprehensive gate unit tests",
-          "description": "Unit tests for all gates with mocked command execution",
-          "technical_strategy": "Create pkg/gates/gates_test.go. Use exec.Command mocking via interface. Test success, failure, timeout scenarios for each stack. Target 90%+ coverage.",
-          "depends_on": [
-            "T-US-006-002",
-            "T-US-006-003",
-            "T-US-006-004",
-            "T-US-006-005"
-          ],
-          "verification_script": "cd openexec-execution && go test -v ./pkg/gates/... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep total"
+          "verification_script": "go test ./internal/webhook/... -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-007",
-      "title": "Telegram HITL Webhook",
-      "description": "As an operator, I want to receive approval requests via Telegram and respond with approve/reject/pause so that I can control execution remotely",
-      "requirement_id": "REQ-TELEGRAM",
+      "title": "WhatsApp/Twilio Webhook Integration",
+      "description": "As an operator, I want to approve/reject tasks via WhatsApp so that I have an alternative approval channel",
+      "requirement_id": "REQ-HITL-WHATSAPP",
       "goal_id": "G-004",
       "depends_on": [
         "US-004"
       ],
       "acceptance_criteria": [
-        "POST /webhook/telegram accepts Telegram bot updates",
-        "Webhook validates secret token from X-Telegram-Bot-Api-Secret-Token header",
-        "Commands /approve, /reject, /pause map to execution actions",
-        "Invalid tokens return 401 Unauthorized"
+        "POST /webhook/whatsapp validates Twilio signature",
+        "Parses approve/reject commands from message body",
+        "Updates execution state via internal API",
+        "Sends TwiML response for confirmation"
       ],
-      "verification_script": "curl -s -X POST -H 'X-Telegram-Bot-Api-Secret-Token: test' -H 'Content-Type: application/json' -d '{\"message\":{\"text\":\"/approve\"}}' http://localhost:8080/webhook/telegram",
-      "contract": {
-        "endpoint": "POST /webhook/telegram",
-        "headers": {
-          "X-Telegram-Bot-Api-Secret-Token": "string"
-        },
-        "commands": [
-          "/approve <task_id>",
-          "/reject <task_id> <reason>",
-          "/pause"
-        ]
-      },
+      "verification_script": "curl -X POST http://localhost:8080/webhook/whatsapp -H 'X-Twilio-Signature: valid' -d 'Body=approve T-001' | grep -q 'Message'",
+      "contract": "POST /webhook/whatsapp Body=approve+T-001&From=whatsapp%3A%2B1234567890",
       "tasks": [
         {
           "id": "T-US-007-001",
-          "title": "Define Telegram webhook schema and commands",
-          "description": "Create structs for Telegram updates and command parsing",
-          "technical_strategy": "Create pkg/telegram/schema.go with Update, Message, Command structs matching Telegram Bot API. Define command constants APPROVE, REJECT, PAUSE.",
+          "title": "Define WhatsApp webhook schema and TwiML response",
+          "description": "Define TwilioWebhook struct and TwiML response format",
+          "technical_strategy": "Parse application/x-www-form-urlencoded body. Define TwiML Message struct with XML tags. Include From and Body fields.",
           "depends_on": [],
-          "verification_script": "test -f openexec-interface/pkg/telegram/schema.go && grep -q 'Update' openexec-interface/pkg/telegram/schema.go"
+          "verification_script": "go build ./internal/webhook/..."
         },
         {
           "id": "T-US-007-002",
-          "title": "Implement webhook handler with token validation",
-          "description": "Create HTTP handler for Telegram webhook with secret validation",
-          "technical_strategy": "Create pkg/telegram/handler.go. Extract X-Telegram-Bot-Api-Secret-Token header. Compare with configured secret using constant-time comparison. Return 401 on mismatch.",
+          "title": "Implement Twilio signature validation",
+          "description": "Validate X-Twilio-Signature using auth token and request URL",
+          "technical_strategy": "Use crypto/hmac with sha1. Concatenate URL and sorted params. Base64 encode result and compare.",
           "depends_on": [
             "T-US-007-001"
           ],
-          "verification_script": "cd openexec-interface && go test -v ./pkg/telegram/... -run TestWebhookAuth"
+          "verification_script": "go test ./internal/webhook/... -run TestTwilioAuth -v"
         },
         {
           "id": "T-US-007-003",
-          "title": "Implement command parsing and execution mapping",
-          "description": "Parse Telegram commands and map to execution service actions",
-          "technical_strategy": "Create pkg/telegram/commands.go. Parse /approve <id>, /reject <id> <reason>, /pause. Call execution service client with appropriate action. Return confirmation message.",
+          "title": "Implement command parser and TwiML response",
+          "description": "Parse command from Body field and return TwiML confirmation",
+          "technical_strategy": "Reuse command parsing logic from Telegram. Return application/xml content type. Include task status in Message body.",
           "depends_on": [
             "T-US-007-002"
           ],
-          "verification_script": "cd openexec-interface && go test -v ./pkg/telegram/... -run TestCommandParsing"
+          "verification_script": "go test ./internal/webhook/... -run TestWhatsAppCommands -v"
         },
         {
           "id": "T-US-007-004",
-          "title": "Add unit tests for Telegram webhook",
-          "description": "Comprehensive tests for webhook authentication and command handling",
-          "technical_strategy": "Create pkg/telegram/handler_test.go. Test valid token, invalid token, missing token. Test each command with valid/invalid formats. Mock execution client.",
+          "title": "Add integration tests for WhatsApp webhook",
+          "description": "Test full webhook flow with mock Twilio signatures",
+          "technical_strategy": "Generate valid signatures in tests. Test approve/reject commands. Verify TwiML response format.",
           "depends_on": [
             "T-US-007-003"
           ],
-          "verification_script": "cd openexec-interface && go test -v ./pkg/telegram/... -cover"
+          "verification_script": "go test ./internal/webhook/... -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-008",
-      "title": "WhatsApp HITL Webhook",
-      "description": "As an operator, I want to receive approval requests via WhatsApp and respond with approve/reject/pause so that I have an alternative communication channel",
-      "requirement_id": "REQ-WHATSAPP",
-      "goal_id": "G-004",
+      "title": "CLI Start Command",
+      "description": "As a developer, I want 'openexec start' to launch execution with configurable flags so that I can run tasks",
+      "requirement_id": "REQ-CLI-START",
+      "goal_id": "G-005",
       "depends_on": [
+        "US-002",
         "US-004"
       ],
       "acceptance_criteria": [
-        "POST /webhook/whatsapp accepts Twilio webhook requests",
-        "Webhook validates Twilio signature from X-Twilio-Signature header",
-        "Text responses 'approve', 'reject', 'pause' map to execution actions",
-        "Invalid signatures return 403 Forbidden"
+        "Reads tasks.json from .openexec directory",
+        "Supports --harness (docker|local), --provider (anthropic|openai), --model flags",
+        "Starts execution and prints run ID",
+        "Respects task dependencies and ordering"
       ],
-      "verification_script": "curl -s -X POST -H 'X-Twilio-Signature: test' -H 'Content-Type: application/x-www-form-urlencoded' -d 'Body=approve' http://localhost:8080/webhook/whatsapp",
-      "contract": {
-        "endpoint": "POST /webhook/whatsapp",
-        "headers": {
-          "X-Twilio-Signature": "string"
-        },
-        "body_format": "application/x-www-form-urlencoded",
-        "commands": [
-          "approve <task_id>",
-          "reject <task_id> <reason>",
-          "pause"
-        ]
-      },
+      "verification_script": "openexec start --harness local --provider anthropic --model claude-3 | grep -q 'run-'",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-008-001",
-          "title": "Define WhatsApp/Twilio webhook schema",
-          "description": "Create structs for Twilio webhook payload parsing",
-          "technical_strategy": "Create pkg/whatsapp/schema.go with TwilioWebhook struct. Fields: From, Body, MessageSid. Use form tags for url.Values parsing.",
+          "title": "Define start command flags and validation",
+          "description": "Define --harness, --provider, --model flags with validation",
+          "technical_strategy": "Use cobra flags with default values. Validate provider/model combinations. Load from config.yaml as fallback.",
           "depends_on": [],
-          "verification_script": "test -f openexec-interface/pkg/whatsapp/schema.go && grep -q 'TwilioWebhook' openexec-interface/pkg/whatsapp/schema.go"
+          "verification_script": "go build ./cmd/openexec && ./bin/openexec start --help | grep -q 'harness'"
         },
         {
           "id": "T-US-008-002",
-          "title": "Implement Twilio signature validation",
-          "description": "Create HTTP handler with Twilio signature verification",
-          "technical_strategy": "Create pkg/whatsapp/handler.go. Implement Twilio signature validation using HMAC-SHA1. Compare with X-Twilio-Signature header. Return 403 on mismatch.",
+          "title": "Implement task loader and dependency resolver",
+          "description": "Load tasks.json and build execution DAG from dependencies",
+          "technical_strategy": "Use topological sort for DAG. Detect cycles and report error. Group independent tasks for parallel execution.",
           "depends_on": [
             "T-US-008-001"
           ],
-          "verification_script": "cd openexec-interface && go test -v ./pkg/whatsapp/... -run TestTwilioSignature"
+          "verification_script": "go test ./internal/executor/... -run TestTaskLoader -v"
         },
         {
           "id": "T-US-008-003",
-          "title": "Implement message parsing and execution mapping",
-          "description": "Parse WhatsApp text messages and map to execution actions",
-          "technical_strategy": "Create pkg/whatsapp/commands.go. Parse Body field for approve/reject/pause keywords. Extract task ID and reason. Call execution client. Return TwiML response.",
+          "title": "Implement execution launcher",
+          "description": "Start execution loop with configured harness and provider",
+          "technical_strategy": "Use factory pattern for harness/provider selection. Generate UUID for run ID. Write run start to audit.",
           "depends_on": [
             "T-US-008-002"
           ],
-          "verification_script": "cd openexec-interface && go test -v ./pkg/whatsapp/... -run TestMessageParsing"
+          "verification_script": "go test ./internal/executor/... -run TestLauncher -v"
         },
         {
           "id": "T-US-008-004",
-          "title": "Add unit tests for WhatsApp webhook",
-          "description": "Comprehensive tests for signature validation and message handling",
-          "technical_strategy": "Create pkg/whatsapp/handler_test.go. Test valid signature, invalid signature. Test each command format. Verify TwiML response format. Mock execution client.",
+          "title": "Add unit tests for start command",
+          "description": "Test flag parsing, validation, and execution startup",
+          "technical_strategy": "Mock executor interface. Test invalid flag combinations. Verify audit entries for run start.",
           "depends_on": [
             "T-US-008-003"
           ],
-          "verification_script": "cd openexec-interface && go test -v ./pkg/whatsapp/... -cover"
+          "verification_script": "go test ./cmd/openexec/... -run TestStart -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-009",
-      "title": "OpenExec Init Command",
-      "description": "As a developer, I want to run openexec init to create a .openexec directory and initialize stores so that I can set up a new project for orchestration",
-      "requirement_id": "REQ-INIT-CLI",
+      "title": "CLI Status Command",
+      "description": "As a developer, I want 'openexec status' to show real-time execution status so that I can monitor progress",
+      "requirement_id": "REQ-CLI-STATUS",
       "goal_id": "G-005",
       "depends_on": [
-        "US-001"
+        "US-004"
       ],
       "acceptance_criteria": [
-        "openexec init creates .openexec directory in current path",
-        "Creates empty tasks.json and config.yaml files",
-        "Creates audit.db SQLite database with schema",
-        "Warns if .openexec already exists without --force"
+        "Subscribes to SSE /events endpoint",
+        "Prints concise status updates to terminal",
+        "Shows task progress, current phase, and any errors",
+        "Handles connection drops and reconnects"
       ],
-      "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec init --help",
-      "contract": {
-        "command": "openexec init",
-        "flags": [
-          "--force"
-        ],
-        "creates": [
-          ".openexec/",
-          ".openexec/tasks.json",
-          ".openexec/config.yaml",
-          ".openexec/audit.db"
-        ]
-      },
+      "verification_script": "openexec status --timeout 5s | grep -q 'connected'",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-009-001",
-          "title": "Define init command structure and templates",
-          "description": "Create default file templates and directory structure",
-          "technical_strategy": "Create internal/init/templates.go with embedded template files using //go:embed. Define default config.yaml and empty tasks.json structures.",
+          "title": "Define status output format",
+          "description": "Define terminal output format for status updates",
+          "technical_strategy": "Use ANSI colors for status (green=done, yellow=running, red=failed). Show progress bar for overall completion. Include ETA based on task durations.",
           "depends_on": [],
-          "verification_script": "test -f openexec-cli/internal/init/templates.go && grep -q 'embed' openexec-cli/internal/init/templates.go"
+          "verification_script": "go build ./cmd/openexec && ./bin/openexec status --help"
         },
         {
           "id": "T-US-009-002",
-          "title": "Implement init command with directory creation",
-          "description": "Create cobra command that initializes project structure",
-          "technical_strategy": "Create cmd/init.go with cobra.Command. Check for existing .openexec. Create directory with 0755 permissions. Write template files. Initialize audit.db with schema.",
+          "title": "Implement SSE client with reconnection",
+          "description": "Create SSE client that handles connection drops and reconnects",
+          "technical_strategy": "Use bufio.Scanner for SSE parsing. Implement exponential backoff for reconnection. Use Last-Event-ID header for resume.",
           "depends_on": [
             "T-US-009-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./cmd/... -run TestInit"
+          "verification_script": "go test ./internal/client/... -run TestSSEClient -v"
         },
         {
           "id": "T-US-009-003",
-          "title": "Add --force flag and safety checks",
-          "description": "Implement force overwrite and existing directory warnings",
-          "technical_strategy": "Add --force bool flag. If .openexec exists and !force, print warning and exit 1. If force, backup existing to .openexec.bak before overwriting.",
+          "title": "Implement status renderer",
+          "description": "Render SSE events to terminal with formatting",
+          "technical_strategy": "Use term package for cursor control. Clear and redraw on each event. Handle terminal resize with SIGWINCH.",
           "depends_on": [
             "T-US-009-002"
           ],
-          "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec init --help | grep -q 'force'"
+          "verification_script": "go test ./internal/client/... -run TestStatusRenderer -v"
+        },
+        {
+          "id": "T-US-009-004",
+          "title": "Add unit tests for status command",
+          "description": "Test SSE parsing, reconnection, and rendering",
+          "technical_strategy": "Use mock SSE server. Test event parsing for all types. Verify output formatting.",
+          "depends_on": [
+            "T-US-009-003"
+          ],
+          "verification_script": "go test ./cmd/openexec/... -run TestStatus -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-010",
-      "title": "OpenExec Status Command",
-      "description": "As a developer, I want to run openexec status to see current execution state so that I can monitor progress from the terminal",
-      "requirement_id": "REQ-STATUS-CLI",
+      "title": "Live TUI Dashboard",
+      "description": "As a developer, I want 'openexec tui' to provide a real-time terminal dashboard so that I can monitor all workers and tasks",
+      "requirement_id": "REQ-TUI-DASHBOARD",
       "goal_id": "G-005",
       "depends_on": [
         "US-004"
       ],
       "acceptance_criteria": [
-        "openexec status connects to execution service SSE",
-        "Displays current phase, active task, and completion percentage",
-        "Updates in real-time as events are received",
-        "Exits cleanly on Ctrl+C"
+        "Shows all workers with status (idle, running, error)",
+        "Displays pending tasks queue",
+        "Shows live logs from current task",
+        "Updates in real-time via SSE",
+        "Keyboard navigation (j/k scroll, q quit, enter select)"
       ],
-      "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec status --help",
-      "contract": {
-        "command": "openexec status",
-        "flags": [
-          "--follow",
-          "--json"
-        ],
-        "output": "Current phase, task info, progress bar"
-      },
+      "verification_script": "echo 'q' | openexec tui --timeout 2s",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-010-001",
-          "title": "Implement SSE client for status updates",
-          "description": "Create SSE client that connects to execution /events endpoint",
-          "technical_strategy": "Create internal/sse/client.go. Use bufio.Scanner for SSE parsing. Handle 'event:' and 'data:' lines. Return parsed events via channel. Handle reconnection.",
+          "title": "Define TUI layout and component structure",
+          "description": "Design TUI layout with workers panel, tasks panel, and logs panel",
+          "technical_strategy": "Use Bubbletea for TUI framework. Define Model struct with focused panel state. Use Lipgloss for styling.",
           "depends_on": [],
-          "verification_script": "cd openexec-cli && go test -v ./internal/sse/... -run TestSSEClient"
+          "verification_script": "go build ./cmd/openexec && ./bin/openexec tui --help"
         },
         {
           "id": "T-US-010-002",
-          "title": "Implement status command with live display",
-          "description": "Create cobra command that displays real-time execution status",
-          "technical_strategy": "Create cmd/status.go. Connect SSE client. Use terminal ANSI codes for in-place updates. Show phase, current task, progress bar. Handle SIGINT for clean exit.",
+          "title": "Implement workers panel",
+          "description": "Display worker list with status indicators and current task",
+          "technical_strategy": "Use table component from Bubbles. Update on worker SSE events. Show spinner for running workers.",
           "depends_on": [
             "T-US-010-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./cmd/... -run TestStatus"
+          "verification_script": "go test ./internal/tui/... -run TestWorkersPanel -v"
         },
         {
           "id": "T-US-010-003",
-          "title": "Add --follow and --json output flags",
-          "description": "Add flags for continuous following and JSON output mode",
-          "technical_strategy": "Add --follow bool (default true), --json bool flags. If !follow, print current state and exit. If json, output raw SSE events as JSON lines.",
+          "title": "Implement tasks queue panel",
+          "description": "Display pending tasks with dependencies and priority",
+          "technical_strategy": "Use list component from Bubbles. Show dependency count. Highlight blocked vs ready tasks.",
           "depends_on": [
-            "T-US-010-002"
+            "T-US-010-001"
           ],
-          "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec status --help | grep -q 'json'"
+          "verification_script": "go test ./internal/tui/... -run TestTasksPanel -v"
+        },
+        {
+          "id": "T-US-010-004",
+          "title": "Implement live logs panel",
+          "description": "Show scrollable log output from current task",
+          "technical_strategy": "Use viewport component from Bubbles. Buffer last 1000 lines. Auto-scroll with toggle.",
+          "depends_on": [
+            "T-US-010-001"
+          ],
+          "verification_script": "go test ./internal/tui/... -run TestLogsPanel -v"
+        },
+        {
+          "id": "T-US-010-005",
+          "title": "Implement keyboard navigation",
+          "description": "Add keyboard shortcuts for panel focus, scrolling, and actions",
+          "technical_strategy": "Handle KeyMsg in Update. Tab cycles panels. j/k scroll in focused panel. q quits.",
+          "depends_on": [
+            "T-US-010-002",
+            "T-US-010-003",
+            "T-US-010-004"
+          ],
+          "verification_script": "go test ./internal/tui/... -run TestKeyboardNav -v"
+        },
+        {
+          "id": "T-US-010-006",
+          "title": "Add unit tests for TUI components",
+          "description": "Test all panels, navigation, and SSE integration",
+          "technical_strategy": "Use Bubbletea test helpers. Send mock key events. Verify View() output.",
+          "depends_on": [
+            "T-US-010-005"
+          ],
+          "verification_script": "go test ./internal/tui/... -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-011",
-      "title": "Live TUI Dashboard",
-      "description": "As a developer, I want to run openexec tui for a rich terminal interface so that I can have full visibility into workers, tasks, and logs",
-      "requirement_id": "REQ-TUI",
-      "goal_id": "G-005",
+      "title": "ISO Evidence Export",
+      "description": "As an auditor, I want 'openexec export --evidence' to generate a complete evidence archive so that I can verify compliance",
+      "requirement_id": "REQ-ISO-EXPORT",
+      "goal_id": "G-006",
       "depends_on": [
-        "US-004",
-        "US-010"
+        "US-003",
+        "US-005"
       ],
       "acceptance_criteria": [
-        "openexec tui displays full-screen terminal interface",
-        "Shows worker status panel with active/idle counts",
-        "Shows task queue with pending/running/completed tasks",
-        "Shows live log stream from execution",
-        "Supports keyboard navigation between panels"
+        "Exports full audit trail from SQLite",
+        "Includes all verification evidence (test results, gate reports)",
+        "Records model versions used for each task",
+        "Includes static gate reports",
+        "Optional cryptographic signing of archive"
       ],
-      "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec tui --help",
-      "contract": {
-        "command": "openexec tui",
-        "library": "bubbletea",
-        "panels": [
-          "workers",
-          "tasks",
-          "logs"
-        ]
-      },
+      "verification_script": "openexec export --evidence --output evidence.tar.gz && tar -tzf evidence.tar.gz | grep -q 'audit.db'",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-011-001",
-          "title": "Set up Bubbletea TUI framework",
-          "description": "Initialize Bubbletea app with basic model structure",
-          "technical_strategy": "Create internal/tui/app.go. Import github.com/charmbracelet/bubbletea. Define Model struct with panels slice. Implement Init, Update, View methods.",
+          "title": "Define evidence archive structure",
+          "description": "Define directory structure and manifest format for evidence archive",
+          "technical_strategy": "Create manifest.json with schema version, export timestamp, and file checksums. Organize by run_id/task_id hierarchy.",
           "depends_on": [],
-          "verification_script": "cd openexec-cli && go get github.com/charmbracelet/bubbletea && go build -o bin/openexec ."
+          "verification_script": "go build ./cmd/openexec && ./bin/openexec export --help | grep -q 'evidence'"
         },
         {
           "id": "T-US-011-002",
-          "title": "Implement workers panel component",
-          "description": "Create panel showing worker status and counts",
-          "technical_strategy": "Create internal/tui/panels/workers.go. Show active/idle/total counts. List worker IDs with current task. Use lipgloss for styling. Update from SSE events.",
+          "title": "Implement audit trail exporter",
+          "description": "Export audit.db to archive with integrity verification",
+          "technical_strategy": "Use SQLite backup API for consistent copy. Calculate SHA256 of database. Include in manifest.",
           "depends_on": [
             "T-US-011-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./internal/tui/panels/... -run TestWorkersPanel"
+          "verification_script": "go test ./internal/export/... -run TestAuditExport -v"
         },
         {
           "id": "T-US-011-003",
-          "title": "Implement tasks panel component",
-          "description": "Create panel showing task queue with status",
-          "technical_strategy": "Create internal/tui/panels/tasks.go. Show pending/running/completed/failed counts. List tasks with status indicators. Support scrolling with j/k keys.",
+          "title": "Implement evidence collector",
+          "description": "Collect verification evidence (test outputs, gate results) by run",
+          "technical_strategy": "Query audit.db for evidence events. Copy referenced files to archive. Verify file existence.",
           "depends_on": [
-            "T-US-011-001"
+            "T-US-011-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./internal/tui/panels/... -run TestTasksPanel"
+          "verification_script": "go test ./internal/export/... -run TestEvidenceCollector -v"
         },
         {
           "id": "T-US-011-004",
-          "title": "Implement logs panel component",
-          "description": "Create panel showing live execution logs",
-          "technical_strategy": "Create internal/tui/panels/logs.go. Ring buffer for last 100 log lines. Auto-scroll to bottom. Color-code by log level. Support pause with space key.",
+          "title": "Implement model version recorder",
+          "description": "Extract and record model versions used for each task",
+          "technical_strategy": "Parse model field from audit events. Create models.json with task_id to model mapping. Include provider info.",
           "depends_on": [
-            "T-US-011-001"
+            "T-US-011-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./internal/tui/panels/... -run TestLogsPanel"
+          "verification_script": "go test ./internal/export/... -run TestModelVersions -v"
         },
         {
           "id": "T-US-011-005",
-          "title": "Implement keyboard navigation and layout",
-          "description": "Add keyboard shortcuts and responsive panel layout",
-          "technical_strategy": "Create internal/tui/layout.go. Tab key cycles focus between panels. q quits. Resize handler adjusts panel widths. Use lipgloss.JoinHorizontal for layout.",
+          "title": "Implement optional cryptographic signing",
+          "description": "Sign manifest with Ed25519 key for tamper detection",
+          "technical_strategy": "Use crypto/ed25519 for signing. Store signature in manifest.sig. Support --sign and --key flags.",
           "depends_on": [
-            "T-US-011-002",
             "T-US-011-003",
             "T-US-011-004"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./internal/tui/... -run TestLayout"
+          "verification_script": "go test ./internal/export/... -run TestSigning -v"
         },
         {
           "id": "T-US-011-006",
-          "title": "Integrate TUI with SSE event stream",
-          "description": "Connect TUI components to execution SSE feed",
-          "technical_strategy": "Create internal/tui/stream.go. Use goroutine to read SSE. Send events to Bubbletea via Program.Send(). Update model state from events.",
+          "title": "Add unit tests for export command",
+          "description": "Test archive generation, content verification, and signing",
+          "technical_strategy": "Create test fixtures with sample audit data. Verify archive contents. Test signature verification.",
           "depends_on": [
             "T-US-011-005"
           ],
-          "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec tui --help"
+          "verification_script": "go test ./internal/export/... -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-012",
-      "title": "ISO-Compliant Evidence Export",
-      "description": "As a compliance officer, I want to run openexec export --evidence to generate a complete audit package so that I can satisfy ISO audit requirements",
-      "requirement_id": "REQ-EXPORT",
+      "title": "Story-Level Validation Review",
+      "description": "As a reviewer, I want validation to occur at story level so that I can verify integrated features",
+      "requirement_id": "REQ-STORY-VALIDATION",
       "goal_id": "G-006",
       "depends_on": [
         "US-003",
-        "US-006"
+        "US-004"
       ],
       "acceptance_criteria": [
-        "openexec export --evidence creates timestamped export directory",
-        "Export includes full audit.db copy",
-        "Export includes all verification evidence files",
-        "Export includes model versions and gate reports",
-        "Optional cryptographic signing of export manifest"
+        "Task-level verification is autonomous and evidence-based",
+        "Story completion triggers validation checkpoint",
+        "Validation includes integrated feature testing",
+        "Evidence is logged for both verification and validation",
+        "Failed validation blocks dependent stories"
       ],
-      "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec export --help | grep -q 'evidence'",
-      "contract": {
-        "command": "openexec export --evidence",
-        "flags": [
-          "--sign",
-          "--output <path>"
-        ],
-        "output_structure": {
-          "audit.db": "SQLite database copy",
-          "evidence/": "Verification artifacts",
-          "gates/": "Quality gate reports",
-          "manifest.json": "Export metadata",
-          "manifest.json.sig": "Optional signature"
-        }
-      },
+      "verification_script": "go test ./internal/validation/... -v && sqlite3 .openexec/audit.db 'SELECT * FROM events WHERE event_type LIKE \"validation%\"'",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-012-001",
-          "title": "Define export manifest schema",
-          "description": "Create schema for export manifest with metadata",
-          "technical_strategy": "Create internal/export/manifest.go. Define Manifest struct with ExportTime, RunID, ModelVersions, GateResults fields. Use json tags for serialization.",
+          "title": "Define verification vs validation event types",
+          "description": "Define distinct event types for task verification and story validation",
+          "technical_strategy": "Add EventTypeTaskVerified, EventTypeStoryValidated, EventTypeStoryRejected. Include evidence_path in payload.",
           "depends_on": [],
-          "verification_script": "test -f openexec-cli/internal/export/manifest.go && grep -q 'Manifest' openexec-cli/internal/export/manifest.go"
+          "verification_script": "go build ./internal/validation/..."
         },
         {
           "id": "T-US-012-002",
-          "title": "Implement evidence collection",
-          "description": "Collect all verification evidence from execution",
-          "technical_strategy": "Create internal/export/collector.go. Copy audit.db with WAL checkpoint. Collect evidence files from .openexec/evidence/. Collect gate reports from .openexec/gates/.",
+          "title": "Implement autonomous task verification",
+          "description": "Run verification_script for each task and log evidence",
+          "technical_strategy": "Execute script with timeout. Capture stdout/stderr to evidence file. Log EventTypeTaskVerified with pass/fail.",
           "depends_on": [
             "T-US-012-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./internal/export/... -run TestCollector"
+          "verification_script": "go test ./internal/validation/... -run TestTaskVerification -v"
         },
         {
           "id": "T-US-012-003",
-          "title": "Implement export command with packaging",
-          "description": "Create cobra command that packages evidence into export directory",
-          "technical_strategy": "Create cmd/export.go. Create timestamped directory YYYYMMDD_HHMMSS_export/. Copy collected files. Write manifest.json. Support --output path override.",
+          "title": "Implement story completion detector",
+          "description": "Detect when all tasks in a story are verified",
+          "technical_strategy": "Query audit.db for task events by story. Check all tasks have EventTypeTaskVerified. Emit StoryReadyForValidation event.",
           "depends_on": [
             "T-US-012-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v ./cmd/... -run TestExport"
+          "verification_script": "go test ./internal/validation/... -run TestStoryCompletion -v"
         },
         {
           "id": "T-US-012-004",
-          "title": "Implement optional cryptographic signing",
-          "description": "Add --sign flag for manifest signing",
-          "technical_strategy": "Create internal/export/sign.go. Use ed25519 for signing. Sign manifest.json content. Write signature to manifest.json.sig. Read signing key from OPENEXEC_SIGNING_KEY env.",
+          "title": "Implement story validation checkpoint",
+          "description": "Run integrated validation and request reviewer approval",
+          "technical_strategy": "Execute story verification_script. Emit validation request via webhook. Wait for approve/reject response.",
           "depends_on": [
             "T-US-012-003"
           ],
-          "verification_script": "cd openexec-cli && go build -o bin/openexec . && ./bin/openexec export --help | grep -q 'sign'"
+          "verification_script": "go test ./internal/validation/... -run TestStoryValidation -v"
+        },
+        {
+          "id": "T-US-012-005",
+          "title": "Implement dependency blocking on validation failure",
+          "description": "Block dependent stories when validation fails",
+          "technical_strategy": "Check story validation status before starting dependent stories. Log blocked reason in audit. Notify via SSE.",
+          "depends_on": [
+            "T-US-012-004"
+          ],
+          "verification_script": "go test ./internal/validation/... -run TestDependencyBlocking -v"
+        },
+        {
+          "id": "T-US-012-006",
+          "title": "Add unit tests for validation system",
+          "description": "Test verification, validation, and blocking scenarios",
+          "technical_strategy": "Create test stories with dependencies. Mock verification scripts. Verify audit events and blocking behavior.",
+          "depends_on": [
+            "T-US-012-005"
+          ],
+          "verification_script": "go test ./internal/validation/... -cover | grep -q '90'"
         }
       ]
     },
     {
       "id": "US-013",
-      "title": "Story-Level Validation Review",
-      "description": "As a reviewer, I want story-level validation checkpoints so that I can verify integrated features rather than individual tasks",
-      "requirement_id": "REQ-STORY-REVIEW",
-      "goal_id": "G-006",
-      "depends_on": [
-        "US-003",
-        "US-006"
-      ],
-      "acceptance_criteria": [
-        "Tasks within stories have autonomous verification (evidence-based)",
-        "Story completion triggers validation review checkpoint",
-        "Validation review checks integrated feature against acceptance criteria",
-        "Review results recorded in audit trail"
-      ],
-      "verification_script": "cd openexec-execution && go test -v ./internal/review/... -cover",
-      "contract": {
-        "review_tiers": {
-          "task": {
-            "type": "verification",
-            "automated": true,
-            "evidence": "audit.db"
-          },
-          "story": {
-            "type": "validation",
-            "checkpoint": true,
-            "criteria": "acceptance_criteria"
-          }
-        }
-      },
-      "tasks": [
-        {
-          "id": "T-US-013-001",
-          "title": "Define review tier schema and states",
-          "description": "Create schema for two-tier review process",
-          "technical_strategy": "Create internal/review/schema.go. Define ReviewTier enum (Task, Story). Define ReviewState (Pending, InProgress, Passed, Failed). Define ReviewResult with evidence links.",
-          "depends_on": [],
-          "verification_script": "test -f openexec-execution/internal/review/schema.go && grep -q 'ReviewTier' openexec-execution/internal/review/schema.go"
-        },
-        {
-          "id": "T-US-013-002",
-          "title": "Implement task-level verification",
-          "description": "Create automated verification for individual tasks",
-          "technical_strategy": "Create internal/review/verification.go. Run task verification_script. Capture output as evidence. Record result in audit.db. Return ReviewResult.",
-          "depends_on": [
-            "T-US-013-001"
-          ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/review/... -run TestTaskVerification"
-        },
-        {
-          "id": "T-US-013-003",
-          "title": "Implement story-level validation checkpoint",
-          "description": "Create validation checkpoint triggered on story completion",
-          "technical_strategy": "Create internal/review/validation.go. Trigger when all tasks verified. Check integrated feature against acceptance_criteria. Support manual validation input. Record in audit.",
-          "depends_on": [
-            "T-US-013-002"
-          ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/review/... -run TestStoryValidation"
-        },
-        {
-          "id": "T-US-013-004",
-          "title": "Add review audit integration",
-          "description": "Record all review activities in immutable audit trail",
-          "technical_strategy": "Create internal/review/audit.go. Emit REVIEW_STARTED, REVIEW_PASSED, REVIEW_FAILED events. Include reviewer ID, timestamp, evidence links. Use existing AuditWriter.",
-          "depends_on": [
-            "T-US-013-003"
-          ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/review/... -run TestReviewAudit"
-        }
-      ]
-    },
-    {
-      "id": "US-014",
       "title": "Web Dashboard with SSE",
-      "description": "As an operator, I want a web dashboard showing projects, phases, workers, and audit events so that I can monitor execution from a browser",
-      "requirement_id": "REQ-DASHBOARD",
+      "description": "As an operator, I want a web dashboard to monitor projects and execution so that I have visual observability",
+      "requirement_id": "REQ-WEB-DASHBOARD",
       "goal_id": "G-005",
       "depends_on": [
         "US-004"
       ],
       "acceptance_criteria": [
-        "Next.js dashboard accessible at configured URL",
-        "Dashboard shows list of projects with status",
-        "Real-time updates via SSE connection",
-        "Displays current phases and worker states",
-        "Shows recent audit events"
+        "Next.js dashboard shows projects list",
+        "Displays phases and worker status",
+        "Shows recent audit events in real-time",
+        "Configurable via .env.local for backend endpoints",
+        "Responsive design for desktop and mobile"
       ],
-      "verification_script": "cd openexec-web && npm install && npm run build",
-      "contract": {
-        "framework": "Next.js",
-        "config": ".env.local",
-        "pages": [
-          "/",
-          "/projects/[id]",
-          "/audit"
-        ],
-        "sse_endpoint": "OPENEXEC_API_URL/events"
-      },
+      "verification_script": "cd openexec-web && npm run build && npm run test",
+      "contract": "",
+      "tasks": [
+        {
+          "id": "T-US-013-001",
+          "title": "Define dashboard API contract and types",
+          "description": "Define TypeScript types for API responses and SSE events",
+          "technical_strategy": "Create types in src/types/. Match Go struct definitions. Use zod for runtime validation.",
+          "depends_on": [],
+          "verification_script": "cd openexec-web && npm run type-check"
+        },
+        {
+          "id": "T-US-013-002",
+          "title": "Implement SSE client hook",
+          "description": "Create React hook for SSE subscription with reconnection",
+          "technical_strategy": "Use EventSource API. Handle onmessage, onerror, onopen. Implement reconnection with exponential backoff.",
+          "depends_on": [
+            "T-US-013-001"
+          ],
+          "verification_script": "cd openexec-web && npm test -- --grep 'useSSE'"
+        },
+        {
+          "id": "T-US-013-003",
+          "title": "Implement projects list page",
+          "description": "Create page showing all projects with status summary",
+          "technical_strategy": "Use Next.js App Router. Fetch projects from API. Show card for each with progress indicator.",
+          "depends_on": [
+            "T-US-013-002"
+          ],
+          "verification_script": "cd openexec-web && npm test -- --grep 'ProjectsList'"
+        },
+        {
+          "id": "T-US-013-004",
+          "title": "Implement project detail page",
+          "description": "Create page showing phases, workers, and live events for a project",
+          "technical_strategy": "Use dynamic route /projects/[id]. Subscribe to SSE for updates. Show worker cards and event log.",
+          "depends_on": [
+            "T-US-013-003"
+          ],
+          "verification_script": "cd openexec-web && npm test -- --grep 'ProjectDetail'"
+        },
+        {
+          "id": "T-US-013-005",
+          "title": "Implement audit events component",
+          "description": "Create real-time audit event list with filtering",
+          "technical_strategy": "Use virtualized list for performance. Filter by event type and severity. Show timestamp and details.",
+          "depends_on": [
+            "T-US-013-002"
+          ],
+          "verification_script": "cd openexec-web && npm test -- --grep 'AuditEvents'"
+        },
+        {
+          "id": "T-US-013-006",
+          "title": "Implement environment configuration",
+          "description": "Support .env.local configuration for backend endpoints",
+          "technical_strategy": "Use NEXT_PUBLIC_API_URL env var. Provide default for local dev. Document in README.",
+          "depends_on": [],
+          "verification_script": "cd openexec-web && test -f .env.example"
+        },
+        {
+          "id": "T-US-013-007",
+          "title": "Add unit and E2E tests for dashboard",
+          "description": "Test all components and user flows",
+          "technical_strategy": "Use React Testing Library for unit tests. Use Playwright for E2E. Mock SSE in tests.",
+          "depends_on": [
+            "T-US-013-004",
+            "T-US-013-005",
+            "T-US-013-006"
+          ],
+          "verification_script": "cd openexec-web && npm run test && npm run test:e2e"
+        }
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Goal Validation E2E Tests",
+      "description": "As a project owner, I want E2E tests to verify primary goals so that I have confidence in system correctness",
+      "requirement_id": "REQ-GOAL-VALIDATION",
+      "goal_id": "G-001",
+      "depends_on": [
+        "US-001",
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-008",
+        "US-009"
+      ],
+      "acceptance_criteria": [
+        "E2E test covers full workflow: init -> plan -> start -> status",
+        "Verifies audit trail contains expected events",
+        "Verifies quality gates run and report results",
+        "Verifies SSE events are received",
+        "Tests run in CI environment"
+      ],
+      "verification_script": "go test ./e2e/... -v -tags=e2e",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-014-001",
-          "title": "Set up Next.js project structure",
-          "description": "Initialize Next.js project with TypeScript and configuration",
-          "technical_strategy": "Use create-next-app with TypeScript template. Configure .env.local with OPENEXEC_API_URL. Set up src/app directory structure. Install tailwindcss for styling.",
+          "title": "Define E2E test fixtures",
+          "description": "Create sample intent document and expected outputs for E2E tests",
+          "technical_strategy": "Create testdata/ directory. Include minimal intent.md. Define expected story count and task IDs.",
           "depends_on": [],
-          "verification_script": "cd openexec-web && npm run build"
+          "verification_script": "test -f e2e/testdata/intent.md"
         },
         {
           "id": "T-US-014-002",
-          "title": "Implement SSE client hook",
-          "description": "Create React hook for SSE connection management",
-          "technical_strategy": "Create src/hooks/useSSE.ts. Use EventSource API. Handle reconnection with exponential backoff. Parse SSE events into typed objects. Return events and connection state.",
+          "title": "Implement init -> plan -> start workflow test",
+          "description": "Test full CLI workflow from project init to execution start",
+          "technical_strategy": "Use t.TempDir() for isolated project. Execute CLI commands via exec.Command. Verify file outputs.",
           "depends_on": [
             "T-US-014-001"
           ],
-          "verification_script": "cd openexec-web && npm test -- --testPathPattern=useSSE"
+          "verification_script": "go test ./e2e/... -run TestFullWorkflow -v -tags=e2e"
         },
         {
           "id": "T-US-014-003",
-          "title": "Implement projects list page",
-          "description": "Create main page showing all projects with status",
-          "technical_strategy": "Create src/app/page.tsx. Fetch projects from API. Display cards with project name, status, last activity. Use SSE hook for real-time status updates.",
+          "title": "Implement audit trail verification test",
+          "description": "Verify audit.db contains expected events after execution",
+          "technical_strategy": "Query audit.db after workflow. Assert EventTypeRunStart, EventTypeTaskStart events exist. Verify timestamps are sequential.",
           "depends_on": [
             "T-US-014-002"
           ],
-          "verification_script": "cd openexec-web && npm test -- --testPathPattern=page"
+          "verification_script": "go test ./e2e/... -run TestAuditTrail -v -tags=e2e"
         },
         {
           "id": "T-US-014-004",
-          "title": "Implement project detail page",
-          "description": "Create page showing phases, workers, and tasks for a project",
-          "technical_strategy": "Create src/app/projects/[id]/page.tsx. Show phase timeline. Display workers table with status. Show task queue. Subscribe to project-specific SSE events.",
+          "title": "Implement quality gates E2E test",
+          "description": "Verify quality gates run and produce structured results",
+          "technical_strategy": "Create test project with Go code. Run gates command. Parse JSON output and verify structure.",
           "depends_on": [
-            "T-US-014-002"
+            "T-US-014-001"
           ],
-          "verification_script": "cd openexec-web && npm test -- --testPathPattern=projects"
+          "verification_script": "go test ./e2e/... -run TestQualityGates -v -tags=e2e"
         },
         {
           "id": "T-US-014-005",
-          "title": "Implement audit events page",
-          "description": "Create page showing recent audit events with filtering",
-          "technical_strategy": "Create src/app/audit/page.tsx. Fetch audit events from API. Support filtering by event type, time range. Display as scrollable table. Real-time updates via SSE.",
+          "title": "Implement SSE E2E test",
+          "description": "Verify SSE events are received during execution",
+          "technical_strategy": "Start execution in background. Connect to /events. Assert heartbeat and task events received within timeout.",
           "depends_on": [
             "T-US-014-002"
           ],
-          "verification_script": "cd openexec-web && npm test -- --testPathPattern=audit"
+          "verification_script": "go test ./e2e/... -run TestSSEEvents -v -tags=e2e"
         },
         {
           "id": "T-US-014-006",
-          "title": "Add component unit tests",
-          "description": "Unit tests for dashboard components",
-          "technical_strategy": "Create tests in __tests__/ directories. Use @testing-library/react. Mock SSE connection. Test loading, error, and data states. Target 80%+ coverage.",
+          "title": "Configure CI for E2E tests",
+          "description": "Add E2E tests to CI pipeline with proper setup",
+          "technical_strategy": "Add e2e job to GitHub Actions. Install Go and dependencies. Run with -tags=e2e. Upload test artifacts on failure.",
           "depends_on": [
             "T-US-014-003",
             "T-US-014-004",
             "T-US-014-005"
           ],
-          "verification_script": "cd openexec-web && npm test -- --coverage"
-        }
-      ]
-    },
-    {
-      "id": "US-015",
-      "title": "Docker Development Environment",
-      "description": "As a developer, I want a Docker-based development environment so that I can run all OpenExec services locally with hot-reload",
-      "requirement_id": "REQ-DOCKER",
-      "goal_id": "G-005",
-      "depends_on": [
-        "US-001"
-      ],
-      "acceptance_criteria": [
-        "docker compose up starts all services",
-        "Source code changes trigger automatic rebuild",
-        "All containers pass health checks",
-        "Ports exposed for local development access"
-      ],
-      "verification_script": "docker compose config && docker compose build",
-      "contract": {
-        "services": [
-          "openexec-cli",
-          "openexec-execution",
-          "openexec-interface",
-          "openexec-orchestration",
-          "openexec-web"
-        ],
-        "ports": {
-          "cli": 8080,
-          "execution": 8081,
-          "interface": 8082,
-          "orchestration": 8083,
-          "web": 3000
-        }
-      },
-      "tasks": [
-        {
-          "id": "T-US-015-001",
-          "title": "Create Dockerfiles for Go services",
-          "description": "Create multi-stage Dockerfiles for CLI, Execution, Interface services",
-          "technical_strategy": "Use golang:1.21-alpine as builder. Separate go mod download from build for cache. Use scratch or distroless for final image. Add HEALTHCHECK instruction.",
-          "depends_on": [],
-          "verification_script": "docker build -t openexec-cli openexec-cli/ && docker build -t openexec-execution openexec-execution/"
-        },
-        {
-          "id": "T-US-015-002",
-          "title": "Create Dockerfile for Python orchestration service",
-          "description": "Create Dockerfile for orchestration service with development mode",
-          "technical_strategy": "Use python:3.11-slim. Install with pip --no-cache-dir. Create non-root user. Add HEALTHCHECK with curl. Support hot-reload with watchfiles.",
-          "depends_on": [],
-          "verification_script": "docker build -t openexec-orchestration openexec-orchestration/"
-        },
-        {
-          "id": "T-US-015-003",
-          "title": "Create Dockerfile for Next.js web dashboard",
-          "description": "Create Dockerfile for web dashboard with development mode",
-          "technical_strategy": "Use node:20-alpine. Multi-stage: deps, builder, runner. Use standalone output mode. Add HEALTHCHECK. Support hot-reload in dev mode.",
-          "depends_on": [],
-          "verification_script": "docker build -t openexec-web openexec-web/"
-        },
-        {
-          "id": "T-US-015-004",
-          "title": "Create docker-compose.yml for all services",
-          "description": "Configure docker-compose with volume mounts and networking",
-          "technical_strategy": "Define all services with build contexts. Map host directories for hot-reload. Create internal network. Define health checks. Expose development ports.",
-          "depends_on": [
-            "T-US-015-001",
-            "T-US-015-002",
-            "T-US-015-003"
-          ],
-          "verification_script": "docker compose config"
-        },
-        {
-          "id": "T-US-015-005",
-          "title": "Verify all containers start and pass health checks",
-          "description": "Ensure complete Docker environment starts successfully",
-          "technical_strategy": "Run docker compose up -d. Wait for health checks with timeout. Check all services reach 'healthy' state. Document any startup dependencies.",
-          "depends_on": [
-            "T-US-015-004"
-          ],
-          "verification_script": "docker compose up -d && sleep 30 && docker compose ps | grep -v 'unhealthy'"
-        }
-      ]
-    },
-    {
-      "id": "US-016",
-      "title": "Goal Validation E2E Tests",
-      "description": "As a project stakeholder, I want automated E2E tests that validate all primary goals so that I can verify the system works end-to-end",
-      "requirement_id": "REQ-E2E",
-      "goal_id": "G-001",
-      "depends_on": [
-        "US-002",
-        "US-005",
-        "US-010",
-        "US-014",
-        "US-015"
-      ],
-      "acceptance_criteria": [
-        "E2E test suite covers all 6 primary goals",
-        "Tests run against Docker environment",
-        "Playwright tests for web dashboard",
-        "CLI integration tests for command workflows",
-        "Test results generate coverage report"
-      ],
-      "verification_script": "cd openexec-e2e && npm test",
-      "contract": {
-        "framework": "Playwright",
-        "test_files": [
-          "planning.spec.ts",
-          "execution.spec.ts",
-          "gates.spec.ts",
-          "hitl.spec.ts",
-          "cli.spec.ts",
-          "audit.spec.ts"
-        ]
-      },
-      "tasks": [
-        {
-          "id": "T-US-016-001",
-          "title": "Set up Playwright E2E test project",
-          "description": "Initialize Playwright project with configuration",
-          "technical_strategy": "Create openexec-e2e directory. Run npm init playwright. Configure baseURL from env. Set up Docker compose dependency. Create test fixtures for common setup.",
-          "depends_on": [],
-          "verification_script": "cd openexec-e2e && npm install && npx playwright install"
-        },
-        {
-          "id": "T-US-016-002",
-          "title": "Implement G-001 Planning E2E test",
-          "description": "E2E test for PRD to Goal Tree planning flow",
-          "technical_strategy": "Create tests/planning.spec.ts. Test openexec plan with sample intent. Verify JSON output structure. Check tasks.json written. Assert goal tree completeness.",
-          "depends_on": [
-            "T-US-016-001"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test planning.spec.ts"
-        },
-        {
-          "id": "T-US-016-003",
-          "title": "Implement G-002 Execution E2E test",
-          "description": "E2E test for auditable execution with SSE",
-          "technical_strategy": "Create tests/execution.spec.ts. Start execution, subscribe to SSE. Verify iteration events received. Check audit.db entries created. Assert completion event.",
-          "depends_on": [
-            "T-US-016-001"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test execution.spec.ts"
-        },
-        {
-          "id": "T-US-016-004",
-          "title": "Implement G-003 Quality Gates E2E test",
-          "description": "E2E test for stack-aware quality gates",
-          "technical_strategy": "Create tests/gates.spec.ts. Test gates on sample Python, JS, Go projects. Verify structured JSON output. Check pass/fail detection. Assert error location accuracy.",
-          "depends_on": [
-            "T-US-016-001"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test gates.spec.ts"
-        },
-        {
-          "id": "T-US-016-005",
-          "title": "Implement G-004 HITL E2E test",
-          "description": "E2E test for Telegram and WhatsApp webhooks",
-          "technical_strategy": "Create tests/hitl.spec.ts. Send mock Telegram webhook with approve command. Verify execution state change. Test WhatsApp webhook similarly. Check audit trail.",
-          "depends_on": [
-            "T-US-016-001"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test hitl.spec.ts"
-        },
-        {
-          "id": "T-US-016-006",
-          "title": "Implement G-005 CLI and Dashboard E2E test",
-          "description": "E2E test for CLI commands and web dashboard",
-          "technical_strategy": "Create tests/cli.spec.ts. Test init, plan, start, status commands. Navigate dashboard pages. Verify SSE updates in UI. Check all panels render correctly.",
-          "depends_on": [
-            "T-US-016-001"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test cli.spec.ts"
-        },
-        {
-          "id": "T-US-016-007",
-          "title": "Implement G-006 Audit Export E2E test",
-          "description": "E2E test for ISO-compliant evidence export",
-          "technical_strategy": "Create tests/audit.spec.ts. Run execution to completion. Execute export --evidence. Verify export directory structure. Check manifest completeness. Test optional signing.",
-          "depends_on": [
-            "T-US-016-001"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test audit.spec.ts"
-        },
-        {
-          "id": "T-US-016-008",
-          "title": "Generate E2E test coverage report",
-          "description": "Configure coverage reporting for E2E suite",
-          "technical_strategy": "Configure playwright.config.ts with reporter: [['html'], ['json']]. Create coverage aggregation script. Output to coverage/ directory. Include in CI artifacts.",
-          "depends_on": [
-            "T-US-016-002",
-            "T-US-016-003",
-            "T-US-016-004",
-            "T-US-016-005",
-            "T-US-016-006",
-            "T-US-016-007"
-          ],
-          "verification_script": "cd openexec-e2e && npx playwright test --reporter=html && test -d playwright-report"
+          "verification_script": "test -f .github/workflows/e2e.yml"
         }
       ]
     }
