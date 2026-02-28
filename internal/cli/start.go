@@ -483,11 +483,10 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 
 				node.Status = StatusCompleted
 				
-				// Persist completion back to tasks.json
+				// Persist completion back to tasks.json (already done, but let's be safe)
 				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
 				
 				// ADAPTIVE DISCOVERY: Re-scan for new tasks
-				mu.Lock()
 				doneCount++
 				fmt.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
 				
