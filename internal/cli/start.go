@@ -39,6 +39,7 @@ type Task struct {
 	StoryID            string   `json:"story_id,omitempty"`
 	Status             string   `json:"status"`
 	DependsOn          []string `json:"depends_on,omitempty"`
+	Dependencies       []string `json:"dependencies,omitempty"` // Alias for compatibility
 	VerificationScript string   `json:"verification_script,omitempty"`
 }
 
@@ -279,7 +280,19 @@ Examples:
 			tasks = filtered
 		}
 
-		fmt.Printf("📋 Executing %d task(s)\n", len(tasks))
+		pendingCount := 0
+		for _, t := range tasks {
+			if t.Status != "completed" && t.Status != "done" {
+				pendingCount++
+			}
+		}
+
+		if pendingCount == 0 {
+			fmt.Println("No pending tasks found.")
+			return nil
+		}
+
+		fmt.Printf("📋 Executing %d task(s)\n", pendingCount)
 		if startExecutor != "" {
 			fmt.Printf("   Executor: %s\n", startExecutor)
 		}
@@ -329,16 +342,34 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 
 	// 1. Build the graph
 	nodes := make(map[string]*TaskNode)
+	totalToRun := 0
+	
 	for _, t := range tasks {
+		status := StatusPending
+		if t.Status == "completed" || t.Status == "done" {
+			status = StatusCompleted
+		} else {
+			totalToRun++
+		}
+		
 		node := &TaskNode{
 			Task:      t,
-			Status:    StatusPending,
+			Status:    status,
 			DependsOn: make(map[string]bool),
 		}
+		// Merge both fields for maximum compatibility
 		for _, dep := range t.DependsOn {
 			node.DependsOn[dep] = true
 		}
+		for _, dep := range t.Dependencies {
+			node.DependsOn[dep] = true
+		}
 		nodes[t.ID] = node
+	}
+
+	if totalToRun == 0 {
+		fmt.Println("No pending tasks to execute.")
+		return nil
 	}
 
 	var mu sync.Mutex
@@ -346,7 +377,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 	readyTasks := make(chan *TaskNode, len(tasks))
 	errors := make(chan error, len(tasks))
 	doneCount := 0
-	totalCount := len(tasks)
+	totalCount := totalToRun
 
 	// Helper to check and enqueue ready tasks
 	checkReady := func() {
@@ -451,6 +482,10 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				node.Status = StatusCompleted
 				doneCount++
 				fmt.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
+				
+				// Persist completion back to tasks.json
+				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
+				
 				mu.Unlock()
 
 				// Re-check for new ready tasks
@@ -601,21 +636,27 @@ func isServerRunning(port int) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// loadPendingTasks loads tasks from stories.json or tasks.json
+// loadPendingTasks loads all tasks from tasks.json or .openexec/stories.json
 func loadPendingTasks(projectDir string) ([]Task, error) {
 	var tasks []Task
 
-	// Try tasks.json first
+	// Try root tasks.json first
+	rootTasksFile := filepath.Join(projectDir, "tasks.json")
+	if data, err := os.ReadFile(rootTasksFile); err == nil {
+		var tf TasksFile
+		if err := json.Unmarshal(data, &tf); err == nil {
+			// LOAD ALL TASKS to preserve DAG integrity
+			return tf.Tasks, nil
+		}
+	}
+
+	// Try .openexec/tasks.json next
 	tasksFile := filepath.Join(projectDir, ".openexec", "tasks.json")
 	if data, err := os.ReadFile(tasksFile); err == nil {
 		var tf TasksFile
 		if err := json.Unmarshal(data, &tf); err == nil {
-			for _, t := range tf.Tasks {
-				if t.Status == "pending" || t.Status == "" {
-					tasks = append(tasks, t)
-				}
-			}
-			return tasks, nil
+			// LOAD ALL TASKS to preserve DAG integrity
+			return tf.Tasks, nil
 		}
 	}
 
@@ -929,4 +970,80 @@ func ensureMCPConfig(projectDir string) (string, error) {
 	}
 
 	return mcpPath, nil
+}
+
+// saveTaskStatus persists task status to .openexec/tasks.json and root tasks.json
+func saveTaskStatus(projectDir string, taskID string, status string) error {
+	paths := []string{
+		filepath.Join(projectDir, "tasks.json"),
+		filepath.Join(projectDir, ".openexec", "tasks.json"),
+	}
+
+	var firstData []byte
+	for _, p := range paths {
+		if data, err := os.ReadFile(p); err == nil {
+			firstData = data
+			break
+		}
+	}
+
+	if firstData == nil {
+		return fmt.Errorf("could not find tasks.json in root or .openexec")
+	}
+
+	// We need a generic map to preserve all fields (phases, etc.)
+	var data map[string]interface{}
+	if err := json.Unmarshal(firstData, &data); err != nil {
+		return err
+	}
+
+	updated := false
+
+	// Update in flat 'tasks' list if exists
+	if tasks, ok := data["tasks"].([]interface{}); ok {
+		for _, t := range tasks {
+			if taskMap, ok := t.(map[string]interface{}); ok {
+				if id, ok := taskMap["id"].(string); ok && id == taskID {
+					taskMap["status"] = status
+					updated = true
+				}
+			}
+		}
+	}
+
+	// Update in 'phases' too if present
+	if phases, ok := data["phases"].([]interface{}); ok {
+		for _, phase := range phases {
+			if phaseMap, ok := phase.(map[string]interface{}); ok {
+				if tasks, ok := phaseMap["tasks"].([]interface{}); ok {
+					for _, t := range tasks {
+						if taskMap, ok := t.(map[string]interface{}); ok {
+							if id, ok := taskMap["id"].(string); ok && id == taskID {
+								taskMap["status"] = status
+								updated = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if !updated {
+		return fmt.Errorf("task %s not found in tasks.json", taskID)
+	}
+
+	newData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write to all paths that exist
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			_ = os.WriteFile(p, newData, 0644)
+		}
+	}
+
+	return nil
 }
