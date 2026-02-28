@@ -480,14 +480,15 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				}
 
 				node.Status = StatusCompleted
-				doneCount++
-				fmt.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
 				
 				// Persist completion back to tasks.json
 				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
 				
 				// ADAPTIVE DISCOVERY: Re-scan for new tasks
 				mu.Lock()
+				doneCount++
+				fmt.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
+				
 				newTasks, err := loadPendingTasks(projectDir)
 				if err == nil {
 					for _, nt := range newTasks {
@@ -512,17 +513,16 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 						}
 					}
 				}
-				mu.Unlock()
-
-				// Re-check for new ready tasks
-				checkReady()
-
+				
 				// If all tasks are done, close the channel to stop workers
-				mu.Lock()
-				if doneCount == totalCount {
+				isDone := doneCount == totalCount
+				if isDone {
 					close(readyTasks)
 				}
 				mu.Unlock()
+
+				// Re-check for new ready tasks (OUTSIDE of lock to prevent deadlock)
+				checkReady()
 			}
 		}(i)
 	}
