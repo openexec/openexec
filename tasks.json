@@ -1,0 +1,2108 @@
+{
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Phase 1",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-001-001",
+          "title": "Discovery: Analyze Existing OpenExec Codebase: Extract environment variables and dependencies",
+          "depends_on": [],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Phase 2",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-001-002",
+          "title": "Discovery: Analyze Existing OpenExec Codebase: Map existing API surface area",
+          "depends_on": [
+            "T-US-001-001"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Phase 3",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-001-003",
+          "title": "Discovery: Analyze Existing OpenExec Codebase: Verify local buildability of all components",
+          "depends_on": [
+            "T-US-001-002"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Phase 4",
+      "hours": 2.0,
+      "tasks": [
+        {
+          "id": "T-US-002-001",
+          "title": "Orchestration Plan CLI: Define Plan CLI schema and error codes",
+          "depends_on": [
+            "T-US-001-003"
+          ],
+          "estimated_hours": 2.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Phase 5",
+      "hours": 2.0,
+      "tasks": [
+        {
+          "id": "T-US-002-002",
+          "title": "Orchestration Plan CLI: Implement plan command with mock handler",
+          "depends_on": [
+            "T-US-002-001",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 2.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Phase 6",
+      "hours": 2.0,
+      "tasks": [
+        {
+          "id": "T-US-002-003",
+          "title": "Orchestration Plan CLI: Integrate orchestration service for plan generation",
+          "depends_on": [
+            "T-US-002-002",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 2.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Phase 7",
+      "hours": 8.0,
+      "tasks": [
+        {
+          "id": "T-US-002-004",
+          "title": "Orchestration Plan CLI: Write tasks to .openexec/tasks.json",
+          "depends_on": [
+            "T-US-002-003",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-003-001",
+          "title": "Non-Bypassable Audit System: Define audit schema and event types",
+          "depends_on": [
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 8,
+      "name": "Phase 8",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-003-002",
+          "title": "Non-Bypassable Audit System: Implement AuditWriter with SQLite backend",
+          "depends_on": [
+            "T-US-003-001",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 9,
+      "name": "Phase 9",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-003-003",
+          "title": "Non-Bypassable Audit System: Implement execution halt on audit failure",
+          "depends_on": [
+            "T-US-003-002",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 10,
+      "name": "Phase 10",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-003-004",
+          "title": "Non-Bypassable Audit System: Add audit unit tests with 90%+ coverage",
+          "depends_on": [
+            "T-US-003-003",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 11,
+      "name": "Phase 11",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-004-001",
+          "title": "Execution SSE Events Endpoint: Define SSE event schema and types",
+          "depends_on": [
+            "T-US-003-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 12,
+      "name": "Phase 12",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-004-002",
+          "title": "Execution SSE Events Endpoint: Implement SSE handler with heartbeat",
+          "depends_on": [
+            "T-US-004-001",
+            "T-US-003-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 13,
+      "name": "Phase 13",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-004-003",
+          "title": "Execution SSE Events Endpoint: Integrate execution loop with SSE emitter",
+          "depends_on": [
+            "T-US-004-002",
+            "T-US-003-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 14,
+      "name": "Phase 14",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-004-004",
+          "title": "Execution SSE Events Endpoint: Handle client disconnect and cleanup",
+          "depends_on": [
+            "T-US-004-003",
+            "T-US-003-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 15,
+      "name": "Phase 15",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-005-001",
+          "title": "Execution Start with Provider Flags: Define start command flags and config schema",
+          "depends_on": [
+            "T-US-002-004",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 16,
+      "name": "Phase 16",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-005-002",
+          "title": "Execution Start with Provider Flags: Implement start command with mock execution",
+          "depends_on": [
+            "T-US-005-001",
+            "T-US-002-004",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 17,
+      "name": "Phase 17",
+      "hours": 8.0,
+      "tasks": [
+        {
+          "id": "T-US-005-003",
+          "title": "Execution Start with Provider Flags: Integrate with execution service",
+          "depends_on": [
+            "T-US-005-002",
+            "T-US-002-004",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-006-001",
+          "title": "Stack-Aware Quality Gates: Define gate result schema and stack detection",
+          "depends_on": [
+            "T-US-003-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 18,
+      "name": "Phase 18",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-006-002",
+          "title": "Stack-Aware Quality Gates: Implement Python quality gate",
+          "depends_on": [
+            "T-US-006-001",
+            "T-US-003-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 19,
+      "name": "Phase 19",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-006-003",
+          "title": "Stack-Aware Quality Gates: Implement JavaScript/TypeScript quality gate",
+          "depends_on": [
+            "T-US-006-001",
+            "T-US-003-004",
+            "T-US-006-002"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 20,
+      "name": "Phase 20",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-006-004",
+          "title": "Stack-Aware Quality Gates: Implement Go quality gate",
+          "depends_on": [
+            "T-US-006-001",
+            "T-US-003-004",
+            "T-US-006-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 21,
+      "name": "Phase 21",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-006-005",
+          "title": "Stack-Aware Quality Gates: Implement Rust quality gate",
+          "depends_on": [
+            "T-US-006-001",
+            "T-US-003-004",
+            "T-US-006-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 22,
+      "name": "Phase 22",
+      "hours": 7.0,
+      "tasks": [
+        {
+          "id": "T-US-006-006",
+          "title": "Stack-Aware Quality Gates: Add comprehensive gate unit tests",
+          "depends_on": [
+            "T-US-006-002",
+            "T-US-006-003",
+            "T-US-006-004",
+            "T-US-006-005",
+            "T-US-003-004"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-007-001",
+          "title": "Telegram HITL Webhook: Define Telegram webhook schema and commands",
+          "depends_on": [
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 23,
+      "name": "Phase 23",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-007-002",
+          "title": "Telegram HITL Webhook: Implement webhook handler with token validation",
+          "depends_on": [
+            "T-US-007-001",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 24,
+      "name": "Phase 24",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-007-003",
+          "title": "Telegram HITL Webhook: Implement command parsing and execution mapping",
+          "depends_on": [
+            "T-US-007-002",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 25,
+      "name": "Phase 25",
+      "hours": 7.0,
+      "tasks": [
+        {
+          "id": "T-US-007-004",
+          "title": "Telegram HITL Webhook: Add unit tests for Telegram webhook",
+          "depends_on": [
+            "T-US-007-003",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-008-001",
+          "title": "WhatsApp HITL Webhook: Define WhatsApp/Twilio webhook schema",
+          "depends_on": [
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 26,
+      "name": "Phase 26",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-008-002",
+          "title": "WhatsApp HITL Webhook: Implement Twilio signature validation",
+          "depends_on": [
+            "T-US-008-001",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 27,
+      "name": "Phase 27",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-008-003",
+          "title": "WhatsApp HITL Webhook: Implement message parsing and execution mapping",
+          "depends_on": [
+            "T-US-008-002",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 28,
+      "name": "Phase 28",
+      "hours": 7.0,
+      "tasks": [
+        {
+          "id": "T-US-008-004",
+          "title": "WhatsApp HITL Webhook: Add unit tests for WhatsApp webhook",
+          "depends_on": [
+            "T-US-008-003",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-009-001",
+          "title": "OpenExec Init Command: Define init command structure and templates",
+          "depends_on": [
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 29,
+      "name": "Phase 29",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-009-002",
+          "title": "OpenExec Init Command: Implement init command with directory creation",
+          "depends_on": [
+            "T-US-009-001",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 30,
+      "name": "Phase 30",
+      "hours": 8.0,
+      "tasks": [
+        {
+          "id": "T-US-009-003",
+          "title": "OpenExec Init Command: Add --force flag and safety checks",
+          "depends_on": [
+            "T-US-009-002",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-010-001",
+          "title": "OpenExec Status Command: Implement SSE client for status updates",
+          "depends_on": [
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 31,
+      "name": "Phase 31",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-010-002",
+          "title": "OpenExec Status Command: Implement status command with live display",
+          "depends_on": [
+            "T-US-010-001",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 32,
+      "name": "Phase 32",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-010-003",
+          "title": "OpenExec Status Command: Add --follow and --json output flags",
+          "depends_on": [
+            "T-US-010-002",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 33,
+      "name": "Phase 33",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-011-001",
+          "title": "Live TUI Dashboard: Set up Bubbletea TUI framework",
+          "depends_on": [
+            "T-US-004-004",
+            "T-US-010-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 34,
+      "name": "Phase 34",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-011-002",
+          "title": "Live TUI Dashboard: Implement workers panel component",
+          "depends_on": [
+            "T-US-011-001",
+            "T-US-004-004",
+            "T-US-010-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 35,
+      "name": "Phase 35",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-011-003",
+          "title": "Live TUI Dashboard: Implement tasks panel component",
+          "depends_on": [
+            "T-US-011-001",
+            "T-US-004-004",
+            "T-US-010-003",
+            "T-US-011-002"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 36,
+      "name": "Phase 36",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-011-004",
+          "title": "Live TUI Dashboard: Implement logs panel component",
+          "depends_on": [
+            "T-US-011-001",
+            "T-US-004-004",
+            "T-US-010-003",
+            "T-US-011-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 37,
+      "name": "Phase 37",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-011-005",
+          "title": "Live TUI Dashboard: Implement keyboard navigation and layout",
+          "depends_on": [
+            "T-US-011-002",
+            "T-US-011-003",
+            "T-US-011-004",
+            "T-US-004-004",
+            "T-US-010-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 38,
+      "name": "Phase 38",
+      "hours": 8.0,
+      "tasks": [
+        {
+          "id": "T-US-011-006",
+          "title": "Live TUI Dashboard: Integrate TUI with SSE event stream",
+          "depends_on": [
+            "T-US-011-005",
+            "T-US-004-004",
+            "T-US-010-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-012-001",
+          "title": "ISO-Compliant Evidence Export: Define export manifest schema",
+          "depends_on": [
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 39,
+      "name": "Phase 39",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-012-002",
+          "title": "ISO-Compliant Evidence Export: Implement evidence collection",
+          "depends_on": [
+            "T-US-012-001",
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 40,
+      "name": "Phase 40",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-012-003",
+          "title": "ISO-Compliant Evidence Export: Implement export command with packaging",
+          "depends_on": [
+            "T-US-012-002",
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 41,
+      "name": "Phase 41",
+      "hours": 8.0,
+      "tasks": [
+        {
+          "id": "T-US-012-004",
+          "title": "ISO-Compliant Evidence Export: Implement optional cryptographic signing",
+          "depends_on": [
+            "T-US-012-003",
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-013-001",
+          "title": "Story-Level Validation Review: Define review tier schema and states",
+          "depends_on": [
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 42,
+      "name": "Phase 42",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-013-002",
+          "title": "Story-Level Validation Review: Implement task-level verification",
+          "depends_on": [
+            "T-US-013-001",
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 43,
+      "name": "Phase 43",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-013-003",
+          "title": "Story-Level Validation Review: Implement story-level validation checkpoint",
+          "depends_on": [
+            "T-US-013-002",
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 44,
+      "name": "Phase 44",
+      "hours": 8.0,
+      "tasks": [
+        {
+          "id": "T-US-013-004",
+          "title": "Story-Level Validation Review: Add review audit integration",
+          "depends_on": [
+            "T-US-013-003",
+            "T-US-003-004",
+            "T-US-006-006"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-014-001",
+          "title": "Web Dashboard with SSE: Set up Next.js project structure",
+          "depends_on": [
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 45,
+      "name": "Phase 45",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-014-002",
+          "title": "Web Dashboard with SSE: Implement SSE client hook",
+          "depends_on": [
+            "T-US-014-001",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 46,
+      "name": "Phase 46",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-014-003",
+          "title": "Web Dashboard with SSE: Implement projects list page",
+          "depends_on": [
+            "T-US-014-002",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 47,
+      "name": "Phase 47",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-014-004",
+          "title": "Web Dashboard with SSE: Implement project detail page",
+          "depends_on": [
+            "T-US-014-002",
+            "T-US-004-004",
+            "T-US-014-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 48,
+      "name": "Phase 48",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-014-005",
+          "title": "Web Dashboard with SSE: Implement audit events page",
+          "depends_on": [
+            "T-US-014-002",
+            "T-US-004-004",
+            "T-US-014-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 49,
+      "name": "Phase 49",
+      "hours": 7.0,
+      "tasks": [
+        {
+          "id": "T-US-014-006",
+          "title": "Web Dashboard with SSE: Add component unit tests",
+          "depends_on": [
+            "T-US-014-003",
+            "T-US-014-004",
+            "T-US-014-005",
+            "T-US-004-004"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-015-001",
+          "title": "Docker Development Environment: Create Dockerfiles for Go services",
+          "depends_on": [
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 50,
+      "name": "Phase 50",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-015-002",
+          "title": "Docker Development Environment: Create Dockerfile for Python orchestration service",
+          "depends_on": [
+            "T-US-001-003",
+            "T-US-015-001"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 51,
+      "name": "Phase 51",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-015-003",
+          "title": "Docker Development Environment: Create Dockerfile for Next.js web dashboard",
+          "depends_on": [
+            "T-US-001-003",
+            "T-US-015-002"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 52,
+      "name": "Phase 52",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-015-004",
+          "title": "Docker Development Environment: Create docker-compose.yml for all services",
+          "depends_on": [
+            "T-US-015-001",
+            "T-US-015-002",
+            "T-US-015-003",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 53,
+      "name": "Phase 53",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-015-005",
+          "title": "Docker Development Environment: Verify all containers start and pass health checks",
+          "depends_on": [
+            "T-US-015-004",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 54,
+      "name": "Phase 54",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-001",
+          "title": "Goal Validation E2E Tests: Set up Playwright E2E test project",
+          "depends_on": [
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 55,
+      "name": "Phase 55",
+      "hours": 2.0,
+      "tasks": [
+        {
+          "id": "T-US-016-002",
+          "title": "Goal Validation E2E Tests: Implement G-001 Planning E2E test",
+          "depends_on": [
+            "T-US-016-001",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005"
+          ],
+          "estimated_hours": 2.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 56,
+      "name": "Phase 56",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-003",
+          "title": "Goal Validation E2E Tests: Implement G-002 Execution E2E test",
+          "depends_on": [
+            "T-US-016-001",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005",
+            "T-US-016-002"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 57,
+      "name": "Phase 57",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-004",
+          "title": "Goal Validation E2E Tests: Implement G-003 Quality Gates E2E test",
+          "depends_on": [
+            "T-US-016-001",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005",
+            "T-US-016-003"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 58,
+      "name": "Phase 58",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-005",
+          "title": "Goal Validation E2E Tests: Implement G-004 HITL E2E test",
+          "depends_on": [
+            "T-US-016-001",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005",
+            "T-US-016-004"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 59,
+      "name": "Phase 59",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-006",
+          "title": "Goal Validation E2E Tests: Implement G-005 CLI and Dashboard E2E test",
+          "depends_on": [
+            "T-US-016-001",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005",
+            "T-US-016-005"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 60,
+      "name": "Phase 60",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-007",
+          "title": "Goal Validation E2E Tests: Implement G-006 Audit Export E2E test",
+          "depends_on": [
+            "T-US-016-001",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005",
+            "T-US-016-006"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 61,
+      "name": "Phase 61",
+      "hours": 3.0,
+      "tasks": [
+        {
+          "id": "T-US-016-008",
+          "title": "Goal Validation E2E Tests: Generate E2E test coverage report",
+          "depends_on": [
+            "T-US-016-002",
+            "T-US-016-003",
+            "T-US-016-004",
+            "T-US-016-005",
+            "T-US-016-006",
+            "T-US-016-007",
+            "T-US-002-004",
+            "T-US-005-003",
+            "T-US-010-003",
+            "T-US-014-006",
+            "T-US-015-005"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    }
+  ],
+  "total_hours": 264.0,
+  "task_count": 71,
+  "phase_count": 61,
+  "tasks": [
+    {
+      "id": "T-US-001-001",
+      "title": "Discovery: Analyze Existing OpenExec Codebase: Extract environment variables and dependencies",
+      "depends_on": [],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-001-002",
+      "title": "Discovery: Analyze Existing OpenExec Codebase: Map existing API surface area",
+      "depends_on": [
+        "T-US-001-001"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-001-003",
+      "title": "Discovery: Analyze Existing OpenExec Codebase: Verify local buildability of all components",
+      "depends_on": [
+        "T-US-001-002"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-002-001",
+      "title": "Orchestration Plan CLI: Define Plan CLI schema and error codes",
+      "depends_on": [
+        "T-US-001-003"
+      ],
+      "estimated_hours": 2.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-002-002",
+      "title": "Orchestration Plan CLI: Implement plan command with mock handler",
+      "depends_on": [
+        "T-US-002-001",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 2.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-002-003",
+      "title": "Orchestration Plan CLI: Integrate orchestration service for plan generation",
+      "depends_on": [
+        "T-US-002-002",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 2.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-002-004",
+      "title": "Orchestration Plan CLI: Write tasks to .openexec/tasks.json",
+      "depends_on": [
+        "T-US-002-003",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-003-001",
+      "title": "Non-Bypassable Audit System: Define audit schema and event types",
+      "depends_on": [
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-003-002",
+      "title": "Non-Bypassable Audit System: Implement AuditWriter with SQLite backend",
+      "depends_on": [
+        "T-US-003-001",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-003-003",
+      "title": "Non-Bypassable Audit System: Implement execution halt on audit failure",
+      "depends_on": [
+        "T-US-003-002",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-003-004",
+      "title": "Non-Bypassable Audit System: Add audit unit tests with 90%+ coverage",
+      "depends_on": [
+        "T-US-003-003",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-004-001",
+      "title": "Execution SSE Events Endpoint: Define SSE event schema and types",
+      "depends_on": [
+        "T-US-003-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-004-002",
+      "title": "Execution SSE Events Endpoint: Implement SSE handler with heartbeat",
+      "depends_on": [
+        "T-US-004-001",
+        "T-US-003-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-004-003",
+      "title": "Execution SSE Events Endpoint: Integrate execution loop with SSE emitter",
+      "depends_on": [
+        "T-US-004-002",
+        "T-US-003-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-004-004",
+      "title": "Execution SSE Events Endpoint: Handle client disconnect and cleanup",
+      "depends_on": [
+        "T-US-004-003",
+        "T-US-003-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-005-001",
+      "title": "Execution Start with Provider Flags: Define start command flags and config schema",
+      "depends_on": [
+        "T-US-002-004",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-005-002",
+      "title": "Execution Start with Provider Flags: Implement start command with mock execution",
+      "depends_on": [
+        "T-US-005-001",
+        "T-US-002-004",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-005-003",
+      "title": "Execution Start with Provider Flags: Integrate with execution service",
+      "depends_on": [
+        "T-US-005-002",
+        "T-US-002-004",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-006-001",
+      "title": "Stack-Aware Quality Gates: Define gate result schema and stack detection",
+      "depends_on": [
+        "T-US-003-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-006-002",
+      "title": "Stack-Aware Quality Gates: Implement Python quality gate",
+      "depends_on": [
+        "T-US-006-001",
+        "T-US-003-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-006-003",
+      "title": "Stack-Aware Quality Gates: Implement JavaScript/TypeScript quality gate",
+      "depends_on": [
+        "T-US-006-001",
+        "T-US-003-004",
+        "T-US-006-002"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-006-004",
+      "title": "Stack-Aware Quality Gates: Implement Go quality gate",
+      "depends_on": [
+        "T-US-006-001",
+        "T-US-003-004",
+        "T-US-006-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-006-005",
+      "title": "Stack-Aware Quality Gates: Implement Rust quality gate",
+      "depends_on": [
+        "T-US-006-001",
+        "T-US-003-004",
+        "T-US-006-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-006-006",
+      "title": "Stack-Aware Quality Gates: Add comprehensive gate unit tests",
+      "depends_on": [
+        "T-US-006-002",
+        "T-US-006-003",
+        "T-US-006-004",
+        "T-US-006-005",
+        "T-US-003-004"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-007-001",
+      "title": "Telegram HITL Webhook: Define Telegram webhook schema and commands",
+      "depends_on": [
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-007-002",
+      "title": "Telegram HITL Webhook: Implement webhook handler with token validation",
+      "depends_on": [
+        "T-US-007-001",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-007-003",
+      "title": "Telegram HITL Webhook: Implement command parsing and execution mapping",
+      "depends_on": [
+        "T-US-007-002",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-007-004",
+      "title": "Telegram HITL Webhook: Add unit tests for Telegram webhook",
+      "depends_on": [
+        "T-US-007-003",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-008-001",
+      "title": "WhatsApp HITL Webhook: Define WhatsApp/Twilio webhook schema",
+      "depends_on": [
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-008-002",
+      "title": "WhatsApp HITL Webhook: Implement Twilio signature validation",
+      "depends_on": [
+        "T-US-008-001",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-008-003",
+      "title": "WhatsApp HITL Webhook: Implement message parsing and execution mapping",
+      "depends_on": [
+        "T-US-008-002",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-008-004",
+      "title": "WhatsApp HITL Webhook: Add unit tests for WhatsApp webhook",
+      "depends_on": [
+        "T-US-008-003",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-009-001",
+      "title": "OpenExec Init Command: Define init command structure and templates",
+      "depends_on": [
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-009-002",
+      "title": "OpenExec Init Command: Implement init command with directory creation",
+      "depends_on": [
+        "T-US-009-001",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-009-003",
+      "title": "OpenExec Init Command: Add --force flag and safety checks",
+      "depends_on": [
+        "T-US-009-002",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-010-001",
+      "title": "OpenExec Status Command: Implement SSE client for status updates",
+      "depends_on": [
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-010-002",
+      "title": "OpenExec Status Command: Implement status command with live display",
+      "depends_on": [
+        "T-US-010-001",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-010-003",
+      "title": "OpenExec Status Command: Add --follow and --json output flags",
+      "depends_on": [
+        "T-US-010-002",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-011-001",
+      "title": "Live TUI Dashboard: Set up Bubbletea TUI framework",
+      "depends_on": [
+        "T-US-004-004",
+        "T-US-010-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-011-002",
+      "title": "Live TUI Dashboard: Implement workers panel component",
+      "depends_on": [
+        "T-US-011-001",
+        "T-US-004-004",
+        "T-US-010-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-011-003",
+      "title": "Live TUI Dashboard: Implement tasks panel component",
+      "depends_on": [
+        "T-US-011-001",
+        "T-US-004-004",
+        "T-US-010-003",
+        "T-US-011-002"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-011-004",
+      "title": "Live TUI Dashboard: Implement logs panel component",
+      "depends_on": [
+        "T-US-011-001",
+        "T-US-004-004",
+        "T-US-010-003",
+        "T-US-011-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-011-005",
+      "title": "Live TUI Dashboard: Implement keyboard navigation and layout",
+      "depends_on": [
+        "T-US-011-002",
+        "T-US-011-003",
+        "T-US-011-004",
+        "T-US-004-004",
+        "T-US-010-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-011-006",
+      "title": "Live TUI Dashboard: Integrate TUI with SSE event stream",
+      "depends_on": [
+        "T-US-011-005",
+        "T-US-004-004",
+        "T-US-010-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-012-001",
+      "title": "ISO-Compliant Evidence Export: Define export manifest schema",
+      "depends_on": [
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-012-002",
+      "title": "ISO-Compliant Evidence Export: Implement evidence collection",
+      "depends_on": [
+        "T-US-012-001",
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-012-003",
+      "title": "ISO-Compliant Evidence Export: Implement export command with packaging",
+      "depends_on": [
+        "T-US-012-002",
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-012-004",
+      "title": "ISO-Compliant Evidence Export: Implement optional cryptographic signing",
+      "depends_on": [
+        "T-US-012-003",
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-013-001",
+      "title": "Story-Level Validation Review: Define review tier schema and states",
+      "depends_on": [
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-013-002",
+      "title": "Story-Level Validation Review: Implement task-level verification",
+      "depends_on": [
+        "T-US-013-001",
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-013-003",
+      "title": "Story-Level Validation Review: Implement story-level validation checkpoint",
+      "depends_on": [
+        "T-US-013-002",
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-013-004",
+      "title": "Story-Level Validation Review: Add review audit integration",
+      "depends_on": [
+        "T-US-013-003",
+        "T-US-003-004",
+        "T-US-006-006"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-014-001",
+      "title": "Web Dashboard with SSE: Set up Next.js project structure",
+      "depends_on": [
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-014-002",
+      "title": "Web Dashboard with SSE: Implement SSE client hook",
+      "depends_on": [
+        "T-US-014-001",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-014-003",
+      "title": "Web Dashboard with SSE: Implement projects list page",
+      "depends_on": [
+        "T-US-014-002",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-014-004",
+      "title": "Web Dashboard with SSE: Implement project detail page",
+      "depends_on": [
+        "T-US-014-002",
+        "T-US-004-004",
+        "T-US-014-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-014-005",
+      "title": "Web Dashboard with SSE: Implement audit events page",
+      "depends_on": [
+        "T-US-014-002",
+        "T-US-004-004",
+        "T-US-014-004"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-014-006",
+      "title": "Web Dashboard with SSE: Add component unit tests",
+      "depends_on": [
+        "T-US-014-003",
+        "T-US-014-004",
+        "T-US-014-005",
+        "T-US-004-004"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-001",
+      "title": "Docker Development Environment: Create Dockerfiles for Go services",
+      "depends_on": [
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-002",
+      "title": "Docker Development Environment: Create Dockerfile for Python orchestration service",
+      "depends_on": [
+        "T-US-001-003",
+        "T-US-015-001"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-003",
+      "title": "Docker Development Environment: Create Dockerfile for Next.js web dashboard",
+      "depends_on": [
+        "T-US-001-003",
+        "T-US-015-002"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-004",
+      "title": "Docker Development Environment: Create docker-compose.yml for all services",
+      "depends_on": [
+        "T-US-015-001",
+        "T-US-015-002",
+        "T-US-015-003",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-005",
+      "title": "Docker Development Environment: Verify all containers start and pass health checks",
+      "depends_on": [
+        "T-US-015-004",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-001",
+      "title": "Goal Validation E2E Tests: Set up Playwright E2E test project",
+      "depends_on": [
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-002",
+      "title": "Goal Validation E2E Tests: Implement G-001 Planning E2E test",
+      "depends_on": [
+        "T-US-016-001",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005"
+      ],
+      "estimated_hours": 2.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-003",
+      "title": "Goal Validation E2E Tests: Implement G-002 Execution E2E test",
+      "depends_on": [
+        "T-US-016-001",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005",
+        "T-US-016-002"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-004",
+      "title": "Goal Validation E2E Tests: Implement G-003 Quality Gates E2E test",
+      "depends_on": [
+        "T-US-016-001",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005",
+        "T-US-016-003"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-005",
+      "title": "Goal Validation E2E Tests: Implement G-004 HITL E2E test",
+      "depends_on": [
+        "T-US-016-001",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005",
+        "T-US-016-004"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-006",
+      "title": "Goal Validation E2E Tests: Implement G-005 CLI and Dashboard E2E test",
+      "depends_on": [
+        "T-US-016-001",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005",
+        "T-US-016-005"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-007",
+      "title": "Goal Validation E2E Tests: Implement G-006 Audit Export E2E test",
+      "depends_on": [
+        "T-US-016-001",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005",
+        "T-US-016-006"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-008",
+      "title": "Goal Validation E2E Tests: Generate E2E test coverage report",
+      "depends_on": [
+        "T-US-016-002",
+        "T-US-016-003",
+        "T-US-016-004",
+        "T-US-016-005",
+        "T-US-016-006",
+        "T-US-016-007",
+        "T-US-002-004",
+        "T-US-005-003",
+        "T-US-010-003",
+        "T-US-014-006",
+        "T-US-015-005"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    }
+  ]
+}
