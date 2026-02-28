@@ -531,16 +531,20 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 		}(i)
 	}
 
+	var once sync.Once
 	// Monitor for completion to close the channel
 	go func() {
 		for {
 			mu.Lock()
-			if doneCount == totalCount {
-				close(readyTasks)
-				mu.Unlock()
+			finished := (doneCount == totalCount && totalCount > 0)
+			mu.Unlock()
+			
+			if finished {
+				once.Do(func() {
+					close(readyTasks)
+				})
 				return
 			}
-			mu.Unlock()
 			time.Sleep(100 * time.Millisecond)
 		}
 	}()
