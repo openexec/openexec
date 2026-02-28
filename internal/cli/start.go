@@ -554,6 +554,33 @@ Examples:
 	},
 }
 
+var restartCmd = &cobra.Command{
+	Use:   "restart",
+	Short: "Restart the execution daemon",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("♻️ Restarting OpenExec Execution Engine...")
+		
+		// Stop if running
+		if isServerRunning(startPort) {
+			stopArgs := []string{"start", "stop", "--port", fmt.Sprintf("%d", startPort)}
+			stopExec := exec.Command(os.Args[0], stopArgs...)
+			_ = stopExec.Run()
+			time.Sleep(1 * time.Second)
+		}
+		
+		// Start again
+		startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
+		if startReviewer != "" {
+			startArgs = append(startArgs, "--reviewer", startReviewer)
+		}
+		
+		startExec := exec.Command(os.Args[0], startArgs...)
+		startExec.Stdout = os.Stdout
+		startExec.Stderr = os.Stderr
+		return startExec.Run()
+	},
+}
+
 func init() {
 	// start command flags
 	startCmd.Flags().IntVarP(&startPort, "port", "P", 8080, "HTTP server port")
@@ -561,6 +588,10 @@ func init() {
 	startCmd.Flags().IntVarP(&startTimeout, "timeout", "t", 600, "Task timeout in seconds")
 	startCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (e.g., claude-3-opus-20240229)")
 	startCmd.Flags().BoolVarP(&startDaemon, "daemon", "d", false, "Run as background daemon")
+
+	// Subcommands for start
+	startCmd.AddCommand(stopCmd)
+	startCmd.AddCommand(restartCmd)
 
 	// run command flags
 	runCmd.Flags().IntVar(&startPort, "port", 8080, "Execution engine port")
