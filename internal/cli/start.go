@@ -385,6 +385,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 		defer mu.Unlock()
 
 		for _, node := range nodes {
+			// Only consider tasks that are currently pending
 			if node.Status != StatusPending {
 				continue
 			}
@@ -394,7 +395,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 			for depID := range node.DependsOn {
 				depNode, exists := nodes[depID]
 				if !exists {
-					// Dependency not in current set (maybe already completed in previous run)
+					// Dependency not in current set
 					continue
 				}
 				if depNode.Status != StatusCompleted {
@@ -404,6 +405,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 			}
 
 			if allDone {
+				// Mark as ready FIRST to prevent double-enqueuing in concurrent checkReady calls
 				node.Status = StatusReady
 				readyTasks <- node
 			}
@@ -514,18 +516,35 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 					}
 				}
 				
-				// If all tasks are done, close the channel to stop workers
-				isDone := doneCount == totalCount
-				if isDone {
-					close(readyTasks)
-				}
+				// If all tasks are done, signal completion
+				finished := (doneCount == totalCount)
 				mu.Unlock()
 
-				// Re-check for new ready tasks (OUTSIDE of lock to prevent deadlock)
+				if finished {
+					// Don't close yet, let WaitGroup handle termination if workers are still active
+					// Actually, with range readyTasks, we MUST close it to stop workers.
+					// We'll close it once after all tasks are finished.
+				}
+
+				// Re-check for new ready tasks (OUTSIDE of lock)
 				checkReady()
 			}
 		}(i)
 	}
+
+	// Monitor for completion to close the channel
+	go func() {
+		for {
+			mu.Lock()
+			if doneCount == totalCount {
+				close(readyTasks)
+				mu.Unlock()
+				return
+			}
+			mu.Unlock()
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 
 	// Wait for workers to finish
 	wg.Wait()
