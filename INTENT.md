@@ -33,15 +33,16 @@ A conversational, tool-using OS for software projects. Engineers use a chat-firs
 - Sessions DB (SQLite): sessions, messages, tool_calls, project_path, provider, model.
 - Provider drivers (OpenAI/Gemini) with streaming and tool schema translation.
 - MCP tools: read_file, write_file, run_shell_command, git_apply_patch.
-- UI features: model picker, session fork, patch preview/apply/rollback.
-- Docs: Conversational Orchestration included in Orchestrator; no separate CLI.
+- UI features: model picker, session fork, patch preview/apply/rollback, and cost/token dashboard.
+- Advanced Engine: Automated session history summarization and cost/budget visibility.
+- Docs: Updated Orchestrator README and documentation declaring conversational orchestration as a built-in feature.
 
 ## Phases
 
 1. Read-only chat with auto-context. 
 2. Tool-enabled with approvals. 
-3. Multi-provider forking and cost/limits UI. 
-4. Meta self-fix pathways.
+3. Multi-provider forking, history summarization, and cost/limits UI. 
+4. Meta self-fix pathways and final documentation migration.
 
 ## Acceptance Criteria
 
