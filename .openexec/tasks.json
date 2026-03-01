@@ -7,7 +7,7 @@
       "tasks": [
         {
           "id": "T-US-001-001",
-          "title": "Project Initialization & Directory Structure: Define init command schema and directory structure",
+          "title": "Project Infrastructure Discovery: Extract environment variables and dependencies",
           "depends_on": [],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -22,7 +22,7 @@
       "tasks": [
         {
           "id": "T-US-001-002",
-          "title": "Project Initialization & Directory Structure: Implement init command with idempotency checks",
+          "title": "Project Infrastructure Discovery: Map existing API surface area",
           "depends_on": [
             "T-US-001-001"
           ],
@@ -35,15 +35,15 @@
     {
       "phase": 3,
       "name": "Phase 3",
-      "hours": 3.0,
+      "hours": 4.0,
       "tasks": [
         {
           "id": "T-US-001-003",
-          "title": "Project Initialization & Directory Structure: Add unit tests for init command",
+          "title": "Project Infrastructure Discovery: Verify local buildability",
           "depends_on": [
             "T-US-001-002"
           ],
-          "estimated_hours": 3.0,
+          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         }
@@ -52,15 +52,15 @@
     {
       "phase": 4,
       "name": "Phase 4",
-      "hours": 2.0,
+      "hours": 4.0,
       "tasks": [
         {
           "id": "T-US-002-001",
-          "title": "Orchestration Plan CLI: Define plan command API contract and task schema",
+          "title": "Core Audit Schema and Writer: Define audit schema and types",
           "depends_on": [
             "T-US-001-003"
           ],
-          "estimated_hours": 2.0,
+          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         }
@@ -69,16 +69,16 @@
     {
       "phase": 5,
       "name": "Phase 5",
-      "hours": 4.0,
+      "hours": 3.0,
       "tasks": [
         {
           "id": "T-US-002-002",
-          "title": "Orchestration Plan CLI: Implement intent file parser",
+          "title": "Core Audit Schema and Writer: Implement AuditWriter with tests",
           "depends_on": [
             "T-US-002-001",
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
+          "estimated_hours": 3.0,
           "status": "pending",
           "kind": "task"
         }
@@ -87,13 +87,41 @@
     {
       "phase": 6,
       "name": "Phase 6",
-      "hours": 4.0,
+      "hours": 6.0,
       "tasks": [
         {
           "id": "T-US-002-003",
-          "title": "Orchestration Plan CLI: Implement LLM-based story generation",
+          "title": "Core Audit Schema and Writer: Implement cryptographic signing (optional)",
           "depends_on": [
             "T-US-002-002",
+            "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-003-001",
+          "title": "Orchestration Plan CLI: Define plan command schema and flags",
+          "depends_on": [
+            "T-US-001-003"
+          ],
+          "estimated_hours": 2.0,
+          "status": "pending",
+          "kind": "task"
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Phase 7",
+      "hours": 4.0,
+      "tasks": [
+        {
+          "id": "T-US-003-002",
+          "title": "Orchestration Plan CLI: Implement intent parser",
+          "depends_on": [
+            "T-US-003-001",
             "T-US-001-003"
           ],
           "estimated_hours": 4.0,
@@ -103,43 +131,15 @@
       ]
     },
     {
-      "phase": 7,
-      "name": "Phase 7",
-      "hours": 2.0,
-      "tasks": [
-        {
-          "id": "T-US-002-004",
-          "title": "Orchestration Plan CLI: Implement plan command with flags",
-          "depends_on": [
-            "T-US-002-003",
-            "T-US-001-003"
-          ],
-          "estimated_hours": 2.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
       "phase": 8,
       "name": "Phase 8",
-      "hours": 6.0,
+      "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-002-005",
-          "title": "Orchestration Plan CLI: Add unit and integration tests for plan command",
+          "id": "T-US-003-003",
+          "title": "Orchestration Plan CLI: Implement task tree generator",
           "depends_on": [
-            "T-US-002-004",
-            "T-US-001-003"
-          ],
-          "estimated_hours": 2.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-003-001",
-          "title": "Non-Bypassable Audit System: Define audit event schema and error types",
-          "depends_on": [
+            "T-US-003-002",
             "T-US-001-003"
           ],
           "estimated_hours": 4.0,
@@ -151,14 +151,24 @@
     {
       "phase": 9,
       "name": "Phase 9",
-      "hours": 4.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-003-002",
-          "title": "Non-Bypassable Audit System: Implement audit writer with transaction support",
+          "id": "T-US-003-004",
+          "title": "Orchestration Plan CLI: Integrate LLM story generation",
           "depends_on": [
-            "T-US-003-001",
+            "T-US-003-003",
             "T-US-001-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-004-001",
+          "title": "Execution SSE Event Stream: Define SSE event types and schema",
+          "depends_on": [
+            "T-US-002-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -172,11 +182,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-003-003",
-          "title": "Non-Bypassable Audit System: Implement optional cryptographic signing",
+          "id": "T-US-004-002",
+          "title": "Execution SSE Event Stream: Implement SSE handler with heartbeat",
           "depends_on": [
-            "T-US-003-002",
-            "T-US-001-003"
+            "T-US-004-001",
+            "T-US-002-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -187,16 +197,27 @@
     {
       "phase": 11,
       "name": "Phase 11",
-      "hours": 3.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-003-004",
-          "title": "Non-Bypassable Audit System: Add comprehensive audit system tests",
+          "id": "T-US-004-003",
+          "title": "Execution SSE Event Stream: Integrate audit writer with execution loop",
           "depends_on": [
-            "T-US-003-003",
-            "T-US-001-003"
+            "T-US-004-002",
+            "T-US-002-002",
+            "T-US-002-003"
           ],
-          "estimated_hours": 3.0,
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-005-001",
+          "title": "Stack-Aware Quality Gates: Define gate result schema",
+          "depends_on": [
+            "T-US-002-003"
+          ],
+          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         }
@@ -208,11 +229,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-004-001",
-          "title": "Execution Engine with SSE: Define SSE event types and payload schemas",
+          "id": "T-US-005-002",
+          "title": "Stack-Aware Quality Gates: Implement stack detection",
           "depends_on": [
-            "T-US-001-003",
-            "T-US-003-004"
+            "T-US-005-001",
+            "T-US-002-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -226,12 +247,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-004-002",
-          "title": "Execution Engine with SSE: Implement SSE broker with fan-out",
+          "id": "T-US-005-003",
+          "title": "Stack-Aware Quality Gates: Implement Python gates",
           "depends_on": [
-            "T-US-004-001",
-            "T-US-001-003",
-            "T-US-003-004"
+            "T-US-005-002",
+            "T-US-002-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -245,12 +265,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-004-003",
-          "title": "Execution Engine with SSE: Implement /events HTTP handler",
+          "id": "T-US-005-004",
+          "title": "Stack-Aware Quality Gates: Implement JavaScript/TypeScript gates",
           "depends_on": [
-            "T-US-004-002",
-            "T-US-001-003",
-            "T-US-003-004"
+            "T-US-005-002",
+            "T-US-002-003",
+            "T-US-005-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -261,15 +281,24 @@
     {
       "phase": 15,
       "name": "Phase 15",
-      "hours": 4.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-004-004",
-          "title": "Execution Engine with SSE: Implement heartbeat generator",
+          "id": "T-US-005-005",
+          "title": "Stack-Aware Quality Gates: Implement Go gates",
           "depends_on": [
-            "T-US-004-002",
-            "T-US-001-003",
-            "T-US-003-004",
+            "T-US-005-002",
+            "T-US-002-003",
+            "T-US-005-004"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-006-001",
+          "title": "HITL Telegram Webhook: Define Telegram webhook types",
+          "depends_on": [
             "T-US-004-003"
           ],
           "estimated_hours": 4.0,
@@ -281,18 +310,16 @@
     {
       "phase": 16,
       "name": "Phase 16",
-      "hours": 3.0,
+      "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-004-005",
-          "title": "Execution Engine with SSE: Add SSE integration tests",
+          "id": "T-US-006-002",
+          "title": "HITL Telegram Webhook: Implement webhook handler with auth",
           "depends_on": [
-            "T-US-004-003",
-            "T-US-004-004",
-            "T-US-001-003",
-            "T-US-003-004"
+            "T-US-006-001",
+            "T-US-004-003"
           ],
-          "estimated_hours": 3.0,
+          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         }
@@ -301,14 +328,24 @@
     {
       "phase": 17,
       "name": "Phase 17",
-      "hours": 4.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-005-001",
-          "title": "Execution Start Command: Define start command flags and configuration",
+          "id": "T-US-006-003",
+          "title": "HITL Telegram Webhook: Implement command parser and executor",
           "depends_on": [
-            "T-US-002-005",
-            "T-US-004-005"
+            "T-US-006-002",
+            "T-US-004-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-007-001",
+          "title": "HITL WhatsApp Webhook: Define WhatsApp/Twilio types",
+          "depends_on": [
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -322,12 +359,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-005-002",
-          "title": "Execution Start Command: Implement execution loop with task scheduling",
+          "id": "T-US-007-002",
+          "title": "HITL WhatsApp Webhook: Implement Twilio signature validation",
           "depends_on": [
-            "T-US-005-001",
-            "T-US-002-005",
-            "T-US-004-005"
+            "T-US-007-001",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -338,15 +374,24 @@
     {
       "phase": 19,
       "name": "Phase 19",
-      "hours": 4.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-005-003",
-          "title": "Execution Start Command: Implement harness abstraction (local/docker)",
+          "id": "T-US-007-003",
+          "title": "HITL WhatsApp Webhook: Implement message parser and executor",
           "depends_on": [
-            "T-US-005-002",
-            "T-US-002-005",
-            "T-US-004-005"
+            "T-US-007-002",
+            "T-US-004-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-008-001",
+          "title": "OpenExec CLI Init Command: Define init command with cobra",
+          "depends_on": [
+            "T-US-001-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -360,13 +405,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-005-004",
-          "title": "Execution Start Command: Implement provider abstraction (anthropic/openai/ollama)",
+          "id": "T-US-008-002",
+          "title": "OpenExec CLI Init Command: Implement directory scaffolding",
           "depends_on": [
-            "T-US-005-002",
-            "T-US-002-005",
-            "T-US-004-005",
-            "T-US-005-003"
+            "T-US-008-001",
+            "T-US-001-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -380,13 +423,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-005-005",
-          "title": "Execution Start Command: Wire start command with SSE output",
+          "id": "T-US-008-003",
+          "title": "OpenExec CLI Init Command: Initialize audit database",
           "depends_on": [
-            "T-US-005-003",
-            "T-US-005-004",
-            "T-US-002-005",
-            "T-US-004-005"
+            "T-US-008-002",
+            "T-US-002-001",
+            "T-US-001-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -397,25 +439,14 @@
     {
       "phase": 22,
       "name": "Phase 22",
-      "hours": 7.0,
+      "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-005-006",
-          "title": "Execution Start Command: Add unit and integration tests for start command",
+          "id": "T-US-009-001",
+          "title": "OpenExec CLI Start Command: Define start command with flags",
           "depends_on": [
-            "T-US-005-005",
-            "T-US-002-005",
-            "T-US-004-005"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-006-001",
-          "title": "Stack-Aware Quality Gates: Define quality gate schema and stack detection",
-          "depends_on": [
-            "T-US-001-003"
+            "T-US-008-003",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -429,11 +460,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-006-002",
-          "title": "Stack-Aware Quality Gates: Implement Python quality gates",
+          "id": "T-US-009-002",
+          "title": "OpenExec CLI Start Command: Implement execution client",
           "depends_on": [
-            "T-US-006-001",
-            "T-US-001-003"
+            "T-US-009-001",
+            "T-US-008-003",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -444,15 +476,25 @@
     {
       "phase": 24,
       "name": "Phase 24",
-      "hours": 4.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-006-003",
-          "title": "Stack-Aware Quality Gates: Implement JavaScript/TypeScript quality gates",
+          "id": "T-US-009-003",
+          "title": "OpenExec CLI Start Command: Implement signal handling",
           "depends_on": [
-            "T-US-006-001",
-            "T-US-001-003",
-            "T-US-006-002"
+            "T-US-009-002",
+            "T-US-008-003",
+            "T-US-004-003"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-010-001",
+          "title": "OpenExec CLI Status Command: Define status command with flags",
+          "depends_on": [
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -466,12 +508,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-006-004",
-          "title": "Stack-Aware Quality Gates: Implement Go quality gates",
+          "id": "T-US-010-002",
+          "title": "OpenExec CLI Status Command: Implement SSE client",
           "depends_on": [
-            "T-US-006-001",
-            "T-US-001-003",
-            "T-US-006-003"
+            "T-US-010-001",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -485,12 +526,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-006-005",
-          "title": "Stack-Aware Quality Gates: Implement Rust quality gates",
+          "id": "T-US-010-003",
+          "title": "OpenExec CLI Status Command: Implement status formatter",
           "depends_on": [
-            "T-US-006-001",
-            "T-US-001-003",
-            "T-US-006-004"
+            "T-US-010-002",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -504,14 +544,10 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-006-006",
-          "title": "Stack-Aware Quality Gates: Implement gates CLI command with JSON output",
+          "id": "T-US-011-001",
+          "title": "OpenExec CLI TUI Dashboard: Set up Bubbletea TUI framework",
           "depends_on": [
-            "T-US-006-002",
-            "T-US-006-003",
-            "T-US-006-004",
-            "T-US-006-005",
-            "T-US-001-003"
+            "T-US-010-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -522,24 +558,14 @@
     {
       "phase": 28,
       "name": "Phase 28",
-      "hours": 7.0,
+      "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-006-007",
-          "title": "Stack-Aware Quality Gates: Add comprehensive gate tests",
+          "id": "T-US-011-002",
+          "title": "OpenExec CLI TUI Dashboard: Implement workers panel",
           "depends_on": [
-            "T-US-006-006",
-            "T-US-001-003"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-007-001",
-          "title": "Status Command with SSE Subscription: Define status display format and update logic",
-          "depends_on": [
-            "T-US-004-005"
+            "T-US-011-001",
+            "T-US-010-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -553,11 +579,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-007-002",
-          "title": "Status Command with SSE Subscription: Implement SSE client for status subscription",
+          "id": "T-US-011-003",
+          "title": "OpenExec CLI TUI Dashboard: Implement tasks panel",
           "depends_on": [
-            "T-US-007-001",
-            "T-US-004-005"
+            "T-US-011-001",
+            "T-US-010-003",
+            "T-US-011-002"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -571,11 +598,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-007-003",
-          "title": "Status Command with SSE Subscription: Wire status command with terminal output",
+          "id": "T-US-011-004",
+          "title": "OpenExec CLI TUI Dashboard: Implement logs panel",
           "depends_on": [
-            "T-US-007-002",
-            "T-US-004-005"
+            "T-US-011-001",
+            "T-US-010-003",
+            "T-US-011-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -586,25 +614,28 @@
     {
       "phase": 31,
       "name": "Phase 31",
-      "hours": 7.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-007-004",
-          "title": "Status Command with SSE Subscription: Add status command tests",
+          "id": "T-US-011-005",
+          "title": "OpenExec CLI TUI Dashboard: Integrate SSE updates into TUI",
           "depends_on": [
-            "T-US-007-003",
-            "T-US-004-005"
+            "T-US-011-002",
+            "T-US-011-003",
+            "T-US-011-004",
+            "T-US-010-002",
+            "T-US-010-003"
           ],
-          "estimated_hours": 3.0,
+          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         },
         {
-          "id": "T-US-008-001",
-          "title": "Telegram Webhook Integration: Define Telegram webhook schema and validation",
+          "id": "T-US-012-001",
+          "title": "ISO-Compliant Evidence Export: Define export command with flags",
           "depends_on": [
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-002-003",
+            "T-US-005-005"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -618,12 +649,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-008-002",
-          "title": "Telegram Webhook Integration: Implement Telegram command parser",
+          "id": "T-US-012-002",
+          "title": "ISO-Compliant Evidence Export: Implement evidence collector",
           "depends_on": [
-            "T-US-008-001",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-012-001",
+            "T-US-002-003",
+            "T-US-005-005"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -634,15 +665,26 @@
     {
       "phase": 33,
       "name": "Phase 33",
-      "hours": 4.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-008-003",
-          "title": "Telegram Webhook Integration: Implement execution state updates from webhook",
+          "id": "T-US-012-003",
+          "title": "ISO-Compliant Evidence Export: Implement archive creator",
           "depends_on": [
-            "T-US-008-002",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-012-002",
+            "T-US-002-003",
+            "T-US-005-005"
+          ],
+          "estimated_hours": 4.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-013-001",
+          "title": "Story-Level Validation Review: Define validation state machine",
+          "depends_on": [
+            "T-US-002-003",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -656,12 +698,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-008-004",
-          "title": "Telegram Webhook Integration: Implement Telegram reply sender",
+          "id": "T-US-013-002",
+          "title": "Story-Level Validation Review: Implement task verification tracker",
           "depends_on": [
-            "T-US-008-003",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-013-001",
+            "T-US-002-003",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -672,26 +714,28 @@
     {
       "phase": 35,
       "name": "Phase 35",
-      "hours": 7.0,
+      "hours": 8.0,
       "tasks": [
         {
-          "id": "T-US-008-005",
-          "title": "Telegram Webhook Integration: Add Telegram webhook integration tests",
+          "id": "T-US-013-003",
+          "title": "Story-Level Validation Review: Implement validation notification",
           "depends_on": [
-            "T-US-008-004",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-013-002",
+            "T-US-006-003",
+            "T-US-007-003",
+            "T-US-002-003",
+            "T-US-004-003"
           ],
-          "estimated_hours": 3.0,
+          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         },
         {
-          "id": "T-US-009-001",
-          "title": "WhatsApp Webhook Integration: Define WhatsApp/Twilio webhook schema and validation",
+          "id": "T-US-014-001",
+          "title": "Conversational Project Wizard: Define wizard command and prompts",
           "depends_on": [
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-008-003",
+            "T-US-003-004"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -705,12 +749,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-009-002",
-          "title": "WhatsApp Webhook Integration: Implement WhatsApp message parser",
+          "id": "T-US-014-002",
+          "title": "Conversational Project Wizard: Implement intent generator",
           "depends_on": [
-            "T-US-009-001",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-014-001",
+            "T-US-008-003",
+            "T-US-003-004"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -721,15 +765,26 @@
     {
       "phase": 37,
       "name": "Phase 37",
-      "hours": 4.0,
+      "hours": 6.0,
       "tasks": [
         {
-          "id": "T-US-009-003",
-          "title": "WhatsApp Webhook Integration: Implement TwiML response generator",
+          "id": "T-US-014-003",
+          "title": "Conversational Project Wizard: Integrate plan command into wizard flow",
           "depends_on": [
-            "T-US-009-002",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-014-002",
+            "T-US-003-003",
+            "T-US-008-003",
+            "T-US-003-004"
+          ],
+          "estimated_hours": 2.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-015-001",
+          "title": "Web Dashboard Core Infrastructure: Scaffold Next.js application",
+          "depends_on": [
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -743,12 +798,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-009-004",
-          "title": "WhatsApp Webhook Integration: Wire WhatsApp webhook to execution state",
+          "id": "T-US-015-002",
+          "title": "Web Dashboard Core Infrastructure: Implement SSE client hook",
           "depends_on": [
-            "T-US-009-003",
-            "T-US-003-004",
-            "T-US-005-006"
+            "T-US-015-001",
+            "T-US-004-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -759,26 +813,15 @@
     {
       "phase": 39,
       "name": "Phase 39",
-      "hours": 7.0,
+      "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-009-005",
-          "title": "WhatsApp Webhook Integration: Add WhatsApp webhook integration tests",
+          "id": "T-US-015-003",
+          "title": "Web Dashboard Core Infrastructure: Create dashboard layout",
           "depends_on": [
-            "T-US-009-004",
-            "T-US-003-004",
-            "T-US-005-006"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-010-001",
-          "title": "Live TUI Dashboard: Set up Bubbletea TUI framework",
-          "depends_on": [
-            "T-US-004-005",
-            "T-US-007-004"
+            "T-US-015-001",
+            "T-US-004-003",
+            "T-US-015-002"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -792,12 +835,10 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-010-002",
-          "title": "Live TUI Dashboard: Implement worker status panel",
+          "id": "T-US-016-001",
+          "title": "Web Dashboard Execution View: Create projects list page",
           "depends_on": [
-            "T-US-010-001",
-            "T-US-004-005",
-            "T-US-007-004"
+            "T-US-015-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -811,13 +852,12 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-010-003",
-          "title": "Live TUI Dashboard: Implement task queue panel",
+          "id": "T-US-016-002",
+          "title": "Web Dashboard Execution View: Create execution detail page",
           "depends_on": [
-            "T-US-010-001",
-            "T-US-004-005",
-            "T-US-007-004",
-            "T-US-010-002"
+            "T-US-015-002",
+            "T-US-016-001",
+            "T-US-015-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -831,13 +871,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-010-004",
-          "title": "Live TUI Dashboard: Implement live log panel",
+          "id": "T-US-016-003",
+          "title": "Web Dashboard Execution View: Create audit timeline component",
           "depends_on": [
-            "T-US-010-001",
-            "T-US-004-005",
-            "T-US-007-004",
-            "T-US-010-003"
+            "T-US-016-002",
+            "T-US-015-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -848,17 +886,24 @@
     {
       "phase": 43,
       "name": "Phase 43",
-      "hours": 4.0,
+      "hours": 7.0,
       "tasks": [
         {
-          "id": "T-US-010-005",
-          "title": "Live TUI Dashboard: Wire SSE events to TUI updates",
+          "id": "T-US-016-004",
+          "title": "Web Dashboard Execution View: Add E2E tests for dashboard",
           "depends_on": [
-            "T-US-010-002",
-            "T-US-010-003",
-            "T-US-010-004",
-            "T-US-004-005",
-            "T-US-007-004"
+            "T-US-016-003",
+            "T-US-015-003"
+          ],
+          "estimated_hours": 3.0,
+          "status": "pending",
+          "kind": "task"
+        },
+        {
+          "id": "T-US-017-001",
+          "title": "Docker Development Environment: Create Go service Dockerfiles",
+          "depends_on": [
+            "T-US-001-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -872,12 +917,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-010-006",
-          "title": "Live TUI Dashboard: Implement keyboard navigation",
+          "id": "T-US-017-002",
+          "title": "Docker Development Environment: Create Python service Dockerfile",
           "depends_on": [
-            "T-US-010-005",
-            "T-US-004-005",
-            "T-US-007-004"
+            "T-US-001-003",
+            "T-US-017-001"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -888,26 +932,15 @@
     {
       "phase": 45,
       "name": "Phase 45",
-      "hours": 7.0,
+      "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-010-007",
-          "title": "Live TUI Dashboard: Add TUI command and tests",
+          "id": "T-US-017-003",
+          "title": "Docker Development Environment: Create docker-compose.yml",
           "depends_on": [
-            "T-US-010-006",
-            "T-US-004-005",
-            "T-US-007-004"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-011-001",
-          "title": "ISO Evidence Export: Define evidence package structure",
-          "depends_on": [
-            "T-US-003-004",
-            "T-US-006-007"
+            "T-US-017-001",
+            "T-US-017-002",
+            "T-US-001-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -921,12 +954,11 @@
       "hours": 4.0,
       "tasks": [
         {
-          "id": "T-US-011-002",
-          "title": "ISO Evidence Export: Implement evidence collector",
+          "id": "T-US-017-004",
+          "title": "Docker Development Environment: Validate container health checks",
           "depends_on": [
-            "T-US-011-001",
-            "T-US-003-004",
-            "T-US-006-007"
+            "T-US-017-003",
+            "T-US-001-003"
           ],
           "estimated_hours": 4.0,
           "status": "pending",
@@ -937,17 +969,17 @@
     {
       "phase": 47,
       "name": "Phase 47",
-      "hours": 4.0,
+      "hours": 3.0,
       "tasks": [
         {
-          "id": "T-US-011-003",
-          "title": "ISO Evidence Export: Implement manifest generator",
+          "id": "T-US-018-001",
+          "title": "Goal Validation E2E Tests: Set up Playwright test infrastructure",
           "depends_on": [
-            "T-US-011-002",
-            "T-US-003-004",
-            "T-US-006-007"
+            "T-US-017-004",
+            "T-US-016-004",
+            "T-US-011-005"
           ],
-          "estimated_hours": 4.0,
+          "estimated_hours": 3.0,
           "status": "pending",
           "kind": "task"
         }
@@ -956,17 +988,18 @@
     {
       "phase": 48,
       "name": "Phase 48",
-      "hours": 4.0,
+      "hours": 2.0,
       "tasks": [
         {
-          "id": "T-US-011-004",
-          "title": "ISO Evidence Export: Implement zip archive creator",
+          "id": "T-US-018-002",
+          "title": "Goal Validation E2E Tests: Create G-001 planning flow test",
           "depends_on": [
-            "T-US-011-003",
-            "T-US-003-004",
-            "T-US-006-007"
+            "T-US-018-001",
+            "T-US-017-004",
+            "T-US-016-004",
+            "T-US-011-005"
           ],
-          "estimated_hours": 4.0,
+          "estimated_hours": 2.0,
           "status": "pending",
           "kind": "task"
         }
@@ -975,17 +1008,19 @@
     {
       "phase": 49,
       "name": "Phase 49",
-      "hours": 4.0,
+      "hours": 3.0,
       "tasks": [
         {
-          "id": "T-US-011-005",
-          "title": "ISO Evidence Export: Wire export command to CLI",
+          "id": "T-US-018-003",
+          "title": "Goal Validation E2E Tests: Create G-002 execution flow test",
           "depends_on": [
-            "T-US-011-004",
-            "T-US-003-004",
-            "T-US-006-007"
+            "T-US-018-001",
+            "T-US-017-004",
+            "T-US-016-004",
+            "T-US-011-005",
+            "T-US-018-002"
           ],
-          "estimated_hours": 4.0,
+          "estimated_hours": 3.0,
           "status": "pending",
           "kind": "task"
         }
@@ -994,29 +1029,19 @@
     {
       "phase": 50,
       "name": "Phase 50",
-      "hours": 7.0,
+      "hours": 3.0,
       "tasks": [
         {
-          "id": "T-US-011-006",
-          "title": "ISO Evidence Export: Add export command tests",
+          "id": "T-US-018-004",
+          "title": "Goal Validation E2E Tests: Create G-006 audit export test",
           "depends_on": [
+            "T-US-018-001",
+            "T-US-017-004",
+            "T-US-016-004",
             "T-US-011-005",
-            "T-US-003-004",
-            "T-US-006-007"
+            "T-US-018-003"
           ],
           "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-012-001",
-          "title": "Story-Level Validation Review: Define validation trigger and report schema",
-          "depends_on": [
-            "T-US-003-004",
-            "T-US-005-006",
-            "T-US-006-007"
-          ],
-          "estimated_hours": 4.0,
           "status": "pending",
           "kind": "task"
         }
@@ -1025,439 +1050,18 @@
     {
       "phase": 51,
       "name": "Phase 51",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-012-002",
-          "title": "Story-Level Validation Review: Implement story completion detector",
-          "depends_on": [
-            "T-US-012-001",
-            "T-US-003-004",
-            "T-US-005-006",
-            "T-US-006-007"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 52,
-      "name": "Phase 52",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-012-003",
-          "title": "Story-Level Validation Review: Implement story-level gate runner",
-          "depends_on": [
-            "T-US-012-002",
-            "T-US-003-004",
-            "T-US-005-006",
-            "T-US-006-007"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 53,
-      "name": "Phase 53",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-012-004",
-          "title": "Story-Level Validation Review: Implement validation report generator",
-          "depends_on": [
-            "T-US-012-003",
-            "T-US-003-004",
-            "T-US-005-006",
-            "T-US-006-007"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 54,
-      "name": "Phase 54",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-012-005",
-          "title": "Story-Level Validation Review: Integrate validation with notification system",
-          "depends_on": [
-            "T-US-012-004",
-            "T-US-003-004",
-            "T-US-005-006",
-            "T-US-006-007"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 55,
-      "name": "Phase 55",
-      "hours": 7.0,
-      "tasks": [
-        {
-          "id": "T-US-012-006",
-          "title": "Story-Level Validation Review: Add validation integration tests",
-          "depends_on": [
-            "T-US-012-005",
-            "T-US-003-004",
-            "T-US-005-006",
-            "T-US-006-007"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        },
-        {
-          "id": "T-US-013-001",
-          "title": "Web Dashboard with SSE: Initialize Next.js project with TypeScript",
-          "depends_on": [
-            "T-US-004-005"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 56,
-      "name": "Phase 56",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-013-002",
-          "title": "Web Dashboard with SSE: Implement SSE client hook",
-          "depends_on": [
-            "T-US-013-001",
-            "T-US-004-005"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 57,
-      "name": "Phase 57",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-013-003",
-          "title": "Web Dashboard with SSE: Implement project list component",
-          "depends_on": [
-            "T-US-013-002",
-            "T-US-004-005"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 58,
-      "name": "Phase 58",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-013-004",
-          "title": "Web Dashboard with SSE: Implement execution phases component",
-          "depends_on": [
-            "T-US-013-002",
-            "T-US-004-005",
-            "T-US-013-003"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 59,
-      "name": "Phase 59",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-013-005",
-          "title": "Web Dashboard with SSE: Implement worker status component",
-          "depends_on": [
-            "T-US-013-002",
-            "T-US-004-005",
-            "T-US-013-004"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 60,
-      "name": "Phase 60",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-013-006",
-          "title": "Web Dashboard with SSE: Implement audit event feed component",
-          "depends_on": [
-            "T-US-013-002",
-            "T-US-004-005",
-            "T-US-013-005"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 61,
-      "name": "Phase 61",
-      "hours": 4.0,
-      "tasks": [
-        {
-          "id": "T-US-013-007",
-          "title": "Web Dashboard with SSE: Create main dashboard layout",
-          "depends_on": [
-            "T-US-013-003",
-            "T-US-013-004",
-            "T-US-013-005",
-            "T-US-013-006",
-            "T-US-004-005"
-          ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 62,
-      "name": "Phase 62",
       "hours": 3.0,
       "tasks": [
         {
-          "id": "T-US-013-008",
-          "title": "Web Dashboard with SSE: Add E2E tests for dashboard",
+          "id": "T-US-018-005",
+          "title": "Goal Validation E2E Tests: Export test results as evidence",
           "depends_on": [
-            "T-US-013-007",
-            "T-US-004-005"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 63,
-      "name": "Phase 63",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-001",
-          "title": "Goal Validation E2E Tests: Set up Playwright E2E test infrastructure",
-          "depends_on": [
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 64,
-      "name": "Phase 64",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-002",
-          "title": "Goal Validation E2E Tests: Implement G-001 test: PRD to Goal Tree",
-          "depends_on": [
-            "T-US-014-001",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 65,
-      "name": "Phase 65",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-003",
-          "title": "Goal Validation E2E Tests: Implement G-002 test: Auditable Execution",
-          "depends_on": [
-            "T-US-014-001",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008",
-            "T-US-014-002"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 66,
-      "name": "Phase 66",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-004",
-          "title": "Goal Validation E2E Tests: Implement G-003 test: Quality Gates",
-          "depends_on": [
-            "T-US-014-001",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008",
-            "T-US-014-003"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 67,
-      "name": "Phase 67",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-005",
-          "title": "Goal Validation E2E Tests: Implement G-004 test: HITL Webhooks",
-          "depends_on": [
-            "T-US-014-001",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008",
-            "T-US-014-004"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 68,
-      "name": "Phase 68",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-006",
-          "title": "Goal Validation E2E Tests: Implement G-005 test: Unified CLI",
-          "depends_on": [
-            "T-US-014-001",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008",
-            "T-US-014-005"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 69,
-      "name": "Phase 69",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-007",
-          "title": "Goal Validation E2E Tests: Implement G-006 test: ISO Compliance",
-          "depends_on": [
-            "T-US-014-001",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008",
-            "T-US-014-006"
-          ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
-        }
-      ]
-    },
-    {
-      "phase": 70,
-      "name": "Phase 70",
-      "hours": 3.0,
-      "tasks": [
-        {
-          "id": "T-US-014-008",
-          "title": "Goal Validation E2E Tests: Configure CI integration for goal tests",
-          "depends_on": [
-            "T-US-014-002",
-            "T-US-014-003",
-            "T-US-014-004",
-            "T-US-014-005",
-            "T-US-014-006",
-            "T-US-014-007",
-            "T-US-002-005",
-            "T-US-005-006",
-            "T-US-006-007",
-            "T-US-008-005",
-            "T-US-010-007",
-            "T-US-011-006",
-            "T-US-013-008"
+            "T-US-018-002",
+            "T-US-018-003",
+            "T-US-018-004",
+            "T-US-017-004",
+            "T-US-016-004",
+            "T-US-011-005"
           ],
           "estimated_hours": 3.0,
           "status": "pending",
@@ -1466,13 +1070,13 @@
       ]
     }
   ],
-  "total_hours": 290.0,
-  "task_count": 79,
-  "phase_count": 70,
+  "total_hours": 240.0,
+  "task_count": 63,
+  "phase_count": 51,
   "tasks": [
     {
       "id": "T-US-001-001",
-      "title": "Project Initialization & Directory Structure: Define init command schema and directory structure",
+      "title": "Project Infrastructure Discovery: Extract environment variables and dependencies",
       "depends_on": [],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1480,7 +1084,7 @@
     },
     {
       "id": "T-US-001-002",
-      "title": "Project Initialization & Directory Structure: Implement init command with idempotency checks",
+      "title": "Project Infrastructure Discovery: Map existing API surface area",
       "depends_on": [
         "T-US-001-001"
       ],
@@ -1490,29 +1094,18 @@
     },
     {
       "id": "T-US-001-003",
-      "title": "Project Initialization & Directory Structure: Add unit tests for init command",
+      "title": "Project Infrastructure Discovery: Verify local buildability",
       "depends_on": [
         "T-US-001-002"
       ],
-      "estimated_hours": 3.0,
+      "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-002-001",
-      "title": "Orchestration Plan CLI: Define plan command API contract and task schema",
+      "title": "Core Audit Schema and Writer: Define audit schema and types",
       "depends_on": [
-        "T-US-001-003"
-      ],
-      "estimated_hours": 2.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-002-002",
-      "title": "Orchestration Plan CLI: Implement intent file parser",
-      "depends_on": [
-        "T-US-002-001",
         "T-US-001-003"
       ],
       "estimated_hours": 4.0,
@@ -1520,8 +1113,19 @@
       "kind": "task"
     },
     {
+      "id": "T-US-002-002",
+      "title": "Core Audit Schema and Writer: Implement AuditWriter with tests",
+      "depends_on": [
+        "T-US-002-001",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
       "id": "T-US-002-003",
-      "title": "Orchestration Plan CLI: Implement LLM-based story generation",
+      "title": "Core Audit Schema and Writer: Implement cryptographic signing (optional)",
       "depends_on": [
         "T-US-002-002",
         "T-US-001-003"
@@ -1531,40 +1135,18 @@
       "kind": "task"
     },
     {
-      "id": "T-US-002-004",
-      "title": "Orchestration Plan CLI: Implement plan command with flags",
-      "depends_on": [
-        "T-US-002-003",
-        "T-US-001-003"
-      ],
-      "estimated_hours": 2.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-002-005",
-      "title": "Orchestration Plan CLI: Add unit and integration tests for plan command",
-      "depends_on": [
-        "T-US-002-004",
-        "T-US-001-003"
-      ],
-      "estimated_hours": 2.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
       "id": "T-US-003-001",
-      "title": "Non-Bypassable Audit System: Define audit event schema and error types",
+      "title": "Orchestration Plan CLI: Define plan command schema and flags",
       "depends_on": [
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
+      "estimated_hours": 2.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-003-002",
-      "title": "Non-Bypassable Audit System: Implement audit writer with transaction support",
+      "title": "Orchestration Plan CLI: Implement intent parser",
       "depends_on": [
         "T-US-003-001",
         "T-US-001-003"
@@ -1575,7 +1157,7 @@
     },
     {
       "id": "T-US-003-003",
-      "title": "Non-Bypassable Audit System: Implement optional cryptographic signing",
+      "title": "Orchestration Plan CLI: Implement task tree generator",
       "depends_on": [
         "T-US-003-002",
         "T-US-001-003"
@@ -1586,21 +1168,20 @@
     },
     {
       "id": "T-US-003-004",
-      "title": "Non-Bypassable Audit System: Add comprehensive audit system tests",
+      "title": "Orchestration Plan CLI: Integrate LLM story generation",
       "depends_on": [
         "T-US-003-003",
         "T-US-001-003"
       ],
-      "estimated_hours": 3.0,
+      "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-004-001",
-      "title": "Execution Engine with SSE: Define SSE event types and payload schemas",
+      "title": "Execution SSE Event Stream: Define SSE event types and schema",
       "depends_on": [
-        "T-US-001-003",
-        "T-US-003-004"
+        "T-US-002-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1608,11 +1189,10 @@
     },
     {
       "id": "T-US-004-002",
-      "title": "Execution Engine with SSE: Implement SSE broker with fan-out",
+      "title": "Execution SSE Event Stream: Implement SSE handler with heartbeat",
       "depends_on": [
         "T-US-004-001",
-        "T-US-001-003",
-        "T-US-003-004"
+        "T-US-002-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1620,48 +1200,21 @@
     },
     {
       "id": "T-US-004-003",
-      "title": "Execution Engine with SSE: Implement /events HTTP handler",
+      "title": "Execution SSE Event Stream: Integrate audit writer with execution loop",
       "depends_on": [
         "T-US-004-002",
-        "T-US-001-003",
-        "T-US-003-004"
+        "T-US-002-002",
+        "T-US-002-003"
       ],
       "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-004-004",
-      "title": "Execution Engine with SSE: Implement heartbeat generator",
-      "depends_on": [
-        "T-US-004-002",
-        "T-US-001-003",
-        "T-US-003-004",
-        "T-US-004-003"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-004-005",
-      "title": "Execution Engine with SSE: Add SSE integration tests",
-      "depends_on": [
-        "T-US-004-003",
-        "T-US-004-004",
-        "T-US-001-003",
-        "T-US-003-004"
-      ],
-      "estimated_hours": 3.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-005-001",
-      "title": "Execution Start Command: Define start command flags and configuration",
+      "title": "Stack-Aware Quality Gates: Define gate result schema",
       "depends_on": [
-        "T-US-002-005",
-        "T-US-004-005"
+        "T-US-002-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1669,11 +1222,10 @@
     },
     {
       "id": "T-US-005-002",
-      "title": "Execution Start Command: Implement execution loop with task scheduling",
+      "title": "Stack-Aware Quality Gates: Implement stack detection",
       "depends_on": [
         "T-US-005-001",
-        "T-US-002-005",
-        "T-US-004-005"
+        "T-US-002-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1681,11 +1233,10 @@
     },
     {
       "id": "T-US-005-003",
-      "title": "Execution Start Command: Implement harness abstraction (local/docker)",
+      "title": "Stack-Aware Quality Gates: Implement Python gates",
       "depends_on": [
         "T-US-005-002",
-        "T-US-002-005",
-        "T-US-004-005"
+        "T-US-002-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1693,11 +1244,10 @@
     },
     {
       "id": "T-US-005-004",
-      "title": "Execution Start Command: Implement provider abstraction (anthropic/openai/ollama)",
+      "title": "Stack-Aware Quality Gates: Implement JavaScript/TypeScript gates",
       "depends_on": [
         "T-US-005-002",
-        "T-US-002-005",
-        "T-US-004-005",
+        "T-US-002-003",
         "T-US-005-003"
       ],
       "estimated_hours": 4.0,
@@ -1706,34 +1256,21 @@
     },
     {
       "id": "T-US-005-005",
-      "title": "Execution Start Command: Wire start command with SSE output",
+      "title": "Stack-Aware Quality Gates: Implement Go gates",
       "depends_on": [
-        "T-US-005-003",
-        "T-US-005-004",
-        "T-US-002-005",
-        "T-US-004-005"
+        "T-US-005-002",
+        "T-US-002-003",
+        "T-US-005-004"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
-      "id": "T-US-005-006",
-      "title": "Execution Start Command: Add unit and integration tests for start command",
-      "depends_on": [
-        "T-US-005-005",
-        "T-US-002-005",
-        "T-US-004-005"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
       "id": "T-US-006-001",
-      "title": "Stack-Aware Quality Gates: Define quality gate schema and stack detection",
+      "title": "HITL Telegram Webhook: Define Telegram webhook types",
       "depends_on": [
-        "T-US-001-003"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1741,10 +1278,10 @@
     },
     {
       "id": "T-US-006-002",
-      "title": "Stack-Aware Quality Gates: Implement Python quality gates",
+      "title": "HITL Telegram Webhook: Implement webhook handler with auth",
       "depends_on": [
         "T-US-006-001",
-        "T-US-001-003"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1752,70 +1289,20 @@
     },
     {
       "id": "T-US-006-003",
-      "title": "Stack-Aware Quality Gates: Implement JavaScript/TypeScript quality gates",
-      "depends_on": [
-        "T-US-006-001",
-        "T-US-001-003",
-        "T-US-006-002"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-006-004",
-      "title": "Stack-Aware Quality Gates: Implement Go quality gates",
-      "depends_on": [
-        "T-US-006-001",
-        "T-US-001-003",
-        "T-US-006-003"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-006-005",
-      "title": "Stack-Aware Quality Gates: Implement Rust quality gates",
-      "depends_on": [
-        "T-US-006-001",
-        "T-US-001-003",
-        "T-US-006-004"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-006-006",
-      "title": "Stack-Aware Quality Gates: Implement gates CLI command with JSON output",
+      "title": "HITL Telegram Webhook: Implement command parser and executor",
       "depends_on": [
         "T-US-006-002",
-        "T-US-006-003",
-        "T-US-006-004",
-        "T-US-006-005",
-        "T-US-001-003"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-006-007",
-      "title": "Stack-Aware Quality Gates: Add comprehensive gate tests",
-      "depends_on": [
-        "T-US-006-006",
-        "T-US-001-003"
-      ],
-      "estimated_hours": 3.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-007-001",
-      "title": "Status Command with SSE Subscription: Define status display format and update logic",
+      "title": "HITL WhatsApp Webhook: Define WhatsApp/Twilio types",
       "depends_on": [
-        "T-US-004-005"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1823,10 +1310,10 @@
     },
     {
       "id": "T-US-007-002",
-      "title": "Status Command with SSE Subscription: Implement SSE client for status subscription",
+      "title": "HITL WhatsApp Webhook: Implement Twilio signature validation",
       "depends_on": [
         "T-US-007-001",
-        "T-US-004-005"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1834,32 +1321,20 @@
     },
     {
       "id": "T-US-007-003",
-      "title": "Status Command with SSE Subscription: Wire status command with terminal output",
+      "title": "HITL WhatsApp Webhook: Implement message parser and executor",
       "depends_on": [
         "T-US-007-002",
-        "T-US-004-005"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
-      "id": "T-US-007-004",
-      "title": "Status Command with SSE Subscription: Add status command tests",
-      "depends_on": [
-        "T-US-007-003",
-        "T-US-004-005"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
       "id": "T-US-008-001",
-      "title": "Telegram Webhook Integration: Define Telegram webhook schema and validation",
+      "title": "OpenExec CLI Init Command: Define init command with cobra",
       "depends_on": [
-        "T-US-003-004",
-        "T-US-005-006"
+        "T-US-001-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1867,11 +1342,10 @@
     },
     {
       "id": "T-US-008-002",
-      "title": "Telegram Webhook Integration: Implement Telegram command parser",
+      "title": "OpenExec CLI Init Command: Implement directory scaffolding",
       "depends_on": [
         "T-US-008-001",
-        "T-US-003-004",
-        "T-US-005-006"
+        "T-US-001-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1879,46 +1353,22 @@
     },
     {
       "id": "T-US-008-003",
-      "title": "Telegram Webhook Integration: Implement execution state updates from webhook",
+      "title": "OpenExec CLI Init Command: Initialize audit database",
       "depends_on": [
         "T-US-008-002",
-        "T-US-003-004",
-        "T-US-005-006"
+        "T-US-002-001",
+        "T-US-001-003"
       ],
       "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-008-004",
-      "title": "Telegram Webhook Integration: Implement Telegram reply sender",
-      "depends_on": [
-        "T-US-008-003",
-        "T-US-003-004",
-        "T-US-005-006"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-008-005",
-      "title": "Telegram Webhook Integration: Add Telegram webhook integration tests",
-      "depends_on": [
-        "T-US-008-004",
-        "T-US-003-004",
-        "T-US-005-006"
-      ],
-      "estimated_hours": 3.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-009-001",
-      "title": "WhatsApp Webhook Integration: Define WhatsApp/Twilio webhook schema and validation",
+      "title": "OpenExec CLI Start Command: Define start command with flags",
       "depends_on": [
-        "T-US-003-004",
-        "T-US-005-006"
+        "T-US-008-003",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1926,11 +1376,11 @@
     },
     {
       "id": "T-US-009-002",
-      "title": "WhatsApp Webhook Integration: Implement WhatsApp message parser",
+      "title": "OpenExec CLI Start Command: Implement execution client",
       "depends_on": [
         "T-US-009-001",
-        "T-US-003-004",
-        "T-US-005-006"
+        "T-US-008-003",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1938,46 +1388,21 @@
     },
     {
       "id": "T-US-009-003",
-      "title": "WhatsApp Webhook Integration: Implement TwiML response generator",
+      "title": "OpenExec CLI Start Command: Implement signal handling",
       "depends_on": [
         "T-US-009-002",
-        "T-US-003-004",
-        "T-US-005-006"
+        "T-US-008-003",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-009-004",
-      "title": "WhatsApp Webhook Integration: Wire WhatsApp webhook to execution state",
-      "depends_on": [
-        "T-US-009-003",
-        "T-US-003-004",
-        "T-US-005-006"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-009-005",
-      "title": "WhatsApp Webhook Integration: Add WhatsApp webhook integration tests",
-      "depends_on": [
-        "T-US-009-004",
-        "T-US-003-004",
-        "T-US-005-006"
-      ],
-      "estimated_hours": 3.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-010-001",
-      "title": "Live TUI Dashboard: Set up Bubbletea TUI framework",
+      "title": "OpenExec CLI Status Command: Define status command with flags",
       "depends_on": [
-        "T-US-004-005",
-        "T-US-007-004"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1985,11 +1410,10 @@
     },
     {
       "id": "T-US-010-002",
-      "title": "Live TUI Dashboard: Implement worker status panel",
+      "title": "OpenExec CLI Status Command: Implement SSE client",
       "depends_on": [
         "T-US-010-001",
-        "T-US-004-005",
-        "T-US-007-004"
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -1997,24 +1421,19 @@
     },
     {
       "id": "T-US-010-003",
-      "title": "Live TUI Dashboard: Implement task queue panel",
+      "title": "OpenExec CLI Status Command: Implement status formatter",
       "depends_on": [
-        "T-US-010-001",
-        "T-US-004-005",
-        "T-US-007-004",
-        "T-US-010-002"
+        "T-US-010-002",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
-      "id": "T-US-010-004",
-      "title": "Live TUI Dashboard: Implement live log panel",
+      "id": "T-US-011-001",
+      "title": "OpenExec CLI TUI Dashboard: Set up Bubbletea TUI framework",
       "depends_on": [
-        "T-US-010-001",
-        "T-US-004-005",
-        "T-US-007-004",
         "T-US-010-003"
       ],
       "estimated_hours": 4.0,
@@ -2022,61 +1441,11 @@
       "kind": "task"
     },
     {
-      "id": "T-US-010-005",
-      "title": "Live TUI Dashboard: Wire SSE events to TUI updates",
-      "depends_on": [
-        "T-US-010-002",
-        "T-US-010-003",
-        "T-US-010-004",
-        "T-US-004-005",
-        "T-US-007-004"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-010-006",
-      "title": "Live TUI Dashboard: Implement keyboard navigation",
-      "depends_on": [
-        "T-US-010-005",
-        "T-US-004-005",
-        "T-US-007-004"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-010-007",
-      "title": "Live TUI Dashboard: Add TUI command and tests",
-      "depends_on": [
-        "T-US-010-006",
-        "T-US-004-005",
-        "T-US-007-004"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-011-001",
-      "title": "ISO Evidence Export: Define evidence package structure",
-      "depends_on": [
-        "T-US-003-004",
-        "T-US-006-007"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
       "id": "T-US-011-002",
-      "title": "ISO Evidence Export: Implement evidence collector",
+      "title": "OpenExec CLI TUI Dashboard: Implement workers panel",
       "depends_on": [
         "T-US-011-001",
-        "T-US-003-004",
-        "T-US-006-007"
+        "T-US-010-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2084,11 +1453,11 @@
     },
     {
       "id": "T-US-011-003",
-      "title": "ISO Evidence Export: Implement manifest generator",
+      "title": "OpenExec CLI TUI Dashboard: Implement tasks panel",
       "depends_on": [
-        "T-US-011-002",
-        "T-US-003-004",
-        "T-US-006-007"
+        "T-US-011-001",
+        "T-US-010-003",
+        "T-US-011-002"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2096,11 +1465,11 @@
     },
     {
       "id": "T-US-011-004",
-      "title": "ISO Evidence Export: Implement zip archive creator",
+      "title": "OpenExec CLI TUI Dashboard: Implement logs panel",
       "depends_on": [
-        "T-US-011-003",
-        "T-US-003-004",
-        "T-US-006-007"
+        "T-US-011-001",
+        "T-US-010-003",
+        "T-US-011-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2108,35 +1477,24 @@
     },
     {
       "id": "T-US-011-005",
-      "title": "ISO Evidence Export: Wire export command to CLI",
+      "title": "OpenExec CLI TUI Dashboard: Integrate SSE updates into TUI",
       "depends_on": [
+        "T-US-011-002",
+        "T-US-011-003",
         "T-US-011-004",
-        "T-US-003-004",
-        "T-US-006-007"
+        "T-US-010-002",
+        "T-US-010-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
-      "id": "T-US-011-006",
-      "title": "ISO Evidence Export: Add export command tests",
-      "depends_on": [
-        "T-US-011-005",
-        "T-US-003-004",
-        "T-US-006-007"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
       "id": "T-US-012-001",
-      "title": "Story-Level Validation Review: Define validation trigger and report schema",
+      "title": "ISO-Compliant Evidence Export: Define export command with flags",
       "depends_on": [
-        "T-US-003-004",
-        "T-US-005-006",
-        "T-US-006-007"
+        "T-US-002-003",
+        "T-US-005-005"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2144,12 +1502,11 @@
     },
     {
       "id": "T-US-012-002",
-      "title": "Story-Level Validation Review: Implement story completion detector",
+      "title": "ISO-Compliant Evidence Export: Implement evidence collector",
       "depends_on": [
         "T-US-012-001",
-        "T-US-003-004",
-        "T-US-005-006",
-        "T-US-006-007"
+        "T-US-002-003",
+        "T-US-005-005"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2157,61 +1514,22 @@
     },
     {
       "id": "T-US-012-003",
-      "title": "Story-Level Validation Review: Implement story-level gate runner",
+      "title": "ISO-Compliant Evidence Export: Implement archive creator",
       "depends_on": [
         "T-US-012-002",
-        "T-US-003-004",
-        "T-US-005-006",
-        "T-US-006-007"
+        "T-US-002-003",
+        "T-US-005-005"
       ],
       "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-012-004",
-      "title": "Story-Level Validation Review: Implement validation report generator",
-      "depends_on": [
-        "T-US-012-003",
-        "T-US-003-004",
-        "T-US-005-006",
-        "T-US-006-007"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-012-005",
-      "title": "Story-Level Validation Review: Integrate validation with notification system",
-      "depends_on": [
-        "T-US-012-004",
-        "T-US-003-004",
-        "T-US-005-006",
-        "T-US-006-007"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-012-006",
-      "title": "Story-Level Validation Review: Add validation integration tests",
-      "depends_on": [
-        "T-US-012-005",
-        "T-US-003-004",
-        "T-US-005-006",
-        "T-US-006-007"
-      ],
-      "estimated_hours": 3.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-013-001",
-      "title": "Web Dashboard with SSE: Initialize Next.js project with TypeScript",
+      "title": "Story-Level Validation Review: Define validation state machine",
       "depends_on": [
-        "T-US-004-005"
+        "T-US-002-003",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2219,10 +1537,11 @@
     },
     {
       "id": "T-US-013-002",
-      "title": "Web Dashboard with SSE: Implement SSE client hook",
+      "title": "Story-Level Validation Review: Implement task verification tracker",
       "depends_on": [
         "T-US-013-001",
-        "T-US-004-005"
+        "T-US-002-003",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
       "status": "pending",
@@ -2230,216 +1549,238 @@
     },
     {
       "id": "T-US-013-003",
-      "title": "Web Dashboard with SSE: Implement project list component",
+      "title": "Story-Level Validation Review: Implement validation notification",
       "depends_on": [
         "T-US-013-002",
-        "T-US-004-005"
+        "T-US-006-003",
+        "T-US-007-003",
+        "T-US-002-003",
+        "T-US-004-003"
       ],
       "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-013-004",
-      "title": "Web Dashboard with SSE: Implement execution phases component",
-      "depends_on": [
-        "T-US-013-002",
-        "T-US-004-005",
-        "T-US-013-003"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-013-005",
-      "title": "Web Dashboard with SSE: Implement worker status component",
-      "depends_on": [
-        "T-US-013-002",
-        "T-US-004-005",
-        "T-US-013-004"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-013-006",
-      "title": "Web Dashboard with SSE: Implement audit event feed component",
-      "depends_on": [
-        "T-US-013-002",
-        "T-US-004-005",
-        "T-US-013-005"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-013-007",
-      "title": "Web Dashboard with SSE: Create main dashboard layout",
-      "depends_on": [
-        "T-US-013-003",
-        "T-US-013-004",
-        "T-US-013-005",
-        "T-US-013-006",
-        "T-US-004-005"
-      ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-013-008",
-      "title": "Web Dashboard with SSE: Add E2E tests for dashboard",
-      "depends_on": [
-        "T-US-013-007",
-        "T-US-004-005"
-      ],
-      "estimated_hours": 3.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-014-001",
-      "title": "Goal Validation E2E Tests: Set up Playwright E2E test infrastructure",
+      "title": "Conversational Project Wizard: Define wizard command and prompts",
       "depends_on": [
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008"
+        "T-US-008-003",
+        "T-US-003-004"
       ],
-      "estimated_hours": 3.0,
+      "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-014-002",
-      "title": "Goal Validation E2E Tests: Implement G-001 test: PRD to Goal Tree",
+      "title": "Conversational Project Wizard: Implement intent generator",
       "depends_on": [
         "T-US-014-001",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008"
+        "T-US-008-003",
+        "T-US-003-004"
       ],
-      "estimated_hours": 3.0,
+      "estimated_hours": 4.0,
       "status": "pending",
       "kind": "task"
     },
     {
       "id": "T-US-014-003",
-      "title": "Goal Validation E2E Tests: Implement G-002 test: Auditable Execution",
-      "depends_on": [
-        "T-US-014-001",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008",
-        "T-US-014-002"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-014-004",
-      "title": "Goal Validation E2E Tests: Implement G-003 test: Quality Gates",
-      "depends_on": [
-        "T-US-014-001",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008",
-        "T-US-014-003"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-014-005",
-      "title": "Goal Validation E2E Tests: Implement G-004 test: HITL Webhooks",
-      "depends_on": [
-        "T-US-014-001",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008",
-        "T-US-014-004"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-014-006",
-      "title": "Goal Validation E2E Tests: Implement G-005 test: Unified CLI",
-      "depends_on": [
-        "T-US-014-001",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008",
-        "T-US-014-005"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-014-007",
-      "title": "Goal Validation E2E Tests: Implement G-006 test: ISO Compliance",
-      "depends_on": [
-        "T-US-014-001",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008",
-        "T-US-014-006"
-      ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
-    },
-    {
-      "id": "T-US-014-008",
-      "title": "Goal Validation E2E Tests: Configure CI integration for goal tests",
+      "title": "Conversational Project Wizard: Integrate plan command into wizard flow",
       "depends_on": [
         "T-US-014-002",
-        "T-US-014-003",
-        "T-US-014-004",
-        "T-US-014-005",
-        "T-US-014-006",
-        "T-US-014-007",
-        "T-US-002-005",
-        "T-US-005-006",
-        "T-US-006-007",
-        "T-US-008-005",
-        "T-US-010-007",
-        "T-US-011-006",
-        "T-US-013-008"
+        "T-US-003-003",
+        "T-US-008-003",
+        "T-US-003-004"
+      ],
+      "estimated_hours": 2.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-001",
+      "title": "Web Dashboard Core Infrastructure: Scaffold Next.js application",
+      "depends_on": [
+        "T-US-004-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-002",
+      "title": "Web Dashboard Core Infrastructure: Implement SSE client hook",
+      "depends_on": [
+        "T-US-015-001",
+        "T-US-004-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-015-003",
+      "title": "Web Dashboard Core Infrastructure: Create dashboard layout",
+      "depends_on": [
+        "T-US-015-001",
+        "T-US-004-003",
+        "T-US-015-002"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-001",
+      "title": "Web Dashboard Execution View: Create projects list page",
+      "depends_on": [
+        "T-US-015-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-002",
+      "title": "Web Dashboard Execution View: Create execution detail page",
+      "depends_on": [
+        "T-US-015-002",
+        "T-US-016-001",
+        "T-US-015-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-003",
+      "title": "Web Dashboard Execution View: Create audit timeline component",
+      "depends_on": [
+        "T-US-016-002",
+        "T-US-015-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-016-004",
+      "title": "Web Dashboard Execution View: Add E2E tests for dashboard",
+      "depends_on": [
+        "T-US-016-003",
+        "T-US-015-003"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-017-001",
+      "title": "Docker Development Environment: Create Go service Dockerfiles",
+      "depends_on": [
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-017-002",
+      "title": "Docker Development Environment: Create Python service Dockerfile",
+      "depends_on": [
+        "T-US-001-003",
+        "T-US-017-001"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-017-003",
+      "title": "Docker Development Environment: Create docker-compose.yml",
+      "depends_on": [
+        "T-US-017-001",
+        "T-US-017-002",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-017-004",
+      "title": "Docker Development Environment: Validate container health checks",
+      "depends_on": [
+        "T-US-017-003",
+        "T-US-001-003"
+      ],
+      "estimated_hours": 4.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-018-001",
+      "title": "Goal Validation E2E Tests: Set up Playwright test infrastructure",
+      "depends_on": [
+        "T-US-017-004",
+        "T-US-016-004",
+        "T-US-011-005"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-018-002",
+      "title": "Goal Validation E2E Tests: Create G-001 planning flow test",
+      "depends_on": [
+        "T-US-018-001",
+        "T-US-017-004",
+        "T-US-016-004",
+        "T-US-011-005"
+      ],
+      "estimated_hours": 2.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-018-003",
+      "title": "Goal Validation E2E Tests: Create G-002 execution flow test",
+      "depends_on": [
+        "T-US-018-001",
+        "T-US-017-004",
+        "T-US-016-004",
+        "T-US-011-005",
+        "T-US-018-002"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-018-004",
+      "title": "Goal Validation E2E Tests: Create G-006 audit export test",
+      "depends_on": [
+        "T-US-018-001",
+        "T-US-017-004",
+        "T-US-016-004",
+        "T-US-011-005",
+        "T-US-018-003"
+      ],
+      "estimated_hours": 3.0,
+      "status": "pending",
+      "kind": "task"
+    },
+    {
+      "id": "T-US-018-005",
+      "title": "Goal Validation E2E Tests: Export test results as evidence",
+      "depends_on": [
+        "T-US-018-002",
+        "T-US-018-003",
+        "T-US-018-004",
+        "T-US-017-004",
+        "T-US-016-004",
+        "T-US-011-005"
       ],
       "estimated_hours": 3.0,
       "status": "pending",

@@ -23,6 +23,14 @@ OpenExec provides a modular, production-ready path from PRD to verified code: pl
 - Verification (Tasks) must be autonomous and evidence-based.
 - Validation (Story) is the primary checkpoint for the "Reviewer" role.
 
+## Feature: Conversational Project Bootstrapping
+The OpenExec Console must provide an end-to-end "Zero-to-Code" experience:
+- **Interactive Init**: Users can run `init` inside the chat. The agent should ask for the project name and structure, then scaffold it via MCP tools.
+- **Wizard Integration**: The chat agent can trigger the `wizard` mode to interview the user, then automatically generate the `INTENT.md`.
+- **Automated Planning**: Once the intent is finalized, the agent should automatically run `openexec plan` and present the tasks for approval.
+- **Daemon Management**: The console should provide controls to start/stop the execution daemon for the current project and monitor its health in real-time.
+- **Unified Handover**: Seamlessly move from conversation (planning) to execution (daemon) within the same UI context.
+
 ## Feature: Live TUI Dashboard
 - `openexec tui` must provide a real-time, terminal-based view of all workers, pending tasks, and live logs using a TUI library (e.g., Bubbletea or Rich).
 
