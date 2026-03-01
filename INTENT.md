@@ -1,64 +1,51 @@
-# OpenExec — Intent
+# AI Project Operating System
 
-This is the working PRD/intent file for the OpenExec system. Planning tools can consume it directly from the project folder.
+## Vision
 
-## Overview
-OpenExec provides a modular, production-ready path from PRD to verified code: planning, execution, quality gates, human approvals, and live observability.
+A conversational, tool-using OS for software projects. Engineers use a chat-first interface (like Claude Code) to plan, code, run, and fix projects—including improving the orchestrator itself—safely and repeatably.
 
 ## Goals
-1. Plan from PRD into a Goal Tree and FWUs, then schedule execution.
-2. Execute FWUs with an auditable loop and live status (SSE).
-3. Enforce quality via stack-aware gates (Python/JS/Go/Rust) with structured results.
-4. Support approvals via Telegram/WhatsApp webhooks and apply decisions to execution.
-5. Provide a unified CLI (init/plan/start/status/tui) and a web dashboard for observability.
-6. Keep an immutable audit trail with automated evidence export for ISO compliance.
 
-## Feature: ISO-Compliant Audit & Evidence Export
-- Every project run must be exportable via `openexec export --evidence`.
-- The export must include: Full audit trail (SQLite), all verification evidence, model versions used, and static gate reports.
-- Immutable logs must be cryptographically signed (optional).
+- Multi-project chat with persistent sessions bound to workspaces.
+- Provider-agnostic agent loop (OpenAI/Gemini/Anthropic) with model picker.
+- Tool-use via MCP (filesystem, shell, git) with explicit approvals and audit.
+- Auto-context injection (INTENT.md, tasks.json, recent logs).
+- Self-healing/meta: agent can locate, edit, build, and request restart of Orchestrator.
 
-## Feature: Story-Level Integrated Review
-- Shift from task-level review to Story-level validation.
-- Verification (Tasks) must be autonomous and evidence-based.
-- Validation (Story) is the primary checkpoint for the "Reviewer" role.
+## Pillars
 
-## Feature: Conversational Project Bootstrapping
-The OpenExec Console must provide an end-to-end "Zero-to-Code" experience:
-- **Interactive Init**: Users can run `init` inside the chat. The agent should ask for the project name and structure, then scaffold it via MCP tools.
-- **Wizard Integration**: The chat agent can trigger the `wizard` mode to interview the user, then automatically generate the `INTENT.md`.
-- **Automated Planning**: Once the intent is finalized, the agent should automatically run `openexec plan` and present the tasks for approval.
-- **Daemon Management**: The console should provide controls to start/stop the execution daemon for the current project and monitor its health in real-time.
-- **Unified Handover**: Seamlessly move from conversation (planning) to execution (daemon) within the same UI context.
+- Interactive UI: Extend claudecodeui (chat history, streaming markdown, spinners).
+- Tool-Calling Loop: Function-calling → MCP tools; provider adapters.
+- Auto-Context: Inject per-turn project brain (intent, task state, log tail).
+- Meta-Engineering: Workspace-aware edits + build/restart prompts.
 
-## Feature: Live TUI Dashboard
-- `openexec tui` must provide a real-time, terminal-based view of all workers, pending tasks, and live logs using a TUI library (e.g., Bubbletea or Rich).
+## Non-Goals
+
+- Full IDE replacement; binary debugging; unrestricted exec without approval.
 
 ## Constraints
-- Security: audit writes are non-bypassable; failures halt execution.
-- Portability: local dev via compose or binaries; no hard cloud dependencies.
-- Time-to-value: prioritize working solutions over large rewrites.
 
-## Feature: Orchestration Plan CLI
-- CLI: `openexec plan <intent>` prints JSON summary and writes tasks.
-- Supports ordering and timeout_mode parameters.
+- All write/exec goes through approval; paths validated within WORKSPACES_ROOT.
+- Secrets redacted; audit logs persisted.
 
-## Feature: Execution SSE + Non-Bypassable Audit
-- Endpoint `GET /events` with heartbeats; iteration and phase events.
-- Audit write errors stop the run with explicit error.
-- Flags: `--harness`, `--provider`, `--model`.
+## Deliverables
 
-## Feature: HITL Webhooks (Interface)
-- Routes: `/webhook/telegram` (secret token), `/webhook/whatsapp` (Twilio signature).
-- Approve/Reject/Pause map to execution API.
+- Sessions DB (SQLite): sessions, messages, tool_calls, project_path, provider, model.
+- Provider drivers (OpenAI/Gemini) with streaming and tool schema translation.
+- MCP tools: read_file, write_file, run_shell_command, git_apply_patch.
+- UI features: model picker, session fork, patch preview/apply/rollback.
+- Docs: Conversational Orchestration included in Orchestrator; no separate CLI.
 
-## Feature: OpenExec CLI (init/plan/start/status/tui)
-- `openexec init` creates `.openexec` and initializes stores.
-- `openexec plan` invokes orchestration plan CLI and outputs summary.
-- `openexec start` launches execution with flags.
-- `openexec status` subscribes to SSE and prints concise status.
-- `openexec tui` shows live dashboard.
+## Phases
 
-## Feature: Web Dashboard (SSE)
-- Next.js dashboard shows projects, phases, workers, and recent audit events via SSE.
-- Config from `.env.local` for backend endpoints.
+1. Read-only chat with auto-context. 
+2. Tool-enabled with approvals. 
+3. Multi-provider forking and cost/limits UI. 
+4. Meta self-fix pathways.
+
+## Acceptance Criteria
+
+- Create/resume/fork sessions per project; pick provider/model.
+- Tool-calls execute via MCP with audit records and redaction.
+- Auto-context present and truncated safely; logs accurate.
+- Self-fix demo: agent edits orchestrator file, builds binary, requests restart.

@@ -3,935 +3,1034 @@
   "goals": [
     {
       "id": "G-001",
-      "title": "PRD to Goal Tree Planning",
-      "description": "Plan from PRD into a Goal Tree and FWUs, then schedule execution",
-      "success_criteria": "PRD can be parsed and converted to executable task tree with proper scheduling",
-      "verification_method": "Run openexec plan on sample PRD and verify JSON output structure"
+      "title": "Multi-Project Chat with Persistent Sessions",
+      "description": "Enable chat sessions bound to workspaces with persistence and resume capability",
+      "success_criteria": "Users can create, resume, and fork sessions per project with full history preservation",
+      "verification_method": "E2E test creating session, sending messages, closing, reopening and verifying history"
     },
     {
       "id": "G-002",
-      "title": "Auditable Execution Loop",
-      "description": "Execute FWUs with an auditable loop and live status via SSE",
-      "success_criteria": "Tasks execute with real-time SSE events and all actions logged to audit trail",
-      "verification_method": "Execute tasks and verify SSE stream contains iteration/phase events"
+      "title": "Provider-Agnostic Agent Loop",
+      "description": "Support multiple LLM providers (OpenAI/Gemini/Anthropic) with unified interface and model picker",
+      "success_criteria": "Users can switch between providers mid-conversation with consistent tool-calling behavior",
+      "verification_method": "Integration test cycling through all providers with identical prompts"
     },
     {
       "id": "G-003",
-      "title": "Stack-Aware Quality Gates",
-      "description": "Enforce quality via stack-aware gates (Python/JS/Go/Rust) with structured results",
-      "success_criteria": "Quality gates run appropriate linters/tests per stack and return structured pass/fail results",
-      "verification_method": "Run gates on sample projects and verify structured JSON results"
+      "title": "Tool-Use via MCP with Approvals",
+      "description": "Execute filesystem, shell, and git operations through MCP with explicit user approval and audit trail",
+      "success_criteria": "All tool executions require approval, are logged in audit.db, and secrets are redacted",
+      "verification_method": "Audit log inspection after tool execution sequence"
     },
     {
       "id": "G-004",
-      "title": "HITL Approval Webhooks",
-      "description": "Support approvals via Telegram/WhatsApp webhooks and apply decisions to execution",
-      "success_criteria": "Webhook endpoints receive approval/reject/pause commands and affect execution state",
-      "verification_method": "Send test webhook payloads and verify execution state changes"
+      "title": "Auto-Context Injection",
+      "description": "Automatically inject project context (INTENT.md, tasks.json, recent logs) into each conversation turn",
+      "success_criteria": "Context is present in prompts, safely truncated, and accurate to current project state",
+      "verification_method": "Verify injected context matches source files with truncation under token limits"
     },
     {
       "id": "G-005",
-      "title": "Unified CLI Experience",
-      "description": "Provide a unified CLI (init/plan/start/status/tui) for all operations",
-      "success_criteria": "All CLI commands work as documented with proper help and error handling",
-      "verification_method": "Run each CLI command with --help and verify expected behavior"
-    },
-    {
-      "id": "G-006",
-      "title": "ISO-Compliant Audit Trail",
-      "description": "Keep an immutable audit trail with automated evidence export for ISO compliance",
-      "success_criteria": "Audit exports include full trail, verification evidence, model versions, and gate reports",
-      "verification_method": "Run openexec export --evidence and verify archive contents"
-    },
-    {
-      "id": "G-007",
-      "title": "Web Dashboard Observability",
-      "description": "Provide a web dashboard for real-time observability of projects and execution",
-      "success_criteria": "Dashboard displays projects, phases, workers, and audit events via SSE",
-      "verification_method": "Load dashboard and verify SSE connection and data rendering"
+      "title": "Self-Healing Meta-Engineering",
+      "description": "Enable agent to locate, edit, build, and request restart of the Orchestrator itself",
+      "success_criteria": "Agent can successfully edit orchestrator code, build binary, and trigger controlled restart",
+      "verification_method": "Demo script executing self-fix workflow with verification of changes"
     }
   ],
   "stories": [
     {
       "id": "US-001",
-      "title": "Project Infrastructure Discovery",
-      "description": "As a developer, I want to understand the existing codebase structure so that I can build upon it correctly",
-      "requirement_id": "REQ-DISCOVERY",
+      "title": "SQLite Sessions Database Schema",
+      "description": "As a developer, I want a SQLite database schema for sessions, messages, and tool_calls so that chat history persists across restarts",
+      "requirement_id": "REQ-001",
       "goal_id": "G-001",
       "depends_on": [],
       "acceptance_criteria": [
-        "All existing environment variables and dependencies are documented",
-        "Existing API surface area (inputs/outputs) is mapped",
-        "Local buildability of current state is verified"
+        "SQLite database created with sessions, messages, tool_calls tables",
+        "Foreign key relationships enforced between tables",
+        "Indexes on project_path, created_at, session_id for query performance",
+        "Migration script executes idempotently"
       ],
-      "verification_script": "ls -la openexec-*/go.mod openexec-*/package.json 2>/dev/null || echo 'Discovery complete'",
-      "contract": "",
+      "verification_script": "sqlite3 orchestrator.db '.schema' | grep -q 'CREATE TABLE sessions' && sqlite3 orchestrator.db '.schema' | grep -q 'CREATE TABLE messages' && sqlite3 orchestrator.db '.schema' | grep -q 'CREATE TABLE tool_calls'",
+      "contract": "Tables: sessions(id, project_path, provider, model, created_at, updated_at), messages(id, session_id, role, content, created_at), tool_calls(id, message_id, tool_name, input, output, approved, executed_at)",
       "tasks": [
         {
           "id": "T-US-001-001",
-          "title": "Extract environment variables and dependencies",
-          "description": "Document all env vars from existing configs and list dependencies from go.mod/package.json files",
-          "technical_strategy": "Parse go.mod for Go dependencies, package.json for Node dependencies. Create ENV_VARS.md documenting all required environment variables with defaults.",
+          "title": "Define database schema and migrations",
+          "description": "Create SQLAlchemy models and Alembic migration for sessions, messages, and tool_calls tables",
+          "technical_strategy": "Use SQLAlchemy 2.0 declarative style with Mapped types. Define cascade deletes on foreign keys. Include CHECK constraints for role enum ('user', 'assistant', 'system', 'tool').",
           "depends_on": [],
-          "verification_script": "test -f .openexec/ENV_VARS.md && cat .openexec/ENV_VARS.md"
+          "verification_script": "python -c 'from app.db.models import Session, Message, ToolCall; print(\"Models imported\")'"
         },
         {
           "id": "T-US-001-002",
-          "title": "Map existing API surface area",
-          "description": "Document all existing API endpoints, their inputs, outputs, and protocols",
-          "technical_strategy": "Grep for http.HandleFunc, gin routes, or mux patterns. Document in API_SURFACE.md with method, path, request/response schemas.",
+          "title": "Implement repository pattern for sessions",
+          "description": "Create SessionRepository with CRUD operations and query methods",
+          "technical_strategy": "Use async SQLAlchemy with sessionmaker. Return Pydantic schemas from repository methods. Include get_by_project_path with pagination support.",
           "depends_on": [
             "T-US-001-001"
           ],
-          "verification_script": "test -f .openexec/API_SURFACE.md && grep -c 'endpoint' .openexec/API_SURFACE.md"
+          "verification_script": "pytest tests/unit/test_session_repository.py -v"
         },
         {
           "id": "T-US-001-003",
-          "title": "Verify local buildability",
-          "description": "Ensure all existing modules build successfully in current state",
-          "technical_strategy": "Run 'go build ./...' in each Go module directory. Run 'npm install && npm run build' for Node projects. Log results to BUILD_STATUS.md.",
+          "title": "Unit tests for database operations",
+          "description": "Write comprehensive unit tests for all repository methods with >90% coverage",
+          "technical_strategy": "Use pytest-asyncio with in-memory SQLite. Test edge cases: empty results, duplicate keys, cascade deletes. Mock datetime.now for deterministic timestamps.",
           "depends_on": [
             "T-US-001-002"
           ],
-          "verification_script": "cd openexec-cli && go build ./... 2>&1 | head -5"
+          "verification_script": "pytest tests/unit/test_session_repository.py --cov=app.db --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-002",
-      "title": "Core Audit Schema and Writer",
-      "description": "As a system administrator, I want an immutable audit trail so that all execution events are logged for ISO compliance",
-      "requirement_id": "REQ-AUDIT",
-      "goal_id": "G-006",
+      "title": "Provider Adapter Base Architecture",
+      "description": "As a developer, I want a provider adapter interface so that I can add new LLM providers without modifying core logic",
+      "requirement_id": "REQ-002",
+      "goal_id": "G-002",
       "depends_on": [
         "US-001"
       ],
       "acceptance_criteria": [
-        "SQLite audit database is created with proper schema",
-        "Audit writes are non-bypassable - failures halt execution",
-        "All events include timestamp, event_type, payload, and optional signature"
+        "Abstract ProviderAdapter base class with stream_chat and get_models methods",
+        "Tool schema translation layer converts MCP tools to provider-specific format",
+        "Provider registry allows runtime provider switching",
+        "Streaming responses yield partial content chunks"
       ],
-      "verification_script": "sqlite3 .openexec/audit.db 'SELECT count(*) FROM audit_events;'",
-      "contract": "AuditWriter.Write(event AuditEvent) error - writes event or returns error that halts execution",
+      "verification_script": "python -c 'from app.providers import ProviderRegistry, ProviderAdapter; print(\"Provider architecture loaded\")'",
+      "contract": "Interface: ProviderAdapter.stream_chat(messages, tools) -> AsyncIterator[StreamChunk], ProviderAdapter.translate_tools(mcp_tools) -> List[ProviderTool]",
       "tasks": [
         {
           "id": "T-US-002-001",
-          "title": "Define audit schema and types",
-          "description": "Create Go types for audit events and SQLite schema",
-          "technical_strategy": "Define AuditEvent struct with ID, Timestamp, EventType, Payload (json.RawMessage), Signature (optional). Use 'time.Time' for timestamps. Schema: CREATE TABLE audit_events with TEXT for JSON payload.",
+          "title": "Define provider adapter abstract base class",
+          "description": "Create ABC with stream_chat, translate_tools, and get_available_models methods",
+          "technical_strategy": "Use abc.ABC with @abstractmethod decorators. Define StreamChunk as TypedDict with 'type' (content|tool_call|error) and 'data' fields. Import TYPE_CHECKING for forward refs.",
           "depends_on": [],
-          "verification_script": "grep -q 'AuditEvent' openexec-execution/internal/audit/schema.go"
+          "verification_script": "python -c 'from app.providers.base import ProviderAdapter, StreamChunk; print(\"Base class valid\")'"
         },
         {
           "id": "T-US-002-002",
-          "title": "Implement AuditWriter with tests",
-          "description": "Create AuditWriter that writes to SQLite with non-bypassable error handling",
-          "technical_strategy": "Use database/sql with sqlite3 driver. Wrap writes in transaction. On any error, return immediately - caller must halt. Include unit tests with mock DB failures.",
+          "title": "Implement provider registry with factory pattern",
+          "description": "Create ProviderRegistry singleton that instantiates adapters by name",
+          "technical_strategy": "Use dict mapping provider names to adapter classes. Lazy instantiation with caching. Thread-safe with threading.Lock. Raise ProviderNotFoundError for unknown providers.",
           "depends_on": [
             "T-US-002-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v ./internal/audit/..."
+          "verification_script": "pytest tests/unit/test_provider_registry.py -v"
         },
         {
           "id": "T-US-002-003",
-          "title": "Implement cryptographic signing (optional)",
-          "description": "Add optional Ed25519 signing for audit events",
-          "technical_strategy": "Use crypto/ed25519 for signing. Key loaded from OPENEXEC_AUDIT_KEY env var. If key present, sign; if not, leave signature empty. Never fail on missing key.",
+          "title": "Tool schema translation utilities",
+          "description": "Create functions to convert MCP tool definitions to OpenAI/Anthropic/Gemini formats",
+          "technical_strategy": "Define MCPTool Pydantic model as source of truth. Create to_openai_function(), to_anthropic_tool(), to_gemini_declaration() converters. Handle parameter type mappings (string->str, integer->int).",
           "depends_on": [
-            "T-US-002-002"
+            "T-US-002-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestSign ./internal/audit/..."
+          "verification_script": "pytest tests/unit/test_tool_translation.py -v"
+        },
+        {
+          "id": "T-US-002-004",
+          "title": "Unit tests for provider architecture",
+          "description": "Write tests for registry, translation, and mock provider implementation",
+          "technical_strategy": "Create MockProvider extending ProviderAdapter for testing. Verify translation round-trips preserve semantics. Test registry thread safety with concurrent access.",
+          "depends_on": [
+            "T-US-002-002",
+            "T-US-002-003"
+          ],
+          "verification_script": "pytest tests/unit/test_providers/ --cov=app.providers --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-003",
-      "title": "Orchestration Plan CLI",
-      "description": "As a developer, I want to run 'openexec plan <intent>' so that I can generate a task tree from a PRD",
-      "requirement_id": "REQ-PLAN",
-      "goal_id": "G-001",
-      "depends_on": [
-        "US-001"
-      ],
-      "acceptance_criteria": [
-        "CLI accepts intent file path as argument",
-        "Outputs JSON summary to stdout",
-        "Writes tasks to .openexec/tasks.json",
-        "Supports --ordering and --timeout-mode flags"
-      ],
-      "verification_script": "openexec plan --help && echo 'Plan CLI available'",
-      "contract": "openexec plan <intent.md> [--ordering parallel|sequential] [--timeout-mode strict|lenient] -> JSON task tree",
-      "tasks": [
-        {
-          "id": "T-US-003-001",
-          "title": "Define plan command schema and flags",
-          "description": "Create cobra command with required flags and validation",
-          "technical_strategy": "Use spf13/cobra for CLI. Define StringP flags for ordering (default: parallel) and timeout-mode (default: strict). Validate intent file exists before proceeding.",
-          "depends_on": [],
-          "verification_script": "grep -q 'planCmd' openexec-cli/cmd/plan.go"
-        },
-        {
-          "id": "T-US-003-002",
-          "title": "Implement intent parser",
-          "description": "Parse markdown intent file into structured goals and requirements",
-          "technical_strategy": "Use goldmark for markdown parsing. Extract ## headers as sections. Look for 'Goals', 'Feature:', 'Constraints' patterns. Return IntentDocument struct.",
-          "depends_on": [
-            "T-US-003-001"
-          ],
-          "verification_script": "cd openexec-cli && go test -v -run TestIntentParser ./internal/..."
-        },
-        {
-          "id": "T-US-003-003",
-          "title": "Implement task tree generator",
-          "description": "Convert parsed intent to task tree JSON structure",
-          "technical_strategy": "Map each Feature to a Story. Generate task IDs as T-US-XXX-YYY. Calculate depends_on based on sequential ordering flag. Output to .openexec/tasks.json.",
-          "depends_on": [
-            "T-US-003-002"
-          ],
-          "verification_script": "cd openexec-cli && go test -v -run TestTaskGenerator ./internal/..."
-        },
-        {
-          "id": "T-US-003-004",
-          "title": "Integrate LLM story generation",
-          "description": "Use LLM to generate detailed stories from intent document",
-          "technical_strategy": "Call openexec-orchestration Python service via HTTP. Pass intent markdown. Receive JSON stories. Merge with local task tree. Handle timeout with context.WithTimeout.",
-          "depends_on": [
-            "T-US-003-003"
-          ],
-          "verification_script": "cd openexec-cli && go test -v -run TestLLMIntegration ./internal/..."
-        }
-      ]
-    },
-    {
-      "id": "US-004",
-      "title": "Execution SSE Event Stream",
-      "description": "As a developer, I want real-time execution status via SSE so that I can monitor task progress",
-      "requirement_id": "REQ-SSE",
+      "title": "OpenAI Provider Driver",
+      "description": "As a user, I want to use OpenAI models (GPT-4, GPT-4o) so that I can leverage OpenAI's capabilities in my projects",
+      "requirement_id": "REQ-003",
       "goal_id": "G-002",
       "depends_on": [
         "US-002"
       ],
       "acceptance_criteria": [
-        "GET /events endpoint streams SSE events",
-        "Heartbeat events sent every 30 seconds",
-        "Iteration and phase events include task ID and status",
-        "Audit write errors stop the run with explicit error event"
+        "OpenAI adapter implements stream_chat with SSE streaming",
+        "Tool calls are parsed from streamed function_call deltas",
+        "API key loaded from environment with validation",
+        "Rate limiting and retry logic with exponential backoff"
       ],
-      "verification_script": "curl -N -H 'Accept: text/event-stream' http://localhost:8080/events | head -3",
-      "contract": "GET /events -> SSE stream with event types: heartbeat, iteration, phase, error",
+      "verification_script": "OPENAI_API_KEY=test python -c 'from app.providers.openai import OpenAIAdapter; a = OpenAIAdapter(); print(a.provider_name)'",
+      "contract": "OpenAIAdapter.stream_chat(messages, tools, model='gpt-4o') -> AsyncIterator[StreamChunk]",
+      "tasks": [
+        {
+          "id": "T-US-003-001",
+          "title": "Define OpenAI adapter contract and error types",
+          "description": "Create OpenAI-specific error classes and response schemas",
+          "technical_strategy": "Extend base ProviderError for OpenAIError, RateLimitError, AuthenticationError. Use Pydantic for ChatCompletionChunk parsing. Define OPENAI_MODELS constant list.",
+          "depends_on": [],
+          "verification_script": "python -c 'from app.providers.openai.schemas import OpenAIError, ChatCompletionChunk; print(\"Schemas valid\")'"
+        },
+        {
+          "id": "T-US-003-002",
+          "title": "Implement mock OpenAI handler for testing",
+          "description": "Create mock that simulates OpenAI streaming responses for unit tests",
+          "technical_strategy": "Use httpx MockTransport. Simulate SSE data: chunks with content deltas and function_call assembly. Include mock rate limit response (429) for retry testing.",
+          "depends_on": [
+            "T-US-003-001"
+          ],
+          "verification_script": "pytest tests/unit/test_openai_mock.py -v"
+        },
+        {
+          "id": "T-US-003-003",
+          "title": "Implement OpenAI streaming chat",
+          "description": "Create OpenAIAdapter with httpx async client and SSE parsing",
+          "technical_strategy": "Use httpx.AsyncClient with stream=True. Parse 'data: ' prefixed lines. Accumulate function_call name/arguments across chunks. Handle [DONE] sentinel. Use tenacity for retries.",
+          "depends_on": [
+            "T-US-003-002"
+          ],
+          "verification_script": "pytest tests/unit/test_openai_adapter.py -v"
+        },
+        {
+          "id": "T-US-003-004",
+          "title": "Integration test with real OpenAI API",
+          "description": "Create integration test that validates real API connectivity (skipped without API key)",
+          "technical_strategy": "Use pytest.mark.skipif when OPENAI_API_KEY not set. Test simple completion and tool call. Assert response structure matches expected StreamChunk format.",
+          "depends_on": [
+            "T-US-003-003"
+          ],
+          "verification_script": "pytest tests/integration/test_openai_integration.py -v --ignore-glob='**/test_*_integration.py' || echo 'Skipped without API key'"
+        }
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Gemini Provider Driver",
+      "description": "As a user, I want to use Google Gemini models so that I can choose cost-effective alternatives",
+      "requirement_id": "REQ-004",
+      "goal_id": "G-002",
+      "depends_on": [
+        "US-002"
+      ],
+      "acceptance_criteria": [
+        "Gemini adapter implements stream_chat with streaming generation",
+        "Function declarations translated from MCP tool schemas",
+        "Handles Gemini-specific safety settings and content filters",
+        "API key loaded from GOOGLE_API_KEY environment variable"
+      ],
+      "verification_script": "GOOGLE_API_KEY=test python -c 'from app.providers.gemini import GeminiAdapter; a = GeminiAdapter(); print(a.provider_name)'",
+      "contract": "GeminiAdapter.stream_chat(messages, tools, model='gemini-1.5-pro') -> AsyncIterator[StreamChunk]",
       "tasks": [
         {
           "id": "T-US-004-001",
-          "title": "Define SSE event types and schema",
-          "description": "Create Go types for all SSE event payloads",
-          "technical_strategy": "Define HeartbeatEvent, IterationEvent, PhaseEvent, ErrorEvent structs. Use json tags for serialization. Include timestamp in all events.",
+          "title": "Define Gemini adapter schemas and error types",
+          "description": "Create Gemini-specific Pydantic models for request/response",
+          "technical_strategy": "Model GenerateContentRequest with contents, tools, safetySettings. Map Gemini roles (user/model) to standard roles. Define GEMINI_MODELS constant.",
           "depends_on": [],
-          "verification_script": "grep -q 'IterationEvent' openexec-execution/internal/loop/event.go"
+          "verification_script": "python -c 'from app.providers.gemini.schemas import GenerateContentRequest; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-004-002",
-          "title": "Implement SSE handler with heartbeat",
-          "description": "Create HTTP handler that streams SSE with periodic heartbeats",
-          "technical_strategy": "Set Content-Type: text/event-stream. Use time.Ticker for 30s heartbeats. Flush after each event. Handle client disconnect via request context.",
+          "title": "Implement mock Gemini handler for testing",
+          "description": "Create mock that simulates Gemini streaming responses",
+          "technical_strategy": "Mock the generateContent SSE endpoint. Simulate candidates[0].content.parts streaming. Include functionCall part simulation for tool calls.",
           "depends_on": [
             "T-US-004-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestSSEHandler ./internal/..."
+          "verification_script": "pytest tests/unit/test_gemini_mock.py -v"
         },
         {
           "id": "T-US-004-003",
-          "title": "Integrate audit writer with execution loop",
-          "description": "Wire audit writes to execution events with halt-on-error",
-          "technical_strategy": "Call AuditWriter.Write before each SSE emit. If Write returns error, send ErrorEvent and return immediately from handler. Never continue after audit failure.",
+          "title": "Implement Gemini streaming chat",
+          "description": "Create GeminiAdapter with httpx async client and Gemini API integration",
+          "technical_strategy": "Use generativelanguage.googleapis.com/v1beta endpoint. Parse streaming JSON lines. Convert functionCall to StreamChunk tool_call format. Handle HARM_CATEGORY blocks gracefully.",
           "depends_on": [
-            "T-US-004-002",
-            "T-US-002-002"
+            "T-US-004-002"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestAuditIntegration ./internal/..."
+          "verification_script": "pytest tests/unit/test_gemini_adapter.py -v"
+        },
+        {
+          "id": "T-US-004-004",
+          "title": "Unit tests for Gemini adapter",
+          "description": "Comprehensive tests including safety filter handling and function calling",
+          "technical_strategy": "Test blocked content returns appropriate error. Verify function call parsing matches MCP expected format. Test multi-turn conversation state preservation.",
+          "depends_on": [
+            "T-US-004-003"
+          ],
+          "verification_script": "pytest tests/unit/test_gemini_adapter.py --cov=app.providers.gemini --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-005",
-      "title": "Stack-Aware Quality Gates",
-      "description": "As a developer, I want quality gates that understand my tech stack so that appropriate linters and tests run automatically",
-      "requirement_id": "REQ-GATES",
-      "goal_id": "G-003",
+      "title": "Anthropic Provider Driver",
+      "description": "As a user, I want to use Anthropic Claude models so that I have access to Claude's capabilities",
+      "requirement_id": "REQ-005",
+      "goal_id": "G-002",
       "depends_on": [
         "US-002"
       ],
       "acceptance_criteria": [
-        "Gates detect stack from file extensions and config files",
-        "Python: runs black, isort, flake8, mypy, pytest",
-        "JavaScript/TypeScript: runs eslint, prettier, jest/vitest",
-        "Go: runs go fmt, go vet, golangci-lint, go test",
-        "Results returned as structured JSON with pass/fail status"
+        "Anthropic adapter implements stream_chat with Messages API streaming",
+        "Tool use blocks parsed from streaming events",
+        "System prompts handled via system parameter",
+        "API key loaded from ANTHROPIC_API_KEY environment variable"
       ],
-      "verification_script": "openexec gates --stack python --dry-run",
-      "contract": "openexec gates [--stack <stack>] -> JSON {stack, gates: [{name, status, output}], overall_status}",
+      "verification_script": "ANTHROPIC_API_KEY=test python -c 'from app.providers.anthropic import AnthropicAdapter; a = AnthropicAdapter(); print(a.provider_name)'",
+      "contract": "AnthropicAdapter.stream_chat(messages, tools, model='claude-3-5-sonnet-20241022') -> AsyncIterator[StreamChunk]",
       "tasks": [
         {
           "id": "T-US-005-001",
-          "title": "Define gate result schema",
-          "description": "Create types for gate configuration and results",
-          "technical_strategy": "Define GateConfig struct with Name, Command, Args, FailOnError. Define GateResult with Status (pass/fail/skip), Output, Duration. Use enum for Status.",
+          "title": "Define Anthropic adapter schemas",
+          "description": "Create Pydantic models for Messages API request/response structures",
+          "technical_strategy": "Model content blocks: TextBlock, ToolUseBlock, ToolResultBlock. Handle input_json_delta for streaming tool use. Define ANTHROPIC_MODELS with token limits.",
           "depends_on": [],
-          "verification_script": "grep -q 'GateResult' openexec-execution/internal/gates/types.go"
+          "verification_script": "python -c 'from app.providers.anthropic.schemas import MessagesRequest, ContentBlock; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-005-002",
-          "title": "Implement stack detection",
-          "description": "Auto-detect project stack from files and configs",
-          "technical_strategy": "Check for go.mod (Go), package.json (JS/TS), pyproject.toml/setup.py (Python), Cargo.toml (Rust). Return []string of detected stacks. Handle monorepos with multiple stacks.",
+          "title": "Implement mock Anthropic handler",
+          "description": "Create mock simulating Anthropic SSE streaming events",
+          "technical_strategy": "Simulate event types: message_start, content_block_start, content_block_delta, content_block_stop, message_stop. Include tool_use content block simulation.",
           "depends_on": [
             "T-US-005-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestStackDetection ./internal/gates/..."
+          "verification_script": "pytest tests/unit/test_anthropic_mock.py -v"
         },
         {
           "id": "T-US-005-003",
-          "title": "Implement Python gates",
-          "description": "Create gate runners for Python tooling",
-          "technical_strategy": "Check each tool exists via exec.LookPath. Run black --check, isort --check, flake8, mypy, pytest --tb=short. Capture stdout/stderr. Parse exit codes.",
+          "title": "Implement Anthropic streaming chat",
+          "description": "Create AnthropicAdapter with Messages API integration",
+          "technical_strategy": "Use api.anthropic.com/v1/messages with stream=true. Parse SSE events by type. Accumulate tool_use input across deltas. Convert to unified StreamChunk format.",
           "depends_on": [
             "T-US-005-002"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestPythonGates ./internal/gates/..."
+          "verification_script": "pytest tests/unit/test_anthropic_adapter.py -v"
         },
         {
           "id": "T-US-005-004",
-          "title": "Implement JavaScript/TypeScript gates",
-          "description": "Create gate runners for JS/TS tooling",
-          "technical_strategy": "Detect npm vs yarn vs pnpm from lockfiles. Run eslint, prettier --check, npm test. Handle missing scripts gracefully with skip status.",
+          "title": "Unit tests for Anthropic adapter",
+          "description": "Tests covering streaming, tool use, and error handling",
+          "technical_strategy": "Test content_block_delta accumulation. Verify tool_use JSON parsing. Test overloaded_error handling. Ensure system message extraction works correctly.",
           "depends_on": [
-            "T-US-005-002"
+            "T-US-005-003"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestJSGates ./internal/gates/..."
-        },
-        {
-          "id": "T-US-005-005",
-          "title": "Implement Go gates",
-          "description": "Create gate runners for Go tooling",
-          "technical_strategy": "Run go fmt -l (list only), go vet, golangci-lint run, go test -v ./.... Check go fmt output for any files - if any listed, fail gate.",
-          "depends_on": [
-            "T-US-005-002"
-          ],
-          "verification_script": "cd openexec-execution && go test -v -run TestGoGates ./internal/gates/..."
+          "verification_script": "pytest tests/unit/test_anthropic_adapter.py --cov=app.providers.anthropic --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-006",
-      "title": "HITL Telegram Webhook",
-      "description": "As an approver, I want to approve/reject tasks via Telegram so that I can review from my phone",
-      "requirement_id": "REQ-TELEGRAM",
-      "goal_id": "G-004",
+      "title": "MCP Tools: File System Operations",
+      "description": "As an agent, I want to read and write files through MCP so that I can modify project code safely",
+      "requirement_id": "REQ-006",
+      "goal_id": "G-003",
       "depends_on": [
-        "US-004"
+        "US-001"
       ],
       "acceptance_criteria": [
-        "POST /webhook/telegram endpoint validates secret token",
-        "Parses Telegram bot commands: /approve, /reject, /pause",
-        "Commands map to execution API state changes",
-        "Invalid tokens return 401 Unauthorized"
+        "read_file tool reads files within WORKSPACES_ROOT only",
+        "write_file tool writes files with approval required",
+        "Path traversal attacks blocked (no ../ escapes)",
+        "File operations logged in tool_calls table"
       ],
-      "verification_script": "curl -X POST -H 'X-Telegram-Bot-Api-Secret-Token: test' http://localhost:8080/webhook/telegram -d '{}'",
-      "contract": "POST /webhook/telegram {update} -> 200 OK or 401 Unauthorized",
+      "verification_script": "pytest tests/unit/test_mcp_filesystem.py -v",
+      "contract": "read_file(path: str) -> str, write_file(path: str, content: str) -> bool",
       "tasks": [
         {
           "id": "T-US-006-001",
-          "title": "Define Telegram webhook types",
-          "description": "Create Go types for Telegram Update payload",
-          "technical_strategy": "Define Update, Message, CallbackQuery structs matching Telegram Bot API. Use json tags. Only include fields we need: message.text, callback_query.data.",
+          "title": "Define MCP tool schemas for filesystem",
+          "description": "Create Pydantic schemas for read_file and write_file tools",
+          "technical_strategy": "Define ReadFileInput(path: str), WriteFileInput(path: str, content: str). Include JSON schema export for provider translation. Add max_size_bytes parameter for read.",
           "depends_on": [],
-          "verification_script": "grep -q 'TelegramUpdate' openexec-interface/internal/telegram/types.go"
+          "verification_script": "python -c 'from app.mcp.tools.filesystem import ReadFileInput, WriteFileInput; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-006-002",
-          "title": "Implement webhook handler with auth",
-          "description": "Create handler that validates secret token header",
-          "technical_strategy": "Read X-Telegram-Bot-Api-Secret-Token header. Compare with TELEGRAM_WEBHOOK_SECRET env var using subtle.ConstantTimeCompare. Return 401 if mismatch.",
+          "title": "Implement path validation and sandboxing",
+          "description": "Create PathValidator that ensures all paths are within WORKSPACES_ROOT",
+          "technical_strategy": "Use pathlib.Path.resolve() to canonicalize. Check path.is_relative_to(WORKSPACES_ROOT). Raise PathEscapeError for violations. Block symlinks pointing outside root.",
           "depends_on": [
             "T-US-006-001"
           ],
-          "verification_script": "cd openexec-interface && go test -v -run TestTelegramAuth ./internal/telegram/..."
+          "verification_script": "pytest tests/unit/test_path_validator.py -v"
         },
         {
           "id": "T-US-006-003",
-          "title": "Implement command parser and executor",
-          "description": "Parse bot commands and call execution API",
-          "technical_strategy": "Parse /approve <task_id>, /reject <task_id>, /pause. Use http.Client to call execution service at EXECUTION_API_URL. Log all actions to audit.",
+          "title": "Implement read_file and write_file handlers",
+          "description": "Create async handlers that perform validated file operations",
+          "technical_strategy": "Use aiofiles for async I/O. Validate paths before any operation. Log tool_calls with input/output. Return structured ToolResult with success/error.",
           "depends_on": [
             "T-US-006-002"
           ],
-          "verification_script": "cd openexec-interface && go test -v -run TestTelegramCommands ./internal/telegram/..."
+          "verification_script": "pytest tests/unit/test_filesystem_handlers.py -v"
+        },
+        {
+          "id": "T-US-006-004",
+          "title": "Unit tests for filesystem tools with security scenarios",
+          "description": "Test path traversal attacks, symlink escapes, and normal operations",
+          "technical_strategy": "Test '../../../etc/passwd' rejection. Test symlink to /etc rejection. Test valid read/write within workspace. Use tmp_path fixture for isolation.",
+          "depends_on": [
+            "T-US-006-003"
+          ],
+          "verification_script": "pytest tests/unit/test_mcp_filesystem.py --cov=app.mcp.tools.filesystem --cov-fail-under=95"
         }
       ]
     },
     {
       "id": "US-007",
-      "title": "HITL WhatsApp Webhook",
-      "description": "As an approver, I want to approve/reject tasks via WhatsApp so that I can use my preferred messaging app",
-      "requirement_id": "REQ-WHATSAPP",
-      "goal_id": "G-004",
+      "title": "MCP Tools: Shell Command Execution",
+      "description": "As an agent, I want to run shell commands with approval so that I can execute builds and tests",
+      "requirement_id": "REQ-007",
+      "goal_id": "G-003",
       "depends_on": [
-        "US-004"
+        "US-006"
       ],
       "acceptance_criteria": [
-        "POST /webhook/whatsapp endpoint validates Twilio signature",
-        "Parses WhatsApp message body for commands",
-        "Commands map to execution API state changes",
-        "Invalid signatures return 403 Forbidden"
+        "run_shell_command executes commands with user approval",
+        "Command output captured and returned (stdout/stderr)",
+        "Timeout enforced to prevent hanging commands",
+        "Working directory constrained to project path"
       ],
-      "verification_script": "curl -X POST http://localhost:8080/webhook/whatsapp -d 'Body=approve%20task-001'",
-      "contract": "POST /webhook/whatsapp {Twilio form data} -> 200 OK or 403 Forbidden",
+      "verification_script": "pytest tests/unit/test_mcp_shell.py -v",
+      "contract": "run_shell_command(command: str, cwd: str, timeout: int) -> ShellResult(exit_code, stdout, stderr)",
       "tasks": [
         {
           "id": "T-US-007-001",
-          "title": "Define WhatsApp/Twilio types",
-          "description": "Create Go types for Twilio webhook payload",
-          "technical_strategy": "Define TwilioWebhook struct with From, Body, MessageSid fields. Parse as application/x-www-form-urlencoded. Twilio sends form data, not JSON.",
+          "title": "Define shell command tool schema",
+          "description": "Create Pydantic schemas for run_shell_command input/output",
+          "technical_strategy": "Define RunShellInput(command: str, cwd: Optional[str], timeout: int = 60). Define ShellResult(exit_code: int, stdout: str, stderr: str, timed_out: bool).",
           "depends_on": [],
-          "verification_script": "grep -q 'TwilioWebhook' openexec-interface/internal/whatsapp/types.go"
+          "verification_script": "python -c 'from app.mcp.tools.shell import RunShellInput, ShellResult; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-007-002",
-          "title": "Implement Twilio signature validation",
-          "description": "Validate X-Twilio-Signature header using auth token",
-          "technical_strategy": "Reconstruct signed string from URL + sorted form params. HMAC-SHA1 with TWILIO_AUTH_TOKEN. Base64 encode and compare. Use twilio-go SDK if available.",
+          "title": "Implement shell command executor",
+          "description": "Create async shell executor with subprocess and timeout handling",
+          "technical_strategy": "Use asyncio.create_subprocess_shell with PIPE for stdout/stderr. Use asyncio.wait_for for timeout. Kill process on timeout. Capture full output even on error.",
           "depends_on": [
             "T-US-007-001"
           ],
-          "verification_script": "cd openexec-interface && go test -v -run TestTwilioSignature ./internal/whatsapp/..."
+          "verification_script": "pytest tests/unit/test_shell_executor.py -v"
         },
         {
           "id": "T-US-007-003",
-          "title": "Implement message parser and executor",
-          "description": "Parse message body for commands and call execution API",
-          "technical_strategy": "Parse 'approve <task_id>', 'reject <task_id>', 'pause' from Body field. Case-insensitive matching. Respond with TwiML XML for confirmation.",
+          "title": "Integrate approval flow with shell commands",
+          "description": "Create approval checkpoint that pauses execution until approved",
+          "technical_strategy": "Define ApprovalRequest Pydantic model with command, cwd, requester. Use asyncio.Event for approval signal. Store pending approvals in memory dict by request_id.",
           "depends_on": [
             "T-US-007-002"
           ],
-          "verification_script": "cd openexec-interface && go test -v -run TestWhatsAppCommands ./internal/whatsapp/..."
+          "verification_script": "pytest tests/unit/test_shell_approval.py -v"
+        },
+        {
+          "id": "T-US-007-004",
+          "title": "Unit tests for shell execution",
+          "description": "Test successful execution, timeouts, and approval flow",
+          "technical_strategy": "Test 'echo hello' returns stdout. Test 'sleep 100' with 1s timeout. Test approval rejection stops execution. Use mock for approval to avoid blocking.",
+          "depends_on": [
+            "T-US-007-003"
+          ],
+          "verification_script": "pytest tests/unit/test_mcp_shell.py --cov=app.mcp.tools.shell --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-008",
-      "title": "OpenExec CLI Init Command",
-      "description": "As a developer, I want to run 'openexec init' to initialize a new project with OpenExec structure",
-      "requirement_id": "REQ-CLI-INIT",
-      "goal_id": "G-005",
+      "title": "MCP Tools: Git Patch Operations",
+      "description": "As an agent, I want to apply git patches so that I can make atomic code changes",
+      "requirement_id": "REQ-008",
+      "goal_id": "G-003",
       "depends_on": [
-        "US-001"
+        "US-007"
       ],
       "acceptance_criteria": [
-        "Creates .openexec directory with required structure",
-        "Initializes SQLite audit database",
-        "Creates default config file",
-        "Idempotent - safe to run multiple times"
+        "git_apply_patch applies unified diff patches",
+        "Patch preview shows affected files before apply",
+        "Rollback capability via git stash or revert",
+        "Only operates on git repositories within workspace"
       ],
-      "verification_script": "openexec init && test -d .openexec && test -f .openexec/audit.db",
-      "contract": "openexec init [--force] -> creates .openexec/ directory structure",
+      "verification_script": "pytest tests/unit/test_mcp_git.py -v",
+      "contract": "git_apply_patch(patch: str, cwd: str, dry_run: bool) -> PatchResult(applied: bool, files_changed: List[str])",
       "tasks": [
         {
           "id": "T-US-008-001",
-          "title": "Define init command with cobra",
-          "description": "Create init cobra command with --force flag",
-          "technical_strategy": "Use spf13/cobra. Add --force bool flag to overwrite existing. Check for .openexec existence first. Print clear progress messages.",
+          "title": "Define git patch tool schemas",
+          "description": "Create Pydantic models for patch operations",
+          "technical_strategy": "Define GitApplyInput(patch: str, cwd: str, dry_run: bool = True). Define PatchResult(applied: bool, files_changed: List[str], error: Optional[str]).",
           "depends_on": [],
-          "verification_script": "grep -q 'initCmd' openexec-cli/cmd/init.go"
+          "verification_script": "python -c 'from app.mcp.tools.git import GitApplyInput, PatchResult; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-008-002",
-          "title": "Implement directory scaffolding",
-          "description": "Create .openexec directory structure",
-          "technical_strategy": "Create .openexec/, .openexec/evidence/, .openexec/exports/. Use os.MkdirAll with 0755 permissions. Skip if exists and not --force.",
+          "title": "Implement git patch handler",
+          "description": "Create handler that validates and applies git patches",
+          "technical_strategy": "Use 'git apply --check' for dry_run. Parse 'git apply --stat' for files_changed. Create stash before apply for rollback. Verify .git directory exists in cwd.",
           "depends_on": [
             "T-US-008-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestInitScaffold ./cmd/..."
+          "verification_script": "pytest tests/unit/test_git_handler.py -v"
         },
         {
           "id": "T-US-008-003",
-          "title": "Initialize audit database",
-          "description": "Create SQLite database with audit schema",
-          "technical_strategy": "Use database/sql with sqlite3. Run CREATE TABLE IF NOT EXISTS for audit_events. Close connection after init. Verify with SELECT 1.",
+          "title": "Implement patch preview and rollback",
+          "description": "Create functions for previewing changes and rolling back failed applies",
+          "technical_strategy": "Preview shows 'git apply --stat' output formatted. Rollback uses 'git stash pop' if stash was created. Track stash ref in PatchContext dataclass.",
           "depends_on": [
-            "T-US-008-002",
-            "T-US-002-001"
+            "T-US-008-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestInitAuditDB ./cmd/..."
+          "verification_script": "pytest tests/unit/test_git_rollback.py -v"
+        },
+        {
+          "id": "T-US-008-004",
+          "title": "Unit tests for git patch operations",
+          "description": "Test patch apply, preview, rollback, and error cases",
+          "technical_strategy": "Use gitpython to create test repos. Test valid patch applies. Test conflict detection. Test non-git directory rejection. Clean up test repos in fixture teardown.",
+          "depends_on": [
+            "T-US-008-003"
+          ],
+          "verification_script": "pytest tests/unit/test_mcp_git.py --cov=app.mcp.tools.git --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-009",
-      "title": "OpenExec CLI Start Command",
-      "description": "As a developer, I want to run 'openexec start' to begin task execution with configurable options",
-      "requirement_id": "REQ-CLI-START",
-      "goal_id": "G-005",
+      "title": "Audit Logging and Secret Redaction",
+      "description": "As a security admin, I want all tool calls logged with secrets redacted so that I can audit agent actions safely",
+      "requirement_id": "REQ-009",
+      "goal_id": "G-003",
       "depends_on": [
-        "US-008",
-        "US-004"
+        "US-001",
+        "US-006"
       ],
       "acceptance_criteria": [
-        "Starts execution daemon/process",
-        "Supports --harness, --provider, --model flags",
-        "Connects to SSE endpoint for status",
-        "Graceful shutdown on SIGINT/SIGTERM"
+        "All tool_calls logged with timestamp, input, output, approval status",
+        "Secrets (API keys, passwords, tokens) redacted from logs",
+        "Audit records persisted in SQLite tool_calls table",
+        "Query interface for audit log retrieval"
       ],
-      "verification_script": "openexec start --help | grep -q 'harness'",
-      "contract": "openexec start [--harness <harness>] [--provider <provider>] [--model <model>] -> starts execution",
+      "verification_script": "pytest tests/unit/test_audit_logging.py -v",
+      "contract": "AuditLogger.log_tool_call(tool_name, input, output, approved) -> audit_id",
       "tasks": [
         {
           "id": "T-US-009-001",
-          "title": "Define start command with flags",
-          "description": "Create start cobra command with execution flags",
-          "technical_strategy": "Use spf13/cobra. Add StringP flags: harness (default: docker), provider (default: anthropic), model (default: claude-sonnet-4-20250514). Validate flag values.",
+          "title": "Define audit log schema and redaction patterns",
+          "description": "Create schemas and regex patterns for secret detection",
+          "technical_strategy": "Define SECRET_PATTERNS list with regex for API keys, tokens, passwords. Pattern examples: r'(api[_-]?key)\\s*[=:]\\s*[\\w-]+', r'Bearer\\s+[\\w.-]+'. Use re.IGNORECASE.",
           "depends_on": [],
-          "verification_script": "grep -q 'startCmd' openexec-cli/cmd/start.go"
+          "verification_script": "python -c 'from app.audit.redaction import SECRET_PATTERNS; print(f\"{len(SECRET_PATTERNS)} patterns defined\")'"
         },
         {
           "id": "T-US-009-002",
-          "title": "Implement execution client",
-          "description": "Create client to start execution via API",
-          "technical_strategy": "POST to /api/execution/start with JSON body containing flags. Handle 409 Conflict if already running. Return run_id on success.",
+          "title": "Implement secret redaction engine",
+          "description": "Create redact() function that replaces secrets with [REDACTED]",
+          "technical_strategy": "Apply all SECRET_PATTERNS sequentially. Replace captured groups with [REDACTED]. Handle nested JSON by recursively redacting string values. Return RedactedContent wrapper.",
           "depends_on": [
             "T-US-009-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestExecutionClient ./internal/..."
+          "verification_script": "pytest tests/unit/test_redaction.py -v"
         },
         {
           "id": "T-US-009-003",
-          "title": "Implement signal handling",
-          "description": "Handle SIGINT/SIGTERM for graceful shutdown",
-          "technical_strategy": "Use signal.NotifyContext with os.Interrupt and syscall.SIGTERM. On signal, POST to /api/execution/stop. Wait for confirmation before exit.",
+          "title": "Implement AuditLogger service",
+          "description": "Create service that logs tool calls to database with redaction",
+          "technical_strategy": "Inject SessionRepository dependency. Redact input/output before persisting. Include execution duration. Return audit_id for reference. Use async context manager for transactions.",
           "depends_on": [
             "T-US-009-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestSignalHandling ./internal/..."
+          "verification_script": "pytest tests/unit/test_audit_logger.py -v"
+        },
+        {
+          "id": "T-US-009-004",
+          "title": "Unit tests for audit logging",
+          "description": "Test redaction effectiveness and log persistence",
+          "technical_strategy": "Test API key redaction: 'sk-abc123' -> '[REDACTED]'. Test Bearer token redaction. Test log retrieval by session. Verify redaction in both input and output fields.",
+          "depends_on": [
+            "T-US-009-003"
+          ],
+          "verification_script": "pytest tests/unit/test_audit_logging.py --cov=app.audit --cov-fail-under=95"
         }
       ]
     },
     {
       "id": "US-010",
-      "title": "OpenExec CLI Status Command",
-      "description": "As a developer, I want to run 'openexec status' to see current execution state",
-      "requirement_id": "REQ-CLI-STATUS",
-      "goal_id": "G-005",
+      "title": "Auto-Context Injection Engine",
+      "description": "As an agent, I want project context automatically injected into my prompts so that I have relevant information for each task",
+      "requirement_id": "REQ-010",
+      "goal_id": "G-004",
       "depends_on": [
-        "US-004"
+        "US-006"
       ],
       "acceptance_criteria": [
-        "Connects to SSE endpoint and prints events",
-        "Shows concise, formatted status output",
-        "Handles connection errors gracefully",
-        "Exits cleanly on Ctrl+C"
+        "INTENT.md content injected into system prompt",
+        "tasks.json current state included in context",
+        "Recent log tail (last 50 lines) included",
+        "Context truncated safely to fit token limits"
       ],
-      "verification_script": "openexec status --help | grep -q 'status'",
-      "contract": "openexec status [--follow] -> prints current status or streams updates",
+      "verification_script": "pytest tests/unit/test_auto_context.py -v",
+      "contract": "ContextBuilder.build_context(project_path, max_tokens) -> ContextPayload(system_prompt, injected_files)",
       "tasks": [
         {
           "id": "T-US-010-001",
-          "title": "Define status command with flags",
-          "description": "Create status cobra command with follow flag",
-          "technical_strategy": "Use spf13/cobra. Add --follow bool flag for continuous streaming. Default to one-shot status check. Add --json flag for machine-readable output.",
+          "title": "Define context payload schemas",
+          "description": "Create Pydantic models for context injection",
+          "technical_strategy": "Define ContextPayload(system_prompt: str, files: Dict[str, str], token_count: int). Define ContextConfig(max_tokens: int = 8000, include_intent: bool = True).",
           "depends_on": [],
-          "verification_script": "grep -q 'statusCmd' openexec-cli/cmd/status.go"
+          "verification_script": "python -c 'from app.context.schemas import ContextPayload, ContextConfig; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-010-002",
-          "title": "Implement SSE client",
-          "description": "Create client to consume SSE events from execution service",
-          "technical_strategy": "Use bufio.Scanner on http.Response.Body. Parse 'event:' and 'data:' lines. Handle reconnection on EOF. Use context for cancellation.",
+          "title": "Implement token counting and truncation",
+          "description": "Create utilities for counting tokens and truncating content",
+          "technical_strategy": "Use tiktoken with cl100k_base encoding for accurate counts. Truncate at sentence boundaries when possible. Preserve beginning of files (more important context).",
           "depends_on": [
             "T-US-010-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestSSEClient ./internal/..."
+          "verification_script": "pytest tests/unit/test_token_utils.py -v"
         },
         {
           "id": "T-US-010-003",
-          "title": "Implement status formatter",
-          "description": "Format status events for terminal display",
-          "technical_strategy": "Use lipgloss or termenv for colors. Show task name, status, duration. Use spinner for in-progress tasks. Clear line for updates.",
+          "title": "Implement ContextBuilder service",
+          "description": "Create service that assembles project context with priority ordering",
+          "technical_strategy": "Priority order: INTENT.md > tasks.json > recent logs. Use read_file MCP tool internally. Calculate remaining budget after each file. Return partial context if truncated.",
           "depends_on": [
             "T-US-010-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestStatusFormatter ./internal/..."
+          "verification_script": "pytest tests/unit/test_context_builder.py -v"
+        },
+        {
+          "id": "T-US-010-004",
+          "title": "Unit tests for context injection",
+          "description": "Test context assembly, truncation, and missing file handling",
+          "technical_strategy": "Test full context builds correctly. Test truncation preserves priority files. Test missing INTENT.md handled gracefully. Test token count accuracy within 5%.",
+          "depends_on": [
+            "T-US-010-003"
+          ],
+          "verification_script": "pytest tests/unit/test_auto_context.py --cov=app.context --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-011",
-      "title": "OpenExec CLI TUI Dashboard",
-      "description": "As a developer, I want to run 'openexec tui' for a rich terminal dashboard showing execution status",
-      "requirement_id": "REQ-TUI",
-      "goal_id": "G-005",
+      "title": "Chat UI with Streaming Markdown",
+      "description": "As a user, I want a chat interface with streaming markdown rendering so that I can interact with the agent in real-time",
+      "requirement_id": "REQ-011",
+      "goal_id": "G-001",
       "depends_on": [
-        "US-010"
+        "US-001",
+        "US-002"
       ],
       "acceptance_criteria": [
-        "Real-time view of all workers and their status",
-        "List of pending tasks with priorities",
-        "Live log streaming panel",
-        "Keyboard navigation (j/k for up/down, q to quit)"
+        "Chat messages display with markdown rendering",
+        "Streaming responses render incrementally",
+        "Loading spinners shown during generation",
+        "Chat history scrollable with auto-scroll to bottom"
       ],
-      "verification_script": "openexec tui --help | grep -q 'tui'",
-      "contract": "openexec tui -> launches interactive terminal dashboard",
+      "verification_script": "npm test -- --testPathPattern=Chat",
+      "contract": "WebSocket /ws/chat/{session_id} for streaming, REST /api/sessions for CRUD",
       "tasks": [
         {
           "id": "T-US-011-001",
-          "title": "Set up Bubbletea TUI framework",
-          "description": "Initialize Bubbletea app with basic model",
-          "technical_strategy": "Use charmbracelet/bubbletea. Define Model with workers, tasks, logs slices. Implement Init, Update, View methods. Handle tea.WindowSizeMsg.",
+          "title": "Define chat API contract and WebSocket protocol",
+          "description": "Create OpenAPI schema and WebSocket message types",
+          "technical_strategy": "Define ChatMessage schema. WebSocket messages: {type: 'chunk'|'tool_call'|'done', data: any}. Use JSON encoding. Include heartbeat ping/pong.",
           "depends_on": [],
-          "verification_script": "grep -q 'bubbletea' openexec-cli/go.mod"
+          "verification_script": "python -c 'from app.api.schemas.chat import ChatMessage, WSMessage; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-011-002",
-          "title": "Implement workers panel",
-          "description": "Create panel showing worker status",
-          "technical_strategy": "Use charmbracelet/lipgloss for styling. Show worker ID, current task, status, duration. Update via SSE events. Use table layout.",
+          "title": "Implement WebSocket chat endpoint",
+          "description": "Create FastAPI WebSocket endpoint for streaming chat",
+          "technical_strategy": "Use FastAPI WebSocket with accept(). Stream provider chunks as JSON messages. Handle disconnection gracefully. Store partial response on disconnect.",
           "depends_on": [
             "T-US-011-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestWorkersPanel ./internal/tui/..."
+          "verification_script": "pytest tests/unit/test_chat_websocket.py -v"
         },
         {
           "id": "T-US-011-003",
-          "title": "Implement tasks panel",
-          "description": "Create panel showing pending tasks queue",
-          "technical_strategy": "List tasks by priority. Show ID, title, status, depends_on. Highlight currently selected. Allow j/k navigation. Show task details on enter.",
+          "title": "Create React chat components",
+          "description": "Build ChatWindow, MessageList, MessageInput components",
+          "technical_strategy": "Use react-markdown for rendering. useRef for scroll container with auto-scroll. Use WebSocket hook with reconnection. Memoize MessageList items.",
           "depends_on": [
-            "T-US-011-001"
+            "T-US-011-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestTasksPanel ./internal/tui/..."
+          "verification_script": "npm test -- --testPathPattern=components/Chat"
         },
         {
           "id": "T-US-011-004",
-          "title": "Implement logs panel",
-          "description": "Create panel with live log streaming",
-          "technical_strategy": "Use viewport component for scrollable logs. Auto-scroll to bottom on new logs. Allow scroll lock toggle. Limit to last 1000 lines.",
+          "title": "Implement streaming response rendering",
+          "description": "Create component that renders markdown incrementally",
+          "technical_strategy": "Accumulate chunks in state. Debounce markdown parsing (100ms). Show cursor animation during streaming. Handle code blocks with syntax highlighting via react-syntax-highlighter.",
           "depends_on": [
-            "T-US-011-001"
+            "T-US-011-003"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestLogsPanel ./internal/tui/..."
+          "verification_script": "npm test -- --testPathPattern=StreamingMessage"
         },
         {
           "id": "T-US-011-005",
-          "title": "Integrate SSE updates into TUI",
-          "description": "Wire SSE client to update TUI model",
-          "technical_strategy": "Run SSE client in goroutine. Send events via tea.Program.Send. Batch updates every 100ms to reduce renders. Handle reconnection.",
+          "title": "Unit and integration tests for chat UI",
+          "description": "Test components and WebSocket integration",
+          "technical_strategy": "Use React Testing Library. Mock WebSocket with jest-websocket-mock. Test markdown rendering edge cases. Test scroll behavior on new messages.",
           "depends_on": [
-            "T-US-011-002",
-            "T-US-011-003",
-            "T-US-011-004",
-            "T-US-010-002"
+            "T-US-011-004"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestTUISSEIntegration ./internal/tui/..."
+          "verification_script": "npm test -- --coverage --testPathPattern=Chat"
         }
       ]
     },
     {
       "id": "US-012",
-      "title": "ISO-Compliant Evidence Export",
-      "description": "As an auditor, I want to export all project evidence so that I can review for ISO compliance",
-      "requirement_id": "REQ-EXPORT",
-      "goal_id": "G-006",
+      "title": "Model Picker and Provider Selection UI",
+      "description": "As a user, I want to select my preferred LLM provider and model so that I can control cost and capability trade-offs",
+      "requirement_id": "REQ-012",
+      "goal_id": "G-002",
       "depends_on": [
-        "US-002",
-        "US-005"
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-011"
       ],
       "acceptance_criteria": [
-        "Export includes full SQLite audit trail",
-        "Export includes all verification evidence files",
-        "Export includes model versions used",
-        "Export includes static gate reports",
-        "Output is a timestamped archive (.tar.gz)"
+        "Dropdown displays available providers and their models",
+        "Model selection persists per session",
+        "Provider switch mid-conversation preserves history",
+        "Cost/token indicators shown per model"
       ],
-      "verification_script": "openexec export --evidence && ls -la .openexec/exports/*.tar.gz",
-      "contract": "openexec export --evidence [--output <path>] -> creates evidence archive",
+      "verification_script": "npm test -- --testPathPattern=ModelPicker",
+      "contract": "GET /api/providers -> List[Provider], PATCH /api/sessions/{id} -> Session",
       "tasks": [
         {
           "id": "T-US-012-001",
-          "title": "Define export command with flags",
-          "description": "Create export cobra command with evidence flag",
-          "technical_strategy": "Use spf13/cobra. Add --evidence bool flag, --output string flag for custom path. Default output to .openexec/exports/evidence-{timestamp}.tar.gz.",
+          "title": "Create providers API endpoint",
+          "description": "Implement endpoint returning available providers and models",
+          "technical_strategy": "Query ProviderRegistry.get_all_providers(). Include model metadata: name, context_length, cost_per_1k_tokens. Filter by configured API keys (only show usable providers).",
           "depends_on": [],
-          "verification_script": "grep -q 'exportCmd' openexec-cli/cmd/export.go"
+          "verification_script": "pytest tests/unit/test_providers_api.py -v"
         },
         {
           "id": "T-US-012-002",
-          "title": "Implement evidence collector",
-          "description": "Gather all evidence files for export",
-          "technical_strategy": "Copy audit.db, scan .openexec/evidence/ for verification logs, read gate reports from last run. Create manifest.json listing all included files.",
+          "title": "Build ModelPicker React component",
+          "description": "Create dropdown component for provider/model selection",
+          "technical_strategy": "Use Headless UI Listbox for accessibility. Group models by provider. Show token limits and cost badges. Disable unavailable providers with tooltip explanation.",
           "depends_on": [
             "T-US-012-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestEvidenceCollector ./internal/export/..."
+          "verification_script": "npm test -- --testPathPattern=ModelPicker"
         },
         {
           "id": "T-US-012-003",
-          "title": "Implement archive creator",
-          "description": "Create tar.gz archive of evidence",
-          "technical_strategy": "Use archive/tar and compress/gzip. Add manifest first. Include all evidence files with relative paths. Verify archive integrity after creation.",
+          "title": "Implement session provider update",
+          "description": "Create PATCH endpoint to update session provider/model",
+          "technical_strategy": "Validate new provider is available. Update session record. Preserve message history. Add system message noting provider switch for context.",
           "depends_on": [
             "T-US-012-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestArchiveCreator ./internal/export/..."
+          "verification_script": "pytest tests/unit/test_session_update.py -v"
+        },
+        {
+          "id": "T-US-012-004",
+          "title": "Unit tests for model picker",
+          "description": "Test selection, persistence, and provider switching",
+          "technical_strategy": "Test provider list rendering. Test selection updates session. Test disabled state for missing API keys. Test mid-conversation switch preserves history.",
+          "depends_on": [
+            "T-US-012-003"
+          ],
+          "verification_script": "npm test -- --coverage --testPathPattern=ModelPicker && pytest tests/unit/test_session_update.py"
         }
       ]
     },
     {
       "id": "US-013",
-      "title": "Story-Level Validation Review",
-      "description": "As a reviewer, I want story-level validation checkpoints so that I review integrated features, not individual tasks",
-      "requirement_id": "REQ-STORY-REVIEW",
-      "goal_id": "G-006",
+      "title": "Session Fork and History Management",
+      "description": "As a user, I want to fork sessions and manage history so that I can explore alternative approaches",
+      "requirement_id": "REQ-013",
+      "goal_id": "G-001",
       "depends_on": [
-        "US-002",
-        "US-004"
+        "US-011"
       ],
       "acceptance_criteria": [
-        "Task verification is autonomous and evidence-based",
-        "Story validation triggers only when all tasks complete",
-        "Validation checkpoint notifies reviewer via configured channel",
-        "Validation evidence is recorded in audit trail"
+        "Fork button creates new session from any message point",
+        "Forked sessions show branch indicator",
+        "Session list displays all sessions for project",
+        "Delete session removes history and tool_calls"
       ],
-      "verification_script": "openexec status | grep -q 'story-validation'",
-      "contract": "Story validation triggers POST /api/review/validate/{story_id} when all story tasks verified",
+      "verification_script": "npm test -- --testPathPattern=SessionManagement",
+      "contract": "POST /api/sessions/{id}/fork?from_message_id={id} -> Session",
       "tasks": [
         {
           "id": "T-US-013-001",
-          "title": "Define validation state machine",
-          "description": "Create state machine for task->story validation flow",
-          "technical_strategy": "States: task_pending, task_verified, story_validating, story_validated, story_rejected. Transitions triggered by verification script results and reviewer decisions.",
+          "title": "Implement session fork API",
+          "description": "Create endpoint that forks session from specified message",
+          "technical_strategy": "Copy session with new ID. Copy messages up to and including from_message_id. Set parent_session_id foreign key. Copy relevant tool_calls. Return new session.",
           "depends_on": [],
-          "verification_script": "grep -q 'ValidationState' openexec-execution/internal/validation/state.go"
+          "verification_script": "pytest tests/unit/test_session_fork.py -v"
         },
         {
           "id": "T-US-013-002",
-          "title": "Implement task verification tracker",
-          "description": "Track verification status of all tasks in a story",
-          "technical_strategy": "Store task verification results in SQLite. Query for all tasks in story. Transition to story_validating when all tasks verified. Emit SSE event.",
+          "title": "Build session list component",
+          "description": "Create sidebar component showing project sessions",
+          "technical_strategy": "Fetch sessions by project_path. Show tree structure for forks. Display last message preview. Sort by updated_at descending. Highlight active session.",
           "depends_on": [
             "T-US-013-001"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestVerificationTracker ./internal/validation/..."
+          "verification_script": "npm test -- --testPathPattern=SessionList"
         },
         {
           "id": "T-US-013-003",
-          "title": "Implement validation notification",
-          "description": "Notify reviewer when story ready for validation",
-          "technical_strategy": "Send notification via configured channel (Telegram/WhatsApp/webhook). Include story summary, all task evidence links, verification script results.",
+          "title": "Implement fork UI with branch indicator",
+          "description": "Add fork button to messages and branch visualization",
+          "technical_strategy": "Fork button appears on hover over messages. Show fork icon with branch count badge. Branch line visualization using CSS pseudo-elements. Navigate to forked session on create.",
           "depends_on": [
-            "T-US-013-002",
-            "T-US-006-003",
-            "T-US-007-003"
+            "T-US-013-002"
           ],
-          "verification_script": "cd openexec-execution && go test -v -run TestValidationNotification ./internal/validation/..."
+          "verification_script": "npm test -- --testPathPattern=ForkButton"
+        },
+        {
+          "id": "T-US-013-004",
+          "title": "Unit tests for session management",
+          "description": "Test fork, list, delete operations",
+          "technical_strategy": "Test fork copies correct messages. Test cascade delete removes tool_calls. Test session tree renders correctly. Test navigation between sessions.",
+          "depends_on": [
+            "T-US-013-003"
+          ],
+          "verification_script": "npm test -- --coverage --testPathPattern=Session && pytest tests/unit/test_session_*.py"
         }
       ]
     },
     {
       "id": "US-014",
-      "title": "Conversational Project Wizard",
-      "description": "As a new user, I want an interactive wizard so that I can bootstrap a project through conversation",
-      "requirement_id": "REQ-WIZARD",
-      "goal_id": "G-005",
+      "title": "Tool Approval UI with Patch Preview",
+      "description": "As a user, I want to preview and approve tool calls so that I maintain control over agent actions",
+      "requirement_id": "REQ-014",
+      "goal_id": "G-003",
       "depends_on": [
+        "US-007",
         "US-008",
-        "US-003"
+        "US-011"
       ],
       "acceptance_criteria": [
-        "Wizard asks for project name and tech stack",
-        "Generates INTENT.md from conversation",
-        "Automatically runs openexec plan after intent finalization",
-        "Presents generated tasks for approval"
+        "Pending tool calls shown with expandable details",
+        "Patch preview shows diff with syntax highlighting",
+        "Approve/Reject buttons execute or cancel tool",
+        "Rollback option available after patch apply"
       ],
-      "verification_script": "openexec wizard --help | grep -q 'wizard'",
-      "contract": "openexec wizard -> interactive session that generates INTENT.md and tasks.json",
+      "verification_script": "npm test -- --testPathPattern=ToolApproval",
+      "contract": "POST /api/tool-calls/{id}/approve, POST /api/tool-calls/{id}/reject, POST /api/tool-calls/{id}/rollback",
       "tasks": [
         {
           "id": "T-US-014-001",
-          "title": "Define wizard command and prompts",
-          "description": "Create wizard cobra command with interactive prompts",
-          "technical_strategy": "Use charmbracelet/huh for form-based prompts. Ask: project name, description, tech stack (multi-select), features (text area). Validate inputs.",
+          "title": "Create tool approval API endpoints",
+          "description": "Implement approve, reject, and rollback endpoints",
+          "technical_strategy": "Approve triggers tool execution via MCP. Reject marks tool_call as rejected and resumes agent. Rollback calls git stash pop. Return updated tool_call record.",
           "depends_on": [],
-          "verification_script": "grep -q 'wizardCmd' openexec-cli/cmd/wizard.go"
+          "verification_script": "pytest tests/unit/test_tool_approval_api.py -v"
         },
         {
           "id": "T-US-014-002",
-          "title": "Implement intent generator",
-          "description": "Generate INTENT.md from wizard answers",
-          "technical_strategy": "Use text/template for markdown generation. Map tech stack to recommended patterns. Generate Goals and Features sections. Write to project root.",
+          "title": "Build ToolCallCard component",
+          "description": "Create component displaying tool call with expand/collapse",
+          "technical_strategy": "Show tool name, status badge, and summary. Expand reveals full input JSON. Use Disclosure component for animation. Different styling for pending/approved/rejected.",
           "depends_on": [
             "T-US-014-001"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestIntentGenerator ./internal/wizard/..."
+          "verification_script": "npm test -- --testPathPattern=ToolCallCard"
         },
         {
           "id": "T-US-014-003",
-          "title": "Integrate plan command into wizard flow",
-          "description": "Run planning after intent generation",
-          "technical_strategy": "Call plan.Execute() programmatically after writing INTENT.md. Display generated stories with confirmation prompt. Allow edit/regenerate cycle.",
+          "title": "Implement diff preview component",
+          "description": "Create component showing git diff with syntax highlighting",
+          "technical_strategy": "Parse unified diff format. Use react-diff-viewer-continued for rendering. Show file names as headers. Highlight added (green) and removed (red) lines.",
           "depends_on": [
-            "T-US-014-002",
-            "T-US-003-003"
+            "T-US-014-002"
           ],
-          "verification_script": "cd openexec-cli && go test -v -run TestWizardPlanIntegration ./internal/wizard/..."
+          "verification_script": "npm test -- --testPathPattern=DiffPreview"
+        },
+        {
+          "id": "T-US-014-004",
+          "title": "Build approval action buttons",
+          "description": "Create Approve/Reject/Rollback buttons with confirmation",
+          "technical_strategy": "Approve and Reject are primary actions. Rollback shown only for applied patches. Confirm dialog for destructive actions. Disable buttons while action pending.",
+          "depends_on": [
+            "T-US-014-003"
+          ],
+          "verification_script": "npm test -- --testPathPattern=ApprovalButtons"
+        },
+        {
+          "id": "T-US-014-005",
+          "title": "Unit tests for tool approval flow",
+          "description": "Test complete approval workflow including rollback",
+          "technical_strategy": "Test pending state rendering. Test approve triggers execution. Test reject cancels and resumes. Test rollback reverts changes. Test optimistic UI updates.",
+          "depends_on": [
+            "T-US-014-004"
+          ],
+          "verification_script": "npm test -- --coverage --testPathPattern=ToolApproval && pytest tests/unit/test_tool_approval_api.py"
         }
       ]
     },
     {
       "id": "US-015",
-      "title": "Web Dashboard Core Infrastructure",
-      "description": "As a developer, I want a web dashboard so that I can monitor execution visually",
-      "requirement_id": "REQ-DASHBOARD",
-      "goal_id": "G-007",
+      "title": "Meta Self-Fix: Workspace-Aware Orchestrator Editing",
+      "description": "As an agent, I want to locate and edit orchestrator source files so that I can improve myself",
+      "requirement_id": "REQ-015",
+      "goal_id": "G-005",
       "depends_on": [
-        "US-004"
+        "US-006",
+        "US-008"
       ],
       "acceptance_criteria": [
-        "Next.js app scaffolded with TypeScript",
-        "Configured from .env.local for backend endpoints",
-        "SSE connection to execution service established",
-        "Basic layout with navigation"
+        "Agent can locate orchestrator source via ORCHESTRATOR_PATH env var",
+        "Edit operations on orchestrator files require elevated approval",
+        "Changes tracked in separate audit category",
+        "Build verification runs before restart prompt"
       ],
-      "verification_script": "cd openexec-web && npm run build && npm run start -- -p 3000 &",
-      "contract": "Dashboard available at http://localhost:3000 with SSE connection to backend",
+      "verification_script": "pytest tests/unit/test_meta_editing.py -v",
+      "contract": "get_orchestrator_source() -> str, edit_orchestrator_file(path, patch) -> bool",
       "tasks": [
         {
           "id": "T-US-015-001",
-          "title": "Scaffold Next.js application",
-          "description": "Create Next.js app with TypeScript and Tailwind",
-          "technical_strategy": "Use create-next-app with typescript, tailwind, eslint flags. Add .env.local.example with NEXT_PUBLIC_API_URL. Configure next.config.js for standalone output.",
+          "title": "Define meta-engineering tool schemas",
+          "description": "Create schemas for orchestrator editing operations",
+          "technical_strategy": "Define OrchestratorEditInput extending WriteFileInput. Add elevated_approval: bool field. Define OrchestratorContext with ORCHESTRATOR_PATH validation.",
           "depends_on": [],
-          "verification_script": "test -f openexec-web/package.json && grep -q 'next' openexec-web/package.json"
+          "verification_script": "python -c 'from app.mcp.tools.meta import OrchestratorEditInput; print(\"Schema valid\")'"
         },
         {
           "id": "T-US-015-002",
-          "title": "Implement SSE client hook",
-          "description": "Create React hook for SSE connection",
-          "technical_strategy": "Use EventSource API. Handle reconnection with exponential backoff. Parse event data as JSON. Expose events via useState. Cleanup on unmount.",
+          "title": "Implement orchestrator source locator",
+          "description": "Create function to find and validate orchestrator source directory",
+          "technical_strategy": "Read ORCHESTRATOR_PATH from env. Verify it contains expected files (main.go, go.mod, etc.). Cache result for session. Raise ConfigError if not found.",
           "depends_on": [
             "T-US-015-001"
           ],
-          "verification_script": "test -f openexec-web/src/hooks/useSSE.ts"
+          "verification_script": "pytest tests/unit/test_orchestrator_locator.py -v"
         },
         {
           "id": "T-US-015-003",
-          "title": "Create dashboard layout",
-          "description": "Build main layout with navigation",
-          "technical_strategy": "Use Next.js app router layout.tsx. Add sidebar with links: Projects, Execution, Audit. Use shadcn/ui for components. Responsive design.",
+          "title": "Implement elevated approval flow",
+          "description": "Create special approval path for orchestrator modifications",
+          "technical_strategy": "Wrap standard approval with meta_approval flag. Log to separate audit category 'meta_edit'. Require explicit confirmation with warning message. Track approval chain.",
           "depends_on": [
-            "T-US-015-001"
+            "T-US-015-002"
           ],
-          "verification_script": "test -f openexec-web/src/app/layout.tsx"
+          "verification_script": "pytest tests/unit/test_elevated_approval.py -v"
+        },
+        {
+          "id": "T-US-015-004",
+          "title": "Unit tests for meta-editing",
+          "description": "Test locator, elevated approval, and audit logging",
+          "technical_strategy": "Mock ORCHESTRATOR_PATH for tests. Test elevated approval blocks without confirmation. Test audit records have meta_edit category. Test missing env var handling.",
+          "depends_on": [
+            "T-US-015-003"
+          ],
+          "verification_script": "pytest tests/unit/test_meta_editing.py --cov=app.mcp.tools.meta --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-016",
-      "title": "Web Dashboard Execution View",
-      "description": "As a developer, I want to see execution progress in the dashboard so that I can monitor tasks visually",
-      "requirement_id": "REQ-DASHBOARD-EXEC",
-      "goal_id": "G-007",
+      "title": "Meta Self-Fix: Build and Restart Protocol",
+      "description": "As an agent, I want to trigger orchestrator builds and request restarts so that my changes take effect",
+      "requirement_id": "REQ-016",
+      "goal_id": "G-005",
       "depends_on": [
-        "US-015"
+        "US-015",
+        "US-007"
       ],
       "acceptance_criteria": [
-        "Projects list page shows all projects",
-        "Execution page shows phases, workers, and current task",
-        "Recent audit events displayed in timeline",
-        "Real-time updates via SSE"
+        "Build command executes with output capture",
+        "Build failure blocks restart and reports errors",
+        "Restart request prompts user for confirmation",
+        "Graceful shutdown preserves session state"
       ],
-      "verification_script": "curl http://localhost:3000/execution | grep -q 'Execution'",
-      "contract": "Dashboard pages: /projects, /execution, /audit",
+      "verification_script": "pytest tests/unit/test_meta_restart.py -v",
+      "contract": "build_orchestrator() -> BuildResult, request_restart() -> RestartStatus",
       "tasks": [
         {
           "id": "T-US-016-001",
-          "title": "Create projects list page",
-          "description": "Build page showing all projects with status",
-          "technical_strategy": "Fetch from /api/projects endpoint. Display as cards with name, status, last activity. Link to /execution/{id}. Add new project button.",
-          "depends_on": [
-            "T-US-015-003"
-          ],
-          "verification_script": "test -f openexec-web/src/app/projects/page.tsx"
+          "title": "Define build and restart schemas",
+          "description": "Create Pydantic models for build/restart operations",
+          "technical_strategy": "Define BuildResult(success: bool, output: str, binary_path: str). Define RestartRequest(reason: str, build_verified: bool). Define RestartStatus enum.",
+          "depends_on": [],
+          "verification_script": "python -c 'from app.mcp.tools.meta import BuildResult, RestartRequest; print(\"Schemas valid\")'"
         },
         {
           "id": "T-US-016-002",
-          "title": "Create execution detail page",
-          "description": "Build page showing current execution status",
-          "technical_strategy": "Use useSSE hook for real-time updates. Show phases as progress bar. Display workers in table. Current task highlighted. Logs in collapsible panel.",
+          "title": "Implement orchestrator build handler",
+          "description": "Create handler that executes go build with output capture",
+          "technical_strategy": "Run 'go build -o bin/orchestrator ./cmd/orchestrator' via shell executor. Capture stdout/stderr. Verify binary exists after build. Return BuildResult with success status.",
           "depends_on": [
-            "T-US-015-002",
             "T-US-016-001"
           ],
-          "verification_script": "test -f openexec-web/src/app/execution/[id]/page.tsx"
+          "verification_script": "pytest tests/unit/test_orchestrator_build.py -v"
         },
         {
           "id": "T-US-016-003",
-          "title": "Create audit timeline component",
-          "description": "Build timeline showing recent audit events",
-          "technical_strategy": "Vertical timeline with event type icons. Show timestamp, event summary, link to details. Virtual scrolling for performance. Filter by event type.",
+          "title": "Implement restart request protocol",
+          "description": "Create handler that requests graceful restart with user confirmation",
+          "technical_strategy": "Verify build_verified is True before proceeding. Create RestartRequest with reason. Signal main process via SIGUSR1. Persist session state before signal. Return pending status.",
           "depends_on": [
             "T-US-016-002"
           ],
-          "verification_script": "test -f openexec-web/src/components/AuditTimeline.tsx"
+          "verification_script": "pytest tests/unit/test_restart_protocol.py -v"
         },
         {
           "id": "T-US-016-004",
-          "title": "Add E2E tests for dashboard",
-          "description": "Create Playwright tests for dashboard flows",
-          "technical_strategy": "Test: navigate to projects, click project, verify execution page loads, verify SSE updates displayed. Use MSW for API mocking.",
+          "title": "Implement graceful shutdown handler",
+          "description": "Create signal handler that persists state before exit",
+          "technical_strategy": "Register SIGUSR1 handler in main. Flush all pending DB writes. Close WebSocket connections with restart message. Exit with code 0 for supervisor restart.",
           "depends_on": [
             "T-US-016-003"
           ],
-          "verification_script": "cd openexec-web && npm run test:e2e"
+          "verification_script": "pytest tests/unit/test_graceful_shutdown.py -v"
+        },
+        {
+          "id": "T-US-016-005",
+          "title": "Unit tests for build and restart",
+          "description": "Test build success/failure and restart flow",
+          "technical_strategy": "Mock go build with success and failure. Test restart blocked without verified build. Test signal handler called. Test session state persisted before shutdown.",
+          "depends_on": [
+            "T-US-016-004"
+          ],
+          "verification_script": "pytest tests/unit/test_meta_restart.py --cov=app.mcp.tools.meta --cov-fail-under=90"
         }
       ]
     },
     {
       "id": "US-017",
       "title": "Docker Development Environment",
-      "description": "As a developer, I want Docker-based development so that I can run all services locally",
-      "requirement_id": "REQ-DOCKER",
-      "goal_id": "G-005",
-      "depends_on": [
-        "US-001"
-      ],
+      "description": "As a developer, I want a Docker-based development environment so that I can develop and test locally",
+      "requirement_id": "REQ-017",
+      "goal_id": "G-001",
+      "depends_on": [],
       "acceptance_criteria": [
-        "docker-compose.yml defines all services",
-        "All containers start successfully",
-        "Health checks pass for all services",
-        "Volume mounts enable hot-reload"
+        "docker compose up starts all services",
+        "Hot-reload works for both backend and frontend",
+        "SQLite database persisted via volume",
+        "Health checks pass for all containers"
       ],
-      "verification_script": "docker compose up -d && docker compose ps | grep -q 'healthy'",
-      "contract": "docker compose up starts: cli, execution, interface, orchestration, web, postgres",
+      "verification_script": "docker compose config && docker compose build && docker compose up -d && sleep 10 && docker compose ps --format json | jq -e '.[] | select(.Health != \"healthy\")' && docker compose down",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-017-001",
-          "title": "Create Go service Dockerfiles",
-          "description": "Create multi-stage Dockerfiles for Go services",
-          "technical_strategy": "Use golang:1.21-alpine for build, scratch or alpine for runtime. Multi-stage: build with CGO_ENABLED=0, copy binary only. Add health check endpoint.",
+          "title": "Create backend Dockerfile with development target",
+          "description": "Create multi-stage Dockerfile for Python backend",
+          "technical_strategy": "Use python:3.11-slim as base. Create dev target with watchfiles for hot-reload. Separate pip install from code COPY. Use backslashes for multi-line RUN. Include healthcheck.",
           "depends_on": [],
-          "verification_script": "docker build -f openexec-execution/Dockerfile openexec-execution"
+          "verification_script": "docker build --target dev -t orchestrator-backend:dev ./backend"
         },
         {
           "id": "T-US-017-002",
-          "title": "Create Python service Dockerfile",
-          "description": "Create Dockerfile for orchestration service",
-          "technical_strategy": "Use python:3.11-slim. Install Poetry or use pip with requirements.txt. Non-root user. Health check via /health endpoint.",
+          "title": "Create frontend Dockerfile with development target",
+          "description": "Create multi-stage Dockerfile for React frontend",
+          "technical_strategy": "Use node:20-slim as base. Create dev target with npm run dev. Cache node_modules with separate COPY package*.json. Include Vite hot-reload configuration.",
           "depends_on": [],
-          "verification_script": "docker build -f openexec-orchestration/Dockerfile openexec-orchestration"
+          "verification_script": "docker build --target dev -t orchestrator-frontend:dev ./frontend"
         },
         {
           "id": "T-US-017-003",
-          "title": "Create docker-compose.yml",
-          "description": "Define all services in compose file",
-          "technical_strategy": "Services: postgres (5432), execution (8080), interface (8081), orchestration (8082), web (3000). Use healthchecks. Shared network. Volume for postgres data.",
+          "title": "Create docker-compose.yml with volume mounts",
+          "description": "Configure compose with services, volumes, and health checks",
+          "technical_strategy": "Define backend, frontend services. Mount source directories for hot-reload. Create named volume for SQLite. Define healthcheck endpoints. Use environment_file for secrets.",
           "depends_on": [
             "T-US-017-001",
             "T-US-017-002"
@@ -940,85 +1039,100 @@
         },
         {
           "id": "T-US-017-004",
-          "title": "Validate container health checks",
-          "description": "Verify all services start and pass health checks",
-          "technical_strategy": "Run docker compose up -d. Wait for health checks with timeout. Verify all show 'healthy'. Log failures for debugging. Exit non-zero on any unhealthy.",
+          "title": "Verify Docker environment starts successfully",
+          "description": "Integration test that all containers start and pass health checks",
+          "technical_strategy": "Run docker compose up -d. Poll health status for 60 seconds. Assert all services report healthy. Test backend /health endpoint. Test frontend responds on port.",
           "depends_on": [
             "T-US-017-003"
           ],
-          "verification_script": "docker compose up -d && sleep 30 && docker compose ps --format json | jq -e 'all(.Health == \"healthy\")'"
+          "verification_script": "docker compose up -d && sleep 15 && curl -f http://localhost:8001/health && curl -f http://localhost:3001 && docker compose down"
         }
       ]
     },
     {
       "id": "US-018",
       "title": "Goal Validation E2E Tests",
-      "description": "As a project maintainer, I want E2E tests validating all goals so that I can verify the system works end-to-end",
-      "requirement_id": "REQ-E2E",
+      "description": "As a QA engineer, I want E2E tests validating all primary goals so that I can verify the system works end-to-end",
+      "requirement_id": "REQ-018",
       "goal_id": "G-001",
       "depends_on": [
-        "US-017",
+        "US-011",
+        "US-012",
+        "US-013",
+        "US-014",
         "US-016",
-        "US-011"
+        "US-017"
       ],
       "acceptance_criteria": [
-        "Playwright tests cover all primary goals",
-        "Tests run against Docker environment",
-        "All tests pass in CI",
-        "Test results exported as evidence"
+        "E2E test for session create/resume/fork flow",
+        "E2E test for provider switching mid-conversation",
+        "E2E test for tool approval workflow",
+        "E2E test for self-fix demonstration",
+        "All E2E tests pass in CI environment"
       ],
-      "verification_script": "cd openexec-web && npm run test:e2e:ci",
-      "contract": "Playwright tests in openexec-web/e2e/ validate all goals",
+      "verification_script": "npm run test:e2e",
+      "contract": "",
       "tasks": [
         {
           "id": "T-US-018-001",
           "title": "Set up Playwright test infrastructure",
-          "description": "Configure Playwright for E2E testing",
-          "technical_strategy": "Install @playwright/test. Configure playwright.config.ts with baseURL from env. Set up webServer to start compose. Add reporters: html, json.",
+          "description": "Configure Playwright for E2E testing with Docker",
+          "technical_strategy": "Use @playwright/test. Configure baseURL from environment. Create fixtures for authenticated sessions. Set up screenshot on failure. Configure CI reporters.",
           "depends_on": [],
-          "verification_script": "cd openexec-web && npx playwright --version"
+          "verification_script": "npx playwright install && npx playwright test --list"
         },
         {
           "id": "T-US-018-002",
-          "title": "Create G-001 planning flow test",
-          "description": "Test PRD to task tree generation",
-          "technical_strategy": "Upload sample INTENT.md via wizard. Verify tasks.json generated. Check task count matches expected. Verify goal IDs assigned.",
+          "title": "E2E test for session management (G-001)",
+          "description": "Test session create, send message, close, resume, fork",
+          "technical_strategy": "Create session via UI. Send test message and verify response. Close browser. Reopen and verify history. Fork from message and verify branch.",
           "depends_on": [
             "T-US-018-001"
           ],
-          "verification_script": "cd openexec-web && npx playwright test e2e/planning.spec.ts"
+          "verification_script": "npx playwright test tests/e2e/session-management.spec.ts"
         },
         {
           "id": "T-US-018-003",
-          "title": "Create G-002 execution flow test",
-          "description": "Test task execution with SSE monitoring",
-          "technical_strategy": "Start execution via dashboard. Verify SSE events received. Check task status transitions. Verify audit events logged.",
+          "title": "E2E test for provider switching (G-002)",
+          "description": "Test model picker and mid-conversation provider switch",
+          "technical_strategy": "Start conversation with OpenAI. Send message and get response. Switch to Gemini via picker. Send follow-up and verify new provider. Check history preserved.",
           "depends_on": [
             "T-US-018-001"
           ],
-          "verification_script": "cd openexec-web && npx playwright test e2e/execution.spec.ts"
+          "verification_script": "npx playwright test tests/e2e/provider-switching.spec.ts"
         },
         {
           "id": "T-US-018-004",
-          "title": "Create G-006 audit export test",
-          "description": "Test evidence export functionality",
-          "technical_strategy": "Run execution to completion. Trigger export via CLI. Verify archive created. Check archive contains audit.db, evidence files, manifest.",
+          "title": "E2E test for tool approval workflow (G-003)",
+          "description": "Test tool call display, approval, and execution",
+          "technical_strategy": "Trigger tool call via prompt ('read this file'). Verify tool card appears. Expand and inspect details. Click approve. Verify execution result in chat.",
           "depends_on": [
             "T-US-018-001"
           ],
-          "verification_script": "cd openexec-web && npx playwright test e2e/audit-export.spec.ts"
+          "verification_script": "npx playwright test tests/e2e/tool-approval.spec.ts"
         },
         {
           "id": "T-US-018-005",
-          "title": "Export test results as evidence",
-          "description": "Configure test result export for ISO compliance",
-          "technical_strategy": "Copy playwright-report/ to .openexec/evidence/e2e/. Include test-results.json in evidence export. Add test run metadata (date, versions).",
+          "title": "E2E test for self-fix workflow (G-005)",
+          "description": "Test orchestrator edit, build, and restart request",
+          "technical_strategy": "Trigger self-edit prompt. Approve elevated edit. Verify build runs. Check restart confirmation appears. Mock restart for test (don't actually restart).",
+          "depends_on": [
+            "T-US-018-001"
+          ],
+          "verification_script": "npx playwright test tests/e2e/self-fix.spec.ts"
+        },
+        {
+          "id": "T-US-018-006",
+          "title": "CI configuration for E2E tests",
+          "description": "Configure GitHub Actions workflow for E2E test execution",
+          "technical_strategy": "Use docker compose for test services. Run Playwright in headed mode with Xvfb. Upload trace artifacts on failure. Set timeout appropriate for CI.",
           "depends_on": [
             "T-US-018-002",
             "T-US-018-003",
-            "T-US-018-004"
+            "T-US-018-004",
+            "T-US-018-005"
           ],
-          "verification_script": "test -f .openexec/evidence/e2e/test-results.json"
+          "verification_script": "cat .github/workflows/e2e.yml"
         }
       ]
     }
