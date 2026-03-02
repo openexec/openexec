@@ -16,6 +16,10 @@ export interface ProjectSelectorProps {
   selectedProjectPath?: string
   /** Callback when a project is selected */
   onProjectSelect: (projectPath: string) => void
+  /** Callback to init a new project */
+  onProjectInit: () => void
+  /** Callback to start wizard */
+  onProjectWizard: () => void
   /** Whether projects are loading */
   loading?: boolean
 }
@@ -24,6 +28,8 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   projects,
   selectedProjectPath,
   onProjectSelect,
+  onProjectInit,
+  onProjectWizard,
   loading = false,
 }) => {
   return (
@@ -31,20 +37,41 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
       <label htmlFor="project-select" style={styles.label}>
         Project Workspace
       </label>
-      <select
-        id="project-select"
-        value={selectedProjectPath || ''}
-        onChange={(e) => onProjectSelect(e.target.value)}
-        disabled={loading}
-        style={styles.select}
-      >
-        <option value="">All Projects</option>
-        {projects.map((project) => (
-          <option key={project.path} value={project.path}>
-            {project.name}
-          </option>
-        ))}
-      </select>
+      <div style={styles.selectorRow}>
+        <select
+          id="project-select"
+          value={selectedProjectPath || ''}
+          onChange={(e) => onProjectSelect(e.target.value)}
+          disabled={loading}
+          style={styles.select}
+        >
+          <option value="">Select Project...</option>
+          {projects.map((project) => (
+            <option key={project.path} value={project.path}>
+              {project.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      <div style={styles.actionsRow}>
+        <button 
+          onClick={onProjectInit} 
+          style={styles.actionButton}
+          title="Initialize new project in a directory"
+        >
+          Init
+        </button>
+        <button 
+          onClick={onProjectWizard} 
+          style={{...styles.actionButton, ...styles.wizardButton}}
+          disabled={!selectedProjectPath}
+          title="Start guided setup wizard for selected project"
+        >
+          Wizard
+        </button>
+      </div>
+
       {loading && <span style={styles.loading}>Loading...</span>}
     </div>
   )
@@ -56,15 +83,39 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #30363d',
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '10px',
+  },
+  selectorRow: {
+    display: 'flex',
+    gap: '8px',
+  },
+  actionsRow: {
+    display: 'flex',
+    gap: '8px',
+  },
+  actionButton: {
+    flex: 1,
+    padding: '4px 8px',
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#c9d1d9',
+    backgroundColor: '#21262d',
+    border: '1px solid #30363d',
+    borderRadius: '4px',
+    cursor: 'pointer',
+  },
+  wizardButton: {
+    backgroundColor: '#30363d',
+    borderColor: '#8b949e',
   },
   label: {
-    fontSize: '12px',
-    fontWeight: 500,
+    fontSize: '11px',
+    fontWeight: 600,
     color: '#8b949e',
+    textTransform: 'uppercase',
   },
   select: {
-    width: '100%',
+    flex: 1,
     padding: '6px 10px',
     fontSize: '13px',
     color: '#c9d1d9',

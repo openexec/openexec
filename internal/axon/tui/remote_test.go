@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/internal/manager"
+	"github.com/openexec/openexec/pkg/manager"
 )
 
 func TestRemoteSource_List(t *testing.T) {

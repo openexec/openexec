@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/openexec/openexec/internal/db/session"
+	"github.com/openexec/openexec/pkg/db/session"
 )
 
 // mockSessionRepository is a mock implementation of session.Repository for testing.

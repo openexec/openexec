@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openexec/openexec/internal/manager"
+	"github.com/openexec/openexec/pkg/manager"
 )
 
 func TestDashboard_CursorMovement(t *testing.T) {

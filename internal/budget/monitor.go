@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openexec/openexec/internal/audit"
+	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/internal/protocol"
 )
 

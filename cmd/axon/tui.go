@@ -5,7 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/openexec/openexec/internal/manager"
+	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/internal/axon/tui"
 	"github.com/spf13/cobra"

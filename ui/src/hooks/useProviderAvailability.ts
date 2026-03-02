@@ -38,22 +38,16 @@ export interface ModelInfoResponse {
   id: string
   name: string
   provider: string
-  contextWindow: number
-  maxOutputTokens: number
+  capabilities: {
+    maxContextTokens: number
+    maxOutputTokens: number
+    toolUse: boolean
+    streaming: boolean
+    vision: boolean
+  }
   pricePerMInputTokens: number
   pricePerMOutputTokens: number
-  supportsTools: boolean
-  supportsStreaming: boolean
-  supportsVision: boolean
   deprecated?: boolean
-}
-
-/**
- * Combined availability response
- */
-export interface AvailabilityResponse {
-  providers: ProviderStatus[]
-  models?: ModelInfoResponse[]
 }
 
 // =============================================================================
@@ -161,7 +155,6 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   gemini: 'Google Gemini',
-  google: 'Google Gemini',
 }
 
 function getProviderDisplayName(providerId: string): string {
@@ -177,13 +170,13 @@ function transformModelInfo(model: ModelInfoResponse): ModelInfo {
     id: model.id,
     name: model.name,
     provider: model.provider,
-    contextWindow: model.contextWindow,
-    maxOutputTokens: model.maxOutputTokens,
+    contextWindow: model.capabilities.maxContextTokens,
+    maxOutputTokens: model.capabilities.maxOutputTokens,
     pricePerMInputTokens: model.pricePerMInputTokens,
     pricePerMOutputTokens: model.pricePerMOutputTokens,
-    supportsTools: model.supportsTools,
-    supportsStreaming: model.supportsStreaming,
-    supportsVision: model.supportsVision,
+    supportsTools: model.capabilities.toolUse,
+    supportsStreaming: model.capabilities.streaming,
+    supportsVision: model.capabilities.vision,
   }
 }
 
@@ -257,7 +250,7 @@ export function useProviderAvailability(
 
     try {
       // Fetch provider status
-      const statusUrl = `${baseUrl}/providers/status`
+      const statusUrl = `${baseUrl}/providers`
       const statusData = await apiRequest<ProviderStatus[]>(
         statusUrl,
         { method: 'GET' },
@@ -265,7 +258,7 @@ export function useProviderAvailability(
       )
 
       // Fetch model info
-      const modelsUrl = `${baseUrl}/providers/models`
+      const modelsUrl = `${baseUrl}/models`
       let modelsData: ModelInfoResponse[] = []
       try {
         modelsData = await apiRequest<ModelInfoResponse[]>(

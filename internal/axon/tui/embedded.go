@@ -2,7 +2,7 @@ package axontui
 
 import (
 	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/internal/manager"
+	"github.com/openexec/openexec/pkg/manager"
 )
 
 // EmbeddedSource wraps a *manager.Manager directly.

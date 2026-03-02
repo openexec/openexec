@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openexec/openexec/internal/db/session"
+	"github.com/openexec/openexec/pkg/db/session"
 )
 
 // SessionForkManager handles session fork operations.

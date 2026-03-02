@@ -33,6 +33,10 @@ export interface SessionSidebarProps {
   onFiltersChange?: (filters: SessionFiltersType) => void
   /** Callback when a project is selected */
   onProjectSelect?: (projectPath: string) => void
+  /** Callback when project init is triggered */
+  onProjectInit?: () => void
+  /** Callback when project wizard is triggered */
+  onProjectWizard?: () => void
   /** Callback when fork action is triggered */
   onFork?: (sessionId: string) => void
   /** Callback when archive action is triggered */
@@ -61,6 +65,8 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
   onNewSession,
   onFiltersChange,
   onProjectSelect,
+  onProjectInit,
+  onProjectWizard,
   onFork,
   onArchive,
   onDelete,
@@ -101,6 +107,8 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
         projects={projects}
         selectedProjectPath={projectPath}
         onProjectSelect={onProjectSelect || (() => {})}
+        onProjectInit={onProjectInit || (() => {})}
+        onProjectWizard={onProjectWizard || (() => {})}
         loading={projectsLoading}
       />
 

@@ -66,6 +66,35 @@ test.describe('OpenExec Integration', () => {
     await expect(mainHeader).toContainText(title)
   })
 
+  test('should initialize a new project', async ({ page }) => {
+    await page.goto('/')
+    
+    // Click Init button
+    await page.getByRole('button', { name: /init/i }).click()
+    
+    // Verify Modal appears
+    await expect(page.getByText('Initialize Project')).toBeVisible()
+    
+    // Enter Name and Path
+    const projectName = `e2e-project-${Date.now()}`
+    const projectPath = `../${projectName}`
+    
+    await page.getByPlaceholder(/e.g. my-new-app/i).fill(projectName)
+    await page.getByPlaceholder(/e.g. ..\/my-new-app/i).fill(projectPath)
+    
+    // Click Initialize
+    await page.getByRole('button', { name: /initialize/i, exact: true }).click()
+    
+    // Wait for modal to close
+    await expect(page.getByText('Initialize Project')).not.toBeVisible({ timeout: 15000 })
+    
+    // Wait for the new project option to appear in the select dropdown
+    await expect(page.locator(`#project-select option[value*="${projectName}"]`)).toBeAttached({ timeout: 10000 });
+    
+    // Verify project is selected in dropdown
+    await expect(page.locator('#project-select')).toHaveValue(new RegExp(projectName))
+  })
+
   test('should show error when backend is down', async ({ page }) => {
     // This test is tricky if we want it to be "real", but we can simulate a bad port
     // For now, let's just verify we can see existing sessions if any

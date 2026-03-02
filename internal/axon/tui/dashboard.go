@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/openexec/openexec/internal/manager"
+	"github.com/openexec/openexec/pkg/manager"
 )
 
 // Dashboard displays the FWU list and detail panel side by side.

@@ -29,7 +29,7 @@ export interface AppConfig {
  */
 const defaultConfig: AppConfig = {
   wsUrl: import.meta.env.VITE_WS_URL ?? 'ws://localhost:8080/ws',
-  apiUrl: import.meta.env.VITE_API_URL ?? '/api',
+  apiUrl: '/api',
   authToken: import.meta.env.VITE_AUTH_TOKEN,
   debug: import.meta.env.DEV,
 }

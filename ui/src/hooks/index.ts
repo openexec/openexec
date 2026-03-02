@@ -44,7 +44,6 @@ export type {
   UseProviderAvailabilityReturn,
   ProviderStatus,
   ModelInfoResponse,
-  AvailabilityResponse,
 } from './useProviderAvailability'
 
 export { useRollback } from './useRollback'

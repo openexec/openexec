@@ -16,8 +16,10 @@ import {
   CostPanel,
   SessionForkDialog,
 } from '../components/chat'
+import ProjectInitModal from '../components/chat/session/ProjectInitModal'
+import ProjectWizard from '../components/chat/session/ProjectWizard'
 import type { AncestorSession } from '../components/chat/session/ForkAncestryTree'
-import { useChat, useFork, type ChatConfig } from '../hooks'
+import { useChat, useFork, useProviderAvailability, type ChatConfig } from '../hooks'
 import type { CreateSessionParams, SessionFilters, ToolCallApproval, Session, Message } from '../types'
 import type { ForkOptions, ForkResult } from '../components/chat/session/SessionForkDialog'
 
@@ -42,7 +44,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
   // Initialize the chat hook with configuration
   const chat = useChat(config)
 
-  // Local state for selected project
+  // Initialize provider availability
+  const availability = useProviderAvailability({
+    baseUrl: config.apiUrl,
+    authToken: config.authToken,
+  })
+
+  // Local state
+  const [showInitModal, setShowInitModal] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const [selectedProjectPath, setSelectedProjectPath] = useState<string>(() => {
     return localStorage.getItem('openexec-selected-project') || ''
   })
@@ -76,6 +86,28 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
     localStorage.setItem('openexec-selected-project', projectPath)
     chat.fetchSessions({ projectPath })
   }, [chat])
+
+  // Project handlers
+  const handleProjectInit = useCallback(() => {
+    setShowInitModal(true)
+  }, [])
+
+  const handleProjectInitSubmit = useCallback(async (name: string, path: string) => {
+    try {
+      await chat.initProject(name, path)
+      setShowInitModal(false)
+      // Switch to new project
+      handleProjectSelect(path)
+    } catch (err) {
+      console.error('Project init failed', err)
+    }
+  }, [chat, handleProjectSelect])
+
+  const handleProjectWizard = useCallback(() => {
+    if (selectedProjectPath) {
+      setShowWizard(true)
+    }
+  }, [selectedProjectPath])
 
   // Fetch fork info when current session changes (if it's a forked session)
   useEffect(() => {
@@ -308,7 +340,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
       onNewSession={handleNewSession}
       onFiltersChange={handleFiltersChange}
       onProjectSelect={handleProjectSelect}
+      onProjectInit={handleProjectInit}
+      onProjectWizard={handleProjectWizard}
       onFork={handleForkClick}
+      providers={availability.providers}
       defaultProvider="anthropic"
       defaultModel="claude-3-5-sonnet-20241022"
       projectPath={selectedProjectPath}
@@ -381,6 +416,24 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
           onFork={handleFork}
           onNavigateToSession={handleNavigateToSession}
           isLoading={fork.isForking}
+        />
+      )}
+
+      {/* Project Init Modal */}
+      {showInitModal && (
+        <ProjectInitModal
+          onSubmit={handleProjectInitSubmit}
+          onCancel={() => setShowInitModal(false)}
+          apiUrl={config.apiUrl}
+        />
+      )}
+
+      {/* Project Wizard */}
+      {showWizard && selectedProjectPath && (
+        <ProjectWizard
+          projectPath={selectedProjectPath}
+          apiUrl={config.apiUrl}
+          onClose={() => setShowWizard(false)}
         />
       )}
     </>

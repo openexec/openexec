@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/agent"
-	"github.com/openexec/openexec/internal/db/session"
+	"github.com/openexec/openexec/pkg/db/session"
 )
 
 // mockProvider implements agent.ProviderAdapter for testing.

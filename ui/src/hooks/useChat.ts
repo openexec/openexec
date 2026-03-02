@@ -103,6 +103,7 @@ export interface UseChatReturn {
   // Session actions
   fetchSessions: ReturnType<typeof useSession>['fetchSessions']
   createSession: (params: CreateSessionParams) => Promise<Session>
+  initProject: (name: string, path: string) => Promise<void>
   loadSession: (sessionId: string) => Promise<void>
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>
   archiveSession: (sessionId: string) => Promise<void>
@@ -610,6 +611,7 @@ export function useChat(config: ChatConfig): UseChatReturn {
     // Session actions
     fetchSessions: session.fetchSessions,
     createSession,
+    initProject: session.initProject,
     loadSession,
     updateSessionTitle: session.updateSessionTitle,
     archiveSession: session.archiveSession,

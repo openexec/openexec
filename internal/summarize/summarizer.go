@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/openexec/openexec/internal/agent"
-	"github.com/openexec/openexec/internal/db/session"
+	"github.com/openexec/openexec/pkg/db/session"
 )
 
 // SessionSummarizer implements the Summarizer interface, providing session history

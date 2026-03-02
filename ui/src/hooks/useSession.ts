@@ -62,6 +62,8 @@ export interface UseSessionReturn {
   fetchProjects: () => Promise<void>
   /** Create a new session */
   createSession: (params: CreateSessionParams) => Promise<Session>
+  /** Initialize a new project */
+  initProject: (name: string, path: string) => Promise<void>
   /** Load a session by ID */
   loadSession: (sessionId: string) => Promise<Session>
   /** Update session title */
@@ -141,7 +143,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
     try {
       const url = `${baseUrl}/projects`
       const data = await apiRequest<ProjectInfo[]>(url, { method: 'GET' }, authToken)
-      setProjects(data)
+      setProjects(data || [])
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch projects'
       setProjectsError(message)
@@ -213,6 +215,24 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
       return session
     },
     [baseUrl, authToken]
+  )
+
+  // Initialize project
+  const initProject = useCallback(
+    async (name: string, path: string) => {
+      const url = `${baseUrl}/projects/init`
+      await apiRequest<any>(
+        url,
+        {
+          method: 'POST',
+          body: JSON.stringify({ name, path }),
+        },
+        authToken
+      )
+      // Refresh projects list
+      await fetchProjects()
+    },
+    [baseUrl, authToken, fetchProjects]
   )
 
   // Load session
@@ -418,6 +438,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
     fetchSessions,
     fetchProjects,
     createSession,
+    initProject,
     loadSession,
     updateSessionTitle,
     archiveSession,

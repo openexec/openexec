@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/openexec/openexec/internal/audit"
+	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/internal/health"
 	"github.com/openexec/openexec/internal/loop"
 )

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/internal/manager"
+	"github.com/openexec/openexec/pkg/manager"
 )
 
 // RemoteSource connects to a running axon serve via HTTP API + SSE.
