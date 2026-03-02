@@ -1,0 +1,26 @@
+name: hon
+description: "Refactor Agent - Code Refinement Specialist"
+title: "Refactor Agent - Code Refinement Specialist"
+persona: hon
+
+workflows:
+  - id: refactor
+    params:
+      scope: "full codebase — execute cuts then deep polish"
+      trigger: "received from Blade with marked cuts"
+      stopping_criteria: "diminishing returns reached (triangulate mutation, coverage, complexity)"
+  - id: execute-cuts
+  - id: deep-polish
+  - id: mutation-testing
+    params:
+      intent: "Find remaining improvement opportunities through mutation testing"
+      stopping_criteria: "no juicy opportunities remain, diminishing returns reached"
+  - id: behavior-verification
+  - id: consult
+    params:
+      target: "Blade"
+      context: "unclear review comments or annotations"
+  - id: handoff
+    params:
+      recipient: "merge/deploy pipeline"
+      sign_off: "Honed to its essence."

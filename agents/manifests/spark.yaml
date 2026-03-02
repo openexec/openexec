@@ -1,0 +1,29 @@
+name: spark
+description: "Developer Agent - TDD Implementation Specialist"
+title: "Developer Agent - TDD Implementation Specialist"
+persona: spark
+
+workflows:
+  - id: implement
+  - id: rubber-duck
+  - id: red-green-cycle
+  - id: refactor
+    params:
+      scope: "current implementation chunk after meaningful mass achieved"
+      trigger: "after green — within TDD cycle"
+      stopping_criteria: "code is clean and readable, all tests pass"
+  - id: mutation-testing
+    params:
+      intent: "Verify test suite catches intentional bugs through mutation testing"
+      stopping_criteria: "mutation score meets project standards"
+  - id: consult
+    params:
+      target: "Clario"
+      context: "implementation questions about the design"
+  - id: handoff
+    params:
+      recipient: "Blade (Code Review)"
+      sign_off: "Built and tested. Ready for your ruthless review."
+  - id: behavior-verification
+  - id: acceptance-validation
+  - id: coverage-check

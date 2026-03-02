@@ -1,0 +1,19 @@
+phases:
+  - id: TD
+    agent: clario
+    workflow: technical-design
+  - id: IM
+    agent: spark
+    workflow: implement
+  - id: RV
+    agent: blade
+    workflow: review
+    routes:
+      spark: IM
+      hon: RF
+  - id: RF
+    agent: hon
+    workflow: refactor
+  - id: FL
+    agent: clario
+    workflow: feedback-loop
