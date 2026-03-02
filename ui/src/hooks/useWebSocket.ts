@@ -398,7 +398,7 @@ export function useWebSocket(
           sendRaw({
             type: 'subscribe',
             sessionId: subscribedSession,
-          } as ClientMessage)
+          } as unknown as ClientMessage)
         }
       }
 

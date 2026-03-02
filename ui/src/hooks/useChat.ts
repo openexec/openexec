@@ -9,6 +9,7 @@
  * - Loop control
  * - Event tracking
  * - Cost monitoring
+ * - Project management
  *
  * @module hooks/useChat
  */
@@ -28,7 +29,7 @@ import type {
   EventFilters,
   CreateSessionParams,
   ToolCallApproval,
-  StreamingChunk,
+  ProjectInfo,
 } from '../types'
 import type { ConnectionStatus } from '../types/store'
 
@@ -64,6 +65,11 @@ export interface UseChatReturn {
   sessionsLoading: boolean
   currentSession: Session | undefined
   currentSessionLoading: boolean
+
+  // Project state
+  projects: ProjectInfo[]
+  projectsLoading: boolean
+  projectsError: string | undefined
 
   // Message state
   messages: Message[]
@@ -101,6 +107,9 @@ export interface UseChatReturn {
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>
   archiveSession: (sessionId: string) => Promise<void>
   forkSession: (sessionId: string, forkPointMessageId?: string) => Promise<Session>
+
+  // Project actions
+  fetchProjects: () => Promise<void>
 
   // Message actions
   sendMessage: (content: string) => Promise<void>
@@ -564,6 +573,11 @@ export function useChat(config: ChatConfig): UseChatReturn {
     currentSession: session.currentSession,
     currentSessionLoading: session.currentSessionLoading,
 
+    // Project state
+    projects: session.projects,
+    projectsLoading: session.projectsLoading,
+    projectsError: session.projectsError,
+
     // Message state
     messages: messagesHook.messages,
     messagesLoading: messagesHook.messagesLoading,
@@ -600,6 +614,9 @@ export function useChat(config: ChatConfig): UseChatReturn {
     updateSessionTitle: session.updateSessionTitle,
     archiveSession: session.archiveSession,
     forkSession: session.forkSession,
+
+    // Project actions
+    fetchProjects: session.fetchProjects,
 
     // Message actions
     sendMessage,

@@ -168,7 +168,7 @@ export function useRestartApproval(
     setError(undefined)
 
     try {
-      const url = `${baseUrl}/api/restart/requests`
+      const url = `${baseUrl}/restart/requests`
       const data = await apiRequest<RestartRequest[]>(url, { method: 'GET' }, authToken)
 
       if (isMounted.current) {
@@ -194,7 +194,7 @@ export function useRestartApproval(
     setError(undefined)
 
     try {
-      const url = `${baseUrl}/api/restart/requests?status=pending`
+      const url = `${baseUrl}/restart/requests?status=pending`
       const data = await apiRequest<RestartRequest[]>(url, { method: 'GET' }, authToken)
 
       if (isMounted.current) {
@@ -225,7 +225,7 @@ export function useRestartApproval(
       setError(undefined)
 
       try {
-        const url = `${baseUrl}/api/restart/requests/${requestId}/approve`
+        const url = `${baseUrl}/restart/requests/${requestId}/approve`
         await apiRequest<void>(
           url,
           {
@@ -274,7 +274,7 @@ export function useRestartApproval(
       setError(undefined)
 
       try {
-        const url = `${baseUrl}/api/restart/requests/${requestId}/reject`
+        const url = `${baseUrl}/restart/requests/${requestId}/reject`
         await apiRequest<void>(
           url,
           {
@@ -323,7 +323,7 @@ export function useRestartApproval(
       setError(undefined)
 
       try {
-        const url = `${baseUrl}/api/restart/requests/${requestId}/cancel`
+        const url = `${baseUrl}/restart/requests/${requestId}/cancel`
         await apiRequest<void>(
           url,
           {
@@ -369,7 +369,7 @@ export function useRestartApproval(
   const runPreflightChecks = useCallback(
     async (requestId: string): Promise<PreflightResult> => {
       try {
-        const url = `${baseUrl}/api/restart/requests/${requestId}/preflight`
+        const url = `${baseUrl}/restart/requests/${requestId}/preflight`
         const result = await apiRequest<PreflightResult>(url, { method: 'GET' }, authToken)
 
         log('Preflight result:', result)

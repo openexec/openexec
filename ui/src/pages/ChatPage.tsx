@@ -7,7 +7,7 @@
  * @module pages/ChatPage
  */
 
-import React, { useEffect, useMemo, useCallback } from 'react'
+import React, { useEffect, useMemo, useCallback, useState } from 'react'
 import {
   ChatLayout,
   ChatMain,
@@ -42,17 +42,40 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
   // Initialize the chat hook with configuration
   const chat = useChat(config)
 
+  // Local state for selected project
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string>(() => {
+    return localStorage.getItem('openexec-selected-project') || ''
+  })
+
   // Initialize the fork hook with API configuration
   const fork = useFork({
     baseUrl: config.apiUrl,
     authToken: config.authToken,
   })
 
-  // Fetch sessions on mount
+  // Fetch sessions and projects on mount
   useEffect(() => {
-    chat.fetchSessions()
+    chat.fetchProjects()
+    chat.fetchSessions({ projectPath: selectedProjectPath })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Auto-select first project if none selected
+  useEffect(() => {
+    if (!selectedProjectPath && chat.projects.length > 0) {
+      const firstProject = chat.projects[0].path
+      setSelectedProjectPath(firstProject)
+      localStorage.setItem('openexec-selected-project', firstProject)
+      chat.fetchSessions({ projectPath: firstProject })
+    }
+  }, [chat.projects, selectedProjectPath, chat])
+
+  // Update sessions when project changes
+  const handleProjectSelect = useCallback((projectPath: string) => {
+    setSelectedProjectPath(projectPath)
+    localStorage.setItem('openexec-selected-project', projectPath)
+    chat.fetchSessions({ projectPath })
+  }, [chat])
 
   // Fetch fork info when current session changes (if it's a forked session)
   useEffect(() => {
@@ -71,16 +94,22 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
 
   const handleNewSession = useCallback(
     (params: CreateSessionParams) => {
-      chat.createSession(params)
+      chat.createSession({
+        ...params,
+        projectPath: selectedProjectPath || params.projectPath,
+      })
     },
-    [chat]
+    [chat, selectedProjectPath]
   )
 
   const handleFiltersChange = useCallback(
     (filters: SessionFilters) => {
-      chat.fetchSessions(filters)
+      chat.fetchSessions({
+        ...filters,
+        projectPath: selectedProjectPath,
+      })
     },
-    [chat]
+    [chat, selectedProjectPath]
   )
 
   // Message handlers
@@ -149,7 +178,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
         // Convert SessionListItem to Session format for the dialog
         const session: Session = {
           id: sessionToFork.id,
-          projectPath: '',
+          projectPath: selectedProjectPath,
           provider: sessionToFork.provider,
           model: sessionToFork.model,
           title: sessionToFork.title,
@@ -160,7 +189,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
         fork.openForkDialog(session)
       }
     },
-    [chat.sessions, fork]
+    [chat.sessions, fork, selectedProjectPath]
   )
 
   const handleFork = useCallback(
@@ -171,10 +200,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
     ): Promise<ForkResult> => {
       const result = await fork.forkSession(sessionId, forkPointMessageId, options)
       // Refresh sessions to include the new forked session
-      chat.fetchSessions()
+      chat.fetchSessions({ projectPath: selectedProjectPath })
       return result
     },
-    [fork, chat]
+    [fork, chat, selectedProjectPath]
   )
 
   const handleNavigateToSession = useCallback(
@@ -271,14 +300,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
   const sidebar = (
     <SessionSidebar
       sessions={sessionListItems}
+      projects={chat.projects}
+      projectsLoading={chat.projectsLoading}
       selectedSessionId={chat.currentSession?.id}
       loading={chat.sessionsLoading}
       onSessionSelect={handleSessionSelect}
       onNewSession={handleNewSession}
       onFiltersChange={handleFiltersChange}
+      onProjectSelect={handleProjectSelect}
       onFork={handleForkClick}
       defaultProvider="anthropic"
       defaultModel="claude-3-5-sonnet-20241022"
+      projectPath={selectedProjectPath}
     />
   )
 

@@ -189,7 +189,7 @@ export function useFork(config: ForkApiConfig): UseForkReturn {
       setForkError(undefined)
 
       try {
-        const url = `${baseUrl}/api/sessions/${sessionId}/fork`
+        const url = `${baseUrl}/sessions/${sessionId}/fork`
         const body = {
           fork_point_message_id: forkPointMessageId,
           title: options.title,
@@ -248,7 +248,7 @@ export function useFork(config: ForkApiConfig): UseForkReturn {
       setForkInfoLoading(true)
 
       try {
-        const url = `${baseUrl}/api/sessions/${sessionId}/fork-info`
+        const url = `${baseUrl}/sessions/${sessionId}/fork-info`
         const result = await apiRequest<{
           session_id: string
           fork_depth: number
@@ -282,7 +282,7 @@ export function useFork(config: ForkApiConfig): UseForkReturn {
       setSessionForksLoading(true)
 
       try {
-        const url = `${baseUrl}/api/sessions/${sessionId}/forks`
+        const url = `${baseUrl}/sessions/${sessionId}/forks`
         const result = await apiRequest<
           Array<{
             session_id: string

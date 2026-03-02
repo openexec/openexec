@@ -55,6 +55,15 @@ export interface Session {
 }
 
 /**
+ * Metadata about an OpenExec project workspace
+ */
+export interface ProjectInfo {
+  name: string
+  path: string
+  type: string
+}
+
+/**
  * Session creation parameters
  */
 export interface CreateSessionParams {

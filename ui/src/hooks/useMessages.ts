@@ -151,7 +151,7 @@ export function useMessages(config: MessagesApiConfig): UseMessagesReturn {
           offset: offset.toString(),
         })
 
-        const url = `${baseUrl}/api/sessions/${sessionId}/messages?${params}`
+        const url = `${baseUrl}/sessions/${sessionId}/messages?${params}`
         const data = await apiRequest<MessagesResponse>(url, { method: 'GET' }, authToken)
 
         // Check if we're still on the same session

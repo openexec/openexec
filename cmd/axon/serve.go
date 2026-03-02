@@ -2,14 +2,20 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/openexec/openexec/internal/api"
+	"github.com/openexec/openexec/internal/audit"
+	"github.com/openexec/openexec/internal/db/session"
 	"github.com/openexec/openexec/internal/manager"
 	"github.com/openexec/openexec/internal/pipeline"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +28,8 @@ var (
 	serveMaxIterationsFlag int
 	serveMaxRetriesFlag    int
 	serveMaxReviewFlag     int
+	serveAuditDBFlag       string
+	serveProjectsDirFlag   string
 )
 
 func init() {
@@ -33,6 +41,8 @@ func init() {
 	serveCmd.Flags().IntVar(&serveMaxIterationsFlag, "max-iterations", 10, "Maximum iterations per phase (0 = unlimited)")
 	serveCmd.Flags().IntVar(&serveMaxRetriesFlag, "max-retries", 3, "Retry attempts on crash per phase")
 	serveCmd.Flags().IntVar(&serveMaxReviewFlag, "max-review-cycles", 3, "Maximum IM↔RV review cycles")
+	serveCmd.Flags().StringVar(&serveAuditDBFlag, "audit-db", ".openexec/data/audit.db", "Path to audit database")
+	serveCmd.Flags().StringVar(&serveProjectsDirFlag, "projects-dir", "..", "Path to projects root directory for multi-project discovery")
 
 	_ = serveCmd.MarkFlagRequired("tract-store")
 
@@ -59,6 +69,29 @@ Endpoints:
 			return fmt.Errorf("load pipeline config: %w", err)
 		}
 
+		// Initialize Database and Repository
+		dbPath := serveAuditDBFlag
+		if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+			return fmt.Errorf("create audit db directory: %w", err)
+		}
+
+		db, err := sql.Open("sqlite3", dbPath)
+		if err != nil {
+			return fmt.Errorf("open sqlite db: %w", err)
+		}
+		defer db.Close()
+
+		sessionRepo, err := session.NewSQLiteRepository(db)
+		if err != nil {
+			return fmt.Errorf("create session repo: %w", err)
+		}
+
+		auditLogger, err := audit.NewLogger(dbPath)
+		if err != nil {
+			// If NewLogger fails, we can still run with partial functionality
+			fmt.Printf("Warning: failed to initialize audit logger: %v\n", err)
+		}
+
 		cfg := manager.Config{
 			WorkDir:              serveWorkdirFlag,
 			TractStore:           serveTractStoreFlag,
@@ -73,7 +106,7 @@ Endpoints:
 
 		mgr := manager.New(cfg)
 		addr := fmt.Sprintf(":%d", servePortFlag)
-		srv := api.New(mgr, addr)
+		srv := api.New(mgr, sessionRepo, auditLogger, serveProjectsDirFlag, addr)
 
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()

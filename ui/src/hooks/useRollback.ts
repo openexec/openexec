@@ -239,7 +239,7 @@ export function useRollback(config: RollbackApiConfig): UseRollbackReturn {
         filesChanged: files.length,
         additions,
         deletions,
-        totalHunks,
+        hunks: totalHunks,
       },
     }
   }, [])

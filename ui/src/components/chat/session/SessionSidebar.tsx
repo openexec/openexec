@@ -8,14 +8,19 @@
  */
 
 import React, { useState, useCallback } from 'react'
-import type { SessionListItem as SessionListItemType, SessionFilters as SessionFiltersType, CreateSessionParams } from '../../../types/chat'
+import type { SessionListItem as SessionListItemType, SessionFilters as SessionFiltersType, CreateSessionParams, ProjectInfo } from '../../../types/chat'
 import SessionList from './SessionList'
 import SessionFilters from './SessionFilters'
 import NewSessionButton from './NewSessionButton'
+import ProjectSelector from './ProjectSelector'
 
 export interface SessionSidebarProps {
   /** List of sessions to display */
   sessions: SessionListItemType[]
+  /** List of available projects */
+  projects?: ProjectInfo[]
+  /** Whether projects are loading */
+  projectsLoading?: boolean
   /** Currently selected session ID */
   selectedSessionId?: string
   /** Whether sessions are loading */
@@ -26,6 +31,8 @@ export interface SessionSidebarProps {
   onNewSession?: (params: CreateSessionParams) => void
   /** Callback when session filters change */
   onFiltersChange?: (filters: SessionFiltersType) => void
+  /** Callback when a project is selected */
+  onProjectSelect?: (projectPath: string) => void
   /** Callback when fork action is triggered */
   onFork?: (sessionId: string) => void
   /** Callback when archive action is triggered */
@@ -46,11 +53,14 @@ export interface SessionSidebarProps {
 
 const SessionSidebar: React.FC<SessionSidebarProps> = ({
   sessions,
+  projects = [],
+  projectsLoading = false,
   selectedSessionId,
   loading = false,
   onSessionSelect,
   onNewSession,
   onFiltersChange,
+  onProjectSelect,
   onFork,
   onArchive,
   onDelete,
@@ -85,6 +95,14 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
           disabled={loading}
         />
       </div>
+
+      {/* Project Selector */}
+      <ProjectSelector
+        projects={projects}
+        selectedProjectPath={projectPath}
+        onProjectSelect={onProjectSelect || (() => {})}
+        loading={projectsLoading}
+      />
 
       {/* Filters */}
       <div className="session-sidebar__filters" style={styles.filters}>
@@ -173,6 +191,14 @@ const NewSessionModal: React.FC<NewSessionModalProps> = ({
               placeholder="Enter session title..."
               style={modalStyles.input}
             />
+          </div>
+
+          {/* Project display */}
+          <div style={modalStyles.field}>
+            <label style={modalStyles.label}>Project Path</label>
+            <div style={modalStyles.projectPathDisplay}>
+              {projectPath || 'No project selected (will use default)'}
+            </div>
           </div>
 
           {/* Provider select */}
@@ -328,6 +354,15 @@ const modalStyles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     outline: 'none',
     cursor: 'pointer',
+  },
+  projectPathDisplay: {
+    padding: '8px 12px',
+    fontSize: '13px',
+    color: '#8b949e',
+    backgroundColor: '#0d1117',
+    border: '1px solid #30363d',
+    borderRadius: '6px',
+    wordBreak: 'break-all',
   },
   actions: {
     display: 'flex',

@@ -257,7 +257,7 @@ export function useProviderAvailability(
 
     try {
       // Fetch provider status
-      const statusUrl = `${baseUrl}/api/providers/status`
+      const statusUrl = `${baseUrl}/providers/status`
       const statusData = await apiRequest<ProviderStatus[]>(
         statusUrl,
         { method: 'GET' },
@@ -265,7 +265,7 @@ export function useProviderAvailability(
       )
 
       // Fetch model info
-      const modelsUrl = `${baseUrl}/api/providers/models`
+      const modelsUrl = `${baseUrl}/providers/models`
       let modelsData: ModelInfoResponse[] = []
       try {
         modelsData = await apiRequest<ModelInfoResponse[]>(

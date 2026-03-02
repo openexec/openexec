@@ -6,6 +6,7 @@
  * - Session forking for branching conversations
  * - Session filtering and listing
  * - WebSocket subscription management
+ * - Project workspace discovery
  *
  * @module hooks/useSession
  */
@@ -16,6 +17,7 @@ import type {
   SessionListItem,
   SessionFilters,
   CreateSessionParams,
+  ProjectInfo,
 } from '../types'
 
 // =============================================================================
@@ -40,6 +42,12 @@ export interface UseSessionReturn {
   sessionsLoading: boolean
   /** Sessions loading error */
   sessionsError: string | undefined
+  /** List of available projects */
+  projects: ProjectInfo[]
+  /** Whether projects are loading */
+  projectsLoading: boolean
+  /** Projects loading error */
+  projectsError: string | undefined
   /** Current active session */
   currentSession: Session | undefined
   /** Whether current session is loading */
@@ -50,6 +58,8 @@ export interface UseSessionReturn {
   filters: SessionFilters
   /** Fetch sessions with optional filters */
   fetchSessions: (filters?: SessionFilters) => Promise<void>
+  /** Fetch available projects */
+  fetchProjects: () => Promise<void>
   /** Create a new session */
   createSession: (params: CreateSessionParams) => Promise<Session>
   /** Load a session by ID */
@@ -115,10 +125,30 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   const [sessions, setSessions] = useState<SessionListItem[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionsError, setSessionsError] = useState<string | undefined>()
+  const [projects, setProjects] = useState<ProjectInfo[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectsError, setProjectsError] = useState<string | undefined>()
   const [currentSession, setCurrentSession] = useState<Session | undefined>()
   const [currentSessionLoading, setCurrentSessionLoading] = useState(false)
   const [currentSessionError, setCurrentSessionError] = useState<string | undefined>()
   const [filters, setFilters] = useState<SessionFilters>({})
+
+  // Fetch projects
+  const fetchProjects = useCallback(async () => {
+    setProjectsLoading(true)
+    setProjectsError(undefined)
+
+    try {
+      const url = `${baseUrl}/projects`
+      const data = await apiRequest<ProjectInfo[]>(url, { method: 'GET' }, authToken)
+      setProjects(data)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch projects'
+      setProjectsError(message)
+    } finally {
+      setProjectsLoading(false)
+    }
+  }, [baseUrl, authToken])
 
   // Fetch sessions
   const fetchSessions = useCallback(
@@ -136,10 +166,10 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
         if (activeFilters.sortBy) params.set('sort_by', activeFilters.sortBy)
         if (activeFilters.sortOrder) params.set('sort_order', activeFilters.sortOrder)
 
-        const url = `${baseUrl}/api/sessions${params.toString() ? `?${params}` : ''}`
+        const url = `${baseUrl}/sessions${params.toString() ? `?${params}` : ''}`
         const data = await apiRequest<SessionListItem[]>(url, { method: 'GET' }, authToken)
 
-        setSessions(data)
+        setSessions(data || [])
         if (newFilters) {
           setFilters(newFilters)
         }
@@ -156,7 +186,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   // Create session
   const createSession = useCallback(
     async (params: CreateSessionParams): Promise<Session> => {
-      const url = `${baseUrl}/api/sessions`
+      const url = `${baseUrl}/sessions`
       const session = await apiRequest<Session>(
         url,
         {
@@ -192,7 +222,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
       setCurrentSessionError(undefined)
 
       try {
-        const url = `${baseUrl}/api/sessions/${sessionId}`
+        const url = `${baseUrl}/sessions/${sessionId}`
         const session = await apiRequest<Session>(url, { method: 'GET' }, authToken)
 
         setCurrentSession(session)
@@ -211,7 +241,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   // Update session title
   const updateSessionTitle = useCallback(
     async (sessionId: string, title: string): Promise<void> => {
-      const url = `${baseUrl}/api/sessions/${sessionId}`
+      const url = `${baseUrl}/sessions/${sessionId}`
       await apiRequest<void>(
         url,
         {
@@ -240,7 +270,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   // Archive session
   const archiveSession = useCallback(
     async (sessionId: string): Promise<void> => {
-      const url = `${baseUrl}/api/sessions/${sessionId}/archive`
+      const url = `${baseUrl}/sessions/${sessionId}/archive`
       await apiRequest<void>(url, { method: 'POST' }, authToken)
 
       // Update local state
@@ -266,7 +296,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   // Delete session
   const deleteSession = useCallback(
     async (sessionId: string): Promise<void> => {
-      const url = `${baseUrl}/api/sessions/${sessionId}`
+      const url = `${baseUrl}/sessions/${sessionId}`
       await apiRequest<void>(url, { method: 'DELETE' }, authToken)
 
       // Update local state
@@ -288,7 +318,7 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   // Fork session
   const forkSession = useCallback(
     async (sessionId: string, forkPointMessageId?: string): Promise<Session> => {
-      const url = `${baseUrl}/api/sessions/${sessionId}/fork`
+      const url = `${baseUrl}/sessions/${sessionId}/fork`
       const session = await apiRequest<Session>(
         url,
         {
@@ -378,11 +408,15 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
     sessions,
     sessionsLoading,
     sessionsError,
+    projects,
+    projectsLoading,
+    projectsError,
     currentSession,
     currentSessionLoading,
     currentSessionError,
     filters,
     fetchSessions,
+    fetchProjects,
     createSession,
     loadSession,
     updateSessionTitle,
