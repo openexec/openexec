@@ -15,7 +15,7 @@ func TestProcessLifecycle(t *testing.T) {
 		WorkDir:     t.TempDir(),
 	}
 
-	proc, err := StartProcess(context.Background(), cfg, nil, nil)
+	proc, err := StartProcess(context.Background(), cfg, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("StartProcess: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestProcessNonZeroExit(t *testing.T) {
 		WorkDir:     t.TempDir(),
 	}
 
-	proc, err := StartProcess(context.Background(), cfg, nil, nil)
+	proc, err := StartProcess(context.Background(), cfg, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("StartProcess: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestProcessKill(t *testing.T) {
 		WorkDir:     t.TempDir(),
 	}
 
-	proc, err := StartProcess(context.Background(), cfg, nil, nil)
+	proc, err := StartProcess(context.Background(), cfg, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("StartProcess: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestProcessContextCancellation(t *testing.T) {
 		WorkDir:     t.TempDir(),
 	}
 
-	proc, err := StartProcess(ctx, cfg, nil, nil)
+	proc, err := StartProcess(ctx, cfg, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("StartProcess: %v", err)
 	}

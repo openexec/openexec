@@ -27,3 +27,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Playwright
+ui/playwright-report/
+ui/test-results/
+ui/playwright/.cache/

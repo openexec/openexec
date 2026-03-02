@@ -1,1402 +1,1401 @@
 {
+  "phase_count": 73,
   "phases": [
     {
-      "phase": 1,
+      "hours": 4,
       "name": "Phase 1",
-      "hours": 4.0,
+      "phase": 1,
       "tasks": [
         {
-          "id": "T-US-001-001",
-          "title": "SQLite Sessions Database Schema: Define Database Schema Types",
           "depends_on": [],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-001-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "SQLite Sessions Database Schema: Define Database Schema Types"
         }
       ]
     },
     {
-      "phase": 2,
+      "hours": 4,
       "name": "Phase 2",
-      "hours": 4.0,
+      "phase": 2,
       "tasks": [
         {
-          "id": "T-US-001-002",
-          "title": "SQLite Sessions Database Schema: Implement SQLite Repository",
           "depends_on": [
             "T-US-001-001"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-001-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "SQLite Sessions Database Schema: Implement SQLite Repository"
         }
       ]
     },
     {
-      "phase": 3,
+      "hours": 7,
       "name": "Phase 3",
-      "hours": 7.0,
+      "phase": 3,
       "tasks": [
         {
-          "id": "T-US-001-003",
-          "title": "SQLite Sessions Database Schema: Unit Tests for Sessions Repository",
           "depends_on": [
             "T-US-001-002"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-001-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "SQLite Sessions Database Schema: Unit Tests for Sessions Repository"
         },
         {
-          "id": "T-US-002-001",
-          "title": "Provider Adapter Interface: Define Provider Adapter ABC and Response Types",
           "depends_on": [],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-002-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Provider Adapter Interface: Define Provider Adapter ABC and Response Types"
         }
       ]
     },
     {
-      "phase": 4,
+      "hours": 4,
       "name": "Phase 4",
-      "hours": 4.0,
+      "phase": 4,
       "tasks": [
         {
-          "id": "T-US-002-002",
-          "title": "Provider Adapter Interface: Implement Tool Schema Translator Base",
           "depends_on": [
             "T-US-002-001"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-002-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Provider Adapter Interface: Implement Tool Schema Translator Base"
         }
       ]
     },
     {
-      "phase": 5,
+      "hours": 4,
       "name": "Phase 5",
-      "hours": 4.0,
+      "phase": 5,
       "tasks": [
         {
-          "id": "T-US-003-001",
-          "title": "OpenAI Provider Driver: Implement OpenAI Provider Class",
           "depends_on": [
             "T-US-002-002"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-003-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "OpenAI Provider Driver: Implement OpenAI Provider Class"
         }
       ]
     },
     {
-      "phase": 6,
+      "hours": 4,
       "name": "Phase 6",
-      "hours": 4.0,
+      "phase": 6,
       "tasks": [
         {
-          "id": "T-US-003-002",
-          "title": "OpenAI Provider Driver: Implement OpenAI Tool Schema Translation",
           "depends_on": [
             "T-US-003-001",
             "T-US-002-002"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-003-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "OpenAI Provider Driver: Implement OpenAI Tool Schema Translation"
         }
       ]
     },
     {
-      "phase": 7,
+      "hours": 7,
       "name": "Phase 7",
-      "hours": 7.0,
+      "phase": 7,
       "tasks": [
         {
-          "id": "T-US-003-003",
-          "title": "OpenAI Provider Driver: Unit Tests for OpenAI Provider",
           "depends_on": [
             "T-US-003-002",
             "T-US-002-002"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-003-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "OpenAI Provider Driver: Unit Tests for OpenAI Provider"
         },
         {
-          "id": "T-US-004-001",
-          "title": "Anthropic Provider Driver: Implement Anthropic Provider Class",
           "depends_on": [
             "T-US-002-002"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-004-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Anthropic Provider Driver: Implement Anthropic Provider Class"
         }
       ]
     },
     {
-      "phase": 8,
+      "hours": 4,
       "name": "Phase 8",
-      "hours": 4.0,
+      "phase": 8,
       "tasks": [
         {
-          "id": "T-US-004-002",
-          "title": "Anthropic Provider Driver: Implement Anthropic Tool Schema Translation",
           "depends_on": [
             "T-US-004-001",
             "T-US-002-002"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-004-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Anthropic Provider Driver: Implement Anthropic Tool Schema Translation"
         }
       ]
     },
     {
-      "phase": 9,
+      "hours": 7,
       "name": "Phase 9",
-      "hours": 7.0,
+      "phase": 9,
       "tasks": [
         {
-          "id": "T-US-004-003",
-          "title": "Anthropic Provider Driver: Unit Tests for Anthropic Provider",
           "depends_on": [
             "T-US-004-002",
             "T-US-002-002"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-004-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Anthropic Provider Driver: Unit Tests for Anthropic Provider"
         },
         {
-          "id": "T-US-005-001",
-          "title": "Gemini Provider Driver: Implement Gemini Provider Class",
           "depends_on": [
             "T-US-002-002"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-005-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Gemini Provider Driver: Implement Gemini Provider Class"
         }
       ]
     },
     {
-      "phase": 10,
+      "hours": 4,
       "name": "Phase 10",
-      "hours": 4.0,
+      "phase": 10,
       "tasks": [
         {
-          "id": "T-US-005-002",
-          "title": "Gemini Provider Driver: Implement Gemini Tool Schema Translation",
           "depends_on": [
             "T-US-005-001",
             "T-US-002-002"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-005-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Gemini Provider Driver: Implement Gemini Tool Schema Translation"
         }
       ]
     },
     {
-      "phase": 11,
+      "hours": 3,
       "name": "Phase 11",
-      "hours": 3.0,
+      "phase": 11,
       "tasks": [
         {
-          "id": "T-US-005-003",
-          "title": "Gemini Provider Driver: Unit Tests for Gemini Provider",
           "depends_on": [
             "T-US-005-002",
             "T-US-002-002"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-005-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Gemini Provider Driver: Unit Tests for Gemini Provider"
         }
       ]
     },
     {
-      "phase": 12,
+      "hours": 4,
       "name": "Phase 12",
-      "hours": 4.0,
+      "phase": 12,
       "tasks": [
         {
-          "id": "T-US-006-001",
-          "title": "Provider Registry and Model Picker: Implement Provider Registry",
           "depends_on": [
             "T-US-003-003",
             "T-US-004-003",
             "T-US-005-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-006-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Provider Registry and Model Picker: Implement Provider Registry"
         }
       ]
     },
     {
-      "phase": 13,
+      "hours": 4,
       "name": "Phase 13",
-      "hours": 4.0,
+      "phase": 13,
       "tasks": [
         {
-          "id": "T-US-006-002",
-          "title": "Provider Registry and Model Picker: Create ModelInfo Schema and Pricing Data",
           "depends_on": [
             "T-US-006-001",
             "T-US-003-003",
             "T-US-004-003",
             "T-US-005-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-006-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Provider Registry and Model Picker: Create ModelInfo Schema and Pricing Data"
         }
       ]
     },
     {
-      "phase": 14,
+      "hours": 7,
       "name": "Phase 14",
-      "hours": 7.0,
+      "phase": 14,
       "tasks": [
         {
-          "id": "T-US-006-003",
-          "title": "Provider Registry and Model Picker: Unit Tests for Provider Registry",
           "depends_on": [
             "T-US-006-002",
             "T-US-003-003",
             "T-US-004-003",
             "T-US-005-003"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-006-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Provider Registry and Model Picker: Unit Tests for Provider Registry"
         },
         {
-          "id": "T-US-007-001",
-          "title": "MCP Tool: read_file: Define MCP Tool Schema for read_file",
           "depends_on": [
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-007-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: read_file: Define MCP Tool Schema for read_file"
         }
       ]
     },
     {
-      "phase": 15,
+      "hours": 4,
       "name": "Phase 15",
-      "hours": 4.0,
+      "phase": 15,
       "tasks": [
         {
-          "id": "T-US-007-002",
-          "title": "MCP Tool: read_file: Implement Path Validation Utility",
           "depends_on": [
             "T-US-007-001",
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-007-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: read_file: Implement Path Validation Utility"
         }
       ]
     },
     {
-      "phase": 16,
+      "hours": 4,
       "name": "Phase 16",
-      "hours": 4.0,
+      "phase": 16,
       "tasks": [
         {
-          "id": "T-US-007-003",
-          "title": "MCP Tool: read_file: Implement read_file Handler",
           "depends_on": [
             "T-US-007-002",
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-007-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: read_file: Implement read_file Handler"
         }
       ]
     },
     {
-      "phase": 17,
+      "hours": 3,
       "name": "Phase 17",
-      "hours": 3.0,
+      "phase": 17,
       "tasks": [
         {
-          "id": "T-US-007-004",
-          "title": "MCP Tool: read_file: Unit Tests for read_file",
           "depends_on": [
             "T-US-007-003",
             "T-US-001-003"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-007-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: read_file: Unit Tests for read_file"
         }
       ]
     },
     {
-      "phase": 18,
+      "hours": 4,
       "name": "Phase 18",
-      "hours": 4.0,
+      "phase": 18,
       "tasks": [
         {
-          "id": "T-US-008-001",
-          "title": "MCP Tool: write_file: Define MCP Tool Schema for write_file",
           "depends_on": [
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-008-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: write_file: Define MCP Tool Schema for write_file"
         }
       ]
     },
     {
-      "phase": 19,
+      "hours": 4,
       "name": "Phase 19",
-      "hours": 4.0,
+      "phase": 19,
       "tasks": [
         {
-          "id": "T-US-008-002",
-          "title": "MCP Tool: write_file: Implement Backup Manager",
           "depends_on": [
             "T-US-008-001",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-008-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: write_file: Implement Backup Manager"
         }
       ]
     },
     {
-      "phase": 20,
+      "hours": 4,
       "name": "Phase 20",
-      "hours": 4.0,
+      "phase": 20,
       "tasks": [
         {
-          "id": "T-US-008-003",
-          "title": "MCP Tool: write_file: Implement write_file Handler",
           "depends_on": [
             "T-US-008-002",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-008-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: write_file: Implement write_file Handler"
         }
       ]
     },
     {
-      "phase": 21,
+      "hours": 7,
       "name": "Phase 21",
-      "hours": 7.0,
+      "phase": 21,
       "tasks": [
         {
-          "id": "T-US-008-004",
-          "title": "MCP Tool: write_file: Unit Tests for write_file",
           "depends_on": [
             "T-US-008-003",
             "T-US-007-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-008-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: write_file: Unit Tests for write_file"
         },
         {
-          "id": "T-US-009-001",
-          "title": "MCP Tool: run_shell_command: Define MCP Tool Schema for run_shell_command",
           "depends_on": [
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-009-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: run_shell_command: Define MCP Tool Schema for run_shell_command"
         }
       ]
     },
     {
-      "phase": 22,
+      "hours": 4,
       "name": "Phase 22",
-      "hours": 4.0,
+      "phase": 22,
       "tasks": [
         {
-          "id": "T-US-009-002",
-          "title": "MCP Tool: run_shell_command: Implement Secret Redaction Utility",
           "depends_on": [
             "T-US-009-001",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-009-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: run_shell_command: Implement Secret Redaction Utility"
         }
       ]
     },
     {
-      "phase": 23,
+      "hours": 4,
       "name": "Phase 23",
-      "hours": 4.0,
+      "phase": 23,
       "tasks": [
         {
-          "id": "T-US-009-003",
-          "title": "MCP Tool: run_shell_command: Implement run_shell_command Handler",
           "depends_on": [
             "T-US-009-002",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-009-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: run_shell_command: Implement run_shell_command Handler"
         }
       ]
     },
     {
-      "phase": 24,
+      "hours": 3,
       "name": "Phase 24",
-      "hours": 3.0,
+      "phase": 24,
       "tasks": [
         {
-          "id": "T-US-009-004",
-          "title": "MCP Tool: run_shell_command: Unit Tests for run_shell_command",
           "depends_on": [
             "T-US-009-003",
             "T-US-007-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-009-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: run_shell_command: Unit Tests for run_shell_command"
         }
       ]
     },
     {
-      "phase": 25,
+      "hours": 4,
       "name": "Phase 25",
-      "hours": 4.0,
+      "phase": 25,
       "tasks": [
         {
-          "id": "T-US-010-001",
-          "title": "MCP Tool: git_apply_patch: Define MCP Tool Schema for git_apply_patch",
           "depends_on": [
             "T-US-008-004",
             "T-US-009-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-010-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: git_apply_patch: Define MCP Tool Schema for git_apply_patch"
         }
       ]
     },
     {
-      "phase": 26,
+      "hours": 4,
       "name": "Phase 26",
-      "hours": 4.0,
+      "phase": 26,
       "tasks": [
         {
-          "id": "T-US-010-002",
-          "title": "MCP Tool: git_apply_patch: Implement Patch Parser and Validator",
           "depends_on": [
             "T-US-010-001",
             "T-US-008-004",
             "T-US-009-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-010-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: git_apply_patch: Implement Patch Parser and Validator"
         }
       ]
     },
     {
-      "phase": 27,
+      "hours": 4,
       "name": "Phase 27",
-      "hours": 4.0,
+      "phase": 27,
       "tasks": [
         {
-          "id": "T-US-010-003",
-          "title": "MCP Tool: git_apply_patch: Implement git_apply_patch Handler",
           "depends_on": [
             "T-US-010-002",
             "T-US-008-004",
             "T-US-009-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-010-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: git_apply_patch: Implement git_apply_patch Handler"
         }
       ]
     },
     {
-      "phase": 28,
+      "hours": 7,
       "name": "Phase 28",
-      "hours": 7.0,
+      "phase": 28,
       "tasks": [
         {
-          "id": "T-US-010-004",
-          "title": "MCP Tool: git_apply_patch: Unit Tests for git_apply_patch",
           "depends_on": [
             "T-US-010-003",
             "T-US-008-004",
             "T-US-009-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-010-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "MCP Tool: git_apply_patch: Unit Tests for git_apply_patch"
         },
         {
-          "id": "T-US-011-001",
-          "title": "Tool Approval System: Define Approval Data Models",
           "depends_on": [
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-011-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Tool Approval System: Define Approval Data Models"
         }
       ]
     },
     {
-      "phase": 29,
+      "hours": 4,
       "name": "Phase 29",
-      "hours": 4.0,
+      "phase": 29,
       "tasks": [
         {
-          "id": "T-US-011-002",
-          "title": "Tool Approval System: Implement ApprovalManager",
           "depends_on": [
             "T-US-011-001",
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-011-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Tool Approval System: Implement ApprovalManager"
         }
       ]
     },
     {
-      "phase": 30,
+      "hours": 7,
       "name": "Phase 30",
-      "hours": 7.0,
+      "phase": 30,
       "tasks": [
         {
-          "id": "T-US-011-003",
-          "title": "Tool Approval System: Unit Tests for ApprovalManager",
           "depends_on": [
             "T-US-011-002",
             "T-US-001-003"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-011-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Tool Approval System: Unit Tests for ApprovalManager"
         },
         {
-          "id": "T-US-012-001",
-          "title": "Audit Logging System: Define Audit Entry Schema",
           "depends_on": [
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-012-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Audit Logging System: Define Audit Entry Schema"
         }
       ]
     },
     {
-      "phase": 31,
+      "hours": 4,
       "name": "Phase 31",
-      "hours": 4.0,
+      "phase": 31,
       "tasks": [
         {
-          "id": "T-US-012-002",
-          "title": "Audit Logging System: Implement AuditLogger",
           "depends_on": [
             "T-US-012-001",
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-012-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Audit Logging System: Implement AuditLogger"
         }
       ]
     },
     {
-      "phase": 32,
+      "hours": 4,
       "name": "Phase 32",
-      "hours": 4.0,
+      "phase": 32,
       "tasks": [
         {
-          "id": "T-US-012-003",
-          "title": "Audit Logging System: Implement Export Functionality",
           "depends_on": [
             "T-US-012-002",
             "T-US-001-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-012-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Audit Logging System: Implement Export Functionality"
         }
       ]
     },
     {
-      "phase": 33,
+      "hours": 7,
       "name": "Phase 33",
-      "hours": 7.0,
+      "phase": 33,
       "tasks": [
         {
-          "id": "T-US-012-004",
-          "title": "Audit Logging System: Unit Tests for Audit System",
           "depends_on": [
             "T-US-012-003",
             "T-US-001-003"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-012-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Audit Logging System: Unit Tests for Audit System"
         },
         {
-          "id": "T-US-013-001",
-          "title": "Auto-Context Builder: Define Context Schema",
           "depends_on": [
             "T-US-001-003",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-013-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Auto-Context Builder: Define Context Schema"
         }
       ]
     },
     {
-      "phase": 34,
+      "hours": 4,
       "name": "Phase 34",
-      "hours": 4.0,
+      "phase": 34,
       "tasks": [
         {
-          "id": "T-US-013-002",
-          "title": "Auto-Context Builder: Implement Context Gatherers",
           "depends_on": [
             "T-US-013-001",
             "T-US-001-003",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-013-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Auto-Context Builder: Implement Context Gatherers"
         }
       ]
     },
     {
-      "phase": 35,
+      "hours": 4,
       "name": "Phase 35",
-      "hours": 4.0,
+      "phase": 35,
       "tasks": [
         {
-          "id": "T-US-013-003",
-          "title": "Auto-Context Builder: Implement Context Builder with Token Budgeting",
           "depends_on": [
             "T-US-013-002",
             "T-US-001-003",
             "T-US-007-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-013-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Auto-Context Builder: Implement Context Builder with Token Budgeting"
         }
       ]
     },
     {
-      "phase": 36,
+      "hours": 3,
       "name": "Phase 36",
-      "hours": 3.0,
+      "phase": 36,
       "tasks": [
         {
-          "id": "T-US-013-004",
-          "title": "Auto-Context Builder: Unit Tests for Context Builder",
           "depends_on": [
             "T-US-013-003",
             "T-US-001-003",
             "T-US-007-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-013-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Auto-Context Builder: Unit Tests for Context Builder"
         }
       ]
     },
     {
-      "phase": 37,
+      "hours": 4,
       "name": "Phase 37",
-      "hours": 4.0,
+      "phase": 37,
       "tasks": [
         {
-          "id": "T-US-014-001",
-          "title": "Agent Loop with Tool Execution: Define Loop Event Types",
           "depends_on": [
             "T-US-006-003",
             "T-US-011-003",
             "T-US-013-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-014-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Agent Loop with Tool Execution: Define Loop Event Types"
         }
       ]
     },
     {
-      "phase": 38,
+      "hours": 4,
       "name": "Phase 38",
-      "hours": 4.0,
+      "phase": 38,
       "tasks": [
         {
-          "id": "T-US-014-002",
-          "title": "Agent Loop with Tool Execution: Implement Tool Executor",
           "depends_on": [
             "T-US-014-001",
             "T-US-006-003",
             "T-US-011-003",
             "T-US-013-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-014-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Agent Loop with Tool Execution: Implement Tool Executor"
         }
       ]
     },
     {
-      "phase": 39,
+      "hours": 4,
       "name": "Phase 39",
-      "hours": 4.0,
+      "phase": 39,
       "tasks": [
         {
-          "id": "T-US-014-003",
-          "title": "Agent Loop with Tool Execution: Implement Agent Loop Core",
           "depends_on": [
             "T-US-014-002",
             "T-US-006-003",
             "T-US-011-003",
             "T-US-013-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-014-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Agent Loop with Tool Execution: Implement Agent Loop Core"
         }
       ]
     },
     {
-      "phase": 40,
+      "hours": 3,
       "name": "Phase 40",
-      "hours": 3.0,
+      "phase": 40,
       "tasks": [
         {
-          "id": "T-US-014-004",
-          "title": "Agent Loop with Tool Execution: Unit Tests for Agent Loop",
           "depends_on": [
             "T-US-014-003",
             "T-US-006-003",
             "T-US-011-003",
             "T-US-013-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-014-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Agent Loop with Tool Execution: Unit Tests for Agent Loop"
         }
       ]
     },
     {
-      "phase": 41,
+      "hours": 2,
       "name": "Phase 41",
-      "hours": 2.0,
+      "phase": 41,
       "tasks": [
         {
-          "id": "T-US-015-001",
-          "title": "Chat UI with Session Management: Design UI Component Structure",
           "depends_on": [
             "T-US-001-003",
             "T-US-014-004"
           ],
-          "estimated_hours": 2.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 2,
+          "id": "T-US-015-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Chat UI with Session Management: Design UI Component Structure"
         }
       ]
     },
     {
-      "phase": 42,
+      "hours": 4,
       "name": "Phase 42",
-      "hours": 4.0,
+      "phase": 42,
       "tasks": [
         {
-          "id": "T-US-015-002",
-          "title": "Chat UI with Session Management: Implement WebSocket Client",
           "depends_on": [
             "T-US-015-001",
             "T-US-001-003",
             "T-US-014-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-015-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Chat UI with Session Management: Implement WebSocket Client"
         }
       ]
     },
     {
-      "phase": 43,
+      "hours": 4,
       "name": "Phase 43",
-      "hours": 4.0,
+      "phase": 43,
       "tasks": [
         {
-          "id": "T-US-015-003",
-          "title": "Chat UI with Session Management: Implement Chat Components",
           "depends_on": [
             "T-US-015-002",
             "T-US-001-003",
             "T-US-014-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-015-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Chat UI with Session Management: Implement Chat Components"
         }
       ]
     },
     {
-      "phase": 44,
+      "hours": 4,
       "name": "Phase 44",
-      "hours": 4.0,
+      "phase": 44,
       "tasks": [
         {
-          "id": "T-US-015-004",
-          "title": "Chat UI with Session Management: Implement Session Sidebar",
           "depends_on": [
             "T-US-015-003",
             "T-US-001-003",
             "T-US-014-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-015-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Chat UI with Session Management: Implement Session Sidebar"
         }
       ]
     },
     {
-      "phase": 45,
+      "hours": 4,
       "name": "Phase 45",
-      "hours": 4.0,
+      "phase": 45,
       "tasks": [
         {
-          "id": "T-US-016-001",
-          "title": "Model Picker UI: Create ModelPicker Component",
           "depends_on": [
             "T-US-006-003",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-016-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Model Picker UI: Create ModelPicker Component"
         }
       ]
     },
     {
-      "phase": 46,
+      "hours": 4,
       "name": "Phase 46",
-      "hours": 4.0,
+      "phase": 46,
       "tasks": [
         {
-          "id": "T-US-016-002",
-          "title": "Model Picker UI: Implement Provider Availability Check",
           "depends_on": [
             "T-US-016-001",
             "T-US-006-003",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-016-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Model Picker UI: Implement Provider Availability Check"
         }
       ]
     },
     {
-      "phase": 47,
+      "hours": 7,
       "name": "Phase 47",
-      "hours": 7.0,
+      "phase": 47,
       "tasks": [
         {
-          "id": "T-US-016-003",
-          "title": "Model Picker UI: Unit Tests for ModelPicker",
           "depends_on": [
             "T-US-016-002",
             "T-US-006-003",
             "T-US-015-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-016-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Model Picker UI: Unit Tests for ModelPicker"
         },
         {
-          "id": "T-US-017-001",
-          "title": "Patch Preview and Apply UI: Create DiffViewer Component",
           "depends_on": [
             "T-US-010-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-017-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Patch Preview and Apply UI: Create DiffViewer Component"
         }
       ]
     },
     {
-      "phase": 48,
+      "hours": 4,
       "name": "Phase 48",
-      "hours": 4.0,
+      "phase": 48,
       "tasks": [
         {
-          "id": "T-US-017-002",
-          "title": "Patch Preview and Apply UI: Implement Patch Preview Modal",
           "depends_on": [
             "T-US-017-001",
             "T-US-010-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-017-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Patch Preview and Apply UI: Implement Patch Preview Modal"
         }
       ]
     },
     {
-      "phase": 49,
+      "hours": 8,
       "name": "Phase 49",
-      "hours": 8.0,
+      "phase": 49,
       "tasks": [
         {
-          "id": "T-US-017-003",
-          "title": "Patch Preview and Apply UI: Implement Rollback UI",
           "depends_on": [
             "T-US-017-002",
             "T-US-010-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-017-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Patch Preview and Apply UI: Implement Rollback UI"
         },
         {
-          "id": "T-US-018-001",
-          "title": "Cost and Token Dashboard: Create Usage Summary Component",
           "depends_on": [
             "T-US-012-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-018-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Cost and Token Dashboard: Create Usage Summary Component"
         }
       ]
     },
     {
-      "phase": 50,
+      "hours": 4,
       "name": "Phase 50",
-      "hours": 4.0,
+      "phase": 50,
       "tasks": [
         {
-          "id": "T-US-018-002",
-          "title": "Cost and Token Dashboard: Implement Usage API Endpoints",
           "depends_on": [
             "T-US-018-001",
             "T-US-012-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-018-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Cost and Token Dashboard: Implement Usage API Endpoints"
         }
       ]
     },
     {
-      "phase": 51,
+      "hours": 4,
       "name": "Phase 51",
-      "hours": 4.0,
+      "phase": 51,
       "tasks": [
         {
-          "id": "T-US-018-003",
-          "title": "Cost and Token Dashboard: Create Usage Charts",
           "depends_on": [
             "T-US-018-002",
             "T-US-012-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-018-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Cost and Token Dashboard: Create Usage Charts"
         }
       ]
     },
     {
-      "phase": 52,
+      "hours": 6,
       "name": "Phase 52",
-      "hours": 6.0,
+      "phase": 52,
       "tasks": [
         {
-          "id": "T-US-018-004",
-          "title": "Cost and Token Dashboard: Implement Budget Alerts",
           "depends_on": [
             "T-US-018-003",
             "T-US-012-004",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-018-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Cost and Token Dashboard: Implement Budget Alerts"
         },
         {
-          "id": "T-US-019-001",
-          "title": "Session History Summarization: Design Summarization Strategy",
           "depends_on": [
             "T-US-014-004"
           ],
-          "estimated_hours": 2.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 2,
+          "id": "T-US-019-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session History Summarization: Design Summarization Strategy"
         }
       ]
     },
     {
-      "phase": 53,
+      "hours": 4,
       "name": "Phase 53",
-      "hours": 4.0,
+      "phase": 53,
       "tasks": [
         {
-          "id": "T-US-019-002",
-          "title": "Session History Summarization: Implement SessionSummarizer",
           "depends_on": [
             "T-US-019-001",
             "T-US-014-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-019-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session History Summarization: Implement SessionSummarizer"
         }
       ]
     },
     {
-      "phase": 54,
+      "hours": 4,
       "name": "Phase 54",
-      "hours": 4.0,
+      "phase": 54,
       "tasks": [
         {
-          "id": "T-US-019-003",
-          "title": "Session History Summarization: Integrate Summarization into Agent Loop",
           "depends_on": [
             "T-US-019-002",
             "T-US-014-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-019-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session History Summarization: Integrate Summarization into Agent Loop"
         }
       ]
     },
     {
-      "phase": 55,
+      "hours": 7,
       "name": "Phase 55",
-      "hours": 7.0,
+      "phase": 55,
       "tasks": [
         {
-          "id": "T-US-019-004",
-          "title": "Session History Summarization: Unit Tests for Summarization",
           "depends_on": [
             "T-US-019-003",
             "T-US-014-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-019-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session History Summarization: Unit Tests for Summarization"
         },
         {
-          "id": "T-US-020-001",
-          "title": "Session Fork Capability: Extend Session Schema for Forks",
           "depends_on": [
             "T-US-001-003",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-020-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session Fork Capability: Extend Session Schema for Forks"
         }
       ]
     },
     {
-      "phase": 56,
+      "hours": 4,
       "name": "Phase 56",
-      "hours": 4.0,
+      "phase": 56,
       "tasks": [
         {
-          "id": "T-US-020-002",
-          "title": "Session Fork Capability: Implement Fork Operation",
           "depends_on": [
             "T-US-020-001",
             "T-US-001-003",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-020-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session Fork Capability: Implement Fork Operation"
         }
       ]
     },
     {
-      "phase": 57,
+      "hours": 8,
       "name": "Phase 57",
-      "hours": 8.0,
+      "phase": 57,
       "tasks": [
         {
-          "id": "T-US-020-003",
-          "title": "Session Fork Capability: Implement Fork UI",
           "depends_on": [
             "T-US-020-002",
             "T-US-001-003",
             "T-US-015-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-020-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Session Fork Capability: Implement Fork UI"
         },
         {
-          "id": "T-US-021-001",
-          "title": "Meta Self-Fix: File Edit Capability: Implement Orchestrator Locator",
           "depends_on": [
             "T-US-008-004",
             "T-US-010-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-021-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: File Edit Capability: Implement Orchestrator Locator"
         }
       ]
     },
     {
-      "phase": 58,
+      "hours": 4,
       "name": "Phase 58",
-      "hours": 4.0,
+      "phase": 58,
       "tasks": [
         {
-          "id": "T-US-021-002",
-          "title": "Meta Self-Fix: File Edit Capability: Add Orchestrator Edit Approval Level",
           "depends_on": [
             "T-US-021-001",
             "T-US-008-004",
             "T-US-010-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-021-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: File Edit Capability: Add Orchestrator Edit Approval Level"
         }
       ]
     },
     {
-      "phase": 59,
+      "hours": 4,
       "name": "Phase 59",
-      "hours": 4.0,
+      "phase": 59,
       "tasks": [
         {
-          "id": "T-US-021-003",
-          "title": "Meta Self-Fix: File Edit Capability: Implement Python Syntax Validator",
           "depends_on": [
             "T-US-021-002",
             "T-US-008-004",
             "T-US-010-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-021-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: File Edit Capability: Implement Python Syntax Validator"
         }
       ]
     },
     {
-      "phase": 60,
+      "hours": 3,
       "name": "Phase 60",
-      "hours": 3.0,
+      "phase": 60,
       "tasks": [
         {
-          "id": "T-US-021-004",
-          "title": "Meta Self-Fix: File Edit Capability: Unit Tests for Meta Edit",
           "depends_on": [
             "T-US-021-003",
             "T-US-008-004",
             "T-US-010-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-021-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: File Edit Capability: Unit Tests for Meta Edit"
         }
       ]
     },
     {
-      "phase": 61,
+      "hours": 4,
       "name": "Phase 61",
-      "hours": 4.0,
+      "phase": 61,
       "tasks": [
         {
-          "id": "T-US-022-001",
-          "title": "Meta Self-Fix: Build Capability: Implement OrchestratorBuilder",
           "depends_on": [
             "T-US-009-004",
             "T-US-021-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-022-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: Build Capability: Implement OrchestratorBuilder"
         }
       ]
     },
     {
-      "phase": 62,
+      "hours": 4,
       "name": "Phase 62",
-      "hours": 4.0,
+      "phase": 62,
       "tasks": [
         {
-          "id": "T-US-022-002",
-          "title": "Meta Self-Fix: Build Capability: Implement Build Output Parser",
           "depends_on": [
             "T-US-022-001",
             "T-US-009-004",
             "T-US-021-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-022-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: Build Capability: Implement Build Output Parser"
         }
       ]
     },
     {
-      "phase": 63,
+      "hours": 3,
       "name": "Phase 63",
-      "hours": 3.0,
+      "phase": 63,
       "tasks": [
         {
-          "id": "T-US-022-003",
-          "title": "Meta Self-Fix: Build Capability: Unit Tests for Builder",
           "depends_on": [
             "T-US-022-002",
             "T-US-009-004",
             "T-US-021-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-022-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: Build Capability: Unit Tests for Builder"
         }
       ]
     },
     {
-      "phase": 64,
+      "hours": 4,
       "name": "Phase 64",
-      "hours": 4.0,
+      "phase": 64,
       "tasks": [
         {
-          "id": "T-US-023-001",
-          "title": "Meta Self-Fix: Restart Request: Implement RestartManager",
           "depends_on": [
             "T-US-022-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-023-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: Restart Request: Implement RestartManager"
         }
       ]
     },
     {
-      "phase": 65,
+      "hours": 4,
       "name": "Phase 65",
-      "hours": 4.0,
+      "phase": 65,
       "tasks": [
         {
-          "id": "T-US-023-002",
-          "title": "Meta Self-Fix: Restart Request: Implement Session Resume After Restart",
           "depends_on": [
             "T-US-023-001",
             "T-US-022-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-023-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: Restart Request: Implement Session Resume After Restart"
         }
       ]
     },
     {
-      "phase": 66,
+      "hours": 5,
       "name": "Phase 66",
-      "hours": 5.0,
+      "phase": 66,
       "tasks": [
         {
-          "id": "T-US-023-003",
-          "title": "Meta Self-Fix: Restart Request: Create Restart Approval UI",
           "depends_on": [
             "T-US-023-002",
             "T-US-022-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-023-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Meta Self-Fix: Restart Request: Create Restart Approval UI"
         },
         {
-          "id": "T-US-024-001",
-          "title": "Documentation: Conversational Orchestration: Write Conversational Mode Documentation",
           "depends_on": [
             "T-US-015-004",
             "T-US-014-004"
           ],
-          "estimated_hours": 1.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 1,
+          "id": "T-US-024-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Documentation: Conversational Orchestration: Write Conversational Mode Documentation"
         }
       ]
     },
     {
-      "phase": 67,
+      "hours": 4,
       "name": "Phase 67",
-      "hours": 4.0,
+      "phase": 67,
       "tasks": [
         {
-          "id": "T-US-024-002",
-          "title": "Documentation: Conversational Orchestration: Update README with Feature Overview",
           "depends_on": [
             "T-US-024-001",
             "T-US-015-004",
             "T-US-014-004"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-024-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Documentation: Conversational Orchestration: Update README with Feature Overview"
         }
       ]
     },
     {
-      "phase": 68,
+      "hours": 5,
       "name": "Phase 68",
-      "hours": 5.0,
+      "phase": 68,
       "tasks": [
         {
-          "id": "T-US-024-003",
-          "title": "Documentation: Conversational Orchestration: Generate API Documentation",
           "depends_on": [
             "T-US-024-002",
             "T-US-015-004",
             "T-US-014-004"
           ],
-          "estimated_hours": 1.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 1,
+          "id": "T-US-024-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Documentation: Conversational Orchestration: Generate API Documentation"
         },
         {
-          "id": "T-US-025-001",
-          "title": "Goal Validation: End-to-End Testing: Setup Playwright E2E Infrastructure",
           "depends_on": [
             "T-US-015-004",
             "T-US-016-003",
@@ -1404,20 +1403,20 @@
             "T-US-018-004",
             "T-US-023-003"
           ],
-          "estimated_hours": 4.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 4,
+          "id": "T-US-025-001",
+          "kind": "task",
+          "status": "completed",
+          "title": "Goal Validation: End-to-End Testing: Setup Playwright E2E Infrastructure"
         }
       ]
     },
     {
-      "phase": 69,
+      "hours": 3,
       "name": "Phase 69",
-      "hours": 3.0,
+      "phase": 69,
       "tasks": [
         {
-          "id": "T-US-025-002",
-          "title": "Goal Validation: End-to-End Testing: E2E Test: Multi-Project Chat Sessions (G-001)",
           "depends_on": [
             "T-US-025-001",
             "T-US-015-004",
@@ -1426,20 +1425,20 @@
             "T-US-018-004",
             "T-US-023-003"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-025-002",
+          "kind": "task",
+          "status": "completed",
+          "title": "Goal Validation: End-to-End Testing: E2E Test: Multi-Project Chat Sessions (G-001)"
         }
       ]
     },
     {
-      "phase": 70,
+      "hours": 3,
       "name": "Phase 70",
-      "hours": 3.0,
+      "phase": 70,
       "tasks": [
         {
-          "id": "T-US-025-003",
-          "title": "Goal Validation: End-to-End Testing: E2E Test: Provider-Agnostic Loop (G-002)",
           "depends_on": [
             "T-US-025-001",
             "T-US-015-004",
@@ -1449,20 +1448,20 @@
             "T-US-023-003",
             "T-US-025-002"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-025-003",
+          "kind": "task",
+          "status": "completed",
+          "title": "Goal Validation: End-to-End Testing: E2E Test: Provider-Agnostic Loop (G-002)"
         }
       ]
     },
     {
-      "phase": 71,
+      "hours": 3,
       "name": "Phase 71",
-      "hours": 3.0,
+      "phase": 71,
       "tasks": [
         {
-          "id": "T-US-025-004",
-          "title": "Goal Validation: End-to-End Testing: E2E Test: Tool-Use with Approvals (G-003)",
           "depends_on": [
             "T-US-025-001",
             "T-US-015-004",
@@ -1472,20 +1471,20 @@
             "T-US-023-003",
             "T-US-025-003"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-025-004",
+          "kind": "task",
+          "status": "completed",
+          "title": "Goal Validation: End-to-End Testing: E2E Test: Tool-Use with Approvals (G-003)"
         }
       ]
     },
     {
-      "phase": 72,
+      "hours": 3,
       "name": "Phase 72",
-      "hours": 3.0,
+      "phase": 72,
       "tasks": [
         {
-          "id": "T-US-025-005",
-          "title": "Goal Validation: End-to-End Testing: E2E Test: Auto-Context Injection (G-004)",
           "depends_on": [
             "T-US-025-001",
             "T-US-015-004",
@@ -1495,20 +1494,20 @@
             "T-US-023-003",
             "T-US-025-004"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-025-005",
+          "kind": "task",
+          "status": "completed",
+          "title": "Goal Validation: End-to-End Testing: E2E Test: Auto-Context Injection (G-004)"
         }
       ]
     },
     {
-      "phase": 73,
+      "hours": 3,
       "name": "Phase 73",
-      "hours": 3.0,
+      "phase": 73,
       "tasks": [
         {
-          "id": "T-US-025-006",
-          "title": "Goal Validation: End-to-End Testing: E2E Test: Meta Self-Fix (G-005)",
           "depends_on": [
             "T-US-025-001",
             "T-US-015-004",
@@ -1518,940 +1517,938 @@
             "T-US-023-003",
             "T-US-025-005"
           ],
-          "estimated_hours": 3.0,
-          "status": "pending",
-          "kind": "task"
+          "estimated_hours": 3,
+          "id": "T-US-025-006",
+          "kind": "task",
+          "status": "completed",
+          "title": "Goal Validation: End-to-End Testing: E2E Test: Meta Self-Fix (G-005)"
         }
       ]
     }
   ],
-  "total_hours": 320.0,
   "task_count": 88,
-  "phase_count": 73,
   "tasks": [
     {
-      "id": "T-US-001-001",
-      "title": "SQLite Sessions Database Schema: Define Database Schema Types",
       "depends_on": [],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-001-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "SQLite Sessions Database Schema: Define Database Schema Types"
     },
     {
-      "id": "T-US-001-002",
-      "title": "SQLite Sessions Database Schema: Implement SQLite Repository",
       "depends_on": [
         "T-US-001-001"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-001-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "SQLite Sessions Database Schema: Implement SQLite Repository"
     },
     {
-      "id": "T-US-001-003",
-      "title": "SQLite Sessions Database Schema: Unit Tests for Sessions Repository",
       "depends_on": [
         "T-US-001-002"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-001-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "SQLite Sessions Database Schema: Unit Tests for Sessions Repository"
     },
     {
-      "id": "T-US-002-001",
-      "title": "Provider Adapter Interface: Define Provider Adapter ABC and Response Types",
       "depends_on": [],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-002-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Provider Adapter Interface: Define Provider Adapter ABC and Response Types"
     },
     {
-      "id": "T-US-002-002",
-      "title": "Provider Adapter Interface: Implement Tool Schema Translator Base",
       "depends_on": [
         "T-US-002-001"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-002-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Provider Adapter Interface: Implement Tool Schema Translator Base"
     },
     {
-      "id": "T-US-003-001",
-      "title": "OpenAI Provider Driver: Implement OpenAI Provider Class",
       "depends_on": [
         "T-US-002-002"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-003-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "OpenAI Provider Driver: Implement OpenAI Provider Class"
     },
     {
-      "id": "T-US-003-002",
-      "title": "OpenAI Provider Driver: Implement OpenAI Tool Schema Translation",
       "depends_on": [
         "T-US-003-001",
         "T-US-002-002"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-003-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "OpenAI Provider Driver: Implement OpenAI Tool Schema Translation"
     },
     {
-      "id": "T-US-003-003",
-      "title": "OpenAI Provider Driver: Unit Tests for OpenAI Provider",
       "depends_on": [
         "T-US-003-002",
         "T-US-002-002"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-003-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "OpenAI Provider Driver: Unit Tests for OpenAI Provider"
     },
     {
-      "id": "T-US-004-001",
-      "title": "Anthropic Provider Driver: Implement Anthropic Provider Class",
       "depends_on": [
         "T-US-002-002"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-004-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Anthropic Provider Driver: Implement Anthropic Provider Class"
     },
     {
-      "id": "T-US-004-002",
-      "title": "Anthropic Provider Driver: Implement Anthropic Tool Schema Translation",
       "depends_on": [
         "T-US-004-001",
         "T-US-002-002"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-004-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Anthropic Provider Driver: Implement Anthropic Tool Schema Translation"
     },
     {
-      "id": "T-US-004-003",
-      "title": "Anthropic Provider Driver: Unit Tests for Anthropic Provider",
       "depends_on": [
         "T-US-004-002",
         "T-US-002-002"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-004-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Anthropic Provider Driver: Unit Tests for Anthropic Provider"
     },
     {
-      "id": "T-US-005-001",
-      "title": "Gemini Provider Driver: Implement Gemini Provider Class",
       "depends_on": [
         "T-US-002-002"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-005-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Gemini Provider Driver: Implement Gemini Provider Class"
     },
     {
-      "id": "T-US-005-002",
-      "title": "Gemini Provider Driver: Implement Gemini Tool Schema Translation",
       "depends_on": [
         "T-US-005-001",
         "T-US-002-002"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-005-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Gemini Provider Driver: Implement Gemini Tool Schema Translation"
     },
     {
-      "id": "T-US-005-003",
-      "title": "Gemini Provider Driver: Unit Tests for Gemini Provider",
       "depends_on": [
         "T-US-005-002",
         "T-US-002-002"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-005-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Gemini Provider Driver: Unit Tests for Gemini Provider"
     },
     {
-      "id": "T-US-006-001",
-      "title": "Provider Registry and Model Picker: Implement Provider Registry",
       "depends_on": [
         "T-US-003-003",
         "T-US-004-003",
         "T-US-005-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-006-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Provider Registry and Model Picker: Implement Provider Registry"
     },
     {
-      "id": "T-US-006-002",
-      "title": "Provider Registry and Model Picker: Create ModelInfo Schema and Pricing Data",
       "depends_on": [
         "T-US-006-001",
         "T-US-003-003",
         "T-US-004-003",
         "T-US-005-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-006-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Provider Registry and Model Picker: Create ModelInfo Schema and Pricing Data"
     },
     {
-      "id": "T-US-006-003",
-      "title": "Provider Registry and Model Picker: Unit Tests for Provider Registry",
       "depends_on": [
         "T-US-006-002",
         "T-US-003-003",
         "T-US-004-003",
         "T-US-005-003"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-006-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Provider Registry and Model Picker: Unit Tests for Provider Registry"
     },
     {
-      "id": "T-US-007-001",
-      "title": "MCP Tool: read_file: Define MCP Tool Schema for read_file",
       "depends_on": [
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-007-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: read_file: Define MCP Tool Schema for read_file"
     },
     {
-      "id": "T-US-007-002",
-      "title": "MCP Tool: read_file: Implement Path Validation Utility",
       "depends_on": [
         "T-US-007-001",
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-007-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: read_file: Implement Path Validation Utility"
     },
     {
-      "id": "T-US-007-003",
-      "title": "MCP Tool: read_file: Implement read_file Handler",
       "depends_on": [
         "T-US-007-002",
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-007-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: read_file: Implement read_file Handler"
     },
     {
-      "id": "T-US-007-004",
-      "title": "MCP Tool: read_file: Unit Tests for read_file",
       "depends_on": [
         "T-US-007-003",
         "T-US-001-003"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-007-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: read_file: Unit Tests for read_file"
     },
     {
-      "id": "T-US-008-001",
-      "title": "MCP Tool: write_file: Define MCP Tool Schema for write_file",
       "depends_on": [
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-008-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: write_file: Define MCP Tool Schema for write_file"
     },
     {
-      "id": "T-US-008-002",
-      "title": "MCP Tool: write_file: Implement Backup Manager",
       "depends_on": [
         "T-US-008-001",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-008-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: write_file: Implement Backup Manager"
     },
     {
-      "id": "T-US-008-003",
-      "title": "MCP Tool: write_file: Implement write_file Handler",
       "depends_on": [
         "T-US-008-002",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-008-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: write_file: Implement write_file Handler"
     },
     {
-      "id": "T-US-008-004",
-      "title": "MCP Tool: write_file: Unit Tests for write_file",
       "depends_on": [
         "T-US-008-003",
         "T-US-007-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-008-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: write_file: Unit Tests for write_file"
     },
     {
-      "id": "T-US-009-001",
-      "title": "MCP Tool: run_shell_command: Define MCP Tool Schema for run_shell_command",
       "depends_on": [
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-009-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: run_shell_command: Define MCP Tool Schema for run_shell_command"
     },
     {
-      "id": "T-US-009-002",
-      "title": "MCP Tool: run_shell_command: Implement Secret Redaction Utility",
       "depends_on": [
         "T-US-009-001",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-009-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: run_shell_command: Implement Secret Redaction Utility"
     },
     {
-      "id": "T-US-009-003",
-      "title": "MCP Tool: run_shell_command: Implement run_shell_command Handler",
       "depends_on": [
         "T-US-009-002",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-009-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: run_shell_command: Implement run_shell_command Handler"
     },
     {
-      "id": "T-US-009-004",
-      "title": "MCP Tool: run_shell_command: Unit Tests for run_shell_command",
       "depends_on": [
         "T-US-009-003",
         "T-US-007-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-009-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: run_shell_command: Unit Tests for run_shell_command"
     },
     {
-      "id": "T-US-010-001",
-      "title": "MCP Tool: git_apply_patch: Define MCP Tool Schema for git_apply_patch",
       "depends_on": [
         "T-US-008-004",
         "T-US-009-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-010-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: git_apply_patch: Define MCP Tool Schema for git_apply_patch"
     },
     {
-      "id": "T-US-010-002",
-      "title": "MCP Tool: git_apply_patch: Implement Patch Parser and Validator",
       "depends_on": [
         "T-US-010-001",
         "T-US-008-004",
         "T-US-009-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-010-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: git_apply_patch: Implement Patch Parser and Validator"
     },
     {
-      "id": "T-US-010-003",
-      "title": "MCP Tool: git_apply_patch: Implement git_apply_patch Handler",
       "depends_on": [
         "T-US-010-002",
         "T-US-008-004",
         "T-US-009-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-010-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: git_apply_patch: Implement git_apply_patch Handler"
     },
     {
-      "id": "T-US-010-004",
-      "title": "MCP Tool: git_apply_patch: Unit Tests for git_apply_patch",
       "depends_on": [
         "T-US-010-003",
         "T-US-008-004",
         "T-US-009-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-010-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "MCP Tool: git_apply_patch: Unit Tests for git_apply_patch"
     },
     {
-      "id": "T-US-011-001",
-      "title": "Tool Approval System: Define Approval Data Models",
       "depends_on": [
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-011-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Tool Approval System: Define Approval Data Models"
     },
     {
-      "id": "T-US-011-002",
-      "title": "Tool Approval System: Implement ApprovalManager",
       "depends_on": [
         "T-US-011-001",
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-011-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Tool Approval System: Implement ApprovalManager"
     },
     {
-      "id": "T-US-011-003",
-      "title": "Tool Approval System: Unit Tests for ApprovalManager",
       "depends_on": [
         "T-US-011-002",
         "T-US-001-003"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-011-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Tool Approval System: Unit Tests for ApprovalManager"
     },
     {
-      "id": "T-US-012-001",
-      "title": "Audit Logging System: Define Audit Entry Schema",
       "depends_on": [
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-012-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Audit Logging System: Define Audit Entry Schema"
     },
     {
-      "id": "T-US-012-002",
-      "title": "Audit Logging System: Implement AuditLogger",
       "depends_on": [
         "T-US-012-001",
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-012-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Audit Logging System: Implement AuditLogger"
     },
     {
-      "id": "T-US-012-003",
-      "title": "Audit Logging System: Implement Export Functionality",
       "depends_on": [
         "T-US-012-002",
         "T-US-001-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-012-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Audit Logging System: Implement Export Functionality"
     },
     {
-      "id": "T-US-012-004",
-      "title": "Audit Logging System: Unit Tests for Audit System",
       "depends_on": [
         "T-US-012-003",
         "T-US-001-003"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-012-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Audit Logging System: Unit Tests for Audit System"
     },
     {
-      "id": "T-US-013-001",
-      "title": "Auto-Context Builder: Define Context Schema",
       "depends_on": [
         "T-US-001-003",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-013-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Auto-Context Builder: Define Context Schema"
     },
     {
-      "id": "T-US-013-002",
-      "title": "Auto-Context Builder: Implement Context Gatherers",
       "depends_on": [
         "T-US-013-001",
         "T-US-001-003",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-013-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Auto-Context Builder: Implement Context Gatherers"
     },
     {
-      "id": "T-US-013-003",
-      "title": "Auto-Context Builder: Implement Context Builder with Token Budgeting",
       "depends_on": [
         "T-US-013-002",
         "T-US-001-003",
         "T-US-007-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-013-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Auto-Context Builder: Implement Context Builder with Token Budgeting"
     },
     {
-      "id": "T-US-013-004",
-      "title": "Auto-Context Builder: Unit Tests for Context Builder",
       "depends_on": [
         "T-US-013-003",
         "T-US-001-003",
         "T-US-007-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-013-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Auto-Context Builder: Unit Tests for Context Builder"
     },
     {
-      "id": "T-US-014-001",
-      "title": "Agent Loop with Tool Execution: Define Loop Event Types",
       "depends_on": [
         "T-US-006-003",
         "T-US-011-003",
         "T-US-013-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-014-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Agent Loop with Tool Execution: Define Loop Event Types"
     },
     {
-      "id": "T-US-014-002",
-      "title": "Agent Loop with Tool Execution: Implement Tool Executor",
       "depends_on": [
         "T-US-014-001",
         "T-US-006-003",
         "T-US-011-003",
         "T-US-013-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-014-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Agent Loop with Tool Execution: Implement Tool Executor"
     },
     {
-      "id": "T-US-014-003",
-      "title": "Agent Loop with Tool Execution: Implement Agent Loop Core",
       "depends_on": [
         "T-US-014-002",
         "T-US-006-003",
         "T-US-011-003",
         "T-US-013-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-014-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Agent Loop with Tool Execution: Implement Agent Loop Core"
     },
     {
-      "id": "T-US-014-004",
-      "title": "Agent Loop with Tool Execution: Unit Tests for Agent Loop",
       "depends_on": [
         "T-US-014-003",
         "T-US-006-003",
         "T-US-011-003",
         "T-US-013-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-014-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Agent Loop with Tool Execution: Unit Tests for Agent Loop"
     },
     {
-      "id": "T-US-015-001",
-      "title": "Chat UI with Session Management: Design UI Component Structure",
       "depends_on": [
         "T-US-001-003",
         "T-US-014-004"
       ],
-      "estimated_hours": 2.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 2,
+      "id": "T-US-015-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Chat UI with Session Management: Design UI Component Structure"
     },
     {
-      "id": "T-US-015-002",
-      "title": "Chat UI with Session Management: Implement WebSocket Client",
       "depends_on": [
         "T-US-015-001",
         "T-US-001-003",
         "T-US-014-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-015-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Chat UI with Session Management: Implement WebSocket Client"
     },
     {
-      "id": "T-US-015-003",
-      "title": "Chat UI with Session Management: Implement Chat Components",
       "depends_on": [
         "T-US-015-002",
         "T-US-001-003",
         "T-US-014-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-015-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Chat UI with Session Management: Implement Chat Components"
     },
     {
-      "id": "T-US-015-004",
-      "title": "Chat UI with Session Management: Implement Session Sidebar",
       "depends_on": [
         "T-US-015-003",
         "T-US-001-003",
         "T-US-014-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-015-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Chat UI with Session Management: Implement Session Sidebar"
     },
     {
-      "id": "T-US-016-001",
-      "title": "Model Picker UI: Create ModelPicker Component",
       "depends_on": [
         "T-US-006-003",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-016-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Model Picker UI: Create ModelPicker Component"
     },
     {
-      "id": "T-US-016-002",
-      "title": "Model Picker UI: Implement Provider Availability Check",
       "depends_on": [
         "T-US-016-001",
         "T-US-006-003",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-016-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Model Picker UI: Implement Provider Availability Check"
     },
     {
-      "id": "T-US-016-003",
-      "title": "Model Picker UI: Unit Tests for ModelPicker",
       "depends_on": [
         "T-US-016-002",
         "T-US-006-003",
         "T-US-015-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-016-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Model Picker UI: Unit Tests for ModelPicker"
     },
     {
-      "id": "T-US-017-001",
-      "title": "Patch Preview and Apply UI: Create DiffViewer Component",
       "depends_on": [
         "T-US-010-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-017-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Patch Preview and Apply UI: Create DiffViewer Component"
     },
     {
-      "id": "T-US-017-002",
-      "title": "Patch Preview and Apply UI: Implement Patch Preview Modal",
       "depends_on": [
         "T-US-017-001",
         "T-US-010-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-017-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Patch Preview and Apply UI: Implement Patch Preview Modal"
     },
     {
-      "id": "T-US-017-003",
-      "title": "Patch Preview and Apply UI: Implement Rollback UI",
       "depends_on": [
         "T-US-017-002",
         "T-US-010-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-017-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Patch Preview and Apply UI: Implement Rollback UI"
     },
     {
-      "id": "T-US-018-001",
-      "title": "Cost and Token Dashboard: Create Usage Summary Component",
       "depends_on": [
         "T-US-012-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-018-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Cost and Token Dashboard: Create Usage Summary Component"
     },
     {
-      "id": "T-US-018-002",
-      "title": "Cost and Token Dashboard: Implement Usage API Endpoints",
       "depends_on": [
         "T-US-018-001",
         "T-US-012-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-018-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Cost and Token Dashboard: Implement Usage API Endpoints"
     },
     {
-      "id": "T-US-018-003",
-      "title": "Cost and Token Dashboard: Create Usage Charts",
       "depends_on": [
         "T-US-018-002",
         "T-US-012-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-018-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Cost and Token Dashboard: Create Usage Charts"
     },
     {
-      "id": "T-US-018-004",
-      "title": "Cost and Token Dashboard: Implement Budget Alerts",
       "depends_on": [
         "T-US-018-003",
         "T-US-012-004",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-018-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Cost and Token Dashboard: Implement Budget Alerts"
     },
     {
-      "id": "T-US-019-001",
-      "title": "Session History Summarization: Design Summarization Strategy",
       "depends_on": [
         "T-US-014-004"
       ],
-      "estimated_hours": 2.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 2,
+      "id": "T-US-019-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session History Summarization: Design Summarization Strategy"
     },
     {
-      "id": "T-US-019-002",
-      "title": "Session History Summarization: Implement SessionSummarizer",
       "depends_on": [
         "T-US-019-001",
         "T-US-014-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-019-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session History Summarization: Implement SessionSummarizer"
     },
     {
-      "id": "T-US-019-003",
-      "title": "Session History Summarization: Integrate Summarization into Agent Loop",
       "depends_on": [
         "T-US-019-002",
         "T-US-014-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-019-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session History Summarization: Integrate Summarization into Agent Loop"
     },
     {
-      "id": "T-US-019-004",
-      "title": "Session History Summarization: Unit Tests for Summarization",
       "depends_on": [
         "T-US-019-003",
         "T-US-014-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-019-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session History Summarization: Unit Tests for Summarization"
     },
     {
-      "id": "T-US-020-001",
-      "title": "Session Fork Capability: Extend Session Schema for Forks",
       "depends_on": [
         "T-US-001-003",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-020-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session Fork Capability: Extend Session Schema for Forks"
     },
     {
-      "id": "T-US-020-002",
-      "title": "Session Fork Capability: Implement Fork Operation",
       "depends_on": [
         "T-US-020-001",
         "T-US-001-003",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-020-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session Fork Capability: Implement Fork Operation"
     },
     {
-      "id": "T-US-020-003",
-      "title": "Session Fork Capability: Implement Fork UI",
       "depends_on": [
         "T-US-020-002",
         "T-US-001-003",
         "T-US-015-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-020-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Session Fork Capability: Implement Fork UI"
     },
     {
-      "id": "T-US-021-001",
-      "title": "Meta Self-Fix: File Edit Capability: Implement Orchestrator Locator",
       "depends_on": [
         "T-US-008-004",
         "T-US-010-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-021-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: File Edit Capability: Implement Orchestrator Locator"
     },
     {
-      "id": "T-US-021-002",
-      "title": "Meta Self-Fix: File Edit Capability: Add Orchestrator Edit Approval Level",
       "depends_on": [
         "T-US-021-001",
         "T-US-008-004",
         "T-US-010-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-021-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: File Edit Capability: Add Orchestrator Edit Approval Level"
     },
     {
-      "id": "T-US-021-003",
-      "title": "Meta Self-Fix: File Edit Capability: Implement Python Syntax Validator",
       "depends_on": [
         "T-US-021-002",
         "T-US-008-004",
         "T-US-010-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-021-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: File Edit Capability: Implement Python Syntax Validator"
     },
     {
-      "id": "T-US-021-004",
-      "title": "Meta Self-Fix: File Edit Capability: Unit Tests for Meta Edit",
       "depends_on": [
         "T-US-021-003",
         "T-US-008-004",
         "T-US-010-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-021-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: File Edit Capability: Unit Tests for Meta Edit"
     },
     {
-      "id": "T-US-022-001",
-      "title": "Meta Self-Fix: Build Capability: Implement OrchestratorBuilder",
       "depends_on": [
         "T-US-009-004",
         "T-US-021-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-022-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: Build Capability: Implement OrchestratorBuilder"
     },
     {
-      "id": "T-US-022-002",
-      "title": "Meta Self-Fix: Build Capability: Implement Build Output Parser",
       "depends_on": [
         "T-US-022-001",
         "T-US-009-004",
         "T-US-021-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-022-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: Build Capability: Implement Build Output Parser"
     },
     {
-      "id": "T-US-022-003",
-      "title": "Meta Self-Fix: Build Capability: Unit Tests for Builder",
       "depends_on": [
         "T-US-022-002",
         "T-US-009-004",
         "T-US-021-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-022-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: Build Capability: Unit Tests for Builder"
     },
     {
-      "id": "T-US-023-001",
-      "title": "Meta Self-Fix: Restart Request: Implement RestartManager",
       "depends_on": [
         "T-US-022-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-023-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: Restart Request: Implement RestartManager"
     },
     {
-      "id": "T-US-023-002",
-      "title": "Meta Self-Fix: Restart Request: Implement Session Resume After Restart",
       "depends_on": [
         "T-US-023-001",
         "T-US-022-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-023-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: Restart Request: Implement Session Resume After Restart"
     },
     {
-      "id": "T-US-023-003",
-      "title": "Meta Self-Fix: Restart Request: Create Restart Approval UI",
       "depends_on": [
         "T-US-023-002",
         "T-US-022-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-023-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Meta Self-Fix: Restart Request: Create Restart Approval UI"
     },
     {
-      "id": "T-US-024-001",
-      "title": "Documentation: Conversational Orchestration: Write Conversational Mode Documentation",
       "depends_on": [
         "T-US-015-004",
         "T-US-014-004"
       ],
-      "estimated_hours": 1.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 1,
+      "id": "T-US-024-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Documentation: Conversational Orchestration: Write Conversational Mode Documentation"
     },
     {
-      "id": "T-US-024-002",
-      "title": "Documentation: Conversational Orchestration: Update README with Feature Overview",
       "depends_on": [
         "T-US-024-001",
         "T-US-015-004",
         "T-US-014-004"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-024-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Documentation: Conversational Orchestration: Update README with Feature Overview"
     },
     {
-      "id": "T-US-024-003",
-      "title": "Documentation: Conversational Orchestration: Generate API Documentation",
       "depends_on": [
         "T-US-024-002",
         "T-US-015-004",
         "T-US-014-004"
       ],
-      "estimated_hours": 1.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 1,
+      "id": "T-US-024-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Documentation: Conversational Orchestration: Generate API Documentation"
     },
     {
-      "id": "T-US-025-001",
-      "title": "Goal Validation: End-to-End Testing: Setup Playwright E2E Infrastructure",
       "depends_on": [
         "T-US-015-004",
         "T-US-016-003",
@@ -2459,13 +2456,13 @@
         "T-US-018-004",
         "T-US-023-003"
       ],
-      "estimated_hours": 4.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 4,
+      "id": "T-US-025-001",
+      "kind": "task",
+      "status": "completed",
+      "title": "Goal Validation: End-to-End Testing: Setup Playwright E2E Infrastructure"
     },
     {
-      "id": "T-US-025-002",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Multi-Project Chat Sessions (G-001)",
       "depends_on": [
         "T-US-025-001",
         "T-US-015-004",
@@ -2474,13 +2471,13 @@
         "T-US-018-004",
         "T-US-023-003"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-025-002",
+      "kind": "task",
+      "status": "completed",
+      "title": "Goal Validation: End-to-End Testing: E2E Test: Multi-Project Chat Sessions (G-001)"
     },
     {
-      "id": "T-US-025-003",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Provider-Agnostic Loop (G-002)",
       "depends_on": [
         "T-US-025-001",
         "T-US-015-004",
@@ -2490,13 +2487,13 @@
         "T-US-023-003",
         "T-US-025-002"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-025-003",
+      "kind": "task",
+      "status": "completed",
+      "title": "Goal Validation: End-to-End Testing: E2E Test: Provider-Agnostic Loop (G-002)"
     },
     {
-      "id": "T-US-025-004",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Tool-Use with Approvals (G-003)",
       "depends_on": [
         "T-US-025-001",
         "T-US-015-004",
@@ -2506,13 +2503,13 @@
         "T-US-023-003",
         "T-US-025-003"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-025-004",
+      "kind": "task",
+      "status": "completed",
+      "title": "Goal Validation: End-to-End Testing: E2E Test: Tool-Use with Approvals (G-003)"
     },
     {
-      "id": "T-US-025-005",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Auto-Context Injection (G-004)",
       "depends_on": [
         "T-US-025-001",
         "T-US-015-004",
@@ -2522,13 +2519,13 @@
         "T-US-023-003",
         "T-US-025-004"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-025-005",
+      "kind": "task",
+      "status": "completed",
+      "title": "Goal Validation: End-to-End Testing: E2E Test: Auto-Context Injection (G-004)"
     },
     {
-      "id": "T-US-025-006",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Meta Self-Fix (G-005)",
       "depends_on": [
         "T-US-025-001",
         "T-US-015-004",
@@ -2538,9 +2535,12 @@
         "T-US-023-003",
         "T-US-025-005"
       ],
-      "estimated_hours": 3.0,
-      "status": "pending",
-      "kind": "task"
+      "estimated_hours": 3,
+      "id": "T-US-025-006",
+      "kind": "task",
+      "status": "completed",
+      "title": "Goal Validation: End-to-End Testing: E2E Test: Meta Self-Fix (G-005)"
     }
-  ]
+  ],
+  "total_hours": 320
 }

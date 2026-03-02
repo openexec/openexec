@@ -10,8 +10,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/openexec/openexec/internal/uploader"
 )
 
 // buildMockClaude compiles the mock_claude test helper binary into dir
@@ -783,7 +781,7 @@ func TestLoop_UploadEvidence(t *testing.T) {
 		EvidenceDir:    evidenceDir,
 		FwuID:          "test-fwu-id",
 		EvidenceBucket: "test-bucket",
-		UploaderFactory: func(ctx context.Context, uCfg uploader.Config) (Uploader, error) {
+		UploaderFactory: func(ctx context.Context, uCfg UploaderConfig) (Uploader, error) {
 			if uCfg.Bucket != "test-bucket" {
 				return nil, fmt.Errorf("unexpected bucket: %s", uCfg.Bucket)
 			}

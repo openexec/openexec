@@ -10,9 +10,9 @@
 
 <p align="center">
   <a href="#what-is-openexec">Overview</a> •
+  <a href="#conversational-orchestration">Conversational Mode</a> •
   <a href="#how-to-start">Quick Start</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#the-workflow">Workflow</a> •
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -38,6 +38,134 @@ Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in
 *   **Headless Execution:** Agents run in a non-interactive daemon mode, managed by a Go-based execution engine.
 *   **Senior Architect Reviews:** Built-in multi-iteration self-review cycles ensure implementation readiness.
 *   **Autonomous Verification Gates:** The engine automatically executes local verification scripts after every task to ensure the "Definition of Done" is met.
+
+---
+
+## Conversational Orchestration
+
+OpenExec includes a **conversational mode** that transforms project management into an interactive dialogue with AI agents. Instead of batch commands, engineers chat with agents to plan, implement, and verify changes.
+
+### Core Capabilities
+
+| Capability | Description |
+| :--- | :--- |
+| **Multi-Provider Support** | Chat with Claude, OpenAI, or Gemini through a unified interface |
+| **Tool Execution with Approvals** | File operations and shell commands require explicit approval gates |
+| **Auto-Context Injection** | Every prompt includes INTENT.md, task state, git status, and recent logs |
+| **Session Persistence** | Conversations stored in SQLite for resumption, forking, and audit trails |
+| **Real-Time Cost Tracking** | Monitor token usage and estimated costs per session and overall |
+| **Quality Gate Integration** | Automatic lint/test/typecheck when agents signal completion |
+| **Signal Protocol** | Agents communicate via structured `axon_signal` events |
+
+### Three-Layer Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    User Interface                        │
+│  (Web UI / CLI / TUI)                                   │
+├─────────────────────────────────────────────────────────┤
+│                    Agent Loop                            │
+│  - Conversation turn lifecycle                          │
+│  - Context injection & summarization                    │
+│  - Token/cost tracking                                  │
+│  - Completion detection                                 │
+├─────────────────────────────────────────────────────────┤
+│                    Execution Layer                       │
+│  - Provider adapters (Claude, OpenAI, Gemini)          │
+│  - Tool executor with approval gates                    │
+│  - Session persistence (SQLite)                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Guided Intent Wizard
+
+The wizard (`openexec wizard`) provides a conversational interface for project bootstrapping:
+
+```bash
+$ openexec wizard
+
+=== OpenExec Guided Intent Interviewer ===
+
+Tell me about your project:
+> I want to build a REST API for user management
+
+[Thinking...]
+
+I understand we are building a NEW PROJECT from scratch.
+
+  ✔ Explicit:
+    - Project type: REST API
+    - Domain: User management
+
+  ⚠ Assumed:
+    - Framework: FastAPI (unconfirmed)
+
+? Which framework would you prefer? (FastAPI, Flask, Express):
+> FastAPI is fine
+
+# The wizard continues until all constraints are pinned,
+# then generates a verified INTENT.md
+```
+
+The wizard extracts **explicit facts** from your input, identifies **assumptions** that need confirmation, and generates a structured `INTENT.md` with all constraints validated.
+
+### Agent Loop Lifecycle
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ 1. Build Context                                         │
+│    - Gather project context (INTENT.md, tasks, logs)    │
+│    - Apply token budget constraints                      │
+├──────────────────────────────────────────────────────────┤
+│ 2. LLM Request                                           │
+│    - Stream response from provider                       │
+│    - Track token usage and cost                          │
+├──────────────────────────────────────────────────────────┤
+│ 3. Process Response                                      │
+│    - Execute tool calls with approval gates              │
+│    - Check for completion signals                        │
+├──────────────────────────────────────────────────────────┤
+│ 4. Check Completion                                      │
+│    - phase-complete signal → run quality gates          │
+│    - Gates pass → loop completes                        │
+│    - Gates fail → auto-fix and retry                    │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Signal Protocol
+
+Agents communicate state via the `axon_signal` tool:
+
+| Signal | Purpose |
+| :--- | :--- |
+| `phase-complete` | Task finished; triggers quality gates |
+| `blocked` | Waiting for human input; pauses loop |
+| `progress` | Incremental work done; resets thrash detection |
+| `decision-point` | Needs human decision before continuing |
+| `route` | Hand off to another specialized agent |
+
+### Quick Start
+
+```bash
+# Initialize project and configure providers
+openexec init
+
+# Start guided intent wizard
+openexec wizard
+
+# Generate execution plan from INTENT.md
+openexec plan INTENT.md
+
+# Launch autonomous execution daemon
+openexec start --daemon
+
+# Monitor via terminal UI
+openexec tui
+```
+
+**Full Documentation:** [docs/CONVERSATIONAL_ORCHESTRATION.md](docs/CONVERSATIONAL_ORCHESTRATION.md)
+
+---
 
 ## How It Works
 
