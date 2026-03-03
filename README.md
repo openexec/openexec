@@ -204,6 +204,55 @@ OpenExec enforces a strict GitFlow architecture to ensure every code change is t
 
 ---
 
+## Manual Testing & Integrated UI
+
+The unified OpenExec environment allows you to manage multiple projects and AI models through a single web interface.
+
+### 1. Start the Unified Stack
+From the `openexec` root directory, launch the integrated backend and UI:
+
+```bash
+# Start backend (Port 8080)
+./bin/axon serve --tract-store ../initial --audit-db .openexec/data/audit.db --projects-dir .. --port 8080
+
+# Start UI (Port 3001) in another terminal
+cd ui && npm run dev -- --port 3001
+```
+
+### 2. Testing Workflows
+
+#### A. Project Discovery
+- Open `http://localhost:3001`.
+- The **Project Workspace** dropdown in the left sidebar should automatically list all directories in your workspace containing an `openexec.yaml` file.
+- Switching projects will filter the session list to only show conversations for that workspace.
+
+#### B. Initializing a New Project
+- Click the **"Init"** button next to the project selector.
+- Use the **Directory Picker** to navigate your local filesystem and select a target folder.
+- Enter a project name and click **Initialize**.
+- The backend will create the `.openexec` structure and `openexec.yaml`, and the UI will automatically select the new project.
+
+#### C. Running the Guided Wizard
+- Select a project from the dropdown.
+- Click the **"Wizard"** button.
+- A chat interface will appear. Type "start" to begin the guided intent interview.
+- Follow the prompts to define your project. Once complete, click **"Generate INTENT.md"** to persist the requirements.
+
+#### D. Multi-Model Chat Sessions
+- Click the **"New"** session button in the sidebar.
+- Select your preferred **Provider** (Anthropic, OpenAI, Gemini) and **Model** (e.g., Claude 3.5 Sonnet, GPT-4o).
+- Create the session and start chatting. The orchestrator will use the specific model selected for that conversation turn.
+
+### 3. Automated Integration Tests
+Verify the full UI-Backend handshake using Playwright:
+
+```bash
+cd ui
+npm run test:e2e:list
+```
+
+---
+
 ## Architecture
 
 OpenExec is now consolidated into two primary repositories for simplified management and atomic deployment:

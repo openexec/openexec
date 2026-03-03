@@ -321,7 +321,7 @@ Sessions are persisted in SQLite (`conversations.db`) for resumption and audit.
 
 **sessions**
 - `id`: UUID primary key
-- `project_path`: Workspace path
+- `projectPath`: Workspace path
 - `provider`, `model`: LLM configuration
 - `title`, `status`: Session metadata
 - `parent_session_id`: For forking
@@ -348,9 +348,9 @@ Sessions are persisted in SQLite (`conversations.db`) for resumption and audit.
 
 **Create**: New session with provider/model selection
 ```
-POST /api/chat/sessions
+POST /api/sessions
 {
-  "project_path": "/path/to/project",
+  "projectPath": "/path/to/project",
   "provider": "claude",
   "model": "sonnet"
 }
@@ -363,9 +363,9 @@ The loop restores: iteration, tokens, cost, messages, lastSignal
 
 **Fork**: Branch session for experimentation
 ```
-POST /api/chat/sessions/:id/fork
+POST /api/sessions/:id/fork
 {
-  "new_model": "opus"  // optionally change model
+  "model": "opus"  // optionally change model
 }
 ```
 
@@ -465,6 +465,7 @@ ChatLayout (main grid)
 ├── SessionSidebar (left)
 │   ├── SessionList
 │   ├── NewSessionButton
+│   ├── ProjectSelector (with Init/Wizard actions)
 │   └── SessionFilters
 │
 ├── ChatMain (center)
