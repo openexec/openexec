@@ -41,11 +41,21 @@ type ExecutionConfig struct {
 }
 
 // Initialize initializes a new OpenExec project
-func Initialize(projectName string) (*ProjectConfig, error) {
-	// Get current working directory
-	projectDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine project directory: %w", err)
+func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
+	// Use provided directory or current working directory
+	if projectDir == "" {
+		var err error
+		projectDir, err = os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine project directory: %w", err)
+		}
+	} else {
+		// Ensure absolute path
+		var err error
+		projectDir, err = filepath.Abs(projectDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to determine project directory: %w", err)
+		}
 	}
 
 	// Validate project name
@@ -54,6 +64,11 @@ func Initialize(projectName string) (*ProjectConfig, error) {
 	}
 	if err := validateProjectName(projectName); err != nil {
 		return nil, err
+	}
+
+	// Create project directory if it doesn't exist
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
 
 	// Create .openexec directory structure
@@ -78,9 +93,23 @@ func Initialize(projectName string) (*ProjectConfig, error) {
 		BaseBranch:  "main",
 	}
 
-	// Save config to file
+	// Save config.json
 	if err := saveProjectConfig(openexecDir, config); err != nil {
 		return nil, fmt.Errorf("failed to save project configuration: %w", err)
+	}
+
+	// Also create openexec.yaml for discovery and quality gates
+	yamlContent := fmt.Sprintf(`project:
+  name: %s
+  type: fullstack-webapp
+
+quality:
+  gates:
+    - lint
+`, projectName)
+	yamlPath := filepath.Join(projectDir, "openexec.yaml")
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0644); err != nil {
+		return nil, fmt.Errorf("failed to create openexec.yaml: %w", err)
 	}
 
 	return config, nil

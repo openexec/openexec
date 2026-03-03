@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 )
 
 func TestNewPromptBuilder(t *testing.T) {

@@ -95,6 +95,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
   const handleProjectInitSubmit = useCallback(async (name: string, path: string) => {
     try {
       await chat.initProject(name, path)
+      // Explicitly refresh projects list
+      await chat.fetchProjects()
       setShowInitModal(false)
       // Switch to new project
       handleProjectSelect(path)

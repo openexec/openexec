@@ -3,7 +3,7 @@ package summarize
 import (
 	"testing"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 )
 
 func makeTextMessage(role agent.Role, text string) agent.Message {

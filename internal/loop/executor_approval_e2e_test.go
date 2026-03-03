@@ -12,7 +12,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/internal/approval"
 )
 

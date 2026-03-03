@@ -170,8 +170,25 @@ const NewSessionModal: React.FC<NewSessionModalProps> = ({
   const [selectedModel, setSelectedModel] = useState(defaultModel)
   const [title, setTitle] = useState('')
 
+  // Update selected provider if current one not available and providers list changes
+  useEffect(() => {
+    if (providers.length > 0 && !providers.find(p => p.id === selectedProvider)) {
+      setSelectedProvider(providers[0].id)
+      if (providers[0].models.length > 0) {
+        setSelectedModel(providers[0].models[0].id)
+      }
+    }
+  }, [providers, selectedProvider])
+
   const currentProvider = providers.find(p => p.id === selectedProvider)
   const availableModels = currentProvider?.models || []
+
+  // Ensure selected model is valid for current provider
+  useEffect(() => {
+    if (availableModels.length > 0 && !availableModels.find(m => m.id === selectedModel)) {
+      setSelectedModel(availableModels[0].id)
+    }
+  }, [availableModels, selectedModel])
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
@@ -248,6 +265,13 @@ const NewSessionModal: React.FC<NewSessionModalProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {providers.length === 0 && (
+            <div style={{ ...modalStyles.field, color: '#f85149', fontSize: '13px' }}>
+              ⚠️ No AI providers or models could be loaded from the backend. 
+              Please ensure your API keys are configured or check the server status.
             </div>
           )}
 

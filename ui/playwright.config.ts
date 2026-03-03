@@ -53,11 +53,19 @@ export default defineConfig({
     },
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: {
-    command: 'npm run dev -- --port 3001',
-    url: 'http://localhost:3001',
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  // Run your local dev server and backend before starting the tests
+  webServer: [
+    {
+      command: 'cd .. && ./bin/axon serve --tract-store ../initial --audit-db .openexec/data/audit.db --projects-dir .. --port 8080 --agents-dir ./agents',
+      port: 8080,
+      reuseExistingServer: true,
+      timeout: 120000,
+    },
+    {
+      command: 'npm run dev -- --port 3001',
+      url: 'http://localhost:3001',
+      reuseExistingServer: true,
+      timeout: 120000,
+    }
+  ],
 })

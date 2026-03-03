@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/db/session"
 )
 

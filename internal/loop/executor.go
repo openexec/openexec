@@ -18,7 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/internal/approval"
 	"github.com/openexec/openexec/internal/mcp"
 )

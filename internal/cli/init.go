@@ -124,7 +124,7 @@ Examples:
 		}
 
 		// Initialize the project
-		cfg, err := project.Initialize(projectName)
+		cfg, err := project.Initialize(projectName, "")
 		if err != nil {
 			return err
 		}

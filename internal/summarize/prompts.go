@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 )
 
 // defaultPromptBuilder implements PromptBuilder with carefully crafted prompts.

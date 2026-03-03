@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/db/session"
 )
 

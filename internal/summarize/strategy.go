@@ -1,7 +1,7 @@
 package summarize
 
 import (
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 )
 
 // Strategy defines the algorithm for selecting which messages to summarize.

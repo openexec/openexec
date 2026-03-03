@@ -108,16 +108,8 @@ func (s *Server) handleInitProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Change working directory temporarily to init project
-	oldWd, _ := os.Getwd()
-	if err := os.Chdir(absPath); err != nil {
-		WriteError(w, http.StatusInternalServerError, "failed to access project directory: "+err.Error())
-		return
-	}
-	defer os.Chdir(oldWd)
-
 	// Initialize the project
-	cfg, err := project.Initialize(req.Name)
+	cfg, err := project.Initialize(req.Name, absPath)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to initialize project: "+err.Error())
 		return

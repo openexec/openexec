@@ -261,11 +261,12 @@ export function useProviderAvailability(
       const modelsUrl = `${baseUrl}/models`
       let modelsData: ModelInfoResponse[] = []
       try {
-        modelsData = await apiRequest<ModelInfoResponse[]>(
+        const response = await apiRequest<ModelInfoResponse[] | null>(
           modelsUrl,
           { method: 'GET' },
           authToken
         )
+        modelsData = response || []
       } catch (modelErr) {
         // Models endpoint may not exist yet, continue with status only
         log('Models endpoint not available, using status only:', modelErr)

@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 	octx "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/mcp"
 	"github.com/openexec/openexec/internal/summarize"

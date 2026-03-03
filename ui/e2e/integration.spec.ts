@@ -80,7 +80,7 @@ test.describe('OpenExec Integration', () => {
     const projectPath = `../${projectName}`
     
     await page.getByPlaceholder(/e.g. my-new-app/i).fill(projectName)
-    await page.getByPlaceholder(/e.g. ..\/my-new-app/i).fill(projectPath)
+    await page.getByPlaceholder(/select a directory below/i).fill(projectPath)
     
     // Click Initialize
     await page.getByRole('button', { name: /initialize/i, exact: true }).click()
@@ -88,10 +88,13 @@ test.describe('OpenExec Integration', () => {
     // Wait for modal to close
     await expect(page.getByText('Initialize Project')).not.toBeVisible({ timeout: 15000 })
     
-    // Wait for the new project option to appear in the select dropdown
-    await expect(page.locator(`#project-select option[value*="${projectName}"]`)).toBeAttached({ timeout: 10000 });
+    // Small delay for filesystem sync and poll interval
+    await page.waitForTimeout(2000);
+
+    // Wait for the new project option to appear in the select dropdown by its display name (text)
+    await expect(page.locator('#project-select')).toContainText(projectName, { timeout: 10000 });
     
-    // Verify project is selected in dropdown
+    // Verify project is selected in dropdown (value is the path)
     await expect(page.locator('#project-select')).toHaveValue(new RegExp(projectName))
   })
 

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/openexec/openexec/internal/agent"
+	"github.com/openexec/openexec/pkg/agent"
 )
 
 // Common errors returned by summarization operations.
