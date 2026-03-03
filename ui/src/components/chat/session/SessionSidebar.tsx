@@ -179,7 +179,7 @@ const NewSessionModal: React.FC<NewSessionModalProps> = ({
       projectPath,
       provider: selectedProvider,
       model: selectedModel,
-      title: title.trim() || undefined,
+      title: title.trim() || '',
     })
   }, [projectPath, selectedProvider, selectedModel, title, onSubmit])
 

@@ -129,12 +129,17 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
+	title := req.Title
+	if title == "" {
+		title = fmt.Sprintf("Session %s", now.Format("2006-01-02 15:04"))
+	}
+
 	newSession := &session.Session{
 		ID:          uuid.New().String(),
 		ProjectPath: req.ProjectPath,
 		Provider:    req.Provider,
 		Model:       req.Model,
-		Title:       req.Title,
+		Title:       title,
 		Status:      session.StatusActive,
 		CreatedAt:   now,
 		UpdatedAt:   now,

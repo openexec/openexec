@@ -188,31 +188,38 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
   // Create session
   const createSession = useCallback(
     async (params: CreateSessionParams): Promise<Session> => {
+      console.log('[useSession] Creating session with params:', params)
       const url = `${baseUrl}/sessions`
-      const session = await apiRequest<Session>(
-        url,
-        {
-          method: 'POST',
-          body: JSON.stringify(params),
-        },
-        authToken
-      )
+      try {
+        const session = await apiRequest<Session>(
+          url,
+          {
+            method: 'POST',
+            body: JSON.stringify(params),
+          },
+          authToken
+        )
+        console.log('[useSession] Session created successfully:', session)
 
-      // Add to sessions list
-      const listItem: SessionListItem = {
-        id: session.id,
-        title: session.title,
-        provider: session.provider,
-        model: session.model,
-        status: session.status,
-        messageCount: 0,
-        totalCostUsd: 0,
-        createdAt: session.createdAt,
-        updatedAt: session.updatedAt,
+        // Add to sessions list
+        const listItem: SessionListItem = {
+          id: session.id,
+          title: session.title,
+          provider: session.provider,
+          model: session.model,
+          status: session.status,
+          messageCount: 0,
+          totalCostUsd: 0,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+        }
+        setSessions((prev) => [listItem, ...prev])
+
+        return session
+      } catch (err) {
+        console.error('[useSession] Failed to create session:', err)
+        throw err
       }
-      setSessions((prev) => [listItem, ...prev])
-
-      return session
     },
     [baseUrl, authToken]
   )
