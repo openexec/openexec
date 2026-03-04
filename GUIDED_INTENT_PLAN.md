@@ -15,7 +15,7 @@ A structured definition of a "ready-to-build" project. Using Pydantic (Python) f
 - **Interface Contracts:** Protocol (REST/gRPC/GraphQL), Auth strategy.
 - **Non-functionals:** SLOs (Latency, Size), Offline support, Deployment target.
 
-### B. The Interviewer Agent (`openexec-orchestration`)
+### B. The Interviewer Agent (`openexec-planner`)
 A specialized LLM agent wrapper that performs "Stateful Extraction":
 1. **Input:** `(current_intent_json, last_user_message, conversation_history)`.
 2. **Action:**

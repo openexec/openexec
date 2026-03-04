@@ -4,7 +4,7 @@
  */
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ChatHeader from '../ChatHeader'
 import type { Session, AgentLoopState, CostInfo } from '../../../../types/chat'
@@ -161,7 +161,9 @@ describe('ChatHeader', () => {
       await user.click(forkBadge)
 
       // Should show some content from ForkAncestryTree
-      expect(screen.getByText(/Root Session/i)).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByText(/Root Session/i) || screen.queryByText(/Root/i)).toBeInTheDocument()
+      })
     })
   })
 

@@ -368,7 +368,7 @@ export interface LoopEvent {
 // =============================================================================
 
 /**
- * Current state of the agent loop
+ * Current state of an active agent loop
  */
 export interface AgentLoopState {
   iteration: number
@@ -376,10 +376,12 @@ export interface AgentLoopState {
   totalCostUsd: number
   isRunning: boolean
   isPaused: boolean
-  lastSignal?: SignalInfo
+  lastSignal?: string
   iterationsSinceProgress: number
   startedAt?: string
   lastIterationAt?: string
+  lastActivity?: string
+  currentPid?: number
 }
 
 /**

@@ -43,37 +43,43 @@ const mockModels: ModelInfoResponse[] = [
     id: 'gpt-4o',
     name: 'GPT-4o',
     provider: 'openai',
-    contextWindow: 128000,
-    maxOutputTokens: 16384,
+    capabilities: {
+      maxContextTokens: 128000,
+      maxOutputTokens: 16384,
+      toolUse: true,
+      streaming: true,
+      vision: true,
+    },
     pricePerMInputTokens: 2.5,
     pricePerMOutputTokens: 10.0,
-    supportsTools: true,
-    supportsStreaming: true,
-    supportsVision: true,
   },
   {
     id: 'gpt-4o-mini',
     name: 'GPT-4o Mini',
     provider: 'openai',
-    contextWindow: 128000,
-    maxOutputTokens: 16384,
+    capabilities: {
+      maxContextTokens: 128000,
+      maxOutputTokens: 16384,
+      toolUse: true,
+      streaming: true,
+      vision: true,
+    },
     pricePerMInputTokens: 0.15,
     pricePerMOutputTokens: 0.6,
-    supportsTools: true,
-    supportsStreaming: true,
-    supportsVision: true,
   },
   {
     id: 'claude-3-5-sonnet-20241022',
     name: 'Claude 3.5 Sonnet',
     provider: 'anthropic',
-    contextWindow: 200000,
-    maxOutputTokens: 8192,
+    capabilities: {
+      maxContextTokens: 200000,
+      maxOutputTokens: 8192,
+      toolUse: true,
+      streaming: true,
+      vision: true,
+    },
     pricePerMInputTokens: 3.0,
     pricePerMOutputTokens: 15.0,
-    supportsTools: true,
-    supportsStreaming: true,
-    supportsVision: true,
   },
 ]
 
@@ -132,11 +138,11 @@ describe('useProviderAvailability', () => {
       // Should have fetched both status and models
       expect(mockFetch).toHaveBeenCalledTimes(2)
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/providers/status',
+        'http://localhost:8080/providers',
         expect.any(Object)
       )
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/providers/models',
+        'http://localhost:8080/models',
         expect.any(Object)
       )
     })
@@ -326,7 +332,7 @@ describe('useProviderAvailability', () => {
       )
 
       // Wait for initial fetch
-      await vi.runOnlyPendingTimersAsync()
+      await act(async () => { await vi.runOnlyPendingTimersAsync() })
 
       const initialCalls = mockFetch.mock.calls.length
 
@@ -336,7 +342,7 @@ describe('useProviderAvailability', () => {
       // Advance by polling interval
       await act(async () => {
         vi.advanceTimersByTime(pollingInterval)
-        await vi.runOnlyPendingTimersAsync()
+        await act(async () => { await vi.runOnlyPendingTimersAsync() })
       })
 
       // Should have made additional calls
@@ -356,12 +362,16 @@ describe('useProviderAvailability', () => {
       )
 
       // Wait for initial fetch
-      await vi.runOnlyPendingTimersAsync()
+      await act(async () => {
+        await act(async () => { await vi.runOnlyPendingTimersAsync() })
+      })
 
       const initialCalls = mockFetch.mock.calls.length
 
       // Advance time significantly
-      vi.advanceTimersByTime(120000)
+      await act(async () => {
+        vi.advanceTimersByTime(120000)
+      })
 
       // No additional calls
       expect(mockFetch.mock.calls.length).toBe(initialCalls)

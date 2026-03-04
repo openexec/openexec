@@ -357,3 +357,13 @@ func (p *Pipeline) buildMCPConfig() (string, func(), error) {
 	}
 	return path, func() { _ = os.Remove(path) }, nil
 }
+
+// GetHealth returns health information about the current phase loop.
+func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.currentLoop == nil {
+		return loop.LoopHealth{}, false
+	}
+	return p.currentLoop.GetHealth(), true
+}

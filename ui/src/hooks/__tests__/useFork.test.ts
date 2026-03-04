@@ -206,7 +206,7 @@ describe('useFork', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/sessions/session-123/fork',
+        'http://localhost:8080/sessions/session-123/fork',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
@@ -462,7 +462,7 @@ describe('useFork', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/api/sessions/session-456/forks',
+        'http://localhost:8080/sessions/session-456/forks',
         expect.objectContaining({ method: 'GET' })
       )
     })

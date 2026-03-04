@@ -173,8 +173,8 @@ func (s *Server) handleWizard(w http.ResponseWriter, r *http.Request) {
 		cmdArgs = append(cmdArgs, "--model", req.Model)
 	}
 
-	// Execute openexec-orchestration (assumed to be in PATH)
-	cmd := exec.Command("openexec-orchestration", cmdArgs...)
+	// Execute openexec-planner (assumed to be in PATH)
+	cmd := exec.Command("openexec-planner", cmdArgs...)
 	cmd.Dir = absPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {

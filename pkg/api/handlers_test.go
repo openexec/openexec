@@ -22,7 +22,7 @@ func buildMockClaude(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "mock_claude")
-	src := filepath.Join("..", "loop", "testdata", "mock_claude.go")
+	src := filepath.Join("..", "..", "internal", "loop", "testdata", "mock_claude.go")
 
 	cmd := exec.Command("go", "build", "-o", bin, src)
 	cmd.Stderr = os.Stderr
@@ -55,7 +55,7 @@ func testManager(t *testing.T, bin string) *manager.Manager {
 	order, phases := allPhasesConfig("signal-complete")
 	return manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "pipeline", "testdata"),
+		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -71,7 +71,7 @@ func testManager(t *testing.T, bin string) *manager.Manager {
 func TestHandleStartSuccess(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	req := httptest.NewRequest("POST", "/api/fwu/FWU-01/start", nil)
 	rec := httptest.NewRecorder()
@@ -96,7 +96,7 @@ func TestHandleStartDuplicate(t *testing.T) {
 	order, phases := allPhasesConfig("slow")
 	mgr := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "pipeline", "testdata"),
+		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -107,7 +107,7 @@ func TestHandleStartDuplicate(t *testing.T) {
 		CommandName:          bin,
 		BriefingFunc:         mockBriefing(),
 	})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	// Start pipeline with slow scenario to keep it running.
 	mgr.Start(context.Background(), "FWU-01")
@@ -127,7 +127,7 @@ func TestHandleStartDuplicate(t *testing.T) {
 func TestHandleStatusFound(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	mgr.Start(context.Background(), "FWU-01")
 	time.Sleep(50 * time.Millisecond)
@@ -151,7 +151,7 @@ func TestHandleStatusFound(t *testing.T) {
 
 func TestHandleStatusNotFound(t *testing.T) {
 	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	req := httptest.NewRequest("GET", "/api/fwu/nonexistent/status", nil)
 	rec := httptest.NewRecorder()
@@ -164,7 +164,7 @@ func TestHandleStatusNotFound(t *testing.T) {
 
 func TestHandleListEmpty(t *testing.T) {
 	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	req := httptest.NewRequest("GET", "/api/fwus", nil)
 	rec := httptest.NewRecorder()
@@ -184,7 +184,7 @@ func TestHandleListEmpty(t *testing.T) {
 func TestHandleListWithPipelines(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	mgr.Start(context.Background(), "FWU-01")
 	mgr.Start(context.Background(), "FWU-02")
@@ -212,7 +212,7 @@ func TestHandlePauseFound(t *testing.T) {
 	order, phases := allPhasesConfig("slow")
 	mgr := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "pipeline", "testdata"),
+		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -223,7 +223,7 @@ func TestHandlePauseFound(t *testing.T) {
 		CommandName:          bin,
 		BriefingFunc:         mockBriefing(),
 	})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	mgr.Start(context.Background(), "FWU-01")
 	time.Sleep(100 * time.Millisecond)
@@ -243,7 +243,7 @@ func TestHandlePauseFound(t *testing.T) {
 
 func TestHandlePauseNotFound(t *testing.T) {
 	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	req := httptest.NewRequest("POST", "/api/fwu/nonexistent/pause", nil)
 	rec := httptest.NewRecorder()
@@ -259,7 +259,7 @@ func TestHandleStopFound(t *testing.T) {
 	order, phases := allPhasesConfig("slow")
 	mgr := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "pipeline", "testdata"),
+		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -270,7 +270,7 @@ func TestHandleStopFound(t *testing.T) {
 		CommandName:          bin,
 		BriefingFunc:         mockBriefing(),
 	})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	mgr.Start(context.Background(), "FWU-01")
 	time.Sleep(100 * time.Millisecond)
@@ -286,7 +286,7 @@ func TestHandleStopFound(t *testing.T) {
 
 func TestHandleStopNotFound(t *testing.T) {
 	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	req := httptest.NewRequest("POST", "/api/fwu/nonexistent/stop", nil)
 	rec := httptest.NewRecorder()
@@ -300,7 +300,7 @@ func TestHandleStopNotFound(t *testing.T) {
 func TestHandleEventsSSE(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	// Use a real HTTP server for SSE (needs flusher).
 	ts := httptest.NewServer(srv.Handler())
@@ -356,7 +356,7 @@ func TestHandleEventsSSE(t *testing.T) {
 
 func TestHandleEventsNotFound(t *testing.T) {
 	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, ":0")
+	srv := New(mgr, nil, nil, "", ":0")
 
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()

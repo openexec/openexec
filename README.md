@@ -260,7 +260,7 @@ OpenExec is now consolidated into two primary repositories for simplified manage
 | Module | Repository | Role | Language |
 | :--- | :--- | :--- | :--- |
 | **OpenExec Core** | [`openexec`](../openexec) | The "Body" & "Interface" - contains CLI, Execution Engine, Interface Gateway (Telegram/WhatsApp), and MCP Signal Server. | Go |
-| **Orchestrator** | [`openexec-orchestration`](../openexec-orchestration) | The "Brain" - handles planning, dependency modeling, and the Wizard. | Python |
+| **Orchestrator** | [`openexec-planner`](../openexec-planner) | The "Brain" - handles planning, dependency modeling, and the Wizard. | Python |
 | **Dashboard** | [`openexec-dashboard`](../openexec-dashboard) | The "Observability" - browser-based UI for monitoring multi-project activity. | TypeScript/Next.js |
 
 ### Key Components (Consolidated):

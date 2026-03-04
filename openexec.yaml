@@ -1,0 +1,7 @@
+project:
+  name: openexec
+  type: fullstack-webapp
+
+quality:
+  gates:
+    - lint

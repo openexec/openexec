@@ -16,7 +16,7 @@ var planCmd = &cobra.Command{
 	Short: "Generate project plan from intent document",
 	Long: `Generate a project plan from an intent document.
 
-This command reads an intent.md file and invokes the orchestration engine
+This command reads an intent.md file and invokes the planner engine
 to generate a Goal Tree and Functional Work Units (FWUs) that define
 the execution plan for the project.
 
@@ -130,29 +130,29 @@ Examples:
 		fmt.Printf("  Tract store: %s\n", config.TractStore)
 		fmt.Printf("  Engram context: %s\n\n", config.EngramStore)
 
-		// Check if openexec-orchestration is available
-		orchestrationBinary := "openexec-orchestration"
-		if _, err := exec.LookPath(orchestrationBinary); err != nil {
-			return fmt.Errorf("orchestration engine not found: ensure openexec-orchestration is installed and in PATH\n\nInstall with:\n  cd ../openexec-orchestration && pip install -e .")
+		// Check if openexec-planner is available
+		plannerBinary := "openexec-planner"
+		if _, err := exec.LookPath(plannerBinary); err != nil {
+			return fmt.Errorf("planner engine not found: ensure openexec-planner is installed and in PATH\n\nInstall with:\n  cd ../openexec-planner && pip install -e .")
 		}
 
 		// Output path for generated stories
 		storiesPath := filepath.Join(config.TractStore, "stories.json")
 
-		// Build orchestration command arguments
-		orchestrationArgs := []string{"generate", absIntentFile, "--output", storiesPath, "--model", plannerModel}
+		// Build planner command arguments
+		plannerArgs := []string{"generate", absIntentFile, "--output", storiesPath, "--model", plannerModel}
 		if reviewEnabled && reviewerModel != "" {
-			orchestrationArgs = append(orchestrationArgs, "--reviewer", reviewerModel)
+			plannerArgs = append(plannerArgs, "--reviewer", reviewerModel)
 		}
 
-		// Invoke orchestration engine to generate stories
+		// Invoke planner engine to generate stories
 		// #nosec G204 - absIntentFile is validated to exist
-		orchestrationCmd := exec.Command(orchestrationBinary, orchestrationArgs...)
+		plannerCmd := exec.Command(plannerBinary, plannerArgs...)
 
 		// Capture output
-		output, err := orchestrationCmd.CombinedOutput()
+		output, err := plannerCmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("orchestration engine failed: %w\nOutput: %s", err, string(output))
+			return fmt.Errorf("planner engine failed: %w\nOutput: %s", err, string(output))
 		}
 
 		fmt.Printf("%s\n", string(output))

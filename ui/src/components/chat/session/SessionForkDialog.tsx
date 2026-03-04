@@ -290,23 +290,25 @@ const SessionForkDialog: React.FC<SessionForkDialogProps> = ({
               </div>
 
               {/* Ancestor Chain */}
-              {forkResult.ancestorChain.length > 0 && (
-                <div className="session-fork-dialog__field" style={styles.field}>
-                  <label style={styles.label}>Ancestor Chain</label>
-                  <div style={styles.ancestorChain}>
-                    {forkResult.ancestorChain.map((ancestorId, index) => (
+              <div className="session-fork-dialog__field" style={styles.field}>
+                <label style={styles.label}>Ancestor Chain</label>
+                <div style={styles.ancestorChain}>
+                  {forkResult.ancestorChain.length > 0 ? (
+                    forkResult.ancestorChain.map((ancestorId, index) => (
                       <span key={ancestorId} style={styles.ancestorItem}>
                         {index > 0 && <span style={styles.ancestorArrow}>→</span>}
                         <code style={styles.ancestorId}>{ancestorId.slice(0, 8)}...</code>
                       </span>
-                    ))}
-                    <span style={styles.ancestorArrow}>→</span>
-                    <code style={{ ...styles.ancestorId, color: '#58a6ff' }}>
-                      {forkResult.forkedSessionId.slice(0, 8)}... (new)
-                    </code>
-                  </div>
+                    ))
+                  ) : (
+                    <span style={styles.dimmed}>None</span>
+                  )}
+                  <span style={styles.ancestorArrow}>→</span>
+                  <code style={{ ...styles.ancestorId, color: '#58a6ff' }}>
+                    {forkResult.forkedSessionId.slice(0, 8)}... (new)
+                  </code>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

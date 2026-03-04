@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// WizardResponse matches the JSON output from openexec-orchestration wizard
+// WizardResponse matches the JSON output from openexec-planner wizard
 type WizardResponse struct {
 	UpdatedState    map[string]interface{} `json:"updated_state"`
 	NextQuestion    string                 `json:"next_question"`
@@ -46,9 +46,9 @@ and contracts before generating your INTENT.md and stories.`,
 			model = "sonnet" // default
 		}
 
-		// Check for orchestration binary
-		if _, err := exec.LookPath("openexec-orchestration"); err != nil {
-			return fmt.Errorf("openexec-orchestration not found in PATH. Please install it first")
+		// Check for planner binary
+		if _, err := exec.LookPath("openexec-planner"); err != nil {
+			return fmt.Errorf("openexec-planner not found in PATH. Please install it first")
 		}
 
 		fmt.Println(color.CyanString("=== OpenExec Guided Intent Interviewer ==="))
@@ -157,22 +157,22 @@ func callOrchestrationWizard(message string, state string, model string) (*Wizar
 		args = append(args, "--state", state)
 	}
 
-	cmd := exec.Command("openexec-orchestration", args...)
+	cmd := exec.Command("openexec-planner", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("orchestration wizard failed: %w\nOutput: %s", err, string(output))
+		return nil, fmt.Errorf("wizard failed: %v\nOutput: %s", err, string(output))
 	}
 
 	var resp WizardResponse
 	if err := json.Unmarshal(output, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse wizard response: %w\nOutput: %s", err, string(output))
+		return nil, fmt.Errorf("failed to parse wizard response: %v\nOutput: %s", err, string(output))
 	}
 
 	return &resp, nil
 }
 
 func renderIntentMD(state string, model string) (string, error) {
-	cmd := exec.Command("openexec-orchestration", "wizard", "--render", "--state", state, "--model", model)
+	cmd := exec.Command("openexec-planner", "wizard", "--render", "--state", state, "--model", model)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to render intent: %w\nOutput: %s", err, string(output))

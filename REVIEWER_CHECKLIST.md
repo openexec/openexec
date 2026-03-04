@@ -4,7 +4,7 @@ This checklist guides reviewers to ensure the OpenExec ecosystem remains robust,
 
 Applies to:
 - `openexec` (CLI/Execution)
-- `openexec-orchestration` (Planning/Scheduling)
+- `openexec-planner` (Planning/Scheduling)
 
 ---
 

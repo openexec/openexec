@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-ORCH_DIR="$ROOT_DIR/../openexec-orchestration"
+ORCH_DIR="$ROOT_DIR/../openexec-planner"
 
 echo "=== OpenExec Installation (Monorepo) ==="
 echo ""
@@ -68,7 +68,7 @@ install_orchestration() {
     cd "$ORCH_DIR"
     pip install -e . --quiet
 
-    echo "      Installed: openexec-orchestration"
+    echo "      Installed: openexec-planner"
 }
 
 # Main
