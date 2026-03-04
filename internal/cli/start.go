@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/openexec/openexec/internal/execution/server"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/spf13/cobra"
@@ -111,36 +112,23 @@ Examples:
 			startReviewer = config.Execution.ReviewerModel
 		}
 
-		// Find execution binary
-		execBin := findExecutionBinary()
-		if execBin == "" {
-			return fmt.Errorf("execution engine not found\n\nInstall with:\n  cd ../openexec-execution && go build -o bin/openexec-execution ./cmd/server\n\nOr add openexec-execution to your PATH")
-		}
-
-		fmt.Printf("🚀 Starting OpenExec Execution Engine\n")
-		fmt.Printf("   Project: %s\n", config.Name)
-		fmt.Printf("   Port: %d\n", startPort)
-		if startReviewer != "" {
-			fmt.Printf("   Reviewer: %s (enabled)\n", startReviewer)
-		} else {
-			fmt.Printf("   Reviewer: disabled\n")
-		}
-		fmt.Println()
-
-		// Prepare execution command
+		// Prepare execution arguments for the integrated server
 		dataDir := filepath.Join(config.ProjectDir, ".openexec", "data")
 		auditDB := filepath.Join(dataDir, "audit.db")
-		execArgs := []string{
+		
+		// Map our cobra flags to server flags
+		os.Args = []string{
+			"openexec-server",
 			"--port", fmt.Sprintf("%d", startPort),
 			"--data-dir", dataDir,
 			"--audit-db", auditDB,
 		}
-
-		// Start execution server
-		// #nosec G204 - execBin is from findExecutionBinary which returns known paths
-		execCmd := exec.Command(execBin, execArgs...)
-		execCmd.Dir = config.ProjectDir
-		execCmd.Env = os.Environ()
+		if startReviewer != "" {
+			os.Args = append(os.Args, "--reviewer", startReviewer)
+		}
+		if startDaemon {
+			os.Args = append(os.Args, "--daemon")
+		}
 
 		// Handle UI launch if requested
 		if startUI {
@@ -180,50 +168,13 @@ Examples:
 			}()
 		}
 
-		if startDaemon {
-			// Run as daemon - detach and return
-			execCmd.Stdout = nil
-			execCmd.Stderr = nil
-			if err := execCmd.Start(); err != nil {
-				return fmt.Errorf("failed to start execution daemon: %w", err)
-			}
-			fmt.Printf("✓ Execution daemon started (PID: %d)\n", execCmd.Process.Pid)
-			fmt.Printf("  API: http://localhost:%d\n", startPort)
-			fmt.Printf("  Health: http://localhost:%d/health\n", startPort)
-			fmt.Println()
-			fmt.Println("To process tasks:")
-			fmt.Println("  openexec run")
-			return nil
-		}
-
-		// Run in foreground with output
-		execCmd.Stdout = os.Stdout
-		execCmd.Stderr = os.Stderr
-
-		// Start the server
-		if err := execCmd.Start(); err != nil {
-			return fmt.Errorf("failed to start execution engine: %w", err)
-		}
-
-		pid := execCmd.Process.Pid
-		fmt.Printf("✓ Execution engine started (PID: %d)\n", pid)
-		fmt.Printf("  API: http://localhost:%d\n", startPort)
-		fmt.Printf("  Health: http://localhost:%d/health\n", startPort)
-		fmt.Println()
-
-		// Wait for server to be ready
-		if err := waitForServer(startPort, 10*time.Second); err != nil {
-			execCmd.Process.Kill()
-			return fmt.Errorf("execution engine failed to start: %w", err)
-		}
-
-		fmt.Println("✓ Execution engine is ready")
-		fmt.Println()
-		fmt.Println("Press Ctrl+C to stop")
-		fmt.Println()
-
-		// Wait for the process
-		return execCmd.Wait()
+		fmt.Printf("🚀 Starting Integrated OpenExec Server\n")
+		fmt.Printf("   Project: %s\n", config.Name)
+		fmt.Printf("   Port: %d\n", startPort)
+		
+		// Call the integrated server directly
+		server.StartServer()
+		return nil
 	},
 }
 
@@ -711,35 +662,6 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
-}
-
-// findExecutionBinary locates the openexec-execution binary
-func findExecutionBinary() string {
-	// Check common locations
-	locations := []string{
-		// In PATH
-		"openexec-execution",
-		// Relative to CLI
-		"./bin/openexec-execution",
-		"../openexec-execution/bin/openexec-execution",
-		// Development locations
-		filepath.Join(os.Getenv("HOME"), "go/bin/openexec-execution"),
-	}
-
-	// First try PATH
-	if path, err := exec.LookPath("openexec-execution"); err == nil {
-		return path
-	}
-
-	// Try relative paths
-	for _, loc := range locations[1:] {
-		if _, err := os.Stat(loc); err == nil {
-			abs, _ := filepath.Abs(loc)
-			return abs
-		}
-	}
-
-	return ""
 }
 
 // waitForServer waits for the server to be ready
