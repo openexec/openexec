@@ -27,6 +27,7 @@ var (
 	startExecutor   string
 	startReviewer   string
 	startDaemon     bool
+	startUI         bool
 	executionBinary string
 	runNoReview     bool
 )
@@ -39,8 +40,8 @@ type Task struct {
 	StoryID            string   `json:"story_id,omitempty"`
 	Status             string   `json:"status"`
 	DependsOn          []string `json:"depends_on,omitempty"`
-	Dependencies       []string `json:"dependencies,omitempty"` // Alias for compatibility
 	VerificationScript string   `json:"verification_script,omitempty"`
+	TechnicalStrategy  string   `json:"technical_strategy,omitempty"`
 }
 
 // TasksFile represents the tasks.json structure
@@ -140,6 +141,44 @@ Examples:
 		execCmd := exec.Command(execBin, execArgs...)
 		execCmd.Dir = config.ProjectDir
 		execCmd.Env = os.Environ()
+
+		// Handle UI launch if requested
+		if startUI {
+			go func() {
+				// Wait for server to be ready
+				_ = waitForServer(startPort, 15*time.Second)
+				uiURL := "http://localhost:3001"
+				fmt.Printf("🌐 Opening web console at %s\n", uiURL)
+
+				var openCmd string
+				var openArgs []string
+
+				// Note: Using GOOS from the runtime environment
+				switch strings.ToLower(os.Getenv("GOOS")) {
+				case "darwin":
+					openCmd = "open"
+				case "windows":
+					openCmd = "cmd"
+					openArgs = []string{"/c", "start"}
+				default: // linux
+					openCmd = "xdg-open"
+				}
+
+				if openCmd == "" && os.PathSeparator == '/' {
+					// Fallback for macOS if GOOS env is not set
+					if _, err := os.Stat("/usr/bin/open"); err == nil {
+						openCmd = "open"
+					} else {
+						openCmd = "xdg-open"
+					}
+				}
+
+				if openCmd != "" {
+					args := append(openArgs, uiURL)
+					_ = exec.Command(openCmd, args...).Start()
+				}
+			}()
+		}
 
 		if startDaemon {
 			// Run as daemon - detach and return
@@ -333,6 +372,7 @@ type TaskNode struct {
 	Task      Task
 	Status    TaskStatus
 	DependsOn map[string]bool
+	Retries   int
 }
 
 func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr *release.Manager) error {
@@ -357,11 +397,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 			Status:    status,
 			DependsOn: make(map[string]bool),
 		}
-		// Merge both fields for maximum compatibility
 		for _, dep := range t.DependsOn {
-			node.DependsOn[dep] = true
-		}
-		for _, dep := range t.Dependencies {
 			node.DependsOn[dep] = true
 		}
 		nodes[t.ID] = node
@@ -432,44 +468,65 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 
 				fmt.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
 
-				// Create execution loop
-				loopID, err := createExecutionLoop(projectDir, node.Task, mgr)
-				if err != nil {
-					fmt.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
-					mu.Lock()
-					node.Status = StatusFailed
-					mu.Unlock()
-					errors <- fmt.Errorf("task %s failed to start: %w", node.Task.ID, err)
-					continue
-				}
+				// Start execution loop
+				var lastError string
+				maxRetries := 3
+				success := false
 
-				fmt.Printf("[Worker %d]    Loop: %s\n", workerID, loopID)
-
-				// Wait for loop to complete
-				err = waitForLoop(loopID)
-				
-				if err == nil && node.Task.VerificationScript != "" {
-					fmt.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
-					
-					// Execute the verification script
-					verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
-					verifyCmd.Dir = projectDir
-					
-					output, verifyErr := verifyCmd.CombinedOutput()
-					if verifyErr != nil {
-						fmt.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
-						err = fmt.Errorf("verification script failed: %w", verifyErr)
-					} else {
-						fmt.Printf("[Worker %d] ✓ Verification passed for %s\n", workerID, node.Task.ID)
+				for node.Retries < maxRetries {
+					if node.Retries > 0 {
+						fmt.Printf("[Worker %d] 🔄 Self-healing attempt %d/%d for %s\n", workerID, node.Retries, maxRetries, node.Task.ID)
 					}
+
+					// Create execution loop (passing last error if this is a retry)
+					loopID, err := createExecutionLoopWithRetry(projectDir, node.Task, mgr, lastError)
+					if err != nil {
+						fmt.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
+						lastError = err.Error()
+						node.Retries++
+						continue
+					}
+
+					fmt.Printf("[Worker %d]    Loop: %s\n", workerID, loopID)
+
+					// Wait for loop to complete
+					err = waitForLoop(loopID)
+					
+					if err == nil && node.Task.VerificationScript != "" {
+						fmt.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
+						
+						// Execute the verification script
+						verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
+						verifyCmd.Dir = projectDir
+						
+						output, verifyErr := verifyCmd.CombinedOutput()
+						if verifyErr != nil {
+							fmt.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
+							err = fmt.Errorf("verification script failed: %s\nOutput:\n%s", verifyErr, string(output))
+						} else {
+							fmt.Printf("[Worker %d] ✓ Verification passed for %s\n", workerID, node.Task.ID)
+							success = true
+							break
+						}
+					} else if err == nil {
+						// No verification script, but loop finished naturally
+						success = true
+						break
+					}
+
+					// If we're here, either loop failed or verification failed
+					if err != nil {
+						lastError = err.Error()
+					}
+					node.Retries++
 				}
 
 				mu.Lock()
-				if err != nil {
-					fmt.Printf("[Worker %d] ⚠ Error in %s: %v\n", workerID, node.Task.ID, err)
+				if !success {
+					fmt.Printf("[Worker %d] ⚠ Task %s permanently failed after %d attempts\n", workerID, node.Task.ID, node.Retries)
 					node.Status = StatusFailed
 					mu.Unlock()
-					errors <- fmt.Errorf("task %s failed: %w", node.Task.ID, err)
+					errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
 					continue
 				}
 
@@ -504,9 +561,6 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 								newNode.Status = StatusCompleted
 							}
 							for _, dep := range nt.DependsOn {
-								newNode.DependsOn[dep] = true
-							}
-							for _, dep := range nt.Dependencies {
 								newNode.DependsOn[dep] = true
 							}
 							nodes[nt.ID] = newNode
@@ -631,18 +685,20 @@ var restartCmd = &cobra.Command{
 
 func init() {
 	// start command flags
-	startCmd.Flags().IntVarP(&startPort, "port", "P", 8080, "HTTP server port")
+	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
 	startCmd.Flags().IntVarP(&startWorkers, "workers", "w", 4, "Number of concurrent workers")
 	startCmd.Flags().IntVarP(&startTimeout, "timeout", "t", 600, "Task timeout in seconds")
 	startCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (e.g., claude-3-opus-20240229)")
 	startCmd.Flags().BoolVarP(&startDaemon, "daemon", "d", false, "Run as background daemon")
+	startCmd.Flags().BoolVar(&startUI, "ui", false, "Open web console in browser")
+	startCmd.Flags().BoolVar(&startUI, "console", false, "Open web console in browser (alias for --ui)")
 
 	// Subcommands for start
 	startCmd.AddCommand(stopCmd)
 	startCmd.AddCommand(restartCmd)
 
 	// run command flags
-	runCmd.Flags().IntVar(&startPort, "port", 8080, "Execution engine port")
+	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	runCmd.Flags().IntVar(&startTimeout, "max-iterations", 10, "Maximum iterations per task")
 	runCmd.Flags().IntVar(&startTimeout, "timeout", 600, "Task timeout in seconds")
 	runCmd.Flags().StringVar(&startExecutor, "executor", "", "Executor model for task execution (overrides config)")
@@ -650,7 +706,7 @@ func init() {
 	runCmd.Flags().BoolVar(&runNoReview, "no-review", false, "Disable code review (overrides config)")
 
 	// stop command flags
-	stopCmd.Flags().IntVar(&startPort, "port", 8080, "Execution engine port")
+	stopCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
@@ -664,6 +720,7 @@ func findExecutionBinary() string {
 		// In PATH
 		"openexec-execution",
 		// Relative to CLI
+		"./bin/openexec-execution",
 		"../openexec-execution/bin/openexec-execution",
 		// Development locations
 		filepath.Join(os.Getenv("HOME"), "go/bin/openexec-execution"),
@@ -746,6 +803,16 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 		return nil, fmt.Errorf("no tasks found: %w", err)
 	}
 
+	// Reuse GeneratedTask from release.go if possible, or define here
+	type GeneratedTask struct {
+		ID                 string   `json:"id"`
+		Title              string   `json:"title"`
+		Description        string   `json:"description"`
+		DependsOn          []string `json:"depends_on"`
+		VerificationScript string   `json:"verification_script,omitempty"`
+		TechnicalStrategy  string   `json:"technical_strategy,omitempty"`
+	}
+
 	var sf struct {
 		Stories []struct {
 			ID        string          `json:"id"`
@@ -754,15 +821,6 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 			DependsOn []string        `json:"depends_on"`
 			Tasks     []GeneratedTask `json:"tasks"`
 		} `json:"stories"`
-	}
-
-	// Reuse GeneratedTask from release.go if possible, or define here
-	type GeneratedTask struct {
-		ID                 string   `json:"id"`
-		Title              string   `json:"title"`
-		Description        string   `json:"description"`
-		DependsOn          []string `json:"depends_on"`
-		VerificationScript string   `json:"verification_script,omitempty"`
 	}
 
 	if err := json.Unmarshal(data, &sf); err != nil {
@@ -835,6 +893,7 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 					Status:             "pending",
 					DependsOn:          deps,
 					VerificationScript: genTask.VerificationScript,
+					TechnicalStrategy:  genTask.TechnicalStrategy,
 				})
 				
 				prevTaskInStory = taskID
@@ -845,10 +904,10 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 	return tasks, nil
 }
 
-// createExecutionLoop creates a new execution loop for a task
-func createExecutionLoop(projectDir string, task Task, mgr *release.Manager) (string, error) {
+// createExecutionLoopWithRetry creates a new execution loop for a task with optional retry context
+func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
 	// Build prompt for the task
-	prompt := buildTaskPrompt(task, mgr)
+	prompt := buildTaskPromptWithRetry(task, mgr, lastError)
 
 	// Ensure MCP config is present
 	mcpPath, err := ensureMCPConfig(projectDir)
@@ -897,8 +956,8 @@ func createExecutionLoop(projectDir string, task Task, mgr *release.Manager) (st
 	return loopResp.ID, nil
 }
 
-// buildTaskPrompt builds a Claude Code prompt for a task
-func buildTaskPrompt(task Task, mgr *release.Manager) string {
+// buildTaskPromptWithRetry builds a Claude Code prompt for a task, including failure context if it's a retry
+func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string) string {
 	var sb strings.Builder
 
 	// Try to get rich story context
@@ -913,6 +972,16 @@ func buildTaskPrompt(task Task, mgr *release.Manager) string {
 	
 	if task.Description != "" {
 		sb.WriteString(fmt.Sprintf("DESCRIPTION: %s\n", task.Description))
+	}
+
+	if task.TechnicalStrategy != "" {
+		sb.WriteString(fmt.Sprintf("TECHNICAL STRATEGY: %s\n", task.TechnicalStrategy))
+	}
+
+	if lastError != "" {
+		sb.WriteString("\n⚠️ SELF-HEALING CONTEXT:\n")
+		sb.WriteString("A previous attempt to complete this task failed. Use the error information below to fix the implementation.\n")
+		sb.WriteString(fmt.Sprintf("PREVIOUS ERROR/FAILURE:\n%s\n", lastError))
 	}
 
 	if story != nil {

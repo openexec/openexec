@@ -28,7 +28,7 @@ export interface AppConfig {
  * Default configuration from environment or fallback values
  */
 const defaultConfig: AppConfig = {
-  wsUrl: import.meta.env.VITE_WS_URL ?? 'ws://localhost:8080/ws',
+  wsUrl: import.meta.env.VITE_WS_URL ?? 'ws://localhost:8765/ws',
   apiUrl: '/api',
   authToken: import.meta.env.VITE_AUTH_TOKEN,
   debug: import.meta.env.DEV,

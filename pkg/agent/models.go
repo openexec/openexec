@@ -4,10 +4,97 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
 )
+
+// ... (rest of imports and types unchanged)
+
+// LoadFromConfig loads model definitions and enabled status from a JSON file.
+func (c *ModelCatalog) LoadFromConfig(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var config struct {
+		Models []*ExtendedModelInfo `json:"models"`
+	}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
+
+	for _, model := range config.Models {
+		// If it's an update to an existing model, merge it
+		if existing, ok := c.models[model.ID]; ok {
+			// Update mutable fields
+			existing.Enabled = model.Enabled
+			if model.Name != "" {
+				existing.Name = model.Name
+			}
+			if model.PricePerMInputTokens > 0 {
+				existing.PricePerMInputTokens = model.PricePerMInputTokens
+			}
+			if model.PricePerMOutputTokens > 0 {
+				existing.PricePerMOutputTokens = model.PricePerMOutputTokens
+			}
+			// Update capabilities if provided
+			if model.Capabilities.MaxContextTokens > 0 {
+				existing.Capabilities = model.Capabilities
+			}
+		} else {
+			// New model
+			c.models[model.ID] = model
+		}
+	}
+
+	return nil
+}
+
+// SaveToConfig saves the current catalog to a JSON file.
+func (c *ModelCatalog) SaveToConfig(path string) error {
+	config := struct {
+		Models []*ExtendedModelInfo `json:"models"`
+	}{
+		Models: c.GetAllModels(),
+	}
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0644)
+}
+
+// GetEnabledModels returns all enabled models.
+func (c *ModelCatalog) GetEnabledModels() []*ExtendedModelInfo {
+	var results []*ExtendedModelInfo
+	for _, model := range c.models {
+		if model.Enabled {
+			results = append(results, model)
+		}
+	}
+
+	// Sort by provider then ID
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Provider != results[j].Provider {
+			return results[i].Provider < results[j].Provider
+		}
+		return results[i].ID < results[j].ID
+	})
+
+	return results
+}
 
 // ModelFamily represents a grouping of related models.
 type ModelFamily string
@@ -266,6 +353,14 @@ func NewModelCatalog() *ModelCatalog {
 		models: make(map[string]*ExtendedModelInfo),
 	}
 	catalog.initializeDefaultModels()
+	
+	// Attempt to load user overrides/custom models
+	homeDir, _ := os.UserHomeDir()
+	configPath := filepath.Join(homeDir, ".openexec", "models.json")
+	if _, err := os.Stat(configPath); err == nil {
+		_ = catalog.LoadFromConfig(configPath)
+	}
+	
 	return catalog
 }
 
@@ -355,6 +450,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGPT4o,
 			Name:     "GPT-4o",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -383,6 +479,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGPT4oMini,
 			Name:     "GPT-4o Mini",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -412,6 +509,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGPT4Turbo,
 			Name:     "GPT-4 Turbo",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -435,6 +533,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGPT4,
 			Name:     "GPT-4",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           false,
@@ -459,6 +558,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGPT35Turbo,
 			Name:     "GPT-3.5 Turbo",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           false,
@@ -483,6 +583,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelO1,
 			Name:     "O1",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -506,6 +607,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelO1Mini,
 			Name:     "O1 Mini",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           false,
@@ -552,6 +654,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelO3Mini,
 			Name:     "O3 Mini",
 			Provider: "openai",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           false,
@@ -580,6 +683,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-opus-4-5-20251101",
 			Name:     "Claude Opus 4.5",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -614,6 +718,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-3-opus-20240229",
 			Name:     "Claude 3 Opus",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -638,6 +743,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-sonnet-4-20250514",
 			Name:     "Claude Sonnet 4",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -672,6 +778,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-3-5-sonnet-20241022",
 			Name:     "Claude 3.5 Sonnet",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -695,6 +802,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-3-sonnet-20240229",
 			Name:     "Claude 3 Sonnet",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -718,6 +826,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-3-5-haiku-20241022",
 			Name:     "Claude 3.5 Haiku",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -746,6 +855,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       "claude-3-haiku-20240307",
 			Name:     "Claude 3 Haiku",
 			Provider: "anthropic",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -774,6 +884,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini20FlashExp,
 			Name:     "Gemini 2.0 Flash Experimental",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -797,6 +908,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini20Flash,
 			Name:     "Gemini 2.0 Flash",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -825,6 +937,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini15Pro,
 			Name:     "Gemini 1.5 Pro",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -856,6 +969,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini15ProLatest,
 			Name:     "Gemini 1.5 Pro Latest",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -878,6 +992,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini15Flash,
 			Name:     "Gemini 1.5 Flash",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -905,6 +1020,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini15FlashLatest,
 			Name:     "Gemini 1.5 Flash Latest",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,
@@ -927,6 +1043,7 @@ func (c *ModelCatalog) initializeDefaultModels() {
 			ID:       ModelGemini15Flash8B,
 			Name:     "Gemini 1.5 Flash 8B",
 			Provider: "gemini",
+			Enabled:  true,
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           true,

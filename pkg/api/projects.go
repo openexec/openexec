@@ -40,7 +40,8 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("[API] Listing projects in: %s\n", s.ProjectsDir)
+	absPath, _ := filepath.Abs(s.ProjectsDir)
+	fmt.Printf("[API] Listing projects in: %s (Resolved: %s)\n", s.ProjectsDir, absPath)
 
 	if s.ProjectsDir == "" {
 		WriteJSON(w, http.StatusOK, []ProjectInfo{})
@@ -49,10 +50,11 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 
 	entries, err := os.ReadDir(s.ProjectsDir)
 	if err != nil {
-		fmt.Printf("[API] Error reading dir: %v\n", err)
+		fmt.Printf("[API] Error reading dir %s: %v\n", s.ProjectsDir, err)
 		WriteError(w, http.StatusInternalServerError, "failed to read projects directory: "+err.Error())
 		return
 	}
+	fmt.Printf("[API] Found %d entries in directory\n", len(entries))
 
 	projects := make([]ProjectInfo, 0)
 	for _, entry := range entries {
@@ -70,6 +72,21 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 				Path: projectPath,
 				Type: cfg.Project.Type,
 			})
+		} else {
+			// Fallback: Check if openexec.yaml exists manually
+			if _, err := os.Stat(filepath.Join(projectPath, "openexec.yaml")); err == nil {
+				projects = append(projects, ProjectInfo{
+					Name: entry.Name(),
+					Path: projectPath,
+					Type: "generic",
+				})
+			} else if _, err := os.Stat(filepath.Join(projectPath, ".openexec", "openexec.yaml")); err == nil {
+				projects = append(projects, ProjectInfo{
+					Name: entry.Name(),
+					Path: projectPath,
+					Type: "generic",
+				})
+			}
 		}
 	}
 

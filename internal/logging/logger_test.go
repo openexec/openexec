@@ -2,11 +2,10 @@ package logging
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
-
-	"golang.org/x/exp/slog"
 )
 
 func TestDefaultConfig(t *testing.T) {

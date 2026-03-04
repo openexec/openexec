@@ -7,7 +7,7 @@
  * @module components/chat/session/SessionSidebar
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import type { SessionListItem as SessionListItemType, SessionFilters as SessionFiltersType, CreateSessionParams, ProjectInfo } from '../../../types/chat'
 import SessionList from './SessionList'
 import SessionFilters from './SessionFilters'
@@ -93,15 +93,6 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
 
   return (
     <aside className="session-sidebar" style={styles.container}>
-      {/* Header with new session button */}
-      <div className="session-sidebar__header" style={styles.header}>
-        <h2 style={styles.title}>Sessions</h2>
-        <NewSessionButton
-          onClick={handleNewSessionClick}
-          disabled={loading}
-        />
-      </div>
-
       {/* Project Selector */}
       <ProjectSelector
         projects={projects}
@@ -111,6 +102,15 @@ const SessionSidebar: React.FC<SessionSidebarProps> = ({
         onProjectWizard={onProjectWizard || (() => {})}
         loading={projectsLoading}
       />
+
+      {/* Header with new session button */}
+      <div className="session-sidebar__header" style={styles.header}>
+        <h2 style={styles.title}>Sessions</h2>
+        <NewSessionButton
+          onClick={handleNewSessionClick}
+          disabled={loading}
+        />
+      </div>
 
       {/* Filters */}
       <div className="session-sidebar__filters" style={styles.filters}>

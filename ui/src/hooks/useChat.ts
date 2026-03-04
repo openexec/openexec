@@ -312,7 +312,7 @@ export function useChat(config: ChatConfig): UseChatReturn {
           ...prev,
           isRunning: true,
           isPaused: false,
-          startedAt: event.timestamp,
+          startedAt: event.timestamp, currentPid: event.currentPid,
         }))
         break
 
@@ -346,7 +346,7 @@ export function useChat(config: ChatConfig): UseChatReturn {
         setLoopState((prev) => ({
           ...prev,
           iteration: event.iteration ?? prev.iteration + 1,
-          lastIterationAt: event.timestamp,
+          lastIterationAt: event.timestamp, lastActivity: event.timestamp,
         }))
         break
     }

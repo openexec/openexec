@@ -28,6 +28,9 @@ type Logger interface {
 	// GetToolCallStats returns aggregated tool call statistics for the given filter.
 	GetToolCallStats(ctx context.Context, filter *QueryFilter) (*ToolCallStats, error)
 
+	// GetDB returns the underlying database handle.
+	GetDB() *sql.DB
+
 	// Close releases resources held by the logger.
 	Close() error
 }
@@ -60,6 +63,13 @@ func NewLogger(dbPath string) (*AuditLogger, error) {
 	}
 
 	return logger, nil
+}
+
+// GetDB returns the underlying database handle.
+func (l *AuditLogger) GetDB() *sql.DB {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.db
 }
 
 // initSchema creates the audit tables if they don't exist.

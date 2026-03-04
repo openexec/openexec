@@ -44,7 +44,7 @@ const DirectoryPicker: React.FC<DirectoryPickerProps> = ({ value, onChange, apiU
 
   useEffect(() => {
     fetchDirs(value || '')
-  }, [apiUrl]) // Initial fetch only
+  }, [value, fetchDirs])
 
   const handleDirClick = (path: string) => {
     onChange(path)
@@ -61,7 +61,7 @@ const DirectoryPicker: React.FC<DirectoryPickerProps> = ({ value, onChange, apiU
         {loading && <div style={styles.status}>Loading...</div>}
         {error && <div style={styles.error}>{error}</div>}
         
-        {!loading && !error && dirs.map((dir) => (
+        {!loading && !error && (dirs || []).map((dir) => (
           <div 
             key={dir.path} 
             onClick={() => handleDirClick(dir.path)}

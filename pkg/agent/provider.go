@@ -323,6 +323,9 @@ type ModelInfo struct {
 	// Deprecated indicates if the model is being phased out
 	Deprecated bool `json:"deprecated,omitempty"`
 
+	// Enabled indicates if the model is currently available for use by the user
+	Enabled bool `json:"enabled"`
+
 	// DeprecationDate is when the model will be removed
 	DeprecationDate *time.Time `json:"deprecation_date,omitempty"`
 }

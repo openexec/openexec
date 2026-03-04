@@ -106,7 +106,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
   }, [chat, handleProjectSelect])
 
   const handleProjectWizard = useCallback(() => {
-    if (selectedProjectPath) {
+    if (selectedProjectPath && selectedProjectPath.trim() !== "") {
       setShowWizard(true)
     }
   }, [selectedProjectPath])
@@ -280,7 +280,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
 
   // Build ancestor sessions for ForkAncestryTree
   const ancestorSessions = useMemo((): AncestorSession[] => {
-    if (!fork.forkInfo || fork.forkInfo.ancestorChain.length === 0) {
+    if (!fork.forkInfo || !fork.forkInfo.ancestorChain || fork.forkInfo.ancestorChain.length === 0) {
       return []
     }
 

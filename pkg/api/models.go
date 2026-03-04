@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/openexec/openexec/pkg/agent"
@@ -24,6 +23,7 @@ func (s *Server) handleListProviders(w http.ResponseWriter, r *http.Request) {
 			{Name: agent.ProviderAnthropic, Available: false, Reason: "Not initialized"},
 			{Name: agent.ProviderOpenAI, Available: false, Reason: "Not initialized"},
 			{Name: agent.ProviderGemini, Available: false, Reason: "Not initialized"},
+			{Name: "opencode", Available: false, Reason: "Not initialized"},
 		}
 	}
 	
@@ -36,18 +36,12 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[API] Fetching models. DefaultModelCatalog: %p\n", agent.DefaultModelCatalog)
+	// Use GetEnabledModels instead of GetAllModels
+	models := agent.DefaultModelCatalog.GetEnabledModels()
 	
-	// Return all known models from the catalog
-	models := agent.DefaultModelCatalog.GetAllModels()
-	log.Printf("[API] Catalog GetAllModels returned %d models\n", len(models))
-	
+	// If no models enabled, fallback to all non-deprecated just in case
 	if len(models) == 0 {
-		// Try to use a fresh catalog if the default is somehow empty
-		log.Printf("[API] Default catalog empty, creating fresh one...\n")
-		freshCatalog := agent.NewModelCatalog()
-		models = freshCatalog.GetAllModels()
-		log.Printf("[API] Fresh catalog has %d models\n", len(models))
+		models = agent.DefaultModelCatalog.GetNonDeprecatedModels()
 	}
 
 	// Convert ExtendedModelInfo to base ModelInfo for the API
@@ -56,6 +50,5 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 		infos = append(infos, m.ModelInfo)
 	}
 	
-	log.Printf("[API] Returning %d model infos\n", len(infos))
 	WriteJSON(w, http.StatusOK, infos)
 }
