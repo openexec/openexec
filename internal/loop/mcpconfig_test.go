@@ -7,7 +7,7 @@ import (
 )
 
 func TestWriteMCPConfig(t *testing.T) {
-	servers := BuildMCPServers("/usr/local/bin/axon", "")
+	servers := BuildMCPServers("/usr/local/bin/openexec", "")
 	path, err := WriteMCPConfig(servers)
 	if err != nil {
 		t.Fatalf("WriteMCPConfig: %v", err)
@@ -24,11 +24,11 @@ func TestWriteMCPConfig(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	entry, ok := cfg.MCPServers["axon-signal"]
+	entry, ok := cfg.MCPServers["openexec-signal"]
 	if !ok {
-		t.Fatal("missing 'axon-signal' server entry")
+		t.Fatal("missing 'openexec-signal' server entry")
 	}
-	if entry.Command != "/usr/local/bin/axon" {
+	if entry.Command != "/usr/local/bin/openexec" {
 		t.Errorf("command = %q", entry.Command)
 	}
 	if len(entry.Args) != 1 || entry.Args[0] != "mcp-serve" {
@@ -37,10 +37,10 @@ func TestWriteMCPConfig(t *testing.T) {
 }
 
 func TestBuildMCPServersWithTract(t *testing.T) {
-	servers := BuildMCPServers("/usr/local/bin/axon", "/data/tracts")
+	servers := BuildMCPServers("/usr/local/bin/openexec", "/data/tracts")
 
-	if _, ok := servers["axon-signal"]; !ok {
-		t.Fatal("missing 'axon-signal' entry")
+	if _, ok := servers["openexec-signal"]; !ok {
+		t.Fatal("missing 'openexec-signal' entry")
 	}
 
 	tract, ok := servers["tract"]
@@ -62,10 +62,10 @@ func TestBuildMCPServersWithTract(t *testing.T) {
 }
 
 func TestBuildMCPServersWithoutTract(t *testing.T) {
-	servers := BuildMCPServers("/usr/local/bin/axon", "")
+	servers := BuildMCPServers("/usr/local/bin/openexec", "")
 
-	if _, ok := servers["axon-signal"]; !ok {
-		t.Fatal("missing 'axon-signal' entry")
+	if _, ok := servers["openexec-signal"]; !ok {
+		t.Fatal("missing 'openexec-signal' entry")
 	}
 	if _, ok := servers["tract"]; ok {
 		t.Error("'tract' entry should not be present when tractStore is empty")
@@ -76,7 +76,7 @@ func TestBuildMCPServersWithoutTract(t *testing.T) {
 }
 
 func TestWriteMCPConfigMultipleServers(t *testing.T) {
-	servers := BuildMCPServers("/usr/local/bin/axon", "/data/tracts")
+	servers := BuildMCPServers("/usr/local/bin/openexec", "/data/tracts")
 	path, err := WriteMCPConfig(servers)
 	if err != nil {
 		t.Fatalf("WriteMCPConfig: %v", err)
@@ -93,8 +93,8 @@ func TestWriteMCPConfigMultipleServers(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	if _, ok := cfg.MCPServers["axon-signal"]; !ok {
-		t.Fatal("missing 'axon-signal' in written config")
+	if _, ok := cfg.MCPServers["openexec-signal"]; !ok {
+		t.Fatal("missing 'openexec-signal' in written config")
 	}
 	if _, ok := cfg.MCPServers["tract"]; !ok {
 		t.Fatal("missing 'tract' in written config")

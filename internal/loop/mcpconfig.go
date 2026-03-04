@@ -26,7 +26,7 @@ func WriteMCPConfig(servers map[string]MCPServerEntry) (string, error) {
 		return "", err
 	}
 
-	f, err := os.CreateTemp("", "axon-mcp-*.json")
+	f, err := os.CreateTemp("", "openexec-mcp-*.json")
 	if err != nil {
 		return "", err
 	}
@@ -46,10 +46,10 @@ func WriteMCPConfig(servers map[string]MCPServerEntry) (string, error) {
 }
 
 // BuildMCPServers constructs the standard MCP server entries.
-// Always includes axon-signal. Includes tract if tractStore is non-empty.
-func BuildMCPServers(axonBinary string, tractStore string) map[string]MCPServerEntry {
+// Always includes openexec-signal. Includes tract if tractStore is non-empty.
+func BuildMCPServers(openexecBinary string, tractStore string) map[string]MCPServerEntry {
 	servers := map[string]MCPServerEntry{
-		"axon-signal": {Command: axonBinary, Args: []string{"mcp-serve"}},
+		"openexec-signal": {Command: openexecBinary, Args: []string{"mcp-serve"}},
 	}
 	if tractStore != "" {
 		servers["tract"] = MCPServerEntry{Command: "tract", Args: []string{"serve", "--store", tractStore}}

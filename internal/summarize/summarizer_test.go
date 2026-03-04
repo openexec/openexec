@@ -229,6 +229,38 @@ func (r *mockRepository) GetUsageByProvider(ctx context.Context) ([]*session.Pro
 	return nil, nil
 }
 
+func (r *mockRepository) ForkSession(ctx context.Context, parentSessionID string, opts *session.ForkOptions) (*session.Session, error) {
+	return nil, nil
+}
+
+func (r *mockRepository) GetForkInfo(ctx context.Context, sessionID string) (*session.ForkInfo, error) {
+	return nil, nil
+}
+
+func (r *mockRepository) GetAncestorChain(ctx context.Context, sessionID string) ([]*session.Session, error) {
+	return nil, nil
+}
+
+func (r *mockRepository) GetRootSession(ctx context.Context, sessionID string) (*session.Session, error) {
+	return nil, nil
+}
+
+func (r *mockRepository) ListDescendants(ctx context.Context, sessionID string) ([]*session.Session, error) {
+	return nil, nil
+}
+
+func (r *mockRepository) IsDescendantOf(ctx context.Context, childSessionID, ancestorSessionID string) (bool, error) {
+	return false, nil
+}
+
+func (r *mockRepository) ListMessagesUpTo(ctx context.Context, sessionID, upToMessageID string) ([]*session.Message, error) {
+	return nil, nil
+}
+
+func (r *mockRepository) GetFullConversationHistory(ctx context.Context, sessionID string) ([]*session.Message, error) {
+	return nil, nil
+}
+
 func (r *mockRepository) Close() error {
 	return nil
 }

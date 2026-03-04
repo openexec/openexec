@@ -344,21 +344,14 @@ func TestOrchestratorBuilder_GetBuildTargets(t *testing.T) {
 
 	// Check that we found the cmd directories
 	foundOpenexec := false
-	foundAxon := false
 	for _, target := range targets {
 		if strings.Contains(target, "openexec") {
 			foundOpenexec = true
-		}
-		if strings.Contains(target, "axon") {
-			foundAxon = true
 		}
 	}
 
 	if !foundOpenexec {
 		t.Error("expected to find openexec in build targets")
-	}
-	if !foundAxon {
-		t.Error("expected to find axon in build targets")
 	}
 }
 

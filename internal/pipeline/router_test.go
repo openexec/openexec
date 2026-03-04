@@ -80,8 +80,8 @@ func TestHandleSignalPlanningMismatch(t *testing.T) {
 		Text:       "Plan diverged",
 	}
 	result := HandleSignal(event)
-	if result.Action != ActionNone {
-		t.Errorf("expected ActionNone, got %d", result.Action)
+	if result.Action != ActionReplan {
+		t.Errorf("expected ActionReplan, got %d", result.Action)
 	}
 }
 
@@ -92,8 +92,8 @@ func TestHandleSignalScopeDiscovery(t *testing.T) {
 		Text:       "Found extra work",
 	}
 	result := HandleSignal(event)
-	if result.Action != ActionNone {
-		t.Errorf("expected ActionNone, got %d", result.Action)
+	if result.Action != ActionReplan {
+		t.Errorf("expected ActionReplan, got %d", result.Action)
 	}
 }
 

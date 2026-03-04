@@ -158,7 +158,7 @@ func TestLoopHookHandleEvent(t *testing.T) {
 
 	// Create a cost event
 	event := &loop.LoopEvent{
-		Type:      loop.CostUpdated,
+		Type:      loop.EventUsageRecorded,
 		Kind:      loop.EventKindCost,
 		SessionID: "session-1",
 		Cost: &loop.CostInfo{
@@ -186,7 +186,7 @@ func TestLoopHookHandleEventNonCost(t *testing.T) {
 
 	// Non-cost events should be ignored
 	event := &loop.LoopEvent{
-		Type:      loop.IterationStart,
+		Type:      loop.EventIterationStart,
 		Kind:      loop.EventKindIteration,
 		SessionID: "session-1",
 	}
@@ -247,7 +247,7 @@ func TestLoopHookEventHandlerFunc(t *testing.T) {
 
 	// Use it with an event
 	event := &loop.LoopEvent{
-		Type:      loop.CostUpdated,
+		Type:      loop.EventUsageRecorded,
 		Kind:      loop.EventKindCost,
 		SessionID: "session-1",
 		Cost: &loop.CostInfo{
@@ -289,7 +289,7 @@ func TestLoopHookCreateEventCallback(t *testing.T) {
 
 	// Use it with an event
 	event := &loop.LoopEvent{
-		Type:      loop.CostUpdated,
+		Type:      loop.EventUsageRecorded,
 		Kind:      loop.EventKindCost,
 		SessionID: "session-1",
 		Cost: &loop.CostInfo{
@@ -319,7 +319,7 @@ func TestLoopHookCreateEventCallbackNilExisting(t *testing.T) {
 
 	// Should not panic
 	event := &loop.LoopEvent{
-		Type:      loop.CostUpdated,
+		Type:      loop.EventUsageRecorded,
 		Kind:      loop.EventKindCost,
 		SessionID: "session-1",
 		Cost: &loop.CostInfo{

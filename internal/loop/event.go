@@ -34,6 +34,7 @@ const (
 
 	// Specialized conflict events.
 	EventPlanningMismatch EventType = "planning_mismatch"
+	EventUsageRecorded    EventType = "usage_recorded"
 )
 
 // EventKind identifies the high-level category of an event.
@@ -46,6 +47,7 @@ const (
 	EventKindSignal    EventKind = "signal"
 	EventKindError     EventKind = "error"
 	EventKindCost      EventKind = "cost"
+	EventKindIteration EventKind = "iteration"
 )
 
 // LoopEvent is an alias for Event used in some packages.
