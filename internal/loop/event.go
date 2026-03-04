@@ -36,9 +36,31 @@ const (
 	EventPlanningMismatch EventType = "planning_mismatch"
 )
 
+// EventKind identifies the high-level category of an event.
+type EventKind string
+
+const (
+	EventKindLifecycle EventKind = "lifecycle"
+	EventKindText      EventKind = "text"
+	EventKindTool      EventKind = "tool"
+	EventKindSignal    EventKind = "signal"
+	EventKindError     EventKind = "error"
+	EventKindCost      EventKind = "cost"
+)
+
+// LoopEvent is an alias for Event used in some packages.
+type LoopEvent = Event
+
+// CostInfo holds session and total cost information
+type CostInfo struct {
+	SessionTotal float64 `json:"session_total"`
+	TotalUSD     float64 `json:"total_usd"`
+}
+
 // Event represents a single occurrence in the loop lifecycle.
 type Event struct {
 	Type         EventType              `json:"type"`
+	Kind         EventKind              `json:"kind,omitempty"`
 	Iteration    int                    `json:"iteration,omitempty"`
 	Text         string                 `json:"text,omitempty"`
 	Tool         string                 `json:"tool,omitempty"`
@@ -47,6 +69,8 @@ type Event struct {
 	ErrText      string                 `json:"error,omitempty"`
 	SignalType   string                 `json:"signal_type,omitempty"`
 	SignalTarget string                 `json:"signal_target,omitempty"`
+	Cost         *CostInfo              `json:"cost,omitempty"`
+	SessionID    string                 `json:"session_id,omitempty"`
 
 	// Pipeline context fields (V4). Omitted for standalone Loop usage.
 	Phase       string `json:"phase,omitempty"`

@@ -16,7 +16,7 @@ func buildMockClaude(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "mock_claude")
-	src := filepath.Join("..", "loop", "testdata", "mock_claude.go")
+	src := filepath.Join("..", "..", "internal", "loop", "testdata", "mock_claude.go")
 
 	cmd := exec.Command("go", "build", "-o", bin, src)
 	cmd.Stderr = os.Stderr
@@ -48,7 +48,7 @@ func managerConfig(bin string) Config {
 	order, phases := allPhasesConfig("signal-complete")
 	return Config{
 		WorkDir:              "",
-		AgentsDir:            filepath.Join("..", "pipeline", "testdata"),
+		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,

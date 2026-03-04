@@ -16,7 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/openexec/openexec/internal/execution/health"
-	"github.com/openexec/openexec/internal/execution/loop"
+	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/api"
 	"github.com/openexec/openexec/pkg/audit"

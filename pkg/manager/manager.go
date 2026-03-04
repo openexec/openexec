@@ -51,6 +51,8 @@ type PipelineInfo struct {
 	StartedAt    time.Time      `json:"started_at"`
 	Elapsed      string         `json:"elapsed"`
 	Error        string         `json:"error,omitempty"`
+	LastActivity time.Time      `json:"last_activity"`
+	CurrentPID   int            `json:"current_pid,omitempty"`
 }
 
 type entry struct {
@@ -66,6 +68,7 @@ type Manager struct {
 	cfg       Config
 	pipelines map[string]*entry
 	mu        sync.RWMutex
+	watchdog  *Watchdog
 }
 
 // New creates a Manager with the given server-level config.
@@ -85,10 +88,13 @@ func New(cfg Config) *Manager {
 	if cfg.RetryBackoff == nil {
 		cfg.RetryBackoff = []time.Duration{0, 5 * time.Second, 15 * time.Second}
 	}
-	return &Manager{
+	m := &Manager{
 		cfg:       cfg,
 		pipelines: make(map[string]*entry),
 	}
+	m.watchdog = NewWatchdog(m)
+	go m.watchdog.Run(context.Background())
+	return m
 }
 
 // isTerminal returns true if the status represents a finished pipeline.
@@ -200,14 +206,22 @@ func (m *Manager) Pause(fwuID string) error {
 // Status returns the current info snapshot for a pipeline.
 func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	e, ok := m.pipelines[fwuID]
+	m.mu.RUnlock()
+
 	if !ok {
 		return PipelineInfo{}, fmt.Errorf("pipeline %s not found", fwuID)
 	}
 
 	info := e.info
+	
+	// Get real-time health from pipeline
+	if h, ok := e.pipeline.GetHealth(); ok {
+		info.Iteration = h.Iteration
+		info.LastActivity = h.LastActivity
+		info.CurrentPID = h.CurrentPID
+	}
+
 	info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
 	return info, nil
 }
@@ -220,6 +234,14 @@ func (m *Manager) List() []PipelineInfo {
 	result := make([]PipelineInfo, 0, len(m.pipelines))
 	for _, e := range m.pipelines {
 		info := e.info
+		
+		// Get real-time health from pipeline
+		if h, ok := e.pipeline.GetHealth(); ok {
+			info.Iteration = h.Iteration
+			info.LastActivity = h.LastActivity
+			info.CurrentPID = h.CurrentPID
+		}
+
 		info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
 		result = append(result, info)
 	}

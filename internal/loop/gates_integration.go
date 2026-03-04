@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/openexec/openexec/internal/gates"
+	"github.com/openexec/openexec/internal/execution/gates"
 )
 
 // GateValidation holds the result of gate validation.

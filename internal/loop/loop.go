@@ -398,3 +398,30 @@ func getExitCode(err error) int {
 	}
 	return 1
 }
+
+// GetConfig returns a copy of the loop configuration.
+func (l *Loop) GetConfig() Config {
+	return l.cfg
+}
+
+// LoopHealth represents the health status of a loop.
+type LoopHealth struct {
+	Active       bool
+	Iteration    int
+	Status       string
+	LastUpdate   time.Time
+	LastActivity time.Time
+	CurrentPID   int
+}
+
+// GetHealth returns the current health status of the loop.
+func (l *Loop) GetHealth() LoopHealth {
+	return LoopHealth{
+		Active:       !l.stopped.Load() && !l.paused.Load(),
+		Iteration:  l.iteration,
+		Status:     "running", // Simplified
+		LastUpdate: time.Now(),
+		LastActivity: time.Now(),
+		CurrentPID: os.Getpid(),
+	}
+}
