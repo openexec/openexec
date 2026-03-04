@@ -36,6 +36,7 @@ type Server struct {
 	mu          sync.RWMutex
 	checker     *health.Checker
 	apiServer   *api.Server
+	projectsDir string
 }
 
 // LoopInstance tracks a running execution loop
@@ -203,11 +204,16 @@ func StartServer() {
 
 	log.Println("All preflight checks passed")
 
+	// Discovery directory for projects
+	projectsDir := "/Users/perttu/study/siivous/orchestrator/projects"
+	log.Printf("Project discovery root forced to: %s", projectsDir)
+
 	// Create server
 	srv := &Server{
 		auditWriter: auditWriter,
 		loops:       make(map[string]*LoopInstance),
 		checker:     checker,
+		projectsDir: projectsDir,
 	}
 
 	// Initialize OpenExec project/session API
@@ -220,10 +226,6 @@ func StartServer() {
 	// We create a dummy manager for now as the execution server has its own loop management
 	// but we need it for the API struct. In the future these should be unified.
 	dummyMgr := openexec_manager.New(openexec_manager.Config{})
-	
-	// Discovery directory for projects
-	projectsDir := "/Users/perttu/study/siivous/orchestrator/projects"
-	log.Printf("Project discovery root forced to: %s", projectsDir)
 
 	srv.apiServer = api.New(dummyMgr, sessionRepo, auditWriter, projectsDir, fmt.Sprintf(":%d", *port))
 
@@ -246,6 +248,8 @@ func StartServer() {
 	mux.HandleFunc("/api/v1/loops", srv.handleLoops)
 	mux.HandleFunc("/api/v1/loops/", srv.handleLoop)
 	mux.HandleFunc("/api/v1/audit", srv.handleAudit)
+	mux.HandleFunc("/api/v1/evidence", srv.handleTaskEvidence)
+	mux.HandleFunc("/api/v1/logs", srv.handleSessionLog)
 
 	// Integrate the new API server's routes
 	srv.apiServer.RegisterRoutes(mux)
