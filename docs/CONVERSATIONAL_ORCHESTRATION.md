@@ -33,7 +33,7 @@ The system follows three core principles:
 
 1. **Provider Agnosticism**: All LLM providers (Anthropic, OpenAI, Google) are accessed through a unified interface
 2. **Tool-First Execution**: All agent capabilities route through MCP tools with approval gates
-3. **Signal-Driven Communication**: Agents communicate state changes via the `axon_signal` protocol
+3. **Signal-Driven Communication**: Agents communicate state changes via the `openexec_signal` protocol
 
 ---
 
@@ -170,7 +170,7 @@ The loop maintains state including:
 - `TotalTokens`: Cumulative token usage
 - `TotalCostUSD`: Cumulative cost
 - `Messages`: Full conversation history
-- `LastSignal`: Most recent axon_signal
+- `LastSignal`: Most recent openexec_signal
 
 Sessions can be paused, resumed, or forked for experimentation.
 
@@ -232,7 +232,7 @@ All agent actions execute through MCP tools (`internal/loop/executor.go`) with a
 | `list_directory` | List directory contents | Low |
 | `run_shell_command` | Execute shell commands | High |
 | `git_apply_patch` | Apply git patches | High |
-| `axon_signal` | Signal orchestrator | Low |
+| `openexec_signal` | Signal orchestrator | Low |
 
 ### Approval Workflow
 
@@ -281,7 +281,7 @@ The OpenExec Signal protocol enables agents to communicate structured events to 
 
 ### Signal Usage
 
-Agents signal via the `axon_signal` tool:
+Agents signal via the `openexec_signal` tool:
 
 ```json
 {

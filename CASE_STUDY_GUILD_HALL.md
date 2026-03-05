@@ -56,7 +56,7 @@ Guild-Hall needed a reproducible environment that:
 The "Executor" agent (Sonnet) began implementation in a headless loop:
 - **Autonomous Action:** The agent created the `Dockerfile`, `docker-compose.yml`, and `scripts/docker-test.sh` without human intervention.
 - **Self-Correction:** When the agent hit terminal-related errors or noisy output issues, the orchestrator (OpenExec) provided the framework to diagnose and patch the system itself.
-- **Signal-Based Completion:** The agent used the `axon_signal` tool to notify the engine when a "Functional Work Unit" was ready for verification.
+- **Signal-Based Completion:** The agent used the `openexec_signal` tool to notify the engine when a "Functional Work Unit" was ready for verification.
 
 ---
 
