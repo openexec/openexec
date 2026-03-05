@@ -20,7 +20,7 @@ func NewEngine(store *knowledge.Store) *Engine {
 // ValidateAction checks if a tool execution is allowed by policy.
 func (e *Engine) ValidateAction(ctx context.Context, toolName string, action string) (bool, string) {
 	policyKey := fmt.Sprintf("tool_%s", toolName)
-	record, err := e.store.GetRecord(knowledge.TypePolicy, policyKey)
+	record, err := e.store.GetPolicy(policyKey)
 	if err != nil {
 		return false, fmt.Sprintf("failed to fetch policy: %v", err)
 	}
@@ -31,7 +31,6 @@ func (e *Engine) ValidateAction(ctx context.Context, toolName string, action str
 	}
 
 	// Simple keyword matching for this scaffold.
-	// In production, this would use a 1-bit LLM or a rego-like engine.
 	if strings.Contains(record.Value, "deny") && strings.Contains(action, "force") {
 		return false, "Policy violation: 'force' operations are denied for this tool."
 	}
@@ -42,7 +41,7 @@ func (e *Engine) ValidateAction(ctx context.Context, toolName string, action str
 // ValidateCodeChange checks proposed code edits against safety policies.
 func (e *Engine) ValidateCodeChange(ctx context.Context, filePath string, content string) (bool, string) {
 	// Fetch global safety policy
-	record, _ := e.store.GetRecord(knowledge.TypePolicy, "safety_code")
+	record, _ := e.store.GetPolicy("safety_code")
 	if record != nil {
 		if strings.Contains(record.Value, "no_secrets") {
 			// Basic secret detection

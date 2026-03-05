@@ -48,6 +48,13 @@ type APIDocRecord struct {
 	Description    string `json:"description"`
 }
 
+// PolicyRecord represents a deterministic rule
+type PolicyRecord struct {
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Description string `json:"description"`
+}
+
 type Store struct {
 	db *sql.DB
 }
@@ -105,6 +112,13 @@ func (s *Store) migrate() error {
 			description TEXT,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (path, method)
+		);`,
+		// Policies Table
+		`CREATE TABLE IF NOT EXISTS policies (
+			key TEXT PRIMARY KEY,
+			value TEXT,
+			description TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);`,
 	}
 
@@ -209,6 +223,39 @@ func (s *Store) ListAPIDocs() ([]*APIDocRecord, error) {
 	for rows.Next() {
 		r := &APIDocRecord{}
 		if err := rows.Scan(&r.Path, &r.Method, &r.Description); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// --- Policy Methods ---
+
+func (s *Store) SetPolicy(r *PolicyRecord) error {
+	query := `INSERT OR REPLACE INTO policies (key, value, description) VALUES (?, ?, ?)`
+	_, err := s.db.Exec(query, r.Key, r.Value, r.Description)
+	return err
+}
+
+func (s *Store) GetPolicy(key string) (*PolicyRecord, error) {
+	r := &PolicyRecord{}
+	query := `SELECT key, value, description FROM policies WHERE key = ?`
+	err := s.db.QueryRow(query, key).Scan(&r.Key, &r.Value, &r.Description)
+	if err == sql.ErrNoRows { return nil, nil }
+	return r, err
+}
+
+func (s *Store) ListPolicies() ([]*PolicyRecord, error) {
+	query := `SELECT key, value, description FROM policies ORDER BY key`
+	rows, err := s.db.Query(query)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	var results []*PolicyRecord
+	for rows.Next() {
+		r := &PolicyRecord{}
+		if err := rows.Scan(&r.Key, &r.Value, &r.Description); err != nil {
 			return nil, err
 		}
 		results = append(results, r)

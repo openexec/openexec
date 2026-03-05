@@ -26,8 +26,7 @@ func TestPolicyEngine(t *testing.T) {
 
 	t.Run("ValidateAction - Deny Force", func(t *testing.T) {
 		// Arrange
-		store.SetRecord(&knowledge.Record{
-			Type:  knowledge.TypePolicy,
+		store.SetPolicy(&knowledge.PolicyRecord{
 			Key:   "tool_deploy",
 			Value: "deny_force",
 		})
@@ -46,8 +45,7 @@ func TestPolicyEngine(t *testing.T) {
 
 	t.Run("ValidateCodeChange - Deny Secrets", func(t *testing.T) {
 		// Arrange
-		store.SetRecord(&knowledge.Record{
-			Type:  knowledge.TypePolicy,
+		store.SetPolicy(&knowledge.PolicyRecord{
 			Key:   "safety_code",
 			Value: "no_secrets",
 		})
