@@ -60,10 +60,11 @@ OpenExec introduces a **Deterministic Control Plane** that transforms AI agents 
 As part of our commitment to simplicity and maintainability, OpenExec is evolving into a **Single-Binary AI Operating System**. 
 
 ### Streamlining Progress
-- ✅ **Native Go Planner:** The high-fidelity story generation engine has been ported from Python to Go.
-- ✅ **Native Go Wizard:** The interactive project interview process is now native Go logic.
-- ✅ **Unified Knowledge Base:** SQLite-backed relational memory replaces fragmented JSON files and external VectorDBs.
-- 🛠️ **In-Flight:** Embedding the React UI and BitNet inference engine directly into the Go binary.
+- ✅ **Native Go Planner:** High-fidelity story generation engine ported from Python.
+- ✅ **Native Go Wizard:** Interactive project interview process is now native Go.
+- ✅ **Embedded UI:** React dashboard baked directly into the Go binary.
+- ✅ **Local Inference Manager:** Self-contained management of 1-bit LLMs (BitNet).
+- 🛠️ **In-Flight:** Migrating the Elixir orchestration layer to Go for a unified "One Binary" experience.
 
 The goal is a system where a single `curl | sh` install provides the full deterministic orchestration suite with zero external requirements.
 

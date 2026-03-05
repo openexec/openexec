@@ -1,31 +1,35 @@
-# OpenExec Engineering Standards (AGENTS.md)
+# Repository Guidelines
 
-This document provides foundational mandates for AI agents working on OpenExec. These take precedence over general defaults.
+## Project Structure & Module Organization
+- `cmd/` CLI entrypoints (Go), main binary built from `./cmd/openexec`.
+- `internal/`, `pkg/` core engine packages; `bin/` houses built tools (e.g., `axon`).
+- `ui/` Vite + React (TypeScript). Unit tests live beside code under `ui/src/**/__tests__`. Playwright e2e in `ui/e2e/`.
+- `docs/`, `scripts/`, `.openexec/` (local data; audit DB at `.openexec/data/audit.db`).
 
-## Senior Engineering Mandate: "Observe, then Resolve"
+## Build, Test, and Development Commands
+- Go build: `go build -o bin/openexec ./cmd/openexec`
+- Go tests: `go test ./...` (backend unit tests)
+- Backend run (dev): `./bin/axon serve --audit-db .openexec/data/audit.db --projects-dir .. --port 8080`
+- UI setup: `cd ui && npm install`
+- UI dev server: `cd ui && npm run dev` (defaults to port 3001)
+- UI tests: `cd ui && npm test` | coverage: `npm run test:coverage`
+- E2E: `cd ui && npm run test:e2e:list`
 
-To prevent thrashing and stalling during task execution, agents MUST adhere to these practices:
+## Coding Style & Naming Conventions
+- Go: idiomatic Go, `gofmt` enforced; package names lowercase; tests `*_test.go`.
+- TypeScript/React: 2-space indent; components `PascalCase.tsx`, hooks `useX.ts`; tests `*.test.ts(x)` colocated under `__tests__/`.
+- Linting: Go via `golangci-lint run` (if installed). UI via `npm run lint` and `npm run type-check`.
 
-### 1. Async & UI Testing (React/Vitest)
-- **Prefer `findBy*`**: Always use `screen.findByText()` or `screen.findByRole()` for elements that appear after an async action (like a button click).
-- **`userEvent` over `fireEvent`**: Use `@testing-library/user-event` for all interactions to ensure proper event bubbling and `act()` wrapping.
-- **Acknowledge State Transitions**: If a component has multiple states (e.g., `idle` -> `loading` -> `success`), ensure the test explicitly waits for the transition using `waitFor()`.
-- **Avoid `setTimeout`**: Never use manual delays in tests. Use Vitest's `vi.useFakeTimers()` or robust `waitFor` polling.
+## Testing Guidelines
+- Frameworks: Go `testing` for backend; Vitest + Testing Library for UI; Playwright for e2e.
+- UI tests: prefer `screen.findBy*` for async elements, use `@testing-library/user-event`, and wait for state transitions with `waitFor()`; avoid manual `setTimeout`.
+- Coverage: use `npm run test:coverage` for UI; ensure critical flows in `ui/src/components/chat/**` and `ui/src/hooks/**` are covered.
 
-### 2. Error Diagnostics & Hypothesis
-- **Verbosity First**: If a test fails once, do not immediately attempt a "fix." Instead, run the test again with `--verbose` or add `screen.debug()` to see the DOM state.
-- **Hypothesis Requirement**: Before modifying any code to fix a bug/test, the agent loop should state a clear hypothesis for the failure (e.g., "Hypothesis: The click is unmounting the component before the state update completes").
-- **No Progress = Revert**: If a change does not fix the reported error after one attempt, **REVERT** the file before trying a different strategy. Do not stack unverified changes.
+## Commit & Pull Request Guidelines
+- Commits: imperative, concise subject; scope prefix when helpful (e.g., `ui:`, `engine:`). Reference issues (`#123`) when applicable.
+- PRs: include summary, linked issues, test evidence (unit/e2e output), and screenshots for UI changes. Note any config or migration steps.
 
-### 3. Environment & Preflights
-- **Verify Backend**: For UI tasks that interact with APIs, always verify the API schema (e.g., checking `internal/api/` or `types/`) before implementing the UI.
-- **Mock Integrity**: Ensure mocks exactly match the current API response format (check `snake_case` vs `camelCase`).
-
-### 4. Learning Loop (Engram)
-- When a complex bug is solved (like the Popover/Vitest timing issue), the agent should summarize the "Lesson Learned" and persist it to `.openexec/engram/learning_log.json`.
-
----
-
-## Known Project Quirks
-- **Vitest & JSDOM**: Be aware that JSDOM does not perfectly simulate all layout-related events (like `onMouseEnter`). If tests fail on interactions, check if the component depends on layout properties.
-- **Audit Database**: The real source of truth for task progress is `openexec/.openexec/data/audit.db`.
+## Agent-Specific Instructions
+- Verify API shapes before UI work (`internal/**`), keep mocks in sync (snake_case vs camelCase).
+- If a test fails: increase verbosity, form a hypothesis, try once; if not fixed, revert and attempt a different approach.
+- Capture notable lessons to `.openexec/engram/learning_log.json`.

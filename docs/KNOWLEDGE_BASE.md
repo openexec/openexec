@@ -79,9 +79,13 @@ The **Knowledge Hub** is the visual dashboard for your project's deterministic b
 
 ## The BitNet Intent Router
 
-The DCP includes a **Local 1-bit LLM (BitNet b1.58 2B)** wrapper. When you interact with OpenExec via the UI or CLI chat:
-1.  Your query is parsed **locally** by BitNet.
-2.  BitNet selects the correct **Surgical Tool** (e.g., `read_symbol`).
+The DCP includes a **Local 1-bit LLM (BitNet b1.58 2B)** wrapper managed by the **Local Inference Manager**.
+
+### Self-Contained Inference
+The system no longer requires manual installation of external AI tools. The Inference Manager:
+1.  **Auto-Locates Engine:** Searches for `bitnet-cli` in local `./bin` folders and user paths.
+2.  **Environment Awareness:** Verifies model availability before attempting surgical tool selection.
+3.  **Local Latency:** Your query is parsed **locally**, selecting the correct **Surgical Tool** (e.g., `read_symbol`) in milliseconds.
 3.  The tool fetches the **Deterministic Record** from SQLite.
 4.  The expensive primary LLM (Claude/GPT) receives only the **exact context** it needs.
 

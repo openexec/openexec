@@ -137,6 +137,17 @@ func (s *Store) migrate() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (section, key)
 		);`,
+		// Durable Task Queue
+		`CREATE TABLE IF NOT EXISTS task_queue (
+			id TEXT PRIMARY KEY,
+			type TEXT,
+			status TEXT,      -- pending, running, completed, failed
+			payload TEXT,     -- JSON input for the agent
+			error_log TEXT,
+			retries INTEGER DEFAULT 0,
+			last_ping DATETIME,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);`,
 	}
 
 	for _, q := range queries {
@@ -311,6 +322,32 @@ func (s *Store) ListPRDRecords(section string) ([]*PRDRecord, error) {
 		results = append(results, r)
 	}
 	return results, nil
+}
+
+// --- Queue Methods ---
+
+func (s *Store) EnqueueTask(id, tType, payload string) error {
+	query := `INSERT INTO task_queue (id, type, status, payload, last_ping) VALUES (?, ?, 'pending', ?, CURRENT_TIMESTAMP)`
+	_, err := s.db.Exec(query, id, tType, payload)
+	return err
+}
+
+func (s *Store) ClaimTask(workerID string) (id, tType, payload string, err error) {
+	query := `UPDATE task_queue SET status = 'running', last_ping = CURRENT_TIMESTAMP WHERE id = (
+		SELECT id FROM task_queue WHERE status = 'pending' LIMIT 1
+	) RETURNING id, type, payload`
+	
+	err = s.db.QueryRow(query).Scan(&id, &tType, &payload)
+	if err == sql.ErrNoRows {
+		return "", "", "", nil
+	}
+	return
+}
+
+func (s *Store) UpdateTaskStatus(id, status, errorLog string) error {
+	query := `UPDATE task_queue SET status = ?, error_log = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := s.db.Exec(query, status, errorLog, id)
+	return err
 }
 
 func (s *Store) Close() error {
