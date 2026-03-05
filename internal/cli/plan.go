@@ -1,14 +1,17 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/openexec/openexec/internal/intent"
 	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -31,12 +34,14 @@ Validation flags:
   --validate-only  Validate and exit without planning (exit 1 on critical failures)
   --no-validate    Skip validation entirely
   --fix            With --validate-only, show stubs for missing sections
+  --native         Use internal Go planner instead of external python engine
 
 Examples:
   openexec plan INTENT.md                        # Validate then plan
   openexec plan INTENT.md --validate-only        # Validate only
   openexec plan INTENT.md --validate-only --fix  # Show missing section stubs
-  openexec plan INTENT.md --no-validate          # Skip validation`,
+  openexec plan INTENT.md --no-validate          # Skip validation
+  openexec plan INTENT.md --native               # Use native Go planner`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		intentFile := args[0]
@@ -50,6 +55,7 @@ Examples:
 		validateOnly, _ := cmd.Flags().GetBool("validate-only")
 		noValidate, _ := cmd.Flags().GetBool("no-validate")
 		fixMode, _ := cmd.Flags().GetBool("fix")
+		useNative, _ := cmd.Flags().GetBool("native")
 
 		// Run validation unless explicitly skipped
 		if !noValidate {
@@ -134,8 +140,11 @@ Examples:
 
 		// Check if openexec-planner is available
 		plannerBinary := "openexec-planner"
-		if _, err := exec.LookPath(plannerBinary); err != nil {
-			return fmt.Errorf("planner engine not found: ensure openexec-planner is installed and in PATH\n\nInstall with:\n  cd ../openexec-planner && pip install -e .")
+		if !useNative {
+			if _, err := exec.LookPath(plannerBinary); err != nil {
+				cmd.Println("  ! Python planner not found. Falling back to --native Go planner.")
+				useNative = true
+			}
 		}
 
 		// Output path for generated stories
@@ -143,20 +152,25 @@ Examples:
 
 		// EXPORT PRD CONTEXT from DCP Knowledge Store if available
 		var prdContextPath string
+		var prdContext map[string][]*knowledge.PRDRecord
+
 		kStore, err := knowledge.NewStore(".")
 		if err == nil {
 			defer kStore.Close()
 			// Fetch all sections
 			sections := []string{"personas", "user_journeys", "functional", "non_functional"}
 			prdData := make(map[string]interface{})
+			prdContext = make(map[string][]*knowledge.PRDRecord)
+
 			for _, sec := range sections {
 				records, _ := kStore.ListPRDRecords(sec)
 				if len(records) > 0 {
 					prdData[sec] = records
+					prdContext[sec] = records
 				}
 			}
 
-			if len(prdData) > 0 {
+			if len(prdData) > 0 && !useNative {
 				cmd.Printf("  + Exporting %d PRD sections from Knowledge Base...\n", len(prdData))
 				tmpFile, _ := os.CreateTemp("", "prd_context_*.json")
 				data, _ := json.Marshal(prdData)
@@ -165,6 +179,37 @@ Examples:
 				tmpFile.Close()
 				defer os.Remove(prdContextPath)
 			}
+		}
+
+		if useNative {
+			cmd.Println("🧠 Using Native Go Planner Engine...")
+
+			// 1. Initialize Native Go Planner
+			p := planner.New(&cliLLMProvider{
+				model: plannerModel,
+				cmd:   cmd,
+			})
+
+			// 2. Read intent content
+			intentContent, err := os.ReadFile(intentFile)
+			if err != nil {
+				return err
+			}
+
+			// 3. Generate Plan
+			plan, err := p.GeneratePlan(cmd.Context(), string(intentContent), prdContext)
+			if err != nil {
+				return err
+			}
+
+			// 4. Save to stories.json
+			data, _ := json.MarshalIndent(plan, "", "  ")
+			if err := os.WriteFile(storiesPath, data, 0644); err != nil {
+				return fmt.Errorf("failed to save stories: %w", err)
+			}
+
+			cmd.Printf("✓ Stories generated: %s (%d stories)\n", storiesPath, len(plan.Stories))
+			return nil
 		}
 
 		// Build planner command arguments
@@ -200,4 +245,42 @@ func init() {
 	planCmd.Flags().Bool("validate-only", false, "Validate INTENT.md and exit (no planning)")
 	planCmd.Flags().Bool("no-validate", false, "Skip INTENT.md validation")
 	planCmd.Flags().Bool("fix", false, "With --validate-only, show missing section stubs")
+	planCmd.Flags().Bool("native", false, "Use internal Go planner")
+}
+
+type cliLLMProvider struct {
+	model string
+	cmd   *cobra.Command
+}
+
+func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, error) {
+	// For now, we simulate success for the port.
+	// In a real scenario, this would call 'claude' or 'gemini' CLI.
+	// We'll use the 'claude --print' pattern here since it's most common.
+	
+	cliCmd := "claude"
+	if strings.Contains(p.model, "gemini") {
+		cliCmd = "gemini"
+	} else if strings.Contains(p.model, "gpt") {
+		cliCmd = "codex"
+	}
+
+	var cmdArgs []string
+	if cliCmd == "claude" {
+		cmdArgs = []string{"--print"}
+	} else if cliCmd == "gemini" {
+		cmdArgs = []string{"--prompt", "-", "--yolo"}
+	} else {
+		cmdArgs = []string{"exec", "--json", "--full-auto", "-"}
+	}
+
+	c := exec.CommandContext(ctx, cliCmd, cmdArgs...)
+	c.Stdin = strings.NewReader(prompt)
+	
+	output, err := c.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("native LLM provider failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return string(output), nil
 }
