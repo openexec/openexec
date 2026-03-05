@@ -123,3 +123,42 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 
 	return nil, fmt.Errorf("failed to parse LLM response as JSON: no stories found\nResponse was: %s", response)
 }
+
+// ProcessWizardMessage handles one turn of the interactive interview
+func (p *Planner) ProcessWizardMessage(ctx context.Context, message string, currentState string) (*WizardResponse, error) {
+	prompt := fmt.Sprintf("%s\n\nCurrent Intent State:\n%s\n\nUser Message: %s", WizardSystemPrompt, currentState, message)
+	
+	response, err := p.provider.Complete(ctx, prompt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract JSON
+	jsonText := response
+	if start := strings.Index(response, "{"); start != -1 {
+		if end := strings.LastIndex(response, "}"); end != -1 && end > start {
+			jsonText = response[start : end+1]
+		}
+	}
+
+	resp := &WizardResponse{}
+	if err := json.Unmarshal([]byte(jsonText), resp); err != nil {
+		return nil, fmt.Errorf("failed to parse wizard response: %w", err)
+	}
+
+	// Auto-complete if state is ready
+	if resp.UpdatedState.IsReady() {
+		resp.IsComplete = true
+	}
+
+	return resp, nil
+}
+
+// RenderIntent generates the markdown document from the state
+func (p *Planner) RenderIntent(ctx context.Context, state string) (string, error) {
+	var intentState IntentState
+	if err := json.Unmarshal([]byte(state), &intentState); err != nil {
+		return "", err
+	}
+	return intentState.RenderIntentMD(), nil
+}
