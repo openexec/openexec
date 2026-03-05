@@ -13,7 +13,7 @@ import (
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/session"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // setupTestUsageServer creates a UsageServer with in-memory databases for testing.
@@ -21,7 +21,7 @@ func setupTestUsageServer(t *testing.T) (*UsageServer, *audit.AuditLogger, *sess
 	t.Helper()
 
 	// Create in-memory audit database
-	auditDB, err := sql.Open("sqlite3", ":memory:")
+	auditDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open audit db: %v", err)
 	}
@@ -42,7 +42,7 @@ func setupTestUsageServer(t *testing.T) (*UsageServer, *audit.AuditLogger, *sess
 	}
 
 	// Create in-memory session database
-	sessionDB, err := sql.Open("sqlite3", ":memory:")
+	sessionDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open session db: %v", err)
 	}
@@ -532,7 +532,7 @@ func TestRegisterUsageRoutes(t *testing.T) {
 	}
 	defer auditLogger.Close()
 
-	sessionDB, err := sql.Open("sqlite3", ":memory:")
+	sessionDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open session db: %v", err)
 	}

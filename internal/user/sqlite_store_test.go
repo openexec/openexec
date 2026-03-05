@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // newTestDB creates a new in-memory SQLite database for testing.
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
@@ -346,7 +346,7 @@ func TestSQLiteStore_List(t *testing.T) {
 func TestSQLiteStore_Persistence(t *testing.T) {
 	t.Run("data persists across store instances", func(t *testing.T) {
 		// Use a file-based database for this test
-		db, err := sql.Open("sqlite3", ":memory:?cache=shared")
+		db, err := sql.Open("sqlite", ":memory:?cache=shared")
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}

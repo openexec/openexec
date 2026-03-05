@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // mockOrchestratorChecker is a mock implementation for testing.
@@ -466,7 +466,7 @@ func TestOrchestratorEditReason(t *testing.T) {
 
 func TestManager_OrchestratorEditEscalation(t *testing.T) {
 	// Create in-memory database for testing
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -580,7 +580,7 @@ func TestManager_OrchestratorEditEscalation(t *testing.T) {
 
 func TestManager_GetEffectiveRiskLevel(t *testing.T) {
 	// Create in-memory database for testing
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -619,7 +619,7 @@ func TestManager_GetEffectiveRiskLevel(t *testing.T) {
 
 func TestManager_IsOrchestratorEdit(t *testing.T) {
 	// Create in-memory database for testing
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -665,7 +665,7 @@ func TestManager_IsOrchestratorEdit(t *testing.T) {
 
 func TestManager_SetOrchestratorEditChecker(t *testing.T) {
 	// Create in-memory database for testing
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}

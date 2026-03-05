@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
@@ -25,7 +25,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 		os.Remove(tmpFile.Name())
 	})
 
-	db, err := sql.Open("sqlite3", tmpFile.Name())
+	db, err := sql.Open("sqlite", tmpFile.Name())
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}

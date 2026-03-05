@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func setupTestRepository(t *testing.T) *SQLiteRepository {
 	t.Helper()
-	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=1")
+	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=1")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -26,7 +26,7 @@ func setupTestRepository(t *testing.T) *SQLiteRepository {
 
 func TestNewSQLiteRepository(t *testing.T) {
 	t.Run("creates repository with valid db", func(t *testing.T) {
-		db, _ := sql.Open("sqlite3", ":memory:")
+		db, _ := sql.Open("sqlite", ":memory:")
 		defer db.Close()
 
 		repo, err := NewSQLiteRepository(db)
@@ -1095,7 +1095,7 @@ func TestSQLiteRepository_ListSessions_OrderBy(t *testing.T) {
 }
 
 func TestSQLiteRepository_Close(t *testing.T) {
-	db, _ := sql.Open("sqlite3", ":memory:")
+	db, _ := sql.Open("sqlite", ":memory:")
 	repo, _ := NewSQLiteRepository(db)
 
 	err := repo.Close()

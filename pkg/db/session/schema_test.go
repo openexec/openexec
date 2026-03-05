@@ -4,12 +4,12 @@ import (
 	"database/sql"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func TestSchema_ApplySuccessfully(t *testing.T) {
 	// Create an in-memory SQLite database
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestSchema_ApplySuccessfully(t *testing.T) {
 
 func TestSchema_Idempotent(t *testing.T) {
 	// Create an in-memory SQLite database
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestSchema_Idempotent(t *testing.T) {
 }
 
 func TestSchema_SessionsTableColumns(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestSchema_SessionsTableColumns(t *testing.T) {
 }
 
 func TestSchema_MessagesTableColumns(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestSchema_MessagesTableColumns(t *testing.T) {
 }
 
 func TestSchema_ToolCallsTableColumns(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestSchema_ToolCallsTableColumns(t *testing.T) {
 }
 
 func TestSchema_ForeignKeyConstraints(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=1")
+	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=1")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestSchema_ForeignKeyConstraints(t *testing.T) {
 }
 
 func TestSchema_CascadeDelete(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=1")
+	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=1")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestSchema_CascadeDelete(t *testing.T) {
 }
 
 func TestSchema_IndexesCreated(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}

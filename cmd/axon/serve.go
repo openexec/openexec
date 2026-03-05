@@ -15,7 +15,7 @@ import (
 	"github.com/openexec/openexec/pkg/db/session"
 	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/internal/pipeline"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/spf13/cobra"
 )
 
@@ -75,7 +75,7 @@ Endpoints:
 			return fmt.Errorf("create audit db directory: %w", err)
 		}
 
-		db, err := sql.Open("sqlite3", dbPath)
+		db, err := sql.Open("sqlite", dbPath)
 		if err != nil {
 			return fmt.Errorf("open sqlite db: %w", err)
 		}

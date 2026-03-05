@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Logger defines the interface for audit logging operations.
@@ -44,7 +44,7 @@ type AuditLogger struct {
 
 // NewLogger creates a new AuditLogger with the given database path.
 func NewLogger(dbPath string) (*AuditLogger, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open audit database: %w", err)
 	}

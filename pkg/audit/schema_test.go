@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func TestSchema_ValidSQL(t *testing.T) {
@@ -19,7 +19,7 @@ func TestSchema_ValidSQL(t *testing.T) {
 	defer os.Remove(tmpPath)
 
 	// Open SQLite database
-	db, err := sql.Open("sqlite3", tmpPath)
+	db, err := sql.Open("sqlite", tmpPath)
 	if err != nil {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestEntrySchema_ValidSQL(t *testing.T) {
 	defer os.Remove(tmpPath)
 
 	// Open SQLite database
-	db, err := sql.Open("sqlite3", tmpPath)
+	db, err := sql.Open("sqlite", tmpPath)
 	if err != nil {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestEntrySchema_InsertAndQuery(t *testing.T) {
 	defer os.Remove(tmpPath)
 
 	// Open SQLite database
-	db, err := sql.Open("sqlite3", tmpPath)
+	db, err := sql.Open("sqlite", tmpPath)
 	if err != nil {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestMigrationSQL_ValidSQL(t *testing.T) {
 	defer os.Remove(tmpPath)
 
 	// Open SQLite database
-	db, err := sql.Open("sqlite3", tmpPath)
+	db, err := sql.Open("sqlite", tmpPath)
 	if err != nil {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestSchema_IndexesCreated(t *testing.T) {
 	defer os.Remove(tmpPath)
 
 	// Open SQLite database
-	db, err := sql.Open("sqlite3", tmpPath)
+	db, err := sql.Open("sqlite", tmpPath)
 	if err != nil {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}

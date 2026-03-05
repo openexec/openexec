@@ -1,0 +1,45 @@
+# Stage 1: Build the UI
+FROM node:20-slim AS ui-builder
+WORKDIR /app/ui
+COPY ui/package*.json ./
+RUN npm install
+COPY ui/ ./
+RUN npm run build
+
+# Stage 2: Build the Multi-Platform Binaries
+FROM golang:1.25-bullseye AS go-builder
+WORKDIR /app
+
+# Copy Go dependencies
+COPY go.mod go.sum ./
+# We skip 'go mod download' because of the missing internal modules in the original repo
+# We will copy the source first
+
+# Copy source code
+COPY . .
+
+# Remove the built-in UI dist if it exists and copy the one from ui-builder
+RUN rm -rf ui/dist
+COPY --from:ui-builder /app/ui/dist ./ui/dist
+
+# Create output directory
+RUN mkdir -p /app/dist
+
+# Build Targets
+# No CGO needed because we switched to modernc.org/sqlite
+ENV CGO_ENABLED=0
+
+# 1. Linux (amd64, arm64)
+RUN GOOS=linux GOARCH=amd64 go build -o /app/dist/openexec-linux-amd64 ./cmd/openexec
+RUN GOOS=linux GOARCH=arm64 go build -o /app/dist/openexec-linux-arm64 ./cmd/openexec
+
+# 2. macOS (amd64, arm64)
+RUN GOOS=darwin GOARCH=amd64 go build -o /app/dist/openexec-darwin-amd64 ./cmd/openexec
+RUN GOOS=darwin GOARCH=arm64 go build -o /app/dist/openexec-darwin-arm64 ./cmd/openexec
+
+# 3. Windows (amd64)
+RUN GOOS=windows GOARCH=amd64 go build -o /app/dist/openexec-windows-amd64.exe ./cmd/openexec
+
+# Stage 3: Artifact Collection
+FROM scratch
+COPY --from:go-builder /app/dist /

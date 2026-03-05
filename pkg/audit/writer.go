@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Writer provides SQLite-based audit logging with optional encryption.
@@ -34,7 +34,7 @@ func NewWriter(dbPath string) (*Writer, error) {
 // If encryptionKey is nil, the writer will operate without encryption.
 // The encryptionKey must be 16, 24, or 32 bytes for AES-128, AES-192, or AES-256.
 func NewWriterWithEncryption(dbPath string, encryptionKey []byte) (*Writer, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open SQLite database: %w", err)
 	}
