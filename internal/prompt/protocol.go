@@ -1,11 +1,11 @@
 package prompt
 
 // SignalProtocol returns the signal protocol template text.
-// Injected into every composed prompt to teach agents how to use axon_signal.
+// Injected into every composed prompt to teach agents how to use openexec_signal.
 func SignalProtocol() string {
-	return `## Axon Signal Protocol
+	return `## OpenExec Signal Protocol
 
-You have access to the ` + "`axon_signal`" + ` MCP tool. Use it to communicate with the Axon
+You have access to the ` + "`openexec_signal`" + ` MCP tool. Use it to communicate with the OpenExec
 orchestrator throughout your work.
 
 ### Signal Types
@@ -26,7 +26,7 @@ orchestrator throughout your work.
 
 ### Usage
 
-Call ` + "`axon_signal`" + ` with at minimum ` + "`" + `{"type": "<signal-type>"}` + "`" + `.
+Call ` + "`openexec_signal`" + ` with at minimum ` + "`" + `{"type": "<signal-type>"}` + "`" + `.
 Add ` + "`reason`" + ` to explain why. Add ` + "`target`" + ` for route signals.
 Add ` + "`metadata`" + ` for structured data (e.g., file list, test results summary).
 
@@ -61,7 +61,7 @@ the architect), use the Claude Code Task tool to spawn a lightweight consultatio
 
 ### Tier 3: Operator Escalation
 For genuine blockers where no safe assumption exists:
-- Call ` + "`axon_signal`" + ` with type "decision-point" and a clear description of what you need.
+- Call ` + "`openexec_signal`" + ` with type "decision-point" and a clear description of what you need.
 - The pipeline will pause until the operator provides guidance.
 - Use sparingly — only when you truly cannot proceed safely.`
 }

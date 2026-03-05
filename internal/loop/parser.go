@@ -106,7 +106,7 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				Text:      item.Text,
 			})
 		case "tool_use":
-			if isAxonSignal(item.Name) {
+			if isOpenExecSignal(item.Name) {
 				p.emitSignal(item.Input)
 			} else {
 				p.emit(Event{
@@ -146,10 +146,10 @@ func (p *Parser) emit(e Event) {
 	p.events <- e
 }
 
-// isAxonSignal returns true if the tool name is an axon_signal call.
-// Handles both direct ("axon_signal") and MCP-prefixed ("mcp__axon-signal__axon_signal").
-func isAxonSignal(toolName string) bool {
-	return strings.HasSuffix(toolName, "axon_signal")
+// isOpenExecSignal returns true if the tool name is an openexec_signal call.
+// Handles both direct ("openexec_signal") and MCP-prefixed ("mcp__axon-signal__openexec_signal").
+func isOpenExecSignal(toolName string) bool {
+	return strings.HasSuffix(toolName, "openexec_signal")
 }
 
 func (p *Parser) emitSignal(input map[string]interface{}) {

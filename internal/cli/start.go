@@ -950,7 +950,7 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 		sb.WriteString(fmt.Sprintf("   -> MANDATORY VERIFICATION SCRIPT: Run '%s' to prove the task is complete.\n", task.VerificationScript))
 	}
 
-	sb.WriteString("4. When complete and verified, signal completion using the axon_signal tool with type 'phase-complete'.\n")
+	sb.WriteString("4. When complete and verified, signal completion using the openexec_signal tool with type 'phase-complete'.\n")
 	sb.WriteString("\n")
 	sb.WriteString("Work autonomously and make reasonable decisions. Do not ask for clarification.\n")
 

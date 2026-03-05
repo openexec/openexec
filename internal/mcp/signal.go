@@ -25,7 +25,7 @@ var validSignalTypes = map[SignalType]bool{
 	SignalRoute:            true,
 }
 
-// Signal represents a structured signal from an agent via axon_signal tool.
+// Signal represents a structured signal from an agent via openexec_signal tool.
 type Signal struct {
 	Type     SignalType             `json:"type"`
 	Reason   string                 `json:"reason,omitempty"`

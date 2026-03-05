@@ -40,7 +40,7 @@ type RPCError struct {
 	Message string `json:"message"`
 }
 
-// Server is a minimal MCP server that exposes the axon_signal tool.
+// Server is a minimal MCP server that exposes the openexec_signal tool.
 type Server struct {
 	in              io.Reader
 	out             io.Writer
@@ -147,8 +147,8 @@ func (s *Server) handleToolsList(req Request) {
 
 func axonSignalToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name":        "axon_signal",
-		"description": "Send a structured signal to the Axon orchestrator. Use this to report progress, signal phase completion, request routing, or flag issues.",
+		"name":        "openexec_signal",
+		"description": "Send a structured signal to the OpenExec orchestrator. Use this to report progress, signal phase completion, request routing, or flag issues.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -192,8 +192,8 @@ func (s *Server) handleToolsCall(req Request) {
 	}
 
 	switch params.Name {
-	case "axon_signal":
-		s.handleAxonSignal(req, params)
+	case "openexec_signal":
+		s.handleOpenExecSignal(req, params)
 	case "read_file":
 		s.handleReadFile(req, params)
 	case "write_file":
@@ -213,7 +213,7 @@ func (s *Server) handleToolsCall(req Request) {
 	}
 }
 
-func (s *Server) handleAxonSignal(req Request, params toolsCallParams) {
+func (s *Server) handleOpenExecSignal(req Request, params toolsCallParams) {
 	var sig Signal
 	if err := json.Unmarshal(params.Arguments, &sig); err != nil {
 		s.writeError(req.ID, -32602, fmt.Sprintf("invalid signal arguments: %v", err))

@@ -33,8 +33,12 @@ build-all:
 	@ls -lh dist/
 
 lint:
-	@echo "🔍 Linting Go..."
+	@echo "🔍 Linting Go (vet)..."
 	go vet ./...
+	@if command -v golangci-lint >/dev/null; then \
+		echo "🔍 Linting Go (golangci-lint)..."; \
+		golangci-lint run; \
+	fi
 	@$(MAKE) ui-lint
 
 ui-lint:

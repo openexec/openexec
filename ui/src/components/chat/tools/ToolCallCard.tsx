@@ -101,7 +101,7 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
       write_file: 'Write File',
       run_shell_command: 'Run Command',
       git_apply_patch: 'Apply Patch',
-      axon_signal: 'Axon Signal',
+      openexec_signal: 'OpenExec Signal',
     }
     return toolNameMap[toolCall.toolName] || toolCall.toolName
   }

@@ -122,7 +122,7 @@ func CaptureStderr(r io.Reader, dir string) error {
 const autonomousPreamble = `IMPORTANT: You are running autonomously in a non-interactive pipeline. ` +
 	`There is no human operator present. Do NOT plan — proceed directly with implementation. ` +
 	`Work independently and make reasonable decisions. ` +
-	`If you are genuinely blocked, use the axon_signal tool with type "blocked" or "decision-point".
+	`If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
 
 `
 

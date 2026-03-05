@@ -42,7 +42,7 @@ func TestComposeValidAgentWorkflow(t *testing.T) {
 	}
 
 	// Verify protocols are present.
-	if !strings.Contains(result, "Axon Signal Protocol") {
+	if !strings.Contains(result, "OpenExec Signal Protocol") {
 		t.Error("prompt missing signal protocol")
 	}
 	if !strings.Contains(result, "Consultation Protocol") {
@@ -83,7 +83,7 @@ func TestComposeEmptyBriefing(t *testing.T) {
 	}
 
 	// Prompt should still be valid with protocols present.
-	if !strings.Contains(result, "Axon Signal Protocol") {
+	if !strings.Contains(result, "OpenExec Signal Protocol") {
 		t.Error("prompt missing signal protocol with empty briefing")
 	}
 	if !strings.Contains(result, "Consultation Protocol") {
@@ -109,7 +109,7 @@ func TestComposeSectionOrdering(t *testing.T) {
 
 	personaIdx := strings.Index(result, "## Persona")
 	workflowIdx := strings.Index(result, "## Workflow")
-	signalIdx := strings.Index(result, "## Axon Signal Protocol")
+	signalIdx := strings.Index(result, "## OpenExec Signal Protocol")
 	consultIdx := strings.Index(result, "## Consultation Protocol")
 
 	if personaIdx < 0 {

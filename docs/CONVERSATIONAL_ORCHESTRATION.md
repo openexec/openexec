@@ -265,7 +265,7 @@ safety:
 
 ## Signal Protocol
 
-The Axon Signal protocol enables agents to communicate structured events to the orchestrator.
+The OpenExec Signal protocol enables agents to communicate structured events to the orchestrator.
 
 ### Signal Types
 

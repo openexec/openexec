@@ -75,16 +75,16 @@ func TestToolsList(t *testing.T) {
 		t.Fatalf("expected 5 tools, got %d", len(tools))
 	}
 
-	// Check axon_signal tool
+	// Check openexec_signal tool
 	tool, _ := tools[0].(map[string]interface{})
-	if tool["name"] != "axon_signal" {
-		t.Errorf("tool[0] name = %v, want axon_signal", tool["name"])
+	if tool["name"] != "openexec_signal" {
+		t.Errorf("tool[0] name = %v, want openexec_signal", tool["name"])
 	}
 
 	schema, _ := tool["inputSchema"].(map[string]interface{})
 	props, _ := schema["properties"].(map[string]interface{})
 	if props["type"] == nil {
-		t.Error("missing 'type' in axon_signal input schema properties")
+		t.Error("missing 'type' in openexec_signal input schema properties")
 	}
 
 	// Check read_file tool
@@ -129,7 +129,7 @@ func TestToolsList(t *testing.T) {
 
 func TestToolsCallValid(t *testing.T) {
 	resps := sendAndReceive(t,
-		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"axon_signal","arguments":{"type":"phase-complete","reason":"All tests pass"}}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openexec_signal","arguments":{"type":"phase-complete","reason":"All tests pass"}}}`,
 	)
 
 	if len(resps) != 1 {
@@ -155,7 +155,7 @@ func TestToolsCallValid(t *testing.T) {
 
 func TestToolsCallUnknownSignalType(t *testing.T) {
 	resps := sendAndReceive(t,
-		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"axon_signal","arguments":{"type":"bad-type"}}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openexec_signal","arguments":{"type":"bad-type"}}}`,
 	)
 
 	if len(resps) != 1 {
@@ -202,7 +202,7 @@ func TestFullHandshake(t *testing.T) {
 		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`,
 		`{"jsonrpc":"2.0","method":"notifications/initialized"}`,
 		`{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
-		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"axon_signal","arguments":{"type":"progress","reason":"Step 1 done"}}}`,
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"openexec_signal","arguments":{"type":"progress","reason":"Step 1 done"}}}`,
 	)
 
 	// 3 responses (initialize, tools/list, tools/call). Notification produces none.
@@ -239,7 +239,7 @@ func TestToolsCallAllSignalTypes(t *testing.T) {
 
 	for _, st := range types {
 		resps := sendAndReceive(t,
-			`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"axon_signal","arguments":{"type":"`+st+`"}}}`,
+			`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openexec_signal","arguments":{"type":"`+st+`"}}}`,
 		)
 		if len(resps) != 1 {
 			t.Fatalf("type %q: expected 1 response, got %d", st, len(resps))
@@ -252,7 +252,7 @@ func TestToolsCallAllSignalTypes(t *testing.T) {
 
 func TestToolsCallRouteWithTarget(t *testing.T) {
 	resps := sendAndReceive(t,
-		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"axon_signal","arguments":{"type":"route","target":"spark","reason":"Test failures found"}}}`,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"openexec_signal","arguments":{"type":"route","target":"spark","reason":"Test failures found"}}}`,
 	)
 
 	if len(resps) != 1 {

@@ -100,7 +100,7 @@ func New(cfg Config) (*Server, error) {
 }
 
 func (s *Server) registerRoutes() {
-	// --- Legacy/High-Level Axon Routes (pkg/api bridge) ---
+	// --- Legacy/High-Level OpenExec Routes (pkg/api bridge) ---
 	axonBridge := api.New(s.Mgr, s.SessionRepo, s.AuditLogger, s.ProjectsDir, "")
 	axonBridge.RegisterRoutes(s.Mux)
 

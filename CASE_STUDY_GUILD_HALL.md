@@ -75,7 +75,7 @@ The "Executor" agent (Sonnet) began implementation in a headless loop:
 During the building of Guild-Hall, we improved OpenExec itself:
 - **Reliability:** Fixed prompt escaping issues that caused parsing failures.
 - **Interoperability:** Updated the system to handle machine-readable JSONL output from high-speed CLI agents.
-- **Tooling:** Integrated the **Axon MCP Server**, allowing AI agents to communicate their progress back to the Go-based execution engine via standard protocols.
+- **Tooling:** Integrated the **OpenExec MCP Server**, allowing AI agents to communicate their progress back to the Go-based execution engine via standard protocols.
 
 ---
 

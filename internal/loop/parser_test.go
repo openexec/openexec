@@ -40,7 +40,7 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name: "axon signal event",
-			input: "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"axon_signal\", \"input\": {\"type\": \"complete\", \"reason\": \"done\"}}]}}\n",
+			input: "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"openexec_signal\", \"input\": {\"type\": \"complete\", \"reason\": \"done\"}}]}}\n",
 			expectedEvents: 1,
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventSignalReceived {

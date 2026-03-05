@@ -6,8 +6,8 @@
 //   full            — outputs text + tool_use + tool_result, exits 0
 //   crash           — outputs partial, exits 1
 //   slow            — outputs text then sleeps 10s (for kill/cancel tests), exits 0
-//   signal-complete — outputs text + axon_signal phase-complete, exits 0
-//   signal-progress — outputs text + axon_signal progress, exits 0
+//   signal-complete — outputs text + openexec_signal phase-complete, exits 0
+//   signal-progress — outputs text + openexec_signal progress, exits 0
 package main
 
 import (
@@ -52,7 +52,7 @@ func main() {
 	case "signal-complete":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"All tests passing."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__axon_signal","input":{"type":"phase-complete","reason":"All tests passing"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"phase-complete","reason":"All tests passing"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: phase-complete"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
@@ -60,7 +60,7 @@ func main() {
 	case "signal-progress":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"Making progress."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__axon_signal","input":{"type":"progress","reason":"Step done"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"progress","reason":"Step done"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: progress"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
@@ -68,7 +68,7 @@ func main() {
 	case "signal-route-spark":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"Review complete. Routing to Spark for rework."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__axon_signal","input":{"type":"route","reason":"Implementation needs rework","target":"spark"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"route","reason":"Implementation needs rework","target":"spark"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: route"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
@@ -76,7 +76,7 @@ func main() {
 	case "signal-route-hon":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"Review approved. Routing to Hon for refactoring."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__axon_signal","input":{"type":"route","reason":"Code approved, proceed to refactor","target":"hon"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"route","reason":"Code approved, proceed to refactor","target":"hon"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: route"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
@@ -84,7 +84,7 @@ func main() {
 	case "signal-blocked":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"Cannot proceed without API credentials."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__axon_signal","input":{"type":"blocked","reason":"Missing API credentials"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"blocked","reason":"Missing API credentials"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: blocked"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
