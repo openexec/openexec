@@ -38,6 +38,35 @@ Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in
 *   **Headless Execution:** Agents run in a non-interactive daemon mode, managed by a Go-based execution engine.
 *   **Senior Architect Reviews:** Built-in multi-iteration self-review cycles ensure implementation readiness.
 *   **Autonomous Verification Gates:** The engine automatically executes local verification scripts after every task to ensure the "Definition of Done" is met.
+*   **Deterministic Control Plane (DCP):** High-speed local orchestration using 1-bit LLMs (BitNet) and structured surgical Knowledge Bases instead of fuzzy VectorDBs.
+
+---
+
+## Deterministic Control Plane (DCP)
+
+OpenExec introduces a **Deterministic Control Plane** that transforms AI agents from "generative guessers" into "surgical operators." By moving project knowledge into structured relational tables, we eliminate hallucinations and drastically reduce latency.
+
+### Core Pillars
+- **Surgical Pointer Records (OpenCode):** Automatically maps your functions, structs, and API handlers to exact file byte-offsets. Agents see exactly the code they need, never more, never less.
+- **BitNet Intent Routing:** Uses a local 1-bit 2B model to parse user intent and select tools in milliseconds, avoiding expensive cloud round-trips for simple decisions.
+- **Deterministic Knowledge Base:** Specialized tables for environments (IPs, topologies, auth steps) and API contracts ensure ops tasks are executed with 100% precision.
+- **Hard Policy Enforcement:** A local validation layer that blocks dangerous actions (like hardcoded secrets or unsafe commands) before they ever reach your project.
+
+### Knowledge CLI
+Manage your project's deterministic brain directly from the terminal:
+```bash
+# Index your source code (populates surgical pointers)
+openexec knowledge index .
+
+# List all DCP-enabled projects on your system
+openexec knowledge ls
+
+# Inspect recorded symbols or environment topologies
+openexec knowledge show symbols
+openexec knowledge show envs
+```
+
+**Full Documentation:** [docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md)
 
 ---
 

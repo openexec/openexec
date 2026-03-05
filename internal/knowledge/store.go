@@ -133,6 +133,23 @@ func (s *Store) GetSymbol(name string) (*SymbolRecord, error) {
 	return r, err
 }
 
+func (s *Store) ListSymbols() ([]*SymbolRecord, error) {
+	query := `SELECT name, kind, file_path, start_line, end_line, purpose FROM symbols ORDER BY name`
+	rows, err := s.db.Query(query)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	var results []*SymbolRecord
+	for rows.Next() {
+		r := &SymbolRecord{}
+		if err := rows.Scan(&r.Name, &r.Kind, &r.FilePath, &r.StartLine, &r.EndLine, &r.Purpose); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
 // --- Environment Methods ---
 
 func (s *Store) SetEnvironment(r *EnvironmentRecord) error {
@@ -149,6 +166,23 @@ func (s *Store) GetEnvironment(env string) (*EnvironmentRecord, error) {
 	return r, err
 }
 
+func (s *Store) ListEnvironments() ([]*EnvironmentRecord, error) {
+	query := `SELECT env, runtime_type, topology FROM environments`
+	rows, err := s.db.Query(query)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	var results []*EnvironmentRecord
+	for rows.Next() {
+		r := &EnvironmentRecord{}
+		if err := rows.Scan(&r.Env, &r.RuntimeType, &r.Topology); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
 // --- API Doc Methods ---
 
 func (s *Store) SetAPIDoc(r *APIDocRecord) error {
@@ -163,6 +197,23 @@ func (s *Store) GetAPIDoc(path, method string) (*APIDocRecord, error) {
 	err := s.db.QueryRow(query, path, method).Scan(&r.Path, &r.Method, &r.RequestSchema, &r.ResponseSchema, &r.Description)
 	if err == sql.ErrNoRows { return nil, nil }
 	return r, err
+}
+
+func (s *Store) ListAPIDocs() ([]*APIDocRecord, error) {
+	query := `SELECT path, method, description FROM api_docs ORDER BY path`
+	rows, err := s.db.Query(query)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	var results []*APIDocRecord
+	for rows.Next() {
+		r := &APIDocRecord{}
+		if err := rows.Scan(&r.Path, &r.Method, &r.Description); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
 }
 
 func (s *Store) Close() error {

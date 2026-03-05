@@ -15,8 +15,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
+	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/router"
+	"github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/api"
 	"github.com/openexec/openexec/pkg/audit"
@@ -38,6 +42,7 @@ type Server struct {
 	checker     *health.Checker
 	apiServer   *api.Server
 	projectsDir string
+	coordinator *dcp.Coordinator
 }
 
 // LoopInstance tracks a running execution loop
@@ -217,6 +222,18 @@ func StartServer() {
 		projectsDir: projectsDir,
 	}
 
+	// Initialize DCP
+	kStore, _ := knowledge.NewStore(".")
+	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
+	srv.coordinator = dcp.NewCoordinator(bRouter, kStore)
+	srv.coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
+	srv.coordinator.RegisterTool(tools.NewDeployTool(kStore))
+	srv.coordinator.RegisterTool(tools.NewKnowledgePopulationTool(kStore))
+	srv.coordinator.RegisterTool(tools.NewDocsUpdaterTool(kStore, "."))
+
+	// Initial sync
+	go srv.coordinator.SyncKnowledge(".")
+
 	// Initialize OpenExec project/session API
 	db := auditWriter.GetDB()
 	sessionRepo, err := session.NewSQLiteRepository(db)
@@ -251,6 +268,7 @@ func StartServer() {
 	mux.HandleFunc("/api/v1/audit", srv.handleAudit)
 	mux.HandleFunc("/api/v1/evidence", srv.handleTaskEvidence)
 	mux.HandleFunc("/api/v1/logs", srv.handleSessionLog)
+	mux.HandleFunc("/api/v1/dcp/query", srv.handleDCPQuery)
 
 	// Integrate the new API server's routes
 	srv.apiServer.RegisterRoutes(mux)
@@ -641,6 +659,33 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request, loopID str
 			return
 		}
 	}
+}
+
+func (s *Server) handleDCPQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Query string `json:"query"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	result, err := s.coordinator.ProcessQuery(r.Context(), req.Query)
+	if err != nil {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"result": result,
+	})
 }
 
 func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
