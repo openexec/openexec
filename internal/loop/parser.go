@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
+
+	"github.com/openexec/openexec/pkg/util"
 )
 
 // Parser reads line-delimited stream-JSON from Claude Code and emits typed Events.
@@ -62,7 +64,7 @@ type contentItem struct {
 
 func (p *Parser) parseLine(line []byte) {
 	var raw rawMessage
-	if err := json.Unmarshal(line, &raw); err != nil {
+	if err := util.UnmarshalRobust(string(line), &raw); err != nil {
 		return // malformed JSON — skip
 	}
 
@@ -92,7 +94,7 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 		return
 	}
 	var body messageBody
-	if err := json.Unmarshal(data, &body); err != nil {
+	if err := util.UnmarshalRobust(string(data), &body); err != nil {
 		return
 	}
 	for _, item := range body.Content {
@@ -124,7 +126,7 @@ func (p *Parser) parseToolResult(data json.RawMessage) {
 	}
 	// Content can be a string or a structured array. Try string first.
 	var s string
-	if err := json.Unmarshal(data, &s); err == nil {
+	if err := util.UnmarshalRobust(string(data), &s); err == nil {
 		p.emit(Event{
 			Type:      EventToolResult,
 			Iteration: p.iteration,

@@ -20,6 +20,7 @@ import (
 	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/api"
 	"github.com/openexec/openexec/pkg/audit"
+	"github.com/openexec/openexec/pkg/util"
 	"github.com/openexec/openexec/pkg/db/session"
 	openexec_manager "github.com/openexec/openexec/pkg/manager"
 )
@@ -417,6 +418,9 @@ func (s *Server) createLoop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Sanitize input prompt from UI
+	req.Prompt = util.SanitizeInput(req.Prompt)
 
 	if req.Prompt == "" {
 		http.Error(w, "Prompt is required", http.StatusBadRequest)

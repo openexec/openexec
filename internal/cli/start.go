@@ -468,6 +468,8 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 					// If we're here, either loop failed or verification failed
 					if err != nil {
 						lastError = err.Error()
+					} else {
+						lastError = "unknown execution failure"
 					}
 					node.Retries++
 				}
