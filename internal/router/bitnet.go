@@ -4,22 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 )
 
 // BitNetRouter wraps a local 1-bit LLM for intent selection
 type BitNetRouter struct {
-	modelPath string
-	tools     map[string]string // tool name -> description/schema
-	skipAvailabilityCheck bool // Used for unit tests
+	manager               *InferenceManager
+	tools                 map[string]string // tool name -> description/schema
+	skipAvailabilityCheck bool              // Used for unit tests
 }
 
 func NewBitNetRouter(modelPath string) *BitNetRouter {
 	return &BitNetRouter{
-		modelPath: modelPath,
-		tools:     make(map[string]string),
+		manager: NewInferenceManager(modelPath),
+		tools:   make(map[string]string),
 	}
 }
 
@@ -33,17 +31,7 @@ func (r *BitNetRouter) CheckAvailability() error {
 	if r.skipAvailabilityCheck {
 		return nil
 	}
-	// 1. Check if model file exists
-	if _, err := os.Stat(r.modelPath); os.IsNotExist(err) {
-		return fmt.Errorf("BitNet model not found at %s", r.modelPath)
-	}
-
-	// 2. Check if inference engine is installed
-	if _, err := exec.LookPath("bitnet-cli"); err != nil {
-		return fmt.Errorf("inference engine 'bitnet-cli' not found in PATH")
-	}
-
-	return nil
+	return r.manager.EnsureReady()
 }
 
 func (r *BitNetRouter) RegisterTool(name, description, schema string) error {
@@ -61,9 +49,7 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	// 1. Build the local prompt for the 1-bit model
 	prompt := r.buildPrompt(query)
 
-	// 2. Invoke local inference engine (e.g. bitnet-cli or llama.cpp wrapper)
-	// In production, this would use a CGO binding or a persistent worker process.
-	// For this scaffold, we simulate the tool selection logic.
+	// 2. Invoke local inference engine
 	output, err := r.runLocalInference(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("local inference failed: %w", err)
@@ -86,7 +72,16 @@ func (r *BitNetRouter) buildPrompt(query string) string {
 }
 
 func (r *BitNetRouter) runLocalInference(ctx context.Context, prompt string) (string, error) {
-	// The prompt now includes the query after "QUERY: "
+	// If we are in skip mode (tests), use the keyword simulator
+	if r.skipAvailabilityCheck {
+		return r.simulateInference(prompt)
+	}
+
+	// Actual local execution via manager
+	return r.manager.RunInference(ctx, prompt)
+}
+
+func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 	queryPart := ""
 	if idx := strings.LastIndex(prompt, "QUERY: "); idx != -1 {
 		queryPart = strings.ToLower(prompt[idx:])
