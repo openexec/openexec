@@ -60,7 +60,7 @@ Examples:
 			// Handle fix mode
 			if fixMode && validateOnly {
 				fixer := intent.NewFixer(result)
-				fmt.Println(fixer.Preview())
+				cmd.Println(fixer.Preview())
 				if !result.Valid {
 					return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
 				}
@@ -70,7 +70,7 @@ Examples:
 			// Show validation result
 			if validateOnly || !result.Valid {
 				reporter := intent.NewReporter(result)
-				fmt.Println(reporter.Generate())
+				cmd.Println(reporter.Generate())
 			}
 
 			// If validate-only, exit here
@@ -78,20 +78,20 @@ Examples:
 				if !result.Valid {
 					return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
 				}
-				fmt.Println("Validation passed. Run without --validate-only to generate plan.")
+				cmd.Println("Validation passed. Run without --validate-only to generate plan.")
 				return nil
 			}
 
 			// If validation failed and not validate-only, fail before planning
 			if !result.Valid {
-				fmt.Println("\nHint: Run 'openexec doctor intent --fix' to scaffold missing sections")
-				fmt.Println("      Or use --no-validate to skip validation")
+				cmd.Println("\nHint: Run 'openexec doctor intent --fix' to scaffold missing sections")
+				cmd.Println("      Or use --no-validate to skip validation")
 				return fmt.Errorf("cannot plan: intent document has %d critical issue(s)", len(result.Critical))
 			}
 
 			// Show brief summary if validation passed
 			if result.Valid && len(result.Warnings) > 0 {
-				fmt.Printf("Validation passed with %d warning(s)\n\n", len(result.Warnings))
+				cmd.Printf("Validation passed with %d warning(s)\n\n", len(result.Warnings))
 			}
 		}
 
@@ -120,15 +120,15 @@ Examples:
 		reviewEnabled := config.Execution.ReviewEnabled
 		reviewerModel := config.Execution.ReviewerModel
 
-		fmt.Printf("Generating plan from: %s\n", intentFile)
-		fmt.Printf("  Planner model:  %s\n", plannerModel)
+		cmd.Printf("Generating plan from: %s\n", intentFile)
+		cmd.Printf("  Planner model:  %s\n", plannerModel)
 		if reviewEnabled {
-			fmt.Printf("  Review enabled: yes (reviewer: %s)\n", reviewerModel)
+			cmd.Printf("  Review enabled: yes (reviewer: %s)\n", reviewerModel)
 		} else {
-			fmt.Printf("  Review enabled: no\n")
+			cmd.Printf("  Review enabled: no\n")
 		}
-		fmt.Printf("  Tract store: %s\n", config.TractStore)
-		fmt.Printf("  Engram context: %s\n\n", config.EngramStore)
+		cmd.Printf("  Tract store: %s\n", config.TractStore)
+		cmd.Printf("  Engram context: %s\n\n", config.EngramStore)
 
 		// Check if openexec-planner is available
 		plannerBinary := "openexec-planner"
@@ -147,16 +147,16 @@ Examples:
 
 		// Invoke planner engine to generate stories
 		// #nosec G204 - absIntentFile is validated to exist
-		plannerCmd := exec.Command(plannerBinary, plannerArgs...)
+		pCmd := exec.Command(plannerBinary, plannerArgs...)
 
 		// Capture output
-		output, err := plannerCmd.CombinedOutput()
+		output, err := pCmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("planner engine failed: %w\nOutput: %s", err, string(output))
 		}
 
-		fmt.Printf("%s\n", string(output))
-		fmt.Printf("Stories generated: %s\n", storiesPath)
+		cmd.Printf("%s\n", string(output))
+		cmd.Printf("Stories generated: %s\n", storiesPath)
 
 		return nil
 	},

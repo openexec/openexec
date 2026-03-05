@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -50,6 +51,7 @@ func InitializeConfig(cfgFile string) error {
 
 	// Set environment variable prefix
 	viper.SetEnvPrefix("UAOS")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
 	return nil

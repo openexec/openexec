@@ -370,3 +370,43 @@ func TestCloseWithoutSubprocess(t *testing.T) {
 	serverInW.Close()
 	serverOutW.Close()
 }
+
+func TestExtractToolText(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
+		input := map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "text",
+					"text": "hello world",
+				},
+			},
+		}
+		got, err := extractToolText(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "hello world" {
+			t.Errorf("got %q, want %q", got, "hello world")
+		}
+	})
+
+	t.Run("Empty Content", func(t *testing.T) {
+		input := map[string]interface{}{
+			"content": []interface{}{},
+		}
+		_, err := extractToolText(input)
+		if err == nil {
+			t.Error("expected error for empty content")
+		}
+	})
+
+	t.Run("Malformed", func(t *testing.T) {
+		input := map[string]interface{}{
+			"something": "else",
+		}
+		_, err := extractToolText(input)
+		if err == nil {
+			t.Error("expected error for malformed input")
+		}
+	})
+}

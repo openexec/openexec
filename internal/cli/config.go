@@ -48,7 +48,7 @@ var configShowCmd = &cobra.Command{
 		if err != nil {
 			if os.IsNotExist(err) {
 				cfg = defaultProjectConfig()
-				fmt.Println("No configuration file found. Using defaults:")
+				cmd.Println("No configuration file found. Using defaults:")
 			} else {
 				return err
 			}
@@ -60,27 +60,27 @@ var configShowCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			cmd.Println(string(data))
 			return nil
 		}
 
-		fmt.Println("OpenExec Configuration")
-		fmt.Println("======================")
-		fmt.Println()
-		fmt.Println("Git Integration:")
-		fmt.Printf("  git_enabled:           %v\n", cfg.GitEnabled)
-		fmt.Printf("  base_branch:           %s\n", cfg.BaseBranch)
-		fmt.Printf("  auto_link_commits:     %v\n", cfg.AutoLinkCommits)
-		fmt.Printf("  release_branch_prefix: %s\n", cfg.ReleaseBranchPrefix)
-		fmt.Printf("  feature_branch_prefix: %s\n", cfg.FeatureBranchPrefix)
-		fmt.Println()
-		fmt.Println("Auto-Merge (when git_enabled=true):")
-		fmt.Printf("  auto_merge_stories:    %v\n", cfg.AutoMergeStories)
-		fmt.Printf("  auto_merge_to_main:    %v\n", cfg.AutoMergeToMain)
-		fmt.Printf("  auto_tag_release:      %v\n", cfg.AutoTagRelease)
-		fmt.Println()
-		fmt.Println("Approval Workflow:")
-		fmt.Printf("  approval_enabled:      %v\n", cfg.ApprovalEnabled)
+		cmd.Println("OpenExec Configuration")
+		cmd.Println("======================")
+		cmd.Println()
+		cmd.Println("Git Integration:")
+		cmd.Printf("  git_enabled:           %v\n", cfg.GitEnabled)
+		cmd.Printf("  base_branch:           %s\n", cfg.BaseBranch)
+		cmd.Printf("  auto_link_commits:     %v\n", cfg.AutoLinkCommits)
+		cmd.Printf("  release_branch_prefix: %s\n", cfg.ReleaseBranchPrefix)
+		cmd.Printf("  feature_branch_prefix: %s\n", cfg.FeatureBranchPrefix)
+		cmd.Println()
+		cmd.Println("Auto-Merge (when git_enabled=true):")
+		cmd.Printf("  auto_merge_stories:    %v\n", cfg.AutoMergeStories)
+		cmd.Printf("  auto_merge_to_main:    %v\n", cfg.AutoMergeToMain)
+		cmd.Printf("  auto_tag_release:      %v\n", cfg.AutoTagRelease)
+		cmd.Println()
+		cmd.Println("Approval Workflow:")
+		cmd.Printf("  approval_enabled:      %v\n", cfg.ApprovalEnabled)
 
 		return nil
 	},
@@ -168,7 +168,7 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Set %s = %s\n", key, value)
+		cmd.Printf("Set %s = %s\n", key, value)
 		return nil
 	},
 }
@@ -191,11 +191,11 @@ var configInitCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("Configuration initialized.")
-		fmt.Printf("  Git integration: %v\n", cfg.GitEnabled)
-		fmt.Printf("  Approval workflow: %v\n", cfg.ApprovalEnabled)
-		fmt.Println()
-		fmt.Println("Modify with: openexec config set <key> <value>")
+		cmd.Println("Configuration initialized.")
+		cmd.Printf("  Git integration: %v\n", cfg.GitEnabled)
+		cmd.Printf("  Approval workflow: %v\n", cfg.ApprovalEnabled)
+		cmd.Println()
+		cmd.Println("Modify with: openexec config set <key> <value>")
 		return nil
 	},
 }

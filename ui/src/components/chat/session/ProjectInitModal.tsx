@@ -20,14 +20,20 @@ export interface ProjectInitModalProps {
   loading?: boolean
 }
 
+const sanitizeProjectName = (name: string) => {
+  return name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+}
+
 const ProjectInitModal: React.FC<ProjectInitModalProps> = ({ onSubmit, onCancel, apiUrl, loading }) => {
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (path.trim()) {
-      onSubmit(name.trim(), path.trim())
+    const sanitizedName = name.trim() ? sanitizeProjectName(name.trim()) : ''
+    const sanitizedPath = path.trim()
+    if (sanitizedPath) {
+      onSubmit(sanitizedName, sanitizedPath)
     }
   }
 
@@ -39,8 +45,9 @@ const ProjectInitModal: React.FC<ProjectInitModalProps> = ({ onSubmit, onCancel,
 
         <form onSubmit={handleSubmit}>
           <div style={styles.field}>
-            <label style={styles.label}>Project Name (optional)</label>
+            <label style={styles.label} htmlFor="project-name">Project Name (optional)</label>
             <input
+              id="project-name"
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
@@ -51,8 +58,9 @@ const ProjectInitModal: React.FC<ProjectInitModalProps> = ({ onSubmit, onCancel,
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Directory Path (required)</label>
+            <label style={styles.label} htmlFor="directory-path">Directory Path (required)</label>
             <input
+              id="directory-path"
               type="text"
               value={path}
               onChange={e => setPath(e.target.value)}

@@ -136,7 +136,7 @@ Examples:
 				// Wait for server to be ready
 				_ = waitForServer(startPort, 15*time.Second)
 				uiURL := "http://localhost:3001"
-				fmt.Printf("🌐 Opening web console at %s\n", uiURL)
+				cmd.Printf("🌐 Opening web console at %s\n", uiURL)
 
 				var openCmd string
 				var openArgs []string
@@ -168,9 +168,9 @@ Examples:
 			}()
 		}
 
-		fmt.Printf("🚀 Starting Integrated OpenExec Server\n")
-		fmt.Printf("   Project: %s\n", config.Name)
-		fmt.Printf("   Port: %d\n", startPort)
+		cmd.Printf("🚀 Starting Integrated OpenExec Server\n")
+		cmd.Printf("   Project: %s\n", config.Name)
+		cmd.Printf("   Port: %d\n", startPort)
 		
 		// Call the integrated server directly
 		server.StartServer()
@@ -246,11 +246,11 @@ Examples:
 		}
 
 		if len(tasks) == 0 {
-			fmt.Println("No pending tasks found.")
-			fmt.Println()
-			fmt.Println("Generate tasks from intent:")
-			fmt.Println("  openexec plan INTENT.md")
-			fmt.Println("  openexec story import")
+			cmd.Println("No pending tasks found.")
+			cmd.Println()
+			cmd.Println("Generate tasks from intent:")
+			cmd.Println("  openexec plan INTENT.md")
+			cmd.Println("  openexec story import")
 			return nil
 		}
 
@@ -278,19 +278,19 @@ Examples:
 		}
 
 		if pendingCount == 0 {
-			fmt.Println("No pending tasks found.")
+			cmd.Println("No pending tasks found.")
 			return nil
 		}
 
-		fmt.Printf("📋 Executing %d task(s)\n", pendingCount)
+		cmd.Printf("📋 Executing %d task(s)\n", pendingCount)
 		if startExecutor != "" {
-			fmt.Printf("   Executor: %s\n", startExecutor)
+			cmd.Printf("   Executor: %s\n", startExecutor)
 		}
 		if startReviewer != "" {
-			fmt.Printf("   Reviewer: %s\n", startReviewer)
+			cmd.Printf("   Reviewer: %s\n", startReviewer)
 		}
-		fmt.Printf("   Workers:  %d\n", startWorkers)
-		fmt.Println()
+		cmd.Printf("   Workers:  %d\n", startWorkers)
+		cmd.Println()
 
 		// Load release manager for status updates
 		mgr, err := getReleaseManager(cmd)
@@ -299,12 +299,12 @@ Examples:
 		}
 
 		// Execute tasks in parallel using DAG scheduler
-		err = executeTasksParallel(config.ProjectDir, tasks, startWorkers, mgr)
+		err = executeTasksParallel(cmd, config.ProjectDir, tasks, startWorkers, mgr)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("✓ Execution complete")
+		cmd.Println("✓ Execution complete")
 		return nil
 	},
 }
@@ -326,7 +326,7 @@ type TaskNode struct {
 	Retries   int
 }
 
-func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr *release.Manager) error {
+func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, workerCount int, mgr *release.Manager) error {
 	if workerCount <= 0 {
 		workerCount = 4
 	}
@@ -355,7 +355,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 	}
 
 	if totalToRun == 0 {
-		fmt.Println("No pending tasks to execute.")
+		cmd.Println("No pending tasks to execute.")
 		return nil
 	}
 
@@ -417,7 +417,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				node.Status = StatusRunning
 				mu.Unlock()
 
-				fmt.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
+				cmd.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
 
 				// Start execution loop
 				var lastError string
@@ -426,25 +426,25 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 
 				for node.Retries < maxRetries {
 					if node.Retries > 0 {
-						fmt.Printf("[Worker %d] 🔄 Self-healing attempt %d/%d for %s\n", workerID, node.Retries, maxRetries, node.Task.ID)
+						cmd.Printf("[Worker %d] 🔄 Self-healing attempt %d/%d for %s\n", workerID, node.Retries, maxRetries, node.Task.ID)
 					}
 
 					// Create execution loop (passing last error if this is a retry)
 					loopID, err := createExecutionLoopWithRetry(projectDir, node.Task, mgr, lastError)
 					if err != nil {
-						fmt.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
+						cmd.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
 						lastError = err.Error()
 						node.Retries++
 						continue
 					}
 
-					fmt.Printf("[Worker %d]    Loop: %s\n", workerID, loopID)
+					cmd.Printf("[Worker %d]    Loop: %s\n", workerID, loopID)
 
 					// Wait for loop to complete
-					err = waitForLoop(loopID)
+					err = waitForLoop(cmd, loopID)
 					
 					if err == nil && node.Task.VerificationScript != "" {
-						fmt.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
+						cmd.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
 						
 						// Execute the verification script
 						verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
@@ -452,10 +452,10 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 						
 						output, verifyErr := verifyCmd.CombinedOutput()
 						if verifyErr != nil {
-							fmt.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
+							cmd.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
 							err = fmt.Errorf("verification script failed: %s\nOutput:\n%s", verifyErr, string(output))
 						} else {
-							fmt.Printf("[Worker %d] ✓ Verification passed for %s\n", workerID, node.Task.ID)
+							cmd.Printf("[Worker %d] ✓ Verification passed for %s\n", workerID, node.Task.ID)
 							success = true
 							break
 						}
@@ -476,7 +476,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 
 				mu.Lock()
 				if !success {
-					fmt.Printf("[Worker %d] ⚠ Task %s permanently failed after %d attempts\n", workerID, node.Task.ID, node.Retries)
+					cmd.Printf("[Worker %d] ⚠ Task %s permanently failed after %d attempts\n", workerID, node.Task.ID, node.Retries)
 					node.Status = StatusFailed
 					mu.Unlock()
 					errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
@@ -487,7 +487,7 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				if mgr != nil {
 					_, updateErr := mgr.CompleteTask(node.Task.ID)
 					if updateErr != nil {
-						fmt.Printf("[Worker %d] ⚠ Warning: failed to update status for %s: %v\n", workerID, node.Task.ID, updateErr)
+						cmd.Printf("[Worker %d] ⚠ Warning: failed to update status for %s: %v\n", workerID, node.Task.ID, updateErr)
 					}
 				}
 
@@ -498,13 +498,13 @@ func executeTasksParallel(projectDir string, tasks []Task, workerCount int, mgr 
 				
 				// ADAPTIVE DISCOVERY: Re-scan for new tasks
 				doneCount++
-				fmt.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
+				cmd.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
 				
 				newTasks, err := loadPendingTasks(projectDir)
 				if err == nil {
 					for _, nt := range newTasks {
 						if _, exists := nodes[nt.ID]; !exists {
-							fmt.Printf("[Worker %d] ✨ Discovered new task: %s\n", workerID, nt.ID)
+							cmd.Printf("[Worker %d] ✨ Discovered new task: %s\n", workerID, nt.ID)
 							newNode := &TaskNode{
 								Task:      nt,
 								Status:    StatusPending,
@@ -949,7 +949,7 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 }
 
 // waitForLoop polls the loop status until completion
-func waitForLoop(loopID string) error {
+func waitForLoop(cmd *cobra.Command, loopID string) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	lastIteration := 0
 
@@ -968,23 +968,23 @@ func waitForLoop(loopID string) error {
 
 		// Show iteration progress
 		if loop.Iteration > lastIteration {
-			fmt.Printf("   → Iteration %d\n", loop.Iteration)
+			cmd.Printf("   → Iteration %d\n", loop.Iteration)
 			lastIteration = loop.Iteration
 		}
 
 		// Check terminal states
 		switch loop.Status {
 		case "complete":
-			fmt.Printf("   ✓ Complete (iteration %d)\n", loop.Iteration)
+			cmd.Printf("   ✓ Complete (iteration %d)\n", loop.Iteration)
 			return nil
 		case "error":
-			fmt.Printf("   ❌ Error\n")
+			cmd.Printf("   ❌ Error\n")
 			return fmt.Errorf("loop failed")
 		case "max_iterations":
-			fmt.Printf("   ⚠ Max iterations reached (%d)\n", loop.Iteration)
+			cmd.Printf("   ⚠ Max iterations reached (%d)\n", loop.Iteration)
 			return nil
 		case "paused":
-			fmt.Printf("   ⏸ Paused\n")
+			cmd.Printf("   ⏸ Paused\n")
 			return nil
 		}
 

@@ -51,26 +51,26 @@ and contracts before generating your INTENT.md and stories.`,
 			return fmt.Errorf("openexec-planner not found in PATH. Please install it first")
 		}
 
-		fmt.Println(color.CyanString("=== OpenExec Guided Intent Interviewer ==="))
-		fmt.Printf("   Project: %s\n", config.Name)
-		fmt.Printf("   Model:   %s\n", model)
+		cmd.Println(color.CyanString("=== OpenExec Guided Intent Interviewer ==="))
+		cmd.Printf("   Project: %s\n", config.Name)
+		cmd.Printf("   Model:   %s\n", model)
 		
 		statePath := filepath.Join(".openexec", "wizard_state.json")
 		stateJSON := ""
 		
 		// Try to resume existing session
 		if data, err := os.ReadFile(statePath); err == nil {
-			fmt.Println(color.YellowString("   [Resuming existing session from %s]", statePath))
+			cmd.Println(color.YellowString("   [Resuming existing session from %s]", statePath))
 			stateJSON = string(data)
 		}
 
-		fmt.Println("Tell me about your project (free-form dump, or type 'exit' to quit):")
-		fmt.Println()
+		cmd.Println("Tell me about your project (free-form dump, or type 'exit' to quit):")
+		cmd.Println()
 
 		reader := bufio.NewReader(os.Stdin)
 
 		for {
-			fmt.Print(color.GreenString("> "))
+			cmd.Print(color.GreenString("> "))
 			input, err := reader.ReadString('\n')
 			if err != nil {
 				return err
@@ -78,7 +78,7 @@ and contracts before generating your INTENT.md and stories.`,
 
 			message := strings.TrimSpace(input)
 			if message == "exit" || message == "quit" {
-				fmt.Println("Goodbye! Your progress is saved in " + statePath)
+				cmd.Println("Goodbye! Your progress is saved in " + statePath)
 				return nil
 			}
 
@@ -87,9 +87,9 @@ and contracts before generating your INTENT.md and stories.`,
 			}
 
 			// Call orchestration wizard
-			fmt.Print(color.CyanString("Thinking... "))
+			cmd.Print(color.CyanString("Thinking... "))
 			resp, err := callOrchestrationWizard(message, stateJSON, model)
-			fmt.Print("\r") // Clear Thinking line
+			cmd.Print("\r") // Clear Thinking line
 			if err != nil {
 				return err
 			}
@@ -103,27 +103,27 @@ and contracts before generating your INTENT.md and stories.`,
 
 			// Show feedback
 			if resp.Acknowledgement != "" {
-				fmt.Println()
-				fmt.Println(color.BlueString("🤖 %s", resp.Acknowledgement))
+				cmd.Println()
+				cmd.Println(color.BlueString("🤖 %s", resp.Acknowledgement))
 			}
 
 			if len(resp.NewFacts) > 0 {
-				fmt.Println(color.WhiteString("\n  ✔ Explicit:"))
+				cmd.Println(color.WhiteString("\n  ✔ Explicit:"))
 				for _, f := range resp.NewFacts {
-					fmt.Printf("    - %s\n", f)
+					cmd.Printf("    - %s\n", f)
 				}
 			}
 
 			if len(resp.NewAssumptions) > 0 {
-				fmt.Println(color.YellowString("\n  ⚠ Assumed:"))
+				cmd.Println(color.YellowString("\n  ⚠ Assumed:"))
 				for _, a := range resp.NewAssumptions {
-					fmt.Printf("    - %s\n", a)
+					cmd.Printf("    - %s\n", a)
 				}
 			}
 
 			if resp.IsComplete {
-				fmt.Println()
-				fmt.Println(color.CyanString("✔ Intent is complete! Rendering INTENT.md..."))
+				cmd.Println()
+				cmd.Println(color.CyanString("✔ Intent is complete! Rendering INTENT.md..."))
 				
 				md, err := renderIntentMD(stateJSON, model)
 				if err != nil {
@@ -134,15 +134,15 @@ and contracts before generating your INTENT.md and stories.`,
 					return fmt.Errorf("failed to write INTENT.md: %w", err)
 				}
 				
-				fmt.Println("Written to INTENT.md")
-				fmt.Println("\nYou can now run: " + color.GreenString("openexec plan INTENT.md"))
+				cmd.Println("Written to INTENT.md")
+				cmd.Println("\nYou can now run: " + color.GreenString("openexec plan INTENT.md"))
 				return nil
 			}
 
 			// Ask next question
-			fmt.Println()
-			fmt.Println(color.GreenString("? %s", resp.NextQuestion))
-			fmt.Println()
+			cmd.Println()
+			cmd.Println(color.GreenString("? %s", resp.NextQuestion))
+			cmd.Println()
 		}
 	},
 }

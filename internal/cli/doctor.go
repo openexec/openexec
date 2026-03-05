@@ -91,9 +91,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		baseDir = args[0]
 	}
 
-	fmt.Println("OpenExec Doctor")
-	fmt.Println("===============")
-	fmt.Println()
+	cmd.Println("OpenExec Doctor")
+	cmd.Println("===============")
+	cmd.Println()
 
 	var allResults []CheckResult
 	passCount, warnCount, failCount := 0, 0, 0
@@ -105,26 +105,29 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Scan for projects
 	projects := findProjects(baseDir)
 	if len(projects) == 0 {
-		fmt.Printf("No OpenExec projects found in %s\n", baseDir)
-		fmt.Println()
-		fmt.Println("To initialize a new project, run:")
-		fmt.Println("  openexec init <project-name>")
-		return nil
+		cmd.Printf("No OpenExec projects found in %s\n", baseDir)
+		cmd.Println()
+		if executionAPIURL == "" {
+			cmd.Println("To initialize a new project, run:")
+			cmd.Println("  openexec init <project-name>")
+			return nil
+		}
+	} else {
+		cmd.Printf("Found %d project(s)\n\n", len(projects))
 	}
-
-	fmt.Printf("Found %d project(s)\n\n", len(projects))
 
 	// Check each project
 	for _, projectPath := range projects {
+
 		projectName := filepath.Base(projectPath)
-		fmt.Printf("Project: %s\n", projectName)
-		fmt.Println(repeatChar('-', len("Project: ")+len(projectName)))
+		cmd.Printf("Project: %s\n", projectName)
+		cmd.Println(repeatChar('-', len("Project: ")+len(projectName)))
 
 		projectResults := checkProject(projectPath)
 		allResults = append(allResults, projectResults...)
 
 		for _, r := range projectResults {
-			printCheckResult(r)
+			printCheckResult(cmd, r)
 			switch r.Status {
 			case "pass":
 				passCount++
@@ -134,19 +137,19 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				failCount++
 			}
 		}
-		fmt.Println()
+		cmd.Println()
 	}
 
 	// Check execution API if specified
 	if executionAPIURL != "" {
-		fmt.Println("Execution API")
-		fmt.Println("-------------")
+		cmd.Println("Execution API")
+		cmd.Println("-------------")
 
 		apiResults := checkExecutionAPI(executionAPIURL)
 		allResults = append(allResults, apiResults...)
 
 		for _, r := range apiResults {
-			printCheckResult(r)
+			printCheckResult(cmd, r)
 			switch r.Status {
 			case "pass":
 				passCount++
@@ -156,27 +159,27 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				failCount++
 			}
 		}
-		fmt.Println()
+		cmd.Println()
 	}
 
 	// Print summary
-	fmt.Println("Summary")
-	fmt.Println("-------")
-	fmt.Printf("  Passed:   %d\n", passCount)
-	fmt.Printf("  Warnings: %d\n", warnCount)
-	fmt.Printf("  Failed:   %d\n", failCount)
-	fmt.Println()
+	cmd.Println("Summary")
+	cmd.Println("-------")
+	cmd.Printf("  Passed:   %d\n", passCount)
+	cmd.Printf("  Warnings: %d\n", warnCount)
+	cmd.Printf("  Failed:   %d\n", failCount)
+	cmd.Println()
 
 	// Print remediation hints for failures
 	hasRemediation := false
 	for _, r := range allResults {
 		if r.Status == "fail" && r.Remediation != "" {
 			if !hasRemediation {
-				fmt.Println("Remediation Steps")
-				fmt.Println("-----------------")
+				cmd.Println("Remediation Steps")
+				cmd.Println("-----------------")
 				hasRemediation = true
 			}
-			fmt.Printf("  - %s: %s\n", r.Name, r.Remediation)
+			cmd.Printf("  - %s: %s\n", r.Name, r.Remediation)
 		}
 	}
 
@@ -184,7 +187,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("doctor found %d issue(s)", failCount)
 	}
 
-	fmt.Println("All checks passed!")
+	cmd.Println("All checks passed!")
 	return nil
 }
 
@@ -614,7 +617,7 @@ func checkAPIEndpoint(baseURL, path, name string) []CheckResult {
 	return results
 }
 
-func printCheckResult(r CheckResult) {
+func printCheckResult(cmd *cobra.Command, r CheckResult) {
 	var symbol string
 	switch r.Status {
 	case "pass":
@@ -625,10 +628,10 @@ func printCheckResult(r CheckResult) {
 		symbol = "[FAIL]"
 	}
 
-	fmt.Printf("  %s %s: %s\n", symbol, r.Name, r.Message)
+	cmd.Printf("  %s %s: %s\n", symbol, r.Name, r.Message)
 
 	if verboseOutput && r.Remediation != "" {
-		fmt.Printf("         Hint: %s\n", r.Remediation)
+		cmd.Printf("         Hint: %s\n", r.Remediation)
 	}
 }
 
@@ -679,11 +682,11 @@ func runDoctorIntent(cmd *cobra.Command, args []string) error {
 	// Handle fix mode
 	if fixMode {
 		fixer := intent.NewFixer(result)
-		fmt.Println(fixer.Preview())
+		cmd.Println(fixer.Preview())
 		if result.Valid {
-			fmt.Println("No critical sections missing.")
+			cmd.Println("No critical sections missing.")
 		} else {
-			fmt.Println("To add these stubs, copy the content above into your INTENT.md")
+			cmd.Println("To add these stubs, copy the content above into your INTENT.md")
 		}
 		return nil
 	}
@@ -696,7 +699,7 @@ func runDoctorIntent(cmd *cobra.Command, args []string) error {
 		reporter.SetFormat(intent.ReportFormatCompact)
 	}
 
-	fmt.Println(reporter.Generate())
+	cmd.Println(reporter.Generate())
 
 	// Exit with error if not valid
 	if !result.Valid {

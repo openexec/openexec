@@ -80,3 +80,82 @@ func TestServer_CreateLoop(t *testing.T) {
 		t.Errorf("expected non-400 status, got %v", rr.Code)
 	}
 }
+
+func TestServer_ListLoops(t *testing.T) {
+	srv := &Server{
+		loops: make(map[string]*LoopInstance),
+	}
+	
+	// Add a dummy loop
+	srv.loops["test-loop"] = &LoopInstance{
+		ID:     "test-loop",
+		Status: "running",
+	}
+
+	req, _ := http.NewRequest("GET", "/api/v1/loops", nil)
+	rr := httptest.NewRecorder()
+	
+	handler := http.HandlerFunc(srv.listLoops)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+
+	var resp []LoopResponse
+	json.Unmarshal(rr.Body.Bytes(), &resp)
+	if len(resp) != 1 || resp[0].ID != "test-loop" {
+		t.Errorf("unexpected response: %v", resp)
+	}
+}
+
+func TestServer_GetLoop(t *testing.T) {
+	srv := &Server{
+		loops: make(map[string]*LoopInstance),
+	}
+	
+	srv.loops["test-loop"] = &LoopInstance{
+		ID:     "test-loop",
+		Status: "running",
+	}
+
+	t.Run("Found", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/loops/test-loop", nil)
+		rr := httptest.NewRecorder()
+		srv.getLoop(rr, req, "test-loop")
+
+		if rr.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rr.Code)
+		}
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/loops/none", nil)
+		rr := httptest.NewRecorder()
+		srv.getLoop(rr, req, "none")
+
+		if rr.Code != http.StatusNotFound {
+			t.Errorf("expected 404, got %d", rr.Code)
+		}
+	})
+}
+
+func TestServer_Audit(t *testing.T) {
+	tmpDir := t.TempDir()
+	logger, _ := audit.NewLogger(filepath.Join(tmpDir, "audit.db"))
+	defer logger.Close()
+
+	srv := &Server{
+		auditWriter: logger,
+	}
+
+	req, _ := http.NewRequest("GET", "/api/v1/audit", nil)
+	rr := httptest.NewRecorder()
+	
+	handler := http.HandlerFunc(srv.handleAudit)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+}

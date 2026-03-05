@@ -3,7 +3,6 @@ package cli
 import (
     "bytes"
     "encoding/json"
-    "fmt"
     "sort"
 
     "github.com/spf13/cobra"
@@ -34,7 +33,7 @@ Without flags, behaves like standard help.`,
             if err != nil {
                 return err
             }
-            fmt.Println(string(data))
+            cmd.Println(string(data))
             return nil
         }
 
@@ -42,7 +41,7 @@ Without flags, behaves like standard help.`,
             // Print aggregated help for all commands
             var buf bytes.Buffer
             writeAllHelp(&buf, rootCmd)
-            fmt.Print(buf.String())
+            cmd.Print(buf.String())
             return nil
         }
 

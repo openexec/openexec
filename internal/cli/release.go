@@ -46,12 +46,12 @@ If git integration is enabled, this will create a release branch (e.g., release/
 			return err
 		}
 
-		fmt.Printf("Created release: %s (v%s)\n", rel.Name, rel.Version)
+		cmd.Printf("Created release: %s (v%s)\n", rel.Name, rel.Version)
 		if rel.Git != nil && rel.Git.Branch != "" {
-			fmt.Printf("  Branch: %s\n", rel.Git.Branch)
+			cmd.Printf("  Branch: %s\n", rel.Git.Branch)
 		}
 		if mgr.GetConfig().ApprovalEnabled {
-			fmt.Printf("  Approval required: yes\n")
+			cmd.Printf("  Approval required: yes\n")
 		}
 
 		return nil
@@ -69,7 +69,7 @@ var releaseShowCmd = &cobra.Command{
 
 		rel := mgr.GetRelease()
 		if rel == nil {
-			fmt.Println("No release defined. Create one with: openexec release create <version>")
+			cmd.Println("No release defined. Create one with: openexec release create <version>")
 			return nil
 		}
 
@@ -79,27 +79,27 @@ var releaseShowCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			cmd.Println(string(data))
 			return nil
 		}
 
-		fmt.Printf("Release: %s\n", rel.Name)
-		fmt.Printf("  Version: %s\n", rel.Version)
-		fmt.Printf("  Status: %s\n", rel.Status)
+		cmd.Printf("Release: %s\n", rel.Name)
+		cmd.Printf("  Version: %s\n", rel.Version)
+		cmd.Printf("  Status: %s\n", rel.Status)
 		if rel.Description != "" {
-			fmt.Printf("  Description: %s\n", rel.Description)
+			cmd.Printf("  Description: %s\n", rel.Description)
 		}
-		fmt.Printf("  Stories: %d\n", len(rel.Stories))
+		cmd.Printf("  Stories: %d\n", len(rel.Stories))
 		if rel.Git != nil {
-			fmt.Printf("  Branch: %s\n", rel.Git.Branch)
+			cmd.Printf("  Branch: %s\n", rel.Git.Branch)
 			if rel.Git.Tag != "" {
-				fmt.Printf("  Tag: %s\n", rel.Git.Tag)
+				cmd.Printf("  Tag: %s\n", rel.Git.Tag)
 			}
 		}
 		if rel.Approval != nil {
-			fmt.Printf("  Approval: %s\n", rel.Approval.Status)
+			cmd.Printf("  Approval: %s\n", rel.Approval.Status)
 			if rel.Approval.ApprovedBy != "" {
-				fmt.Printf("  Approved by: %s\n", rel.Approval.ApprovedBy)
+				cmd.Printf("  Approved by: %s\n", rel.Approval.ApprovedBy)
 			}
 		}
 
@@ -132,7 +132,7 @@ git commit links and approval information when enabled.`,
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(output))
+			cmd.Println(string(output))
 			return nil
 		}
 
@@ -159,9 +159,9 @@ git commit links and approval information when enabled.`,
 			if err := os.WriteFile(outputFile, []byte(changelog), 0o644); err != nil {
 				return err
 			}
-			fmt.Printf("Changelog written to %s\n", outputFile)
+			cmd.Printf("Changelog written to %s\n", outputFile)
 		} else {
-			fmt.Println(changelog)
+			cmd.Println(changelog)
 		}
 
 		return nil
@@ -199,13 +199,13 @@ Examples:
 
 		rel := mgr.GetRelease()
 		if rel != nil && rel.Git != nil {
-			fmt.Printf("Created tag: %s\n", rel.Git.Tag)
+			cmd.Printf("Created tag: %s\n", rel.Git.Tag)
 
 			if push {
 				if err := mgr.PushTag(rel.Git.Tag); err != nil {
 					return fmt.Errorf("tag created but push failed: %w", err)
 				}
-				fmt.Printf("Pushed tag to origin\n")
+				cmd.Printf("Pushed tag to origin\n")
 			}
 		}
 
@@ -243,89 +243,89 @@ Examples:
 		// Handle dry-run output
 		if dryRun {
 			if len(result.WouldMerge) == 0 {
-				fmt.Println("[dry-run] No stories ready to merge.")
-				fmt.Println("Stories must be complete (all tasks done) and approved (if approval_enabled).")
+				cmd.Println("[dry-run] No stories ready to merge.")
+				cmd.Println("Stories must be complete (all tasks done) and approved (if approval_enabled).")
 				return nil
 			}
 
-			fmt.Printf("[dry-run] Would process %d stories:\n", len(result.WouldMerge))
+			cmd.Printf("[dry-run] Would process %d stories:\n", len(result.WouldMerge))
 			for _, id := range result.WouldMerge {
 				story := mgr.GetStory(id)
 				branchInfo := ""
 				if story != nil && story.Git != nil {
 					branchInfo = fmt.Sprintf(" (%s)", story.Git.Branch)
 				}
-				fmt.Printf("  - Would merge %s%s to release\n", id, branchInfo)
+				cmd.Printf("  - Would merge %s%s to release\n", id, branchInfo)
 			}
 
 			if result.ReleaseComplete {
-				fmt.Println("\n[dry-run] Release would be complete!")
+				cmd.Println("\n[dry-run] Release would be complete!")
 				if result.WouldTag {
 					rel := mgr.GetRelease()
-					fmt.Printf("  Would create tag: v%s\n", rel.Version)
+					cmd.Printf("  Would create tag: v%s\n", rel.Version)
 					if push {
-						fmt.Printf("  Would push tag to origin\n")
+						cmd.Printf("  Would push tag to origin\n")
 					}
 				}
 				if result.WouldMergeToMain {
-					fmt.Printf("  Would merge to: %s\n", mgr.GetConfig().BaseBranch)
+					cmd.Printf("  Would merge to: %s\n", mgr.GetConfig().BaseBranch)
 					if push {
-						fmt.Printf("  Would push %s to origin\n", mgr.GetConfig().BaseBranch)
+						cmd.Printf("  Would push %s to origin\n", mgr.GetConfig().BaseBranch)
 					}
 				}
 				if !result.WouldTag && !result.WouldMergeToMain && mgr.GetConfig().ApprovalEnabled {
 					rel := mgr.GetRelease()
 					if rel.Approval == nil || rel.Approval.Status != release.ApprovalApproved {
-						fmt.Println("  Would await release approval before tag/merge")
+						cmd.Println("  Would await release approval before tag/merge")
 					}
 				}
 			}
 
-			fmt.Println("\nRun without --dry-run to execute these actions.")
+			cmd.Println("\nRun without --dry-run to execute these actions.")
 			return nil
 		}
 
 		// Handle actual execution
 		if len(result.StoriesMerged) == 0 {
-			fmt.Println("No stories ready to merge.")
-			fmt.Println("Stories must be complete (all tasks done) and approved (if approval_enabled).")
-			fmt.Println("\nTip: Use --dry-run to preview what would happen.")
+			cmd.Println("No stories ready to merge.")
+			cmd.Println("Stories must be complete (all tasks done) and approved (if approval_enabled).")
+			cmd.Println("\nTip: Use --dry-run to preview what would happen.")
 			return nil
 		}
 
-		fmt.Printf("Processed %d stories:\n", len(result.StoriesMerged))
+		cmd.Printf("Processed %d stories:\n", len(result.StoriesMerged))
 		for _, id := range result.StoriesMerged {
-			fmt.Printf("  - Merged %s to release\n", id)
+			cmd.Printf("  - Merged %s to release\n", id)
 		}
 
 		if len(result.Errors) > 0 {
-			fmt.Println("\nErrors:")
+			cmd.Println("\nErrors:")
 			for _, e := range result.Errors {
-				fmt.Printf("  - %s\n", e)
+				cmd.Printf("  - %s\n", e)
 			}
 		}
 
 		if result.ReleaseComplete {
-			fmt.Println("\nRelease complete!")
+			cmd.Println("\nRelease complete!")
 
 			rel := mgr.GetRelease()
 			if result.ReleaseTagged {
-				fmt.Printf("  Tag: %s\n", rel.Git.Tag)
+				cmd.Printf("  Tag: %s\n", rel.Git.Tag)
 				if push {
 					if err := mgr.PushTag(rel.Git.Tag); err != nil {
-						fmt.Printf("  Warning: failed to push tag: %v\n", err)
+						cmd.Printf("  Warning: failed to push tag: %v\n", err)
 					} else {
-						fmt.Printf("  Pushed tag to origin\n")
+						cmd.Printf("  Pushed tag to origin\n")
 					}
 				}
 			}
 			if result.ReleaseMergedToMain {
-				fmt.Printf("  Merged to: %s\n", mgr.GetConfig().BaseBranch)
+				cmd.Printf("  Merged to: %s\n", mgr.GetConfig().BaseBranch)
 				if push {
 					if err := mgr.PushBranch(mgr.GetConfig().BaseBranch); err != nil {
-						fmt.Printf("  Warning: failed to push %s: %v\n", mgr.GetConfig().BaseBranch, err)
+						cmd.Printf("  Warning: failed to push %s: %v\n", mgr.GetConfig().BaseBranch, err)
 					} else {
-						fmt.Printf("  Pushed %s to origin\n", mgr.GetConfig().BaseBranch)
+						cmd.Printf("  Pushed %s to origin\n", mgr.GetConfig().BaseBranch)
 					}
 				}
 			}
@@ -333,8 +333,8 @@ Examples:
 			if !result.ReleaseTagged && !result.ReleaseMergedToMain {
 				if mgr.GetConfig().ApprovalEnabled {
 					if rel.Approval == nil || rel.Approval.Status != release.ApprovalApproved {
-						fmt.Println("  Awaiting release approval before tag/merge")
-						fmt.Println("  Run: openexec release approve --approver <name>")
+						cmd.Println("  Awaiting release approval before tag/merge")
+						cmd.Println("  Run: openexec release approve --approver <name>")
 					}
 				}
 			}
@@ -376,7 +376,7 @@ Examples:
 			return fmt.Errorf("failed to push branch: %w", err)
 		}
 
-		fmt.Printf("Pushed branch %s to origin\n", branch)
+		cmd.Printf("Pushed branch %s to origin\n", branch)
 		return nil
 	},
 }
@@ -391,8 +391,8 @@ var releaseApproveCmd = &cobra.Command{
 		}
 
 		if !mgr.GetConfig().ApprovalEnabled {
-			fmt.Println("Approval workflow is not enabled.")
-			fmt.Println("Enable it with: openexec config set approval_enabled true")
+			cmd.Println("Approval workflow is not enabled.")
+			cmd.Println("Enable it with: openexec config set approval_enabled true")
 			return nil
 		}
 
@@ -424,7 +424,7 @@ var releaseApproveCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Release approved by %s\n", approverID)
+		cmd.Printf("Release approved by %s\n", approverID)
 		return nil
 	},
 }
@@ -442,8 +442,8 @@ This is useful for CI/CD pipelines to check if there are items blocking the rele
 		}
 
 		if !mgr.GetConfig().ApprovalEnabled {
-			fmt.Println("Approval workflow is not enabled.")
-			fmt.Println("Enable it with: openexec config set approval_enabled true")
+			cmd.Println("Approval workflow is not enabled.")
+			cmd.Println("Enable it with: openexec config set approval_enabled true")
 			return nil
 		}
 
@@ -455,7 +455,7 @@ This is useful for CI/CD pipelines to check if there are items blocking the rele
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			cmd.Println(string(data))
 			return nil
 		}
 
@@ -463,31 +463,31 @@ This is useful for CI/CD pipelines to check if there are items blocking the rele
 
 		if len(pending.Tasks) > 0 {
 			hasItems = true
-			fmt.Printf("Tasks awaiting approval (%d):\n", len(pending.Tasks))
+			cmd.Printf("Tasks awaiting approval (%d):\n", len(pending.Tasks))
 			for _, t := range pending.Tasks {
-				fmt.Printf("  - %s: %s [%s]\n", t.ID, t.Title, t.Status)
+				cmd.Printf("  - %s: %s [%s]\n", t.ID, t.Title, t.Status)
 			}
-			fmt.Println()
+			cmd.Println()
 		}
 
 		if len(pending.Stories) > 0 {
 			hasItems = true
-			fmt.Printf("Stories awaiting approval (%d):\n", len(pending.Stories))
+			cmd.Printf("Stories awaiting approval (%d):\n", len(pending.Stories))
 			for _, s := range pending.Stories {
-				fmt.Printf("  - %s: %s\n", s.ID, s.Title)
+				cmd.Printf("  - %s: %s\n", s.ID, s.Title)
 			}
-			fmt.Println()
+			cmd.Println()
 		}
 
 		if pending.Release != nil {
 			hasItems = true
-			fmt.Printf("Release awaiting approval:\n")
-			fmt.Printf("  - %s (v%s)\n", pending.Release.Name, pending.Release.Version)
-			fmt.Println()
+			cmd.Printf("Release awaiting approval:\n")
+			cmd.Printf("  - %s (v%s)\n", pending.Release.Name, pending.Release.Version)
+			cmd.Println()
 		}
 
 		if !hasItems {
-			fmt.Println("No items awaiting approval.")
+			cmd.Println("No items awaiting approval.")
 		}
 
 		return nil
@@ -540,11 +540,11 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Created story: %s\n", storyID)
-		fmt.Printf("  Title: %s\n", title)
-		fmt.Printf("  Type: %s\n", storyType)
+		cmd.Printf("Created story: %s\n", storyID)
+		cmd.Printf("  Title: %s\n", title)
+		cmd.Printf("  Type: %s\n", storyType)
 		if story.Git != nil && story.Git.Branch != "" {
-			fmt.Printf("  Branch: %s\n", story.Git.Branch)
+			cmd.Printf("  Branch: %s\n", story.Git.Branch)
 		}
 
 		return nil
@@ -568,21 +568,21 @@ var storyListCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			cmd.Println(string(data))
 			return nil
 		}
 
 		if len(stories) == 0 {
-			fmt.Println("No stories found.")
+			cmd.Println("No stories found.")
 			return nil
 		}
 
-		fmt.Printf("Stories (%d):\n\n", len(stories))
+		cmd.Printf("Stories (%d):\n\n", len(stories))
 		for _, story := range stories {
 			status := statusIcon(story.Status)
-			fmt.Printf("%s %s: %s [%s]\n", status, story.ID, story.Title, story.StoryType)
+			cmd.Printf("%s %s: %s [%s]\n", status, story.ID, story.Title, story.StoryType)
 			if story.Git != nil && story.Git.Branch != "" {
-				fmt.Printf("     Branch: %s\n", story.Git.Branch)
+				cmd.Printf("     Branch: %s\n", story.Git.Branch)
 			}
 			tasks := mgr.GetTasksForStory(story.ID)
 			if len(tasks) > 0 {
@@ -592,7 +592,7 @@ var storyListCmd = &cobra.Command{
 						completed++
 					}
 				}
-				fmt.Printf("     Tasks: %d/%d completed\n", completed, len(tasks))
+				cmd.Printf("     Tasks: %d/%d completed\n", completed, len(tasks))
 			}
 		}
 
@@ -623,39 +623,39 @@ var storyShowCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			cmd.Println(string(data))
 			return nil
 		}
 
-		fmt.Printf("Story: %s\n", story.ID)
-		fmt.Printf("  Title: %s\n", story.Title)
-		fmt.Printf("  Type: %s\n", story.StoryType)
-		fmt.Printf("  Status: %s\n", story.Status)
-		fmt.Printf("  Priority: %d\n", story.Priority)
+		cmd.Printf("Story: %s\n", story.ID)
+		cmd.Printf("  Title: %s\n", story.Title)
+		cmd.Printf("  Type: %s\n", story.StoryType)
+		cmd.Printf("  Status: %s\n", story.Status)
+		cmd.Printf("  Priority: %d\n", story.Priority)
 
 		if story.Git != nil {
-			fmt.Printf("\nGit:\n")
-			fmt.Printf("  Branch: %s\n", story.Git.Branch)
+			cmd.Printf("\nGit:\n")
+			cmd.Printf("  Branch: %s\n", story.Git.Branch)
 			if story.Git.MergedTo != "" {
-				fmt.Printf("  Merged to: %s\n", story.Git.MergedTo)
-				fmt.Printf("  Merge commit: %s\n", story.Git.MergeCommit)
+				cmd.Printf("  Merged to: %s\n", story.Git.MergedTo)
+				cmd.Printf("  Merge commit: %s\n", story.Git.MergeCommit)
 			}
 		}
 
 		if story.Approval != nil {
-			fmt.Printf("\nApproval:\n")
-			fmt.Printf("  Status: %s\n", story.Approval.Status)
+			cmd.Printf("\nApproval:\n")
+			cmd.Printf("  Status: %s\n", story.Approval.Status)
 			if story.Approval.ApprovedBy != "" {
-				fmt.Printf("  Approved by: %s\n", story.Approval.ApprovedBy)
+				cmd.Printf("  Approved by: %s\n", story.Approval.ApprovedBy)
 			}
 		}
 
 		tasks := mgr.GetTasksForStory(storyID)
 		if len(tasks) > 0 {
-			fmt.Printf("\nTasks (%d):\n", len(tasks))
+			cmd.Printf("\nTasks (%d):\n", len(tasks))
 			for _, task := range tasks {
 				status := statusIcon(task.Status)
-				fmt.Printf("  %s %s: %s\n", status, task.ID, task.Title)
+				cmd.Printf("  %s %s: %s\n", status, task.ID, task.Title)
 			}
 		}
 
@@ -682,7 +682,7 @@ If approval workflow is enabled, the story must be approved first.`,
 			return err
 		}
 
-		fmt.Printf("Story %s merged to release\n", storyID)
+		cmd.Printf("Story %s merged to release\n", storyID)
 		return nil
 	},
 }
@@ -700,7 +700,7 @@ var storyApproveCmd = &cobra.Command{
 		}
 
 		if !mgr.GetConfig().ApprovalEnabled {
-			fmt.Println("Approval workflow is not enabled.")
+			cmd.Println("Approval workflow is not enabled.")
 			return nil
 		}
 
@@ -732,34 +732,34 @@ var storyApproveCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Story %s approved by %s\n", storyID, approverID)
+		cmd.Printf("Story %s approved by %s\n", storyID, approverID)
 
 		// Process approved stories to trigger auto-merge if configured
 		if mgr.GetConfig().AutoMergeStories {
 			result, err := mgr.ProcessApprovedStories()
 			if err != nil {
-				fmt.Printf("Warning: failed to process approved stories: %v\n", err)
+				cmd.Printf("Warning: failed to process approved stories: %v\n", err)
 			} else if len(result.StoriesMerged) > 0 {
 				for _, id := range result.StoriesMerged {
-					fmt.Printf("  Auto-merged story %s to release\n", id)
+					cmd.Printf("  Auto-merged story %s to release\n", id)
 				}
 				if result.ReleaseComplete {
 					if mgr.GetConfig().ApprovalEnabled {
 						rel := mgr.GetRelease()
 						if rel != nil && (rel.Approval == nil || rel.Approval.Status != release.ApprovalApproved) {
-							fmt.Printf("  Release complete but awaiting approval\n")
-							fmt.Printf("  Run: openexec release approve --approver <name>\n")
+							cmd.Printf("  Release complete but awaiting approval\n")
+							cmd.Printf("  Run: openexec release approve --approver <name>\n")
 						} else {
-							fmt.Printf("  Release complete and approved!\n")
+							cmd.Printf("  Release complete and approved!\n")
 						}
 					} else {
-						fmt.Printf("  Release complete!\n")
+						cmd.Printf("  Release complete!\n")
 					}
 					if result.ReleaseTagged {
-						fmt.Printf("  Created release tag\n")
+						cmd.Printf("  Created release tag\n")
 					}
 					if result.ReleaseMergedToMain {
-						fmt.Printf("  Merged release to main\n")
+						cmd.Printf("  Merged release to main\n")
 					}
 				}
 			}
@@ -840,7 +840,7 @@ Examples:
 
 		// Version validation
 		if sf.SchemaVersion == "" {
-			fmt.Println("Warning: missing schema_version in stories file")
+			cmd.Println("Warning: missing schema_version in stories file")
 		} else if sf.SchemaVersion != "1.0" && sf.SchemaVersion != "1.1" && sf.SchemaVersion != "legacy" {
 			return fmt.Errorf("unsupported stories schema version: %s (expected 1.0 or 1.1)", sf.SchemaVersion)
 		}
@@ -848,13 +848,13 @@ Examples:
 		stories := sf.Stories
 
 		if len(stories) == 0 {
-			fmt.Println("No stories found in file.")
+			cmd.Println("No stories found in file.")
 			return nil
 		}
 
 		// PLANNING GATE: Enforce goal coverage and verifiability
 		if len(sf.Goals) > 0 {
-			fmt.Println("Running Planning Gate checks...")
+			cmd.Println("Running Planning Gate checks...")
 			goalStoryCount := make(map[string]int)
 			goalVerifyCount := make(map[string]int)
 
@@ -875,23 +875,23 @@ Examples:
 					return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script", g.ID, g.Title)
 				}
 			}
-			fmt.Println("✓ Planning Gate passed.")
+			cmd.Println("✓ Planning Gate passed.")
 		}
 
 		if dryRun {
-			fmt.Printf("Would import %d goals and %d stories:\n\n", len(sf.Goals), len(stories))
+			cmd.Printf("Would import %d goals and %d stories:\n\n", len(sf.Goals), len(stories))
 			for _, g := range sf.Goals {
-				fmt.Printf("  Goal %s: %s\n", g.ID, g.Description)
+				cmd.Printf("  Goal %s: %s\n", g.ID, g.Description)
 			}
 			for _, s := range stories {
-				fmt.Printf("  %s [%s]: %s\n", s.ID, s.GoalID, s.Title)
+				cmd.Printf("  %s [%s]: %s\n", s.ID, s.GoalID, s.Title)
 				for _, t := range s.Tasks {
 					id := t.ID
 					if id == "" {
 						// Fallback ID if not provided
 						id = fmt.Sprintf("T-%s-%03d", s.ID, 0) // Just placeholder for dry-run
 					}
-					fmt.Printf("    %s: %s\n", id, t.Title)
+					cmd.Printf("    %s: %s\n", id, t.Title)
 				}
 			}
 			return nil
@@ -910,7 +910,7 @@ Examples:
 				// We need a copy to pass by pointer
 				newGoal := g
 				if err := mgr.CreateGoal(&newGoal); err != nil {
-					fmt.Printf("  [error] %s: %v\n", g.ID, err)
+					cmd.Printf("  [error] %s: %v\n", g.ID, err)
 					continue
 				}
 				goalsCreated++
@@ -922,21 +922,21 @@ Examples:
 		tasksCreated := 0
 		skipped := 0
 
-		fmt.Printf("Importing %d stories from %s...\n\n", len(stories), inputFile)
+		cmd.Printf("Importing %d stories from %s...\n\n", len(stories), inputFile)
 
 		storyIDPattern := regexp.MustCompile(`^(US|REQ)-\d{3}$`)
 
 		for _, genStory := range stories {
 			// Validate ID format
 			if !storyIDPattern.MatchString(genStory.ID) {
-				fmt.Printf("  [error] %s: invalid ID format (expected US-### or REQ-###)\n", genStory.ID)
+				cmd.Printf("  [error] %s: invalid ID format (expected US-### or REQ-###)\n", genStory.ID)
 				continue
 			}
 
 			// Check if story already exists
 			existing := mgr.GetStory(genStory.ID)
 			if existing != nil {
-				fmt.Printf("  [skip] %s: already exists\n", genStory.ID)
+				cmd.Printf("  [skip] %s: already exists\n", genStory.ID)
 				skipped++
 				continue
 			}
@@ -956,12 +956,12 @@ Examples:
 			}
 
 			if err := mgr.CreateStory(story); err != nil {
-				fmt.Printf("  [error] %s: %v\n", genStory.ID, err)
+				cmd.Printf("  [error] %s: %v\n", genStory.ID, err)
 				continue
 			}
 
 			storiesCreated++
-			fmt.Printf("  [created] %s: %s\n", genStory.ID, genStory.Title)
+			cmd.Printf("  [created] %s: %s\n", genStory.ID, genStory.Title)
 
 			// Create tasks for this story
 			for i, genTask := range genStory.Tasks {
@@ -980,20 +980,20 @@ Examples:
 				}
 
 				if err := mgr.CreateTask(task); err != nil {
-					fmt.Printf("    [error] %s: %v\n", taskID, err)
+					cmd.Printf("    [error] %s: %v\n", taskID, err)
 					continue
 				}
 
 				tasksCreated++
-				fmt.Printf("    [created] %s: %s\n", taskID, genTask.Title)
+				cmd.Printf("    [created] %s: %s\n", taskID, genTask.Title)
 			}
 		}
 
-		fmt.Printf("\nImport complete:\n")
-		fmt.Printf("  Stories created: %d\n", storiesCreated)
-		fmt.Printf("  Tasks created: %d\n", tasksCreated)
+		cmd.Printf("\nImport complete:\n")
+		cmd.Printf("  Stories created: %d\n", storiesCreated)
+		cmd.Printf("  Tasks created: %d\n", tasksCreated)
 		if skipped > 0 {
-			fmt.Printf("  Skipped (existing): %d\n", skipped)
+			cmd.Printf("  Skipped (existing): %d\n", skipped)
 		}
 
 		return nil
@@ -1049,14 +1049,14 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Created task: %s\n", taskID)
-		fmt.Printf("  Title: %s\n", title)
-		fmt.Printf("  Story: %s\n", storyID)
+		cmd.Printf("Created task: %s\n", taskID)
+		cmd.Printf("  Title: %s\n", title)
+		cmd.Printf("  Story: %s\n", storyID)
 		if task.Git != nil && task.Git.Branch != "" {
-			fmt.Printf("  Branch: %s\n", task.Git.Branch)
+			cmd.Printf("  Branch: %s\n", task.Git.Branch)
 		}
 		if needsReview {
-			fmt.Printf("  Needs review: yes\n")
+			cmd.Printf("  Needs review: yes\n")
 		}
 
 		return nil
@@ -1087,38 +1087,38 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Task %s marked as done\n", taskID)
+		cmd.Printf("Task %s marked as done\n", taskID)
 
 		if result.StoryComplete {
 			if result.AwaitingApproval {
-				fmt.Printf("  Story %s is complete but awaiting approval\n", result.StoryID)
-				fmt.Printf("  Run: openexec story approve %s\n", result.StoryID)
+				cmd.Printf("  Story %s is complete but awaiting approval\n", result.StoryID)
+				cmd.Printf("  Run: openexec story approve %s\n", result.StoryID)
 			} else if result.StoryMerged {
-				fmt.Printf("  Story %s auto-merged to release\n", result.StoryID)
+				cmd.Printf("  Story %s auto-merged to release\n", result.StoryID)
 			}
 		}
 
 		if result.ReleaseComplete {
-			fmt.Println("  Release is complete!")
+			cmd.Println("  Release is complete!")
 			if result.ReleaseTagged {
-				fmt.Println("  Release tagged")
+				cmd.Println("  Release tagged")
 			}
 			if result.ReleaseMergedToMain {
-				fmt.Println("  Release merged to main")
+				cmd.Println("  Release merged to main")
 			}
 			if !result.ReleaseTagged && !result.ReleaseMergedToMain {
 				rel := mgr.GetRelease()
 				if rel != nil && mgr.GetConfig().ApprovalEnabled {
 					if rel.Approval == nil || rel.Approval.Status != release.ApprovalApproved {
-						fmt.Println("  Awaiting release approval")
-						fmt.Println("  Run: openexec release approve")
+						cmd.Println("  Awaiting release approval")
+						cmd.Println("  Run: openexec release approve")
 					}
 				}
 			}
 		}
 
 		if result.Error != "" {
-			fmt.Printf("  Warning: %s\n", result.Error)
+			cmd.Printf("  Warning: %s\n", result.Error)
 		}
 
 		return nil
@@ -1149,21 +1149,21 @@ var taskListCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Println(string(data))
+			cmd.Println(string(data))
 			return nil
 		}
 
 		if len(tasks) == 0 {
-			fmt.Println("No tasks found.")
+			cmd.Println("No tasks found.")
 			return nil
 		}
 
-		fmt.Printf("Tasks (%d):\n\n", len(tasks))
+		cmd.Printf("Tasks (%d):\n\n", len(tasks))
 		for _, task := range tasks {
 			status := statusIcon(task.Status)
-			fmt.Printf("%s %s: %s [%s]\n", status, task.ID, task.Title, task.StoryID)
+			cmd.Printf("%s %s: %s [%s]\n", status, task.ID, task.Title, task.StoryID)
 			if task.Git != nil && len(task.Git.Commits) > 0 {
-				fmt.Printf("     Commits: %d\n", len(task.Git.Commits))
+				cmd.Printf("     Commits: %d\n", len(task.Git.Commits))
 			}
 		}
 
@@ -1192,7 +1192,7 @@ var taskLinkCmd = &cobra.Command{
 		if len(commitHash) > 7 {
 			shortHash = commitHash[:7]
 		}
-		fmt.Printf("Linked commit %s to task %s\n", shortHash, taskID)
+		cmd.Printf("Linked commit %s to task %s\n", shortHash, taskID)
 		return nil
 	},
 }
@@ -1230,9 +1230,9 @@ Examples:
 		}
 
 		if linked == 0 {
-			fmt.Println("No new commits linked to tasks.")
+			cmd.Println("No new commits linked to tasks.")
 		} else {
-			fmt.Printf("Linked %d commit(s) to tasks.\n", linked)
+			cmd.Printf("Linked %d commit(s) to tasks.\n", linked)
 		}
 
 		return nil
@@ -1266,12 +1266,12 @@ Examples:
 			return err
 		}
 
-		fmt.Printf("Updated PR metadata for task %s\n", taskID)
+		cmd.Printf("Updated PR metadata for task %s\n", taskID)
 		if prNumber > 0 {
-			fmt.Printf("  PR #%d\n", prNumber)
+			cmd.Printf("  PR #%d\n", prNumber)
 		}
 		if prURL != "" {
-			fmt.Printf("  URL: %s\n", prURL)
+			cmd.Printf("  URL: %s\n", prURL)
 		}
 		return nil
 	},
@@ -1290,7 +1290,7 @@ var taskApproveCmd = &cobra.Command{
 		}
 
 		if !mgr.GetConfig().ApprovalEnabled {
-			fmt.Println("Approval workflow is not enabled.")
+			cmd.Println("Approval workflow is not enabled.")
 			return nil
 		}
 
@@ -1323,7 +1323,7 @@ var taskApproveCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Task %s approved by %s\n", taskID, approverID)
+		cmd.Printf("Task %s approved by %s\n", taskID, approverID)
 		return nil
 	},
 }
@@ -1358,29 +1358,29 @@ Examples:
 			}
 		}
 
-		fmt.Println("📋 Goal Verification Report")
-		fmt.Println("==========================")
+		cmd.Println("📋 Goal Verification Report")
+		cmd.Println("==========================")
 
 		if len(args) > 0 {
 			goalID := args[0]
 			if targetStories, ok := goalMap[goalID]; ok {
-				fmt.Printf("Goal %s:\n", goalID)
-				verifyStories(targetStories, execute)
+				cmd.Printf("Goal %s:\n", goalID)
+				verifyStories(cmd, targetStories, execute)
 			} else {
-				fmt.Printf("Goal %s not found or has no supporting stories.\n", goalID)
+				cmd.Printf("Goal %s not found or has no supporting stories.\n", goalID)
 			}
 		} else {
 			if len(goalMap) == 0 {
-				fmt.Println("No goals tracked in current stories.")
+				cmd.Println("No goals tracked in current stories.")
 				return nil
 			}
 			for goalID, targetStories := range goalMap {
-				fmt.Printf("\nGoal %s [%d stories]:\n", goalID, len(targetStories))
-				allDone := verifyStories(targetStories, execute)
+				cmd.Printf("\nGoal %s [%d stories]:\n", goalID, len(targetStories))
+				allDone := verifyStories(cmd, targetStories, execute)
 				if allDone && !execute {
-					fmt.Printf("  ✨ Goal %s is implementations-complete.\n", goalID)
+					cmd.Printf("  ✨ Goal %s is implementations-complete.\n", goalID)
 				} else if allDone && execute {
-					fmt.Printf("  ✨ Goal %s PASSES all verification scripts.\n", goalID)
+					cmd.Printf("  ✨ Goal %s PASSES all verification scripts.\n", goalID)
 				}
 			}
 		}
@@ -1389,30 +1389,30 @@ Examples:
 	},
 }
 
-func verifyStories(stories []*release.Story, execute bool) bool {
+func verifyStories(cmd *cobra.Command, stories []*release.Story, execute bool) bool {
 	allDone := true
 	for _, s := range stories {
-		fmt.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
+		cmd.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
 		
 		if s.Status != "done" && s.Status != "completed" && s.Status != "approved" {
 			allDone = false
 		}
 		
 		if s.VerificationScript != "" {
-			fmt.Printf("    Verification: %s\n", s.VerificationScript)
+			cmd.Printf("    Verification: %s\n", s.VerificationScript)
 			if execute {
-				fmt.Printf("    Running verification...\n")
+				cmd.Printf("    Running verification...\n")
 				verifyCmd := exec.Command("bash", "-c", s.VerificationScript)
 				output, err := verifyCmd.CombinedOutput()
 				if err != nil {
-					fmt.Printf("    ✗ FAILED:\n%s\n", string(output))
+					cmd.Printf("    ✗ FAILED:\n%s\n", string(output))
 					allDone = false
 				} else {
-					fmt.Printf("    ✓ PASSED\n")
+					cmd.Printf("    ✓ PASSED\n")
 				}
 			}
 		} else if execute {
-			fmt.Printf("    ⚠ No verification script provided. Skipping execution.\n")
+			cmd.Printf("    ⚠ No verification script provided. Skipping execution.\n")
 		}
 	}
 	return allDone

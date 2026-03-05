@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -20,9 +18,9 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version of OpenExec CLI",
 	Long:  `Display the current version, build commit, and build date of the OpenExec CLI binary.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("OpenExec CLI v%s\n", Version)
-		fmt.Printf("  Commit:     %s\n", Commit)
-		fmt.Printf("  Build Date: %s\n", BuildDate)
+		cmd.Printf("OpenExec CLI v%s\n", Version)
+		cmd.Printf("  Commit:     %s\n", Commit)
+		cmd.Printf("  Build Date: %s\n", BuildDate)
 	},
 }
 

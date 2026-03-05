@@ -94,12 +94,12 @@ Examples:
 
 		// Helpful gitflow hints (non-fatal)
 		if remoteURL, err := gitClient.GetRemoteURL(); err != nil || remoteURL == "" {
-			fmt.Println("Hint: no 'origin' remote configured. Configure one with: git remote add origin <url>")
+			cmd.Println("Hint: no 'origin' remote configured. Configure one with: git remote add origin <url>")
 		}
 		hasBase := gitClient.BranchExists("main") || gitClient.BranchExists("origin/main") ||
 			gitClient.BranchExists("develop") || gitClient.BranchExists("origin/develop")
 		if !hasBase {
-			fmt.Println("Hint: no base branch ('main' or 'develop') found. Create one, e.g.: git checkout -b main && git push -u origin main")
+			cmd.Println("Hint: no base branch ('main' or 'develop') found. Create one, e.g.: git checkout -b main && git push -u origin main")
 		}
 
 		config, err := project.LoadProjectConfig(projectDir)
@@ -148,32 +148,32 @@ Examples:
 		}
 
 		// Display success message
-		fmt.Printf("\n✓ Project initialized successfully\n")
-		fmt.Printf("  Project name: %s\n", cfg.Name)
-		fmt.Printf("  Project directory: %s\n", cfg.ProjectDir)
-		fmt.Printf("  Tract store: %s\n", cfg.TractStore)
-		fmt.Printf("  Engram memory context: %s\n", cfg.EngramStore)
-		fmt.Printf("\n")
-		fmt.Printf("  Execution settings:\n")
-		fmt.Printf("    Planner model:  %s\n", cfg.Execution.PlannerModel)
-		fmt.Printf("    Executor model: %s\n", cfg.Execution.ExecutorModel)
+		cmd.Printf("\n✓ Project initialized successfully\n")
+		cmd.Printf("  Project name: %s\n", cfg.Name)
+		cmd.Printf("  Project directory: %s\n", cfg.ProjectDir)
+		cmd.Printf("  Tract store: %s\n", cfg.TractStore)
+		cmd.Printf("  Engram memory context: %s\n", cfg.EngramStore)
+		cmd.Printf("\n")
+		cmd.Printf("  Execution settings:\n")
+		cmd.Printf("    Planner model:  %s\n", cfg.Execution.PlannerModel)
+		cmd.Printf("    Executor model: %s\n", cfg.Execution.ExecutorModel)
 		if cfg.Execution.ReviewEnabled {
-			fmt.Printf("    Code review: enabled\n")
-			fmt.Printf("    Reviewer model: %s\n", cfg.Execution.ReviewerModel)
+			cmd.Printf("    Code review: enabled\n")
+			cmd.Printf("    Reviewer model: %s\n", cfg.Execution.ReviewerModel)
 		} else {
-			fmt.Printf("    Code review: disabled\n")
+			cmd.Printf("    Code review: disabled\n")
 		}
 		if cfg.Execution.ParallelEnabled {
-			fmt.Printf("    Parallel processing: enabled (%d workers)\n", cfg.Execution.WorkerCount)
+			cmd.Printf("    Parallel processing: enabled (%d workers)\n", cfg.Execution.WorkerCount)
 		} else {
-			fmt.Printf("    Parallel processing: disabled\n")
+			cmd.Printf("    Parallel processing: disabled\n")
 		}
-		fmt.Printf("\nNext steps:\n")
-		fmt.Printf("  1. Run 'openexec wizard' to define your project requirements (Recommended)\n")
-		fmt.Printf("  2. Run 'openexec plan INTENT.md' to generate stories\n")
-		fmt.Printf("  3. Run 'openexec story import' to import tasks\n")
-		fmt.Printf("  4. Run 'openexec start --daemon' to start execution engine\n")
-		fmt.Printf("  5. Run 'openexec run' to execute tasks\n")
+		cmd.Printf("\nNext steps:\n")
+		cmd.Printf("  1. Run 'openexec wizard' to define your project requirements (Recommended)\n")
+		cmd.Printf("  2. Run 'openexec plan INTENT.md' to generate stories\n")
+		cmd.Printf("  3. Run 'openexec story import' to import tasks\n")
+		cmd.Printf("  4. Run 'openexec start --daemon' to start execution engine\n")
+		cmd.Printf("  5. Run 'openexec run' to execute tasks\n")
 
 		return nil
 	},
@@ -192,28 +192,28 @@ func init() {
 
 // promptExecutionConfig interactively prompts for execution configuration
 func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int) {
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(cmd.InOrStdin())
 
-	fmt.Println("\n=== Execution Settings ===")
+	cmd.Println("\n=== Execution Settings ===")
 
 	// Planner model selection
-	plannerModel = selectModel(reader, "planner", cmd.Flags().Changed("planner"), initPlannerModel)
+	plannerModel = selectModel(cmd, reader, "planner", cmd.Flags().Changed("planner"), initPlannerModel)
 
 	// Ask if same model should be used for execution
-	fmt.Println()
-	fmt.Printf("Use same model '%s' for task execution? [Y/n]: ", plannerModel)
+	cmd.Println()
+	cmd.Printf("Use same model '%s' for task execution? [Y/n]: ", plannerModel)
 	answer, _ := reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 
 	if answer == "n" || answer == "no" {
-		executorModel = selectModel(reader, "executor", cmd.Flags().Changed("executor"), plannerModel)
+		executorModel = selectModel(cmd, reader, "executor", cmd.Flags().Changed("executor"), plannerModel)
 	} else {
 		executorModel = plannerModel
 	}
 
 	// Review configuration
-	fmt.Println()
-	fmt.Print("Enable code review after task execution? [Y/n]: ")
+	cmd.Println()
+	cmd.Print("Enable code review after task execution? [Y/n]: ")
 	answer, _ = reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 
@@ -223,12 +223,12 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 	}
 
 	if reviewEnabled {
-		reviewerModel = selectModel(reader, "reviewer", cmd.Flags().Changed("reviewer"), initReviewerModel)
+		reviewerModel = selectModel(cmd, reader, "reviewer", cmd.Flags().Changed("reviewer"), initReviewerModel)
 	}
 
 	// Parallel configuration
-	fmt.Println()
-	fmt.Print("Enable parallel task execution? [Y/n]: ")
+	cmd.Println()
+	cmd.Print("Enable parallel task execution? [Y/n]: ")
 	answer, _ = reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 
@@ -239,14 +239,11 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 
 	workerCount = 4
 	if parallelEnabled {
-		fmt.Printf("Number of concurrent workers [%d]: ", workerCount)
-		answer, _ = reader.ReadString('\n')
-		answer = strings.TrimSpace(answer)
-		if answer != "" {
-			var count int
-			if _, err := fmt.Sscanf(answer, "%d", &count); err == nil && count > 0 {
-				workerCount = count
-			}
+		cmd.Printf("Number of concurrent workers [%d]: ", workerCount)
+		line, _ := reader.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if line != "" {
+			fmt.Sscanf(line, "%d", &workerCount)
 		}
 	}
 
@@ -254,14 +251,14 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 }
 
 // selectModel prompts user to select a model
-func selectModel(reader *bufio.Reader, modelType string, flagChanged bool, defaultModel string) string {
+func selectModel(cmd *cobra.Command, reader *bufio.Reader, modelType string, flagChanged bool, defaultModel string) string {
 	// If flag was explicitly set, use that value
 	if flagChanged {
 		return defaultModel
 	}
 
-	fmt.Println()
-	fmt.Printf("Select %s model:\n", modelType)
+	cmd.Println()
+	cmd.Printf("Select %s model:\n", modelType)
 
 	// Group by provider
 	currentProvider := ""
@@ -269,14 +266,14 @@ func selectModel(reader *bufio.Reader, modelType string, flagChanged bool, defau
 	for _, m := range availableModels {
 		if m.Provider != currentProvider {
 			currentProvider = m.Provider
-			fmt.Printf("\n  %s:\n", strings.ToUpper(currentProvider))
+			cmd.Printf("\n  %s:\n", strings.ToUpper(currentProvider))
 		}
 		idx++
 		defaultMark := ""
 		if m.Model == defaultModel {
 			defaultMark = " (default)"
 		}
-		fmt.Printf("    [%d] %s - %s%s\n", idx, m.Model, m.Name, defaultMark)
+		cmd.Printf("    [%d] %s - %s%s\n", idx, m.Model, m.Name, defaultMark)
 	}
 
 	// Find default index
@@ -288,7 +285,7 @@ func selectModel(reader *bufio.Reader, modelType string, flagChanged bool, defau
 		}
 	}
 
-	fmt.Printf("\nEnter number [%d]: ", defaultIdx)
+	cmd.Printf("\nEnter number [%d]: ", defaultIdx)
 
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
