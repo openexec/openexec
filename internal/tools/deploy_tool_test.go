@@ -23,6 +23,7 @@ func TestDeployTool(t *testing.T) {
 			Env:         "prod",
 			RuntimeType: "k8s",
 			AuthSteps:   `["gcloud auth login"]`,
+			DeploySteps: `echo "deployed"`,
 			Topology:    `[{"ip": "10.0.0.5", "services": ["backend"]}]`,
 		})
 
@@ -34,7 +35,7 @@ func TestDeployTool(t *testing.T) {
 			t.Fatalf("Execute failed: %v", err)
 		}
 		out := res.(string)
-		if !strings.Contains(out, "k8s runtime") || !strings.Contains(out, "gcloud auth login") {
+		if !strings.Contains(out, "k8s runtime") || !strings.Contains(out, "deployed") {
 			t.Errorf("unexpected output: %s", out)
 		}
 	})

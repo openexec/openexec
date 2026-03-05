@@ -8,6 +8,7 @@ import (
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/tools"
+	"github.com/openexec/openexec/pkg/util"
 )
 
 // Coordinator orchestrates the Deterministic Control Plane
@@ -41,15 +42,36 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 		return nil, fmt.Errorf("intent routing failed: %w", err)
 	}
 
-	// 2. Fetch Tool
+	// 2. Sanitize model outputs
+	c.sanitizeArgs(intent.Args)
+
+	// 3. Fetch Tool
 	tool, ok := c.tools[intent.ToolName]
 	if !ok {
 		return nil, fmt.Errorf("tool %q selected by router but not registered in DCP", intent.ToolName)
 	}
 
-	// 3. Deterministic Execution
+	// 4. Deterministic Execution
 	log.Printf("[DCP] Executing tool %q with confidence %.2f", intent.ToolName, intent.Confidence)
 	return tool.Execute(ctx, intent.Args)
+}
+
+// sanitizeArgs recursively cleans all string values in the arguments map
+func (c *Coordinator) sanitizeArgs(args map[string]interface{}) {
+	for k, v := range args {
+		switch val := v.(type) {
+		case string:
+			args[k] = util.SanitizeInput(val)
+		case map[string]interface{}:
+			c.sanitizeArgs(val)
+		case []interface{}:
+			for i, item := range val {
+				if s, ok := item.(string); ok {
+					val[i] = util.SanitizeInput(s)
+				}
+			}
+		}
+	}
 }
 
 // SyncKnowledge triggers the automatic indexing of source code

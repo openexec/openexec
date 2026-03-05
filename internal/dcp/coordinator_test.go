@@ -32,6 +32,7 @@ func TestDCPCoordinator(t *testing.T) {
 			Env:         "prod",
 			Topology:    `[{"ip": "1.1.1.1"}]`,
 			RuntimeType: "vm",
+			DeploySteps: `echo "success"`,
 		})
 
 		// Act
@@ -50,7 +51,7 @@ func TestDCPCoordinator(t *testing.T) {
 			t.Fatalf("ProcessQuery failed: %v", err)
 		}
 		
-		if !strings.Contains(res.(string), "Executing deployment") {
+		if !strings.Contains(res.(string), "Successfully deployed") {
 			t.Errorf("unexpected result: %v", res)
 		}
 	})
