@@ -49,9 +49,24 @@ OpenExec introduces a **Deterministic Control Plane** that transforms AI agents 
 ### Core Pillars
 - **Surgical Pointer Records (OpenCode):** Automatically maps your functions, structs, and API handlers to exact file byte-offsets. Agents see exactly the code they need, never more, never less.
 - **BitNet Intent Routing:** Uses a local 1-bit 2B model to parse user intent and select tools in milliseconds, avoiding expensive cloud round-trips for simple decisions.
-- **Autonomous Compliance Shield:** Automatically runs mandatory quality gates (go vet, ruff, mypy) before any code is committed via the surgical `safe_commit` tool.
-- **Deterministic Knowledge Base:** Specialized tables for environments (IPs, topologies, auth steps), API contracts, and PRD specifications.
-- **Hard Policy Enforcement:** A local validation layer that blocks dangerous actions (like hardcoded secrets or unsafe commands) before they ever reach your project.
+*   **Autonomous Compliance Shield:** Automatically runs mandatory quality gates (go vet, ruff, mypy) before any code is committed via the surgical `safe_commit` tool.
+*   **Knowledge Hub UI:** A dedicated visual dashboard to inspect surgical pointers, environment topologies, and policy gates.
+*   **Single-Binary Evolution:** Streamlined architecture migrating core logic from Python/Node to native Go for a dependency-free experience.
+
+---
+
+## The Vision: Zero-Dependency Orchestration
+
+As part of our commitment to simplicity and maintainability, OpenExec is evolving into a **Single-Binary AI Operating System**. 
+
+### Streamlining Progress
+- ✅ **Native Go Planner:** The high-fidelity story generation engine has been ported from Python to Go.
+- ✅ **Native Go Wizard:** The interactive project interview process is now native Go logic.
+- ✅ **Unified Knowledge Base:** SQLite-backed relational memory replaces fragmented JSON files and external VectorDBs.
+- 🛠️ **In-Flight:** Embedding the React UI and BitNet inference engine directly into the Go binary.
+
+The goal is a system where a single `curl | sh` install provides the full deterministic orchestration suite with zero external requirements.
+
 
 ### Knowledge CLI
 Manage your project's deterministic brain directly from the terminal:

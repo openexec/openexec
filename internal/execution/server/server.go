@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
 	"github.com/openexec/openexec/internal/knowledge"
@@ -284,6 +285,10 @@ func StartServer() {
 
 	// Integrate the new API server's routes
 	srv.apiServer.RegisterRoutes(mux)
+
+	// Serve embedded UI assets
+	uiFS := openexec.GetUIFS()
+	mux.Handle("/", http.FileServer(http.FS(uiFS)))
 
 	// Demo mode endpoint (if enabled)
 	if *enableDemo {

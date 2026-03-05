@@ -66,6 +66,17 @@ openexec knowledge ls
 
 ---
 
+## Knowledge Hub UI
+
+The **Knowledge Hub** is the visual dashboard for your project's deterministic brain. It is accessible via the OpenExec Web UI and provides real-time visibility into the DCP records.
+
+### Visual Audit
+- **Symbols Dashboard:** Search and view all indexed function pointers and their recorded purposes.
+- **Topology View:** Verify the IP addresses and service mappings for your environments before a deployment.
+- **Policy Registry:** Audit the active safety gates that are currently protecting your codebase.
+
+---
+
 ## The BitNet Intent Router
 
 The DCP includes a **Local 1-bit LLM (BitNet b1.58 2B)** wrapper. When you interact with OpenExec via the UI or CLI chat:
