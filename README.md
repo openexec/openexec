@@ -70,11 +70,14 @@ openexec knowledge show envs
 ## Quick Start
 
 ### 1. Installation
-Download the latest binary for your platform:
+Download the latest binary for your platform (macOS, Linux, Windows), or build from source:
 
 ```bash
 # One-line install (macOS/Linux)
 curl -sSfL https://openexec.io/install.sh | sh
+
+# Build from source (all platforms)
+go build -o bin/openexec ./cmd/openexec
 ```
 
 ### 2. The Execution Flow
@@ -86,8 +89,8 @@ Follow these steps to transform an idea into a verified project:
     Chat with the AI Architect to define your project shape, platform, and contracts. It generates a verified `INTENT.md`.
 3.  **Plan (`openexec plan INTENT.md`)**
     OpenExec decomposes your intent into a structured set of technical stories and tasks by chatting with the AI agent.
-4.  **Start & Monitor (`openexec start --ui`)**
-    Launch the integrated server and open the **Knowledge Hub** dashboard in your browser.
+4.  **Start Server (`openexec start`)**
+    Launch the integrated server. For UI development, run the Vite dev server separately (see below).
 5.  **Run (`openexec run`)**
     The agents begin implementing your tasks, protected by the **Autonomous Compliance Shield**.
 
@@ -136,7 +139,21 @@ graph TD
 | **Wizard** | Requirement Gathering | Chat with AI Agent |
 | **Orchestrator** | Durable Task Execution | Go + SQLite |
 | **DCP** | Deterministic Knowledge | SQLite + BitNet (Local) |
-| **Dashboard** | Visual Hub | React (Embedded in Go) |
+| **Dashboard** | Visual Hub | React (Vite dev server) |
+
+---
+
+## Local UI (Dev)
+
+The CLI and orchestration engine are delivered as a single binary. The web dashboard is developed separately using Vite for a fast feedback loop.
+
+```bash
+cd ui
+npm install
+npm run dev -- --port 3001
+```
+
+Open the dashboard at http://localhost:3001. The server started via `openexec start` exposes the backend API that the UI connects to.
 
 ---
 

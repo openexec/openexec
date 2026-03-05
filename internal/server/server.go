@@ -21,6 +21,7 @@ import (
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/session"
 	"github.com/openexec/openexec/pkg/manager"
+	"github.com/openexec/openexec/pkg/version"
 )
 
 // Server is the unified OpenExec API and UI host.
@@ -146,7 +147,7 @@ func (s *Server) handleKnowledgeEnvs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	s.respondJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "version": "0.1.0"})
+	s.respondJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "version": version.Version})
 }
 
 func (s *Server) respondJSON(w http.ResponseWriter, code int, payload interface{}) {

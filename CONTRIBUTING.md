@@ -44,9 +44,9 @@ We welcome contributions to the OpenExec execution engine!
 
 ## Standards
 
-- **Go Code:** Follow standard PEP 8 and idiomatic Go patterns.
+- **Go Code:** Follow Effective Go and idiomatic patterns; format with `gofmt`.
 - **UI Code:** Use TypeScript and React best practices.
-- **Commit Messages:** Clear, concise messages without automated signatures.
+- **Commit Messages:** Clear, concise subjects; reference issues when applicable.
 
 ## Security
 

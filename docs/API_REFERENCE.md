@@ -23,7 +23,7 @@ This document provides a comprehensive API reference for OpenExec's integrated o
 
 ## Overview
 
-OpenExec uses a unified API layer served by the `axon` backend (port 8080 by default).
+OpenExec exposes a unified API served by the single-binary OpenExec server (`openexec start`, port 8080 by default).
 
 | API Type | Protocol | Base Path | Purpose |
 |----------|----------|-----------|---------|
