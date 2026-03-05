@@ -74,7 +74,7 @@ Download the latest binary for your platform:
 
 ```bash
 # One-line install (macOS/Linux)
-curl -sSfL https://openexec.ai/install.sh | sh
+curl -sSfL https://openexec.io/install.sh | sh
 ```
 
 ### 2. The Execution Flow
@@ -83,9 +83,9 @@ Follow these steps to transform an idea into a verified project:
 1.  **Initialize (`openexec init`)**
     Set up your project configuration and select your preferred AI models.
 2.  **Guided Interview (`openexec wizard`)**
-    Chat with the native Go AI Architect to define your project shape, platform, and contracts. It generates a verified `INTENT.md`.
+    Chat with the AI Architect to define your project shape, platform, and contracts. It generates a verified `INTENT.md`.
 3.  **Plan (`openexec plan INTENT.md`)**
-    OpenExec decomposes your intent into a structured set of technical stories and tasks using the native Go planner.
+    OpenExec decomposes your intent into a structured set of technical stories and tasks by chatting with the AI agent.
 4.  **Start & Monitor (`openexec start --ui`)**
     Launch the integrated server and open the **Knowledge Hub** dashboard in your browser.
 5.  **Run (`openexec run`)**
@@ -132,9 +132,9 @@ graph TD
 | Component | Role | Implementation |
 | :--- | :--- | :--- |
 | **CLI** | Unified Interface | Go (Cobra) |
-| **Planner** | Story & Goal Generation | Native Go |
-| **Wizard** | Requirement Gathering | Native Go |
-| **Orchestrator** | Durable Task Execution | Native Go + SQLite |
+| **Planner** | Story & Goal Generation | Chat with AI Agent |
+| **Wizard** | Requirement Gathering | Chat with AI Agent |
+| **Orchestrator** | Durable Task Execution | Go + SQLite |
 | **DCP** | Deterministic Knowledge | SQLite + BitNet (Local) |
 | **Dashboard** | Visual Hub | React (Embedded in Go) |
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -15,14 +14,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var useNativeWizard bool
-
 var wizardCmd = &cobra.Command{
 	Use:   "wizard",
 	Short: "Start the guided intent interviewer",
 	Long: `Start an interactive chat-based interview to define your project intent.
 The wizard will help you pin down core constraints like platform, application shape,
-and contracts before generating your INTENT.md and stories.`,
+and contracts before generating your INTENT.md and stories using the native Go engine.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Load project configuration
 		config, err := project.LoadProjectConfig(".")
@@ -39,16 +36,9 @@ and contracts before generating your INTENT.md and stories.`,
 			model = "sonnet" // default
 		}
 
-		// Check for planner binary
-		if !useNativeWizard {
-			if _, err := exec.LookPath("openexec-planner"); err != nil {
-				cmd.Println(color.YellowString("   ! openexec-planner not found. Falling back to native Go wizard."))
-				useNativeWizard = true
-			}
-		}
-
 		cmd.Println(color.CyanString("=== OpenExec Guided Intent Interviewer ==="))
 		cmd.Printf("   Project: %s\n", config.Name)
+		cmd.Printf("   Engine:  Native Go Wizard\n")
 		cmd.Printf("   Model:   %s\n", model)
 		
 		statePath := filepath.Join(".openexec", "wizard_state.json")
@@ -64,6 +54,7 @@ and contracts before generating your INTENT.md and stories.`,
 		cmd.Println()
 
 		reader := bufio.NewReader(os.Stdin)
+		p := planner.New(&cliLLMProvider{model: model, cmd: cmd})
 
 		for {
 			cmd.Print(color.GreenString("> "))
@@ -82,9 +73,9 @@ and contracts before generating your INTENT.md and stories.`,
 				continue
 			}
 
-			// Call orchestration wizard
+			// Call orchestration wizard natively
 			cmd.Print(color.CyanString("Thinking... "))
-			resp, err := callOrchestrationWizard(cmd, message, stateJSON, model)
+			resp, err := p.ProcessWizardMessage(cmd.Context(), message, stateJSON)
 			cmd.Print("\r") // Clear Thinking line
 			if err != nil {
 				return err
@@ -121,7 +112,7 @@ and contracts before generating your INTENT.md and stories.`,
 				cmd.Println()
 				cmd.Println(color.CyanString("✔ Intent is complete! Rendering INTENT.md..."))
 				
-				md, err := renderIntentMD(cmd, stateJSON, model)
+				md, err := p.RenderIntent(cmd.Context(), stateJSON)
 				if err != nil {
 					return err
 				}
@@ -145,44 +136,4 @@ and contracts before generating your INTENT.md and stories.`,
 
 func init() {
 	rootCmd.AddCommand(wizardCmd)
-	wizardCmd.Flags().BoolVar(&useNativeWizard, "native", false, "Use internal Go wizard engine")
-}
-
-func callOrchestrationWizard(cmd *cobra.Command, message string, state string, model string) (*planner.WizardResponse, error) {
-	if useNativeWizard {
-		p := planner.New(&cliLLMProvider{model: model, cmd: cmd})
-		return p.ProcessWizardMessage(cmd.Context(), message, state)
-	}
-
-	args := []string{"wizard", "--message", message, "--model", model}
-	if state != "" && state != "{}" {
-		args = append(args, "--state", state)
-	}
-
-	execCmd := exec.Command("openexec-planner", args...)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("wizard failed: %v\nOutput: %s", err, string(output))
-	}
-
-	var resp planner.WizardResponse
-	if err := json.Unmarshal(output, &resp); err != nil {
-		return nil, fmt.Errorf("failed to parse wizard response: %v\nOutput: %s", err, string(output))
-	}
-
-	return &resp, nil
-}
-
-func renderIntentMD(cmd *cobra.Command, state string, model string) (string, error) {
-	if useNativeWizard {
-		p := planner.New(&cliLLMProvider{model: model, cmd: cmd})
-		return p.RenderIntent(cmd.Context(), state)
-	}
-
-	execCmd := exec.Command("openexec-planner", "wizard", "--render", "--state", state, "--model", model)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to render intent: %w\nOutput: %s", err, string(output))
-	}
-	return string(output), nil
 }
