@@ -51,7 +51,7 @@ var knowledgeLsCmd = &cobra.Command{
 }
 
 var knowledgeShowCmd = &cobra.Command{
-	Use:   "show [symbols|envs|api]",
+	Use:   "show [symbols|envs|api|prd]",
 	Short: "Show records in the current project's knowledge base",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,8 +97,27 @@ var knowledgeShowCmd = &cobra.Command{
 			for _, a := range list {
 				cmd.Printf("%s %s: %s\n", a.Method, a.Path, a.Description)
 			}
+		case "prd":
+			// We'll show all sections for simplicity
+			sections := []string{"personas", "user_journeys", "functional", "non_functional"}
+			cmd.Println("Product Requirements (PRD):")
+			cmd.Println("--------------------------")
+			found := false
+			for _, sec := range sections {
+				list, _ := store.ListPRDRecords(sec)
+				if len(list) > 0 {
+					found = true
+					cmd.Printf("\nSection: %s\n", strings.ToUpper(sec))
+					for _, r := range list {
+						cmd.Printf("  - %s: %s\n", r.Key, r.Content)
+					}
+				}
+			}
+			if !found {
+				cmd.Println("No PRD records found. Use the Wizard to generate them.")
+			}
 		default:
-			return fmt.Errorf("unknown type: %s. Use symbols, envs, or api", kType)
+			return fmt.Errorf("unknown type: %s. Use symbols, envs, api, or prd", kType)
 		}
 		return nil
 	},

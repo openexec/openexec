@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/openexec/openexec/internal/intent"
+	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -139,10 +141,39 @@ Examples:
 		// Output path for generated stories
 		storiesPath := filepath.Join(config.TractStore, "stories.json")
 
+		// EXPORT PRD CONTEXT from DCP Knowledge Store if available
+		var prdContextPath string
+		kStore, err := knowledge.NewStore(".")
+		if err == nil {
+			defer kStore.Close()
+			// Fetch all sections
+			sections := []string{"personas", "user_journeys", "functional", "non_functional"}
+			prdData := make(map[string]interface{})
+			for _, sec := range sections {
+				records, _ := kStore.ListPRDRecords(sec)
+				if len(records) > 0 {
+					prdData[sec] = records
+				}
+			}
+
+			if len(prdData) > 0 {
+				cmd.Printf("  + Exporting %d PRD sections from Knowledge Base...\n", len(prdData))
+				tmpFile, _ := os.CreateTemp("", "prd_context_*.json")
+				data, _ := json.Marshal(prdData)
+				tmpFile.Write(data)
+				prdContextPath = tmpFile.Name()
+				tmpFile.Close()
+				defer os.Remove(prdContextPath)
+			}
+		}
+
 		// Build planner command arguments
 		plannerArgs := []string{"generate", absIntentFile, "--output", storiesPath, "--model", plannerModel}
 		if reviewEnabled && reviewerModel != "" {
 			plannerArgs = append(plannerArgs, "--reviewer", reviewerModel)
+		}
+		if prdContextPath != "" {
+			plannerArgs = append(plannerArgs, "--prd-context", prdContextPath)
 		}
 
 		// Invoke planner engine to generate stories

@@ -64,4 +64,22 @@ func TestKnowledgeStore_Specialized(t *testing.T) {
 			t.Errorf("got %q, want %q", got.Description, a.Description)
 		}
 	})
+
+	t.Run("PRD CRUD", func(t *testing.T) {
+		// Arrange
+		p := &PRDRecord{
+			Section: "personas",
+			Key:     "admin",
+			Content: "As an admin, I want to manage users.",
+		}
+
+		// Act
+		store.SetPRDRecord(p)
+		got, _ := store.GetPRDRecord("personas", "admin")
+
+		// Assert
+		if got == nil || got.Content != p.Content {
+			t.Errorf("got %v, want content %q", got, p.Content)
+		}
+	})
 }

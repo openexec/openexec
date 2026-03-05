@@ -55,6 +55,14 @@ type PolicyRecord struct {
 	Description string `json:"description"`
 }
 
+// PRDRecord represents a structured product requirement (Persona, Flow, Requirement)
+type PRDRecord struct {
+	Section     string `json:"section"` // e.g., "personas", "user_journeys", "functional"
+	Key         string `json:"key"`     // e.g., "admin_user", "login_flow"
+	Content     string `json:"content"` // Detailed markdown or JSON
+	Metadata    string `json:"metadata"`
+}
+
 type Store struct {
 	db *sql.DB
 }
@@ -119,6 +127,15 @@ func (s *Store) migrate() error {
 			value TEXT,
 			description TEXT,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);`,
+		// PRD Table
+		`CREATE TABLE IF NOT EXISTS prd_specs (
+			section TEXT,
+			key TEXT,
+			content TEXT,
+			metadata TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (section, key)
 		);`,
 	}
 
@@ -256,6 +273,39 @@ func (s *Store) ListPolicies() ([]*PolicyRecord, error) {
 	for rows.Next() {
 		r := &PolicyRecord{}
 		if err := rows.Scan(&r.Key, &r.Value, &r.Description); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// --- PRD Methods ---
+
+func (s *Store) SetPRDRecord(r *PRDRecord) error {
+	query := `INSERT OR REPLACE INTO prd_specs (section, key, content, metadata) VALUES (?, ?, ?, ?)`
+	_, err := s.db.Exec(query, r.Section, r.Key, r.Content, r.Metadata)
+	return err
+}
+
+func (s *Store) GetPRDRecord(section, key string) (*PRDRecord, error) {
+	r := &PRDRecord{}
+	query := `SELECT section, key, content, metadata FROM prd_specs WHERE section = ? AND key = ?`
+	err := s.db.QueryRow(query, section, key).Scan(&r.Section, &r.Key, &r.Content, &r.Metadata)
+	if err == sql.ErrNoRows { return nil, nil }
+	return r, err
+}
+
+func (s *Store) ListPRDRecords(section string) ([]*PRDRecord, error) {
+	query := `SELECT section, key, content, metadata FROM prd_specs WHERE section = ?`
+	rows, err := s.db.Query(query, section)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	var results []*PRDRecord
+	for rows.Next() {
+		r := &PRDRecord{}
+		if err := rows.Scan(&r.Section, &r.Key, &r.Content, &r.Metadata); err != nil {
 			return nil, err
 		}
 		results = append(results, r)
