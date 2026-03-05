@@ -134,12 +134,15 @@ describe('ChatHeader', () => {
       const forkIndicator = screen.getByTitle(/Forked session/i).parentElement
       expect(forkIndicator).not.toBeNull()
 
-      // Fire mouse enter to show popover
-      fireEvent.mouseEnter(forkIndicator!)
+      // Hover to show popover
+      const user = userEvent.setup()
+      await user.hover(forkIndicator!)
 
-      // Should show the ForkAncestryTree
-      expect(screen.getByText('Root Session')).toBeInTheDocument()
-      expect(screen.getByText('Parent Session')).toBeInTheDocument()
+      // Should show the ForkAncestryTree (async render)
+      await waitFor(() => {
+        expect(screen.getByText('Root Session')).toBeInTheDocument()
+        expect(screen.getByText('Parent Session')).toBeInTheDocument()
+      })
     })
 
     it('allows clicking fork badge to toggle ancestry popover', async () => {
@@ -227,7 +230,8 @@ describe('ChatHeader', () => {
 
       // Open the popover using mouse enter on the container
       const forkIndicator = screen.getByTitle(/Forked session/i).parentElement
-      fireEvent.mouseEnter(forkIndicator!)
+      const user = userEvent.setup()
+      await user.hover(forkIndicator!)
 
       // Find the ancestor button - ForkAncestryTree renders buttons for each ancestor
       // The button contains the title text "Parent Session"
@@ -254,7 +258,8 @@ describe('ChatHeader', () => {
 
       // Open the popover using mouse enter on the container
       const forkIndicator = screen.getByTitle(/Forked session/i).parentElement
-      fireEvent.mouseEnter(forkIndicator!)
+      const user = userEvent.setup()
+      await user.hover(forkIndicator!)
 
       // Current session button should be disabled
       const currentButton = screen.getByText('Current Session').closest('button')

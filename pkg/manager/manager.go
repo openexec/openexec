@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/pipeline"
 )
@@ -74,19 +75,19 @@ type Manager struct {
 // New creates a Manager with the given server-level config.
 func New(cfg Config) *Manager {
 	if cfg.DefaultMaxIterations == 0 {
-		cfg.DefaultMaxIterations = 10
+		cfg.DefaultMaxIterations = config.DefaultMaxIterations
 	}
 	if cfg.MaxRetries == 0 {
-		cfg.MaxRetries = 3
+		cfg.MaxRetries = config.DefaultMaxRetries
 	}
 	if cfg.MaxReviewCycles == 0 {
-		cfg.MaxReviewCycles = 3
+		cfg.MaxReviewCycles = config.DefaultMaxReviewCycles
 	}
 	if cfg.ThrashThreshold == 0 {
-		cfg.ThrashThreshold = 3
+		cfg.ThrashThreshold = config.DefaultThrashThreshold
 	}
 	if cfg.RetryBackoff == nil {
-		cfg.RetryBackoff = []time.Duration{0, 5 * time.Second, 15 * time.Second}
+		cfg.RetryBackoff = config.DefaultRetryBackoff
 	}
 	m := &Manager{
 		cfg:       cfg,

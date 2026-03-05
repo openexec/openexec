@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/openexec/openexec/pkg/version"
 )
 
 func TestVersionCmd(t *testing.T) {
@@ -20,7 +22,7 @@ func TestVersionCmd(t *testing.T) {
 	if !strings.Contains(out, "OpenExec CLI v") {
 		t.Errorf("unexpected output: %q", out)
 	}
-	if !strings.Contains(out, Version) {
-		t.Errorf("output missing version %q: %q", Version, out)
+	if !strings.Contains(out, version.Version) {
+		t.Errorf("output missing version %q: %q", version.Version, out)
 	}
 }

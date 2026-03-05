@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/openexec/openexec/internal/intent"
 	"github.com/openexec/openexec/internal/knowledge"
@@ -163,4 +166,34 @@ func init() {
 	planCmd.Flags().Bool("validate-only", false, "Validate INTENT.md and exit (no planning)")
 	planCmd.Flags().Bool("no-validate", false, "Skip INTENT.md validation")
 	planCmd.Flags().Bool("fix", false, "With --validate-only, show missing section stubs")
+}
+
+type cliLLMProvider struct {
+	model string
+	cmd   *cobra.Command
+}
+
+func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, error) {
+	// Simple shell-out to claude or gemini CLI for planning
+	cliCmd := "claude"
+	if strings.Contains(p.model, "gemini") {
+		cliCmd = "gemini"
+	}
+
+	var cmdArgs []string
+	if cliCmd == "claude" {
+		cmdArgs = []string{"--print"}
+	} else if cliCmd == "gemini" {
+		cmdArgs = []string{"--prompt", "-", "--yolo"}
+	}
+
+	c := exec.CommandContext(ctx, cliCmd, cmdArgs...)
+	c.Stdin = strings.NewReader(prompt)
+	
+	output, err := c.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("native LLM provider failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return string(output), nil
 }

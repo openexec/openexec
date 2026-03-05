@@ -62,35 +62,44 @@ export const KnowledgeHub: React.FC = () => {
   const [envs, setEnvs] = useState<EnvironmentRecord[]>([]);
   const [policies, setPolicies] = useState<PolicyRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const [symRes, envRes, polRes] = await Promise.all([
+        fetch('/api/v1/knowledge/symbols'),
+        fetch('/api/v1/knowledge/envs'),
+        fetch('/api/v1/knowledge/policies')
+      ]);
+
+      if (symRes.ok) {
+        const data = await symRes.json();
+        setSymbols(data.symbols || []);
+      }
+      if (envRes.ok) {
+        const data = await envRes.json();
+        setEnvs(data.environments || []);
+      }
+      if (polRes.ok) {
+        const data = await polRes.json();
+        setPolicies(data.policies || []);
+      }
+
+      if (!symRes.ok || !envRes.ok || !polRes.ok) {
+        setError('Some knowledge endpoints failed to load')
+      }
+    } catch (e: any) {
+      console.error('Failed to load knowledge', e);
+      setError(e?.message || 'Failed to load knowledge')
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [symRes, envRes, polRes] = await Promise.all([
-          fetch('/api/v1/knowledge/symbols'),
-          fetch('/api/v1/knowledge/envs'),
-          fetch('/api/v1/knowledge/policies')
-        ]);
-        
-        if (symRes.ok) {
-          const data = await symRes.json();
-          setSymbols(data.symbols || []);
-        }
-        if (envRes.ok) {
-          const data = await envRes.json();
-          setEnvs(data.environments || []);
-        }
-        if (polRes.ok) {
-          const data = await polRes.json();
-          setPolicies(data.policies || []);
-        }
-      } catch (e) {
-        console.error("Failed to load knowledge", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    void fetchData()
   }, []);
 
   if (loading) return <div style={styles.container}>Loading Deterministic Knowledge Base...</div>;
@@ -99,6 +108,15 @@ export const KnowledgeHub: React.FC = () => {
     <div style={styles.container}>
       <h1 style={styles.title}>Deterministic Control Plane</h1>
       <p>This dashboard exposes the structured "Pointer Records" used by the OpenExec Orchestrator for zero-hallucination planning and execution.</p>
+
+      {error && (
+        <div role="alert" style={{ marginTop: '1rem', padding: '0.75rem 1rem', border: '1px solid #8b949e', borderRadius: 6, background: '#0d1117' }}>
+          <span style={{ color: '#f85149' }}>Error:</span> {error}
+          <button onClick={() => void fetchData()} style={{ marginLeft: 12, border: '1px solid #30363d', background: '#21262d', color: '#c9d1d9', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}>
+            Retry
+          </button>
+        </div>
+      )}
 
       <div style={styles.section}>
         <h2>Surgical Pointers (Symbols)</h2>

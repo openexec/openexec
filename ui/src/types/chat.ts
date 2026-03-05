@@ -361,6 +361,7 @@ export interface LoopEvent {
   gate?: GateInfo
   signal?: SignalInfo
   metadata?: Record<string, unknown>
+  currentPid?: number
 }
 
 // =============================================================================

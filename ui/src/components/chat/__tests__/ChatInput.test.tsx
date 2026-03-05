@@ -7,7 +7,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import ChatInput from '../input/ChatInput'
 
 // Mock child components
@@ -98,11 +99,12 @@ describe('ChatInput', () => {
     expect(textarea).toBeDisabled()
   })
 
-  it('updates content when typing', () => {
+  it('updates content when typing', async () => {
+    const user = userEvent.setup()
     render(<ChatInput />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: 'Hello' } })
+    await user.type(textarea, 'Hello')
 
     expect(textarea).toHaveValue('Hello')
   })
@@ -114,71 +116,77 @@ describe('ChatInput', () => {
     expect(button).toBeDisabled()
   })
 
-  it('enables send button when content is not empty', () => {
+  it('enables send button when content is not empty', async () => {
+    const user = userEvent.setup()
     render(<ChatInput />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: 'Hello' } })
+    await user.type(textarea, 'Hello')
 
     const button = screen.getByTestId('send-button')
     expect(button).not.toBeDisabled()
   })
 
-  it('calls onSubmit with content when send button is clicked', () => {
+  it('calls onSubmit with content when send button is clicked', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ChatInput onSubmit={onSubmit} />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: 'Hello World' } })
+    await user.type(textarea, 'Hello World')
 
     const button = screen.getByTestId('send-button')
-    fireEvent.click(button)
+    await user.click(button)
 
     expect(onSubmit).toHaveBeenCalledWith('Hello World')
   })
 
-  it('clears content after successful submit', () => {
+  it('clears content after successful submit', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ChatInput onSubmit={onSubmit} />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: 'Hello' } })
-    fireEvent.click(screen.getByTestId('send-button'))
+    await user.type(textarea, 'Hello')
+    await user.click(screen.getByTestId('send-button'))
 
     expect(textarea).toHaveValue('')
   })
 
-  it('calls onSubmit when Enter is pressed', () => {
+  it('calls onSubmit when Enter is pressed', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ChatInput onSubmit={onSubmit} />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: 'Hello' } })
-    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+    await user.type(textarea, 'Hello')
+    await user.keyboard('{Enter}')
 
     expect(onSubmit).toHaveBeenCalledWith('Hello')
   })
 
-  it('does not call onSubmit when content is only whitespace', () => {
+  it('does not call onSubmit when content is only whitespace', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ChatInput onSubmit={onSubmit} />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: '   ' } })
-    fireEvent.click(screen.getByTestId('send-button'))
+    await user.type(textarea, '   ')
+    await user.click(screen.getByTestId('send-button'))
 
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  it('does not call onSubmit when disabled', () => {
+  it('does not call onSubmit when disabled', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ChatInput onSubmit={onSubmit} disabled={true} />)
 
     const textarea = screen.getByTestId('input-textarea')
-    fireEvent.change(textarea, { target: { value: 'Hello' } })
+    await user.type(textarea, 'Hello')
 
     // Try to submit via Enter (even though textarea is disabled)
-    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+    await user.keyboard('{Enter}')
 
     expect(onSubmit).not.toHaveBeenCalled()
   })

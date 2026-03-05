@@ -1,21 +1,23 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import ProjectInitModal from '../ProjectInitModal'
 
 describe('ProjectInitModal', () => {
-  it('submits trimmed name and path', () => {
+  it('submits trimmed name and path', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ProjectInitModal onSubmit={onSubmit} onCancel={() => {}} apiUrl="" />)
-    
+
     const nameInput = screen.getByLabelText(/Project Name/i)
     const pathInput = screen.getByLabelText(/Directory Path/i)
-    
-    fireEvent.change(nameInput, { target: { value: '  my-project  ' } })
-    fireEvent.change(pathInput, { target: { value: '  /path/to/project/  ' } })
-    
+
+    await user.type(nameInput, '  my-project  ')
+    await user.type(pathInput, '  /path/to/project/  ')
+
     const submitButton = screen.getByRole('button', { name: /Initialize/i })
-    fireEvent.click(submitButton)
-    
+    await user.click(submitButton)
+
     expect(onSubmit).toHaveBeenCalledWith('my-project', '/path/to/project/')
   })
 
@@ -27,19 +29,20 @@ describe('ProjectInitModal', () => {
     expect(submitButton).toBeDisabled()
   })
 
-  it('sanitizes project name (lowercase and illegal chars)', () => {
+  it('sanitizes project name (lowercase and illegal chars)', async () => {
+    const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ProjectInitModal onSubmit={onSubmit} onCancel={() => {}} apiUrl="" />)
-    
+
     const nameInput = screen.getByLabelText(/Project Name/i)
     const pathInput = screen.getByLabelText(/Directory Path/i)
-    
-    fireEvent.change(nameInput, { target: { value: 'My Project! @2024' } })
-    fireEvent.change(pathInput, { target: { value: '/path' } })
-    
+
+    await user.type(nameInput, 'My Project! @2024')
+    await user.type(pathInput, '/path')
+
     const submitButton = screen.getByRole('button', { name: /Initialize/i })
-    fireEvent.click(submitButton)
-    
+    await user.click(submitButton)
+
     // "My Project! @2024" -> "my-project--2024" -> "my-project-2024"
     expect(onSubmit).toHaveBeenCalledWith('my-project-2024', '/path')
   })

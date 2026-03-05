@@ -6,15 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
 	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/pkg/api"
@@ -61,13 +59,17 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	// 2. Initialize Core Engine
-	mgr := manager.New(auditLogger)
+	mgr := manager.New(manager.Config{
+		WorkDir:    cfg.ProjectsDir,
+		TractStore: cfg.DataDir,
+	})
 	
 	// 3. Initialize Deterministic Control Plane (DCP)
 	kStore, _ := knowledge.NewStore(".")
 	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
 	bRouter.SetSkipAvailabilityCheck(true) // Default to skip for easy startup
 	
+	pEngine := policy.NewEngine(kStore)
 	coordinator := dcp.NewCoordinator(bRouter, kStore)
 	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
 	coordinator.RegisterTool(tools.NewDeployTool(kStore))

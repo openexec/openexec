@@ -28,10 +28,20 @@ export interface AppConfig {
 /**
  * Default configuration from environment or fallback values
  */
+const inferWsUrl = (): string => {
+  const envWs = import.meta.env.VITE_WS_URL as string | undefined
+  if (envWs) return envWs
+  if (typeof window !== 'undefined') {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    return `${proto}://${window.location.host}/ws`
+  }
+  return 'ws://127.0.0.1:8080/ws'
+}
+
 const defaultConfig: AppConfig = {
-  wsUrl: import.meta.env.VITE_WS_URL ?? 'ws://localhost:8765/ws',
-  apiUrl: '/api',
-  authToken: import.meta.env.VITE_AUTH_TOKEN,
+  wsUrl: inferWsUrl(),
+  apiUrl: (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api',
+  authToken: import.meta.env.VITE_AUTH_TOKEN as string | undefined,
   debug: import.meta.env.DEV,
 }
 
