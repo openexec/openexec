@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/openexec/openexec/internal/execution/server"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/internal/server"
 	"github.com/spf13/cobra"
 )
 
@@ -135,7 +135,7 @@ Examples:
 			go func() {
 				// Wait for server to be ready
 				_ = waitForServer(startPort, 15*time.Second)
-				uiURL := "http://localhost:3001"
+				uiURL := fmt.Sprintf("http://localhost:%d", startPort)
 				cmd.Printf("🌐 Opening web console at %s\n", uiURL)
 
 				var openCmd string
@@ -172,9 +172,18 @@ Examples:
 		cmd.Printf("   Project: %s\n", config.Name)
 		cmd.Printf("   Port: %d\n", startPort)
 		
-		// Call the integrated server directly
-		server.StartServer()
-		return nil
+		// Initialize the new unified server
+		srv, err := server.New(server.Config{
+			Port:        startPort,
+			AuditDB:     auditDB,
+			DataDir:     dataDir,
+			ProjectsDir: config.ProjectDir,
+		})
+		if err != nil {
+			return err
+		}
+
+		return srv.Start(cmd.Context())
 	},
 }
 
