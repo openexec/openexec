@@ -20,6 +20,7 @@ import (
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/router"
+	"github.com/openexec/openexec/internal/runtime"
 	"github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/api"
@@ -43,6 +44,7 @@ type Server struct {
 	apiServer   *api.Server
 	projectsDir string
 	coordinator *dcp.Coordinator
+	runtime     *runtime.Client
 }
 
 // LoopInstance tracks a running execution loop
@@ -230,6 +232,9 @@ func StartServer() {
 	srv.coordinator.RegisterTool(tools.NewDeployTool(kStore))
 	srv.coordinator.RegisterTool(tools.NewKnowledgePopulationTool(kStore))
 	srv.coordinator.RegisterTool(tools.NewDocsUpdaterTool(kStore, "."))
+
+	// Initialize BEAM Runtime Client (connecting to Elixir on port 4001)
+	srv.runtime = runtime.NewClient("http://localhost:4001")
 
 	// Initial sync
 	go srv.coordinator.SyncKnowledge(".")

@@ -12,7 +12,10 @@ defmodule OpenExecRuntime.Application do
       {DynamicSupervisor, name: OpenExecRuntime.TaskSupervisor, strategy: :one_for_one},
       
       # Registry allows us to find workers by their Task ID (e.g. "T-001") across nodes
-      {Registry, keys: :unique, name: OpenExecRuntime.TaskRegistry}
+      {Registry, keys: :unique, name: OpenExecRuntime.TaskRegistry},
+
+      # Start the HTTP Bridge for Go communication
+      {Plug.Cowboy, scheme: :http, plug: OpenExecRuntime.Router, options: [port: 4001]}
     ]
 
     opts = [strategy: :one_for_one, name: OpenExecRuntime.Supervisor]

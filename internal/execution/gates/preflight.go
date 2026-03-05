@@ -22,6 +22,13 @@ type PreflightReport struct {
 	Summary string           `json:"summary"`
 }
 
+// Internal check functions, can be overridden for testing
+var (
+	dockerCheckFn = checkDocker
+	nodeCheckCheckFn = checkNode
+	pythonCheckFn = checkPython
+)
+
 // RunPreflightChecks runs preflight checks based on task requirements.
 func RunPreflightChecks(taskTitle string, gateNames []string) *PreflightReport {
 	report := &PreflightReport{
@@ -40,7 +47,7 @@ func RunPreflightChecks(taskTitle string, gateNames []string) *PreflightReport {
 
 	// Run relevant checks
 	if needsDocker {
-		check := checkDocker()
+		check := dockerCheckFn()
 		report.Checks = append(report.Checks, check)
 		if !check.Passed {
 			report.Passed = false
@@ -48,7 +55,7 @@ func RunPreflightChecks(taskTitle string, gateNames []string) *PreflightReport {
 	}
 
 	if needsNode {
-		check := checkNode()
+		check := nodeCheckCheckFn()
 		report.Checks = append(report.Checks, check)
 		if !check.Passed {
 			report.Passed = false
@@ -56,7 +63,7 @@ func RunPreflightChecks(taskTitle string, gateNames []string) *PreflightReport {
 	}
 
 	if needsPython {
-		check := checkPython()
+		check := pythonCheckFn()
 		report.Checks = append(report.Checks, check)
 		if !check.Passed {
 			report.Passed = false

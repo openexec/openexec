@@ -6,6 +6,21 @@ import (
 )
 
 func TestRunPreflightChecks(t *testing.T) {
+	// Mock the check functions
+	oldDocker := dockerCheckFn
+	oldNode := nodeCheckCheckFn
+	oldPython := pythonCheckFn
+	
+	defer func() {
+		dockerCheckFn = oldDocker
+		nodeCheckCheckFn = oldNode
+		pythonCheckFn = oldPython
+	}()
+
+	dockerCheckFn = func() PreflightCheck { return PreflightCheck{Name: "docker", Passed: true} }
+	nodeCheckCheckFn = func() PreflightCheck { return PreflightCheck{Name: "node", Passed: true} }
+	pythonCheckFn = func() PreflightCheck { return PreflightCheck{Name: "python", Passed: true} }
+
 	tests := []struct {
 		name      string
 		taskTitle string

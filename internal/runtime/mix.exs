@@ -23,7 +23,8 @@ defmodule OpenExecRuntime.MixProject do
       {:jason, "~> 1.4"},           # High-speed JSON
       {:ecto_sqlite3, "~> 0.10"},   # For surgical pointer lookups in knowledge.db
       {:telemetry, "~> 1.0"},       # Observability
-      {:uuid, "~> 1.1"}             # For tracking multi-project session IDs
+      {:uuid, "~> 1.1"},            # For tracking multi-project session IDs
+      {:plug_cowboy, "~> 2.6"}      # HTTP Bridge for Go <-> Elixir communication
     ]
   end
 end
