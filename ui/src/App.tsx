@@ -7,8 +7,9 @@
  * @module App
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import ChatPage from './pages/ChatPage'
+import KnowledgeHub from './pages/KnowledgeHub'
 
 /**
  * Application configuration
@@ -42,13 +43,61 @@ export interface AppProps {
   config?: Partial<AppConfig>
 }
 
+const navStyles = {
+  nav: {
+    backgroundColor: '#161b22',
+    padding: '0.5rem 1rem',
+    borderBottom: '1px solid #30363d',
+    display: 'flex',
+    gap: '1rem',
+  },
+  btn: {
+    background: 'none',
+    border: 'none',
+    color: '#c9d1d9',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    fontSize: '14px',
+    fontWeight: 500,
+  },
+  activeBtn: {
+    color: '#58a6ff',
+    borderBottom: '2px solid #58a6ff',
+  }
+}
+
 /**
  * Root Application Component
  */
 const App: React.FC<AppProps> = ({ config }) => {
   const mergedConfig = { ...defaultConfig, ...config }
+  const [view, setView] = useState<'chat' | 'knowledge'>('chat')
 
-  return <ChatPage config={mergedConfig} />
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
+      <nav style={navStyles.nav}>
+        <button 
+          style={{ ...navStyles.btn, ...(view === 'chat' ? navStyles.activeBtn : {}) }}
+          onClick={() => setView('chat')}
+        >
+          Chat
+        </button>
+        <button 
+          style={{ ...navStyles.btn, ...(view === 'knowledge' ? navStyles.activeBtn : {}) }}
+          onClick={() => setView('knowledge')}
+        >
+          Knowledge Hub
+        </button>
+      </nav>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        {view === 'chat' ? (
+          <ChatPage config={mergedConfig} />
+        ) : (
+          <KnowledgeHub />
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default App

@@ -278,6 +278,9 @@ func StartServer() {
 	mux.HandleFunc("/api/v1/evidence", srv.handleTaskEvidence)
 	mux.HandleFunc("/api/v1/logs", srv.handleSessionLog)
 	mux.HandleFunc("/api/v1/dcp/query", srv.handleDCPQuery)
+	mux.HandleFunc("/api/v1/knowledge/symbols", srv.handleKnowledgeSymbols)
+	mux.HandleFunc("/api/v1/knowledge/envs", srv.handleKnowledgeEnvs)
+	mux.HandleFunc("/api/v1/knowledge/policies", srv.handleKnowledgePolicies)
 
 	// Integrate the new API server's routes
 	srv.apiServer.RegisterRoutes(mux)

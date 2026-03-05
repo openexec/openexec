@@ -312,7 +312,7 @@ export function useChat(config: ChatConfig): UseChatReturn {
           ...prev,
           isRunning: true,
           isPaused: false,
-          startedAt: event.timestamp, currentPid: event.currentPid,
+          startedAt: event.timestamp, currentPid: (event as any).currentPid,
         }))
         break
 
