@@ -6,16 +6,18 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/policy"
 )
 
 // SafeCommitTool acts as a mandatory gate before git operations
 type SafeCommitTool struct {
 	policy *policy.Engine
+	syncer knowledge.Syncer
 }
 
-func NewSafeCommitTool(p *policy.Engine) *SafeCommitTool {
-	return &SafeCommitTool{policy: p}
+func NewSafeCommitTool(p *policy.Engine, s knowledge.Syncer) *SafeCommitTool {
+	return &SafeCommitTool{policy: p, syncer: s}
 }
 
 func (t *SafeCommitTool) Name() string {
@@ -63,7 +65,22 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 
 	result := fmt.Sprintf("✓ Successfully validated and committed changes: %q", message)
 
-	// 3. Optional Push
+	// 4. Autonomous Sync: Re-index modified files to handle Line Drift
+	if t.syncer != nil {
+		// Get list of files in the commit
+		cmd = exec.CommandContext(ctx, "git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
+		if out, err := cmd.Output(); err == nil {
+			files := strings.Split(strings.TrimSpace(string(out)), "\n")
+			for _, f := range files {
+				if strings.HasSuffix(f, ".go") {
+					_ = t.syncer.SyncFile(f)
+				}
+			}
+			result += fmt.Sprintf("\n✓ Knowledge Base synchronized for %d files.", len(files))
+		}
+	}
+
+	// 5. Optional Push
 	if push {
 		cmd = exec.CommandContext(ctx, "git", "push")
 		if out, err := cmd.CombinedOutput(); err != nil {

@@ -70,6 +70,7 @@ func New(cfg Config) (*Server, error) {
 	coordinator := dcp.NewCoordinator(bRouter, kStore)
 	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
 	coordinator.RegisterTool(tools.NewDeployTool(kStore))
+	coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
 	
 	// 4. Initialize API Layer
 	mux := http.NewServeMux()

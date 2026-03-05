@@ -15,6 +15,11 @@ type Indexer struct {
 	store *Store
 }
 
+// Syncer defines the interface for triggering file re-indexing
+type Syncer interface {
+	SyncFile(filePath string) error
+}
+
 func NewIndexer(store *Store) *Indexer {
 	return &Indexer{store: store}
 }
@@ -31,19 +36,27 @@ func (idx *Indexer) IndexProject(projectDir string) error {
 
 		// Currently handles Go files. Can be extended with Tree-sitter for polyglot support.
 		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			return idx.indexGoFile(path)
+			return idx.IndexFile(path)
 		}
 		return nil
 	})
 }
 
-func (idx *Indexer) indexGoFile(path string) error {
+// IndexFile atomically updates all symbols for a specific file
+func (idx *Indexer) IndexFile(path string) error {
+	// 1. Parse File
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
-		return nil // Skip files that don't parse
+		return fmt.Errorf("failed to parse %s: %w", path, err)
 	}
 
+	// 2. Clear old records for this file to handle Line Drift
+	if err := idx.store.DeleteSymbolsByFile(path); err != nil {
+		return fmt.Errorf("failed to clear old symbols for %s: %w", path, err)
+	}
+
+	// 3. Extract and set new symbols
 	for _, decl := range node.Decls {
 		if fn, ok := decl.(*ast.FuncDecl); ok {
 			symbol := &SymbolRecord{
@@ -56,15 +69,6 @@ func (idx *Indexer) indexGoFile(path string) error {
 				Purpose:   idx.extractComment(fn.Doc),
 			}
 			idx.store.SetSymbol(symbol)
-
-			// Detect API routes if they look like handlers
-			if strings.Contains(symbol.Signature, "http.ResponseWriter") {
-				idx.store.SetAPIDoc(&APIDocRecord{
-					Path:        "Unknown (check implementation)",
-					Method:      "HTTP",
-					Description: fmt.Sprintf("Handler for %s", symbol.Name),
-				})
-			}
 		}
 	}
 	return nil

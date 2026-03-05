@@ -192,6 +192,12 @@ func (s *Store) ListSymbols() ([]*SymbolRecord, error) {
 	return results, nil
 }
 
+func (s *Store) DeleteSymbolsByFile(filePath string) error {
+	query := `DELETE FROM symbols WHERE file_path = ?`
+	_, err := s.db.Exec(query, filePath)
+	return err
+}
+
 // --- Environment Methods ---
 
 func (s *Store) SetEnvironment(r *EnvironmentRecord) error {

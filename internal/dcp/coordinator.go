@@ -34,6 +34,16 @@ func (c *Coordinator) RegisterTool(t tools.Tool) {
 	c.router.RegisterTool(t.Name(), t.Description(), t.InputSchema())
 }
 
+// SyncKnowledge performs a full project re-index
+func (c *Coordinator) SyncKnowledge(projectDir string) {
+	_ = c.indexer.IndexProject(projectDir)
+}
+
+// SyncFile surgically updates symbols for a single file to handle line drift
+func (c *Coordinator) SyncFile(filePath string) error {
+	return c.indexer.IndexFile(filePath)
+}
+
 // ProcessQuery uses BitNet to parse intent and execute the correct surgical tool
 func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, error) {
 	// 1. Local Intent Routing (BitNet)
@@ -72,10 +82,4 @@ func (c *Coordinator) sanitizeArgs(args map[string]interface{}) {
 			}
 		}
 	}
-}
-
-// SyncKnowledge triggers the automatic indexing of source code
-func (c *Coordinator) SyncKnowledge(projectDir string) error {
-	log.Printf("[DCP] Synchronizing knowledge for %s...", projectDir)
-	return c.indexer.IndexProject(projectDir)
 }
