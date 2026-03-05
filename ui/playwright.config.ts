@@ -56,7 +56,7 @@ export default defineConfig({
   // Run your local dev server and backend before starting the tests
   webServer: [
     {
-      command: 'cd .. && ./bin/axon serve --tract-store ../initial --audit-db .openexec/data/audit.db --projects-dir .. --port 8080 --agents-dir ./agents',
+      command: 'cd .. && ./bin/openexec start --data-dir ../initial --port 8080',
       port: 8080,
       reuseExistingServer: true,
       timeout: 120000,

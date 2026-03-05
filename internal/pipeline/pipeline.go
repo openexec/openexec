@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/loop"
 )
 
@@ -66,19 +67,19 @@ func New(cfg Config) (*Pipeline, <-chan loop.Event) {
 		cfg.Phases = DefaultPhaseConfigs()
 	}
 	if cfg.MaxReviewCycles == 0 {
-		cfg.MaxReviewCycles = 3
+		cfg.MaxReviewCycles = config.DefaultMaxReviewCycles
 	}
 	if cfg.DefaultMaxIterations == 0 {
-		cfg.DefaultMaxIterations = 10
+		cfg.DefaultMaxIterations = config.DefaultMaxIterations
 	}
 	if cfg.MaxRetries == 0 {
-		cfg.MaxRetries = 3
+		cfg.MaxRetries = config.DefaultMaxRetries
 	}
 	if cfg.RetryBackoff == nil {
-		cfg.RetryBackoff = []time.Duration{0, 5 * time.Second, 15 * time.Second}
+		cfg.RetryBackoff = config.DefaultRetryBackoff
 	}
 	if cfg.ThrashThreshold == 0 {
-		cfg.ThrashThreshold = 3
+		cfg.ThrashThreshold = config.DefaultThrashThreshold
 	}
 
 	ch := make(chan loop.Event, 64)
