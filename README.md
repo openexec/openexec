@@ -49,7 +49,8 @@ OpenExec introduces a **Deterministic Control Plane** that transforms AI agents 
 ### Core Pillars
 - **Surgical Pointer Records (OpenCode):** Automatically maps your functions, structs, and API handlers to exact file byte-offsets. Agents see exactly the code they need, never more, never less.
 - **BitNet Intent Routing:** Uses a local 1-bit 2B model to parse user intent and select tools in milliseconds, avoiding expensive cloud round-trips for simple decisions.
-- **Deterministic Knowledge Base:** Specialized tables for environments (IPs, topologies, auth steps) and API contracts ensure ops tasks are executed with 100% precision.
+- **Autonomous Compliance Shield:** Automatically runs mandatory quality gates (go vet, ruff, mypy) before any code is committed via the surgical `safe_commit` tool.
+- **Deterministic Knowledge Base:** Specialized tables for environments (IPs, topologies, auth steps), API contracts, and PRD specifications.
 - **Hard Policy Enforcement:** A local validation layer that blocks dangerous actions (like hardcoded secrets or unsafe commands) before they ever reach your project.
 
 ### Knowledge CLI

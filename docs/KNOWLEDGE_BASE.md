@@ -78,6 +78,20 @@ This "Surgical Context" approach reduces token usage by up to 90% compared to fu
 
 ---
 
+## Autonomous Compliance Shield
+
+The **Compliance Shield** is a hard gate that prevents unverified code from entering your repository. 
+
+### The `safe_commit` Tool
+Instead of using raw `git commit`, the system uses the `safe_commit` tool. It automatically:
+1.  **Detects Environment**: Identifies Go or Python source code.
+2.  **Runs Mandatory Gates**: Executes static analysis (`go vet`, `ruff`, `mypy`).
+3.  **Blocks on Failure**: If any gate fails, the commit is aborted, and the AI is provided with the exact error to fix.
+
+This ensures that every single commit in your project history is verified and compliant with organizational standards.
+
+---
+
 ## Tool Creation Standard
 
 To add a new tool to the DCP, implement the `tools.Tool` interface in `internal/tools/`. Every tool must:

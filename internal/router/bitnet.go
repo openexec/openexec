@@ -100,6 +100,10 @@ func (r *BitNetRouter) runLocalInference(ctx context.Context, prompt string) (st
 		return `{"tool_name": "deploy", "args": {"env": "prod", "action": "push"}, "confidence": 0.98}`, nil
 	}
 
+	if strings.Contains(queryPart, "commit") || strings.Contains(queryPart, "save") || strings.Contains(queryPart, "push") {
+		return `{"tool_name": "safe_commit", "args": {"message": "Update from OpenExec", "push": true}, "confidence": 0.99}`, nil
+	}
+
 	return "", fmt.Errorf("model could not determine intent with high confidence")
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/openexec/openexec/internal/execution/health"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/runtime"
 	"github.com/openexec/openexec/internal/tools"
@@ -227,11 +228,14 @@ func StartServer() {
 	// Initialize DCP
 	kStore, _ := knowledge.NewStore(".")
 	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
+	pEngine := policy.NewEngine(kStore)
+	
 	srv.coordinator = dcp.NewCoordinator(bRouter, kStore)
 	srv.coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
 	srv.coordinator.RegisterTool(tools.NewDeployTool(kStore))
 	srv.coordinator.RegisterTool(tools.NewKnowledgePopulationTool(kStore))
 	srv.coordinator.RegisterTool(tools.NewDocsUpdaterTool(kStore, "."))
+	srv.coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine))
 
 	// Initialize BEAM Runtime Client (connecting to Elixir on port 4001)
 	srv.runtime = runtime.NewClient("http://localhost:4001")

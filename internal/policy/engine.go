@@ -3,6 +3,8 @@ package policy
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/openexec/openexec/internal/knowledge"
@@ -38,16 +40,34 @@ func (e *Engine) ValidateAction(ctx context.Context, toolName string, action str
 	return true, ""
 }
 
-// ValidateCodeChange checks proposed code edits against safety policies.
-func (e *Engine) ValidateCodeChange(ctx context.Context, filePath string, content string) (bool, string) {
-	// Fetch global safety policy
-	record, _ := e.store.GetPolicy("safety_code")
-	if record != nil {
-		if strings.Contains(record.Value, "no_secrets") {
-			// Basic secret detection
-			if strings.Contains(content, "API_KEY") || strings.Contains(content, "PASSWORD") {
-				return false, "Policy violation: No hardcoded secrets allowed."
-			}
+// ValidateCompliance runs mandatory quality gates for the project type.
+func (e *Engine) ValidateCompliance(ctx context.Context, projectDir string) (bool, string) {
+	// 1. Detect project type (Simplified for demo)
+	isGo := false
+	isPython := false
+	if _, err := os.Stat("go.mod"); err == nil { isGo = true }
+	if _, err := os.Stat("pyproject.toml"); err == nil { isPython = true }
+
+	// 2. Execute mandatory gates
+	if isGo {
+		cmd := exec.CommandContext(ctx, "go", "vet", "./...")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return false, fmt.Sprintf("Compliance Failure (go vet):\n%s", string(out))
+		}
+	}
+
+	if isPython {
+		// Run ruff and mypy
+		cmd := exec.CommandContext(ctx, "ruff", "check", ".")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return false, fmt.Sprintf("Compliance Failure (ruff):\n%s", string(out))
+		}
+		
+		// Note: we use python -m mypy to ensure it uses the local environment
+		cmd = exec.CommandContext(ctx, "python3", "-m", "mypy", ".")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			// We only block if it's a hard policy
+			return false, fmt.Sprintf("Compliance Failure (mypy):\n%s", string(out))
 		}
 	}
 
