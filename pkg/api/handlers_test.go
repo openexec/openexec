@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -17,6 +18,60 @@ import (
 	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/internal/pipeline"
 )
+
+func TestHandleCreateLoop(t *testing.T) {
+	bin := buildMockClaude(t)
+	mgr := testManager(t, bin)
+	srv := New(mgr, nil, nil, "", ":0")
+
+	payload := map[string]interface{}{
+		"task_id":  "T-001",
+		"prompt":   "Do it",
+		"work_dir": ".",
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest("POST", "/api/v1/loops", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["id"] != "T-001" {
+		t.Errorf("id = %v, want T-001", resp["id"])
+	}
+
+	waitForTerminal(t, mgr, "T-001")
+}
+
+func TestHandleGetLoop(t *testing.T) {
+	bin := buildMockClaude(t)
+	mgr := testManager(t, bin)
+	srv := New(mgr, nil, nil, "", ":0")
+
+	mgr.Start(context.Background(), "T-001")
+	time.Sleep(50 * time.Millisecond)
+
+	req := httptest.NewRequest("GET", "/api/v1/loops/T-001", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["id"] != "T-001" {
+		t.Errorf("id = %v, want T-001", resp["id"])
+	}
+
+	waitForTerminal(t, mgr, "T-001")
+}
 
 func buildMockClaude(t *testing.T) string {
 	t.Helper()

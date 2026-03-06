@@ -9,6 +9,63 @@ import (
 	"github.com/openexec/openexec/pkg/manager"
 )
 
+func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Prompt        string `json:"prompt"`
+		WorkDir       string `json:"work_dir"`
+		MaxIterations int    `json:"max_iterations,omitempty"`
+		TaskID        string `json:"task_id,omitempty"`
+		MCPConfigPath string `json:"mcp_config_path,omitempty"`
+		ReviewerModel string `json:"reviewer_model,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.TaskID == "" {
+		WriteError(w, http.StatusBadRequest, "missing task_id")
+		return
+	}
+
+	// Start the pipeline/loop via manager
+	err := s.Mgr.Start(r.Context(), req.TaskID)
+	if err != nil {
+		if strings.Contains(err.Error(), "already active") {
+			WriteError(w, http.StatusConflict, err.Error())
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":     req.TaskID,
+		"status": "starting",
+	})
+}
+
+func (s *Server) handleGetLoop(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "missing loop id")
+		return
+	}
+
+	info, err := s.Mgr.Status(id)
+	if err != nil {
+		WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"id":        info.FWUID,
+		"status":    info.Status,
+		"iteration": info.Iteration,
+	})
+}
+
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
