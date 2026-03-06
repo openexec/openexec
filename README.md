@@ -85,8 +85,8 @@ go build -o openexec ./cmd/openexec
 ### 2. The Execution Flow
 Follow these steps to transform an idea into a verified project:
 
-1.  **Initialize (`openexec init`)**
-    Set up your project configuration and select your preferred AI models.
+1.  **Initialize (`git init && openexec init`)**
+    Set up Git if necessary, then run the OpenExec initialization to select your preferred AI models.
 2.  **Guided Interview (`openexec wizard`)**
     Chat with the AI Architect to define your project shape, platform, and contracts. It generates a verified `INTENT.md`.
 3.  **Plan (`openexec plan INTENT.md`)**

@@ -29,7 +29,15 @@ OpenExec is a single binary that embeds its UI. To build it locally:
 
 ## 2. Initialize Your Project
 
-Go to your project directory (it must be a git repo) and run:
+OpenExec uses Git to track changes and manage safety guardrails. **Your project directory must be a Git repository.**
+
+If you haven't already, initialize Git in your project folder:
+
+```bash
+git init
+```
+
+Then, run the OpenExec initialization:
 
 ```bash
 ./openexec init
