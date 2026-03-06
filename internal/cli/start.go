@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -116,6 +117,16 @@ Examples:
 		dataDir := filepath.Join(config.ProjectDir, ".openexec", "data")
 		auditDB := filepath.Join(dataDir, "audit.db")
 		
+		// Find available port if default is busy
+		finalPort, err := findAvailablePort(startPort)
+		if err != nil {
+			return err
+		}
+		if finalPort != startPort {
+			cmd.Printf("   ⚠ Port %d is busy, using %d instead\n", startPort, finalPort)
+			startPort = finalPort
+		}
+
 		// Map our cobra flags to server flags
 		serverArgs := []string{
 			"start",
@@ -736,6 +747,18 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
+}
+
+// findAvailablePort tries to find an available port starting from basePort
+func findAvailablePort(basePort int) (int, error) {
+	for port := basePort; port < basePort+100; port++ {
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err == nil {
+			_ = ln.Close()
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("could not find available port in range %d-%d", basePort, basePort+99)
 }
 
 // writePIDFile writes the current process ID to a file
