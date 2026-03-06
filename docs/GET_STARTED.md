@@ -41,7 +41,7 @@ Follow the interactive prompts to configure your **Task-Specific Brains**. OpenE
 - **Executor:** The agent that writes the actual code.
 - **Reviewer:** The quality gatekeeper that verifies the implementation.
 
-**Why this matters:** You can use a powerful cloud model like Claude 3.5 Sonnet for complex planning, while using a fast local model for repetitive implementation tasks.
+**Why this matters:** You can use a powerful cloud model like Claude 4.6 Sonnet for complex planning, while using a fast local model for repetitive implementation tasks.
 
 ## 3. The Power of the Knowledge Map
 

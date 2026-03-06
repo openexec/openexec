@@ -208,13 +208,13 @@ Returns all models known to the OpenExec Model Catalog.
 ```json
 [
   {
-    "id": "claude-3-5-sonnet-20241022",
-    "name": "Claude 3.5 Sonnet",
+    "id": "claude-4-6-sonnet-20260215",
+    "name": "Claude 4.6 Sonnet",
     "provider": "anthropic",
     "capabilities": {
       "streaming": true,
       "tool_use": true,
-      "max_context_tokens": 200000
+      "max_context_tokens": 400000
     },
     "price_per_m_input_tokens": 3.0,
     "price_per_m_output_tokens": 15.0

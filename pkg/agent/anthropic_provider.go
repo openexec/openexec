@@ -78,6 +78,40 @@ func NewAnthropicProvider(cfg AnthropicConfig) (*AnthropicProvider, error) {
 // initModels initializes the available Anthropic models.
 func (p *AnthropicProvider) initModels() {
 	// Claude 4 models (latest)
+	p.models["claude-4-6-opus-20260215"] = &ModelInfo{
+		ID:       "claude-4-6-opus-20260215",
+		Name:     "Claude 4.6 Opus",
+		Provider: "anthropic",
+		Capabilities: ProviderCapabilities{
+			Streaming:        true,
+			Vision:           true,
+			ToolUse:          true,
+			SystemPrompt:     true,
+			MultiTurn:        true,
+			MaxContextTokens: 400000,
+			MaxOutputTokens:  64000,
+		},
+		PricePerMInputTokens:  15.0,
+		PricePerMOutputTokens: 75.0,
+	}
+
+	p.models["claude-4-6-sonnet-20260215"] = &ModelInfo{
+		ID:       "claude-4-6-sonnet-20260215",
+		Name:     "Claude 4.6 Sonnet",
+		Provider: "anthropic",
+		Capabilities: ProviderCapabilities{
+			Streaming:        true,
+			Vision:           true,
+			ToolUse:          true,
+			SystemPrompt:     true,
+			MultiTurn:        true,
+			MaxContextTokens: 400000,
+			MaxOutputTokens:  64000,
+		},
+		PricePerMInputTokens:  3.0,
+		PricePerMOutputTokens: 15.0,
+	}
+
 	p.models["claude-opus-4-5-20251101"] = &ModelInfo{
 		ID:       "claude-opus-4-5-20251101",
 		Name:     "Claude Opus 4.5",
