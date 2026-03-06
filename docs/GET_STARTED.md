@@ -9,6 +9,19 @@ Welcome to OpenExec! This guide will take you from zero to running your first AI
 - **Node.js 18+ & npm**: (Only for UI development) [Install Node.js](https://nodejs.org/)
 - **Git**: Required for version control integration.
 
+### Installation
+You can install the pre-built binary using our installation script:
+
+```bash
+# Default installation (installs to /usr/local/bin or ~/.local/bin)
+curl -sSfL https://openexec.io/install.sh | sh
+
+# Non-sudo / Custom path installation
+curl -sSfL https://openexec.io/install.sh | INSTALL_DIR=$HOME/bin sh
+```
+
+The script automatically detects your OS and architecture. If it cannot write to `/usr/local/bin`, it will try to install to `~/.local/bin` to avoid requiring `sudo`.
+
 ### Building from Source
 OpenExec is a single binary that embeds its UI. To build it locally:
 

@@ -78,13 +78,20 @@ openexec knowledge show envs
 For a detailed walkthrough, see the **[Getting Started Guide](docs/GET_STARTED.md)**.
 
 ### 1. Installation
-Download the latest binary for your platform (macOS, Linux, Windows), or build from source:
+Download the latest binary for your platform, or use the automated script:
 
 ```bash
-# One-line install (macOS/Linux)
+# Default (installs to /usr/local/bin or ~/.local/bin)
 curl -sSfL https://openexec.io/install.sh | sh
 
-# Build from source (all platforms)
+# Non-sudo / Custom path
+curl -sSfL https://openexec.io/install.sh | INSTALL_DIR=$HOME/bin sh
+```
+
+The script automatically falls back to `~/.local/bin` if it doesn't have permission to write to system directories.
+
+Alternatively, build from source:
+```bash
 go build -o openexec ./cmd/openexec
 ```
 
