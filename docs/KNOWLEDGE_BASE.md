@@ -106,9 +106,21 @@ This ensures that every single commit in your project history is verified and co
 
 ---
 
-## Tool Creation Standard
+## GDPR Compliance & PII Shield
 
-To add a new tool to the DCP, implement the `tools.Tool` interface in `internal/tools/`. Every tool must:
-1.  Define a JSON-RPC compatible `InputSchema`.
-2.  Query the `knowledge.Store` for deterministic records.
-3.  Register itself with the `Coordinator` in `server.go`.
+OpenExec provides a native way to address **GDPR** and **PII (Personally Identifiable Information)** concerns before any data reaches a cloud API.
+
+### 1. Privacy-First Filtering
+The **Local Tool Search (RAG for Tools)** already acts as a metadata shield. By selecting only the necessary tool definitions locally, we prevent the exposure of your full system architecture to external providers.
+
+### 2. Creating Custom Privacy Tools
+Users can create their own "Privacy Shields" by implementing the `tools.Tool` interface. 
+- **The `pii_scrubber` Tool:** A local tool that scans user queries or project files for patterns (emails, phone numbers, IDs) and replaces them with placeholders *before* the data is sent to the cloud LLM.
+- **The `gdpr_gate`:** A policy gate that blocks any commit or deployment that contains identifiable information in unencrypted fields.
+
+### 3. User-Defined Rulesets
+OpenExec allows you to build your own rulesets directly in the **Local Knowledge Map**.
+*   **YAML Guardrails:** Define PII patterns in your `openexec.yaml`.
+*   **Deterministic Blocking:** If the local BitNet router detects a high probability of sensitive data in a query, it can trigger a warning or automatically scrub the information.
+
+**By handling privacy locally, OpenExec ensures that "Need to Know" is the default state for all external communication.**
