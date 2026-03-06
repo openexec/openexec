@@ -80,11 +80,23 @@ To start the orchestration engine and host the web console:
 - **Server:** Runs on `http://localhost:8080` (default).
 - **UI:** Automatically opens in your browser, showing the **Knowledge Hub** and task progress.
 
+### Safe Daemon Mode
+For continuous background execution, use the `--daemon` flag:
+
+```bash
+./openexec start --daemon
+```
+
+OpenExec v0.1.6 includes **Automated PID Tracking**:
+- It writes a process ID file to `.openexec/openexec.pid`.
+- It redirects all background output to `.openexec/daemon.log`.
+- `openexec run` and `openexec stop` automatically use this file to manage the background engine.
+
 ### Executing Tasks
 You can run tasks individually or let the daemon handle them:
 
 ```bash
-# Execute the next pending task
+# Execute the next pending task (automatically connects to background engine)
 ./openexec run
 ```
 

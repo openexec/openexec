@@ -98,9 +98,9 @@ Follow these steps to transform an idea into a verified project:
 3.  **Plan (`openexec plan INTENT.md`)**
     OpenExec decomposes your intent into a structured set of technical stories and tasks by chatting with the AI agent.
 4.  **Start Server (`openexec start --ui`)**
-    Launch the integrated server and open the web dashboard in your browser.
+    Launch the integrated server and open the web dashboard. Use `--daemon` for background mode with **Automated PID Tracking**.
 5.  **Run (`openexec run`)**
-    The agents begin implementing your tasks, protected by the **Autonomous Compliance Shield**.
+    The agents begin implementing your tasks, protected by the **Autonomous Compliance Shield**. The CLI automatically detects and connects to the background engine.
 
 ---
 

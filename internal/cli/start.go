@@ -117,17 +117,45 @@ Examples:
 		auditDB := filepath.Join(dataDir, "audit.db")
 		
 		// Map our cobra flags to server flags
-		os.Args = []string{
-			"openexec-server",
+		serverArgs := []string{
+			"start",
 			"--port", fmt.Sprintf("%d", startPort),
-			"--data-dir", dataDir,
-			"--audit-db", auditDB,
 		}
 		if startReviewer != "" {
-			os.Args = append(os.Args, "--reviewer", startReviewer)
+			serverArgs = append(serverArgs, "--reviewer", startReviewer)
 		}
+
+		// If daemon mode requested, fork a background process
 		if startDaemon {
-			os.Args = append(os.Args, "--daemon")
+			// Check if already running
+			if isServerRunning(config.ProjectDir, startPort) {
+				return fmt.Errorf("execution engine already running on port %d", startPort)
+			}
+
+			// Prepare command to run ourselves without the --daemon flag
+			execPath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("failed to find executable: %w", err)
+			}
+
+			logPath := filepath.Join(config.ProjectDir, ".openexec", "daemon.log")
+			logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				return fmt.Errorf("failed to open log file: %w", err)
+			}
+
+			cmd := exec.Command(execPath, serverArgs...)
+			cmd.Dir = config.ProjectDir
+			cmd.Stdout = logFile
+			cmd.Stderr = logFile
+			
+			if err := cmd.Start(); err != nil {
+				return fmt.Errorf("failed to start background process: %w", err)
+			}
+
+			fmt.Printf("✓ Execution engine started in background (PID: %d)\n", cmd.Process.Pid)
+			fmt.Printf("  Logs: .openexec/daemon.log\n")
+			return nil
 		}
 
 		// Handle UI launch if requested
@@ -172,6 +200,14 @@ Examples:
 		cmd.Printf("   Project: %s\n", config.Name)
 		cmd.Printf("   Port: %d\n", startPort)
 		
+		// Write PID file
+		if err := writePIDFile(config.ProjectDir); err != nil {
+			cmd.Printf("   ⚠ Warning: could not write PID file: %v\n", err)
+		}
+		defer func() {
+			_ = removePIDFile(config.ProjectDir)
+		}()
+
 		// Initialize the new unified server
 		srv, err := server.New(server.Config{
 			Port:        startPort,
@@ -244,7 +280,7 @@ Examples:
 		}
 
 		// Check if server is running
-		if !isServerRunning(startPort) {
+		if !isServerRunning(config.ProjectDir, startPort) {
 			return fmt.Errorf("execution engine not running\n\nStart it with:\n  openexec start --daemon")
 		}
 
@@ -589,8 +625,19 @@ var stopCmd = &cobra.Command{
 Examples:
   openexec stop`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Load project configuration
+		config, err := project.LoadProjectConfig(".")
+		if err != nil {
+			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
+		// Apply config port if not overridden
+		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
+			startPort = config.Execution.Port
+		}
+
 		// Check if server is running
-		if !isServerRunning(startPort) {
+		if !isServerRunning(config.ProjectDir, startPort) {
 			fmt.Println("Execution daemon is not running.")
 			return nil
 		}
@@ -598,10 +645,21 @@ Examples:
 		// Find and kill the process
 		fmt.Printf("Stopping execution daemon on port %d...\n", startPort)
 
-		// Use pkill to find and kill the process
+		// 1. Try killing by PID file first
+		if pid, err := readPID(config.ProjectDir); err == nil {
+			if err := KillDaemon(pid); err == nil {
+				// Wait a moment and verify
+				time.Sleep(500 * time.Millisecond)
+				if !isServerRunning(config.ProjectDir, startPort) {
+					fmt.Println("✓ Execution daemon stopped (via PID)")
+					return nil
+				}
+			}
+		}
+
+		// 2. Fallback to pkill
 		killCmd := exec.Command("pkill", "-f", "openexec-execution")
 		if err := killCmd.Run(); err != nil {
-			// Try alternative method
 			killCmd = exec.Command("pkill", "openexec-execution")
 			_ = killCmd.Run()
 		}
@@ -609,7 +667,7 @@ Examples:
 		// Wait a moment and verify
 		time.Sleep(500 * time.Millisecond)
 
-		if isServerRunning(startPort) {
+		if isServerRunning(config.ProjectDir, startPort) {
 			return fmt.Errorf("failed to stop daemon, it may still be running")
 		}
 
@@ -622,16 +680,21 @@ var restartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "Restart the execution daemon",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Load project configuration
+		config, err := project.LoadProjectConfig(".")
+		if err != nil {
+			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
 		fmt.Println("♻️ Restarting OpenExec Execution Engine...")
-		
+
 		// Stop if running
-		if isServerRunning(startPort) {
+		if isServerRunning(config.ProjectDir, startPort) {
 			stopArgs := []string{"start", "stop", "--port", fmt.Sprintf("%d", startPort)}
 			stopExec := exec.Command(os.Args[0], stopArgs...)
 			_ = stopExec.Run()
 			time.Sleep(1 * time.Second)
-		}
-		
+		}		
 		// Start again
 		startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
 		if startReviewer != "" {
@@ -675,13 +738,38 @@ func init() {
 	rootCmd.AddCommand(stopCmd)
 }
 
+// writePIDFile writes the current process ID to a file
+func writePIDFile(projectDir string) error {
+	pid := os.Getpid()
+	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
+	return os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", pid)), 0644)
+}
+
+// removePIDFile removes the PID file
+func removePIDFile(projectDir string) error {
+	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
+	return os.Remove(pidFile)
+}
+
+// readPID reads the process ID from the PID file
+func readPID(projectDir string) (int, error) {
+	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
+	data, err := os.ReadFile(pidFile)
+	if err != nil {
+		return 0, err
+	}
+	var pid int
+	_, err = fmt.Sscanf(string(data), "%d", &pid)
+	return pid, err
+}
+
 // waitForServer waits for the server to be ready
 func waitForServer(port int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	client := &http.Client{Timeout: 2 * time.Second}
 
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/health", port))
+		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
@@ -695,14 +783,32 @@ func waitForServer(port int, timeout time.Duration) error {
 }
 
 // isServerRunning checks if the execution server is running
-func isServerRunning(port int) bool {
+func isServerRunning(projectDir string, port int) bool {
+	// 1. Try HTTP health check first (most reliable)
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/health", port))
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
+	if err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			return true
+		}
+	}
+
+	// 2. Fallback to PID file check
+	pid, err := readPID(projectDir)
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+
+	// Check if process exists
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+
+	// Signal 0 checks if process is alive without killing it
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
 }
 
 // loadPendingTasks loads all tasks from tasks.json or .openexec/stories.json
