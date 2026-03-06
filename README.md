@@ -38,7 +38,7 @@ OpenExec bridges the gap between machine speed and institutional trust by embedd
 1.  **Safety by Design (Rule-Based Logic):** Translate laws and regulations into local YAML guardrails. Rules act as physical gates—if an action breaks your policy, the system blocks it locally before it happens.
 2.  **Institutional Memory (Owned Logic):** You own the "Library" of logic the AI builds. Your organizational patterns stay local, ensuring you can swap AI providers without losing your intelligence.
 3.  **Information Limiting (Privacy-First):** Control exactly what external APIs see. Sensitive metadata—like API keys, server IPs, and full network maps—stay local. Cloud models only receive the specific context required for the task.
-4.  **GDPR Compliance (PII Shield):** Detect and scrub Personally Identifiable Information (PII) locally. Automatically mask sensitive data before it reaches any external cloud model.
+4.  **GDPR Compliance (PII Shield):** Detect and scrub Personally Identifiable Information (PII) locally. Automatically masks emails, Finnish personal identity codes (HETU), IP addresses, and API keys before they reach any external cloud model.
 5.  **Digital Flight Recorder:** Records not just *what* changed, but *why*. Captures the complete reasoning chain in a tamper-proof vault for public sector accountability.
 
 **Governance isn't a speed limit; it's the brakes that allow you to move at machine speed safely.**
