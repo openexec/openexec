@@ -142,3 +142,53 @@ func TestEnsureMCPConfig(t *testing.T) {
 		t.Error("missing mcpServers in config")
 	}
 }
+
+func TestPIDFileManagement(t *testing.T) {
+	tmpDir := t.TempDir()
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
+	port := 8888
+
+	t.Run("Write and Read PID", func(t *testing.T) {
+		err := writePIDFile(tmpDir, port)
+		if err != nil {
+			t.Fatalf("failed to write PID file: %v", err)
+		}
+
+		pid, gotPort, err := readPID(tmpDir)
+		if err != nil {
+			t.Fatalf("failed to read PID file: %v", err)
+		}
+
+		if pid != os.Getpid() {
+			t.Errorf("got PID %d, want %d", pid, os.Getpid())
+		}
+		if gotPort != port {
+			t.Errorf("got port %d, want %d", gotPort, port)
+		}
+	})
+
+	t.Run("Remove PID", func(t *testing.T) {
+		err := removePIDFile(tmpDir)
+		if err != nil {
+			t.Fatalf("failed to remove PID file: %v", err)
+		}
+
+		_, _, err = readPID(tmpDir)
+		if err == nil {
+			t.Error("expected error reading removed PID file, got nil")
+		}
+	})
+}
+
+func TestPortDiscovery(t *testing.T) {
+	t.Run("Find Available Port", func(t *testing.T) {
+		port, err := findAvailablePort(9000)
+		if err != nil {
+			t.Fatalf("failed to find available port: %v", err)
+		}
+		if port < 9000 {
+			t.Errorf("got port %d, want >= 9000", port)
+		}
+	})
+}
+
