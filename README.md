@@ -33,14 +33,14 @@ Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in
 
 ## Core Pillars: Turning Policy into Reality
 
-OpenExec closes the gap between human high-level intent and verified production code by embedding governance directly into the architecture.
+OpenExec bridges the gap between machine speed and institutional trust by embedding governance directly into the architecture.
 
-1.  **Governance by Design (Deterministic Boundaries):** Evaluates boundaries at runtime. Before an agent acts, it must pass through "Hard Policy Gates." Stability is built into the loop.
-2.  **Owned Intelligence vs. Vendor Lock-in:** The Local Knowledge Map (DCP) ensures project intelligence lives on your machine in an open format. You own the map; models are just interchangeable workers.
-3.  **Sovereignty through Hybrid Brains:** v0.1.6 enables Hybrid Model Selection (Cloud + Local). Local Tool Search (RAG for Tools) reduces API data leakage by 47% by filtering information locally.
-4.  **The Immutable Audit Trail:** Records every AI decision and state change in a local, encrypted vault. Verified evidence for SOC2, ISO 27001, or public sector accountability.
+1.  **Safety by Design (Automated Guardrails):** Evaluates security and policy rules at runtime. Rules act as physical gates—if an action breaks your policy, the system blocks it locally before it happens.
+2.  **Institutional Memory vs. Vendor Lock-in:** You own the "Library" of knowledge the AI builds about your project. Swap AI providers instantly without losing your organizational intelligence.
+3.  **Sovereignty through Privacy-First Filtering:** Control exactly what external APIs see. Our "Need to Know" filter reduces data exposure to cloud models by 47% by locally selecting only necessary context.
+4.  **Digital Flight Recorder:** Records not just *what* changed, but *why*. Captures the complete reasoning chain in a tamper-proof vault for push-button SOC2, ISO 27001, or public sector compliance.
 
-**Governance doesn't slow us down. Done right, it's the only way to move at machine speed safely.**
+**Governance isn't a speed limit; it's the brakes that allow you to move at machine speed safely.**
 
 ---
 
