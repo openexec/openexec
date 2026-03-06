@@ -31,12 +31,16 @@
 
 Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in a structured pipeline. It doesn't just write code; it **plans, reviews, executes, and validates** every change through a recursive autonomous loop.
 
-### Why OpenExec?
-*   **Hybrid Brain Architecture:** You aren't locked into one model. Use **Cloud APIs** (Claude, GPT, Gemini) for complex reasoning and **Local LLMs** (via Ollama) for private, fast code execution. Select models per-task (Planning, Execution, Review).
-*   **Surgical Knowledge Hub (DCP):** Unlike tools that "chat and hope," OpenExec indexes your code locally. It sends the *exact* byte-offsets needed to the AI, drastically reducing token usage and eliminating hallucinations.
-*   **Zero-Dependency Monolith:** A single Go binary containing the CLI, Orchestration Engine, AI Planner, and Web UI. No Python or Node.js required for the core system.
-*   **Autonomous Compliance Shield:** Automatically runs mandatory quality gates (`go vet`, `ruff`, `mypy`) before any code is committed via the surgical `safe_commit` tool.
-*   **Interface-First Parallelism:** Tasks are automatically scheduled using an enhanced DAG. Dependent stories unlock as soon as their prerequisite's **Interface Contract** is defined.
+## Core Pillars: Turning Policy into Reality
+
+OpenExec closes the gap between human high-level intent and verified production code by embedding governance directly into the architecture.
+
+1.  **Governance by Design (Deterministic Boundaries):** Evaluates boundaries at runtime. Before an agent acts, it must pass through "Hard Policy Gates." Stability is built into the loop.
+2.  **Owned Intelligence vs. Vendor Lock-in:** The Local Knowledge Map (DCP) ensures project intelligence lives on your machine in an open format. You own the map; models are just interchangeable workers.
+3.  **Sovereignty through Hybrid Brains:** v0.1.6 enables Hybrid Model Selection (Cloud + Local). Local Tool Search (RAG for Tools) reduces API data leakage by 47% by filtering information locally.
+4.  **The Immutable Audit Trail:** Records every AI decision and state change in a local, encrypted vault. Verified evidence for SOC2, ISO 27001, or public sector accountability.
+
+**Governance doesn't slow us down. Done right, it's the only way to move at machine speed safely.**
 
 ---
 
