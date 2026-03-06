@@ -35,10 +35,10 @@ Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in
 
 OpenExec bridges the gap between machine speed and institutional trust by embedding governance directly into the architecture.
 
-1.  **Safety by Design (Automated Guardrails):** Evaluates security and policy rules at runtime. Rules act as physical gates—if an action breaks your policy, the system blocks it locally before it happens.
-2.  **Institutional Memory vs. Vendor Lock-in:** You own the "Library" of knowledge the AI builds about your project. Swap AI providers instantly without losing your organizational intelligence.
-3.  **Sovereignty through Privacy-First Filtering:** Control exactly what external APIs see. Our "Need to Know" filter reduces data exposure to cloud models by 47% by locally selecting only necessary context.
-4.  **Digital Flight Recorder:** Records not just *what* changed, but *why*. Captures the complete reasoning chain in a tamper-proof vault for push-button SOC2, ISO 27001, or public sector compliance.
+1.  **Safety by Design (Rule-Based Logic):** Translate abstract laws and regulations into local YAML guardrails. Rules act as physical gates—if an action breaks your policy, the system blocks it locally before it happens.
+2.  **Institutional Memory vs. Vendor Lock-in:** You own the "Library" of logic the AI builds. Your organizational patterns stay local in an open format, ensuring you can swap AI providers without losing your intelligence.
+3.  **Information Limiting (Privacy-First):** Control exactly what external APIs see. Our "Need to Know" filter reduces data exposure by 47% by sending only the specific context required for a single task.
+4.  **Digital Flight Recorder:** Records not just *what* changed, but *why*. Captures the complete reasoning chain in a tamper-proof vault for push-button SOC2, ISO 27001, or public sector accountability.
 
 **Governance isn't a speed limit; it's the brakes that allow you to move at machine speed safely.**
 
