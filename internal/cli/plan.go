@@ -192,7 +192,12 @@ func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, e
 	
 	output, err := c.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("native LLM provider failed: %w\nOutput: %s", err, string(output))
+		outStr := string(output)
+		// Detect specific provider errors to give better hints
+		if strings.Contains(outStr, "authentication_error") || strings.Contains(outStr, "OAuth token has expired") || strings.Contains(outStr, "/login") {
+			return "", fmt.Errorf("\n❌ AI Provider Authentication Failed.\n\nYour '%s' CLI session has expired. Please run:\n  %s login\n\nOriginal error: %s", cliCmd, cliCmd, outStr)
+		}
+		return "", fmt.Errorf("native LLM provider failed: %w\nOutput: %s", err, outStr)
 	}
 
 	return string(output), nil
