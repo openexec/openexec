@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -44,6 +46,14 @@ type AuditLogger struct {
 
 // NewLogger creates a new AuditLogger with the given database path.
 func NewLogger(dbPath string) (*AuditLogger, error) {
+	// Ensure parent directory exists
+	dir := filepath.Dir(dbPath)
+	if dir != "." && dir != "/" {
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			return nil, fmt.Errorf("failed to create audit database directory: %w", err)
+		}
+	}
+
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open audit database: %w", err)

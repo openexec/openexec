@@ -12,6 +12,7 @@
   <a href="#what-is-openexec">Overview</a> •
   <a href="#conversational-orchestration">Conversational Mode</a> •
   <a href="#how-to-start">Quick Start</a> •
+  <a href="docs/GET_STARTED.md">Getting Started Guide</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#contributing">Contributing</a>
 </p>
@@ -31,11 +32,10 @@
 Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in a structured pipeline. It doesn't just write code; it **plans, reviews, executes, and validates** every change through a recursive autonomous loop.
 
 ### Why OpenExec?
-*   **Zero-Dependency Architecture:** A single Go binary containing the CLI, Orchestration Engine, AI Planner, and Web UI. No Python or Node.js environment required.
-*   **Surgical Pointer Records (OpenCode):** Automatically maps your functions, structs, and API handlers to exact file byte-offsets. Agents see exactly the code they need.
-*   **BitNet Intent Routing:** Uses a local 1-bit 2B model to parse user intent and select tools in milliseconds, avoiding cloud round-trips for simple decisions.
+*   **Hybrid Brain Architecture:** You aren't locked into one model. Use **Cloud APIs** (Claude, GPT, Gemini) for complex reasoning and **Local LLMs** (via Ollama) for private, fast code execution. Select models per-task (Planning, Execution, Review).
+*   **Surgical Knowledge Hub (DCP):** Unlike tools that "chat and hope," OpenExec indexes your code locally. It sends the *exact* byte-offsets needed to the AI, drastically reducing token usage and eliminating hallucinations.
+*   **Zero-Dependency Monolith:** A single Go binary containing the CLI, Orchestration Engine, AI Planner, and Web UI. No Python or Node.js required for the core system.
 *   **Autonomous Compliance Shield:** Automatically runs mandatory quality gates (`go vet`, `ruff`, `mypy`) before any code is committed via the surgical `safe_commit` tool.
-*   **Knowledge Hub UI:** A built-in React dashboard to visually inspect surgical pointers, environment topologies, and policy gates.
 *   **Interface-First Parallelism:** Tasks are automatically scheduled using an enhanced DAG. Dependent stories unlock as soon as their prerequisite's **Interface Contract** is defined.
 
 ---
@@ -69,6 +69,8 @@ openexec knowledge show envs
 
 ## Quick Start
 
+For a detailed walkthrough, see the **[Getting Started Guide](docs/GET_STARTED.md)**.
+
 ### 1. Installation
 Download the latest binary for your platform (macOS, Linux, Windows), or build from source:
 
@@ -77,7 +79,7 @@ Download the latest binary for your platform (macOS, Linux, Windows), or build f
 curl -sSfL https://openexec.io/install.sh | sh
 
 # Build from source (all platforms)
-go build -o bin/openexec ./cmd/openexec
+go build -o openexec ./cmd/openexec
 ```
 
 ### 2. The Execution Flow
@@ -89,8 +91,8 @@ Follow these steps to transform an idea into a verified project:
     Chat with the AI Architect to define your project shape, platform, and contracts. It generates a verified `INTENT.md`.
 3.  **Plan (`openexec plan INTENT.md`)**
     OpenExec decomposes your intent into a structured set of technical stories and tasks by chatting with the AI agent.
-4.  **Start Server (`openexec start`)**
-    Launch the integrated server. For UI development, run the Vite dev server separately (see below).
+4.  **Start Server (`openexec start --ui`)**
+    Launch the integrated server and open the web dashboard in your browser.
 5.  **Run (`openexec run`)**
     The agents begin implementing your tasks, protected by the **Autonomous Compliance Shield**.
 
@@ -139,13 +141,13 @@ graph TD
 | **Wizard** | Requirement Gathering | Chat with AI Agent |
 | **Orchestrator** | Durable Task Execution | Go + SQLite |
 | **DCP** | Deterministic Knowledge | SQLite + BitNet (Local) |
-| **Dashboard** | Visual Hub | React (Vite dev server) |
+| **Dashboard** | Visual Hub | React (Embedded in binary) |
 
 ---
 
-## Local UI (Dev)
+## Local UI Development
 
-The CLI and orchestration engine are delivered as a single binary. The web dashboard is developed separately using Vite for a fast feedback loop.
+The CLI and orchestration engine are delivered as a single binary with the UI embedded. For development of the React dashboard:
 
 ```bash
 cd ui
@@ -153,7 +155,8 @@ npm install
 npm run dev -- --port 3001
 ```
 
-Open the dashboard at http://localhost:3001. The server started via `openexec start` exposes the backend API that the UI connects to.
+Open the dashboard at http://localhost:3001. The dev server proxies requests to the backend started via `openexec start`.
+
 
 ---
 

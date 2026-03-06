@@ -83,6 +83,12 @@ func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 		return nil, fmt.Errorf("failed to create engram directory: %w", err)
 	}
 
+	// Create data subdirectory for SQLite audit DB
+	dataDir := filepath.Join(openexecDir, "data")
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	// Create project config
 	config := &ProjectConfig{
 		Name:        projectName,

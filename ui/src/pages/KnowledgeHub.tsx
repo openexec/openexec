@@ -102,12 +102,12 @@ export const KnowledgeHub: React.FC = () => {
     void fetchData()
   }, []);
 
-  if (loading) return <div style={styles.container}>Loading Deterministic Knowledge Base...</div>;
+  if (loading) return <div style={styles.container}>Loading Project Knowledge Map...</div>;
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Deterministic Control Plane</h1>
-      <p>This dashboard exposes the structured "Pointer Records" used by the OpenExec Orchestrator for zero-hallucination planning and execution.</p>
+      <h1 style={styles.title}>Project Knowledge Map</h1>
+      <p>This dashboard shows the structured "Code Map" used by OpenExec to ensure the AI knows exactly what to change with zero-hallucination.</p>
 
       {error && (
         <div role="alert" style={{ marginTop: '1rem', padding: '0.75rem 1rem', border: '1px solid #8b949e', borderRadius: 6, background: '#0d1117' }}>
@@ -119,8 +119,8 @@ export const KnowledgeHub: React.FC = () => {
       )}
 
       <div style={styles.section}>
-        <h2>Surgical Pointers (Symbols)</h2>
-        <p>Extracted via <code style={styles.code}>openexec knowledge index</code>. The AI reads exactly these lines when modifying functions.</p>
+        <h2>Surgical Code Map (Symbols)</h2>
+        <p>The AI reads exactly these lines when modifying functions, ensuring precision and reducing token usage.</p>
         <ul style={styles.list}>
           {symbols.length === 0 ? <li style={styles.item}>No symbols indexed.</li> : 
             symbols.map(s => (
@@ -136,8 +136,8 @@ export const KnowledgeHub: React.FC = () => {
       </div>
 
       <div style={styles.section}>
-        <h2>Environment Topologies</h2>
-        <p>Hard constraints and IPs for deterministic deployments.</p>
+        <h2>Environment Maps</h2>
+        <p>Hard constraints and network maps for reliable deployments.</p>
         <ul style={styles.list}>
           {envs.length === 0 ? <li style={styles.item}>No environments recorded.</li> : 
             envs.map(e => (
@@ -151,8 +151,8 @@ export const KnowledgeHub: React.FC = () => {
       </div>
 
       <div style={styles.section}>
-        <h2>Hard Policy Gates</h2>
-        <p>Rules that the <code>safe_commit</code> tool enforces before saving code.</p>
+        <h2>Safety Guardrails (Policies)</h2>
+        <p>Rules that OpenExec enforces automatically before saving any code.</p>
         <ul style={styles.list}>
           {policies.length === 0 ? <li style={styles.item}>No policies recorded.</li> : 
             policies.map(p => (
