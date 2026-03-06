@@ -55,4 +55,58 @@ func TestDCPCoordinator(t *testing.T) {
 			t.Errorf("unexpected result: %v", res)
 		}
 	})
+
+	t.Run("PII and Infrastructure Scrubbing", func(t *testing.T) {
+		// Arrange: Register a mock tool that echoes its input
+		echoTool := &mockEchoTool{}
+		coord.RegisterTool(echoTool)
+
+		// Create a mock router that returns the echo tool
+		mockRouter := &mockPIIRouter{}
+		coord.router = mockRouter
+
+		query := "Process data for test@example.com on 10.0.0.1"
+		
+		// Act
+		res, err := coord.ProcessQuery(ctx, query)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ProcessQuery failed: %v", err)
+		}
+
+		output := res.(string)
+		if strings.Contains(output, "test@example.com") {
+			t.Error("PII (email) was not scrubbed")
+		}
+		if !strings.Contains(output, "[EMAIL_REDACTED]") {
+			t.Error("PII (email) placeholder missing")
+		}
+		if strings.Contains(output, "10.0.0.1") {
+			t.Error("Infrastructure (IP) was not masked")
+		}
+		if !strings.Contains(output, "[IP_REDACTED]") {
+			t.Error("Infrastructure (IP) placeholder missing")
+		}
+	})
 }
+
+type mockEchoTool struct{}
+func (m *mockEchoTool) Name() string { return "echo" }
+func (m *mockEchoTool) Description() string { return "Echoes input" }
+func (m *mockEchoTool) InputSchema() string { return "{}" }
+func (m *mockEchoTool) Execute(ctx context.Context, args map[string]interface{}) (any, error) {
+	return args["text"], nil
+}
+
+type mockPIIRouter struct {
+	router.BitNetRouter
+}
+func (m *mockPIIRouter) ParseIntent(ctx context.Context, query string) (*router.Intent, error) {
+	return &router.Intent{
+		ToolName:   "echo",
+		Args:       map[string]interface{}{"text": query},
+		Confidence: 1.0,
+	}, nil
+}
+func (m *mockPIIRouter) RegisterTool(name, desc, schema string) error { return nil }

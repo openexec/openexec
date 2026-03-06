@@ -66,18 +66,26 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 	return tool.Execute(ctx, intent.Args)
 }
 
-// sanitizeArgs recursively cleans all string values in the arguments map
+// sanitizeArgs recursively cleans all string values in the arguments map,
+// scrubbing PII and masking infrastructure details before any tool execution.
 func (c *Coordinator) sanitizeArgs(args map[string]interface{}) {
 	for k, v := range args {
 		switch val := v.(type) {
 		case string:
-			args[k] = util.SanitizeInput(val)
+			// 1. Basic sanitization (printable chars)
+			sanitized := util.SanitizeInput(val)
+			// 2. Scrub PII (GDPR compliance)
+			scrubbed := util.ScrubPII(sanitized)
+			// 3. Mask Infrastructure (IPs)
+			args[k] = util.MaskInfrastructure(scrubbed)
 		case map[string]interface{}:
 			c.sanitizeArgs(val)
 		case []interface{}:
 			for i, item := range val {
 				if s, ok := item.(string); ok {
-					val[i] = util.SanitizeInput(s)
+					sanitized := util.SanitizeInput(s)
+					scrubbed := util.ScrubPII(sanitized)
+					val[i] = util.MaskInfrastructure(scrubbed)
 				}
 			}
 		}
