@@ -36,6 +36,11 @@ func NewSQLiteRepository(db *sql.DB) (*SQLiteRepository, error) {
 
 // initSchema creates the session tables if they don't exist.
 func (r *SQLiteRepository) initSchema(ctx context.Context) error {
+	// Enable foreign keys
+	if _, err := r.db.ExecContext(ctx, "PRAGMA foreign_keys = ON;"); err != nil {
+		return fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+
 	_, err := r.db.ExecContext(ctx, Schema)
 	return err
 }

@@ -211,11 +211,17 @@ func TestSchema_ToolCallsTableColumns(t *testing.T) {
 }
 
 func TestSchema_ForeignKeyConstraints(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=1")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
 	defer db.Close()
+
+	// Enable foreign keys
+	_, err = db.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		t.Fatalf("Failed to enable foreign keys: %v", err)
+	}
 
 	_, err = db.Exec(Schema)
 	if err != nil {
@@ -252,11 +258,17 @@ func TestSchema_ForeignKeyConstraints(t *testing.T) {
 }
 
 func TestSchema_CascadeDelete(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=1")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
 	}
 	defer db.Close()
+
+	// Enable foreign keys
+	_, err = db.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		t.Fatalf("Failed to enable foreign keys: %v", err)
+	}
 
 	_, err = db.Exec(Schema)
 	if err != nil {

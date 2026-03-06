@@ -52,7 +52,7 @@ func main() {
 	case "signal-complete":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"All tests passing."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"phase-complete","reason":"All tests passing"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"openexec_signal","input":{"type":"phase-complete","reason":"All tests passing"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: phase-complete"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
@@ -60,7 +60,7 @@ func main() {
 	case "signal-progress":
 		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
 		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"Making progress."}]}}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"mcp__axon-signal__openexec_signal","input":{"type":"progress","reason":"Step done"}}]}}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu1","name":"openexec_signal","input":{"type":"progress","reason":"Step done"}}]}}`)
 		fmt.Println(`{"type":"tool_result","tool_use_id":"tu1","content":"Signal received: progress"}`)
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)

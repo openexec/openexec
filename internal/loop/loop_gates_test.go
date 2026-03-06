@@ -36,10 +36,14 @@ quality:
 		
 		done := make(chan struct{})
 		var foundPassed bool
+		var foundComplete bool
 		go func() {
 			for e := range events {
 				if e.Type == EventGatesPassed {
 					foundPassed = true
+				}
+				if e.Type == EventComplete {
+					foundComplete = true
 				}
 			}
 			close(done)
@@ -53,6 +57,9 @@ quality:
 		
 		if !foundPassed {
 			t.Error("expected EventGatesPassed")
+		}
+		if !foundComplete {
+			t.Error("expected EventComplete")
 		}
 	})
 

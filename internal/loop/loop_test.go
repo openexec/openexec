@@ -27,7 +27,7 @@ func TestLoop_Run(t *testing.T) {
 		{
 			name:          "run with signal",
 			scenario:      "signal-complete",
-			expectedEvent: EventSignalReceived,
+			expectedEvent: EventComplete,
 		},
 	}
 

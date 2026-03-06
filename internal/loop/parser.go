@@ -146,10 +146,10 @@ func (p *Parser) emit(e Event) {
 	p.events <- e
 }
 
-// isOpenExecSignal returns true if the tool name is an openexec_signal call.
-// Handles both direct ("openexec_signal") and MCP-prefixed ("mcp__axon-signal__openexec_signal").
+// isOpenExecSignal returns true if the tool name is an openexec_signal or axon_signal call.
+// Handles both direct ("openexec_signal") and MCP-prefixed ("mcp__axon-signal__axon_signal").
 func isOpenExecSignal(toolName string) bool {
-	return strings.HasSuffix(toolName, "openexec_signal")
+	return strings.HasSuffix(toolName, "openexec_signal") || strings.HasSuffix(toolName, "axon_signal")
 }
 
 func (p *Parser) emitSignal(input map[string]interface{}) {
