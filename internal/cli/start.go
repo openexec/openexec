@@ -212,7 +212,7 @@ Examples:
 		cmd.Printf("   Port: %d\n", startPort)
 		
 		// Write PID file
-		if err := writePIDFile(config.ProjectDir); err != nil {
+		if err := writePIDFile(config.ProjectDir, startPort); err != nil {
 			cmd.Printf("   ⚠ Warning: could not write PID file: %v\n", err)
 		}
 		defer func() {
@@ -657,7 +657,7 @@ Examples:
 		fmt.Printf("Stopping execution daemon on port %d...\n", startPort)
 
 		// 1. Try killing by PID file first
-		if pid, err := readPID(config.ProjectDir); err == nil {
+		if pid, _, err := readPID(config.ProjectDir); err == nil {
 			if err := KillDaemon(pid); err == nil {
 				// Wait a moment and verify
 				time.Sleep(500 * time.Millisecond)
@@ -761,11 +761,11 @@ func findAvailablePort(basePort int) (int, error) {
 	return 0, fmt.Errorf("could not find available port in range %d-%d", basePort, basePort+99)
 }
 
-// writePIDFile writes the current process ID to a file
-func writePIDFile(projectDir string) error {
+// writePIDFile writes the current process ID and port to a file
+func writePIDFile(projectDir string, port int) error {
 	pid := os.Getpid()
 	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
-	return os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", pid)), 0644)
+	return os.WriteFile(pidFile, []byte(fmt.Sprintf("%d:%d", pid, port)), 0644)
 }
 
 // removePIDFile removes the PID file
@@ -774,16 +774,21 @@ func removePIDFile(projectDir string) error {
 	return os.Remove(pidFile)
 }
 
-// readPID reads the process ID from the PID file
-func readPID(projectDir string) (int, error) {
+// readPID reads the process ID and optional port from the PID file
+func readPID(projectDir string) (int, int, error) {
 	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
 	data, err := os.ReadFile(pidFile)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	var pid int
-	_, err = fmt.Sscanf(string(data), "%d", &pid)
-	return pid, err
+	var pid, port int
+	content := string(data)
+	if strings.Contains(content, ":") {
+		_, err = fmt.Sscanf(content, "%d:%d", &pid, &port)
+	} else {
+		_, err = fmt.Sscanf(content, "%d", &pid)
+	}
+	return pid, port, err
 }
 
 // waitForServer waits for the server to be ready
@@ -805,33 +810,55 @@ func waitForServer(port int, timeout time.Duration) error {
 	return fmt.Errorf("server did not become ready within %v", timeout)
 }
 
-// isServerRunning checks if the execution server is running
+// isServerRunning checks if the execution server is running.
+// If port is 0, it tries to discover the port from the PID file.
 func isServerRunning(projectDir string, port int) bool {
-	// 1. Try HTTP health check first (most reliable)
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
+	checkPort := port
+
+	// 1. Check PID file first to see if we can discover the actual port
+	pid, discoveredPort, err := readPID(projectDir)
 	if err == nil {
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			return true
+		if checkPort == 0 || checkPort == 8765 || checkPort == 8080 { // only override if default or unspecified
+			if discoveredPort > 0 {
+				checkPort = discoveredPort
+			}
+		}
+
+		// Verify process is actually alive
+		process, err := os.FindProcess(pid)
+		if err == nil {
+			if err := process.Signal(syscall.Signal(0)); err != nil {
+				return false // process is dead
+			}
 		}
 	}
 
-	// 2. Fallback to PID file check
-	pid, err := readPID(projectDir)
-	if err != nil {
-		return false
+	// 2. Try HTTP health check (most reliable)
+	if checkPort > 0 {
+		client := &http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return true
+			}
+		}
+		
+		// If explicit port failed, but we discovered a DIFFERENT port, try that too
+		if checkPort != port {
+			resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", checkPort))
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					// Update global startPort so CLI uses the discovered one
+					startPort = checkPort
+					return true
+				}
+			}
+		}
 	}
 
-	// Check if process exists
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-
-	// Signal 0 checks if process is alive without killing it
-	err = process.Signal(syscall.Signal(0))
-	return err == nil
+	return false
 }
 
 // loadPendingTasks loads all tasks from tasks.json or .openexec/stories.json
