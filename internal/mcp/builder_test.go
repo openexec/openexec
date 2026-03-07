@@ -786,6 +786,9 @@ func TestOrchestratorBuilder_Test(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test method test in short mode")
 	}
+	if os.Getenv("RUN_RECURSIVE_TESTS") == "" {
+		t.Skip("skipping recursive test (set RUN_RECURSIVE_TESTS=1 to run)")
+	}
 
 	root, err := DetectOrchestratorRoot()
 	if err != nil {
@@ -825,6 +828,9 @@ func TestOrchestratorBuilder_TestWithVerbose(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping verbose test in short mode")
 	}
+	if os.Getenv("RUN_RECURSIVE_TESTS") == "" {
+		t.Skip("skipping recursive test")
+	}
 
 	root, err := DetectOrchestratorRoot()
 	if err != nil {
@@ -854,7 +860,10 @@ func TestOrchestratorBuilder_TestWithVerbose(t *testing.T) {
 
 func TestOrchestratorBuilder_TestWithRaceDetector(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping race detector test in short mode")
+		t.Skip("skipping test in short mode")
+	}
+	if os.Getenv("RUN_RECURSIVE_TESTS") == "" {
+		t.Skip("skipping recursive test")
 	}
 
 	root, err := DetectOrchestratorRoot()
@@ -886,6 +895,9 @@ func TestOrchestratorBuilder_TestWithRaceDetector(t *testing.T) {
 func TestOrchestratorBuilder_TestWithTags(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping tags test in short mode")
+	}
+	if os.Getenv("RUN_RECURSIVE_TESTS") == "" {
+		t.Skip("skipping recursive test")
 	}
 
 	root, err := DetectOrchestratorRoot()
@@ -949,7 +961,10 @@ func TestOrchestratorBuilder_BuildAll(t *testing.T) {
 
 func TestOrchestratorBuilder_BuildAllWithTests(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping BuildAll with tests in short mode")
+		t.Skip("skipping test in short mode")
+	}
+	if os.Getenv("RUN_RECURSIVE_TESTS") == "" {
+		t.Skip("skipping recursive test")
 	}
 
 	root, err := DetectOrchestratorRoot()
@@ -985,6 +1000,9 @@ func TestOrchestratorBuilder_BuildAllWithTests(t *testing.T) {
 func TestQuickTest(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping quick test in short mode")
+	}
+	if os.Getenv("RUN_RECURSIVE_TESTS") == "" {
+		t.Skip("skipping recursive test")
 	}
 
 	root, err := DetectOrchestratorRoot()

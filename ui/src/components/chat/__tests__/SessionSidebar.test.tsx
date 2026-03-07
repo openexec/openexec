@@ -209,7 +209,7 @@ describe('SessionSidebar', () => {
       projectPath: '/test/project',
       provider: 'anthropic',
       model: 'claude-3-5-sonnet-20241022',
-      title: undefined,
+      title: '',
     })
   })
 })

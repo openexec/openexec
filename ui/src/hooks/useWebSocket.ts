@@ -454,6 +454,23 @@ export function useWebSocket(
     updateConnectionStatus('disconnected')
   }, [clearTimers, log, updateConnectionStatus])
 
+  // Ensure all timers and sockets are cleaned up on unmount
+  useEffect(() => {
+    return () => {
+      // Prevent reconnection attempts during teardown
+      isIntentionalDisconnect.current = true
+      clearTimers()
+      if (wsRef.current) {
+        try {
+          wsRef.current.close(1000, 'Unmount')
+        } catch {
+          // ignore close errors during teardown
+        }
+        wsRef.current = null
+      }
+    }
+  }, [clearTimers])
+
   // Subscribe to session
   const subscribe = useCallback(
     (sessionId: string) => {
@@ -587,14 +604,7 @@ export function useWebSocket(
     [queueMessage, sendRaw]
   )
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isIntentionalDisconnect.current = true
-      clearTimers()
-      wsRef.current?.close(1000, 'Component unmount')
-    }
-  }, [clearTimers])
+  // Cleanup on unmount handled by earlier useEffect
 
   return {
     connectionStatus,

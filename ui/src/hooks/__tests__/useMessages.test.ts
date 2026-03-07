@@ -13,7 +13,7 @@ global.fetch = mockFetch
 
 describe('useMessages', () => {
   const defaultConfig: MessagesApiConfig = {
-    baseUrl: 'http://localhost:8080',
+    baseUrl: 'http://localhost:8080/api',
     authToken: 'test-token',
   }
 

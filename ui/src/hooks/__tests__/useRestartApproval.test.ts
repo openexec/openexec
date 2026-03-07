@@ -87,7 +87,7 @@ const mockApiError = (message: string, status = 500) => {
 
 describe('useRestartApproval', () => {
   const defaultConfig = {
-    baseUrl: 'http://localhost:8080',
+    baseUrl: 'http://localhost:8080/api',
   }
 
   beforeEach(() => {

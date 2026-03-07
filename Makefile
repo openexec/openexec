@@ -51,8 +51,8 @@ test:
 	@$(MAKE) ui-test
 
 ui-test:
-	@echo "🧪 Running UI tests..."
-	cd ui && npm run test
+	@echo "🧪 Running UI tests (non-watch)..."
+	cd ui && npm run test:run
 
 type-check:
 	@echo "⌨️ Checking Go types..."

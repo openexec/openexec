@@ -87,8 +87,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
               <div
                 className="chat-header__fork-indicator"
                 style={styles.forkIndicator}
-                onMouseEnter={() => setShowAncestryPopover(true)}
-                onMouseLeave={() => setShowAncestryPopover(false)}
               >
                 <button
                   className="chat-header__fork-badge"
@@ -103,7 +101,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
                 {/* Fork ancestry popover */}
                 {showAncestryPopover && ancestorSessions.length > 0 && (
-                  <div className="chat-header__ancestry-popover" style={styles.ancestryPopover}>
+                  <div 
+                    className="chat-header__ancestry-popover" 
+                    style={styles.ancestryPopover}
+                    onMouseLeave={() => setShowAncestryPopover(false)}
+                  >
                     <ForkAncestryTree
                       ancestors={ancestorSessions}
                       currentSessionId={session.id}

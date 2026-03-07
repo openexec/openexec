@@ -41,13 +41,16 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
 })
-
 // Helper to create mock response
 function createMockResponse<T>(data: T, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
-    text: async () => data ? JSON.stringify(data) : '',
+    text: async () => {
+      if (typeof data === 'string') return data
+      return data ? JSON.stringify(data) : ''
+    },
+    json: async () => data,
   } as Response
 }
 
@@ -57,7 +60,7 @@ function createMockResponse<T>(data: T, status = 200): Response {
 
 describe('useSession', () => {
   const defaultConfig: SessionApiConfig = {
-    baseUrl: 'http://localhost:8080',
+    baseUrl: 'http://localhost:8080/api',
     authToken: 'test-token',
   }
 
@@ -86,7 +89,7 @@ describe('useSession', () => {
       })
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8080/sessions',
+        'http://localhost:8080/api/sessions',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({

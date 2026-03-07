@@ -70,19 +70,21 @@ export interface SessionForkDialogProps {
   isLoading?: boolean
 }
 
+const EMPTY_MESSAGES: Message[] = []
+const EMPTY_PROVIDERS: ProviderInfo[] = []
+
 const SessionForkDialog: React.FC<SessionForkDialogProps> = ({
   session,
   forkPointMessage,
-  messages = [],
-  providers = [],
+  messages = EMPTY_MESSAGES,
+  providers = EMPTY_PROVIDERS,
   isOpen,
   onClose,
   onFork,
   onNavigateToSession,
   isLoading = false,
 }) => {
-  // Form state
-  const [selectedMessageId, setSelectedMessageId] = useState<string>('')
+  const [selectedMessageId, setSelectedMessageId] = useState<string>(forkPointMessage?.id || '')
   const [title, setTitle] = useState<string>('')
   const [overrideProvider, setOverrideProvider] = useState<string>('')
   const [overrideModel, setOverrideModel] = useState<string>('')
@@ -94,7 +96,7 @@ const SessionForkDialog: React.FC<SessionForkDialogProps> = ({
   const [forkResult, setForkResult] = useState<ForkResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize state when dialog opens
+  // Sync state when props change or dialog opens
   useEffect(() => {
     if (isOpen) {
       if (forkPointMessage) {
@@ -104,6 +106,7 @@ const SessionForkDialog: React.FC<SessionForkDialogProps> = ({
         setSelectedMessageId(messages[messages.length - 1].id)
         setTitle(`Fork of "${session.title}"`)
       } else {
+        setSelectedMessageId('')
         setTitle(`Fork of "${session.title}"`)
       }
       setOverrideProvider('')

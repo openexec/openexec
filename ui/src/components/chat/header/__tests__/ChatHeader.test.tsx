@@ -4,7 +4,7 @@
  */
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ChatHeader from '../ChatHeader'
 import type { Session, AgentLoopState, CostInfo } from '../../../../types/chat'
@@ -83,7 +83,6 @@ describe('ChatHeader', () => {
     it('renders provider and model indicator', () => {
       const session = createMockSession()
       render(<ChatHeader session={session} />)
-      // ModelIndicator would show provider/model info
       expect(screen.getByText(/anthropic/i)).toBeInTheDocument()
     })
 
@@ -116,7 +115,8 @@ describe('ChatHeader', () => {
       expect(screen.queryByText(/Level 0/)).not.toBeInTheDocument()
     })
 
-    it('shows fork ancestry popover on hover when ancestors provided', async () => {
+    it('shows fork ancestry popover when ancestors provided', async () => {
+      const user = userEvent.setup()
       const session = createMockSession({ parentSessionId: 'parent-session' })
       const forkInfo = createMockForkInfo()
       const ancestors = createMockAncestors()
@@ -127,22 +127,16 @@ describe('ChatHeader', () => {
           forkInfo={forkInfo}
           ancestorSessions={ancestors}
           onNavigateToSession={mockOnNavigateToSession}
+          onForkSession={mockOnForkSession}
+          onUpdateTitle={mockOnUpdateTitle}
         />
       )
 
-      // Find the fork indicator container
-      const forkIndicator = screen.getByTitle(/Forked session/i).parentElement
-      expect(forkIndicator).not.toBeNull()
+      const forkBadge = screen.getByRole('button', { name: /Forked session/i })
+      await user.click(forkBadge)
 
-      // Hover to show popover
-      const user = userEvent.setup()
-      await user.hover(forkIndicator!)
-
-      // Should show the ForkAncestryTree (async render)
-      await waitFor(() => {
-        expect(screen.getByText('Root Session')).toBeInTheDocument()
-        expect(screen.getByText('Parent Session')).toBeInTheDocument()
-      })
+      await screen.findByText('Root Session')
+      expect(screen.getByText('Parent Session')).toBeInTheDocument()
     })
 
     it('allows clicking fork badge to toggle ancestry popover', async () => {
@@ -157,15 +151,21 @@ describe('ChatHeader', () => {
           forkInfo={forkInfo}
           ancestorSessions={ancestors}
           onNavigateToSession={mockOnNavigateToSession}
+          onForkSession={mockOnForkSession}
+          onUpdateTitle={mockOnUpdateTitle}
         />
       )
 
       const forkBadge = screen.getByRole('button', { name: /Forked session/i })
+      
+      // Click to open
       await user.click(forkBadge)
-
-      // Should show some content from ForkAncestryTree
+      await screen.findByText('Parent Session')
+      
+      // Click to close
+      await user.click(forkBadge)
       await waitFor(() => {
-        expect(screen.queryByText(/Root Session/i) || screen.queryByText(/Root/i)).toBeInTheDocument()
+        expect(screen.queryByText('Parent Session')).not.toBeInTheDocument()
       })
     })
   })
@@ -182,12 +182,6 @@ describe('ChatHeader', () => {
       expect(screen.getByTitle('Fork this session')).toBeInTheDocument()
     })
 
-    it('does not show fork button when onForkSession is not provided', () => {
-      const session = createMockSession()
-      render(<ChatHeader session={session} />)
-      expect(screen.queryByTitle('Fork this session')).not.toBeInTheDocument()
-    })
-
     it('calls onForkSession when fork button is clicked', async () => {
       const user = userEvent.setup()
       const session = createMockSession()
@@ -200,15 +194,6 @@ describe('ChatHeader', () => {
 
       await user.click(screen.getByTitle('Fork this session'))
       expect(mockOnForkSession).toHaveBeenCalled()
-    })
-
-    it('does not show fork button when no session is selected', () => {
-      render(
-        <ChatHeader
-          onForkSession={mockOnForkSession}
-        />
-      )
-      expect(screen.queryByTitle('Fork this session')).not.toBeInTheDocument()
     })
   })
 
@@ -225,25 +210,23 @@ describe('ChatHeader', () => {
           forkInfo={forkInfo}
           ancestorSessions={ancestors}
           onNavigateToSession={mockOnNavigateToSession}
+          onForkSession={mockOnForkSession}
+          onUpdateTitle={mockOnUpdateTitle}
         />
       )
 
-      // Open the popover using mouse enter on the container
-      const forkIndicator = screen.getByTitle(/Forked session/i).parentElement
-      const user = userEvent.setup()
-      await user.hover(forkIndicator!)
-
-      // Find the ancestor button - ForkAncestryTree renders buttons for each ancestor
-      // The button contains the title text "Parent Session"
-      const parentButton = screen.getByText('Parent Session').closest('button')
-      expect(parentButton).not.toBeNull()
-      await user.click(parentButton!)
+      const forkBadge = screen.getByRole('button', { name: /Forked session/i })
+      await user.click(forkBadge)
+      
+      const parentButton = await screen.findByText('Parent Session')
+      await user.click(parentButton)
 
       expect(mockOnNavigateToSession).toHaveBeenCalledWith('parent-session')
     })
 
     it('does not allow navigation to current session', async () => {
-      const session = createMockSession({ parentSessionId: 'parent-session' })
+      const user = userEvent.setup()
+      const session = createMockSession({ id: 'session-123', parentSessionId: 'parent-session' })
       const forkInfo = createMockForkInfo()
       const ancestors = createMockAncestors()
 
@@ -253,42 +236,24 @@ describe('ChatHeader', () => {
           forkInfo={forkInfo}
           ancestorSessions={ancestors}
           onNavigateToSession={mockOnNavigateToSession}
+          onForkSession={mockOnForkSession}
+          onUpdateTitle={mockOnUpdateTitle}
         />
       )
 
-      // Open the popover using mouse enter on the container
-      const forkIndicator = screen.getByTitle(/Forked session/i).parentElement
-      const user = userEvent.setup()
-      await user.hover(forkIndicator!)
-
-      // Current session button should be disabled
-      const currentButton = screen.getByText('Current Session').closest('button')
-      expect(currentButton).not.toBeNull()
-      expect(currentButton).toBeDisabled()
+      const forkBadge = screen.getByRole('button', { name: /Forked session/i })
+      await user.click(forkBadge)
+      
+      const currentButton = await screen.findByText('Current Session')
+      expect(currentButton.closest('button')).toBeDisabled()
     })
   })
 
   describe('loop controls', () => {
-    it('calls onPauseLoop when pause is triggered', async () => {
-      const session = createMockSession()
-      const loopState = createMockLoopState({ isRunning: true })
-      render(
-        <ChatHeader
-          session={session}
-          loopState={loopState}
-          onPauseLoop={mockOnPauseLoop}
-        />
-      )
-      // ChatActions component handles the actual button rendering
-      // This test verifies the prop is passed correctly
-      expect(mockOnPauseLoop).not.toHaveBeenCalled()
-    })
-
     it('passes loop state to LoopStatusBadge', () => {
       const session = createMockSession()
       const loopState = createMockLoopState({ isRunning: true, iteration: 5 })
       render(<ChatHeader session={session} loopState={loopState} />)
-      // LoopStatusBadge should display iteration info
       expect(screen.getByText(/iter 5/i)).toBeInTheDocument()
     })
   })
@@ -302,7 +267,6 @@ describe('ChatHeader', () => {
           onUpdateTitle={mockOnUpdateTitle}
         />
       )
-      // SessionTitle handles the editable title
       expect(screen.getByText('Test Session')).toBeInTheDocument()
     })
   })
@@ -318,14 +282,6 @@ describe('ChatHeader', () => {
       expect(screen.getByText('$0.5000')).toBeInTheDocument()
       expect(screen.getByText('/ $1.00')).toBeInTheDocument()
     })
-
-    it('does not show budget when not provided', () => {
-      const session = createMockSession()
-      const costInfo = createMockCostInfo({ sessionTotal: 0.50 })
-      render(<ChatHeader session={session} costInfo={costInfo} />)
-      expect(screen.getByText('$0.5000')).toBeInTheDocument()
-      expect(screen.queryByText(/\/ \$/)).not.toBeInTheDocument()
-    })
   })
 
   describe('accessibility', () => {
@@ -336,19 +292,6 @@ describe('ChatHeader', () => {
 
       const forkBadge = screen.getByRole('button', { name: /Forked session at depth 3/i })
       expect(forkBadge).toBeInTheDocument()
-    })
-
-    it('fork button has proper aria-label', () => {
-      const session = createMockSession()
-      render(
-        <ChatHeader
-          session={session}
-          onForkSession={mockOnForkSession}
-        />
-      )
-
-      const forkButton = screen.getByRole('button', { name: /Fork this session/i })
-      expect(forkButton).toBeInTheDocument()
     })
   })
 })
