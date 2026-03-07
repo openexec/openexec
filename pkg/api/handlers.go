@@ -33,7 +33,7 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 	err := s.Mgr.Start(r.Context(), req.TaskID)
 	if err != nil {
 		if strings.Contains(err.Error(), "already active") {
-			WriteError(w, http.StatusConflict, err.Error())
+			WriteErrorWithSuggestion(w, http.StatusConflict, err.Error(), "Try stopping the existing execution with 'openexec stop' before running again.")
 			return
 		}
 		WriteError(w, http.StatusInternalServerError, err.Error())
@@ -208,4 +208,11 @@ func WriteJSON(w http.ResponseWriter, status int, v interface{}) {
 
 func WriteError(w http.ResponseWriter, status int, msg string) {
 	WriteJSON(w, status, map[string]string{"error": msg})
+}
+
+func WriteErrorWithSuggestion(w http.ResponseWriter, status int, msg string, suggestion string) {
+	WriteJSON(w, status, map[string]string{
+		"error":      msg,
+		"suggestion": suggestion,
+	})
 }

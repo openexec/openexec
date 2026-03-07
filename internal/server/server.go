@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/dcp"
@@ -112,6 +113,16 @@ func (s *Server) registerRoutes() {
 	// --- Health & System Routes ---
 	s.Mux.HandleFunc("GET /api/health", s.handleHealth)
 
+	// --- Catch-all 404 handler for unknown API routes ---
+	s.Mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[API] 404 Not Found: %s %s", r.Method, r.URL.Path)
+		s.respondJSON(w, http.StatusNotFound, map[string]string{
+			"error":      "Endpoint not found",
+			"path":       r.URL.Path,
+			"suggestion": "Verify the URL prefix and version (e.g., /api/v1/). If using 'openexec run', ensure the server is updated to v0.1.7+.",
+		})
+	})
+
 	// --- Embedded UI ---
 	uiFS := openexec.GetUIFS()
 	s.Mux.Handle("/", http.FileServer(http.FS(uiFS)))
@@ -159,9 +170,35 @@ func (s *Server) respondJSON(w http.ResponseWriter, code int, payload interface{
 	w.Write(response)
 }
 
+// responseWriter wraps http.ResponseWriter to capture the status code
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// loggingMiddleware logs details about every incoming request
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		wrapped := &responseWriter{ResponseWriter: w, status: http.StatusOK}
+		
+		next.ServeHTTP(wrapped, r)
+		
+		log.Printf("[API] %s %s %d (%v)", r.Method, r.URL.Path, wrapped.status, time.Since(start))
+	})
+}
+
 // Start runs the server and blocks
 func (s *Server) Start(ctx context.Context) error {
 	log.Printf("[Server] Unified OpenExec API listening on %s", s.HttpServer.Addr)
+	
+	// Wrap the mux with logging middleware
+	s.HttpServer.Handler = loggingMiddleware(s.Mux)
 	
 	errCh := make(chan error, 1)
 	go func() {

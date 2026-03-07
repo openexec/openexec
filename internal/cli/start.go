@@ -1034,6 +1034,16 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
+		var errData struct {
+			Error      string `json:"error"`
+			Suggestion string `json:"suggestion"`
+		}
+		if err := json.Unmarshal(respBody, &errData); err == nil {
+			if errData.Suggestion != "" {
+				return "", fmt.Errorf("server error: %s\n💡 Suggestion: %s", errData.Error, errData.Suggestion)
+			}
+			return "", fmt.Errorf("server error: %s", errData.Error)
+		}
 		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
