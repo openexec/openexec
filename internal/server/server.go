@@ -34,6 +34,7 @@ type Server struct {
 	Mux         *http.ServeMux
 	HttpServer  *http.Server
 	mu          sync.RWMutex
+	axonBridge  *api.Server
 }
 
 // Config defines settings for the unified server
@@ -86,6 +87,7 @@ func New(cfg Config) (*Server, error) {
 		Checker:     health.NewChecker(),
 		ProjectsDir: cfg.ProjectsDir,
 		Mux:         mux,
+		axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
 		HttpServer: &http.Server{
 			Addr:    fmt.Sprintf(":%d", cfg.Port),
 			Handler: mux,
@@ -102,8 +104,7 @@ func New(cfg Config) (*Server, error) {
 
 func (s *Server) registerRoutes() {
 	// --- Legacy/High-Level OpenExec Routes (pkg/api bridge) ---
-	axonBridge := api.New(s.Mgr, s.SessionRepo, s.AuditLogger, s.ProjectsDir, "")
-	axonBridge.RegisterRoutes(s.Mux)
+	s.axonBridge.RegisterRoutes(s.Mux)
 
 	// --- DCP Surgical Routes ---
 	s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)

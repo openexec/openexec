@@ -17,6 +17,7 @@ type Server struct {
 	ProjectsDir string
 	Server      *http.Server
 	Mux         *http.ServeMux
+	Hub         *Hub
 }
 
 // New creates an HTTP Server bound to the given address.
@@ -28,12 +29,17 @@ func New(mgr *manager.Manager, sessionRepo session.Repository, auditLogger audit
 		AuditLogger: auditLogger,
 		ProjectsDir: projectsDir,
 		Mux:         mux,
+		Hub:         NewHub(),
 		Server: &http.Server{
 			Addr:    addr,
 			Handler: mux,
 		},
 	}
 	s.registerRoutes()
+	
+	// Start the WebSocket hub
+	go s.Hub.Run()
+	
 	return s
 }
 
@@ -43,6 +49,9 @@ func (s *Server) registerRoutes() {
 
 // RegisterRoutes registers all API routes to the given mux.
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
+	// WebSocket route
+	mux.HandleFunc("GET /ws", s.handleWS)
+
 	// Task Execution (FWU) routes
 	mux.HandleFunc("POST /api/fwu/{id}/start", s.handleStart)
 	mux.HandleFunc("GET /api/fwu/{id}/status", s.handleStatus)
