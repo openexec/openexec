@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -62,10 +63,23 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	// 2. Initialize Core Engine
+	// Resolve to absolute path — ProjectsDir may be "." from config.
+	projectsAbs, _ := filepath.Abs(cfg.ProjectsDir)
+
+	// Agents ship alongside the binary, not inside the user's project.
+	execPath, _ := os.Executable()
+	execDir := filepath.Dir(execPath)
+	agentsDir := filepath.Join(execDir, "..", "agents")
+	// If not found next to binary (e.g. `go run`), fall back to cwd.
+	if _, err := os.Stat(agentsDir); err != nil {
+		agentsDir = filepath.Join(".", "agents")
+	}
+	agentsDir, _ = filepath.Abs(agentsDir)
+
 	mgr := manager.New(manager.Config{
-		WorkDir:    cfg.ProjectsDir,
+		WorkDir:    projectsAbs,
 		TractStore: cfg.DataDir,
-		AgentsDir:  filepath.Join(cfg.ProjectsDir, "agents"),
+		AgentsDir:  agentsDir,
 	})
 	
 	// 3. Initialize Deterministic Control Plane (DCP)
