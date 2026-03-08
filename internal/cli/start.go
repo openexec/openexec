@@ -304,6 +304,16 @@ Examples:
 			return fmt.Errorf("failed to load tasks: %w", err)
 		}
 
+		// Materialize tasks.json so saveTaskStatus can persist completions.
+		// Only write if no tasks.json exists yet (i.e., tasks came from stories.json).
+		tasksPath := filepath.Join(config.ProjectDir, ".openexec", "tasks.json")
+		if _, statErr := os.Stat(tasksPath); statErr != nil && len(tasks) > 0 {
+			tf := TasksFile{Tasks: tasks}
+			if data, err := json.MarshalIndent(tf, "", "  "); err == nil {
+				_ = os.WriteFile(tasksPath, data, 0644)
+			}
+		}
+
 		if len(tasks) == 0 {
 			cmd.Println("No pending tasks found.")
 			cmd.Println()
