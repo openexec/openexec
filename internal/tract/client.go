@@ -184,11 +184,8 @@ func (c *Client) readResponse() (*mcp.Response, error) {
 }
 
 // extractToolText extracts the text from an MCP tool response result.
-// Expected structure: {"content":[{"type":"text","text":"..."}]}
+// Expected structure: {"content":[{"type":"text","text":"..."}], "isError": false}
 func extractToolText(result interface{}) (string, error) {
-	// The result comes from JSON unmarshaling, so it's a map[string]interface{}.
-	// But since mcp.Response.Result is interface{}, after json.Unmarshal it could
-	// be in raw form. We marshal and re-unmarshal to get a consistent map.
 	data, err := json.Marshal(result)
 	if err != nil {
 		return "", fmt.Errorf("marshal result: %w", err)
@@ -199,6 +196,7 @@ func extractToolText(result interface{}) (string, error) {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
+		IsError bool `json:"isError"`
 	}
 	if err := json.Unmarshal(data, &wrapper); err != nil {
 		return "", fmt.Errorf("unmarshal tool wrapper: %w", err)
@@ -206,6 +204,10 @@ func extractToolText(result interface{}) (string, error) {
 
 	if len(wrapper.Content) == 0 {
 		return "", fmt.Errorf("empty content array")
+	}
+
+	if wrapper.IsError {
+		return "", fmt.Errorf("tool error: %s", wrapper.Content[0].Text)
 	}
 
 	return wrapper.Content[0].Text, nil

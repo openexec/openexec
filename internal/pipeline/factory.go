@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/openexec/openexec/internal/loop"
@@ -50,17 +51,20 @@ func NewLoopFactory(cfg LoopFactoryConfig) *LoopFactory {
 type BriefingFunc func(ctx context.Context, fwuID string) (string, error)
 
 // TractBriefingFunc returns a BriefingFunc that uses the real TractClient.
+// Falls back to a minimal briefing if tract is unavailable or the FWU is not found.
 func TractBriefingFunc(tractStore string) BriefingFunc {
 	return func(ctx context.Context, fwuID string) (string, error) {
 		client, err := tract.StartSubprocess(ctx, tractStore)
 		if err != nil {
-			return "", fmt.Errorf("start tract: %w", err)
+			log.Printf("[Briefing] tract unavailable for %s, using minimal briefing: %v", fwuID, err)
+			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
 		}
 		defer func() { _ = client.Close() }()
 
 		brief, err := client.Brief(fwuID)
 		if err != nil {
-			return "", fmt.Errorf("fetch briefing: %w", err)
+			log.Printf("[Briefing] tract briefing failed for %s, using minimal briefing: %v", fwuID, err)
+			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
 		}
 
 		return prompt.FormatBriefing(brief), nil
