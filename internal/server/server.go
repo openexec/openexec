@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -64,6 +65,7 @@ func New(cfg Config) (*Server, error) {
 	mgr := manager.New(manager.Config{
 		WorkDir:    cfg.ProjectsDir,
 		TractStore: cfg.DataDir,
+		AgentsDir:  filepath.Join(cfg.ProjectsDir, "agents"),
 	})
 	
 	// 3. Initialize Deterministic Control Plane (DCP)
