@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"log"
+
 	"github.com/openexec/openexec/internal/loop"
 )
 
@@ -10,6 +12,17 @@ const subscriberBufSize = 64
 // Runs as a goroutine per pipeline. Closes all subscriber channels when the pipeline channel closes.
 func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 	for event := range events {
+		switch event.Type {
+		case loop.EventError:
+			log.Printf("[Manager] Event %s [%s]: ERROR: %s", fwuID, event.Type, event.ErrText)
+		case loop.EventPhaseStart, loop.EventPhaseComplete, loop.EventPipelineComplete:
+			log.Printf("[Manager] Event %s [%s]: phase=%s agent=%s", fwuID, event.Type, event.Phase, event.Agent)
+		case loop.EventRetrying:
+			log.Printf("[Manager] Event %s [%s]: retrying - %s", fwuID, event.Type, event.Text)
+		case loop.EventComplete:
+			log.Printf("[Manager] Event %s [%s]: loop complete", fwuID, event.Type)
+		}
+
 		m.mu.Lock()
 		e, ok := m.pipelines[fwuID]
 		if ok {

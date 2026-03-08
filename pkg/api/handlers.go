@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -29,8 +31,9 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start the pipeline/loop via manager
-	err := s.Mgr.Start(r.Context(), req.TaskID)
+	// Start the pipeline/loop via manager.
+	// Use background context — the pipeline must outlive the HTTP request.
+	err := s.Mgr.Start(context.Background(), req.TaskID)
 	if err != nil {
 		if strings.Contains(err.Error(), "already active") {
 			WriteErrorWithSuggestion(w, http.StatusConflict, err.Error(), "Try stopping the existing execution with 'openexec stop' before running again.")
@@ -59,11 +62,23 @@ func (s *Server) handleGetLoop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"id":        info.FWUID,
 		"status":    info.Status,
 		"iteration": info.Iteration,
-	})
+		"elapsed":   info.Elapsed,
+	}
+	if info.Error != "" {
+		resp["error"] = info.Error
+		log.Printf("[Loop] Status: pipeline %s status=%s error=%s", id, info.Status, info.Error)
+	}
+	if info.Phase != "" {
+		resp["phase"] = info.Phase
+	}
+	if info.Agent != "" {
+		resp["agent"] = info.Agent
+	}
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +88,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := s.Mgr.Start(r.Context(), id)
+	err := s.Mgr.Start(context.Background(), id)
 	if err != nil {
 		if strings.Contains(err.Error(), "already active") {
 			WriteError(w, http.StatusConflict, err.Error())

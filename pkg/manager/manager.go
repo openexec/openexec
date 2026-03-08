@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -152,6 +153,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string) error {
 
 	// Run pipeline in background.
 	go func() {
+		log.Printf("[Manager] Pipeline %s: running", fwuID)
 		err := p.Run(pipeCtx)
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -159,10 +161,12 @@ func (m *Manager) Start(ctx context.Context, fwuID string) error {
 			if err != nil && !isTerminal(e.info.Status) {
 				e.info.Status = StatusError
 				e.info.Error = err.Error()
+				log.Printf("[Manager] Pipeline %s: failed with error: %v", fwuID, err)
+			} else if err != nil {
+				log.Printf("[Manager] Pipeline %s: finished (terminal status=%s) with error: %v", fwuID, e.info.Status, err)
+			} else {
+				log.Printf("[Manager] Pipeline %s: finished with status=%s", fwuID, e.info.Status)
 			}
-			// If status is still "starting" or "running" and no error,
-			// the pipeline finished via events (complete/paused/stopped) —
-			// consumeEvents will have set the status.
 		}
 	}()
 

@@ -66,6 +66,9 @@ type LoopResponse struct {
 	ID        string `json:"id"`
 	Status    string `json:"status"`
 	Iteration int    `json:"iteration"`
+	Error     string `json:"error,omitempty"`
+	Phase     string `json:"phase,omitempty"`
+	Agent     string `json:"agent,omitempty"`
 	StartedAt string `json:"started_at,omitempty"`
 }
 
@@ -1153,6 +1156,10 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 			cmd.Printf("   ✓ Complete (iteration %d)\n", loop.Iteration)
 			return nil
 		case "error":
+			if loop.Error != "" {
+				cmd.Printf("   ❌ Error: %s\n", loop.Error)
+				return fmt.Errorf("loop failed: %s", loop.Error)
+			}
 			cmd.Printf("   ❌ Error\n")
 			return fmt.Errorf("loop failed")
 		case "max_iterations":
