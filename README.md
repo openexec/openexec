@@ -96,7 +96,13 @@ Alternatively, build from source:
 go build -o openexec ./cmd/openexec
 ```
 
-### 2. The Execution Flow
+### 2. Updating
+To update to the latest version at any time:
+```bash
+openexec update
+```
+
+### 3. The Execution Flow
 Follow these steps to transform an idea into a verified project:
 
 1.  **Initialize (`git init && openexec init`)**

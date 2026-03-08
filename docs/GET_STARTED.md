@@ -125,7 +125,17 @@ If you are modifying the React UI and want Hot Module Replacement (HMR):
    ```
 3. Visit `http://localhost:3001`. The UI will proxy requests to the backend on `:8080`.
 
-## 7. Troubleshooting
+## 7. Updating OpenExec
+
+To update to the latest version, simply run:
+
+```bash
+./openexec update
+```
+
+This will check the latest version on openexec.io and replace your current binary with the latest one for your platform.
+
+## 8. Troubleshooting
 
 - **Logs:** Check `.openexec/daemon.log` for background process output.
 - **Audit Database:** All AI decisions and tool calls are stored in `.openexec/data/audit.db`. You can inspect this with any SQLite browser.
