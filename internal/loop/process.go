@@ -99,6 +99,7 @@ func (p *Process) Kill() error {
 }
 
 // CaptureStderr copies stderr to a log file in dir. Blocks until EOF.
+// Removes the file on clean exit if it's empty.
 func CaptureStderr(r io.Reader, dir string) error {
 	if dir == "" {
 		dir = "."
@@ -111,10 +112,16 @@ func CaptureStderr(r io.Reader, dir string) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
 
-	_, err = io.Copy(f, r)
-	return err
+	n, copyErr := io.Copy(f, r)
+	_ = f.Close()
+
+	// Remove empty log files — they provide no diagnostic value.
+	if n == 0 {
+		_ = os.Remove(path)
+	}
+
+	return copyErr
 }
 
 // autonomousPreamble is prepended to every prompt to ensure Claude operates
