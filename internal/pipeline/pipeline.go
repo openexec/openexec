@@ -30,8 +30,11 @@ type Config struct {
 	CommandName          string       // test override
 	CommandArgs          []string     // test override
 
+	// Log configuration
+	LogDir string
+
 	// Evidence configuration
-	EvidenceDir      string
+	EvidenceDir string
 	EvidenceBucket   string
 	EvidenceRegion   string
 	EvidenceEndpoint string
@@ -124,6 +127,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		ThrashThreshold:      p.cfg.ThrashThreshold,
 		CommandName:          p.cfg.CommandName,
 		CommandArgs:          p.cfg.CommandArgs,
+		LogDir:               p.cfg.LogDir,
 		EvidenceDir:          p.cfg.EvidenceDir,
 		EvidenceBucket:       p.cfg.EvidenceBucket,
 		EvidenceRegion:       p.cfg.EvidenceRegion,

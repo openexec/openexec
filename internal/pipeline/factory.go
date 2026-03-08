@@ -24,6 +24,7 @@ type LoopFactoryConfig struct {
 	CommandName          string   // test override
 	CommandArgs          []string // test override (default for all phases)
 
+	LogDir           string
 	EvidenceDir      string
 	EvidenceBucket   string
 	EvidenceRegion   string
@@ -88,6 +89,7 @@ func (f *LoopFactory) Create(briefing string, phaseCfg PhaseConfig) (*loop.Loop,
 		MCPConfigPath:    f.cfg.MCPConfigPath,
 		ThrashThreshold:  f.cfg.ThrashThreshold,
 		FwuID:            f.cfg.FWUID,
+		LogDir:           f.cfg.LogDir,
 		EvidenceDir:      f.cfg.EvidenceDir,
 		EvidenceBucket:   f.cfg.EvidenceBucket,
 		EvidenceRegion:   f.cfg.EvidenceRegion,

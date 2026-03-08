@@ -76,10 +76,14 @@ func New(cfg Config) (*Server, error) {
 	}
 	agentsDir, _ = filepath.Abs(agentsDir)
 
+	logDir := filepath.Join(projectsAbs, ".openexec", "logs")
+	_ = os.MkdirAll(logDir, 0750)
+
 	mgr := manager.New(manager.Config{
 		WorkDir:    projectsAbs,
 		TractStore: cfg.DataDir,
 		AgentsDir:  agentsDir,
+		LogDir:     logDir,
 	})
 	
 	// 3. Initialize Deterministic Control Plane (DCP)

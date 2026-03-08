@@ -39,6 +39,7 @@ type Config struct {
 	RetryBackoff         []time.Duration
 	CommandName          string                // test override
 	CommandArgs          []string              // test override
+	LogDir               string
 	BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
 }
 
@@ -130,6 +131,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string) error {
 		RetryBackoff:         m.cfg.RetryBackoff,
 		CommandName:          m.cfg.CommandName,
 		CommandArgs:          m.cfg.CommandArgs,
+		LogDir:               m.cfg.LogDir,
 		BriefingFunc:         m.cfg.BriefingFunc,
 	}
 
