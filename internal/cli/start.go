@@ -1166,6 +1166,10 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 			cmd.Printf("   ⚠ Max iterations reached (%d)\n", loop.Iteration)
 			return nil
 		case "paused":
+			if loop.Error != "" {
+				cmd.Printf("   ⏸ Paused: %s\n", loop.Error)
+				return fmt.Errorf("loop paused: %s", loop.Error)
+			}
 			cmd.Printf("   ⏸ Paused\n")
 			return nil
 		}
