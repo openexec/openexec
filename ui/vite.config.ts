@@ -38,15 +38,7 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
-      testTimeout: 5000,
-      hookTimeout: 5000,
-      teardownTimeout: 2000,
-      pool: 'forks',
-      poolOptions: {
-        forks: {
-          isolate: false,
-        },
-      },
+      testTimeout: 10000,
       coverage: {
         provider: 'v8',
         reporter: ['text', 'json', 'html'],

@@ -604,7 +604,14 @@ export function useWebSocket(
     [queueMessage, sendRaw]
   )
 
-  // Cleanup on unmount handled by earlier useEffect
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isIntentionalDisconnect.current = true
+      clearTimers()
+      wsRef.current?.close(1000, 'Component unmount')
+    }
+  }, [clearTimers])
 
   return {
     connectionStatus,

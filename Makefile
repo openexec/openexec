@@ -51,8 +51,8 @@ test:
 	@$(MAKE) ui-test
 
 ui-test:
-	@echo "🧪 Running UI tests (non-watch)..."
-	cd ui && npm run test:run
+	@echo "🧪 Running UI tests (Strict Serial Mode)..."
+	cd ui && npx vitest run --fileParallelism=false --maxWorkers=1 --minWorkers=1
 
 type-check:
 	@echo "⌨️ Checking Go types..."

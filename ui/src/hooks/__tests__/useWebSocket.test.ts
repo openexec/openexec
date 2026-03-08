@@ -22,11 +22,13 @@ class MockWebSocket {
   onmessage: ((event: MessageEvent) => void) | null = null
 
   private sentMessages: string[] = []
+  private openTimeout: ReturnType<typeof setTimeout> | null = null
+  private closeTimeout: ReturnType<typeof setTimeout> | null = null
 
   constructor(url: string) {
     this.url = url
     // Simulate async connection
-    setTimeout(() => this.simulateOpen(), 10)
+    this.openTimeout = setTimeout(() => this.simulateOpen(), 10)
   }
 
   send(data: string) {
@@ -38,19 +40,27 @@ class MockWebSocket {
 
   close(code?: number, reason?: string) {
     this.readyState = MockWebSocket.CLOSING
-    setTimeout(() => {
+    this.clearTimeouts()
+    this.closeTimeout = setTimeout(() => {
       this.readyState = MockWebSocket.CLOSED
       this.onclose?.({ code: code ?? 1000, reason: reason ?? '' } as CloseEvent)
     }, 10)
   }
 
+  clearTimeouts() {
+    if (this.openTimeout) clearTimeout(this.openTimeout)
+    if (this.closeTimeout) clearTimeout(this.closeTimeout)
+  }
+
   // Test helpers
   simulateOpen() {
+    this.clearTimeouts()
     this.readyState = MockWebSocket.OPEN
     this.onopen?.({ type: 'open' } as Event)
   }
 
   simulateClose(code = 1000, reason = '') {
+    this.clearTimeouts()
     this.readyState = MockWebSocket.CLOSED
     this.onclose?.({ code, reason } as CloseEvent)
   }
@@ -88,8 +98,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  if (currentWs) {
+    currentWs.clearTimeouts()
+  }
   currentWs = null
-  jest.useRealTimers()
+  vi.useRealTimers()
 })
 
 describe('useWebSocket', () => {
