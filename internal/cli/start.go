@@ -1136,10 +1136,16 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	return sb.String()
 }
 
-// waitForLoop polls the loop status until completion
+// brailleSpinner is a smooth braille spinner sequence.
+var brailleSpinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// waitForLoop polls the loop status until completion, showing a spinner.
 func waitForLoop(cmd *cobra.Command, loopID string) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	lastIteration := 0
+	lastPhase := ""
+	tick := 0
+	startTime := time.Now()
 
 	for {
 		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
@@ -1154,8 +1160,19 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 		}
 		resp.Body.Close()
 
+		// Show phase transitions
+		if loop.Phase != "" && loop.Phase != lastPhase {
+			if lastPhase != "" {
+				// Clear spinner line before printing phase change
+				cmd.Printf("\r\033[K")
+			}
+			cmd.Printf("   → Phase %s (%s)\n", loop.Phase, loop.Agent)
+			lastPhase = loop.Phase
+		}
+
 		// Show iteration progress
 		if loop.Iteration > lastIteration {
+			cmd.Printf("\r\033[K")
 			cmd.Printf("   → Iteration %d\n", loop.Iteration)
 			lastIteration = loop.Iteration
 		}
@@ -1163,9 +1180,12 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 		// Check terminal states
 		switch loop.Status {
 		case "complete":
-			cmd.Printf("   ✓ Complete (iteration %d)\n", loop.Iteration)
+			elapsed := time.Since(startTime).Truncate(time.Second)
+			cmd.Printf("\r\033[K")
+			cmd.Printf("   ✓ Complete (%s)\n", elapsed)
 			return nil
 		case "error":
+			cmd.Printf("\r\033[K")
 			if loop.Error != "" {
 				cmd.Printf("   ❌ Error: %s\n", loop.Error)
 				return fmt.Errorf("loop failed: %s", loop.Error)
@@ -1173,9 +1193,11 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 			cmd.Printf("   ❌ Error\n")
 			return fmt.Errorf("loop failed")
 		case "max_iterations":
+			cmd.Printf("\r\033[K")
 			cmd.Printf("   ⚠ Max iterations reached (%d)\n", loop.Iteration)
 			return nil
 		case "paused":
+			cmd.Printf("\r\033[K")
 			if loop.Error != "" {
 				cmd.Printf("   ⏸ Paused: %s\n", loop.Error)
 				return fmt.Errorf("loop paused: %s", loop.Error)
@@ -1183,6 +1205,16 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 			cmd.Printf("   ⏸ Paused\n")
 			return nil
 		}
+
+		// Show spinner while running
+		elapsed := time.Since(startTime).Truncate(time.Second)
+		frame := brailleSpinner[tick%len(brailleSpinner)]
+		phaseLabel := ""
+		if loop.Phase != "" {
+			phaseLabel = fmt.Sprintf(" [%s/%s]", loop.Phase, loop.Agent)
+		}
+		cmd.Printf("\r\033[K   %s Working%s (%s)", frame, phaseLabel, elapsed)
+		tick++
 
 		// Still running, wait and poll again
 		time.Sleep(2 * time.Second)
