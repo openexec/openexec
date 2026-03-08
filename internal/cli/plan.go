@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
-	"time"
 
 	"github.com/openexec/openexec/internal/intent"
 	"github.com/openexec/openexec/internal/knowledge"
@@ -143,30 +141,11 @@ Examples:
 			return err
 		}
 
-		// 3. Generate Plan (with spinner)
-		var plan *planner.ProjectPlan
-		var planErr error
-		var done atomic.Bool
-
-		go func() {
-			plan, planErr = p.GeneratePlan(cmd.Context(), string(intentContent), prdContext)
-			done.Store(true)
-		}()
-
-		spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-		tick := 0
-		start := time.Now()
-		for !done.Load() {
-			elapsed := time.Since(start).Truncate(time.Second)
-			frame := spinner[tick%len(spinner)]
-			cmd.Printf("\r\033[K  %s Planning... (%s)", frame, elapsed)
-			tick++
-			time.Sleep(200 * time.Millisecond)
-		}
-		cmd.Printf("\r\033[K")
-
-		if planErr != nil {
-			return planErr
+		// 3. Generate Plan
+		cmd.Println("  Planning...")
+		plan, err := p.GeneratePlan(cmd.Context(), string(intentContent), prdContext)
+		if err != nil {
+			return err
 		}
 
 		// 4. Save to stories.json
