@@ -19,6 +19,9 @@ type Config struct {
 	WorkDir              string
 	TractStore           string
 	AgentsFS             fs.FS
+	ExecutorModel        string   // model for runner resolution
+	RunnerCommand        string   // CLI override
+	RunnerArgs           []string // CLI args override
 	Pipeline             *PipelineDef          // if set, overrides Phases/Order
 	Phases               map[Phase]PhaseConfig // defaults to DefaultPhaseConfigs()
 	Order                []Phase               // defaults to DefaultPhaseOrder()
@@ -126,6 +129,9 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		MaxRetries:           p.cfg.MaxRetries,
 		RetryBackoff:         p.cfg.RetryBackoff,
 		ThrashThreshold:      p.cfg.ThrashThreshold,
+		ExecutorModel:        p.cfg.ExecutorModel,
+		RunnerCommand:        p.cfg.RunnerCommand,
+		RunnerArgs:           p.cfg.RunnerArgs,
 		CommandName:          p.cfg.CommandName,
 		CommandArgs:          p.cfg.CommandArgs,
 		LogDir:               p.cfg.LogDir,

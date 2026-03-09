@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/openexec/openexec/internal/runner"
 )
 
 // Process represents a running Claude Code instance.
@@ -167,10 +169,31 @@ var disabledTools = []string{
 }
 
 func buildCommand(cfg Config) (string, []string) {
+	// If the server/caller already provided a command name and args, use them.
 	if cfg.CommandName != "" {
 		return cfg.CommandName, cfg.CommandArgs
 	}
 
+	// Resolve runner using centralized logic.
+	cliCmd, cmdArgs, err := runner.Resolve(
+		cfg.ExecutorModel,
+		cfg.RunnerCommand,
+		cfg.RunnerArgs,
+	)
+	if err != nil {
+		// Fallback to internal Claude default if resolution fails
+		return "claude", buildClaudeArgs(cfg)
+	}
+
+	// For Claude, ensuring we use our specific flags if it was using defaults.
+	if strings.Contains(strings.ToLower(cliCmd), "claude") {
+		return cliCmd, buildClaudeArgs(cfg)
+	}
+
+	return cliCmd, cmdArgs
+}
+
+func buildClaudeArgs(cfg Config) []string {
 	prompt := autonomousPreamble + cfg.Prompt
 
 	args := []string{
@@ -184,5 +207,5 @@ func buildCommand(cfg Config) (string, []string) {
 	if cfg.MCPConfigPath != "" {
 		args = append(args, "--mcp-config", cfg.MCPConfigPath)
 	}
-	return "claude", args
+	return args
 }

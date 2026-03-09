@@ -3,6 +3,7 @@ package loop
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -111,7 +112,7 @@ func TestBuildCommandWithMCPConfig(t *testing.T) {
 	}
 	name, args := buildCommand(cfg)
 
-	if name != "claude" {
+	if name != "claude" && !strings.HasSuffix(name, "/claude") {
 		t.Errorf("name = %q", name)
 	}
 

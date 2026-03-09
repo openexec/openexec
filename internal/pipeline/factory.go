@@ -23,6 +23,9 @@ type LoopFactoryConfig struct {
 	MaxRetries           int
 	RetryBackoff         []time.Duration
 	ThrashThreshold      int
+	ExecutorModel        string   // used for runner resolution
+	RunnerCommand        string   // explicit CLI override
+	RunnerArgs           []string // explicit CLI args override
 	CommandName          string   // test override
 	CommandArgs          []string // test override (default for all phases)
 
@@ -88,6 +91,9 @@ func (f *LoopFactory) Create(briefing string, phaseCfg PhaseConfig) (*loop.Loop,
 	cfg := loop.Config{
 		Prompt:           composed,
 		WorkDir:          f.cfg.WorkDir,
+		ExecutorModel:    f.cfg.ExecutorModel,
+		RunnerCommand:    f.cfg.RunnerCommand,
+		RunnerArgs:       f.cfg.RunnerArgs,
 		MaxIterations:    maxIter,
 		MaxRetries:       f.cfg.MaxRetries,
 		RetryBackoff:     f.cfg.RetryBackoff,

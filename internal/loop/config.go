@@ -106,6 +106,15 @@ type Config struct {
 
 	// TaskTitle is the task title (used for preflight check detection).
 	TaskTitle string
+
+	// ExecutorModel is the model name (e.g. gemini-...) used for centralized runner resolution.
+	ExecutorModel string
+
+	// RunnerCommand optionally overrides the CLI binary.
+	RunnerCommand string
+
+	// RunnerArgs optionally overrides the CLI arguments.
+	RunnerArgs []string
 }
 
 // DefaultConfig returns a Config with sensible defaults.

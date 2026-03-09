@@ -13,6 +13,7 @@ import (
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -175,17 +176,20 @@ type cliLLMProvider struct {
 }
 
 func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, error) {
-	// Simple shell-out to claude or gemini CLI for planning
-	cliCmd := "claude"
-	if strings.Contains(p.model, "gemini") {
-		cliCmd = "gemini"
+	// Resolve runner using centralized logic.
+	// Can be overridden via env vars for the planner.
+	cliCmd, cmdArgs, err := runner.Resolve(
+		p.model,
+		os.Getenv("OPENEXEC_PLANNER_CLI"),
+		strings.Fields(os.Getenv("OPENEXEC_PLANNER_ARGS")),
+	)
+	if err != nil {
+		return "", err
 	}
 
-	var cmdArgs []string
-	if cliCmd == "claude" {
+	// For Claude, ensuring we use --print or similar non-interactive flag if it was using defaults.
+	if strings.Contains(strings.ToLower(cliCmd), "claude") {
 		cmdArgs = []string{"--print"}
-	} else if cliCmd == "gemini" {
-		cmdArgs = []string{"--prompt", "-", "--yolo"}
 	}
 
 	c := exec.CommandContext(ctx, cliCmd, cmdArgs...)

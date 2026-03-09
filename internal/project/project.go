@@ -26,6 +26,10 @@ type ExecutionConfig struct {
 	PlannerModel string `json:"planner_model,omitempty"`
 	// ExecutorModel is the model to use for task execution
 	ExecutorModel string `json:"executor_model,omitempty"`
+	// RunnerCommand optionally overrides the loop runner binary (e.g., "claude", "gemini", "codex").
+	RunnerCommand string `json:"runner_command,omitempty"`
+	// RunnerArgs optionally provides arguments for the runner when RunnerCommand is set.
+	RunnerArgs []string `json:"runner_args,omitempty"`
 	// ReviewEnabled enables code review after task execution
 	ReviewEnabled bool `json:"review_enabled"`
 	// ReviewerModel is the model to use for code review

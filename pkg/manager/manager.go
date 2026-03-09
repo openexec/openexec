@@ -30,6 +30,9 @@ type Config struct {
 	WorkDir              string
 	TractStore           string
 	AgentsFS             fs.FS
+	ExecutorModel        string   // model for runner resolution
+	RunnerCommand        string   // CLI override
+	RunnerArgs           []string // CLI args override
 	Pipeline             *pipeline.PipelineDef                   // pipeline config (nil = default)
 	Phases               map[pipeline.Phase]pipeline.PhaseConfig // test override (nil = DefaultPhaseConfigs)
 	Order                []pipeline.Phase                        // test override (nil = DefaultPhaseOrder)
@@ -122,6 +125,9 @@ func (m *Manager) Start(ctx context.Context, fwuID string) error {
 		WorkDir:              m.cfg.WorkDir,
 		TractStore:           m.cfg.TractStore,
 		AgentsFS:             m.cfg.AgentsFS,
+		ExecutorModel:        m.cfg.ExecutorModel,
+		RunnerCommand:        m.cfg.RunnerCommand,
+		RunnerArgs:           m.cfg.RunnerArgs,
 		Pipeline:             m.cfg.Pipeline,
 		Phases:               m.cfg.Phases,
 		Order:                m.cfg.Order,
@@ -254,4 +260,9 @@ func (m *Manager) List() []PipelineInfo {
 		result = append(result, info)
 	}
 	return result
+}
+
+// GetConfig returns the manager's configuration.
+func (m *Manager) GetConfig() Config {
+	return m.cfg
 }
