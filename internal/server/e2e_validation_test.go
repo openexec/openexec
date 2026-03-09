@@ -7,30 +7,23 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/openexec/openexec/internal/router"
 )
+
+// forbiddenIntentErrorStrings defines error messages that must never appear in responses.
+// These indicate intent routing failures that the G-001 fix should prevent.
+var forbiddenIntentErrorStrings = []string{
+	"could not determine intent",
+	"low confidence",
+	"model could not determine",
+}
 
 // TestE2EIntentRoutingValidation validates G-001 goal completion.
 // This is the comprehensive validation suite proving intent routing works correctly.
 // All queries MUST receive valid responses; none may return "could not determine intent" errors.
 func TestE2EIntentRoutingValidation(t *testing.T) {
-	// Setup server with GeneralChatTool registered (default behavior)
-	cfg := Config{
-		Port:        0, // random
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
-	}
-
-	s, err := New(cfg)
-	if err != nil {
-		t.Fatalf("failed to create server: %v", err)
-	}
-
-	// Bypass availability check - use simulator for deterministic keyword-based routing
-	if br, ok := s.Coordinator.GetRouter().(*router.BitNetRouter); ok {
-		br.SetSkipAvailabilityCheck(true)
-	}
+	// Setup server with BitNetRouter in skip mode (uses NewTestServer helper)
+	ts := NewTestServer(t)
+	s := ts.Server
 
 	// Matrix of test inputs representing real user scenarios
 	// NOTE: allowError=true means we accept 500s from tool execution failures,
@@ -65,13 +58,6 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 		{"tabs", "hello\tworld", "general_chat", "query", false},
 	}
 
-	// CRITICAL ASSERTION: No response may contain the old error message
-	forbiddenSubstrings := []string{
-		"could not determine intent",
-		"low confidence",
-		"model could not determine",
-	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Prepare request
@@ -94,7 +80,7 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 				}
 				// For allowError cases, we still check the response doesn't contain intent errors
 				bodyStr := rec.Body.String()
-				for _, forbidden := range forbiddenSubstrings {
+				for _, forbidden := range forbiddenIntentErrorStrings {
 					if strings.Contains(strings.ToLower(bodyStr), forbidden) {
 						t.Errorf("CRITICAL: Found forbidden substring %q in error response: %s", forbidden, bodyStr)
 					}
@@ -126,7 +112,7 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 			// 5. CRITICAL: Check for forbidden substrings
 			resultStr, _ := resp.Result.(string)
 			bodyStr := rec.Body.String()
-			for _, forbidden := range forbiddenSubstrings {
+			for _, forbidden := range forbiddenIntentErrorStrings {
 				if strings.Contains(strings.ToLower(resultStr), forbidden) {
 					t.Errorf("CRITICAL: Found forbidden substring %q in result: %s", forbidden, resultStr)
 				}
@@ -146,20 +132,8 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 // TestE2ENoConfidenceErrorsOnAnyInput ensures that arbitrary inputs never produce confidence errors.
 // This is the definitive regression test for G-001.
 func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
-	cfg := Config{
-		Port:        0,
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
-	}
-
-	s, err := New(cfg)
-	if err != nil {
-		t.Fatalf("failed to create server: %v", err)
-	}
-
-	if br, ok := s.Coordinator.GetRouter().(*router.BitNetRouter); ok {
-		br.SetSkipAvailabilityCheck(true)
-	}
+	ts := NewTestServer(t)
+	s := ts.Server
 
 	// Fuzz-like inputs designed to potentially trigger edge cases
 	fuzzInputs := []string{
@@ -180,11 +154,6 @@ func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
 		"foo\tbar\tbaz",                          // tabs
 	}
 
-	forbiddenSubstrings := []string{
-		"could not determine intent",
-		"low confidence",
-	}
-
 	for i, input := range fuzzInputs {
 		t.Run(strings.ReplaceAll(input[:min(len(input), 20)], "\n", "\\n"), func(t *testing.T) {
 			payload := map[string]string{"query": input}
@@ -203,7 +172,7 @@ func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
 
 			// Must not contain forbidden substrings
 			bodyStr := rec.Body.String()
-			for _, forbidden := range forbiddenSubstrings {
+			for _, forbidden := range forbiddenIntentErrorStrings {
 				if strings.Contains(strings.ToLower(bodyStr), forbidden) {
 					t.Errorf("[input %d] CRITICAL: Found forbidden substring %q in response: %s", i, forbidden, bodyStr)
 				}
@@ -214,20 +183,8 @@ func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
 
 // TestE2ERapidSequentialQueries ensures no race conditions under sequential load.
 func TestE2ERapidSequentialQueries(t *testing.T) {
-	cfg := Config{
-		Port:        0,
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
-	}
-
-	s, err := New(cfg)
-	if err != nil {
-		t.Fatalf("failed to create server: %v", err)
-	}
-
-	if br, ok := s.Coordinator.GetRouter().(*router.BitNetRouter); ok {
-		br.SetSkipAvailabilityCheck(true)
-	}
+	ts := NewTestServer(t)
+	s := ts.Server
 
 	queries := []string{"help", "deploy", "wizard", "asdf", "test", "hello"}
 
