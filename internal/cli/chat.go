@@ -46,14 +46,26 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 				return fmt.Errorf("failed to start background engine: %w", err)
 			}
 			
-			// Wait for server to be ready
-			fmt.Printf("⏳ Waiting for engine to initialize...")
+			// Re-read the port from PID file because it might have shifted (discovery)
+			_, actualPort, err := readPID(projectDir)
+			if err == nil {
+				startPort = actualPort
+			}
+
+			// Wait for server to be ready on the discovered port
+			fmt.Printf("⏳ Waiting for engine to initialize (port %d)...", startPort)
 			if err := waitForServer(startPort, 15*time.Second); err != nil {
 				fmt.Println(color.RedString(" ✗ Failed!"))
-				return fmt.Errorf("engine failed to become ready: %w", err)
+				return fmt.Errorf("engine failed to become ready on port %d: %w", startPort, err)
 			}
 			fmt.Println(color.GreenString(" ✓ Ready"))
 			fmt.Println()
+		} else {
+			// Even if it was already running, discover the correct port from PID file
+			_, actualPort, err := readPID(projectDir)
+			if err == nil {
+				startPort = actualPort
+			}
 		}
 
 		return runChatREPL(projectName)

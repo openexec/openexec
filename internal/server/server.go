@@ -159,11 +159,15 @@ func (s *Server) handleDCPQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[DCP] Received query: %q", req.Query)
 	result, err := s.Coordinator.ProcessQuery(r.Context(), req.Query)
 	if err != nil {
+		log.Printf("[DCP] Query error: %v", err)
 		s.respondJSON(w, http.StatusOK, map[string]interface{}{"error": err.Error()})
 		return
 	}
+	
+	log.Printf("[DCP] Query result: %v", result)
 	s.respondJSON(w, http.StatusOK, map[string]interface{}{"result": result})
 }
 
