@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -18,42 +17,21 @@ func TestInferenceManager_ModelExists(t *testing.T) {
 	// When: EnsureReady() called
 	// Then: Returns nil (model found), binPath set OR error for missing binary
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Also create a fake binary
-	binDir := filepath.Join(tmpDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("failed to create bin dir: %v", err)
-	}
-	binPath := filepath.Join(binDir, "bitnet-cli")
-	if err := os.WriteFile(binPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
-		t.Fatalf("failed to create fake binary: %v", err)
-	}
+	modelPath := env.createFakeModel("model.gguf")
+	env.createFakeBinary(true)
+	env.chdir()
 
-	// Create manager with our model path
 	m := NewInferenceManager(modelPath)
-	// Override the binary search by placing it in the first search location
-	// We'll save and restore the working directory
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
-	// Act
 	err := m.EnsureReady()
 
 	// Assert: Model check passes (we may still fail on binary if not found)
-	// Since we created ./bin/bitnet-cli relative to tmpDir, it should find it
 	if err != nil {
-		// If error is about model not found, that's a failure
 		if strings.Contains(err.Error(), "model not found") {
 			t.Errorf("model should be found: %v", err)
 		}
-		// Binary not found is expected if our setup didn't work
 		if !strings.Contains(err.Error(), "bitnet-cli") {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -66,13 +44,9 @@ func TestInferenceManager_ModelMissing(t *testing.T) {
 	// When: EnsureReady() called
 	// Then: Returns error with setup instructions
 
-	// Arrange
 	m := NewInferenceManager("/tmp/non-existent-model-abc123.gguf")
-
-	// Act
 	err := m.EnsureReady()
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error for missing model")
 	}
@@ -90,36 +64,16 @@ func TestInferenceManager_BinaryInLocal(t *testing.T) {
 	// When: EnsureReady() called
 	// Then: Uses local binary
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Create ./bin/bitnet-cli
-	binDir := filepath.Join(tmpDir, "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("failed to create bin dir: %v", err)
-	}
-	binPath := filepath.Join(binDir, "bitnet-cli")
-	if err := os.WriteFile(binPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
-		t.Fatalf("failed to create fake binary: %v", err)
-	}
-
-	// Change to tmpDir so ./bin/bitnet-cli is found
-	origDir, _ := os.Getwd()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to chdir: %v", err)
-	}
-	defer os.Chdir(origDir)
+	modelPath := env.createFakeModel("model.gguf")
+	env.createFakeBinary(true)
+	env.chdir()
 
 	m := NewInferenceManager(modelPath)
-
-	// Act
 	err := m.EnsureReady()
 
-	// Assert
 	if err != nil {
 		t.Fatalf("EnsureReady should succeed with local binary: %v", err)
 	}
@@ -134,42 +88,20 @@ func TestInferenceManager_BinaryInHome(t *testing.T) {
 	// When: EnsureReady() called
 	// Then: Uses home binary
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Create fake HOME structure
-	fakeHome := filepath.Join(tmpDir, "fakehome")
-	binDir := filepath.Join(fakeHome, ".openexec", "bin")
-	if err := os.MkdirAll(binDir, 0755); err != nil {
-		t.Fatalf("failed to create bin dir: %v", err)
-	}
-	binPath := filepath.Join(binDir, "bitnet-cli")
-	if err := os.WriteFile(binPath, []byte("#!/bin/bash\necho test"), 0755); err != nil {
-		t.Fatalf("failed to create fake binary: %v", err)
-	}
-
-	// Set HOME to our fake home
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", fakeHome)
-	defer os.Setenv("HOME", origHome)
+	modelPath := env.createFakeModel("model.gguf")
+	fakeHome := env.createFakeHome()
+	env.setHome(fakeHome)
 
 	// Make sure ./bin/bitnet-cli does NOT exist in cwd
-	origDir, _ := os.Getwd()
-	noLocalBinDir := filepath.Join(tmpDir, "workdir")
-	os.MkdirAll(noLocalBinDir, 0755)
-	os.Chdir(noLocalBinDir)
-	defer os.Chdir(origDir)
+	noLocalBinDir := filepath.Join(env.tmpDir, "workdir")
+	env.chdirTo(noLocalBinDir)
 
 	m := NewInferenceManager(modelPath)
-
-	// Act
 	err := m.EnsureReady()
 
-	// Assert
 	if err != nil {
 		t.Fatalf("EnsureReady should succeed with home binary: %v", err)
 	}
@@ -185,41 +117,24 @@ func TestInferenceManager_BinaryInPATH(t *testing.T) {
 	// When: EnsureReady() called
 	// Then: Uses system binary
 
-	// This test is harder to set up reliably without actually installing a binary
-	// We can only verify the fallback mechanism works by checking LookPath would be called
-
 	// Skip if bitnet-cli is not actually installed
 	if _, err := exec.LookPath("bitnet-cli"); err != nil {
 		t.Skip("bitnet-cli not in PATH, skipping system PATH test")
 	}
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Ensure no local binary exists
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
-	// Clear HOME to prevent ~/.openexec/bin lookup
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", "/nonexistent")
-	defer os.Setenv("HOME", origHome)
+	modelPath := env.createFakeModel("model.gguf")
+	env.chdir()
+	env.setHome("/nonexistent")
 
 	m := NewInferenceManager(modelPath)
-
-	// Act
 	err := m.EnsureReady()
 
-	// Assert
 	if err != nil {
 		t.Fatalf("EnsureReady should succeed with PATH binary: %v", err)
 	}
-	// binPath should be the result of exec.LookPath
 	if m.binPath == "" {
 		t.Error("binPath should be set")
 	}
@@ -231,34 +146,17 @@ func TestInferenceManager_NoBinary(t *testing.T) {
 	// When: EnsureReady() called
 	// Then: Returns error with install instructions
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Ensure no local binary exists
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
-	// Set HOME to a path without the binary
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir) // No .openexec/bin here
-	defer os.Setenv("HOME", origHome)
-
-	// Temporarily modify PATH to exclude bitnet-cli
-	origPath := os.Getenv("PATH")
-	os.Setenv("PATH", "/nonexistent")
-	defer os.Setenv("PATH", origPath)
+	modelPath := env.createFakeModel("model.gguf")
+	env.chdir()
+	env.setHome(env.tmpDir) // No .openexec/bin here
+	env.setPath("/nonexistent")
 
 	m := NewInferenceManager(modelPath)
-
-	// Act
 	err := m.EnsureReady()
 
-	// Assert
 	if err == nil {
 		t.Fatal("expected error when no binary found")
 	}
@@ -276,38 +174,21 @@ func TestInferenceManager_HomeNotSet(t *testing.T) {
 	// Edge case: HOME not set
 	// Expected: os.Getenv returns empty string, path construction proceeds
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
-	// Unset HOME
-	origHome := os.Getenv("HOME")
-	os.Unsetenv("HOME")
-	defer os.Setenv("HOME", origHome)
-
-	// Also clear PATH to ensure binary not found
-	origPath := os.Getenv("PATH")
-	os.Setenv("PATH", "/nonexistent")
-	defer os.Setenv("PATH", origPath)
+	modelPath := env.createFakeModel("model.gguf")
+	env.chdir()
+	env.unsetHome()
+	env.setPath("/nonexistent")
 
 	m := NewInferenceManager(modelPath)
-
-	// Act
 	err := m.EnsureReady()
 
 	// Assert: Should fail due to missing binary, NOT panic due to empty HOME
 	if err == nil {
 		t.Fatal("expected error when no binary found")
 	}
-	// The path construction should have proceeded without panic
-	// We verify by checking we get the expected "no binary" error
 	if !strings.Contains(err.Error(), "bitnet-cli") {
 		t.Errorf("error should mention bitnet-cli, got: %v", err)
 	}
@@ -317,26 +198,14 @@ func TestInferenceManager_ModelPathIsDirectory(t *testing.T) {
 	// Edge case: Model path is directory
 	// Expected: os.Stat succeeds but inference will fail
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model-dir")
-	if err := os.MkdirAll(modelPath, 0755); err != nil {
-		t.Fatalf("failed to create model directory: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Create a binary so EnsureReady can succeed
-	binDir := filepath.Join(tmpDir, "bin")
-	os.MkdirAll(binDir, 0755)
-	binPath := filepath.Join(binDir, "bitnet-cli")
-	os.WriteFile(binPath, []byte("#!/bin/bash\necho test"), 0755)
-
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	modelPath := env.createModelDir("model-dir")
+	env.createFakeBinary(true)
+	env.chdir()
 
 	m := NewInferenceManager(modelPath)
-
-	// Act
 	err := m.EnsureReady()
 
 	// Assert: EnsureReady succeeds (os.Stat works on directories)
@@ -350,22 +219,12 @@ func TestInferenceManager_BinaryNotExecutable(t *testing.T) {
 	// Edge case: Binary not executable
 	// Expected: EnsureReady succeeds, RunInference fails
 
-	// Arrange
-	tmpDir := t.TempDir()
-	modelPath := filepath.Join(tmpDir, "model.gguf")
-	if err := os.WriteFile(modelPath, []byte("fake model"), 0644); err != nil {
-		t.Fatalf("failed to create fake model: %v", err)
-	}
+	env := newTestEnv(t)
+	defer env.done()
 
-	// Create binary WITHOUT execute permission
-	binDir := filepath.Join(tmpDir, "bin")
-	os.MkdirAll(binDir, 0755)
-	binPath := filepath.Join(binDir, "bitnet-cli")
-	os.WriteFile(binPath, []byte("#!/bin/bash\necho test"), 0644) // Note: 0644 not 0755
-
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	modelPath := env.createFakeModel("model.gguf")
+	env.createFakeBinary(false) // Not executable
+	env.chdir()
 
 	m := NewInferenceManager(modelPath)
 

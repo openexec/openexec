@@ -16,6 +16,16 @@ const (
 	// LowConfidenceThreshold is the minimum confidence for trusting model output.
 	// Below this threshold, we fall back to general_chat.
 	LowConfidenceThreshold = 0.2
+
+	// GeneralChatTool is the fallback tool name used when intent cannot be determined.
+	GeneralChatTool = "general_chat"
+
+	// Prompt markers for query extraction
+	promptQueryMarker      = "QUERY: "
+	promptQueryMarkerLower = "query: "
+
+	// Known error phrases that trigger fallback
+	errorPhraseNoIntent = "could not determine intent"
 )
 
 // BitNetRouter wraps a local 1-bit LLM for intent selection
@@ -53,7 +63,7 @@ func (r *BitNetRouter) RegisterTool(name, description, schema string) error {
 // ParseIntent invokes the local BitNet model to select a tool
 func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, error) {
 	fallback := &Intent{
-		ToolName:   "general_chat",
+		ToolName:   GeneralChatTool,
 		Args:       map[string]interface{}{"query": query},
 		Confidence: FallbackConfidence,
 	}
@@ -78,7 +88,7 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	intent, err := r.parseModelOutput(output)
 	if err != nil {
 		// Also check if the raw output itself is just an error message string
-		if strings.Contains(strings.ToLower(output), "could not determine intent") {
+		if strings.Contains(strings.ToLower(output), errorPhraseNoIntent) {
 			return fallback, nil
 		}
 		// Fallback to general chat if model output is malformed
@@ -100,7 +110,7 @@ func (r *BitNetRouter) buildPrompt(query string) string {
 	for name, info := range r.tools {
 		sb.WriteString(fmt.Sprintf("- %s: %s\n", name, info))
 	}
-	sb.WriteString(fmt.Sprintf("\nQUERY: %s\n", query))
+	sb.WriteString(fmt.Sprintf("\n%s%s\n", promptQueryMarker, query))
 	sb.WriteString("JSON_INTENT:")
 	return sb.String()
 }
@@ -115,41 +125,57 @@ func (r *BitNetRouter) runLocalInference(ctx context.Context, prompt string) (st
 	return r.manager.RunInference(ctx, prompt)
 }
 
+// simulatedToolMatch defines a keyword-to-tool mapping for test inference simulation.
+type simulatedToolMatch struct {
+	keywords   []string
+	toolName   string
+	args       string // JSON-encoded args
+	confidence float64
+}
+
+// simulatedToolMatches defines the keyword matching rules for test mode.
+// Order matters: first match wins.
+var simulatedToolMatches = []simulatedToolMatch{
+	{[]string{"symbol", "function"}, "read_symbol", `{"name": "Execute"}`, 0.95},
+	{[]string{"deploy", "prod"}, "deploy", `{"env": "prod", "action": "push"}`, 0.98},
+	{[]string{"commit", "save", "push"}, "safe_commit", `{"message": "Update from OpenExec", "push": true}`, 0.99},
+	{[]string{"wizard"}, "general_chat", `{"query": "wizard"}`, 0.99},
+	{[]string{"init"}, "general_chat", `{"query": "init"}`, 0.99},
+}
+
+// matchesAnyKeyword returns true if query contains any of the given keywords.
+func matchesAnyKeyword(query string, keywords []string) bool {
+	for _, kw := range keywords {
+		if strings.Contains(query, kw) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
-	queryPart := ""
-	if idx := strings.LastIndex(prompt, "QUERY: "); idx != -1 {
-		queryPart = strings.ToLower(prompt[idx:])
+	lowerQuery := ""
+	if idx := strings.LastIndex(prompt, promptQueryMarker); idx != -1 {
+		lowerQuery = strings.ToLower(prompt[idx:])
 	}
 
-	if strings.Contains(queryPart, "symbol") || strings.Contains(queryPart, "function") {
-		return `{"tool_name": "read_symbol", "args": {"name": "Execute"}, "confidence": 0.95}`, nil
-	}
-
-	if strings.Contains(queryPart, "deploy") || strings.Contains(queryPart, "prod") {
-		return `{"tool_name": "deploy", "args": {"env": "prod", "action": "push"}, "confidence": 0.98}`, nil
-	}
-
-	if strings.Contains(queryPart, "commit") || strings.Contains(queryPart, "save") || strings.Contains(queryPart, "push") {
-		return `{"tool_name": "safe_commit", "args": {"message": "Update from OpenExec", "push": true}, "confidence": 0.99}`, nil
-	}
-
-	if strings.Contains(queryPart, "wizard") {
-		return `{"tool_name": "general_chat", "args": {"query": "wizard"}, "confidence": 0.99}`, nil
-	}
-
-	if strings.Contains(queryPart, "init") {
-		return `{"tool_name": "general_chat", "args": {"query": "init"}, "confidence": 0.99}`, nil
+	// Check each tool match rule in order
+	for _, match := range simulatedToolMatches {
+		if matchesAnyKeyword(lowerQuery, match.keywords) {
+			return fmt.Sprintf(`{"tool_name": %q, "args": %s, "confidence": %.2f}`,
+				match.toolName, match.args, match.confidence), nil
+		}
 	}
 
 	// Default to general chat if no surgical tool matches
-	cleanQuery := strings.TrimPrefix(queryPart, "query: ")
+	cleanQuery := strings.TrimPrefix(lowerQuery, promptQueryMarkerLower)
 	// Strip trailing "json_intent:" or other prompt markers
 	if idx := strings.Index(cleanQuery, "\n"); idx != -1 {
 		cleanQuery = cleanQuery[:idx]
 	}
 	cleanQuery = strings.TrimSpace(cleanQuery)
 
-	return fmt.Sprintf(`{"tool_name": "general_chat", "args": {"query": %q}, "confidence": 0.50}`, cleanQuery), nil
+	return fmt.Sprintf(`{"tool_name": %q, "args": {"query": %q}, "confidence": %.2f}`, GeneralChatTool, cleanQuery, FallbackConfidence), nil
 }
 
 func (r *BitNetRouter) parseModelOutput(output string) (*Intent, error) {

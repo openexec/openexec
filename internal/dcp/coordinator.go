@@ -38,7 +38,9 @@ func (c *Coordinator) GetRouter() router.Router {
 	return c.router
 }
 
-// SyncKnowledge performs a full project re-index
+// SyncKnowledge performs a full project re-index.
+// Error is intentionally ignored: indexing is best-effort and the DCP
+// continues to function with stale or empty knowledge when indexing fails.
 func (c *Coordinator) SyncKnowledge(projectDir string) {
 	_ = c.indexer.IndexProject(projectDir)
 }
@@ -65,6 +67,7 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 		if result, ok := c.fallbackToChat(ctx, query, "Low confidence (%.2f)", intent.Confidence); ok {
 			return result, nil
 		}
+		// Fallback failed (general_chat not registered or errored), proceed with original tool execution
 	}
 
 	// 3. Sanitize model outputs
@@ -100,26 +103,29 @@ func (c *Coordinator) fallbackToChat(ctx context.Context, query, reason string, 
 	return result, true
 }
 
+// sanitizeString applies the full sanitization pipeline to a single string:
+// 1. Basic sanitization (printable chars)
+// 2. Scrub PII (GDPR compliance)
+// 3. Mask Infrastructure (IPs)
+func sanitizeString(s string) string {
+	sanitized := util.SanitizeInput(s)
+	scrubbed := util.ScrubPII(sanitized)
+	return util.MaskInfrastructure(scrubbed)
+}
+
 // sanitizeArgs recursively cleans all string values in the arguments map,
 // scrubbing PII and masking infrastructure details before any tool execution.
 func (c *Coordinator) sanitizeArgs(args map[string]interface{}) {
 	for k, v := range args {
 		switch val := v.(type) {
 		case string:
-			// 1. Basic sanitization (printable chars)
-			sanitized := util.SanitizeInput(val)
-			// 2. Scrub PII (GDPR compliance)
-			scrubbed := util.ScrubPII(sanitized)
-			// 3. Mask Infrastructure (IPs)
-			args[k] = util.MaskInfrastructure(scrubbed)
+			args[k] = sanitizeString(val)
 		case map[string]interface{}:
 			c.sanitizeArgs(val)
 		case []interface{}:
 			for i, item := range val {
 				if s, ok := item.(string); ok {
-					sanitized := util.SanitizeInput(s)
-					scrubbed := util.ScrubPII(sanitized)
-					val[i] = util.MaskInfrastructure(scrubbed)
+					val[i] = sanitizeString(s)
 				}
 			}
 		}

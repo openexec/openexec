@@ -11,6 +11,30 @@
   ],
   "stories": [
     {
+      "id": "US-003",
+      "goal_id": "G-001",
+      "title": "Harden Coordinator ProcessQuery Error Handling",
+      "description": "As a CLI user, I want the coordinator to always produce a response so that I never see internal errors",
+      "acceptance_criteria": [
+        "ProcessQuery never returns error when general_chat tool is registered",
+        "Low confidence handling logs appropriately but does not fail",
+        "Missing tool fallback works correctly"
+      ],
+      "verification_script": "go test ./internal/dcp/... -v -cover",
+      "tasks": [
+        "T-US-003-001",
+        "T-US-003-002",
+        "T-US-003-003"
+      ],
+      "depends_on": [
+        "US-002"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "done",
+      "created_at": "2026-03-09T20:34:53.397643+02:00"
+    },
+    {
       "id": "US-004",
       "goal_id": "G-001",
       "title": "CLI Chat End-to-End Integration Test",
@@ -98,6 +122,8 @@
         "T-US-002-001",
         "T-US-002-002",
         "T-US-002-003",
+        "T-US-002-004",
+        "T-US-002-003",
         "T-US-002-004"
       ],
       "depends_on": [
@@ -107,30 +133,6 @@
       "priority": 0,
       "status": "done",
       "created_at": "2026-03-09T20:34:53.395246+02:00"
-    },
-    {
-      "id": "US-003",
-      "goal_id": "G-001",
-      "title": "Harden Coordinator ProcessQuery Error Handling",
-      "description": "As a CLI user, I want the coordinator to always produce a response so that I never see internal errors",
-      "acceptance_criteria": [
-        "ProcessQuery never returns error when general_chat tool is registered",
-        "Low confidence handling logs appropriately but does not fail",
-        "Missing tool fallback works correctly"
-      ],
-      "verification_script": "go test ./internal/dcp/... -v -cover",
-      "tasks": [
-        "T-US-003-001",
-        "T-US-003-002",
-        "T-US-003-003"
-      ],
-      "depends_on": [
-        "US-002"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "done",
-      "created_at": "2026-03-09T20:34:53.397643+02:00"
     }
   ]
 }
