@@ -182,7 +182,7 @@ func sendChatQuery(query string) (string, error) {
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("server returned status %d", resp.StatusCode)
 		}
-		return "(no response from agent)", nil
+		return "(no response from agent; add --debug for raw output)", nil
 	}
 
 	return finalResult, nil

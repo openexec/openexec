@@ -61,7 +61,8 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 		return nil, fmt.Errorf("intent routing failed: %w", err)
 	}
 
-	// 2. Threshold check: if confidence is too low, fallback to general chat
+	// 2. Threshold check: if confidence is too low, fallback to general chat.
+	// We use 0.2 as a heuristic cutoff; below this, the local model is likely guessing.
 	if intent.Confidence < 0.2 {
 		if chatTool, ok := c.tools["general_chat"]; ok {
 			log.Printf("[DCP] Low confidence (%.2f), falling back to general_chat", intent.Confidence)

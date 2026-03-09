@@ -93,6 +93,7 @@ func New(cfg Config) (*Server, error) {
 	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
 	coordinator.RegisterTool(tools.NewDeployTool(kStore))
 	coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
+	// Global fallback tool for conversational queries and routing failures
 	coordinator.RegisterTool(tools.NewGeneralChatTool())
 	
 	// 4. Initialize API Layer
