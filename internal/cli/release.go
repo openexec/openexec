@@ -947,34 +947,34 @@ Examples:
 			}
 
 			// Check if story already exists
-			existing := mgr.GetStory(genStory.ID)
-			if existing != nil {
-				cmd.Printf("  [skip] %s: already exists\n", genStory.ID)
+			story := mgr.GetStory(genStory.ID)
+			if story == nil {
+				// Create story
+				story = &release.Story{
+					ID:                 genStory.ID,
+					GoalID:             genStory.GoalID,
+					Title:              genStory.Title,
+					Description:        genStory.Description,
+					AcceptanceCriteria: genStory.AcceptanceCriteria,
+					VerificationScript: genStory.VerificationScript,
+					Contract:           genStory.Contract,
+					StoryType:          "feature",
+					DependsOn:          genStory.DependsOn,
+					Tasks:              []string{},
+					Status:             release.StoryStatusPending,
+				}
+
+				if err := mgr.CreateStory(story); err != nil {
+					cmd.Printf("  [error] %s: %v\n", genStory.ID, err)
+					continue
+				}
+
+				storiesCreated++
+				cmd.Printf("  [created] %s: %s\n", genStory.ID, genStory.Title)
+			} else {
+				cmd.Printf("  [exists] %s: %s (status: %s)\n", genStory.ID, genStory.Title, story.Status)
 				skipped++
-				continue
 			}
-
-			// Create story
-			story := &release.Story{
-				ID:                 genStory.ID,
-				GoalID:             genStory.GoalID,
-				Title:              genStory.Title,
-				Description:        genStory.Description,
-				AcceptanceCriteria: genStory.AcceptanceCriteria,
-				VerificationScript: genStory.VerificationScript,
-				Contract:           genStory.Contract,
-				StoryType:          "feature",
-				DependsOn:          genStory.DependsOn,
-				Tasks:              []string{},
-			}
-
-			if err := mgr.CreateStory(story); err != nil {
-				cmd.Printf("  [error] %s: %v\n", genStory.ID, err)
-				continue
-			}
-
-			storiesCreated++
-			cmd.Printf("  [created] %s: %s\n", genStory.ID, genStory.Title)
 
 			// Create tasks for this story
 			for i, tRaw := range genStory.Tasks {
@@ -997,6 +997,16 @@ Examples:
 					taskID = fmt.Sprintf("T-%s-%03d", genStory.ID, i+1)
 				}
 
+				// Check if task already exists
+				existingTask := mgr.GetTask(taskID)
+				if existingTask != nil {
+					// Ensure existing task is linked to this story
+					if existingTask.StoryID != genStory.ID {
+						cmd.Printf("    [warning] %s: exists but belongs to story %s\n", taskID, existingTask.StoryID)
+					}
+					continue
+				}
+
 				task := &release.Task{
 					ID:                 taskID,
 					Title:              genTask.Title,
@@ -1004,6 +1014,7 @@ Examples:
 					StoryID:            genStory.ID,
 					DependsOn:          genTask.DependsOn,
 					VerificationScript: genTask.VerificationScript,
+					Status:             release.TaskStatusPending,
 				}
 
 				if task.Title == "" {
@@ -1016,7 +1027,7 @@ Examples:
 				}
 
 				tasksCreated++
-				cmd.Printf("    [created] %s: %s\n", taskID, genTask.Title)
+				cmd.Printf("    [created] %s: %s\n", taskID, task.Title)
 			}
 		}
 

@@ -21,7 +21,7 @@ func TestLoadPendingTasks(t *testing.T) {
 		data, _ := json.Marshal(tasks)
 		os.WriteFile(filepath.Join(tmpDir, "tasks.json"), data, 0644)
 
-		got, err := loadPendingTasks(tmpDir)
+		got, err := loadPendingTasks(tmpDir, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -51,7 +51,7 @@ func TestLoadPendingTasks(t *testing.T) {
 		}`
 		os.WriteFile(filepath.Join(tmpDir, ".openexec", "stories.json"), []byte(storiesContent), 0644)
 
-		got, err := loadPendingTasks(tmpDir)
+		got, err := loadPendingTasks(tmpDir, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

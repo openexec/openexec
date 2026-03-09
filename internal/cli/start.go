@@ -301,8 +301,14 @@ Examples:
 			return fmt.Errorf("execution engine not running\n\nStart it with:\n  openexec start --daemon")
 		}
 
+		// Load release manager for status updates and as source of truth for tasks
+		mgr, err := getReleaseManager(cmd)
+		if err != nil {
+			return err
+		}
+
 		// Load tasks
-		tasks, err := loadPendingTasks(config.ProjectDir)
+		tasks, err := loadPendingTasks(config.ProjectDir, mgr)
 		if err != nil {
 			return fmt.Errorf("failed to load tasks: %w", err)
 		}
@@ -363,12 +369,6 @@ Examples:
 		}
 		cmd.Printf("   Workers:  %d\n", startWorkers)
 		cmd.Println()
-
-		// Load release manager for status updates
-		mgr, err := getReleaseManager(cmd)
-		if err != nil {
-			return err
-		}
 
 		// Execute tasks in parallel using DAG scheduler
 		err = executeTasksParallel(cmd, config.ProjectDir, tasks, startWorkers, mgr)
@@ -581,7 +581,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				doneCount++
 				cmd.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
 				
-				newTasks, err := loadPendingTasks(projectDir)
+				newTasks, err := loadPendingTasks(projectDir, mgr)
 				if err == nil {
 					for _, nt := range newTasks {
 						if _, exists := nodes[nt.ID]; !exists {
@@ -886,11 +886,29 @@ func isServerRunning(projectDir string, port int) bool {
 	return false
 }
 
-// loadPendingTasks loads all tasks from tasks.json or .openexec/stories.json
-func loadPendingTasks(projectDir string) ([]Task, error) {
-	var tasks []Task
+// loadPendingTasks loads all tasks from the release manager, tasks.json, or stories.json
+func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
+	// 1. Try Release Manager first (Source of Truth)
+	if mgr != nil {
+		relTasks := mgr.GetTasks()
+		if len(relTasks) > 0 {
+			var tasks []Task
+			for _, rt := range relTasks {
+				tasks = append(tasks, Task{
+					ID:                 rt.ID,
+					Title:              rt.Title,
+					Description:        rt.Description,
+					StoryID:            rt.StoryID,
+					Status:             rt.Status,
+					DependsOn:          rt.DependsOn,
+					VerificationScript: rt.VerificationScript,
+				})
+			}
+			return tasks, nil
+		}
+	}
 
-	// Try root tasks.json first
+	// 2. Fallback to root tasks.json
 	rootTasksFile := filepath.Join(projectDir, "tasks.json")
 	if data, err := os.ReadFile(rootTasksFile); err == nil {
 		var tf TasksFile
@@ -899,7 +917,7 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 		}
 	}
 
-	// Try .openexec/tasks.json next (where story import saves)
+	// 3. Fallback to .openexec/tasks.json
 	hiddenTasksFile := filepath.Join(projectDir, ".openexec", "tasks.json")
 	if data, err := os.ReadFile(hiddenTasksFile); err == nil {
 		var tf TasksFile
@@ -908,7 +926,7 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 		}
 	}
 
-	// Fall back to stories.json
+	// 4. Fallback to stories.json (Planner Output)
 	storiesFile := filepath.Join(projectDir, ".openexec", "stories.json")
 	data, err := os.ReadFile(storiesFile)
 	if err != nil {
@@ -962,6 +980,7 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 		}
 	}
 
+	var tasks []Task
 	// Extract tasks from stories
 	for _, story := range sf.Stories {
 		if story.Status == "pending" || story.Status == "" {
