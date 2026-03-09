@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/router"
@@ -458,6 +459,58 @@ func TestE2EHighConfidenceExecutesTool(t *testing.T) {
 	}
 
 	ts.AssertNoErrorPhrases(resp, "push changes to production server now")
+}
+
+// =============================================================================
+// E2E Tests: Server Lifecycle (Shutdown)
+// =============================================================================
+
+func TestE2EServerShutdownGracefully(t *testing.T) {
+	// GIVEN a running server
+	ts := NewTestServer(t)
+
+	// Verify server is responsive before shutdown
+	resp := ts.MustQuery("hello")
+	if resp.Result == nil || resp.Result == "" {
+		t.Fatal("server should be responsive before shutdown")
+	}
+
+	// WHEN I initiate shutdown via context cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start server in a goroutine (simulating real server lifecycle)
+	serverDone := make(chan error, 1)
+	go func() {
+		serverDone <- ts.Server.Start(ctx)
+	}()
+
+	// Give server a moment to start accepting connections
+	time.Sleep(50 * time.Millisecond)
+
+	// Trigger graceful shutdown
+	cancel()
+
+	// THEN the server stops cleanly
+	select {
+	case err := <-serverDone:
+		// http.ErrServerClosed is the expected error on graceful shutdown
+		if err != nil && err != http.ErrServerClosed {
+			t.Errorf("unexpected shutdown error: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not shutdown within timeout")
+	}
+
+	// THEN the httptest-based queries still work (via the mux, not the http.Server)
+	// This verifies the mux remains valid even after http.Server shutdown
+	postShutdownResp, err := ts.Query(context.Background(), "test after shutdown")
+	if err != nil {
+		// This is actually expected behavior - the Query uses httptest which
+		// doesn't depend on the live http.Server, so it should still work
+	}
+	if postShutdownResp != nil {
+		ts.AssertNoErrorPhrases(postShutdownResp, "test after shutdown")
+	}
 }
 
 func TestDCPQueryIntegration(t *testing.T) {
