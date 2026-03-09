@@ -65,6 +65,8 @@ func New(cfg Config) (*Server, error) {
 
 	// 2. Initialize Core Engine
 	// Resolve to absolute path — ProjectsDir may be "." from config.
+	// Error ignored: filepath.Abs only fails on invalid path syntax; cfg.ProjectsDir
+	// is validated before reaching here, and "." is always valid.
 	projectsAbs, _ := filepath.Abs(cfg.ProjectsDir)
 
 	// Agents are embedded by default, but can be overridden by env for dev.
@@ -74,6 +76,8 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	logDir := filepath.Join(projectsAbs, ".openexec", "logs")
+	// Error ignored: log directory is best-effort. If it fails (permissions, disk full),
+	// the manager will fallback to stderr logging.
 	_ = os.MkdirAll(logDir, 0750)
 
 	mgr := manager.New(manager.Config{
@@ -84,6 +88,8 @@ func New(cfg Config) (*Server, error) {
 	})
 
 	// 3. Initialize Deterministic Control Plane (DCP)
+	// Error ignored: knowledge store is optional; DCP tools gracefully handle nil/empty store
+	// by returning "not found" errors for symbol lookups.
 	kStore, _ := knowledge.NewStore(".")
 	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
 	bRouter.SetSkipAvailabilityCheck(true) // Default to skip for easy startup
@@ -170,6 +176,8 @@ func (s *Server) handleDCPQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleKnowledgeSymbols(w http.ResponseWriter, r *http.Request) {
+	// Errors ignored: these are informational endpoints that return empty lists on failure.
+	// Creating a new store per request is intentional to pick up index changes.
 	store, _ := knowledge.NewStore(".")
 	defer store.Close()
 	list, _ := store.ListSymbols()
@@ -177,6 +185,7 @@ func (s *Server) handleKnowledgeSymbols(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleKnowledgeEnvs(w http.ResponseWriter, r *http.Request) {
+	// Errors ignored: these are informational endpoints that return empty lists on failure.
 	store, _ := knowledge.NewStore(".")
 	defer store.Close()
 	list, _ := store.ListEnvironments()
