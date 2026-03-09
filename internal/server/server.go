@@ -82,12 +82,12 @@ func New(cfg Config) (*Server, error) {
 		AgentsFS:   agentsFS,
 		LogDir:     logDir,
 	})
-	
+
 	// 3. Initialize Deterministic Control Plane (DCP)
 	kStore, _ := knowledge.NewStore(".")
 	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
 	bRouter.SetSkipAvailabilityCheck(true) // Default to skip for easy startup
-	
+
 	pEngine := policy.NewEngine(kStore)
 	coordinator := dcp.NewCoordinator(bRouter, kStore)
 	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
@@ -95,7 +95,7 @@ func New(cfg Config) (*Server, error) {
 	coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
 	// Global fallback tool for conversational queries and routing failures
 	coordinator.RegisterTool(tools.NewGeneralChatTool())
-	
+
 	// 4. Initialize API Layer
 	mux := http.NewServeMux()
 	s := &Server{
@@ -114,7 +114,7 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	s.registerRoutes()
-	
+
 	// Start background indexing
 	go coordinator.SyncKnowledge(".")
 
@@ -129,7 +129,7 @@ func (s *Server) registerRoutes() {
 	s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)
 	s.Mux.HandleFunc("GET /api/v1/knowledge/symbols", s.handleKnowledgeSymbols)
 	s.Mux.HandleFunc("GET /api/v1/knowledge/envs", s.handleKnowledgeEnvs)
-	
+
 	// --- Health & System Routes ---
 	s.Mux.HandleFunc("GET /api/health", s.handleHealth)
 
@@ -164,7 +164,7 @@ func (s *Server) handleDCPQuery(w http.ResponseWriter, r *http.Request) {
 		s.respondJSON(w, http.StatusInternalServerError, map[string]interface{}{"error": err.Error()})
 		return
 	}
-	
+
 	log.Printf("[DCP] Query result: %v", result)
 	s.respondJSON(w, http.StatusOK, map[string]interface{}{"result": result})
 }
@@ -210,9 +210,9 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		wrapped := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-		
+
 		next.ServeHTTP(wrapped, r)
-		
+
 		log.Printf("[API] %s %s %d (%v)", r.Method, r.URL.Path, wrapped.status, time.Since(start))
 	})
 }
@@ -220,10 +220,10 @@ func loggingMiddleware(next http.Handler) http.Handler {
 // Start runs the server and blocks
 func (s *Server) Start(ctx context.Context) error {
 	log.Printf("[Server] Unified OpenExec API listening on %s", s.HttpServer.Addr)
-	
+
 	// Wrap the mux with logging middleware
 	s.HttpServer.Handler = loggingMiddleware(s.Mux)
-	
+
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.HttpServer.ListenAndServe()

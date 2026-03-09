@@ -21,8 +21,8 @@ import (
 
 // TestServer provides a controlled E2E test environment for DCP queries
 type TestServer struct {
-	Server  *Server
-	t       *testing.T
+	Server *Server
+	t      *testing.T
 }
 
 // QueryResponse represents the expected response structure from DCP queries
@@ -535,10 +535,10 @@ func TestDCPQueryIntegration(t *testing.T) {
 	// Test successful general chat fallback
 	payload := map[string]string{"query": "hello"}
 	body, _ := json.Marshal(payload)
-	
+
 	req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
-	
+
 	s.Mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -584,13 +584,13 @@ func TestDCPQueryErrorIntegration(t *testing.T) {
 
 	// Override with error router and REMOVE general_chat to force a 500
 	s.Coordinator = dcp.NewCoordinator(&mockErrorRouter{}, nil)
-	
+
 	payload := map[string]string{"query": "trigger error"}
 	body, _ := json.Marshal(payload)
-	
+
 	req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
-	
+
 	s.Mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
