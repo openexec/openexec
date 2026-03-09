@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/openexec/openexec/internal/release"
 	"github.com/spf13/cobra"
@@ -993,7 +994,26 @@ Examples:
 			storyDir := filepath.Join(mgr.BaseDir(), ".openexec", "stories")
 			_ = os.MkdirAll(storyDir, 0o750)
 			storyPath := filepath.Join(storyDir, genStory.ID+".md")
-			if _, err := os.Stat(storyPath); os.IsNotExist(err) {
+			
+			fileExisted := false
+			if _, err := os.Stat(storyPath); err == nil {
+				fileExisted = true
+				// Check if file content says it's done
+				if data, err := os.ReadFile(storyPath); err == nil {
+					content := string(data)
+					if strings.Contains(strings.ToLower(content), "status: completed") || 
+					   strings.Contains(strings.ToLower(content), "status: done") {
+						// Sync back to database if it was pending
+						if story != nil && story.Status == release.StoryStatusPending {
+							story.Status = release.StoryStatusDone
+							_ = mgr.CreateStory(story)
+							cmd.Printf("  [sync] %s: marked as done based on filesystem\n", genStory.ID)
+						}
+					}
+				}
+			}
+
+			if !fileExisted {
 				content := fmt.Sprintf("# Story %s: %s\n\n%s\n\n## Acceptance Criteria\n", genStory.ID, genStory.Title, genStory.Description)
 				for _, ac := range genStory.AcceptanceCriteria {
 					content += fmt.Sprintf("- %s\n", ac)

@@ -105,6 +105,16 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				Iteration: p.iteration,
 				Text:      item.Text,
 			})
+
+			// SELF-HEALING: Detect if agent claims task is already done
+			// e.g. "Story T-US-005-001 is already COMPLETED"
+			txtLower := strings.ToLower(item.Text)
+			if strings.Contains(txtLower, "already completed") || strings.Contains(txtLower, "already done") {
+				p.emitSignal(map[string]interface{}{
+					"type":   "complete",
+					"reason": "Agent detected task was already completed in previous run",
+				})
+			}
 		case "tool_use":
 			if isOpenExecSignal(item.Name) {
 				p.emitSignal(item.Input)

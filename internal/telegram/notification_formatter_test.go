@@ -295,8 +295,6 @@ func TestFormatWithoutDuration(t *testing.T) {
 }
 
 func TestFormatDuration(t *testing.T) {
-	formatter := NewNotificationFormatter()
-
 	tests := []struct {
 		seconds  float64
 		expected string
@@ -318,9 +316,9 @@ func TestFormatDuration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := formatter.formatDuration(tt.seconds)
+		result := FormatDuration(tt.seconds)
 		if result != tt.expected {
-			t.Errorf("formatDuration(%.1f) = %q, want %q", tt.seconds, result, tt.expected)
+			t.Errorf("FormatDuration(%.1f) = %q, want %q", tt.seconds, result, tt.expected)
 		}
 	}
 }

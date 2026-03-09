@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/openexec/openexec/internal/protocol"
 )
@@ -376,4 +377,34 @@ func sanitizeFileName(name string) string {
 	}
 
 	return sanitized
+}
+
+// FormatDuration formats a duration in seconds to a human-readable string.
+// This is a shared utility function used by formatters in this package.
+func FormatDuration(seconds float64) string {
+	d := time.Duration(seconds * float64(time.Second))
+
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", seconds)
+	}
+
+	if d < time.Hour {
+		mins := int(d.Minutes())
+		secs := int(d.Seconds()) % 60
+		if secs == 0 {
+			return fmt.Sprintf("%dm", mins)
+		}
+		return fmt.Sprintf("%dm %ds", mins, secs)
+	}
+
+	hours := int(d.Hours())
+	mins := int(d.Minutes()) % 60
+	if mins == 0 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	return fmt.Sprintf("%dh %dm", hours, mins)
 }

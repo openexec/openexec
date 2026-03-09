@@ -3,7 +3,6 @@ package telegram
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/openexec/openexec/internal/protocol"
 )
@@ -113,7 +112,7 @@ func (f *NotificationFormatter) Format(event *protocol.TaskCompleteEvent) *Forma
 
 	// Duration
 	if event.Duration > 0 {
-		durationStr := f.formatDuration(event.Duration)
+		durationStr := FormatDuration(event.Duration)
 		if f.includeEmojis {
 			sb.WriteString(fmt.Sprintf("%s Duration: %s\n", EmojiClock, durationStr))
 		} else {
@@ -202,39 +201,10 @@ func (f *NotificationFormatter) formatSummary(event *protocol.TaskCompleteEvent)
 
 	durationPart := ""
 	if event.Duration > 0 {
-		durationPart = fmt.Sprintf(" (%s)", f.formatDuration(event.Duration))
+		durationPart = fmt.Sprintf(" (%s)", FormatDuration(event.Duration))
 	}
 
 	return fmt.Sprintf("%s%s: %s%s", emoji, taskPart, event.Status, durationPart)
-}
-
-// formatDuration formats a duration in seconds to a human-readable string.
-func (f *NotificationFormatter) formatDuration(seconds float64) string {
-	d := time.Duration(seconds * float64(time.Second))
-
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	}
-
-	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", seconds)
-	}
-
-	if d < time.Hour {
-		mins := int(d.Minutes())
-		secs := int(d.Seconds()) % 60
-		if secs == 0 {
-			return fmt.Sprintf("%dm", mins)
-		}
-		return fmt.Sprintf("%dm %ds", mins, secs)
-	}
-
-	hours := int(d.Hours())
-	mins := int(d.Minutes()) % 60
-	if mins == 0 {
-		return fmt.Sprintf("%dh", hours)
-	}
-	return fmt.Sprintf("%dh %dm", hours, mins)
 }
 
 // FormatSuccess creates a success notification message from basic parameters.
@@ -303,8 +273,7 @@ func GetStatusEmoji(status protocol.TaskCompleteStatus) string {
 }
 
 // FormatDurationString formats a duration in seconds to a human-readable string.
-// This is a convenience function that uses the default formatting.
+// This is a convenience function that uses the shared FormatDuration utility.
 func FormatDurationString(seconds float64) string {
-	f := NewNotificationFormatter()
-	return f.formatDuration(seconds)
+	return FormatDuration(seconds)
 }

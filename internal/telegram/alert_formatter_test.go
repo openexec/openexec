@@ -304,8 +304,6 @@ func TestAlertFormatterFormatWithoutProjectID(t *testing.T) {
 }
 
 func TestAlertFormatterFormatDuration(t *testing.T) {
-	formatter := NewAlertFormatter()
-
 	tests := []struct {
 		seconds  float64
 		expected string
@@ -327,9 +325,9 @@ func TestAlertFormatterFormatDuration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := formatter.formatDuration(tt.seconds)
+		result := FormatDuration(tt.seconds)
 		if result != tt.expected {
-			t.Errorf("formatDuration(%.1f) = %q, want %q", tt.seconds, result, tt.expected)
+			t.Errorf("FormatDuration(%.1f) = %q, want %q", tt.seconds, result, tt.expected)
 		}
 	}
 }

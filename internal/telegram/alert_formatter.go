@@ -120,7 +120,7 @@ func (f *AlertFormatter) Format(event *protocol.AlertEvent) *FormattedAlert {
 
 	// Duration (for long-running alerts)
 	if event.Duration > 0 {
-		durationStr := f.formatDuration(event.Duration)
+		durationStr := FormatDuration(event.Duration)
 		if f.includeEmojis {
 			sb.WriteString(fmt.Sprintf("%s Duration: %s\n", EmojiClock, durationStr))
 		} else {
@@ -130,7 +130,7 @@ func (f *AlertFormatter) Format(event *protocol.AlertEvent) *FormattedAlert {
 
 	// Threshold information
 	if event.Threshold > 0 {
-		thresholdStr := f.formatDuration(event.Threshold)
+		thresholdStr := FormatDuration(event.Threshold)
 		sb.WriteString(fmt.Sprintf("Threshold: %s\n", thresholdStr))
 	}
 
@@ -225,35 +225,6 @@ func (f *AlertFormatter) formatSummary(event *protocol.AlertEvent) string {
 		return fmt.Sprintf("%s%s: %s (%s)", emoji, event.AlertType, taskPart, event.Severity)
 	}
 	return fmt.Sprintf("%s%s (%s)", emoji, event.AlertType, event.Severity)
-}
-
-// formatDuration formats a duration in seconds to a human-readable string.
-func (f *AlertFormatter) formatDuration(seconds float64) string {
-	d := time.Duration(seconds * float64(time.Second))
-
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	}
-
-	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", seconds)
-	}
-
-	if d < time.Hour {
-		mins := int(d.Minutes())
-		secs := int(d.Seconds()) % 60
-		if secs == 0 {
-			return fmt.Sprintf("%dm", mins)
-		}
-		return fmt.Sprintf("%dm %ds", mins, secs)
-	}
-
-	hours := int(d.Hours())
-	mins := int(d.Minutes()) % 60
-	if mins == 0 {
-		return fmt.Sprintf("%dh", hours)
-	}
-	return fmt.Sprintf("%dh %dm", hours, mins)
 }
 
 // FormatLongRunning creates an alert notification for a long-running task.
