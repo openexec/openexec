@@ -435,10 +435,10 @@ func TestE2ELowConfidenceFallsBackToChat(t *testing.T) {
 	// THEN the response comes from general_chat (indicated by the echo pattern)
 	resultStr := fmt.Sprintf("%v", resp.Result)
 
-	// general_chat echoes queries it doesn't recognize
-	if !strings.Contains(strings.ToLower(resultStr), "query") ||
-		!strings.Contains(strings.ToLower(resultStr), "received") {
-		// It's also valid if it just doesn't error
+	// general_chat echoes queries it doesn't recognize with "received your query" pattern
+	// If the pattern isn't found, the test still passes - the key assertion is no forbidden phrases
+	if strings.Contains(strings.ToLower(resultStr), "received") {
+		t.Log("Confirmed: response uses general_chat echo pattern")
 	}
 
 	// Most importantly: no forbidden phrases
