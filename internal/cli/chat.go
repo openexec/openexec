@@ -15,6 +15,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	chatDebug bool
+)
+
 var chatCmd = &cobra.Command{
 	Use:   "chat",
 	Short: "Start an interactive conversational session",
@@ -136,23 +140,21 @@ func sendChatQuery(query string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		var errData struct {
-			Error string `json:"error"`
-		}
-		json.NewDecoder(resp.Body).Decode(&errData)
-		if errData.Error != "" {
-			return "", fmt.Errorf("server error: %s", errData.Error)
-		}
-		return "", fmt.Errorf("server returned status %d", resp.StatusCode)
+	respBody, _ := io.ReadAll(resp.Body)
+	if chatDebug {
+		fmt.Printf(color.YellowString("\n[DEBUG] HTTP %d\n[DEBUG] Body: %s\n"), resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
 		Response string `json:"response"`
-		Result   string `json:"result"`
+		Result   any    `json:"result"`
 		Error    string `json:"error"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(respBody))
+		}
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -161,14 +163,33 @@ func sendChatQuery(query string) (string, error) {
 		return "", fmt.Errorf("agent error: %s", result.Error)
 	}
 
-	// Server returns "result", but we'll check both for safety
-	if result.Result != "" {
-		return result.Result, nil
+	// Format result
+	var finalResult string
+	if result.Result != nil {
+		switch v := result.Result.(type) {
+		case string:
+			finalResult = v
+		default:
+			// Pretty print non-string results
+			data, _ := json.MarshalIndent(v, "", "  ")
+			finalResult = string(data)
+		}
+	} else if result.Response != "" {
+		finalResult = result.Response
 	}
-	return result.Response, nil
+
+	if finalResult == "" {
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("server returned status %d", resp.StatusCode)
+		}
+		return "(no response from agent)", nil
+	}
+
+	return finalResult, nil
 }
 
 func init() {
 	chatCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
+	chatCmd.Flags().BoolVar(&chatDebug, "debug", false, "Show raw HTTP debug information")
 	rootCmd.AddCommand(chatCmd)
 }
