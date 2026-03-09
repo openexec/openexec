@@ -469,6 +469,81 @@ func (m *Manager) CreateTask(task *Task) error {
 	return m.saveUnlocked()
 }
 
+// UpdateTask updates an existing task in place and persists changes.
+// If the StoryID changes, it will remove the task from the old story and
+// append it to the new story's task list.
+func (m *Manager) UpdateTask(updated *Task) error {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+
+    existing, ok := m.tasks[updated.ID]
+    if !ok {
+        return fmt.Errorf("task %s not found", updated.ID)
+    }
+
+    // Track old story to repair story.Tasks list if StoryID changes
+    oldStoryID := existing.StoryID
+
+    // Replace fields
+    m.tasks[updated.ID] = updated
+
+    // Move task between story task lists if needed
+    if oldStoryID != updated.StoryID {
+        if old, ok := m.stories[oldStoryID]; ok {
+            // Filter out the task from old story
+            filtered := make([]string, 0, len(old.Tasks))
+            for _, id := range old.Tasks {
+                if id != updated.ID {
+                    filtered = append(filtered, id)
+                }
+            }
+            old.Tasks = filtered
+        }
+        if ns, ok := m.stories[updated.StoryID]; ok {
+            // Avoid duplicates
+            present := false
+            for _, id := range ns.Tasks {
+                if id == updated.ID {
+                    present = true
+                    break
+                }
+            }
+            if !present {
+                ns.Tasks = append(ns.Tasks, updated.ID)
+            }
+        }
+    }
+
+    return m.saveUnlocked()
+}
+
+// ReassignTask changes a task's StoryID and persists the update.
+func (m *Manager) ReassignTask(taskID, newStoryID string) error {
+    m.mu.RLock()
+    t, ok := m.tasks[taskID]
+    m.mu.RUnlock()
+    if !ok {
+        return fmt.Errorf("task %s not found", taskID)
+    }
+    // Copy to avoid mutating shared pointer inadvertently; keep existing as base
+    updated := *t
+    updated.StoryID = newStoryID
+    return m.UpdateTask(&updated)
+}
+
+// SetTaskStatus updates the lifecycle status of a task and persists it.
+func (m *Manager) SetTaskStatus(taskID string, status string) error {
+    m.mu.RLock()
+    t, ok := m.tasks[taskID]
+    m.mu.RUnlock()
+    if !ok {
+        return fmt.Errorf("task %s not found", taskID)
+    }
+    updated := *t
+    updated.Status = status
+    return m.UpdateTask(&updated)
+}
+
 // LinkCommitToTask links a commit hash to a task.
 func (m *Manager) LinkCommitToTask(taskID, commitHash string) error {
 	m.mu.Lock()

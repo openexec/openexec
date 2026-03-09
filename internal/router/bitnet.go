@@ -175,7 +175,16 @@ func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 	}
 	cleanQuery = strings.TrimSpace(cleanQuery)
 
-	return fmt.Sprintf(`{"tool_name": %q, "args": {"query": %q}, "confidence": %.2f}`, GeneralChatTool, cleanQuery, FallbackConfidence), nil
+	// Use json.Marshal to properly escape the query for JSON.
+	// Go's %q uses Go escape syntax (\x00, \a) which is NOT valid JSON.
+	// JSON requires \uXXXX for control characters.
+	queryJSON, err := json.Marshal(cleanQuery)
+	if err != nil {
+		// Should never happen for a string, but be defensive
+		queryJSON = []byte(`""`)
+	}
+
+	return fmt.Sprintf(`{"tool_name": %q, "args": {"query": %s}, "confidence": %.2f}`, GeneralChatTool, queryJSON, FallbackConfidence), nil
 }
 
 func (r *BitNetRouter) parseModelOutput(output string) (*Intent, error) {

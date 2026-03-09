@@ -1,0 +1,9 @@
+project:
+  name: OpenExec Project
+  type: app
+
+quality:
+  # Enable default quality gates
+  gates:
+    - lint
+  custom: []

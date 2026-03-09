@@ -816,6 +816,7 @@ Examples:
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		reassign, _ := cmd.Flags().GetBool("reassign")
 
 		// Read stories file
 		data, err := os.ReadFile(inputFile)
@@ -1043,14 +1044,31 @@ Examples:
 				}
 
 				// Check if task already exists
-				existingTask := mgr.GetTask(taskID)
-				if existingTask != nil {
-					// Ensure existing task is linked to this story
-					if existingTask.StoryID != genStory.ID {
-						cmd.Printf("    [warning] %s: exists but belongs to story %s\n", taskID, existingTask.StoryID)
-					}
-					continue
-				}
+                existingTask := mgr.GetTask(taskID)
+                if existingTask != nil {
+                    // Optionally reassign existing tasks to this story and sync status
+                    if reassign {
+                        if existingTask.StoryID == "" || existingTask.StoryID != genStory.ID {
+                            if err := mgr.ReassignTask(existingTask.ID, genStory.ID); err == nil {
+                                cmd.Printf("    [reassign] %s: linked to story %s\n", taskID, genStory.ID)
+                            } else {
+                                cmd.Printf("    [error] %s: failed to reassign: %v\n", taskID, err)
+                            }
+                        }
+                        // If story is done, mark task done too
+                        if story != nil && story.Status == release.StoryStatusDone && existingTask.Status != release.TaskStatusDone {
+                            if err := mgr.SetTaskStatus(existingTask.ID, release.TaskStatusDone); err == nil {
+                                cmd.Printf("    [sync] %s: marked done to match story status\n", taskID)
+                            }
+                        }
+                    } else {
+                        // Without reassign, just warn about mismatched linkage
+                        if existingTask.StoryID != genStory.ID {
+                            cmd.Printf("    [warning] %s: exists but belongs to story %s\n", taskID, existingTask.StoryID)
+                        }
+                    }
+                    continue
+                }
 
 				task := &release.Task{
 					ID:                 taskID,
@@ -1062,9 +1080,14 @@ Examples:
 					Status:             release.TaskStatusPending,
 				}
 
-				if task.Title == "" {
-					task.Title = "Imported Task " + taskID
-				}
+                if task.Title == "" {
+                    task.Title = "Imported Task " + taskID
+                }
+
+                // If the parent story is already done, sync task status to done
+                if story != nil && story.Status == release.StoryStatusDone {
+                    task.Status = release.TaskStatusDone
+                }
 
 				if err := mgr.CreateTask(task); err != nil {
 					cmd.Printf("    [error] %s: %v\n", taskID, err)

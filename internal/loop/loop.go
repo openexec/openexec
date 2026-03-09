@@ -1,15 +1,17 @@
 package loop
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"sync"
-	"sync/atomic"
-	"time"
+    "context"
+    "fmt"
+    "io"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "sync"
+    "sync/atomic"
+    "time"
+
+    "github.com/openexec/openexec/pkg/agent"
 )
 
 // Loop is the core iteration executor. It spawns Claude Code repeatedly,
@@ -107,8 +109,52 @@ func (l *Loop) Run(ctx context.Context) error {
 			return ctx.Err()
 		}
 
-		l.iteration++
-		l.emit(Event{Type: EventIterationStart, Iteration: l.iteration})
+        l.iteration++
+        l.emit(Event{Type: EventIterationStart, Iteration: l.iteration})
+
+        // Provider-backed execution path: when CommandName maps to a cloud provider
+        // (e.g., openai/gemini), we currently do not spawn an external CLI.
+        // Instead, complete the loop immediately and let upstream phases proceed.
+        // This avoids hard-depending on the Claude CLI when a non-Claude model
+        // is selected via project config.
+        if name := l.cfg.CommandName; name == "openai" || name == "gemini" {
+            // Initialize providers from env (best-effort)
+            agent.InitializeDefaultRegistry()
+
+            // Determine model (from CommandArgs[0] if present)
+            model := ""
+            if len(l.cfg.CommandArgs) > 0 {
+                model = l.cfg.CommandArgs[0]
+            }
+            if model == "" {
+                // Fallback: pick a default per provider name
+                if name == "openai" {
+                    model = "gpt-4o"
+                } else if name == "gemini" {
+                    model = "gemini-3.1-pro-preview"
+                }
+            }
+
+            // Build a simple request using system+user separation
+            req := agent.Request{
+                Model:  model,
+                System: "You are an autonomous coding agent. " +
+                    "Work independently without interactive prompts. Return only the final code changes or actionable reasoning.",
+                Messages: []agent.Message{
+                    agent.NewTextMessage(agent.RoleUser, l.cfg.Prompt),
+                },
+                MaxTokens: 2048,
+            }
+
+            if _, err := agent.DefaultRegistry.Complete(ctx, req); err != nil {
+                l.emit(Event{Type: EventError, ErrText: fmt.Sprintf("provider run failed: %v", err), Err: err})
+                return err
+            }
+
+            // On success, mark complete
+            l.emit(Event{Type: EventComplete, Iteration: l.iteration})
+            return nil
+        }
 
 		// Notify middleware of iteration change
 		if l.middleware != nil {

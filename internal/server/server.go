@@ -15,6 +15,7 @@ import (
 	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/router"
@@ -24,6 +25,8 @@ import (
 	"github.com/openexec/openexec/pkg/db/session"
 	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/pkg/version"
+    "strings"
+    "os/exec"
 )
 
 // Server is the unified OpenExec API and UI host.
@@ -80,12 +83,37 @@ func New(cfg Config) (*Server, error) {
 	// the manager will fallback to stderr logging.
 	_ = os.MkdirAll(logDir, 0750)
 
-	mgr := manager.New(manager.Config{
-		WorkDir:    projectsAbs,
-		TractStore: cfg.DataDir,
-		AgentsFS:   agentsFS,
-		LogDir:     logDir,
-	})
+	// Resolve runner command from project execution model (best-effort).
+	runnerCmd := ""
+	if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil {
+		model := strings.ToLower(projCfg.Execution.ExecutorModel)
+		switch {
+		case model == "", strings.Contains(model, "claude"), strings.Contains(model, "sonnet"), strings.Contains(model, "opus"), strings.Contains(model, "haiku"):
+			runnerCmd = "claude"
+		case strings.HasPrefix(model, "gpt-") || strings.Contains(model, "codex"):
+			// Placeholder for OpenAI/Codex CLI if available in user env
+			runnerCmd = "openai"
+		case strings.HasPrefix(model, "gemini"):
+			// Placeholder for Gemini CLI if available in user env
+			runnerCmd = "gemini"
+		}
+		if runnerCmd != "" {
+			if _, err := exec.LookPath(runnerCmd); err != nil {
+				log.Printf("[Server] Warning: executor model %s mapped to runner '%s' which was not found on PATH. Loops may fail to start.", model, runnerCmd)
+			} else {
+				log.Printf("[Server] Executor model: %s → runner command: %s", model, runnerCmd)
+			}
+		}
+	}
+
+    mgr := manager.New(manager.Config{
+        WorkDir:     projectsAbs,
+        TractStore:  cfg.DataDir,
+        AgentsFS:    agentsFS,
+        LogDir:      logDir,
+        CommandName: runnerCmd,
+        CommandArgs: func() []string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return []string{projCfg.Execution.ExecutorModel} }; return nil }(),
+    })
 
 	// 3. Initialize Deterministic Control Plane (DCP)
 	// Error ignored: knowledge store is optional; DCP tools gracefully handle nil/empty store

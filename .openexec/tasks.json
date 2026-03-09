@@ -1,567 +1,30 @@
 {
   "tasks": [
     {
-      "id": "T-US-004-002",
-      "title": "Anthropic Provider Driver: Implement Anthropic Tool Schema Translation",
-      "story_id": "",
-      "depends_on": [
-        "T-US-004-001",
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-008-003",
-      "title": "MCP Tool: write_file: Implement write_file Handler",
-      "story_id": "",
-      "depends_on": [
-        "T-US-008-002",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-010-004",
-      "title": "MCP Tool: git_apply_patch: Unit Tests for git_apply_patch",
-      "story_id": "",
-      "depends_on": [
-        "T-US-010-003",
-        "T-US-008-004",
-        "T-US-009-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-012-001",
-      "title": "Audit Logging System: Define Audit Entry Schema",
-      "story_id": "",
-      "depends_on": [
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-012-003",
-      "title": "Audit Logging System: Implement Export Functionality",
-      "story_id": "",
-      "depends_on": [
-        "T-US-012-002",
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-014-001",
-      "title": "Agent Loop with Tool Execution: Define Loop Event Types",
-      "story_id": "",
-      "depends_on": [
-        "T-US-006-003",
-        "T-US-011-003",
-        "T-US-013-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
       "id": "T-US-001-002",
-      "title": "SQLite Sessions Database Schema: Implement SQLite Repository",
-      "story_id": "",
+      "title": "Map API Surface and Local Buildability",
+      "description": "Identify all entry points in internal/wizard and internal/router to verify legacy state consistency.",
+      "story_id": "US-001",
+      "verification_script": "go build ./cmd/openexec",
       "depends_on": [
         "T-US-001-001"
       ],
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
       "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-003-001",
-      "title": "OpenAI Provider Driver: Implement OpenAI Provider Class",
-      "story_id": "",
-      "depends_on": [
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-006-001",
-      "title": "Provider Registry and Model Picker: Implement Provider Registry",
-      "story_id": "",
-      "depends_on": [
-        "T-US-003-003",
-        "T-US-004-003",
-        "T-US-005-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-012-004",
-      "title": "Audit Logging System: Unit Tests for Audit System",
-      "story_id": "",
-      "depends_on": [
-        "T-US-012-003",
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-014-003",
-      "title": "Agent Loop with Tool Execution: Implement Agent Loop Core",
-      "story_id": "",
-      "depends_on": [
-        "T-US-014-002",
-        "T-US-006-003",
-        "T-US-011-003",
-        "T-US-013-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-018-002",
-      "title": "Cost and Token Dashboard: Implement Usage API Endpoints",
-      "story_id": "",
-      "depends_on": [
-        "T-US-018-001",
-        "T-US-012-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-019-003",
-      "title": "Session History Summarization: Integrate Summarization into Agent Loop",
-      "story_id": "",
-      "depends_on": [
-        "T-US-019-002",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-024-001",
-      "title": "Documentation: Conversational Orchestration: Write Conversational Mode Documentation",
-      "story_id": "",
-      "depends_on": [
-        "T-US-015-004",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.549664+02:00"
     },
     {
       "id": "T-US-002-001",
-      "title": "Provider Adapter Interface: Define Provider Adapter ABC and Response Types",
-      "story_id": "",
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-008-002",
-      "title": "MCP Tool: write_file: Implement Backup Manager",
-      "story_id": "",
-      "depends_on": [
-        "T-US-008-001",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-009-004",
-      "title": "MCP Tool: run_shell_command: Unit Tests for run_shell_command",
-      "story_id": "",
-      "depends_on": [
-        "T-US-009-003",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-010-001",
-      "title": "MCP Tool: git_apply_patch: Define MCP Tool Schema for git_apply_patch",
-      "story_id": "",
-      "depends_on": [
-        "T-US-008-004",
-        "T-US-009-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-010-002",
-      "title": "MCP Tool: git_apply_patch: Implement Patch Parser and Validator",
-      "story_id": "",
-      "depends_on": [
-        "T-US-010-001",
-        "T-US-008-004",
-        "T-US-009-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-014-004",
-      "title": "Agent Loop with Tool Execution: Unit Tests for Agent Loop",
-      "story_id": "",
-      "depends_on": [
-        "T-US-014-003",
-        "T-US-006-003",
-        "T-US-011-003",
-        "T-US-013-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-019-001",
-      "title": "Session History Summarization: Design Summarization Strategy",
-      "story_id": "",
-      "depends_on": [
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-025-001",
-      "title": "Goal Validation: End-to-End Testing: Setup Playwright E2E Infrastructure",
-      "story_id": "",
-      "depends_on": [
-        "T-US-015-004",
-        "T-US-016-003",
-        "T-US-017-003",
-        "T-US-018-004",
-        "T-US-023-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-003-003",
-      "title": "OpenAI Provider Driver: Unit Tests for OpenAI Provider",
-      "story_id": "",
-      "depends_on": [
-        "T-US-003-002",
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-005-001",
-      "title": "Gemini Provider Driver: Implement Gemini Provider Class",
-      "story_id": "",
-      "depends_on": [
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-006-003",
-      "title": "Provider Registry and Model Picker: Unit Tests for Provider Registry",
-      "story_id": "",
-      "depends_on": [
-        "T-US-006-002",
-        "T-US-003-003",
-        "T-US-004-003",
-        "T-US-005-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-009-003",
-      "title": "MCP Tool: run_shell_command: Implement run_shell_command Handler",
-      "story_id": "",
-      "depends_on": [
-        "T-US-009-002",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-011-001",
-      "title": "Tool Approval System: Define Approval Data Models",
-      "story_id": "",
-      "depends_on": [
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-013-002",
-      "title": "Auto-Context Builder: Implement Context Gatherers",
-      "story_id": "",
-      "depends_on": [
-        "T-US-013-001",
-        "T-US-001-003",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-017-003",
-      "title": "Patch Preview and Apply UI: Implement Rollback UI",
-      "story_id": "",
-      "depends_on": [
-        "T-US-017-002",
-        "T-US-010-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-025-004",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Tool-Use with Approvals (G-003)",
-      "story_id": "",
-      "depends_on": [
-        "T-US-025-001",
-        "T-US-015-004",
-        "T-US-016-003",
-        "T-US-017-003",
-        "T-US-018-004",
-        "T-US-023-003",
-        "T-US-025-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-005-002",
-      "title": "Gemini Provider Driver: Implement Gemini Tool Schema Translation",
-      "story_id": "",
-      "depends_on": [
-        "T-US-005-001",
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-020-002",
-      "title": "Session Fork Capability: Implement Fork Operation",
-      "story_id": "",
-      "depends_on": [
-        "T-US-020-001",
-        "T-US-001-003",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-021-002",
-      "title": "Meta Self-Fix: File Edit Capability: Add Orchestrator Edit Approval Level",
-      "story_id": "",
-      "depends_on": [
-        "T-US-021-001",
-        "T-US-008-004",
-        "T-US-010-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-023-001",
-      "title": "Meta Self-Fix: Restart Request: Implement RestartManager",
-      "story_id": "",
-      "depends_on": [
-        "T-US-022-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-024-003",
-      "title": "Documentation: Conversational Orchestration: Generate API Documentation",
-      "story_id": "",
-      "depends_on": [
-        "T-US-024-002",
-        "T-US-015-004",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-025-005",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Auto-Context Injection (G-004)",
-      "story_id": "",
-      "depends_on": [
-        "T-US-025-001",
-        "T-US-015-004",
-        "T-US-016-003",
-        "T-US-017-003",
-        "T-US-018-004",
-        "T-US-023-003",
-        "T-US-025-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-002-003",
-      "title": "Imported Task T-US-002-003",
+      "title": "Restore CI/CD Pipeline Integrity",
+      "description": "Fix existing test failures across all packages and update CI workflow files if necessary.",
       "story_id": "US-002",
+      "verification_script": "go test ./...",
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
@@ -570,581 +33,36 @@
       },
       "needs_review": false,
       "status": "pending",
-      "created_at": "2026-03-09T21:56:38.197388+02:00"
-    },
-    {
-      "id": "T-US-006-002",
-      "title": "Provider Registry and Model Picker: Create ModelInfo Schema and Pricing Data",
-      "story_id": "",
-      "depends_on": [
-        "T-US-006-001",
-        "T-US-003-003",
-        "T-US-004-003",
-        "T-US-005-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-007-004",
-      "title": "MCP Tool: read_file: Unit Tests for read_file",
-      "story_id": "",
-      "depends_on": [
-        "T-US-007-003",
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-018-001",
-      "title": "Cost and Token Dashboard: Create Usage Summary Component",
-      "story_id": "",
-      "depends_on": [
-        "T-US-012-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-007-001",
-      "title": "MCP Tool: read_file: Define MCP Tool Schema for read_file",
-      "story_id": "",
-      "depends_on": [
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-015-002",
-      "title": "Chat UI with Session Management: Implement WebSocket Client",
-      "story_id": "",
-      "depends_on": [
-        "T-US-015-001",
-        "T-US-001-003",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-025-006",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Meta Self-Fix (G-005)",
-      "story_id": "",
-      "depends_on": [
-        "T-US-025-001",
-        "T-US-015-004",
-        "T-US-016-003",
-        "T-US-017-003",
-        "T-US-018-004",
-        "T-US-023-003",
-        "T-US-025-005"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-008-004",
-      "title": "MCP Tool: write_file: Unit Tests for write_file",
-      "story_id": "",
-      "depends_on": [
-        "T-US-008-003",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-009-001",
-      "title": "MCP Tool: run_shell_command: Define MCP Tool Schema for run_shell_command",
-      "story_id": "",
-      "depends_on": [
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-009-002",
-      "title": "MCP Tool: run_shell_command: Implement Secret Redaction Utility",
-      "story_id": "",
-      "depends_on": [
-        "T-US-009-001",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-013-001",
-      "title": "Auto-Context Builder: Define Context Schema",
-      "story_id": "",
-      "depends_on": [
-        "T-US-001-003",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-022-002",
-      "title": "Meta Self-Fix: Build Capability: Implement Build Output Parser",
-      "story_id": "",
-      "depends_on": [
-        "T-US-022-001",
-        "T-US-009-004",
-        "T-US-021-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-017-001",
-      "title": "Patch Preview and Apply UI: Create DiffViewer Component",
-      "story_id": "",
-      "depends_on": [
-        "T-US-010-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-005-003",
-      "title": "Gemini Provider Driver: Unit Tests for Gemini Provider",
-      "story_id": "",
-      "depends_on": [
-        "T-US-005-002",
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-017-002",
-      "title": "Patch Preview and Apply UI: Implement Patch Preview Modal",
-      "story_id": "",
-      "depends_on": [
-        "T-US-017-001",
-        "T-US-010-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-021-004",
-      "title": "Meta Self-Fix: File Edit Capability: Unit Tests for Meta Edit",
-      "story_id": "",
-      "depends_on": [
-        "T-US-021-003",
-        "T-US-008-004",
-        "T-US-010-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-023-003",
-      "title": "Meta Self-Fix: Restart Request: Create Restart Approval UI",
-      "story_id": "",
-      "depends_on": [
-        "T-US-023-002",
-        "T-US-022-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-007-002",
-      "title": "MCP Tool: read_file: Implement Path Validation Utility",
-      "story_id": "",
-      "depends_on": [
-        "T-US-007-001",
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-011-003",
-      "title": "Tool Approval System: Unit Tests for ApprovalManager",
-      "story_id": "",
-      "depends_on": [
-        "T-US-011-002",
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-014-002",
-      "title": "Agent Loop with Tool Execution: Implement Tool Executor",
-      "story_id": "",
-      "depends_on": [
-        "T-US-014-001",
-        "T-US-006-003",
-        "T-US-011-003",
-        "T-US-013-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-015-003",
-      "title": "Chat UI with Session Management: Implement Chat Components",
-      "story_id": "",
-      "depends_on": [
-        "T-US-015-002",
-        "T-US-001-003",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-015-004",
-      "title": "Chat UI with Session Management: Implement Session Sidebar",
-      "story_id": "",
-      "depends_on": [
-        "T-US-015-003",
-        "T-US-001-003",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-016-002",
-      "title": "Model Picker UI: Implement Provider Availability Check",
-      "story_id": "",
-      "depends_on": [
-        "T-US-016-001",
-        "T-US-006-003",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-016-003",
-      "title": "Model Picker UI: Unit Tests for ModelPicker",
-      "story_id": "",
-      "depends_on": [
-        "T-US-016-002",
-        "T-US-006-003",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-022-003",
-      "title": "Meta Self-Fix: Build Capability: Unit Tests for Builder",
-      "story_id": "",
-      "depends_on": [
-        "T-US-022-002",
-        "T-US-009-004",
-        "T-US-021-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "created_at": "2026-03-09T23:24:40.550104+02:00"
     },
     {
       "id": "T-US-002-002",
-      "title": "Provider Adapter Interface: Implement Tool Schema Translator Base",
-      "story_id": "",
+      "title": "Verify Multi-Platform Build Chassis",
+      "description": "Ensure the Go build system correctly targets macos, linux, and windows as per REQ-001.",
+      "story_id": "US-002",
+      "verification_script": "GOOS=windows go build ./cmd/openexec \u0026\u0026 GOOS=linux go build ./cmd/openexec",
       "depends_on": [
         "T-US-002-001"
       ],
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
       "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.550281+02:00"
     },
     {
-      "id": "T-US-010-003",
-      "title": "MCP Tool: git_apply_patch: Implement git_apply_patch Handler",
-      "story_id": "",
+      "id": "T-US-003-002",
+      "title": "Implement Wizard Mock Handlers and Unit Tests",
+      "description": "Create test doubles for CLI prompts to ensure the engine processes inputs correctly.",
+      "story_id": "US-003",
+      "verification_script": "go test ./internal/wizard -coverprofile=coverage.out",
       "depends_on": [
-        "T-US-010-002",
-        "T-US-008-004",
-        "T-US-009-004"
+        "T-US-003-001"
       ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-013-003",
-      "title": "Auto-Context Builder: Implement Context Builder with Token Budgeting",
-      "story_id": "",
-      "depends_on": [
-        "T-US-013-002",
-        "T-US-001-003",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-015-001",
-      "title": "Chat UI with Session Management: Design UI Component Structure",
-      "story_id": "",
-      "depends_on": [
-        "T-US-001-003",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-020-003",
-      "title": "Session Fork Capability: Implement Fork UI",
-      "story_id": "",
-      "depends_on": [
-        "T-US-020-002",
-        "T-US-001-003",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-023-002",
-      "title": "Meta Self-Fix: Restart Request: Implement Session Resume After Restart",
-      "story_id": "",
-      "depends_on": [
-        "T-US-023-001",
-        "T-US-022-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-024-002",
-      "title": "Documentation: Conversational Orchestration: Update README with Feature Overview",
-      "story_id": "",
-      "depends_on": [
-        "T-US-024-001",
-        "T-US-015-004",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-019-004",
-      "title": "Session History Summarization: Unit Tests for Summarization",
-      "story_id": "",
-      "depends_on": [
-        "T-US-019-003",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-021-003",
-      "title": "Meta Self-Fix: File Edit Capability: Implement Python Syntax Validator",
-      "story_id": "",
-      "depends_on": [
-        "T-US-021-002",
-        "T-US-008-004",
-        "T-US-010-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-001-001",
-      "title": "SQLite Sessions Database Schema: Define Database Schema Types",
-      "story_id": "",
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-004-001",
-      "title": "Anthropic Provider Driver: Implement Anthropic Provider Class",
-      "story_id": "",
-      "depends_on": [
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-008-001",
-      "title": "MCP Tool: write_file: Define MCP Tool Schema for write_file",
-      "story_id": "",
-      "depends_on": [
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-019-002",
-      "title": "Session History Summarization: Implement SessionSummarizer",
-      "story_id": "",
-      "depends_on": [
-        "T-US-019-001",
-        "T-US-014-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-002-004",
-      "title": "Imported Task T-US-002-004",
-      "story_id": "US-002",
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
@@ -1153,243 +71,160 @@
       },
       "needs_review": false,
       "status": "pending",
-      "created_at": "2026-03-09T21:56:38.19813+02:00"
+      "created_at": "2026-03-09T23:24:40.550944+02:00"
     },
     {
-      "id": "T-US-001-003",
-      "title": "SQLite Sessions Database Schema: Unit Tests for Sessions Repository",
-      "story_id": "",
+      "id": "T-US-004-001",
+      "title": "Define Story Schema and DB Contract",
+      "description": "Update the story data model and database schema to support new requirements.",
+      "story_id": "US-004",
+      "verification_script": "go test ./internal/stories -run TestMigration",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.551658+02:00"
+    },
+    {
+      "id": "T-US-004-002",
+      "title": "Implement Story Import Logic and DAG Validation",
+      "description": "Refactor internal/stories/ to handle the import of granular stories and validate depends_on chains.",
+      "story_id": "US-004",
+      "verification_script": "go test ./internal/stories -run TestImport",
       "depends_on": [
-        "T-US-001-002"
+        "T-US-004-001"
       ],
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
       "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.551974+02:00"
     },
     {
-      "id": "T-US-011-002",
-      "title": "Tool Approval System: Implement ApprovalManager",
-      "story_id": "",
+      "id": "T-US-005-001",
+      "title": "Implement Self-Healing Exit Strategy and Log Logic",
+      "description": "Fix the loop in internal/dcp/healing.go and implement a max-retry counter.",
+      "story_id": "US-005",
+      "verification_script": "go test ./internal/dcp -run TestHealingExitStrategy",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.553147+02:00"
+    },
+    {
+      "id": "T-US-006-001",
+      "title": "Fix BitNet Routing Logic and Intent Matching",
+      "description": "Refactor internal/router/bitnet.go to correctly map inputs to tool handlers.",
+      "story_id": "US-006",
+      "verification_script": "go test ./internal/router -run TestBitNetRouting",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.553976+02:00"
+    },
+    {
+      "id": "T-US-001-001",
+      "title": "Extract Environment and Dependency Map",
+      "description": "Analyze go.mod and internal config loaders to map required variables and external dependencies.",
+      "story_id": "US-001",
+      "verification_script": "go mod verify",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.549496+02:00"
+    },
+    {
+      "id": "T-US-003-001",
+      "title": "Define Wizard Contract and Intent Schema",
+      "description": "Formalize the Intent struct and error codes for the planning engine.",
+      "story_id": "US-003",
+      "verification_script": "go test ./internal/wizard/... -run TestSchema",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.550762+02:00"
+    },
+    {
+      "id": "T-US-003-003",
+      "title": "Implement Core Wizard Logic and Intent Generation",
+      "description": "Fix the core intent planning logic in internal/wizard/ to generate valid output files.",
+      "story_id": "US-003",
+      "verification_script": "openexec wizard --test-mode",
       "depends_on": [
-        "T-US-011-001",
-        "T-US-001-003"
+        "T-US-003-002"
       ],
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
       "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.551136+02:00"
     },
     {
-      "id": "T-US-012-002",
-      "title": "Audit Logging System: Implement AuditLogger",
-      "story_id": "",
+      "id": "T-US-005-002",
+      "title": "Verify Healing Loop Maturity and Run-ID Isolation",
+      "description": "Ensure node-level caching and run-id based organization is active in the healing flow.",
+      "story_id": "US-005",
+      "verification_script": "go test ./internal/dcp -run TestFingerprinting",
       "depends_on": [
-        "T-US-012-001",
-        "T-US-001-003"
+        "T-US-005-001"
       ],
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
       "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.553391+02:00"
     },
     {
-      "id": "T-US-020-001",
-      "title": "Session Fork Capability: Extend Session Schema for Forks",
-      "story_id": "",
-      "depends_on": [
-        "T-US-001-003",
-        "T-US-015-004"
-      ],
+      "id": "T-US-007-001",
+      "title": "Final Validation Review and E2E Suite",
+      "description": "Execute a full project lifecycle test and perform a Task-Tier and Story-Tier review.",
+      "story_id": "US-007",
+      "verification_script": "go test ./tests/e2e",
       "priority": 0,
       "attempt_count": 0,
       "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
       "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-004-003",
-      "title": "Anthropic Provider Driver: Unit Tests for Anthropic Provider",
-      "story_id": "",
-      "depends_on": [
-        "T-US-004-002",
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-021-001",
-      "title": "Meta Self-Fix: File Edit Capability: Implement Orchestrator Locator",
-      "story_id": "",
-      "depends_on": [
-        "T-US-008-004",
-        "T-US-010-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-025-002",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Multi-Project Chat Sessions (G-001)",
-      "story_id": "",
-      "depends_on": [
-        "T-US-025-001",
-        "T-US-015-004",
-        "T-US-016-003",
-        "T-US-017-003",
-        "T-US-018-004",
-        "T-US-023-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-025-003",
-      "title": "Goal Validation: End-to-End Testing: E2E Test: Provider-Agnostic Loop (G-002)",
-      "story_id": "",
-      "depends_on": [
-        "T-US-025-001",
-        "T-US-015-004",
-        "T-US-016-003",
-        "T-US-017-003",
-        "T-US-018-004",
-        "T-US-023-003",
-        "T-US-025-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-007-003",
-      "title": "MCP Tool: read_file: Implement read_file Handler",
-      "story_id": "",
-      "depends_on": [
-        "T-US-007-002",
-        "T-US-001-003"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-013-004",
-      "title": "Auto-Context Builder: Unit Tests for Context Builder",
-      "story_id": "",
-      "depends_on": [
-        "T-US-013-003",
-        "T-US-001-003",
-        "T-US-007-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-018-003",
-      "title": "Cost and Token Dashboard: Create Usage Charts",
-      "story_id": "",
-      "depends_on": [
-        "T-US-018-002",
-        "T-US-012-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-018-004",
-      "title": "Cost and Token Dashboard: Implement Budget Alerts",
-      "story_id": "",
-      "depends_on": [
-        "T-US-018-003",
-        "T-US-012-004",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-022-001",
-      "title": "Meta Self-Fix: Build Capability: Implement OrchestratorBuilder",
-      "story_id": "",
-      "depends_on": [
-        "T-US-009-004",
-        "T-US-021-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-016-001",
-      "title": "Model Picker UI: Create ModelPicker Component",
-      "story_id": "",
-      "depends_on": [
-        "T-US-006-003",
-        "T-US-015-004"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
-    },
-    {
-      "id": "T-US-003-002",
-      "title": "OpenAI Provider Driver: Implement OpenAI Tool Schema Translation",
-      "story_id": "",
-      "depends_on": [
-        "T-US-003-001",
-        "T-US-002-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "needs_review": false,
-      "status": "completed",
-      "created_at": "0001-01-01T00:00:00Z"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.554556+02:00"
     }
   ]
 }

@@ -3,24 +3,130 @@
   "goals": [
     {
       "id": "G-001",
-      "title": "Fix Intent Routing Failure",
-      "description": "Fix the intent routing failure in openexec chat where all inputs fail with 'model could not determine intent with high confidence'",
-      "success_criteria": "User inputs are successfully routed to appropriate handlers without the low confidence error",
-      "verification_method": "Run 'openexec chat' and send test queries; verify they receive valid responses from general_chat tool"
+      "title": "Fix Wizard and Intent Planning",
+      "description": "Restore functionality to the 'openexec wizard' and intent planning logic to allow successful intent.md generation and story import.",
+      "success_criteria": "Wizard runs, generates valid intent.md, and stories import without failure.",
+      "verification_method": "CLI verification of 'openexec wizard' and database check for imported stories."
+    },
+    {
+      "id": "G-002",
+      "title": "Restore CI/CD and Self-Healing",
+      "description": "Fix regressions in self-healing loops and return the CI/CD pipeline to a green state.",
+      "success_criteria": "CI/CD pipeline passes; self-healing recovers from errors without infinite loops.",
+      "verification_method": "Execute 'go test ./...' and simulated error recovery tests."
+    },
+    {
+      "id": "G-003",
+      "title": "Fix BitNet Routing",
+      "description": "Address routing failures where chat inputs do not reach handlers correctly.",
+      "success_criteria": "Chat inputs are correctly routed to general_chat or tool handlers.",
+      "verification_method": "Run 'openexec chat' and verify response accuracy."
     }
   ],
   "stories": [
     {
+      "id": "US-006",
+      "goal_id": "G-003",
+      "title": "BitNet Router and Chat Input Routing",
+      "description": "As a user, I want my chat inputs correctly routed to handlers so that I can interact with the system via CLI.",
+      "acceptance_criteria": [
+        "Inputs reach general_chat or tool handlers based on intent.",
+        "BitNet router correctly classifies inputs.",
+        "Response time for routing is under 200ms."
+      ],
+      "verification_script": "openexec chat \"What is the status of my tasks?\" | grep -v \"error\"",
+      "contract": "internal/router/interface.go",
+      "tasks": [
+        "T-US-006-001"
+      ],
+      "depends_on": [
+        "US-002"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.553623+02:00"
+    },
+    {
+      "id": "US-007",
+      "goal_id": "G-001",
+      "title": "Goal Validation and E2E Testing",
+      "description": "As a system owner, I want to verify that all primary goals are met so that the orchestrator is considered stable.",
+      "acceptance_criteria": [
+        "Complete E2E flow: Wizard -\u003e Import -\u003e Execution -\u003e Healing -\u003e Chat Success.",
+        "CI/CD remains green across all platforms.",
+        "Audit database shows 100% trace coverage for the E2E run."
+      ],
+      "verification_script": "./scripts/validate_goals.sh",
+      "tasks": [
+        "T-US-007-001"
+      ],
+      "depends_on": [
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-006"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.554206+02:00"
+    },
+    {
+      "id": "US-001",
+      "goal_id": "G-002",
+      "title": "Refactor Discovery and Legacy State Analysis",
+      "description": "As a developer, I want to map the existing broken state of the OpenExec orchestrator so that I can systematically fix failures without regressions.",
+      "acceptance_criteria": [
+        "Environment variables and internal dependencies mapped.",
+        "API surface area for Wizard, Stories, and Router documented.",
+        "Current build failures in CI/CD identified and categorized."
+      ],
+      "verification_script": "make build || echo 'Build failures mapped'",
+      "tasks": [
+        "T-US-001-001",
+        "T-US-001-002"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.549105+02:00"
+    },
+    {
+      "id": "US-002",
+      "goal_id": "G-002",
+      "title": "Core Architecture and CI/CD Restoration",
+      "description": "As a developer, I want the core architecture and CI/CD pipeline restored so that I can verify feature work against a stable baseline.",
+      "acceptance_criteria": [
+        "All existing tests in 'go test ./...' pass.",
+        "CLI binary builds successfully for macOS, Linux, and Windows.",
+        "Audit database tracks execution state correctly."
+      ],
+      "verification_script": "go test ./... \u0026\u0026 make build-all",
+      "tasks": [
+        "T-US-002-001",
+        "T-US-002-002"
+      ],
+      "depends_on": [
+        "US-001"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.54982+02:00"
+    },
+    {
       "id": "US-003",
       "goal_id": "G-001",
-      "title": "Harden Coordinator ProcessQuery Error Handling",
-      "description": "As a CLI user, I want the coordinator to always produce a response so that I never see internal errors",
+      "title": "WizardEngine and Intent Planning Logic",
+      "description": "As a user, I want the 'openexec wizard' to work correctly so that I can generate intent.md files for my projects.",
       "acceptance_criteria": [
-        "ProcessQuery never returns error when general_chat tool is registered",
-        "Low confidence handling logs appropriately but does not fail",
-        "Missing tool fallback works correctly"
+        "Wizard generates a valid intent.md following the schema.",
+        "Interactive CLI prompts capture all required project goals and requirements.",
+        "Unit tests cover wizard logic in internal/wizard/."
       ],
-      "verification_script": "go test ./internal/dcp/... -v -cover",
+      "verification_script": "openexec wizard --dry-run \u0026\u0026 test -f intent.md",
+      "contract": "internal/wizard/schema.go",
       "tasks": [
         "T-US-003-001",
         "T-US-003-002",
@@ -31,108 +137,55 @@
       ],
       "story_type": "feature",
       "priority": 0,
-      "status": "done",
-      "created_at": "2026-03-09T20:34:53.397643+02:00"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.550456+02:00"
     },
     {
       "id": "US-004",
       "goal_id": "G-001",
-      "title": "CLI Chat End-to-End Integration Test",
-      "description": "As a developer, I want automated E2E tests for the chat command so that routing regressions are caught early",
+      "title": "StoryManager and Import Logic",
+      "description": "As a user, I want stories to be imported from intent.md files so that the orchestrator can begin task execution.",
       "acceptance_criteria": [
-        "E2E test starts server, sends queries, validates responses",
-        "Test covers: help query, unknown query, surgical tool query",
-        "Test verifies no 'could not determine intent' errors appear"
+        "Stories are successfully parsed and saved to the audit database.",
+        "Dependency graphs for stories are correctly calculated.",
+        "Import failures provide clear error messages."
       ],
-      "verification_script": "go test ./internal/server/... -v -run TestIntegration",
+      "verification_script": "openexec stories import --file intent.md \u0026\u0026 sqlite3 .openexec/data/audit.db 'select count(*) from stories'",
+      "contract": "internal/stories/contract.go",
       "tasks": [
         "T-US-004-001",
-        "T-US-004-002",
-        "T-US-004-003"
+        "T-US-004-002"
       ],
       "depends_on": [
         "US-003"
       ],
       "story_type": "feature",
       "priority": 0,
-      "status": "done",
-      "created_at": "2026-03-09T20:34:53.399614+02:00"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.55132+02:00"
     },
     {
       "id": "US-005",
-      "goal_id": "G-001",
-      "title": "Goal Validation: Intent Routing Fix Verification",
-      "description": "As a project stakeholder, I want E2E validation that the intent routing fix works so that I can confirm the goal is achieved",
+      "goal_id": "G-002",
+      "title": "Self-Healing Loop and Error Recovery",
+      "description": "As a developer, I want the agent loops to self-heal correctly so that systemic failures are handled autonomously.",
       "acceptance_criteria": [
-        "Manual or automated test of 'openexec chat' with various inputs",
-        "All test queries receive valid responses from general_chat or appropriate tool",
-        "No 'model could not determine intent with high confidence' errors observed",
-        "Test results logged and verified"
+        "Self-healing logic in internal/dcp/healing.go recovers from simulated errors.",
+        "Exit strategy prevents infinite loops (C-003).",
+        "Recovery attempts are logged in audit.db."
       ],
-      "verification_script": "go build ./cmd/openexec \u0026\u0026 echo 'help' | timeout 5 ./openexec chat --port 18765 2\u003e\u00261 | grep -v 'could not determine'",
+      "verification_script": "go test ./internal/dcp -run TestSelfHealingRecovery",
       "tasks": [
         "T-US-005-001",
-        "T-US-005-002",
-        "T-US-005-003"
+        "T-US-005-002"
       ],
       "depends_on": [
         "US-004"
       ],
       "story_type": "feature",
       "priority": 0,
-      "status": "done",
-      "created_at": "2026-03-09T20:34:53.401603+02:00"
-    },
-    {
-      "id": "US-001",
-      "goal_id": "G-001",
-      "title": "Discovery: Analyze Intent Routing Flow",
-      "description": "As a developer, I want to understand the current intent routing flow so that I can identify the root cause of the low confidence error",
-      "acceptance_criteria": [
-        "Document the complete flow from CLI chat input to tool execution",
-        "Identify where 'could not determine intent with high confidence' message originates",
-        "Map all fallback paths in BitNetRouter and Coordinator",
-        "Verify skipAvailabilityCheck flag behavior in production vs test"
-      ],
-      "verification_script": "go test ./internal/router/... -v -run TestBitNetRouter",
-      "tasks": [
-        "T-US-001-001",
-        "T-US-001-002",
-        "T-US-001-003"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "done",
-      "created_at": "2026-03-09T20:34:53.393088+02:00"
-    },
-    {
-      "id": "US-002",
-      "goal_id": "G-001",
-      "title": "Harden BitNetRouter Fallback Logic",
-      "description": "As a CLI user, I want the router to always return a usable intent so that my queries never fail with cryptic error messages",
-      "acceptance_criteria": [
-        "ParseIntent never returns an error - always falls back to general_chat",
-        "simulateInference returns valid JSON for any input when skipAvailabilityCheck=true",
-        "Confidence threshold of 0.2 is consistently applied",
-        "All fallback paths return confidence \u003e= 0.5 to avoid coordinator re-fallback"
-      ],
-      "verification_script": "go test ./internal/router/... -v -cover -coverprofile=coverage.out \u0026\u0026 go tool cover -func=coverage.out | grep -E 'ParseIntent|simulateInference'",
-      "contract": "{\"tool_name\": \"string\", \"args\": {\"query\": \"string\"}, \"confidence\": \"number \u003e= 0.5\"}",
-      "tasks": [
-        "T-US-002-001",
-        "T-US-002-002",
-        "T-US-002-003",
-        "T-US-002-004",
-        "T-US-002-003",
-        "T-US-002-004"
-      ],
-      "depends_on": [
-        "US-001"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "done",
-      "created_at": "2026-03-09T20:34:53.395246+02:00"
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.552482+02:00"
     }
   ]
 }
