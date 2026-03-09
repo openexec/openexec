@@ -186,33 +186,36 @@ func (m *Manager) Save() error {
 		}
 	}
 
-	// Save stories and goals
-	storiesPath := filepath.Join(openexecDir, "stories.json")
-	storiesList := make([]Story, 0, len(m.stories))
-	for _, s := range m.stories {
-		storiesList = append(storiesList, *s)
-	}
-	goalsList := make([]Goal, 0, len(m.goals))
-	for _, g := range m.goals {
-		goalsList = append(goalsList, *g)
-	}
+	// Save stories and goals — only if we have data, to avoid overwriting
+	// the planner's stories.json (which uses a different nested Task format).
+	if len(m.stories) > 0 || len(m.goals) > 0 {
+		storiesPath := filepath.Join(openexecDir, "stories.json")
+		storiesList := make([]Story, 0, len(m.stories))
+		for _, s := range m.stories {
+			storiesList = append(storiesList, *s)
+		}
+		goalsList := make([]Goal, 0, len(m.goals))
+		for _, g := range m.goals {
+			goalsList = append(goalsList, *g)
+		}
 
-	sf := struct {
-		SchemaVersion string  `json:"schema_version"`
-		Goals         []Goal  `json:"goals"`
-		Stories       []Story `json:"stories"`
-	}{
-		SchemaVersion: "1.1",
-		Goals:         goalsList,
-		Stories:       storiesList,
-	}
+		sf := struct {
+			SchemaVersion string  `json:"schema_version"`
+			Goals         []Goal  `json:"goals"`
+			Stories       []Story `json:"stories"`
+		}{
+			SchemaVersion: "1.1",
+			Goals:         goalsList,
+			Stories:       storiesList,
+		}
 
-	data, err := json.MarshalIndent(sf, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
-		return err
+		data, err := json.MarshalIndent(sf, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
+			return err
+		}
 	}
 
 	// Save tasks
@@ -224,7 +227,7 @@ func (m *Manager) Save() error {
 	tasksData := struct {
 		Tasks []Task `json:"tasks"`
 	}{Tasks: tasksList}
-	data, err = json.MarshalIndent(tasksData, "", "  ")
+	data, err := json.MarshalIndent(tasksData, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -713,33 +716,36 @@ func (m *Manager) saveUnlocked() error {
 		}
 	}
 
-	// Save stories and goals
-	storiesPath := filepath.Join(openexecDir, "stories.json")
-	storiesList := make([]Story, 0, len(m.stories))
-	for _, s := range m.stories {
-		storiesList = append(storiesList, *s)
-	}
-	goalsList := make([]Goal, 0, len(m.goals))
-	for _, g := range m.goals {
-		goalsList = append(goalsList, *g)
-	}
+	// Save stories and goals — only if we have data, to avoid overwriting
+	// the planner's stories.json (which uses a different nested Task format).
+	if len(m.stories) > 0 || len(m.goals) > 0 {
+		storiesPath := filepath.Join(openexecDir, "stories.json")
+		storiesList := make([]Story, 0, len(m.stories))
+		for _, s := range m.stories {
+			storiesList = append(storiesList, *s)
+		}
+		goalsList := make([]Goal, 0, len(m.goals))
+		for _, g := range m.goals {
+			goalsList = append(goalsList, *g)
+		}
 
-	sf := struct {
-		SchemaVersion string  `json:"schema_version"`
-		Goals         []Goal  `json:"goals"`
-		Stories       []Story `json:"stories"`
-	}{
-		SchemaVersion: "1.1",
-		Goals:         goalsList,
-		Stories:       storiesList,
-	}
+		sf := struct {
+			SchemaVersion string  `json:"schema_version"`
+			Goals         []Goal  `json:"goals"`
+			Stories       []Story `json:"stories"`
+		}{
+			SchemaVersion: "1.1",
+			Goals:         goalsList,
+			Stories:       storiesList,
+		}
 
-	data, err := json.MarshalIndent(sf, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
-		return err
+		data, err := json.MarshalIndent(sf, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
+			return err
+		}
 	}
 
 	// Save tasks
@@ -751,7 +757,7 @@ func (m *Manager) saveUnlocked() error {
 	tasksData := struct {
 		Tasks []Task `json:"tasks"`
 	}{Tasks: tasksList}
-	data, err = json.MarshalIndent(tasksData, "", "  ")
+	data, err := json.MarshalIndent(tasksData, "", "  ")
 	if err != nil {
 		return err
 	}

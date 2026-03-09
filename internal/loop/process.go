@@ -98,9 +98,10 @@ func (p *Process) Kill() error {
 	return p.cmd.Process.Kill()
 }
 
-// CaptureStderr copies stderr to a log file in dir. Blocks until EOF.
-// Removes the file on clean exit if it's empty.
-func CaptureStderr(r io.Reader, dir string) error {
+// CaptureStderr copies stderr to a log file in dir and a memory buffer.
+// Blocks until EOF. Removes the file on clean exit if it's empty.
+// Returns the captured stderr content (tail, up to 4KB) for error diagnostics.
+func CaptureStderr(r io.Reader, dir string) (string, error) {
 	if dir == "" {
 		dir = "."
 	}
@@ -110,10 +111,13 @@ func CaptureStderr(r io.Reader, dir string) error {
 	// path is constructed from a timestamp-based filename, safe to create
 	f, err := os.Create(path) // #nosec G304
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	n, copyErr := io.Copy(f, r)
+	// Capture into both file and a tail buffer for diagnostics
+	var buf stderrTailBuffer
+	w := io.MultiWriter(f, &buf)
+	n, copyErr := io.Copy(w, r)
 	_ = f.Close()
 
 	// Remove empty log files — they provide no diagnostic value.
@@ -121,7 +125,26 @@ func CaptureStderr(r io.Reader, dir string) error {
 		_ = os.Remove(path)
 	}
 
-	return copyErr
+	return buf.String(), copyErr
+}
+
+// stderrTailBuffer keeps the last 4KB of stderr for error diagnostics.
+type stderrTailBuffer struct {
+	data []byte
+}
+
+const stderrTailMax = 4096
+
+func (b *stderrTailBuffer) Write(p []byte) (int, error) {
+	b.data = append(b.data, p...)
+	if len(b.data) > stderrTailMax {
+		b.data = b.data[len(b.data)-stderrTailMax:]
+	}
+	return len(p), nil
+}
+
+func (b *stderrTailBuffer) String() string {
+	return strings.TrimSpace(string(b.data))
 }
 
 // autonomousPreamble is prepended to every prompt to ensure Claude operates

@@ -507,10 +507,11 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						continue
 					}
 
-					cmd.Printf("[Worker %d]    Loop: %s\n", workerID, loopID)
+					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
+					cmd.Printf("%s    Loop: %s\n", workerPrefix, loopID)
 
 					// Wait for loop to complete
-					err = waitForLoop(cmd, loopID)
+					err = waitForLoop(cmd, loopID, workerPrefix)
 					
 					if err == nil && node.Task.VerificationScript != "" {
 						cmd.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
@@ -1137,7 +1138,8 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 }
 
 // waitForLoop polls the loop status until completion.
-func waitForLoop(cmd *cobra.Command, loopID string) error {
+// prefix is prepended to all output lines (e.g. "[Worker 1] ").
+func waitForLoop(cmd *cobra.Command, loopID string, prefix string) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	lastIteration := 0
 	lastPhase := ""
@@ -1158,13 +1160,13 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 
 		// Show phase transitions
 		if loop.Phase != "" && loop.Phase != lastPhase {
-			cmd.Printf("   → Phase %s (%s)\n", loop.Phase, loop.Agent)
+			cmd.Printf("%s   → Phase %s (%s)\n", prefix, loop.Phase, loop.Agent)
 			lastPhase = loop.Phase
 		}
 
 		// Show iteration progress
 		if loop.Iteration > lastIteration {
-			cmd.Printf("   → Iteration %d\n", loop.Iteration)
+			cmd.Printf("%s   → Iteration %d\n", prefix, loop.Iteration)
 			lastIteration = loop.Iteration
 		}
 
@@ -1172,24 +1174,24 @@ func waitForLoop(cmd *cobra.Command, loopID string) error {
 		switch loop.Status {
 		case "complete":
 			elapsed := time.Since(startTime).Truncate(time.Second)
-			cmd.Printf("   ✓ Complete (%s)\n", elapsed)
+			cmd.Printf("%s   ✓ Complete (%s)\n", prefix, elapsed)
 			return nil
 		case "error":
 			if loop.Error != "" {
-				cmd.Printf("   ❌ Error: %s\n", loop.Error)
+				cmd.Printf("%s   ❌ Error: %s\n", prefix, loop.Error)
 				return fmt.Errorf("loop failed: %s", loop.Error)
 			}
-			cmd.Printf("   ❌ Error\n")
+			cmd.Printf("%s   ❌ Error\n", prefix)
 			return fmt.Errorf("loop failed")
 		case "max_iterations":
-			cmd.Printf("   ⚠ Max iterations reached (%d)\n", loop.Iteration)
+			cmd.Printf("%s   ⚠ Max iterations reached (%d)\n", prefix, loop.Iteration)
 			return nil
 		case "paused":
 			if loop.Error != "" {
-				cmd.Printf("   ⏸ Paused: %s\n", loop.Error)
+				cmd.Printf("%s   ⏸ Paused: %s\n", prefix, loop.Error)
 				return fmt.Errorf("loop paused: %s", loop.Error)
 			}
-			cmd.Printf("   ⏸ Paused\n")
+			cmd.Printf("%s   ⏸ Paused\n", prefix)
 			return nil
 		}
 

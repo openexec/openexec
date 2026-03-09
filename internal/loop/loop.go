@@ -175,6 +175,7 @@ func (l *Loop) Run(ctx context.Context) error {
 		}()
 
 		// Capture stderr in a goroutine.
+		var stderrTail string
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -183,7 +184,7 @@ func (l *Loop) Run(ctx context.Context) error {
 				logDir = l.cfg.WorkDir
 			}
 			if logDir != "" {
-				_ = CaptureStderr(proc.Stderr, logDir)
+				stderrTail, _ = CaptureStderr(proc.Stderr, logDir)
 			} else {
 				_, _ = io.Copy(io.Discard, proc.Stderr)
 			}
@@ -213,12 +214,18 @@ func (l *Loop) Run(ctx context.Context) error {
 		}
 
 		if procErr != nil {
+			// Build diagnostic error text including stderr tail if available
+			errDetail := procErr.Error()
+			if stderrTail != "" {
+				errDetail = fmt.Sprintf("%s\nstderr: %s", procErr.Error(), stderrTail)
+			}
+
 			if retryCount < l.cfg.MaxRetries {
 				backoff := l.backoff(retryCount)
 				l.emit(Event{
 					Type:      EventRetrying,
 					Iteration: l.iteration,
-					ErrText:   procErr.Error(),
+					ErrText:   errDetail,
 					Text:      fmt.Sprintf("attempt %d/%d, backoff %s", retryCount+1, l.cfg.MaxRetries, backoff),
 				})
 				l.sleep(ctx, backoff)
@@ -228,7 +235,7 @@ func (l *Loop) Run(ctx context.Context) error {
 			}
 			l.emit(Event{
 				Type:    EventError,
-				ErrText: fmt.Sprintf("retries exhausted: %v", procErr),
+				ErrText: fmt.Sprintf("retries exhausted: %s", errDetail),
 				Err:     procErr,
 			})
 			return procErr
