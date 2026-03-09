@@ -7,6 +7,17 @@ import (
 	"strings"
 )
 
+const (
+	// FallbackConfidence is used when the router cannot determine intent.
+	// This value MUST be >= the coordinator's low-confidence threshold (0.2)
+	// to prevent double-fallback behavior.
+	FallbackConfidence = 0.5
+
+	// LowConfidenceThreshold is the minimum confidence for trusting model output.
+	// Below this threshold, we fall back to general_chat.
+	LowConfidenceThreshold = 0.2
+)
+
 // BitNetRouter wraps a local 1-bit LLM for intent selection
 type BitNetRouter struct {
 	manager               *InferenceManager
@@ -44,7 +55,7 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	fallback := &Intent{
 		ToolName:   "general_chat",
 		Args:       map[string]interface{}{"query": query},
-		Confidence: 0.1,
+		Confidence: FallbackConfidence,
 	}
 
 	// Guard: check if we can even run the model
@@ -75,7 +86,7 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	}
 
 	// 4. Threshold check: if confidence is extremely low, prefer chat fallback
-	if intent.Confidence < 0.2 {
+	if intent.Confidence < LowConfidenceThreshold {
 		return fallback, nil
 	}
 
@@ -113,7 +124,7 @@ func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 	if strings.Contains(queryPart, "symbol") || strings.Contains(queryPart, "function") {
 		return `{"tool_name": "read_symbol", "args": {"name": "Execute"}, "confidence": 0.95}`, nil
 	}
-	
+
 	if strings.Contains(queryPart, "deploy") || strings.Contains(queryPart, "prod") {
 		return `{"tool_name": "deploy", "args": {"env": "prod", "action": "push"}, "confidence": 0.98}`, nil
 	}
@@ -137,7 +148,7 @@ func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 		cleanQuery = cleanQuery[:idx]
 	}
 	cleanQuery = strings.TrimSpace(cleanQuery)
-	
+
 	return fmt.Sprintf(`{"tool_name": "general_chat", "args": {"query": %q}, "confidence": 0.50}`, cleanQuery), nil
 }
 

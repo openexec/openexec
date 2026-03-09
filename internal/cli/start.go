@@ -1074,6 +1074,24 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusConflict {
+		// Pipeline already active! During self-healing, we should aggressively stop it.
+		stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, task.ID)
+		_, _ = http.Post(stopURL, "application/json", nil)
+		time.Sleep(1 * time.Second) // give server a moment to cleanup
+		
+		// Retry the create request
+		resp, err = http.Post(
+			fmt.Sprintf("http://localhost:%d/api/v1/loops", startPort),
+			"application/json",
+			bytes.NewReader(body),
+		)
+		if err != nil {
+			return "", fmt.Errorf("failed to retry after stop: %w", err)
+		}
+		defer resp.Body.Close()
+	}
+
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
 		var errData struct {
@@ -1179,7 +1197,10 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 	for {
 		select {
 		case <-ctx.Done():
-			cmd.Printf("%s   ⚠ Timeout reached after %v\n", prefix, timeout)
+			cmd.Printf("%s   ⚠ Timeout reached after %v. Aborting server-side execution...\n", prefix, timeout)
+			// Explicitly stop the loop on the server so retries can proceed
+			stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, loopID)
+			_, _ = http.Post(stopURL, "application/json", nil)
 			return fmt.Errorf("loop timed out after %v", timeout)
 		default:
 			// continue

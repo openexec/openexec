@@ -53,20 +53,17 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 	// 1. Local Intent Routing (BitNet)
 	intent, err := c.router.ParseIntent(ctx, query)
 	if err != nil {
-		// Fallback to general chat if intent routing fails
-		if chatTool, ok := c.tools["general_chat"]; ok {
-			log.Printf("[DCP] Routing failed, falling back to general_chat: %v", err)
-			return chatTool.Execute(ctx, map[string]interface{}{"query": query})
+		if result, ok := c.fallbackToChat(ctx, query, "Routing failed: %v", err); ok {
+			return result, nil
 		}
 		return nil, fmt.Errorf("intent routing failed: %w", err)
 	}
 
 	// 2. Threshold check: if confidence is too low, fallback to general chat.
-	// We use 0.2 as a heuristic cutoff; below this, the local model is likely guessing.
-	if intent.Confidence < 0.2 {
-		if chatTool, ok := c.tools["general_chat"]; ok {
-			log.Printf("[DCP] Low confidence (%.2f), falling back to general_chat", intent.Confidence)
-			return chatTool.Execute(ctx, map[string]interface{}{"query": query})
+	// Below the router's low-confidence threshold, the local model is likely guessing.
+	if intent.Confidence < router.LowConfidenceThreshold {
+		if result, ok := c.fallbackToChat(ctx, query, "Low confidence (%.2f)", intent.Confidence); ok {
+			return result, nil
 		}
 	}
 
@@ -76,10 +73,8 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 	// 4. Fetch Tool
 	tool, ok := c.tools[intent.ToolName]
 	if !ok {
-		// Even if tool is not found, try falling back to chat
-		if chatTool, ok := c.tools["general_chat"]; ok {
-			log.Printf("[DCP] Tool %q not found, falling back to general_chat", intent.ToolName)
-			return chatTool.Execute(ctx, map[string]interface{}{"query": query})
+		if result, ok := c.fallbackToChat(ctx, query, "Tool %q not found", intent.ToolName); ok {
+			return result, nil
 		}
 		return nil, fmt.Errorf("tool %q selected by router but not registered in DCP", intent.ToolName)
 	}
@@ -87,6 +82,21 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 	// 5. Deterministic Execution
 	log.Printf("[DCP] Executing tool %q with confidence %.2f", intent.ToolName, intent.Confidence)
 	return tool.Execute(ctx, intent.Args)
+}
+
+// fallbackToChat attempts to execute the general_chat tool as a fallback.
+// Returns (result, true) if fallback succeeded, (nil, false) if no fallback available.
+func (c *Coordinator) fallbackToChat(ctx context.Context, query, reason string, args ...interface{}) (any, bool) {
+	chatTool, ok := c.tools["general_chat"]
+	if !ok {
+		return nil, false
+	}
+	log.Printf("[DCP] %s, falling back to general_chat", fmt.Sprintf(reason, args...))
+	result, err := chatTool.Execute(ctx, map[string]interface{}{"query": query})
+	if err != nil {
+		return nil, false
+	}
+	return result, true
 }
 
 // sanitizeArgs recursively cleans all string values in the arguments map,
