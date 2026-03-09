@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -35,20 +36,24 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 			}
 		}
 
-		// Check if server is running
+		// Check if server is running, if not, start it in background
 		if !isServerRunning(projectDir, startPort) {
-			fmt.Println(color.YellowString("⚠ Execution engine is not running."))
-			fmt.Println("Start it in another terminal with:")
-			fmt.Println(color.CyanString("  openexec start"))
-			fmt.Println()
+			fmt.Println(color.CyanString("🚀 Starting execution engine in background..."))
 			
-			if err != nil {
-				fmt.Println(color.WhiteString("Note: You are not in an initialized OpenExec project."))
-				fmt.Println("To enable full orchestration features, run: " + color.CyanString("openexec init"))
-				fmt.Println()
+			// Set daemon flag and run start command
+			startDaemon = true
+			if err := startCmd.RunE(cmd, args); err != nil {
+				return fmt.Errorf("failed to start background engine: %w", err)
 			}
 			
-			return fmt.Errorf("engine required for chat")
+			// Wait for server to be ready
+			fmt.Printf("⏳ Waiting for engine to initialize...")
+			if err := waitForServer(startPort, 15*time.Second); err != nil {
+				fmt.Println(color.RedString(" ✗ Failed!"))
+				return fmt.Errorf("engine failed to become ready: %w", err)
+			}
+			fmt.Println(color.GreenString(" ✓ Ready"))
+			fmt.Println()
 		}
 
 		return runChatREPL(projectName)
