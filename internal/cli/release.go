@@ -1570,6 +1570,7 @@ func init() {
 
 	storyCmd.AddCommand(storyImportCmd)
 	storyImportCmd.Flags().Bool("dry-run", false, "Preview import without creating stories/tasks")
+	storyImportCmd.Flags().Bool("reassign", false, "Reassign existing tasks to stories if StoryID is missing")
 
 	// Task subcommands
 	rootCmd.AddCommand(taskCmd)
