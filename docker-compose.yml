@@ -31,6 +31,12 @@ services:
     environment:
       - OPENEXEC_AUDIT_ENABLED=true
       - OPENEXEC_AUDIT_DB_PATH=/data/audit.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - openexec
 

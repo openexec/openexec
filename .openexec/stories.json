@@ -57,6 +57,7 @@
       "tasks": [
         "T-US-001-003",
         "T-US-001-003",
+        "T-US-001-003",
         "T-US-001-003"
       ],
       "story_type": "feature",
@@ -76,6 +77,8 @@
       "verification_script": "go build -o bin/openexec ./cmd/openexec \u0026\u0026 ./bin/openexec --help",
       "contract": "CLI command interface schema",
       "tasks": [
+        "T-US-002-003",
+        "T-US-002-004",
         "T-US-002-003",
         "T-US-002-004",
         "T-US-002-003",
@@ -107,6 +110,9 @@
       "verification_script": "make test \u0026\u0026 docker compose ps",
       "contract": "Engine Interface Contract (Wizard, Story, Router, Healing)",
       "tasks": [
+        "T-US-003-004",
+        "T-US-003-005",
+        "T-US-003-006",
         "T-US-003-004",
         "T-US-003-005",
         "T-US-003-006",

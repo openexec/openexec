@@ -190,6 +190,20 @@ func buildCommand(cfg Config) (string, []string) {
 		return cliCmd, buildClaudeArgs(cfg)
 	}
 
+	// For Gemini, we want to ensure --yolo is present to avoid interactive hangs.
+	if strings.Contains(strings.ToLower(cliCmd), "gemini") {
+		hasYolo := false
+		for _, a := range cmdArgs {
+			if a == "--yolo" {
+				hasYolo = true
+				break
+			}
+		}
+		if !hasYolo {
+			cmdArgs = append(cmdArgs, "--yolo")
+		}
+	}
+
 	return cliCmd, cmdArgs
 }
 

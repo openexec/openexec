@@ -114,10 +114,7 @@ func (l *Loop) Run(ctx context.Context) error {
 
         // Provider-backed execution path: when CommandName maps to a cloud provider
         // (e.g., openai/gemini), we currently do not spawn an external CLI.
-        // Instead, complete the loop immediately and let upstream phases proceed.
-        // This avoids hard-depending on the Claude CLI when a non-Claude model
-        // is selected via project config.
-        if name := l.cfg.CommandName; name == "openai" || name == "gemini" {
+        if name := filepath.Base(l.cfg.CommandName); name == "openai" || name == "gemini" {
             // Initialize providers from env (best-effort)
             agent.InitializeDefaultRegistry()
 

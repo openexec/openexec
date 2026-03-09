@@ -90,6 +90,13 @@ func main() {
 		fmt.Println(`{"type":"result","result":{"content":[]}}`)
 		os.Exit(0)
 
+	case "no-progress":
+		// Scenario for testing C-003 exit strategy: completes without sending progress signals
+		fmt.Println(`{"type":"system","subtype":"init","session_id":"mock"}`)
+		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"Working without progress signals."}]}}`)
+		fmt.Println(`{"type":"result","result":{"content":[{"type":"text","text":"Done but no signal."}]}}`)
+		os.Exit(0)
+
 	default:
 		fmt.Fprintf(os.Stderr, "unknown scenario: %s\n", scenario)
 		os.Exit(2)
