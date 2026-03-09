@@ -228,7 +228,18 @@ func (s *Server) handleKnowledgeEnvs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	s.respondJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "version": version.Version})
+	runnerName := "claude"
+	if s.Mgr != nil {
+		cfg := s.Mgr.GetConfig()
+		if cfg.CommandName != "" {
+			runnerName = filepath.Base(cfg.CommandName)
+		}
+	}
+	s.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"version": version.Version,
+		"runner":  runnerName,
+	})
 }
 
 func (s *Server) respondJSON(w http.ResponseWriter, code int, payload interface{}) {
