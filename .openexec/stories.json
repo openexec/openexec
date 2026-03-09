@@ -78,6 +78,8 @@
         "T-US-002-003",
         "T-US-002-004",
         "T-US-002-003",
+        "T-US-002-004",
+        "T-US-002-003",
         "T-US-002-004"
       ],
       "depends_on": [
@@ -102,6 +104,9 @@
       "verification_script": "make test \u0026\u0026 docker compose ps",
       "contract": "Engine Interface Contract (Wizard, Story, Router, Healing)",
       "tasks": [
+        "T-US-003-004",
+        "T-US-003-005",
+        "T-US-003-006",
         "T-US-003-004",
         "T-US-003-005",
         "T-US-003-006",

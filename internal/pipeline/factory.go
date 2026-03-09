@@ -103,11 +103,10 @@ func (f *LoopFactory) Create(briefing string, phaseCfg PhaseConfig) (*loop.Loop,
 	}
 
 	// Apply command overrides: phase-specific takes precedence over factory default.
+	cfg.CommandName = f.cfg.CommandName
 	if phaseCfg.CommandArgs != nil {
-		cfg.CommandName = f.cfg.CommandName
 		cfg.CommandArgs = phaseCfg.CommandArgs
 	} else if f.cfg.CommandArgs != nil {
-		cfg.CommandName = f.cfg.CommandName
 		cfg.CommandArgs = f.cfg.CommandArgs
 	}
 
