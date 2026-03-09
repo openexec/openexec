@@ -178,6 +178,7 @@ func (s *Server) registerRoutes() {
 
 	// --- Health & System Routes ---
 	s.Mux.HandleFunc("GET /api/health", s.handleHealth)
+	s.Mux.HandleFunc("GET /api/ready", s.Checker.ReadyHandler())
 
 	// --- Catch-all 404 handler for unknown API routes ---
 	s.Mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
@@ -277,8 +278,70 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// registerPreflightChecks registers startup validation checks.
+// CONTRACT:
+// 1. Must be called before Start()
+// 2. Registers checks for: runner_available, knowledge_db, audit_db
+// 3. runner_available is CRITICAL (blocks startup)
+// 4. knowledge_db and audit_db are NON-CRITICAL (degraded mode OK)
+func (s *Server) registerPreflightChecks() {
+	// Critical: Runner must be available
+	s.Checker.Register(health.Check{
+		Name:     "runner_available",
+		Critical: true,
+		Run: func(ctx context.Context) (health.Status, string, error) {
+			// Get execution config from manager
+			cfg := s.Mgr.GetConfig()
+			runnerCmd, _, err := runner.Resolve(
+				cfg.ExecutorModel,
+				cfg.RunnerCommand,
+				cfg.RunnerArgs,
+			)
+			if err != nil {
+				return health.StatusFailed, fmt.Sprintf("runner not available: %v", err), nil
+			}
+			return health.StatusOK, fmt.Sprintf("runner '%s' available", filepath.Base(runnerCmd)), nil
+		},
+		Remediation: "Install Claude CLI: npm install -g @anthropic/claude-code, or configure a custom runner in openexec.yaml",
+	})
+
+	// Non-critical: Knowledge database
+	s.Checker.Register(health.Check{
+		Name:     "knowledge_db",
+		Critical: false,
+		Run: func(ctx context.Context) (health.Status, string, error) {
+			kStore, err := knowledge.NewStore(".")
+			if err != nil {
+				return health.StatusDegraded, fmt.Sprintf("knowledge store unavailable: %v", err), nil
+			}
+			_ = kStore.Close()
+			return health.StatusOK, "knowledge store initialized", nil
+		},
+		Remediation: "Run 'openexec index' to initialize the knowledge database",
+	})
+
+	// Non-critical: Audit database (already initialized in New())
+	s.Checker.Register(health.Check{
+		Name:     "audit_db",
+		Critical: false,
+		Run: func(ctx context.Context) (health.Status, string, error) {
+			if s.AuditLogger == nil {
+				return health.StatusDegraded, "audit logger not initialized", nil
+			}
+			return health.StatusOK, "audit logger active", nil
+		},
+		Remediation: "Check data directory permissions",
+	})
+}
+
 // Start runs the server and blocks
 func (s *Server) Start(ctx context.Context) error {
+	// Register and run preflight checks before starting
+	s.registerPreflightChecks()
+	if err := s.Checker.RunPreflight(ctx); err != nil {
+		return fmt.Errorf("preflight failed: %w", err)
+	}
+
 	log.Printf("[Server] Unified OpenExec API listening on %s", s.HttpServer.Addr)
 
 	// Wrap the mux with logging middleware
