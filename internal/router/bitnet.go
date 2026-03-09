@@ -59,7 +59,7 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	// 2. Invoke local inference engine
 	output, err := r.runLocalInference(ctx, prompt)
 	if err != nil {
-		// Fallback to general chat if inference fails (OOM, timeout, etc)
+		// CRITICAL: ALWAYS fallback to general chat if inference fails (OOM, binary missing, model error)
 		return fallback, nil
 	}
 

@@ -60,6 +60,20 @@ func TestBitNetRouter(t *testing.T) {
 			t.Error("expected query arg to be populated")
 		}
 	})
+
+	t.Run("Real Inference Failure Fallback", func(t *testing.T) {
+		// Use a router that will actually fail (availability check fails)
+		failR := NewBitNetRouter("/tmp/non-existent.bin")
+		// failR.skipAvailabilityCheck is false by default
+		
+		intent, err := failR.ParseIntent(ctx, "hello")
+		if err != nil {
+			t.Fatalf("expected nil error due to fallback, got %v", err)
+		}
+		if intent.ToolName != "general_chat" {
+			t.Errorf("expected general_chat fallback, got %q", intent.ToolName)
+		}
+	})
 }
 
 func TestBitNetRouter_Availability(t *testing.T) {
