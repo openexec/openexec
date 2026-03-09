@@ -1,7 +1,7 @@
 package version
 
 // Version is the current version of OpenExec
-const Version = "0.1.19"
+const Version = "0.1.20"
 
 
 // Commit is the git commit hash, usually injected at build time

@@ -996,18 +996,18 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 						deps = append(deps, prerequisiteTasks...)
 					}
 				}
-				
+
 				tasks = append(tasks, Task{
 					ID:                 taskID,
 					Title:              genTask.Title,
 					Description:        genTask.Description,
 					StoryID:            story.ID,
-					Status:             "pending",
+					Status:             story.Status,
 					DependsOn:          deps,
 					VerificationScript: genTask.VerificationScript,
-					TechnicalStrategy:  genTask.TechnicalStrategy,
 				})
 				
+				// Move to next task in story
 				prevTaskInStory = taskID
 			}
 		}
