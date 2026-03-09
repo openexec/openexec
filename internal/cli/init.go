@@ -237,37 +237,9 @@ func ensureGitignore(projectDir string) {
 		return
 	}
 
-	// No .gitignore — create with common defaults
-	content := `# Dependencies
-node_modules/
-vendor/
-.venv/
-__pycache__/
-
-# Build output
-dist/
-build/
-out/
-bin/
-*.exe
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
-.env
-.env.local
-.env.*.local
-` + openexecBlock
-
-	_ = os.WriteFile(gitignorePath, []byte(content), 0644)
+	// No .gitignore — create with OpenExec entries only.
+	// The agent will add stack-specific patterns during the first task.
+	_ = os.WriteFile(gitignorePath, []byte("# OpenExec\n.openexec/logs/\n.openexec/data/\n"), 0644)
 }
 
 // selectModelInteractively prompts user to select a model

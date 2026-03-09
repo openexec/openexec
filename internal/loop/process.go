@@ -154,6 +154,8 @@ const autonomousPreamble = `IMPORTANT: You are running autonomously in a non-int
 	`Work independently and make reasonable decisions. ` +
 	`If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
 
+` + `If the project does not yet have a .gitignore file, create an appropriate one for the tech stack before writing other code.
+
 `
 
 // disabledTools lists tools that require interactive approval and are useless
