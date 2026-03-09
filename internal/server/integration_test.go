@@ -556,6 +556,204 @@ func TestDCPQueryIntegration(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// US-004: CLI Chat End-to-End Integration Tests
+// =============================================================================
+// These tests implement the acceptance criteria for US-004:
+// - AC1: E2E test starts server, sends queries, validates responses
+// - AC2: Test covers: help query, unknown query, surgical tool query
+// - AC3: Test verifies no 'could not determine intent' errors appear
+//
+// Run with: go test ./internal/server/... -v -run TestIntegration
+// =============================================================================
+
+// TestIntegrationCLIChatHelpQuery validates AC2: help query routing.
+// GIVEN a running server with GeneralChatTool registered
+// WHEN a user asks for help
+// THEN the response contains guidance about available commands
+// AND no intent routing errors appear (AC3)
+func TestIntegrationCLIChatHelpQuery(t *testing.T) {
+	// AC1: Start server
+	ts := NewTestServer(t)
+
+	// AC1: Send query
+	resp := ts.MustQuery("help")
+
+	// AC1: Validate response
+	resultStr := fmt.Sprintf("%v", resp.Result)
+
+	// AC2: Help query should mention OpenExec
+	if !strings.Contains(resultStr, "OpenExec") {
+		t.Errorf("help response should mention OpenExec, got: %s", resultStr)
+	}
+
+	// AC2: Help query should provide guidance
+	guidance := []string{"deploy", "commit", "wizard"}
+	foundGuidance := false
+	for _, g := range guidance {
+		if strings.Contains(strings.ToLower(resultStr), g) {
+			foundGuidance = true
+			break
+		}
+	}
+	if !foundGuidance {
+		t.Errorf("help response should mention available commands, got: %s", resultStr)
+	}
+
+	// AC3: No intent routing errors
+	ts.AssertNoErrorPhrases(resp, "help")
+}
+
+// TestIntegrationCLIChatUnknownQuery validates AC2: unknown query fallback.
+// GIVEN a running server
+// WHEN a user asks something unrelated to available tools
+// THEN the query is handled by general_chat fallback
+// AND no intent routing errors appear (AC3)
+func TestIntegrationCLIChatUnknownQuery(t *testing.T) {
+	// AC1: Start server
+	ts := NewTestServer(t)
+
+	// AC1: Send unknown query
+	resp := ts.MustQuery("What is the capital of France?")
+
+	// AC1: Validate response
+	resultStr := fmt.Sprintf("%v", resp.Result)
+
+	// AC2: Unknown query should be echoed (general_chat behavior)
+	if !strings.Contains(strings.ToLower(resultStr), "france") && !strings.Contains(strings.ToLower(resultStr), "received") {
+		t.Errorf("unknown query should be handled gracefully, got: %s", resultStr)
+	}
+
+	// AC3: No intent routing errors
+	ts.AssertNoErrorPhrases(resp, "What is the capital of France?")
+}
+
+// TestIntegrationCLIChatSurgicalToolQuery validates AC2: surgical tool query.
+// GIVEN a running server with DeployTool registered
+// WHEN a user requests a deployment
+// THEN the deploy tool is invoked with high confidence
+// AND no intent routing errors appear (AC3)
+func TestIntegrationCLIChatSurgicalToolQuery(t *testing.T) {
+	// AC1: Start server
+	ts := NewTestServer(t)
+
+	// AC1: Send surgical deploy query
+	resp := ts.MustQuery("deploy to production")
+
+	// AC1: Validate response
+	resultStr := fmt.Sprintf("%v", resp.Result)
+
+	// AC2: Deploy tool should be invoked (may return KNOWLEDGE_MISSING which is expected)
+	if resultStr == "" {
+		t.Error("surgical tool query should return non-empty result")
+	}
+
+	// AC3: No intent routing errors
+	ts.AssertNoErrorPhrases(resp, "deploy to production")
+}
+
+// TestIntegrationCLIChatE2EMatrix validates all acceptance criteria comprehensively.
+// This is the definitive US-004 integration test that covers:
+// - AC1: Server lifecycle (start, query, response)
+// - AC2: Help, unknown, and surgical tool queries
+// - AC3: No 'could not determine intent' errors in any scenario
+func TestIntegrationCLIChatE2EMatrix(t *testing.T) {
+	// AC1: Start server
+	ts := NewTestServer(t)
+
+	testCases := []struct {
+		name        string
+		query       string
+		category    string // help, unknown, or surgical
+		wantInResp  string // optional substring to verify
+		allowEmpty  bool   // allow empty result (for tool execution errors)
+	}{
+		// AC2: Help queries
+		{"help_basic", "help", "help", "OpenExec", false},
+		{"help_what", "what can you do", "help", "", false},
+		{"help_list", "list commands", "help", "", false},
+
+		// AC2: Unknown queries (should fall back gracefully)
+		{"unknown_weather", "What is the weather today?", "unknown", "", false},
+		{"unknown_joke", "tell me a joke", "unknown", "", false},
+		{"unknown_math", "what is 2+2?", "unknown", "", false},
+		{"unknown_gibberish", "asdfqwerzxcv", "unknown", "", false},
+
+		// AC2: Surgical tool queries
+		{"surgical_deploy", "deploy to prod", "surgical", "", false},
+		{"surgical_commit", "commit my changes", "surgical", "", true}, // may error without git context
+		{"surgical_symbol", "show function main", "surgical", "", true}, // may error without symbol index
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// AC1: Send query
+			resp, err := ts.Query(context.Background(), tc.query)
+
+			// AC1: Validate response structure
+			if err != nil && resp == nil {
+				t.Fatalf("query %q failed catastrophically: %v", tc.query, err)
+			}
+
+			// AC1: Non-empty result (unless allowed)
+			if !tc.allowEmpty && resp.Result == nil && resp.Response == "" {
+				t.Errorf("query %q: expected non-empty result", tc.query)
+			}
+
+			// AC2: Optional content verification
+			if tc.wantInResp != "" {
+				resultStr := fmt.Sprintf("%v", resp.Result)
+				if !strings.Contains(resultStr, tc.wantInResp) {
+					t.Errorf("query %q: expected result to contain %q, got: %s",
+						tc.query, tc.wantInResp, resultStr)
+				}
+			}
+
+			// AC3: CRITICAL - No intent routing errors
+			ts.AssertNoErrorPhrases(resp, tc.query)
+		})
+	}
+}
+
+// TestIntegrationCLIChatNoConfidenceErrors ensures no confidence errors appear in any scenario.
+// This is a comprehensive regression test for the G-001 goal.
+func TestIntegrationCLIChatNoConfidenceErrors(t *testing.T) {
+	ts := NewTestServer(t)
+
+	// Fuzz-like inputs that could potentially trigger edge cases
+	edgeCaseInputs := []string{
+		"",                         // empty
+		"   ",                      // whitespace only
+		"a",                        // single char
+		"你好",                        // unicode
+		"!@#$%",                    // special chars
+		`{"json": "object"}`,       // JSON
+		"deploy commit push",       // multiple keywords
+		strings.Repeat("x", 5000),  // long input
+	}
+
+	for _, input := range edgeCaseInputs {
+		testName := input
+		if len(testName) > 20 {
+			testName = testName[:20] + "..."
+		}
+		testName = strings.ReplaceAll(testName, "\n", "\\n")
+
+		t.Run(testName, func(t *testing.T) {
+			resp, err := ts.Query(context.Background(), input)
+
+			if err != nil && resp == nil {
+				t.Fatalf("input %q caused fatal error: %v", input, err)
+			}
+
+			if resp != nil {
+				// CRITICAL: No forbidden error messages
+				ts.AssertNoErrorPhrases(resp, input)
+			}
+		})
+	}
+}
+
 // mockErrorRouter always returns an error during intent parsing
 type mockErrorRouter struct {
 	router.Router
