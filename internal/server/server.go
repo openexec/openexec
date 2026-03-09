@@ -19,6 +19,7 @@ import (
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/router"
+	"github.com/openexec/openexec/internal/runner"
 	"github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/pkg/api"
 	"github.com/openexec/openexec/pkg/audit"
@@ -26,7 +27,6 @@ import (
 	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/pkg/version"
     "strings"
-    "os/exec"
 )
 
 // Server is the unified OpenExec API and UI host.
@@ -83,38 +83,45 @@ func New(cfg Config) (*Server, error) {
 	// the manager will fallback to stderr logging.
 	_ = os.MkdirAll(logDir, 0750)
 
-	// Resolve runner command from project execution model (best-effort).
+	// Resolve runner command from project execution model.
 	runnerCmd := ""
+	var runnerArgs []string
 	if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil {
-		model := strings.ToLower(projCfg.Execution.ExecutorModel)
-		switch {
-		case model == "", strings.Contains(model, "claude"), strings.Contains(model, "sonnet"), strings.Contains(model, "opus"), strings.Contains(model, "haiku"):
-			runnerCmd = "claude"
-		case strings.HasPrefix(model, "gpt-") || strings.Contains(model, "codex"):
-			// Placeholder for OpenAI/Codex CLI if available in user env
-			runnerCmd = "openai"
-		case strings.HasPrefix(model, "gemini"):
-			// Placeholder for Gemini CLI if available in user env
-			runnerCmd = "gemini"
-		}
-		if runnerCmd != "" {
-			if _, err := exec.LookPath(runnerCmd); err != nil {
-				log.Printf("[Server] Warning: executor model %s mapped to runner '%s' which was not found on PATH. Loops may fail to start.", model, runnerCmd)
-			} else {
-				log.Printf("[Server] Executor model: %s → runner command: %s", model, runnerCmd)
-			}
+		rc, ra, err := runner.Resolve(
+			projCfg.Execution.ExecutorModel,
+			projCfg.Execution.RunnerCommand,
+			projCfg.Execution.RunnerArgs,
+		)
+		if err != nil {
+			log.Printf("[Server] Warning: runner resolution failed: %v", err)
+		} else {
+			runnerCmd = rc
+			runnerArgs = ra
+			log.Printf("[Server] Runner: model=%s command=%s args=%v", 
+				projCfg.Execution.ExecutorModel, runnerCmd, runnerArgs)
 		}
 	}
 
-    mgr := manager.New(manager.Config{
-        WorkDir:     projectsAbs,
-        TractStore:  cfg.DataDir,
-        AgentsFS:    agentsFS,
-        LogDir:      logDir,
-        CommandName: runnerCmd,
-        CommandArgs: func() []string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return []string{projCfg.Execution.ExecutorModel} }; return nil }(),
-    })
+	// For Claude, we want to use the internal buildCommand defaults (no-inline prompt)
+	// unless explicit overrides were provided.
+	finalCmd := runnerCmd
+	finalArgs := runnerArgs
+	if strings.Contains(strings.ToLower(runnerCmd), "claude") {
+		finalCmd = ""
+		finalArgs = nil
+	}
 
+	mgr := manager.New(manager.Config{
+		WorkDir:       projectsAbs,
+		TractStore:    cfg.DataDir,
+		AgentsFS:      agentsFS,
+		LogDir:        logDir,
+		ExecutorModel: func() string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return projCfg.Execution.ExecutorModel }; return "" }(),
+		RunnerCommand: func() string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return projCfg.Execution.RunnerCommand }; return "" }(),
+		RunnerArgs:    func() []string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return projCfg.Execution.RunnerArgs }; return nil }(),
+		CommandName:   finalCmd,
+		CommandArgs:   finalArgs,
+	})
 	// 3. Initialize Deterministic Control Plane (DCP)
 	// Error ignored: knowledge store is optional; DCP tools gracefully handle nil/empty store
 	// by returning "not found" errors for symbol lookups.
