@@ -137,11 +137,16 @@ func sendChatQuery(query string) (string, error) {
 
 	var result struct {
 		Response string `json:"response"`
+		Result   string `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	// Server returns "result", but we'll check both for safety
+	if result.Result != "" {
+		return result.Result, nil
+	}
 	return result.Response, nil
 }
 
