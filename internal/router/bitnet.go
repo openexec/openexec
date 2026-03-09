@@ -43,7 +43,12 @@ func (r *BitNetRouter) RegisterTool(name, description, schema string) error {
 func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, error) {
 	// Guard: check if we can even run the model
 	if err := r.CheckAvailability(); err != nil {
-		return nil, fmt.Errorf("local router unavailable: %w", err)
+		// Fallback to general chat if model environment is missing
+		return &Intent{
+			ToolName:   "general_chat",
+			Args:       map[string]interface{}{"query": query},
+			Confidence: 0.1,
+		}, nil
 	}
 
 	// 1. Build the local prompt for the 1-bit model
@@ -52,11 +57,26 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	// 2. Invoke local inference engine
 	output, err := r.runLocalInference(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("local inference failed: %w", err)
+		// Fallback to general chat if inference fails (OOM, timeout, etc)
+		return &Intent{
+			ToolName:   "general_chat",
+			Args:       map[string]interface{}{"query": query},
+			Confidence: 0.1,
+		}, nil
 	}
 
 	// 3. Parse the model output into an Intent struct
-	return r.parseModelOutput(output)
+	intent, err := r.parseModelOutput(output)
+	if err != nil {
+		// Fallback to general chat if model output is malformed
+		return &Intent{
+			ToolName:   "general_chat",
+			Args:       map[string]interface{}{"query": query},
+			Confidence: 0.1,
+		}, nil
+	}
+
+	return intent, nil
 }
 
 func (r *BitNetRouter) buildPrompt(query string) string {
