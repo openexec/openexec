@@ -99,7 +99,9 @@ func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 		return `{"tool_name": "safe_commit", "args": {"message": "Update from OpenExec", "push": true}, "confidence": 0.99}`, nil
 	}
 
-	return "", fmt.Errorf("model could not determine intent with high confidence")
+	// Default to general chat if no surgical tool matches
+	cleanQuery := strings.TrimPrefix(queryPart, "query: ")
+	return fmt.Sprintf(`{"tool_name": "general_chat", "args": {"query": %q}, "confidence": 0.50}`, cleanQuery), nil
 }
 
 func (r *BitNetRouter) parseModelOutput(output string) (*Intent, error) {

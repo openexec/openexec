@@ -45,13 +45,19 @@ func TestBitNetRouter(t *testing.T) {
 		}
 	})
 
-	t.Run("Low Confidence Failure", func(t *testing.T) {
+	t.Run("General Chat Fallback", func(t *testing.T) {
 		// Act
-		_, err := r.ParseIntent(ctx, "What is the weather today?")
+		intent, err := r.ParseIntent(ctx, "What is the weather today?")
 
 		// Assert
-		if err == nil || !strings.Contains(err.Error(), "confidence") {
-			t.Errorf("expected low confidence error, got %v", err)
+		if err != nil {
+			t.Fatalf("ParseIntent failed: %v", err)
+		}
+		if intent.ToolName != "general_chat" {
+			t.Errorf("got tool %q, want general_chat", intent.ToolName)
+		}
+		if intent.Args["query"] == "" {
+			t.Error("expected query arg to be populated")
 		}
 	})
 }

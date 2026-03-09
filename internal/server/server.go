@@ -96,6 +96,7 @@ func New(cfg Config) (*Server, error) {
 	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
 	coordinator.RegisterTool(tools.NewDeployTool(kStore))
 	coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
+	coordinator.RegisterTool(tools.NewGeneralChatTool())
 	
 	// 4. Initialize API Layer
 	mux := http.NewServeMux()
