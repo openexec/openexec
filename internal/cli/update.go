@@ -39,10 +39,12 @@ var updateCmd = &cobra.Command{
 		fmt.Printf("✨ A new version is available: v%s (current: v%s)\n", latestVersion, currentVersion)
 		
 		// Confirm update
-		fmt.Print("Do you want to update? [y/N]: ")
+		fmt.Print("Do you want to update? [Y/n]: ")
 		var confirm string
 		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
+		confirm = strings.ToLower(strings.TrimSpace(confirm))
+		
+		if confirm != "" && confirm != "y" && confirm != "yes" {
 			fmt.Println("Update cancelled.")
 			return nil
 		}
