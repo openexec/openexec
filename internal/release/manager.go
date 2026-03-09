@@ -105,6 +105,11 @@ func (m *Manager) GetConfig() *Config {
 	return m.config
 }
 
+// BaseDir returns the base project directory.
+func (m *Manager) BaseDir() string {
+	return m.baseDir
+}
+
 // Load loads all data from disk.
 func (m *Manager) Load() error {
 	m.mu.Lock()

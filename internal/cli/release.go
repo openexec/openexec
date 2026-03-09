@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 
-	"github.com/spf13/cobra"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/spf13/cobra"
 )
 
 var releaseCmd = &cobra.Command{
@@ -969,11 +970,35 @@ Examples:
 					continue
 				}
 
+				// Materialize story markdown file for engine visibility
+				storyDir := filepath.Join(mgr.BaseDir(), ".openexec", "stories")
+				_ = os.MkdirAll(storyDir, 0o750)
+				storyPath := filepath.Join(storyDir, genStory.ID+".md")
+				if _, err := os.Stat(storyPath); os.IsNotExist(err) {
+					content := fmt.Sprintf("# Story %s: %s\n\n%s\n\n## Acceptance Criteria\n", genStory.ID, genStory.Title, genStory.Description)
+					for _, ac := range genStory.AcceptanceCriteria {
+						content += fmt.Sprintf("- %s\n", ac)
+					}
+					_ = os.WriteFile(storyPath, []byte(content), 0o644)
+				}
+
 				storiesCreated++
 				cmd.Printf("  [created] %s: %s\n", genStory.ID, genStory.Title)
 			} else {
 				cmd.Printf("  [exists] %s: %s (status: %s)\n", genStory.ID, genStory.Title, story.Status)
 				skipped++
+			}
+
+			// ALWAYS ensure story markdown file exists for engine visibility (Self-Healing)
+			storyDir := filepath.Join(mgr.BaseDir(), ".openexec", "stories")
+			_ = os.MkdirAll(storyDir, 0o750)
+			storyPath := filepath.Join(storyDir, genStory.ID+".md")
+			if _, err := os.Stat(storyPath); os.IsNotExist(err) {
+				content := fmt.Sprintf("# Story %s: %s\n\n%s\n\n## Acceptance Criteria\n", genStory.ID, genStory.Title, genStory.Description)
+				for _, ac := range genStory.AcceptanceCriteria {
+					content += fmt.Sprintf("- %s\n", ac)
+				}
+				_ = os.WriteFile(storyPath, []byte(content), 0o644)
 			}
 
 			// Create tasks for this story

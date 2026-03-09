@@ -1125,7 +1125,12 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 		story = mgr.GetStory(task.StoryID)
 	}
 
-	sb.WriteString("You are executing a development task within the OpenExec orchestration engine.\n\n")
+	if story != nil {
+		sb.WriteString(fmt.Sprintf("STORY ID: %s\n", story.ID))
+		sb.WriteString(fmt.Sprintf("STORY TITLE: %s\n", story.Title))
+		sb.WriteString(fmt.Sprintf("STORY FILE: .openexec/stories/%s.md\n", story.ID))
+	}
+
 	sb.WriteString(fmt.Sprintf("TASK ID: %s\n", task.ID))
 	sb.WriteString(fmt.Sprintf("TITLE:   %s\n", task.Title))
 	
