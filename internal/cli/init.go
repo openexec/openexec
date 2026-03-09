@@ -222,12 +222,13 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 func ensureGitignore(projectDir string) {
 	gitignorePath := filepath.Join(projectDir, ".gitignore")
 
-	const openexecBlock = "\n# OpenExec\n.openexec/logs/\n.openexec/data/\n"
+	const openexecMarker = "# OpenExec Managed Block"
+	const openexecBlock = "\n" + openexecMarker + "\n.openexec/logs/\n.openexec/data/\n.openexec/engram/cache/\n"
 
 	existing, err := os.ReadFile(gitignorePath)
 	if err == nil {
-		// File exists — append openexec entries if missing
-		if !strings.Contains(string(existing), ".openexec/") {
+		// File exists — append openexec entries if missing marker
+		if !strings.Contains(string(existing), openexecMarker) {
 			f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
 			if err == nil {
 				_, _ = f.WriteString(openexecBlock)

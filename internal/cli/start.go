@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +33,8 @@ var (
 	startUI         bool
 	executionBinary string
 	runNoReview     bool
+	runMaxIterations int
+	runTimeout       int
 )
 
 // Task represents a task to execute
@@ -511,7 +514,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					cmd.Printf("%s    Loop: %s\n", workerPrefix, loopID)
 
 					// Wait for loop to complete
-					err = waitForLoop(cmd, loopID, workerPrefix)
+					err = waitForLoop(cmd, loopID, workerPrefix, time.Duration(runTimeout)*time.Second)
 					
 					if err == nil && node.Task.VerificationScript != "" {
 						cmd.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
@@ -519,9 +522,14 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						// Execute the verification script with node_modules/.bin on PATH
 						verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
 						verifyCmd.Dir = projectDir
-						verifyCmd.Env = append(os.Environ(),
-							fmt.Sprintf("PATH=%s/node_modules/.bin:%s", projectDir, os.Getenv("PATH")),
+						
+						// Add node_modules/.bin to PATH cross-platform
+						newPath := fmt.Sprintf("%s%c%s", 
+							filepath.Join(projectDir, "node_modules", ".bin"),
+							filepath.ListSeparator,
+							os.Getenv("PATH"),
 						)
+						verifyCmd.Env = append(os.Environ(), "PATH="+newPath)
 						
 						output, verifyErr := verifyCmd.CombinedOutput()
 						if verifyErr != nil {
@@ -752,8 +760,8 @@ func init() {
 
 	// run command flags
 	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
-	runCmd.Flags().IntVar(&startTimeout, "max-iterations", 10, "Maximum iterations per task")
-	runCmd.Flags().IntVar(&startTimeout, "timeout", 600, "Task timeout in seconds")
+	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Maximum iterations per task")
+	runCmd.Flags().IntVar(&runTimeout, "timeout", 600, "Task timeout in seconds")
 	runCmd.Flags().StringVar(&startExecutor, "executor", "", "Executor model for task execution (overrides config)")
 	runCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (overrides config)")
 	runCmd.Flags().BoolVar(&runNoReview, "no-review", false, "Disable code review (overrides config)")
@@ -1024,7 +1032,7 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 	req := CreateLoopRequest{
 		Prompt:        prompt,
 		WorkDir:       projectDir,
-		MaxIterations: 10,
+		MaxIterations: runMaxIterations,
 		TaskID:        task.ID,
 		MCPConfigPath: mcpPath,
 	}
@@ -1140,15 +1148,26 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	return sb.String()
 }
 
-// waitForLoop polls the loop status until completion.
+// waitForLoop polls the loop status until completion or timeout.
 // prefix is prepended to all output lines (e.g. "[Worker 1] ").
-func waitForLoop(cmd *cobra.Command, loopID string, prefix string) error {
+func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	client := &http.Client{Timeout: 5 * time.Second}
 	lastIteration := 0
 	lastPhase := ""
 	startTime := time.Now()
 
 	for {
+		select {
+		case <-ctx.Done():
+			cmd.Printf("%s   ⚠ Timeout reached after %v\n", prefix, timeout)
+			return fmt.Errorf("loop timed out after %v", timeout)
+		default:
+			// continue
+		}
+
 		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
 		if err != nil {
 			return fmt.Errorf("failed to check loop status: %w", err)

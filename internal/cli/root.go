@@ -19,6 +19,13 @@ managing projects, kicking off intents, and verifying system statuses.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		return config.InitializeConfig(cfgFile)
 	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// If no subcommand is provided, start the chat mode
+		if len(args) == 0 {
+			return chatCmd.RunE(cmd, args)
+		}
+		return cmd.Help()
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
