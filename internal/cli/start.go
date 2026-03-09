@@ -895,17 +895,15 @@ func loadPendingTasks(projectDir string) ([]Task, error) {
 	if data, err := os.ReadFile(rootTasksFile); err == nil {
 		var tf TasksFile
 		if err := json.Unmarshal(data, &tf); err == nil {
-			// LOAD ALL TASKS to preserve DAG integrity
 			return tf.Tasks, nil
 		}
 	}
 
-	// Try .openexec/tasks.json next
-	tasksFile := filepath.Join(projectDir, ".openexec", "tasks.json")
-	if data, err := os.ReadFile(tasksFile); err == nil {
+	// Try .openexec/tasks.json next (where story import saves)
+	hiddenTasksFile := filepath.Join(projectDir, ".openexec", "tasks.json")
+	if data, err := os.ReadFile(hiddenTasksFile); err == nil {
 		var tf TasksFile
 		if err := json.Unmarshal(data, &tf); err == nil {
-			// LOAD ALL TASKS to preserve DAG integrity
 			return tf.Tasks, nil
 		}
 	}

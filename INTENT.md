@@ -1,52 +1,23 @@
-# AI Project Operating System
-
-## Vision
-
-A conversational, tool-using OS for software projects. Engineers use a chat-first interface (like Claude Code) to plan, code, run, and fix projects—including improving the orchestrator itself—safely and repeatably.
+# Intent: openexec
 
 ## Goals
+- Fix the intent routing failure in openexec chat where all inputs fail with 'model could not determine intent with high confidence'
+### G-001: Fix the intent routing failure in openexec chat model where all inputs fail with 'model could not determine intent with high confidence'
+- Success Criteria: User inputs are successfully routed to appropriate handlers without the low confidence error
+- Verification: Run 'openexec chat' and send test queries; verify they receive valid responses from general_chat tool
+- Global Success Metric: 
 
-- Multi-project chat with persistent sessions bound to workspaces.
-- Provider-agnostic agent loop (OpenAI/Gemini/Anthropic) with model picker.
-- Tool-use via MCP (filesystem, shell, git) with explicit approvals and audit.
-- Auto-context injection (INTENT.md, tasks.json, recent logs).
-- Self-healing/meta: agent can locate, edit, build, and request restart of Orchestrator.
+## Requirements
+### REQ-001: Core Architecture
+- Shape: cli
+- Platforms: macos, linux, windows
 
-## Pillars
-
-- Interactive UI: Extend claudecodeui (chat history, streaming markdown, spinners).
-- Tool-Calling Loop: Function-calling → MCP tools; provider adapters.
-- Auto-Context: Inject per-turn project brain (intent, task state, log tail).
-- Meta-Engineering: Workspace-aware edits + build/restart prompts.
-
-## Non-Goals
-
-- Full IDE replacement; binary debugging; unrestricted exec without approval.
+### REQ-002: Data Source Mapping
+- BitNetRouter: Source of Truth: internal/router/bitnet.go
+- Coordinator: Source of Truth: internal/dcp/coordinator.go
+- GeneralChatTool: Source of Truth: internal/tools/chat.go
 
 ## Constraints
-
-- All write/exec goes through approval; paths validated within WORKSPACES_ROOT.
-- Secrets redacted; audit logs persisted.
-
-## Deliverables
-
-- Sessions DB (SQLite): sessions, messages, tool_calls, project_path, provider, model.
-- Provider drivers (OpenAI/Gemini) with streaming and tool schema translation.
-- MCP tools: read_file, write_file, run_shell_command, git_apply_patch.
-- UI features: model picker, session fork, patch preview/apply/rollback, and cost/token dashboard.
-- Advanced Engine: Automated session history summarization and cost/budget visibility.
-- Docs: Updated Orchestrator README and documentation declaring conversational orchestration as a built-in feature.
-
-## Phases
-
-1. Read-only chat with auto-context. 
-2. Tool-enabled with approvals. 
-3. Multi-provider forking, history summarization, and cost/limits UI. 
-4. Meta self-fix pathways and final documentation migration.
-
-## Acceptance Criteria
-
-- Create/resume/fork sessions per project; pick provider/model.
-- Tool-calls execute via MCP with audit records and redaction.
-- Auto-context present and truncated safely; logs accurate.
-- Self-fix demo: agent edits orchestrator file, builds binary, requests restart.
+- C-001: Router must always return an Intent (never error) for graceful degradation
+- C-002: Confidence threshold is 0.2 - below this, fallback to general_chat
+- C-003: skipAvailabilityCheck must be true for simulateInference to be used
