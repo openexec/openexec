@@ -34,7 +34,15 @@ func TestSendChatQuery(t *testing.T) {
 			want:   "hello legacy",
 		},
 		{
-			name: "server error",
+			name: "error field with 200 OK (swallowed error bug)",
+			serverResponse: map[string]interface{}{
+				"error": "hidden engine failure",
+			},
+			status:  http.StatusOK,
+			wantErr: true,
+		},
+		{
+			name: "server error 500",
 			serverResponse: map[string]interface{}{
 				"error": "something went wrong",
 			},

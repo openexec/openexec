@@ -150,9 +150,15 @@ func sendChatQuery(query string) (string, error) {
 	var result struct {
 		Response string `json:"response"`
 		Result   string `json:"result"`
+		Error    string `json:"error"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Check for application-level error in the body
+	if result.Error != "" {
+		return "", fmt.Errorf("agent error: %s", result.Error)
 	}
 
 	// Server returns "result", but we'll check both for safety

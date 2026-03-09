@@ -101,6 +101,12 @@ func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 
 	// Default to general chat if no surgical tool matches
 	cleanQuery := strings.TrimPrefix(queryPart, "query: ")
+	// Strip trailing "json_intent:" or other prompt markers
+	if idx := strings.Index(cleanQuery, "\n"); idx != -1 {
+		cleanQuery = cleanQuery[:idx]
+	}
+	cleanQuery = strings.TrimSpace(cleanQuery)
+	
 	return fmt.Sprintf(`{"tool_name": "general_chat", "args": {"query": %q}, "confidence": 0.50}`, cleanQuery), nil
 }
 
