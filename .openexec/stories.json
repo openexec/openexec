@@ -25,55 +25,6 @@
   ],
   "stories": [
     {
-      "id": "US-002",
-      "goal_id": "G-002",
-      "title": "Core CLI Architecture Restoration",
-      "description": "As a user, I want a functional CLI that works across macOS, Linux, and Windows so that I can use OpenExec on any platform.",
-      "acceptance_criteria": [
-        "CLI binary builds for macOS, Linux, and Windows.",
-        "Core command entry points (wizard, import, run) respond correctly."
-      ],
-      "verification_script": "go build -o bin/openexec ./cmd/openexec \u0026\u0026 ./bin/openexec --help",
-      "contract": "CLI command interface schema",
-      "tasks": [
-        "T-US-002-003",
-        "T-US-002-004"
-      ],
-      "depends_on": [
-        "US-001"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-10T00:04:53.80979+02:00"
-    },
-    {
-      "id": "US-003",
-      "goal_id": "G-001",
-      "title": "Engine Restoration and Logic Fixes",
-      "description": "As a user, I want the Wizard, Story Manager, Router, and Healing loops to work correctly so that I can automate complex tasks reliably.",
-      "acceptance_criteria": [
-        "Wizard generates valid intent.md and imports stories.",
-        "BitNetRouter correctly routes chat inputs.",
-        "Self-healing loops stabilize with exit strategy C-003.",
-        "Docker containers start successfully and pass health checks."
-      ],
-      "verification_script": "make test \u0026\u0026 docker compose ps",
-      "contract": "Engine Interface Contract (Wizard, Story, Router, Healing)",
-      "tasks": [
-        "T-US-003-004",
-        "T-US-003-005",
-        "T-US-003-006"
-      ],
-      "depends_on": [
-        "US-002"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-10T00:04:53.81129+02:00"
-    },
-    {
       "id": "US-004",
       "goal_id": "G-002",
       "title": "Project Goal Validation",
@@ -104,12 +55,67 @@
       ],
       "verification_script": "go mod verify \u0026\u0026 go build ./...",
       "tasks": [
+        "T-US-001-003",
         "T-US-001-003"
       ],
       "story_type": "feature",
       "priority": 0,
       "status": "pending",
       "created_at": "2026-03-10T00:04:53.809236+02:00"
+    },
+    {
+      "id": "US-002",
+      "goal_id": "G-002",
+      "title": "Core CLI Architecture Restoration",
+      "description": "As a user, I want a functional CLI that works across macOS, Linux, and Windows so that I can use OpenExec on any platform.",
+      "acceptance_criteria": [
+        "CLI binary builds for macOS, Linux, and Windows.",
+        "Core command entry points (wizard, import, run) respond correctly."
+      ],
+      "verification_script": "go build -o bin/openexec ./cmd/openexec \u0026\u0026 ./bin/openexec --help",
+      "contract": "CLI command interface schema",
+      "tasks": [
+        "T-US-002-003",
+        "T-US-002-004",
+        "T-US-002-003",
+        "T-US-002-004"
+      ],
+      "depends_on": [
+        "US-001"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.80979+02:00"
+    },
+    {
+      "id": "US-003",
+      "goal_id": "G-001",
+      "title": "Engine Restoration and Logic Fixes",
+      "description": "As a user, I want the Wizard, Story Manager, Router, and Healing loops to work correctly so that I can automate complex tasks reliably.",
+      "acceptance_criteria": [
+        "Wizard generates valid intent.md and imports stories.",
+        "BitNetRouter correctly routes chat inputs.",
+        "Self-healing loops stabilize with exit strategy C-003.",
+        "Docker containers start successfully and pass health checks."
+      ],
+      "verification_script": "make test \u0026\u0026 docker compose ps",
+      "contract": "Engine Interface Contract (Wizard, Story, Router, Healing)",
+      "tasks": [
+        "T-US-003-004",
+        "T-US-003-005",
+        "T-US-003-006",
+        "T-US-003-004",
+        "T-US-003-005",
+        "T-US-003-006"
+      ],
+      "depends_on": [
+        "US-002"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.81129+02:00"
     }
   ]
 }
