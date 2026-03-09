@@ -2,23 +2,22 @@ package workflow
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"strings"
 	"sync"
 )
 
-// Store loads and caches workflow templates from a directory.
+// Store loads and caches workflow templates from a filesystem.
 type Store struct {
-	dir   string
+	fs    fs.FS
 	cache map[string]*Template
 	mu    sync.RWMutex
 }
 
-// NewStore creates a new store that loads workflow files from dir.
-func NewStore(dir string) *Store {
+// NewStore creates a new store that loads workflow files from the given filesystem.
+func NewStore(f fs.FS) *Store {
 	return &Store{
-		dir:   dir,
+		fs:    f,
 		cache: make(map[string]*Template),
 	}
 }
@@ -41,8 +40,8 @@ func (s *Store) Get(id string) (*Template, error) {
 		return t, nil
 	}
 
-	path := filepath.Join(s.dir, id+".md")
-	data, err := os.ReadFile(path)
+	path := id + ".md"
+	data, err := fs.ReadFile(s.fs, path)
 	if err != nil {
 		return nil, fmt.Errorf("workflow %q: %w", id, err)
 	}

@@ -33,7 +33,7 @@ func TestLoadPipelineConfig(t *testing.T) {
 `
 	os.WriteFile(filepath.Join(pipelinesDir, "default.yaml"), []byte(yaml), 0o644)
 
-	def, err := LoadPipelineConfig(dir, "default")
+	def, err := LoadPipelineConfig(os.DirFS(dir), "default")
 	if err != nil {
 		t.Fatalf("LoadPipelineConfig: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestLoadPipelineConfigWithMaxIterations(t *testing.T) {
 `
 	os.WriteFile(filepath.Join(dir, "pipelines", "custom.yaml"), []byte(yaml), 0o644)
 
-	def, err := LoadPipelineConfig(dir, "custom")
+	def, err := LoadPipelineConfig(os.DirFS(dir), "custom")
 	if err != nil {
 		t.Fatalf("LoadPipelineConfig: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestLoadPipelineConfigWithMaxIterations(t *testing.T) {
 }
 
 func TestLoadPipelineConfigNotFound(t *testing.T) {
-	_, err := LoadPipelineConfig(t.TempDir(), "nonexistent")
+	_, err := LoadPipelineConfig(os.DirFS(t.TempDir()), "nonexistent")
 	if err == nil {
 		t.Fatal("expected error for missing pipeline config")
 	}
@@ -104,7 +104,7 @@ func TestLoadPipelineConfigInvalidYAML(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "pipelines"), 0o755)
 	os.WriteFile(filepath.Join(dir, "pipelines", "bad.yaml"), []byte(":::not yaml"), 0o644)
 
-	_, err := LoadPipelineConfig(dir, "bad")
+	_, err := LoadPipelineConfig(os.DirFS(dir), "bad")
 	if err == nil {
 		t.Fatal("expected error for invalid YAML")
 	}

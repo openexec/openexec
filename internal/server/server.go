@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -66,15 +67,11 @@ func New(cfg Config) (*Server, error) {
 	// Resolve to absolute path — ProjectsDir may be "." from config.
 	projectsAbs, _ := filepath.Abs(cfg.ProjectsDir)
 
-	// Agents ship alongside the binary, not inside the user's project.
-	execPath, _ := os.Executable()
-	execDir := filepath.Dir(execPath)
-	agentsDir := filepath.Join(execDir, "..", "agents")
-	// If not found next to binary (e.g. `go run`), fall back to cwd.
-	if _, err := os.Stat(agentsDir); err != nil {
-		agentsDir = filepath.Join(".", "agents")
+	// Agents are embedded by default, but can be overridden by env for dev.
+	var agentsFS fs.FS = openexec.GetAgentsFS()
+	if envDir := os.Getenv("OPENEXEC_AGENTS_DIR"); envDir != "" {
+		agentsFS = os.DirFS(envDir)
 	}
-	agentsDir, _ = filepath.Abs(agentsDir)
 
 	logDir := filepath.Join(projectsAbs, ".openexec", "logs")
 	_ = os.MkdirAll(logDir, 0750)
@@ -82,7 +79,7 @@ func New(cfg Config) (*Server, error) {
 	mgr := manager.New(manager.Config{
 		WorkDir:    projectsAbs,
 		TractStore: cfg.DataDir,
-		AgentsDir:  agentsDir,
+		AgentsFS:   agentsFS,
 		LogDir:     logDir,
 	})
 	

@@ -2,23 +2,22 @@ package persona
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"strings"
 	"sync"
 )
 
-// Store loads and caches persona definitions from a directory.
+// Store loads and caches persona definitions from a filesystem.
 type Store struct {
-	dir   string
+	fs    fs.FS
 	cache map[string]*Persona
 	mu    sync.RWMutex
 }
 
-// NewStore creates a new store that loads persona files from dir.
-func NewStore(dir string) *Store {
+// NewStore creates a new store that loads persona files from the given filesystem.
+func NewStore(f fs.FS) *Store {
 	return &Store{
-		dir:   dir,
+		fs:    f,
 		cache: make(map[string]*Persona),
 	}
 }
@@ -60,8 +59,8 @@ func (s *Store) Get(name string) (*Persona, error) {
 
 // load reads and parses a persona file without merging.
 func (s *Store) load(name string) (*Persona, string, error) {
-	path := filepath.Join(s.dir, name+".md")
-	data, err := os.ReadFile(path)
+	path := name + ".md"
+	data, err := fs.ReadFile(s.fs, path)
 	if err != nil {
 		return nil, "", fmt.Errorf("persona %q: %w", name, err)
 	}

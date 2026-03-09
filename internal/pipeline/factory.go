@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"time"
 
@@ -16,7 +17,7 @@ type LoopFactoryConfig struct {
 	FWUID                string
 	WorkDir              string
 	TractStore           string
-	AgentsDir            string
+	AgentsFS             fs.FS
 	MCPConfigPath        string
 	DefaultMaxIterations int
 	MaxRetries           int
@@ -43,7 +44,7 @@ type LoopFactory struct {
 func NewLoopFactory(cfg LoopFactoryConfig) *LoopFactory {
 	return &LoopFactory{
 		cfg:       cfg,
-		assembler: prompt.NewAssembler(cfg.AgentsDir),
+		assembler: prompt.NewAssembler(cfg.AgentsFS),
 	}
 }
 

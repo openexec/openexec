@@ -25,7 +25,7 @@ workflows:
       context: "implementation questions"
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	m, err := store.Get("spark")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -78,7 +78,7 @@ func TestManifestWorkflowParams(t *testing.T) {
 }
 
 func TestUnknownManifest(t *testing.T) {
-	store := NewStore(t.TempDir())
+	store := NewStore(os.DirFS(t.TempDir()))
 	_, err := store.Get("nonexistent")
 	if err == nil {
 		t.Error("expected error for unknown manifest, got nil")
@@ -93,7 +93,7 @@ workflows:
   - id: test
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	first, err := store.Get("cached")
 	if err != nil {
 		t.Fatalf("first Get: %v", err)

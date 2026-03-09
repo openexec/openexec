@@ -90,7 +90,7 @@ func TestPipelineHappyPath(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -163,7 +163,7 @@ func TestPipelineRouteToSpark(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      2,
@@ -227,7 +227,7 @@ func TestPipelineRouteToHon(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -299,7 +299,7 @@ func TestPipelineBlocked(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -350,7 +350,7 @@ func TestPipelineMaxReviewCycles(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      2,
@@ -405,7 +405,7 @@ func TestPipelinePause(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -462,7 +462,7 @@ func TestPipelineStop(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -507,7 +507,7 @@ func TestPipelineContextCancellation(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -548,7 +548,7 @@ func TestPipelineEventsHavePhaseContext(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-TEST-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -612,7 +612,7 @@ func TestPipelineBriefingCalledPerPhase(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Order:                order,
 		Phases:               phases,
 		MaxReviewCycles:      3,
@@ -664,7 +664,7 @@ func TestPipelineFromPipelineDef(t *testing.T) {
 	cfg := Config{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		Pipeline:             def,
 		MaxReviewCycles:      3,
 		DefaultMaxIterations: 10,

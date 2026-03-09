@@ -48,7 +48,7 @@ func managerConfig(bin string) Config {
 	order, phases := allPhasesConfig("signal-complete")
 	return Config{
 		WorkDir:              "",
-		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
+		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,

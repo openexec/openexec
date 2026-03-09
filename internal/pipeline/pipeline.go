@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -17,7 +18,7 @@ type Config struct {
 	FWUID                string
 	WorkDir              string
 	TractStore           string
-	AgentsDir            string
+	AgentsFS             fs.FS
 	Pipeline             *PipelineDef          // if set, overrides Phases/Order
 	Phases               map[Phase]PhaseConfig // defaults to DefaultPhaseConfigs()
 	Order                []Phase               // defaults to DefaultPhaseOrder()
@@ -119,7 +120,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		FWUID:                p.cfg.FWUID,
 		WorkDir:              p.cfg.WorkDir,
 		TractStore:           p.cfg.TractStore,
-		AgentsDir:            p.cfg.AgentsDir,
+		AgentsFS:             p.cfg.AgentsFS,
 		MCPConfigPath:        mcpPath,
 		DefaultMaxIterations: p.cfg.DefaultMaxIterations,
 		MaxRetries:           p.cfg.MaxRetries,

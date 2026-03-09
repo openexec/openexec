@@ -2,8 +2,7 @@ package pipeline
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,11 +21,11 @@ type PhaseDef struct {
 	Routes        map[string]string `yaml:"routes,omitempty"`
 }
 
-// LoadPipelineConfig loads a named pipeline configuration from the agents directory.
-// The file is read from {agentsDir}/pipelines/{name}.yaml.
-func LoadPipelineConfig(agentsDir, name string) (*PipelineDef, error) {
-	path := filepath.Join(agentsDir, "pipelines", name+".yaml")
-	data, err := os.ReadFile(path)
+// LoadPipelineConfig loads a named pipeline configuration from the agents filesystem.
+// The file is read from pipelines/{name}.yaml.
+func LoadPipelineConfig(f fs.FS, name string) (*PipelineDef, error) {
+	path := "pipelines/" + name + ".yaml"
+	data, err := fs.ReadFile(f, path)
 	if err != nil {
 		return nil, fmt.Errorf("load pipeline %q: %w", name, err)
 	}

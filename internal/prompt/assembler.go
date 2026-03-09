@@ -2,7 +2,7 @@ package prompt
 
 import (
 	"fmt"
-	"path/filepath"
+	"io/fs"
 	"strings"
 
 	"github.com/openexec/openexec/internal/prompt/manifest"
@@ -17,13 +17,17 @@ type Assembler struct {
 	manifests *manifest.Store
 }
 
-// NewAssembler creates an Assembler that reads decomposed agent definitions from dir.
-// dir is the root agents directory containing personas/, workflows/, manifests/ subdirs.
-func NewAssembler(dir string) *Assembler {
+// NewAssembler creates an Assembler that reads decomposed agent definitions from the given filesystem.
+// f is the root agents filesystem containing personas/, workflows/, manifests/ subdirs.
+func NewAssembler(f fs.FS) *Assembler {
+	pFS, _ := fs.Sub(f, "personas")
+	wFS, _ := fs.Sub(f, "workflows")
+	mFS, _ := fs.Sub(f, "manifests")
+
 	return &Assembler{
-		personas:  persona.NewStore(filepath.Join(dir, "personas")),
-		workflows: workflow.NewStore(filepath.Join(dir, "workflows")),
-		manifests: manifest.NewStore(filepath.Join(dir, "manifests")),
+		personas:  persona.NewStore(pFS),
+		workflows: workflow.NewStore(wFS),
+		manifests: manifest.NewStore(mFS),
 	}
 }
 

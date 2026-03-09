@@ -18,7 +18,7 @@ func TestLoadPersonaWithoutExtends(t *testing.T) {
 <principles>Be excellent</principles>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	p, err := store.Get("solo")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -58,7 +58,7 @@ extends: _base
 Welcome ruthless review</principles>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	p, err := store.Get("spark")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -78,7 +78,7 @@ Welcome ruthless review</principles>
 }
 
 func TestUnknownPersona(t *testing.T) {
-	store := NewStore(t.TempDir())
+	store := NewStore(os.DirFS(t.TempDir()))
 	_, err := store.Get("nonexistent")
 	if err == nil {
 		t.Error("expected error for unknown persona, got nil")
@@ -94,7 +94,7 @@ func TestCacheBehavior(t *testing.T) {
 <principles>Cached principles</principles>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	first, err := store.Get("cached")
 	if err != nil {
 		t.Fatalf("first Get: %v", err)
@@ -116,7 +116,7 @@ func TestBasePersonaWithoutExtends(t *testing.T) {
 <principles>Shared principles</principles>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	p, err := store.Get("_base")
 	if err != nil {
 		t.Fatalf("Get: %v", err)

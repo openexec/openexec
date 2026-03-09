@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"sync"
 	"time"
@@ -28,7 +29,7 @@ const (
 type Config struct {
 	WorkDir              string
 	TractStore           string
-	AgentsDir            string
+	AgentsFS             fs.FS
 	Pipeline             *pipeline.PipelineDef                   // pipeline config (nil = default)
 	Phases               map[pipeline.Phase]pipeline.PhaseConfig // test override (nil = DefaultPhaseConfigs)
 	Order                []pipeline.Phase                        // test override (nil = DefaultPhaseOrder)
@@ -120,7 +121,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string) error {
 		FWUID:                fwuID,
 		WorkDir:              m.cfg.WorkDir,
 		TractStore:           m.cfg.TractStore,
-		AgentsDir:            m.cfg.AgentsDir,
+		AgentsFS:             m.cfg.AgentsFS,
 		Pipeline:             m.cfg.Pipeline,
 		Phases:               m.cfg.Phases,
 		Order:                m.cfg.Order,

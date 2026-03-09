@@ -1,12 +1,13 @@
 package prompt
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestComposeValidAgentWorkflow(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	briefing := "## FWU Briefing: FWU-001 — Test Feature\n\n**Status:** in_progress\n**Intent:** Test intent"
 	result, err := asm.Compose("clario", "technical-design", briefing)
@@ -51,7 +52,7 @@ func TestComposeValidAgentWorkflow(t *testing.T) {
 }
 
 func TestComposeUnknownAgent(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	_, err := asm.Compose("nonexistent", "technical-design", "")
 	if err == nil {
@@ -63,7 +64,7 @@ func TestComposeUnknownAgent(t *testing.T) {
 }
 
 func TestComposeUnknownWorkflow(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	_, err := asm.Compose("clario", "nonexistent-workflow", "")
 	if err == nil {
@@ -75,7 +76,7 @@ func TestComposeUnknownWorkflow(t *testing.T) {
 }
 
 func TestComposeEmptyBriefing(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	result, err := asm.Compose("clario", "technical-design", "")
 	if err != nil {
@@ -100,7 +101,7 @@ func TestComposeEmptyBriefing(t *testing.T) {
 }
 
 func TestComposeSectionOrdering(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	result, err := asm.Compose("clario", "technical-design", "## FWU Briefing: test")
 	if err != nil {
@@ -137,7 +138,7 @@ func TestComposeSectionOrdering(t *testing.T) {
 }
 
 func TestComposePersonaMergesBasePrinciples(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	result, err := asm.Compose("clario", "technical-design", "")
 	if err != nil {
@@ -156,7 +157,7 @@ func TestComposePersonaMergesBasePrinciples(t *testing.T) {
 }
 
 func TestComposeParameterizedWorkflow(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	result, err := asm.Compose("clario", "mutation-testing", "")
 	if err != nil {
@@ -178,7 +179,7 @@ func TestComposeParameterizedWorkflow(t *testing.T) {
 }
 
 func TestComposeFeedbackLoopWorkflow(t *testing.T) {
-	asm := NewAssembler("testdata")
+	asm := NewAssembler(os.DirFS("testdata"))
 
 	_, err := asm.Compose("clario", "feedback-loop", "")
 	if err != nil {

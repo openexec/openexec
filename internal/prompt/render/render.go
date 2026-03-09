@@ -2,7 +2,7 @@ package render
 
 import (
 	"fmt"
-	"path/filepath"
+	"io/fs"
 	"strings"
 
 	"github.com/openexec/openexec/internal/prompt/manifest"
@@ -17,12 +17,16 @@ type expandedWorkflow struct {
 	Process      string
 }
 
-// RenderAgent loads decomposed agent definitions from agentsDir and produces
+// RenderAgent loads decomposed agent definitions from the given filesystem and produces
 // a standalone monolithic markdown+XML string for HITL use.
-func RenderAgent(agentsDir, agentName string) (string, error) {
-	manifests := manifest.NewStore(filepath.Join(agentsDir, "manifests"))
-	personas := persona.NewStore(filepath.Join(agentsDir, "personas"))
-	workflows := workflow.NewStore(filepath.Join(agentsDir, "workflows"))
+func RenderAgent(f fs.FS, agentName string) (string, error) {
+	mFS, _ := fs.Sub(f, "manifests")
+	pFS, _ := fs.Sub(f, "personas")
+	wFS, _ := fs.Sub(f, "workflows")
+
+	manifests := manifest.NewStore(mFS)
+	personas := persona.NewStore(pFS)
+	workflows := workflow.NewStore(wFS)
 
 	// Load manifest.
 	mf, err := manifests.Get(agentName)

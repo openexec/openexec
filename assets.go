@@ -9,8 +9,18 @@ import (
 //go:embed all:ui/dist
 var uiAssets embed.FS
 
+// Agents holds the agent definitions
+//go:embed all:agents
+var agents embed.FS
+
 // GetUIFS returns the sub-filesystem for the UI assets
 func GetUIFS() fs.FS {
 	f, _ := fs.Sub(uiAssets, "ui/dist")
+	return f
+}
+
+// GetAgentsFS returns the sub-filesystem for the agent definitions
+func GetAgentsFS() fs.FS {
+	f, _ := fs.Sub(agents, "agents")
 	return f
 }

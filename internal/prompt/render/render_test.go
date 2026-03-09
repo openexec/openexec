@@ -1,6 +1,7 @@
 package render
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -8,7 +9,7 @@ import (
 const testdataDir = "../testdata"
 
 func TestRenderAgentBasic(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -44,7 +45,7 @@ func TestRenderAgentBasic(t *testing.T) {
 }
 
 func TestRenderAgentActivation(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -67,7 +68,7 @@ func TestRenderAgentActivation(t *testing.T) {
 }
 
 func TestRenderAgentPersona(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -93,7 +94,7 @@ func TestRenderAgentPersona(t *testing.T) {
 }
 
 func TestRenderAgentMergesBasePrinciples(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestRenderAgentMergesBasePrinciples(t *testing.T) {
 }
 
 func TestRenderAgentPrompts(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -139,7 +140,7 @@ func TestRenderAgentPrompts(t *testing.T) {
 }
 
 func TestRenderAgentExpandsParams(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -159,7 +160,7 @@ func TestRenderAgentExpandsParams(t *testing.T) {
 }
 
 func TestRenderAgentMenu(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -192,7 +193,7 @@ func TestRenderAgentMenu(t *testing.T) {
 }
 
 func TestRenderAgentSectionOrder(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -218,7 +219,7 @@ func TestRenderAgentSectionOrder(t *testing.T) {
 }
 
 func TestRenderAgentXMLEscaping(t *testing.T) {
-	result, err := RenderAgent(testdataDir, "clario")
+	result, err := RenderAgent(os.DirFS(testdataDir), "clario")
 	if err != nil {
 		t.Fatalf("RenderAgent: %v", err)
 	}
@@ -231,7 +232,7 @@ func TestRenderAgentXMLEscaping(t *testing.T) {
 }
 
 func TestRenderAgentUnknown(t *testing.T) {
-	_, err := RenderAgent(testdataDir, "nonexistent")
+	_, err := RenderAgent(os.DirFS(testdataDir), "nonexistent")
 	if err == nil {
 		t.Error("expected error for unknown agent, got nil")
 	}

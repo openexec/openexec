@@ -24,7 +24,7 @@ params:
 </process>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	tmpl, err := store.Get("mutation-testing")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -60,7 +60,7 @@ Execute full TDD implementation workflow.
 </process>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	tmpl, err := store.Get("implement")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -75,7 +75,7 @@ Execute full TDD implementation workflow.
 }
 
 func TestUnknownWorkflow(t *testing.T) {
-	store := NewStore(t.TempDir())
+	store := NewStore(os.DirFS(t.TempDir()))
 	_, err := store.Get("nonexistent")
 	if err == nil {
 		t.Error("expected error for unknown workflow, got nil")
@@ -91,7 +91,7 @@ func TestCacheBehavior(t *testing.T) {
 <process>Steps</process>
 `)
 
-	store := NewStore(dir)
+	store := NewStore(os.DirFS(dir))
 	first, err := store.Get("cached")
 	if err != nil {
 		t.Fatalf("first Get: %v", err)

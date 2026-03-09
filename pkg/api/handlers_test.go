@@ -110,7 +110,7 @@ func testManager(t *testing.T, bin string) *manager.Manager {
 	order, phases := allPhasesConfig("signal-complete")
 	return manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
+		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -151,7 +151,7 @@ func TestHandleStartDuplicate(t *testing.T) {
 	order, phases := allPhasesConfig("slow")
 	mgr := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
+		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -267,7 +267,7 @@ func TestHandlePauseFound(t *testing.T) {
 	order, phases := allPhasesConfig("slow")
 	mgr := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
+		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,
@@ -314,7 +314,7 @@ func TestHandleStopFound(t *testing.T) {
 	order, phases := allPhasesConfig("slow")
 	mgr := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
-		AgentsDir:            filepath.Join("..", "..", "internal", "pipeline", "testdata"),
+		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
 		Phases:               phases,
 		DefaultMaxIterations: 10,

@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"os"
 	"testing"
 	"time"
 )
@@ -9,7 +10,7 @@ func TestFactoryCreateValid(t *testing.T) {
 	cfg := LoopFactoryConfig{
 		FWUID:                "FWU-01",
 		WorkDir:              t.TempDir(),
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 		MaxRetries:           3,
 		RetryBackoff:         []time.Duration{0},
@@ -38,7 +39,7 @@ func TestFactoryCreateValid(t *testing.T) {
 
 func TestFactoryCreateUnknownAgent(t *testing.T) {
 	cfg := LoopFactoryConfig{
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 	}
 	factory := NewLoopFactory(cfg)
@@ -56,7 +57,7 @@ func TestFactoryCreateUnknownAgent(t *testing.T) {
 
 func TestFactoryCreateUnknownWorkflow(t *testing.T) {
 	cfg := LoopFactoryConfig{
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 	}
 	factory := NewLoopFactory(cfg)
@@ -74,7 +75,7 @@ func TestFactoryCreateUnknownWorkflow(t *testing.T) {
 
 func TestFactoryPhaseMaxIterationsOverride(t *testing.T) {
 	cfg := LoopFactoryConfig{
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 		MaxRetries:           3,
 		RetryBackoff:         []time.Duration{0},
@@ -103,7 +104,7 @@ func TestFactoryPhaseMaxIterationsOverride(t *testing.T) {
 
 func TestFactoryPhaseMaxIterationsDefault(t *testing.T) {
 	cfg := LoopFactoryConfig{
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 		MaxRetries:           3,
 		RetryBackoff:         []time.Duration{0},
@@ -130,7 +131,7 @@ func TestFactoryPhaseMaxIterationsDefault(t *testing.T) {
 
 func TestFactoryPhaseCommandArgsOverride(t *testing.T) {
 	cfg := LoopFactoryConfig{
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 		CommandName:          "mock_claude",
 		CommandArgs:          []string{"default-scenario"},
@@ -155,7 +156,7 @@ func TestFactoryPhaseCommandArgsOverride(t *testing.T) {
 
 func TestFactoryAllWorkflows(t *testing.T) {
 	cfg := LoopFactoryConfig{
-		AgentsDir:            "testdata",
+		AgentsFS:             os.DirFS("testdata"),
 		DefaultMaxIterations: 10,
 		CommandName:          "echo",
 		CommandArgs:          []string{"test"},

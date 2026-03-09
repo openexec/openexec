@@ -2,24 +2,23 @@ package manifest
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"sync"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Store loads and caches agent manifests from a directory.
+// Store loads and caches agent manifests from a filesystem.
 type Store struct {
-	dir   string
+	fs    fs.FS
 	cache map[string]*Manifest
 	mu    sync.RWMutex
 }
 
-// NewStore creates a new store that loads manifest YAML files from dir.
-func NewStore(dir string) *Store {
+// NewStore creates a new store that loads manifest YAML files from the given filesystem.
+func NewStore(f fs.FS) *Store {
 	return &Store{
-		dir:   dir,
+		fs:    f,
 		cache: make(map[string]*Manifest),
 	}
 }
@@ -42,8 +41,8 @@ func (s *Store) Get(name string) (*Manifest, error) {
 		return m, nil
 	}
 
-	path := filepath.Join(s.dir, name+".yaml")
-	data, err := os.ReadFile(path)
+	path := name + ".yaml"
+	data, err := fs.ReadFile(s.fs, path)
 	if err != nil {
 		return nil, fmt.Errorf("manifest %q: %w", name, err)
 	}
