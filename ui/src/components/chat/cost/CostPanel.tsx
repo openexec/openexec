@@ -12,6 +12,8 @@ import type { CostInfo } from '../../../types/chat'
 import CostSummary from './CostSummary'
 import TokenUsage from './TokenUsage'
 import BudgetProgress from './BudgetProgress'
+import { colors, typography, borderRadius } from '../../../utils/theme'
+import { InfoIcon } from '../../../utils/icons'
 
 export interface CostPanelProps {
   /** Cost tracking information */
@@ -97,15 +99,6 @@ const CostPanel: React.FC<CostPanelProps> = ({
     </div>
   )
 }
-
-// Icon component
-const InfoIcon: React.FC = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" y1="16" x2="12" y2="12" />
-    <line x1="12" y1="8" x2="12.01" y2="8" />
-  </svg>
-)
 
 // Styles
 const styles: Record<string, React.CSSProperties> = {

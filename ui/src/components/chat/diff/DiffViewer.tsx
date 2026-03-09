@@ -7,6 +7,8 @@ import React, { useState, useMemo } from 'react'
 import type { Patch, PatchStats, LineSelectInfo } from '../../../types/diff'
 import DiffFileCard from './DiffFileCard'
 import DiffStats from './DiffStats'
+import { colors, typography, borderRadius } from '../../../utils/theme'
+import { ExpandIcon, CollapseIcon } from '../../../utils/icons'
 
 export interface DiffViewerProps {
   /** Parsed patch object */
@@ -148,31 +150,12 @@ const DiffViewer: React.FC<DiffViewerProps> = ({
   )
 }
 
-// Icon components
-const ExpandIcon: React.FC = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="15 3 21 3 21 9" />
-    <polyline points="9 21 3 21 3 15" />
-    <line x1="21" y1="3" x2="14" y2="10" />
-    <line x1="3" y1="21" x2="10" y2="14" />
-  </svg>
-)
-
-const CollapseIcon: React.FC = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="4 14 10 14 10 20" />
-    <polyline points="20 10 14 10 14 4" />
-    <line x1="14" y1="10" x2="21" y2="3" />
-    <line x1="3" y1="21" x2="10" y2="14" />
-  </svg>
-)
-
-// Styles
+// Styles - using centralized theme
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    backgroundColor: '#0d1117',
-    borderRadius: '8px',
-    border: '1px solid #30363d',
+    backgroundColor: colors.bg.primary,
+    borderRadius: borderRadius.xl,
+    border: `1px solid ${colors.bg.border}`,
     overflow: 'hidden',
   },
   header: {
@@ -180,13 +163,13 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '10px 12px',
-    backgroundColor: '#161b22',
-    borderBottom: '1px solid #30363d',
+    backgroundColor: colors.bg.secondary,
+    borderBottom: `1px solid ${colors.bg.border}`,
   },
   title: {
-    fontSize: '13px',
+    fontSize: typography.fontSize.md,
     fontWeight: 600,
-    color: '#c9d1d9',
+    color: colors.text.primary,
   },
   headerControls: {
     marginLeft: 'auto',
@@ -199,11 +182,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '4px 8px',
-    fontSize: '11px',
-    color: '#8b949e',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
     backgroundColor: 'transparent',
-    border: '1px solid #30363d',
-    borderRadius: '4px',
+    border: `1px solid ${colors.bg.border}`,
+    borderRadius: borderRadius.md,
     cursor: 'pointer',
   },
   fileList: {
@@ -213,12 +196,12 @@ const styles: Record<string, React.CSSProperties> = {
   rawContent: {
     margin: 0,
     padding: '12px',
-    fontSize: '12px',
-    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.mono,
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
-    color: '#c9d1d9',
-    backgroundColor: '#0d1117',
+    color: colors.text.primary,
+    backgroundColor: colors.bg.primary,
   },
 }
 

@@ -115,6 +115,9 @@ Examples:
 		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
 			startPort = config.Execution.Port
 		}
+		if !cmd.Flags().Changed("timeout") && config.Execution.TimeoutSeconds > 0 {
+			startTimeout = config.Execution.TimeoutSeconds
+		}
 		if !cmd.Flags().Changed("reviewer") && config.Execution.ReviewEnabled {
 			startReviewer = config.Execution.ReviewerModel
 		}
@@ -285,6 +288,9 @@ Examples:
 		}
 		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
 			startPort = config.Execution.Port
+		}
+		if !cmd.Flags().Changed("timeout") && config.Execution.TimeoutSeconds > 0 {
+			runTimeout = config.Execution.TimeoutSeconds
 		}
 
 		// Use parallel settings from config if not explicitly set
@@ -787,7 +793,7 @@ func init() {
 	// run command flags
 	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Maximum iterations per task")
-	runCmd.Flags().IntVar(&runTimeout, "timeout", 600, "Task timeout in seconds")
+	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Task timeout in seconds")
 	runCmd.Flags().StringVar(&startExecutor, "executor", "", "Executor model for task execution (overrides config)")
 	runCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (overrides config)")
 	runCmd.Flags().BoolVar(&runNoReview, "no-review", false, "Disable code review (overrides config)")

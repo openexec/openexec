@@ -8,6 +8,24 @@ import type { ToolCall } from '../../../types/chat'
 import ToolCallInput from './ToolCallInput'
 import ToolCallOutput from './ToolCallOutput'
 import ToolCallApproval from './ToolCallApproval'
+import {
+  colors,
+  typography,
+  borderRadius,
+  getStatusInfo,
+  getRiskColor,
+} from '../../../utils/theme'
+import { formatDuration, getToolDisplayName } from '../../../utils/formatters'
+import {
+  PendingIcon,
+  RunningIcon,
+  CompletedIcon,
+  ErrorIcon,
+  CancelledIcon,
+  TimeoutIcon,
+  ChevronDownIcon,
+  getStatusIcon,
+} from '../../../utils/icons'
 
 export interface ToolCallCardProps {
   /** Tool call data */
@@ -25,88 +43,10 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true)
 
-  // Determine card status for styling
-  const getStatusInfo = (): { color: string; label: string; icon: React.ReactNode } => {
-    switch (toolCall.status) {
-      case 'pending':
-        return {
-          color: '#f0883e',
-          label: 'Pending',
-          icon: <PendingIcon />,
-        }
-      case 'running':
-        return {
-          color: '#58a6ff',
-          label: 'Running',
-          icon: <RunningIcon />,
-        }
-      case 'completed':
-        return {
-          color: '#238636',
-          label: 'Completed',
-          icon: <CompletedIcon />,
-        }
-      case 'failed':
-        return {
-          color: '#da3633',
-          label: 'Failed',
-          icon: <ErrorIcon />,
-        }
-      case 'cancelled':
-        return {
-          color: '#8b949e',
-          label: 'Cancelled',
-          icon: <CancelledIcon />,
-        }
-      case 'timeout':
-        return {
-          color: '#da3633',
-          label: 'Timeout',
-          icon: <TimeoutIcon />,
-        }
-      default:
-        return {
-          color: '#8b949e',
-          label: 'Unknown',
-          icon: <PendingIcon />,
-        }
-    }
-  }
-
-  // Get risk level badge color
-  const getRiskColor = (): string => {
-    switch (toolCall.riskLevel) {
-      case 'high':
-        return '#da3633'
-      case 'medium':
-        return '#f0883e'
-      case 'low':
-      default:
-        return '#238636'
-    }
-  }
-
-  // Format duration for display
-  const formatDuration = (ms?: number): string => {
-    if (!ms) return ''
-    if (ms < 1000) return `${ms}ms`
-    return `${(ms / 1000).toFixed(2)}s`
-  }
-
-  // Get tool name display
-  const getToolNameDisplay = (): string => {
-    // Map common tool names to friendlier display names
-    const toolNameMap: Record<string, string> = {
-      read_file: 'Read File',
-      write_file: 'Write File',
-      run_shell_command: 'Run Command',
-      git_apply_patch: 'Apply Patch',
-      openexec_signal: 'OpenExec Signal',
-    }
-    return toolNameMap[toolCall.toolName] || toolCall.toolName
-  }
-
-  const statusInfo = getStatusInfo()
+  // Get status info from centralized config
+  const statusInfo = getStatusInfo(toolCall.status)
+  const StatusIconComponent = getStatusIcon(toolCall.status)
+  const riskColor = getRiskColor(toolCall.riskLevel as 'low' | 'medium' | 'high' | undefined)
   const isPending = toolCall.approvalStatus === 'pending'
   const hasOutput = toolCall.toolOutput !== undefined
   const hasError = toolCall.status === 'failed' || toolCall.status === 'timeout'
@@ -141,12 +81,12 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
             color: statusInfo.color,
           }}
         >
-          {statusInfo.icon}
+          <StatusIconComponent />
         </span>
 
         {/* Tool name */}
         <span className="tool-call-card__name" style={styles.name}>
-          {getToolNameDisplay()}
+          {getToolDisplayName(toolCall.toolName)}
         </span>
 
         {/* Risk level badge */}
@@ -155,9 +95,9 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
             className="tool-call-card__risk"
             style={{
               ...styles.riskBadge,
-              backgroundColor: `${getRiskColor()}20`,
-              color: getRiskColor(),
-              borderColor: getRiskColor(),
+              backgroundColor: `${riskColor}20`,
+              color: riskColor,
+              borderColor: riskColor,
             }}
           >
             {toolCall.riskLevel}
@@ -190,7 +130,7 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
             transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
           }}
         >
-          <ChevronIcon />
+          <ChevronDownIcon />
         </span>
       </div>
 
@@ -251,62 +191,12 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
   )
 }
 
-// Icon components
-const PendingIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-)
-
-const RunningIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-  </svg>
-)
-
-const CompletedIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-)
-
-const ErrorIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="15" y1="9" x2="9" y2="15" />
-    <line x1="9" y1="9" x2="15" y2="15" />
-  </svg>
-)
-
-const CancelledIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-  </svg>
-)
-
-const TimeoutIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-    <line x1="2" y1="2" x2="22" y2="22" />
-  </svg>
-)
-
-const ChevronIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-)
-
-// Styles
+// Styles - using centralized theme
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    backgroundColor: '#161b22',
-    borderRadius: '8px',
-    border: '1px solid #30363d',
+    backgroundColor: colors.bg.secondary,
+    borderRadius: borderRadius.xl,
+    border: `1px solid ${colors.bg.border}`,
     borderLeftWidth: '3px',
     overflow: 'hidden',
   },
@@ -315,7 +205,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 12px',
-    backgroundColor: '#0d1117',
+    backgroundColor: colors.bg.primary,
     cursor: 'pointer',
     userSelect: 'none',
   },
@@ -326,33 +216,33 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   name: {
-    fontSize: '13px',
+    fontSize: typography.fontSize.md,
     fontWeight: 600,
-    color: '#c9d1d9',
+    color: colors.text.primary,
     flex: 1,
   },
   riskBadge: {
-    fontSize: '10px',
+    fontSize: typography.fontSize.xs,
     fontWeight: 500,
     textTransform: 'uppercase',
     padding: '2px 6px',
-    borderRadius: '4px',
+    borderRadius: borderRadius.md,
     border: '1px solid',
   },
   statusLabel: {
-    fontSize: '11px',
+    fontSize: typography.fontSize.sm,
     fontWeight: 500,
   },
   duration: {
-    fontSize: '11px',
-    color: '#8b949e',
-    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontFamily: typography.fontFamily.mono,
   },
   chevron: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#8b949e',
+    color: colors.text.secondary,
     transition: 'transform 0.2s ease',
     flexShrink: 0,
   },
@@ -365,7 +255,7 @@ const styles: Record<string, React.CSSProperties> = {
   progress: {
     position: 'relative',
     height: '4px',
-    backgroundColor: '#30363d',
+    backgroundColor: colors.bg.border,
     borderRadius: '2px',
     overflow: 'hidden',
   },
@@ -374,7 +264,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: 0,
     left: 0,
     height: '100%',
-    backgroundColor: '#58a6ff',
+    backgroundColor: colors.status.info,
     borderRadius: '2px',
     transition: 'width 0.3s ease',
   },
@@ -382,19 +272,19 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     top: '8px',
     left: 0,
-    fontSize: '11px',
-    color: '#8b949e',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
   },
   error: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '8px',
     padding: '8px 12px',
-    backgroundColor: 'rgba(218, 54, 51, 0.1)',
-    border: '1px solid rgba(218, 54, 51, 0.4)',
-    borderRadius: '6px',
-    fontSize: '12px',
-    color: '#f85149',
+    backgroundColor: `${colors.status.error}1a`,
+    border: `1px solid ${colors.status.error}66`,
+    borderRadius: borderRadius.lg,
+    fontSize: typography.fontSize.base,
+    color: colors.status.errorText,
   },
 }
 

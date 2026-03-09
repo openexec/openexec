@@ -40,8 +40,10 @@ type ExecutionConfig struct {
 	Port int `json:"port,omitempty"`
 	// ParallelEnabled enables parallel task execution
 	ParallelEnabled bool `json:"parallel_enabled"`
-	// WorkerCount is the number of concurrent workers for parallel execution
-	WorkerCount int `json:"worker_count,omitempty"`
+    // WorkerCount is the number of concurrent workers for parallel execution
+    WorkerCount int `json:"worker_count,omitempty"`
+    // TimeoutSeconds sets the default per-task timeout used by run/start when flags are not provided.
+    TimeoutSeconds int `json:"timeout_seconds,omitempty"`
 }
 
 // Initialize initializes a new OpenExec project
