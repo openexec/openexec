@@ -516,9 +516,12 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					if err == nil && node.Task.VerificationScript != "" {
 						cmd.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
 						
-						// Execute the verification script
+						// Execute the verification script with node_modules/.bin on PATH
 						verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
 						verifyCmd.Dir = projectDir
+						verifyCmd.Env = append(os.Environ(),
+							fmt.Sprintf("PATH=%s/node_modules/.bin:%s", projectDir, os.Getenv("PATH")),
+						)
 						
 						output, verifyErr := verifyCmd.CombinedOutput()
 						if verifyErr != nil {
