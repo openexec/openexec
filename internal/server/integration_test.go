@@ -98,23 +98,18 @@ func (ts *TestServer) MustQuery(query string) *QueryResponse {
 	return resp
 }
 
-// AssertNoErrorPhrases checks response doesn't contain forbidden strings
+// AssertNoErrorPhrases checks response doesn't contain forbidden strings.
+// Uses the shared forbiddenIntentErrorStrings constant for consistency.
 func (ts *TestServer) AssertNoErrorPhrases(resp *QueryResponse, query string) {
 	ts.t.Helper()
-
-	forbiddenPhrases := []string{
-		"could not determine intent",
-		"low confidence",
-		"model could not",
-	}
 
 	resultStr := fmt.Sprintf("%v", resp.Result)
 	responseStr := resp.Response
 	errorStr := resp.Error
 	fullResponse := strings.ToLower(resultStr + responseStr + errorStr)
 
-	for _, phrase := range forbiddenPhrases {
-		if strings.Contains(fullResponse, strings.ToLower(phrase)) {
+	for _, phrase := range forbiddenIntentErrorStrings {
+		if strings.Contains(fullResponse, phrase) {
 			ts.t.Errorf("query %q: response contains forbidden phrase %q. Full response: %s",
 				query, phrase, fullResponse)
 		}
