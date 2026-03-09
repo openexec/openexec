@@ -41,14 +41,16 @@ func (r *BitNetRouter) RegisterTool(name, description, schema string) error {
 
 // ParseIntent invokes the local BitNet model to select a tool
 func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, error) {
+	fallback := &Intent{
+		ToolName:   "general_chat",
+		Args:       map[string]interface{}{"query": query},
+		Confidence: 0.1,
+	}
+
 	// Guard: check if we can even run the model
 	if err := r.CheckAvailability(); err != nil {
 		// Fallback to general chat if model environment is missing
-		return &Intent{
-			ToolName:   "general_chat",
-			Args:       map[string]interface{}{"query": query},
-			Confidence: 0.1,
-		}, nil
+		return fallback, nil
 	}
 
 	// 1. Build the local prompt for the 1-bit model
@@ -58,22 +60,23 @@ func (r *BitNetRouter) ParseIntent(ctx context.Context, query string) (*Intent, 
 	output, err := r.runLocalInference(ctx, prompt)
 	if err != nil {
 		// Fallback to general chat if inference fails (OOM, timeout, etc)
-		return &Intent{
-			ToolName:   "general_chat",
-			Args:       map[string]interface{}{"query": query},
-			Confidence: 0.1,
-		}, nil
+		return fallback, nil
 	}
 
 	// 3. Parse the model output into an Intent struct
 	intent, err := r.parseModelOutput(output)
 	if err != nil {
+		// Also check if the raw output itself is just an error message string
+		if strings.Contains(strings.ToLower(output), "could not determine intent") {
+			return fallback, nil
+		}
 		// Fallback to general chat if model output is malformed
-		return &Intent{
-			ToolName:   "general_chat",
-			Args:       map[string]interface{}{"query": query},
-			Confidence: 0.1,
-		}, nil
+		return fallback, nil
+	}
+
+	// 4. Threshold check: if confidence is extremely low, prefer chat fallback
+	if intent.Confidence < 0.2 {
+		return fallback, nil
 	}
 
 	return intent, nil
