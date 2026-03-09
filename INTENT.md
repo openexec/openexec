@@ -1,10 +1,16 @@
 # Intent: openexec
 
 ## Goals
-- Fix the intent routing failure in openexec chat where all inputs fail with 'model could not determine intent with high confidence'
-### G-001: Fix the intent routing failure in openexec chat model where all inputs fail with 'model could not determine intent with high confidence'
-- Success Criteria: User inputs are successfully routed to appropriate handlers without the low confidence error
-- Verification: Run 'openexec chat' and send test queries; verify they receive valid responses from general_chat tool
+- The OpenExec orchestrator is experiencing systemic failures in its core workflows: the Wizard/Intent planning tool is broken, story import/execution fails, self-healing loops are unstable, and the CI/CD pipeline is red.
+### G-001: Fix the 'openexec wizard' and intent planning logic so intent.md files can be generated and stories can be imported.
+- Success Criteria: Wizard runs successfully, generates a valid intent.md, and stories are imported without failure.
+- Verification: Run CLI commands for wizard and story import; verify file generation and database entries.
+### G-002: Fix the regression in self-healing loops and ensure all existing CI/CD tests pass.
+- Success Criteria: CI/CD pipeline returns to green and agent loops successfully recover from simulated errors.
+- Verification: Execute 'go test ./...' and run a multi-step task that triggers a self-healing retry.
+### G-003: Address the low-confidence routing failure where chat inputs fail to reach handlers.
+- Success Criteria: Chat inputs are correctly routed to general_chat or appropriate tools.
+- Verification: Run 'openexec chat' and verify responses for common queries.
 - Global Success Metric: 
 
 ## Requirements
@@ -13,11 +19,12 @@
 - Platforms: macos, linux, windows
 
 ### REQ-002: Data Source Mapping
+- WizardEngine: Source of Truth: internal/wizard/
+- StoryManager: Source of Truth: internal/stories/
+- SelfHealingLoop: Source of Truth: internal/dcp/healing.go
 - BitNetRouter: Source of Truth: internal/router/bitnet.go
-- Coordinator: Source of Truth: internal/dcp/coordinator.go
-- GeneralChatTool: Source of Truth: internal/tools/chat.go
 
 ## Constraints
-- C-001: Router must always return an Intent (never error) for graceful degradation
-- C-002: Confidence threshold is 0.2 - below this, fallback to general_chat
-- C-003: skipAvailabilityCheck must be true for simulateInference to be used
+- C-001: Must restore compatibility with existing story and intent.md schemas.
+- C-002: CI/CD must pass fully before any feature work is considered complete.
+- C-003: Self-healing must not enter infinite loops (exit strategy required).

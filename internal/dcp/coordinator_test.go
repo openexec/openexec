@@ -1,12 +1,16 @@
 package dcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 
 	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/internal/logging"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/tools"
 )
@@ -119,9 +123,8 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 
 	t.Run("Router fallback confidence 0.5 does not trigger coordinator re-fallback", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns exactly what a real fallback would return
 		mockRouter := &mockFallbackRouter{
@@ -158,9 +161,8 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 
 	t.Run("Fallback without general_chat registered returns error", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns a tool that doesn't exist
 		mockRouter := &mockFallbackRouter{
@@ -188,9 +190,8 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 
 	t.Run("Low confidence from router triggers coordinator fallback to general_chat", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns low confidence (below 0.2 threshold)
 		// This tests the coordinator's own fallback logic
@@ -228,9 +229,8 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 
 	t.Run("Confidence exactly at threshold 0.2 does not trigger fallback", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns confidence exactly at threshold (0.2)
 		// Since the check is "< 0.2", confidence of 0.2 should NOT trigger fallback
@@ -281,9 +281,8 @@ func TestCoordinator_RouterErrorFallback(t *testing.T) {
 
 	t.Run("Router error with general_chat registered triggers fallback", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns an error
 		mockRouter := &mockErrorRouter{
@@ -318,9 +317,8 @@ func TestCoordinator_RouterErrorFallback(t *testing.T) {
 
 	t.Run("Router error without general_chat registered returns error", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns an error
 		mockRouter := &mockErrorRouter{
@@ -349,9 +347,8 @@ func TestCoordinator_MissingToolFallback(t *testing.T) {
 
 	t.Run("Missing tool with general_chat registered triggers fallback", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns an intent for a tool that doesn't exist
 		mockRouter := &mockFallbackRouter{
@@ -395,9 +392,8 @@ func TestCoordinator_FallbackExecutionError(t *testing.T) {
 
 	t.Run("general_chat execution error still returns error for missing tool scenario", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns an intent for a tool that doesn't exist
 		mockRouter := &mockFallbackRouter{
@@ -431,9 +427,8 @@ func TestCoordinator_FallbackExecutionError(t *testing.T) {
 
 	t.Run("general_chat execution error for router error still returns routing error", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns an error
 		mockRouter := &mockErrorRouter{
@@ -463,9 +458,8 @@ func TestCoordinator_FallbackExecutionError(t *testing.T) {
 
 	t.Run("general_chat execution error for low confidence still executes original tool", func(t *testing.T) {
 		// Arrange
-		tmpDir := t.TempDir()
-		store, _ := knowledge.NewStore(tmpDir)
-		defer store.Close()
+		store, cleanup := newTestStore(t)
+		defer cleanup()
 
 		// Mock router that returns low confidence
 		mockRouter := &mockFallbackRouter{
@@ -551,4 +545,359 @@ func (m *mockCountingTool) Execute(ctx context.Context, args map[string]interfac
 		return nil, m.execErr
 	}
 	return "executed", nil
+}
+
+// =============================================================================
+// Logger Injection Tests (TDD for T-US-003-002)
+// =============================================================================
+
+// newTestCoordinator creates a Coordinator with a buffer logger for log capture
+func newTestCoordinator(r router.Router, s *knowledge.Store) (*Coordinator, *bytes.Buffer) {
+	buf := &bytes.Buffer{}
+	logger := logging.New(logging.Config{
+		Level:  slog.LevelDebug,
+		Format: "json",
+		Output: buf,
+	})
+	coord := NewCoordinator(r, s, WithLogger(logger))
+	return coord, buf
+}
+
+// TestCoordinator_LoggerInjection tests the logger injection pattern
+func TestCoordinator_LoggerInjection(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Default logger is used when not specified", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "general_chat",
+				Args:       map[string]interface{}{"query": "hello"},
+				Confidence: 0.5,
+			},
+		}
+
+		// Act: Create coordinator without WithLogger option
+		coord := NewCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "general_chat"})
+
+		// Assert: Coordinator should have a non-nil logger
+		// (can't easily verify it's the default, but we can verify it works)
+		_, err := coord.ProcessQuery(ctx, "hello")
+		if err != nil {
+			t.Fatalf("ProcessQuery should not error: %v", err)
+		}
+	})
+
+	t.Run("Custom logger is used when injected", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		// Mock router returning low confidence to trigger fallback logging
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "some_tool",
+				Args:       map[string]interface{}{},
+				Confidence: 0.1, // Below threshold, triggers fallback
+			},
+		}
+
+		coord, logBuf := newTestCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "general_chat"})
+
+		// Act
+		_, err := coord.ProcessQuery(ctx, "test query")
+
+		// Assert: No error and logs should appear in buffer
+		if err != nil {
+			t.Fatalf("ProcessQuery should not error: %v", err)
+		}
+		if logBuf.Len() == 0 {
+			t.Error("Expected logs to appear in injected logger buffer")
+		}
+	})
+}
+
+// TestCoordinator_FallbackLogging tests structured logging for fallback events
+func TestCoordinator_FallbackLogging(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Low confidence fallback logs with correct attributes", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "some_tool",
+				Args:       map[string]interface{}{},
+				Confidence: 0.1,
+			},
+		}
+
+		coord, logBuf := newTestCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "general_chat"})
+
+		// Act
+		_, err := coord.ProcessQuery(ctx, "test query")
+		if err != nil {
+			t.Fatalf("ProcessQuery should not error: %v", err)
+		}
+
+		// Assert: Parse JSON log entries
+		logEntry := findLogEntry(t, logBuf, "Fallback triggered")
+		if logEntry == nil {
+			t.Fatal("Expected 'Fallback triggered' log entry")
+		}
+
+		// Verify attributes
+		assertLogAttribute(t, logEntry, "level", "WARN")
+		assertLogAttribute(t, logEntry, "reason", FallbackReasonLowConfidence)
+		assertLogAttributeFloat(t, logEntry, "original_confidence", 0.1)
+		assertLogAttribute(t, logEntry, "fallback_tool", "general_chat")
+		assertLogAttribute(t, logEntry, "component", "dcp")
+		assertLogAttributeExists(t, logEntry, "query_hash")
+	})
+
+	t.Run("Router error fallback logs with error attribute", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockErrorRouter{
+			err: fmt.Errorf("model failed"),
+		}
+
+		coord, logBuf := newTestCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "general_chat"})
+
+		// Act
+		_, err := coord.ProcessQuery(ctx, "test query")
+		if err != nil {
+			t.Fatalf("ProcessQuery should not error: %v", err)
+		}
+
+		// Assert: Parse JSON log entries
+		logEntry := findLogEntry(t, logBuf, "Fallback triggered")
+		if logEntry == nil {
+			t.Fatal("Expected 'Fallback triggered' log entry")
+		}
+
+		assertLogAttribute(t, logEntry, "level", "WARN")
+		assertLogAttribute(t, logEntry, "reason", FallbackReasonRouterError)
+		assertLogAttribute(t, logEntry, "error", "model failed")
+	})
+
+	t.Run("Missing tool fallback logs original tool name", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "nonexistent",
+				Args:       map[string]interface{}{},
+				Confidence: 0.9,
+			},
+		}
+
+		coord, logBuf := newTestCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "general_chat"})
+
+		// Act
+		_, err := coord.ProcessQuery(ctx, "test query")
+		if err != nil {
+			t.Fatalf("ProcessQuery should not error: %v", err)
+		}
+
+		// Assert
+		logEntry := findLogEntry(t, logBuf, "Fallback triggered")
+		if logEntry == nil {
+			t.Fatal("Expected 'Fallback triggered' log entry")
+		}
+
+		assertLogAttribute(t, logEntry, "reason", FallbackReasonMissingTool)
+		assertLogAttribute(t, logEntry, "original_tool", "nonexistent")
+	})
+
+	t.Run("Fallback failure logs error level", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockErrorRouter{
+			err: fmt.Errorf("model failed"),
+		}
+
+		coord, logBuf := newTestCoordinator(mockRouter, store)
+		// Register general_chat that fails
+		coord.RegisterTool(&mockCountingTool{
+			name:    "general_chat",
+			execErr: fmt.Errorf("LLM unavailable"),
+		})
+
+		// Act
+		_, _ = coord.ProcessQuery(ctx, "test query")
+
+		// Assert: Should log fallback failure at ERROR level
+		logEntry := findLogEntry(t, logBuf, "Fallback failed")
+		if logEntry == nil {
+			t.Fatal("Expected 'Fallback failed' log entry")
+		}
+
+		assertLogAttribute(t, logEntry, "level", "ERROR")
+		assertLogAttribute(t, logEntry, "reason", FallbackReasonChatFailed)
+		assertLogAttribute(t, logEntry, "error", "LLM unavailable")
+	})
+
+	t.Run("Tool execution logs at INFO level", func(t *testing.T) {
+		// Arrange
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "some_tool",
+				Args:       map[string]interface{}{},
+				Confidence: 0.9, // Above threshold
+			},
+		}
+
+		coord, logBuf := newTestCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "some_tool"})
+
+		// Act
+		_, err := coord.ProcessQuery(ctx, "test query")
+		if err != nil {
+			t.Fatalf("ProcessQuery should not error: %v", err)
+		}
+
+		// Assert
+		logEntry := findLogEntry(t, logBuf, "Executing tool")
+		if logEntry == nil {
+			t.Fatal("Expected 'Executing tool' log entry")
+		}
+
+		assertLogAttribute(t, logEntry, "level", "INFO")
+		assertLogAttribute(t, logEntry, "tool", "some_tool")
+		assertLogAttributeFloat(t, logEntry, "confidence", 0.9)
+	})
+}
+
+// TestCoordinator_QueryHash tests the query hash functionality
+func TestCoordinator_QueryHash(t *testing.T) {
+	t.Run("Query hash is consistent for same query", func(t *testing.T) {
+		hash1 := queryHash("test query")
+		hash2 := queryHash("test query")
+		if hash1 != hash2 {
+			t.Errorf("Same query should produce same hash: got %s and %s", hash1, hash2)
+		}
+	})
+
+	t.Run("Query hash differs for different queries", func(t *testing.T) {
+		hash1 := queryHash("test query 1")
+		hash2 := queryHash("test query 2")
+		if hash1 == hash2 {
+			t.Error("Different queries should produce different hashes")
+		}
+	})
+
+	t.Run("Query hash is 8 characters", func(t *testing.T) {
+		hash := queryHash("test")
+		if len(hash) != 8 {
+			t.Errorf("Query hash should be 8 characters, got %d", len(hash))
+		}
+	})
+
+	t.Run("Empty query produces valid hash", func(t *testing.T) {
+		hash := queryHash("")
+		if len(hash) != 8 {
+			t.Errorf("Empty query should still produce 8-char hash, got %d chars", len(hash))
+		}
+	})
+}
+
+// =============================================================================
+// Test Helpers
+// =============================================================================
+
+// newTestStore creates a temporary knowledge store for testing.
+// Returns the store and a cleanup function. Caller should defer cleanup().
+func newTestStore(t *testing.T) (*knowledge.Store, func()) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	store, err := knowledge.NewStore(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create test store: %v", err)
+	}
+	return store, func() { store.Close() }
+}
+
+// findLogEntry finds a log entry with the given message in JSON log output
+func findLogEntry(t *testing.T, buf *bytes.Buffer, msg string) map[string]interface{} {
+	t.Helper()
+	lines := strings.Split(buf.String(), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var entry map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Logf("Failed to parse log line: %s", line)
+			continue
+		}
+		if entry["msg"] == msg {
+			return entry
+		}
+	}
+	return nil
+}
+
+// assertLogAttribute asserts that a log entry has the expected string attribute
+func assertLogAttribute(t *testing.T, entry map[string]interface{}, key, expected string) {
+	t.Helper()
+	val, ok := entry[key]
+	if !ok {
+		t.Errorf("Log entry missing attribute %q", key)
+		return
+	}
+	if val != expected {
+		t.Errorf("Log attribute %q: expected %q, got %q", key, expected, val)
+	}
+}
+
+// assertLogAttributeFloat asserts that a log entry has the expected float attribute
+func assertLogAttributeFloat(t *testing.T, entry map[string]interface{}, key string, expected float64) {
+	t.Helper()
+	val, ok := entry[key]
+	if !ok {
+		t.Errorf("Log entry missing attribute %q", key)
+		return
+	}
+	// JSON numbers are float64
+	f, ok := val.(float64)
+	if !ok {
+		t.Errorf("Log attribute %q is not a number: %v", key, val)
+		return
+	}
+	if f != expected {
+		t.Errorf("Log attribute %q: expected %v, got %v", key, expected, f)
+	}
+}
+
+// assertLogAttributeExists asserts that a log entry has the attribute (non-empty)
+func assertLogAttributeExists(t *testing.T, entry map[string]interface{}, key string) {
+	t.Helper()
+	val, ok := entry[key]
+	if !ok {
+		t.Errorf("Log entry missing attribute %q", key)
+		return
+	}
+	if val == "" || val == nil {
+		t.Errorf("Log attribute %q is empty", key)
+	}
 }

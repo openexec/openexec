@@ -32,3 +32,8 @@ logs/
 ui/playwright-report/
 ui/test-results/
 ui/playwright/.cache/
+
+# OpenExec Managed Block
+.openexec/logs/
+.openexec/data/
+.openexec/engram/cache/
