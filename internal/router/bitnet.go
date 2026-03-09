@@ -122,6 +122,14 @@ func (r *BitNetRouter) simulateInference(prompt string) (string, error) {
 		return `{"tool_name": "safe_commit", "args": {"message": "Update from OpenExec", "push": true}, "confidence": 0.99}`, nil
 	}
 
+	if strings.Contains(queryPart, "wizard") {
+		return `{"tool_name": "general_chat", "args": {"query": "wizard"}, "confidence": 0.99}`, nil
+	}
+
+	if strings.Contains(queryPart, "init") {
+		return `{"tool_name": "general_chat", "args": {"query": "init"}, "confidence": 0.99}`, nil
+	}
+
 	// Default to general chat if no surgical tool matches
 	cleanQuery := strings.TrimPrefix(queryPart, "query: ")
 	// Strip trailing "json_intent:" or other prompt markers

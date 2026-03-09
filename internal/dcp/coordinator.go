@@ -48,8 +48,18 @@ func (c *Coordinator) SyncFile(filePath string) error {
 func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, error) {
 	// 1. Local Intent Routing (BitNet)
 	intent, err := c.router.ParseIntent(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("intent routing failed: %w", err)
+	
+	// If intent routing fails or confidence is too low, fallback to general chat
+	if err != nil || intent == nil || intent.Confidence < 0.2 {
+		if chatTool, ok := c.tools["general_chat"]; ok {
+			log.Printf("[DCP] Routing failed or low confidence, falling back to general_chat")
+			return chatTool.Execute(ctx, map[string]interface{}{"query": query})
+		}
+		
+		if err != nil {
+			return nil, fmt.Errorf("intent routing failed: %w", err)
+		}
+		return nil, fmt.Errorf("intent routing failed: low confidence and no chat fallback")
 	}
 
 	// 2. Sanitize model outputs
@@ -58,6 +68,10 @@ func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, erro
 	// 3. Fetch Tool
 	tool, ok := c.tools[intent.ToolName]
 	if !ok {
+		// Even if tool is not found, try falling back to chat
+		if chatTool, ok := c.tools["general_chat"]; ok {
+			return chatTool.Execute(ctx, map[string]interface{}{"query": query})
+		}
 		return nil, fmt.Errorf("tool %q selected by router but not registered in DCP", intent.ToolName)
 	}
 
