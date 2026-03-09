@@ -544,6 +544,33 @@ func (m *Manager) SetTaskStatus(taskID string, status string) error {
     return m.UpdateTask(&updated)
 }
 
+// DeleteTask removes a task from the tracking system and its parent story.
+func (m *Manager) DeleteTask(taskID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	task, ok := m.tasks[taskID]
+	if !ok {
+		return nil // already gone
+	}
+
+	// Remove from parent story
+	if story, ok := m.stories[task.StoryID]; ok {
+		filtered := make([]string, 0, len(story.Tasks))
+		for _, id := range story.Tasks {
+			if id != taskID {
+				filtered = append(filtered, id)
+			}
+		}
+		story.Tasks = filtered
+	}
+
+	// Remove from main tasks map
+	delete(m.tasks, taskID)
+
+	return m.saveUnlocked()
+}
+
 // LinkCommitToTask links a commit hash to a task.
 func (m *Manager) LinkCommitToTask(taskID, commitHash string) error {
 	m.mu.Lock()

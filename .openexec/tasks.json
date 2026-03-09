@@ -1,25 +1,6 @@
 {
   "tasks": [
     {
-      "id": "T-US-001-002",
-      "title": "Map API Surface and Local Buildability",
-      "description": "Identify all entry points in internal/wizard and internal/router to verify legacy state consistency.",
-      "story_id": "US-001",
-      "verification_script": "go build ./cmd/openexec",
-      "depends_on": [
-        "T-US-001-001"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "git": {
-        "commits": []
-      },
-      "needs_review": false,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.549664+02:00"
-    },
-    {
       "id": "T-US-002-001",
       "title": "Restore CI/CD Pipeline Integrity",
       "description": "Fix existing test failures across all packages and update CI workflow files if necessary.",
@@ -34,6 +15,152 @@
       "needs_review": false,
       "status": "pending",
       "created_at": "2026-03-09T23:24:40.550104+02:00"
+    },
+    {
+      "id": "T-US-001-001",
+      "title": "Extract Environment and Dependency Map",
+      "description": "Analyze go.mod and internal config loaders to map required variables and external dependencies.",
+      "story_id": "US-001",
+      "verification_script": "go mod verify",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.549496+02:00"
+    },
+    {
+      "id": "T-US-001-003",
+      "title": "Verify local buildability of legacy state",
+      "description": "Ensure the current codebase compiles correctly before starting restoration.",
+      "story_id": "US-001",
+      "verification_script": "go build ./...",
+      "depends_on": [
+        "T-US-001-002"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.809562+02:00"
+    },
+    {
+      "id": "T-US-002-004",
+      "title": "Story-Tier Validation Review",
+      "description": "Perform final validation to ensure the integrated CLI satisfies the acceptance criteria.",
+      "story_id": "US-002",
+      "verification_script": "./bin/openexec --help",
+      "depends_on": [
+        "T-US-002-003"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.811004+02:00"
+    },
+    {
+      "id": "T-US-003-005",
+      "title": "Verify Docker Deployment and Health",
+      "description": "Verify that all containers start successfully and pass their health checks.",
+      "story_id": "US-003",
+      "verification_script": "docker compose ps | grep healthy",
+      "depends_on": [
+        "T-US-003-004"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.811931+02:00"
+    },
+    {
+      "id": "T-US-003-006",
+      "title": "Story-Tier Validation Review",
+      "description": "Final validation of engine restoration against G-001, G-002, and G-003.",
+      "story_id": "US-003",
+      "verification_script": "go test -v ./internal/...",
+      "depends_on": [
+        "T-US-003-005"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.812215+02:00"
+    },
+    {
+      "id": "T-US-006-001",
+      "title": "Fix BitNet Routing Logic and Intent Matching",
+      "description": "Refactor internal/router/bitnet.go to correctly map inputs to tool handlers.",
+      "story_id": "US-006",
+      "verification_script": "go test ./internal/router -run TestBitNetRouting",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.553976+02:00"
+    },
+    {
+      "id": "T-US-003-003",
+      "title": "Implement Core Wizard Logic and Intent Generation",
+      "description": "Fix the core intent planning logic in internal/wizard/ to generate valid output files.",
+      "story_id": "US-003",
+      "verification_script": "openexec wizard --test-mode",
+      "depends_on": [
+        "T-US-003-002"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.551136+02:00"
+    },
+    {
+      "id": "T-US-003-004",
+      "title": "Implement Router and Healing Chassis",
+      "description": "Restore BitNetRouter routing and SelfHealingLoop stability with C-003 exit strategy.",
+      "story_id": "US-003",
+      "verification_script": "go test ./internal/router/... ./internal/dcp/...",
+      "depends_on": [
+        "T-US-003-003"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.811642+02:00"
     },
     {
       "id": "T-US-002-002",
@@ -72,6 +199,79 @@
       "needs_review": false,
       "status": "pending",
       "created_at": "2026-03-09T23:24:40.550944+02:00"
+    },
+    {
+      "id": "T-US-003-001",
+      "title": "Define Wizard Contract and Intent Schema",
+      "description": "Formalize the Intent struct and error codes for the planning engine.",
+      "story_id": "US-003",
+      "verification_script": "go test ./internal/wizard/... -run TestSchema",
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.550762+02:00"
+    },
+    {
+      "id": "T-US-005-002",
+      "title": "Verify Healing Loop Maturity and Run-ID Isolation",
+      "description": "Ensure node-level caching and run-id based organization is active in the healing flow.",
+      "story_id": "US-005",
+      "verification_script": "go test ./internal/dcp -run TestFingerprinting",
+      "depends_on": [
+        "T-US-005-001"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.553391+02:00"
+    },
+    {
+      "id": "T-US-002-003",
+      "title": "Implement Core CLI Logic",
+      "description": "Restore the actual CLI entry points and integrate with internal packages.",
+      "story_id": "US-002",
+      "verification_script": "go build ./cmd/openexec/...",
+      "depends_on": [
+        "T-US-002-002"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.810389+02:00"
+    },
+    {
+      "id": "T-US-001-002",
+      "title": "Map API Surface and Local Buildability",
+      "description": "Identify all entry points in internal/wizard and internal/router to verify legacy state consistency.",
+      "story_id": "US-001",
+      "verification_script": "go build ./cmd/openexec",
+      "depends_on": [
+        "T-US-001-001"
+      ],
+      "priority": 0,
+      "attempt_count": 0,
+      "max_attempts": 0,
+      "git": {
+        "commits": []
+      },
+      "needs_review": false,
+      "status": "pending",
+      "created_at": "2026-03-09T23:24:40.549664+02:00"
     },
     {
       "id": "T-US-004-001",
@@ -123,92 +323,6 @@
       "needs_review": false,
       "status": "pending",
       "created_at": "2026-03-09T23:24:40.553147+02:00"
-    },
-    {
-      "id": "T-US-006-001",
-      "title": "Fix BitNet Routing Logic and Intent Matching",
-      "description": "Refactor internal/router/bitnet.go to correctly map inputs to tool handlers.",
-      "story_id": "US-006",
-      "verification_script": "go test ./internal/router -run TestBitNetRouting",
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "git": {
-        "commits": []
-      },
-      "needs_review": false,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.553976+02:00"
-    },
-    {
-      "id": "T-US-001-001",
-      "title": "Extract Environment and Dependency Map",
-      "description": "Analyze go.mod and internal config loaders to map required variables and external dependencies.",
-      "story_id": "US-001",
-      "verification_script": "go mod verify",
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "git": {
-        "commits": []
-      },
-      "needs_review": false,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.549496+02:00"
-    },
-    {
-      "id": "T-US-003-001",
-      "title": "Define Wizard Contract and Intent Schema",
-      "description": "Formalize the Intent struct and error codes for the planning engine.",
-      "story_id": "US-003",
-      "verification_script": "go test ./internal/wizard/... -run TestSchema",
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "git": {
-        "commits": []
-      },
-      "needs_review": false,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.550762+02:00"
-    },
-    {
-      "id": "T-US-003-003",
-      "title": "Implement Core Wizard Logic and Intent Generation",
-      "description": "Fix the core intent planning logic in internal/wizard/ to generate valid output files.",
-      "story_id": "US-003",
-      "verification_script": "openexec wizard --test-mode",
-      "depends_on": [
-        "T-US-003-002"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "git": {
-        "commits": []
-      },
-      "needs_review": false,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.551136+02:00"
-    },
-    {
-      "id": "T-US-005-002",
-      "title": "Verify Healing Loop Maturity and Run-ID Isolation",
-      "description": "Ensure node-level caching and run-id based organization is active in the healing flow.",
-      "story_id": "US-005",
-      "verification_script": "go test ./internal/dcp -run TestFingerprinting",
-      "depends_on": [
-        "T-US-005-001"
-      ],
-      "priority": 0,
-      "attempt_count": 0,
-      "max_attempts": 0,
-      "git": {
-        "commits": []
-      },
-      "needs_review": false,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.553391+02:00"
     },
     {
       "id": "T-US-007-001",

@@ -941,6 +941,23 @@ Examples:
 		cmd.Printf("Importing %d stories from %s...\n\n", len(stories), inputFile)
 
 		storyIDPattern := regexp.MustCompile(`^(US|REQ)-\d{3}$`)
+		
+		// Map to track which tasks are currently in the incoming stories.json
+		incomingTaskIDs := make(map[string]bool)
+		for _, s := range stories {
+			for _, tRaw := range s.Tasks {
+				id := ""
+				switch v := tRaw.(type) {
+				case string:
+					id = v
+				case map[string]any:
+					id, _ = v["id"].(string)
+				}
+				if id != "" {
+					incomingTaskIDs[id] = true
+				}
+			}
+		}
 
 		for _, genStory := range stories {
 			// Validate ID format
@@ -1099,13 +1116,24 @@ Examples:
 			}
 		}
 
-		cmd.Printf("\nImport complete:\n")
-		cmd.Printf("  Stories created: %d\n", storiesCreated)
-		cmd.Printf("  Tasks created: %d\n", tasksCreated)
-		if skipped > 0 {
-			cmd.Printf("  Skipped (existing): %d\n", skipped)
+		// Prune legacy tasks not in incoming plan
+		allTasks := mgr.GetTasks()
+		prunedCount := 0
+		for _, t := range allTasks {
+			if !incomingTaskIDs[t.ID] {
+				if err := mgr.DeleteTask(t.ID); err == nil {
+					prunedCount++
+				}
+			}
 		}
 
+		cmd.Printf("\nImport complete:\n")
+		cmd.Printf("  Stories created: %d\n", storiesCreated)
+		cmd.Printf("  Tasks created:   %d\n", tasksCreated)
+		cmd.Printf("  Skipped (existing): %d\n", skipped)
+		if prunedCount > 0 {
+			cmd.Printf("  Legacy tasks pruned: %d\n", prunedCount)
+		}
 		return nil
 	},
 }

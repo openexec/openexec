@@ -2,110 +2,42 @@
   "schema_version": "1.1",
   "goals": [
     {
+      "id": "G-003",
+      "title": "Fix Chat Input Routing",
+      "description": "Address the low-confidence routing failure where chat inputs fail to reach handlers.",
+      "success_criteria": "Chat inputs are correctly routed to general_chat or appropriate tools.",
+      "verification_method": "Verify BitNetRouter logs correct handler dispatch for test chat inputs."
+    },
+    {
       "id": "G-001",
-      "title": "Fix Wizard and Intent Planning",
-      "description": "Restore functionality to the 'openexec wizard' and intent planning logic to allow successful intent.md generation and story import.",
-      "success_criteria": "Wizard runs, generates valid intent.md, and stories import without failure.",
-      "verification_method": "CLI verification of 'openexec wizard' and database check for imported stories."
+      "title": "Restore Wizard and Intent Planning",
+      "description": "Fix the 'openexec wizard' and intent planning logic so intent.md files can be generated and stories can be imported.",
+      "success_criteria": "Wizard runs successfully, generates a valid intent.md, and stories are imported without failure.",
+      "verification_method": "Run 'openexec wizard' and verify intent.md generation and subsequent 'openexec import' success."
     },
     {
       "id": "G-002",
-      "title": "Restore CI/CD and Self-Healing",
-      "description": "Fix regressions in self-healing loops and return the CI/CD pipeline to a green state.",
-      "success_criteria": "CI/CD pipeline passes; self-healing recovers from errors without infinite loops.",
-      "verification_method": "Execute 'go test ./...' and simulated error recovery tests."
-    },
-    {
-      "id": "G-003",
-      "title": "Fix BitNet Routing",
-      "description": "Address routing failures where chat inputs do not reach handlers correctly.",
-      "success_criteria": "Chat inputs are correctly routed to general_chat or tool handlers.",
-      "verification_method": "Run 'openexec chat' and verify response accuracy."
+      "title": "Stabilize Self-Healing and CI/CD",
+      "description": "Fix the regression in self-healing loops and ensure all existing CI/CD tests pass.",
+      "success_criteria": "CI/CD pipeline returns to green and agent loops successfully recover from simulated errors.",
+      "verification_method": "Execute 'make test' and verify 100% pass rate in internal/dcp/ healing tests."
     }
   ],
   "stories": [
     {
-      "id": "US-006",
-      "goal_id": "G-003",
-      "title": "BitNet Router and Chat Input Routing",
-      "description": "As a user, I want my chat inputs correctly routed to handlers so that I can interact with the system via CLI.",
-      "acceptance_criteria": [
-        "Inputs reach general_chat or tool handlers based on intent.",
-        "BitNet router correctly classifies inputs.",
-        "Response time for routing is under 200ms."
-      ],
-      "verification_script": "openexec chat \"What is the status of my tasks?\" | grep -v \"error\"",
-      "contract": "internal/router/interface.go",
-      "tasks": [
-        "T-US-006-001"
-      ],
-      "depends_on": [
-        "US-002"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.553623+02:00"
-    },
-    {
-      "id": "US-007",
-      "goal_id": "G-001",
-      "title": "Goal Validation and E2E Testing",
-      "description": "As a system owner, I want to verify that all primary goals are met so that the orchestrator is considered stable.",
-      "acceptance_criteria": [
-        "Complete E2E flow: Wizard -\u003e Import -\u003e Execution -\u003e Healing -\u003e Chat Success.",
-        "CI/CD remains green across all platforms.",
-        "Audit database shows 100% trace coverage for the E2E run."
-      ],
-      "verification_script": "./scripts/validate_goals.sh",
-      "tasks": [
-        "T-US-007-001"
-      ],
-      "depends_on": [
-        "US-003",
-        "US-004",
-        "US-005",
-        "US-006"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.554206+02:00"
-    },
-    {
-      "id": "US-001",
-      "goal_id": "G-002",
-      "title": "Refactor Discovery and Legacy State Analysis",
-      "description": "As a developer, I want to map the existing broken state of the OpenExec orchestrator so that I can systematically fix failures without regressions.",
-      "acceptance_criteria": [
-        "Environment variables and internal dependencies mapped.",
-        "API surface area for Wizard, Stories, and Router documented.",
-        "Current build failures in CI/CD identified and categorized."
-      ],
-      "verification_script": "make build || echo 'Build failures mapped'",
-      "tasks": [
-        "T-US-001-001",
-        "T-US-001-002"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-09T23:24:40.549105+02:00"
-    },
-    {
       "id": "US-002",
       "goal_id": "G-002",
-      "title": "Core Architecture and CI/CD Restoration",
-      "description": "As a developer, I want the core architecture and CI/CD pipeline restored so that I can verify feature work against a stable baseline.",
+      "title": "Core CLI Architecture Restoration",
+      "description": "As a user, I want a functional CLI that works across macOS, Linux, and Windows so that I can use OpenExec on any platform.",
       "acceptance_criteria": [
-        "All existing tests in 'go test ./...' pass.",
-        "CLI binary builds successfully for macOS, Linux, and Windows.",
-        "Audit database tracks execution state correctly."
+        "CLI binary builds for macOS, Linux, and Windows.",
+        "Core command entry points (wizard, import, run) respond correctly."
       ],
-      "verification_script": "go test ./... \u0026\u0026 make build-all",
+      "verification_script": "go build -o bin/openexec ./cmd/openexec \u0026\u0026 ./bin/openexec --help",
+      "contract": "CLI command interface schema",
       "tasks": [
-        "T-US-002-001",
-        "T-US-002-002"
+        "T-US-002-003",
+        "T-US-002-004"
       ],
       "depends_on": [
         "US-001"
@@ -113,24 +45,25 @@
       "story_type": "feature",
       "priority": 0,
       "status": "pending",
-      "created_at": "2026-03-09T23:24:40.54982+02:00"
+      "created_at": "2026-03-10T00:04:53.80979+02:00"
     },
     {
       "id": "US-003",
       "goal_id": "G-001",
-      "title": "WizardEngine and Intent Planning Logic",
-      "description": "As a user, I want the 'openexec wizard' to work correctly so that I can generate intent.md files for my projects.",
+      "title": "Engine Restoration and Logic Fixes",
+      "description": "As a user, I want the Wizard, Story Manager, Router, and Healing loops to work correctly so that I can automate complex tasks reliably.",
       "acceptance_criteria": [
-        "Wizard generates a valid intent.md following the schema.",
-        "Interactive CLI prompts capture all required project goals and requirements.",
-        "Unit tests cover wizard logic in internal/wizard/."
+        "Wizard generates valid intent.md and imports stories.",
+        "BitNetRouter correctly routes chat inputs.",
+        "Self-healing loops stabilize with exit strategy C-003.",
+        "Docker containers start successfully and pass health checks."
       ],
-      "verification_script": "openexec wizard --dry-run \u0026\u0026 test -f intent.md",
-      "contract": "internal/wizard/schema.go",
+      "verification_script": "make test \u0026\u0026 docker compose ps",
+      "contract": "Engine Interface Contract (Wizard, Story, Router, Healing)",
       "tasks": [
-        "T-US-003-001",
-        "T-US-003-002",
-        "T-US-003-003"
+        "T-US-003-004",
+        "T-US-003-005",
+        "T-US-003-006"
       ],
       "depends_on": [
         "US-002"
@@ -138,54 +71,45 @@
       "story_type": "feature",
       "priority": 0,
       "status": "pending",
-      "created_at": "2026-03-09T23:24:40.550456+02:00"
+      "created_at": "2026-03-10T00:04:53.81129+02:00"
     },
     {
       "id": "US-004",
-      "goal_id": "G-001",
-      "title": "StoryManager and Import Logic",
-      "description": "As a user, I want stories to be imported from intent.md files so that the orchestrator can begin task execution.",
+      "goal_id": "G-002",
+      "title": "Project Goal Validation",
+      "description": "As a maintainer, I want to verify all primary goals via E2E testing to ensure the system is production-ready.",
       "acceptance_criteria": [
-        "Stories are successfully parsed and saved to the audit database.",
-        "Dependency graphs for stories are correctly calculated.",
-        "Import failures provide clear error messages."
+        "Wizard, Router, and Healing goals (G-001, G-002, G-003) are verified via E2E tests.",
+        "CI/CD pipeline is fully green."
       ],
-      "verification_script": "openexec stories import --file intent.md \u0026\u0026 sqlite3 .openexec/data/audit.db 'select count(*) from stories'",
-      "contract": "internal/stories/contract.go",
-      "tasks": [
-        "T-US-004-001",
-        "T-US-004-002"
-      ],
+      "verification_script": "make test \u0026\u0026 make lint",
+      "tasks": [],
       "depends_on": [
         "US-003"
       ],
       "story_type": "feature",
       "priority": 0,
       "status": "pending",
-      "created_at": "2026-03-09T23:24:40.55132+02:00"
+      "created_at": "2026-03-10T00:04:53.812481+02:00"
     },
     {
-      "id": "US-005",
-      "goal_id": "G-002",
-      "title": "Self-Healing Loop and Error Recovery",
-      "description": "As a developer, I want the agent loops to self-heal correctly so that systemic failures are handled autonomously.",
+      "id": "US-001",
+      "goal_id": "G-003",
+      "title": "Discovery and Legacy System Audit",
+      "description": "As a developer, I want to map the existing environment and API surface area so that I can safely restore the system without breaking legacy compatibility.",
       "acceptance_criteria": [
-        "Self-healing logic in internal/dcp/healing.go recovers from simulated errors.",
-        "Exit strategy prevents infinite loops (C-003).",
-        "Recovery attempts are logged in audit.db."
+        "Environment variables and dependencies are extracted.",
+        "Existing API surface area is mapped for Wizard, Stories, DCP, and Router.",
+        "Local buildability of the legacy state is verified."
       ],
-      "verification_script": "go test ./internal/dcp -run TestSelfHealingRecovery",
+      "verification_script": "go mod verify \u0026\u0026 go build ./...",
       "tasks": [
-        "T-US-005-001",
-        "T-US-005-002"
-      ],
-      "depends_on": [
-        "US-004"
+        "T-US-001-003"
       ],
       "story_type": "feature",
       "priority": 0,
       "status": "pending",
-      "created_at": "2026-03-09T23:24:40.552482+02:00"
+      "created_at": "2026-03-10T00:04:53.809236+02:00"
     }
   ]
 }
