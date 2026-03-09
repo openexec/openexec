@@ -132,6 +132,9 @@ The project name defaults to the current directory name if not provided.`,
 			return fmt.Errorf("failed to save config: %w", err)
 		}
 
+		// Ensure .gitignore exists with .openexec entries
+		ensureGitignore(absProjectDir)
+
 		// Display success message
 		cmd.Printf("\n✓ Project initialized successfully\n")
 		cmd.Printf("  Project name: %s\n", cfg.Name)
@@ -212,6 +215,59 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 	}
 
 	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount
+}
+
+// ensureGitignore ensures .gitignore exists and contains .openexec entries.
+// If .gitignore doesn't exist, creates one with common defaults.
+func ensureGitignore(projectDir string) {
+	gitignorePath := filepath.Join(projectDir, ".gitignore")
+
+	const openexecBlock = "\n# OpenExec\n.openexec/logs/\n.openexec/data/\n"
+
+	existing, err := os.ReadFile(gitignorePath)
+	if err == nil {
+		// File exists — append openexec entries if missing
+		if !strings.Contains(string(existing), ".openexec/") {
+			f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_WRONLY, 0644)
+			if err == nil {
+				_, _ = f.WriteString(openexecBlock)
+				_ = f.Close()
+			}
+		}
+		return
+	}
+
+	// No .gitignore — create with common defaults
+	content := `# Dependencies
+node_modules/
+vendor/
+.venv/
+__pycache__/
+
+# Build output
+dist/
+build/
+out/
+bin/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+` + openexecBlock
+
+	_ = os.WriteFile(gitignorePath, []byte(content), 0644)
 }
 
 // selectModelInteractively prompts user to select a model
