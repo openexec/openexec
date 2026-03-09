@@ -86,19 +86,24 @@ func New(cfg Config) (*Server, error) {
 	// Resolve runner command from project execution model.
 	runnerCmd := ""
 	var runnerArgs []string
+	var executorModel, runnerCommand string
+	var runnerArgsFromCfg []string
 	if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil {
+		executorModel = projCfg.Execution.ExecutorModel
+		runnerCommand = projCfg.Execution.RunnerCommand
+		runnerArgsFromCfg = projCfg.Execution.RunnerArgs
 		rc, ra, err := runner.Resolve(
-			projCfg.Execution.ExecutorModel,
-			projCfg.Execution.RunnerCommand,
-			projCfg.Execution.RunnerArgs,
+			executorModel,
+			runnerCommand,
+			runnerArgsFromCfg,
 		)
 		if err != nil {
 			log.Printf("[Server] Warning: runner resolution failed: %v", err)
 		} else {
 			runnerCmd = rc
 			runnerArgs = ra
-			log.Printf("[Server] Runner: model=%s command=%s args=%v", 
-				projCfg.Execution.ExecutorModel, runnerCmd, runnerArgs)
+			log.Printf("[Server] Runner: model=%s command=%s args=%v",
+				executorModel, runnerCmd, runnerArgs)
 		}
 	}
 
@@ -116,9 +121,9 @@ func New(cfg Config) (*Server, error) {
 		TractStore:    cfg.DataDir,
 		AgentsFS:      agentsFS,
 		LogDir:        logDir,
-		ExecutorModel: func() string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return projCfg.Execution.ExecutorModel }; return "" }(),
-		RunnerCommand: func() string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return projCfg.Execution.RunnerCommand }; return "" }(),
-		RunnerArgs:    func() []string { if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil { return projCfg.Execution.RunnerArgs }; return nil }(),
+		ExecutorModel: executorModel,
+		RunnerCommand: runnerCommand,
+		RunnerArgs:    runnerArgsFromCfg,
 		CommandName:   finalCmd,
 		CommandArgs:   finalArgs,
 	})
