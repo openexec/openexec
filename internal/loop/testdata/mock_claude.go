@@ -2,12 +2,13 @@
 // It reads a scenario name from the first argument and outputs predefined JSON lines.
 //
 // Scenarios:
-//   ok              — outputs a minimal valid session, exits 0
-//   full            — outputs text + tool_use + tool_result, exits 0
-//   crash           — outputs partial, exits 1
-//   slow            — outputs text then sleeps 10s (for kill/cancel tests), exits 0
-//   signal-complete — outputs text + openexec_signal phase-complete, exits 0
-//   signal-progress — outputs text + openexec_signal progress, exits 0
+//
+//	ok              — outputs a minimal valid session, exits 0
+//	full            — outputs text + tool_use + tool_result, exits 0
+//	crash           — outputs partial, exits 1
+//	slow            — outputs text then sleeps 10s (for kill/cancel tests), exits 0
+//	signal-complete — outputs text + openexec_signal phase-complete, exits 0
+//	signal-progress — outputs text + openexec_signal progress, exits 0
 package main
 
 import (

@@ -21,13 +21,13 @@ func runGit(t *testing.T, dir string, args ...string) {
 
 func TestInitCmd(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	// Setup git repo because init requires it
 	runGit(t, tmpDir, "init")
 	runGit(t, tmpDir, "config", "user.name", "Test User")
 	runGit(t, tmpDir, "config", "user.email", "test@example.com")
 	runGit(t, tmpDir, "config", "commit.gpgsign", "false")
-	
+
 	// Create main branch
 	err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Test"), 0644)
 	if err != nil {
@@ -66,12 +66,12 @@ func TestInitCmd(t *testing.T) {
 
 func TestInitCmd_Interactive(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	runGit(t, tmpDir, "init")
 	runGit(t, tmpDir, "config", "user.name", "Test User")
 	runGit(t, tmpDir, "config", "user.email", "test@example.com")
 	runGit(t, tmpDir, "config", "commit.gpgsign", "false")
-	
+
 	err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Test"), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestInitCmd_Interactive(t *testing.T) {
 	// 5. Parallel: y
 	// 6. Workers: 4
 	input := "1\ny\ny\n2\ny\n4\n"
-	
+
 	b := bytes.NewBufferString("")
 	rootCmd.SetOut(b)
 	rootCmd.SetIn(strings.NewReader(input))

@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/internal/pipeline"
+	"github.com/openexec/openexec/pkg/manager"
 )
 
 func TestHandleCreateLoop(t *testing.T) {

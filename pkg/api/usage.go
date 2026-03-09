@@ -67,16 +67,16 @@ func (s *UsageServer) Handler() http.Handler {
 
 // UsageSummaryResponse represents the overall usage summary.
 type UsageSummaryResponse struct {
-	TotalTokensInput    int64              `json:"total_tokens_input"`
-	TotalTokensOutput   int64              `json:"total_tokens_output"`
-	TotalTokens         int64              `json:"total_tokens"`
-	TotalCostUSD        float64            `json:"total_cost_usd"`
-	TotalRequests       int64              `json:"total_requests"`
-	SuccessfulRequests  int64              `json:"successful_requests"`
-	FailedRequests      int64              `json:"failed_requests"`
-	AverageDurationMs   float64            `json:"average_duration_ms"`
-	ByProvider          map[string]*ProviderStatsResponse `json:"by_provider,omitempty"`
-	Period              *TimePeriod        `json:"period,omitempty"`
+	TotalTokensInput   int64                             `json:"total_tokens_input"`
+	TotalTokensOutput  int64                             `json:"total_tokens_output"`
+	TotalTokens        int64                             `json:"total_tokens"`
+	TotalCostUSD       float64                           `json:"total_cost_usd"`
+	TotalRequests      int64                             `json:"total_requests"`
+	SuccessfulRequests int64                             `json:"successful_requests"`
+	FailedRequests     int64                             `json:"failed_requests"`
+	AverageDurationMs  float64                           `json:"average_duration_ms"`
+	ByProvider         map[string]*ProviderStatsResponse `json:"by_provider,omitempty"`
+	Period             *TimePeriod                       `json:"period,omitempty"`
 }
 
 // ProviderStatsResponse represents usage stats for a provider.

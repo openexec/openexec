@@ -62,7 +62,7 @@ func TestSendChatQuery(t *testing.T) {
 			// Parse port from server URL
 			parts := strings.Split(server.URL, ":")
 			port, _ := strconv.Atoi(parts[len(parts)-1])
-			
+
 			// Save global port and restore later
 			oldPort := startPort
 			startPort = port

@@ -393,7 +393,7 @@ func TestExtractSuggestion(t *testing.T) {
 	parser := NewBuildOutputParser()
 
 	tests := []struct {
-		message        string
+		message          string
 		expectSuggestion bool
 	}{
 		{"undefined: foo", true},

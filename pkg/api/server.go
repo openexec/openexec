@@ -36,10 +36,10 @@ func New(mgr *manager.Manager, sessionRepo session.Repository, auditLogger audit
 		},
 	}
 	s.registerRoutes()
-	
+
 	// Start the WebSocket hub
 	go s.Hub.Run()
-	
+
 	return s
 }
 

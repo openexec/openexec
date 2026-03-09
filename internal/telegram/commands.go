@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/openexec/openexec/internal/user"
 	"github.com/openexec/openexec/internal/conversation"
 	"github.com/openexec/openexec/internal/logging"
 	"github.com/openexec/openexec/internal/protocol"
+	"github.com/openexec/openexec/internal/user"
 )
 
 // MessageSender is an interface for sending Telegram messages.

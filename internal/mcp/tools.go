@@ -548,4 +548,3 @@ func ValidateGitApplyPatchRequest(req *GitApplyPatchRequest) error {
 
 	return nil
 }
-

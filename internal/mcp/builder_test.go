@@ -121,7 +121,7 @@ func TestOrchestratorBuilder_FluentMethods(t *testing.T) {
 
 	builder := NewOrchestratorBuilder(locator).
 		WithGoPath("/usr/local/go/bin/go").
-		WithTimeout(3 * time.Minute).
+		WithTimeout(3*time.Minute).
 		WithTargets("./cmd/openexec", "./internal/...").
 		WithVerbose(true).
 		WithRaceDetector(true).
@@ -1294,7 +1294,7 @@ func TestOrchestratorBuilder_BuildWithLDFlags(t *testing.T) {
 	}
 
 	builder := NewOrchestratorBuilder(locator).
-		WithTimeout(2 * time.Minute).
+		WithTimeout(2*time.Minute).
 		WithTargets("./internal/mcp").
 		WithLDFlags("-s", "-w")
 

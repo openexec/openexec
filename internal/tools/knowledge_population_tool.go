@@ -54,7 +54,7 @@ func (t *KnowledgePopulationTool) Execute(ctx context.Context, args map[string]i
 		if env == "" {
 			return nil, fmt.Errorf("missing environment name (env)")
 		}
-		
+
 		runtimeType, _ := args["runtime_type"].(string)
 		authSteps, _ := args["auth_steps"].(string)
 		deploySteps, _ := args["deploy_steps"].(string)
@@ -67,7 +67,9 @@ func (t *KnowledgePopulationTool) Execute(ctx context.Context, args map[string]i
 			DeploySteps: deploySteps,
 			Topology:    topology,
 		})
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		return fmt.Sprintf("Successfully recorded complex environment topology for %q", env), nil
 
 	case "api_doc":
@@ -82,7 +84,9 @@ func (t *KnowledgePopulationTool) Execute(ctx context.Context, args map[string]i
 			Method:      method,
 			Description: desc,
 		})
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		return fmt.Sprintf("Successfully recorded API contract for %s %s", method, path), nil
 
 	default:

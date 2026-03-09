@@ -331,7 +331,7 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 
 	var response MessagesResponse
 	response.Messages = make([]MessageDTO, 0)
-	
+
 	// Apply manual pagination since ListMessages doesn't support it yet
 	start := offset
 	if start > len(messages) {

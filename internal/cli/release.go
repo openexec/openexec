@@ -890,7 +890,7 @@ Examples:
 				for _, tRaw := range s.Tasks {
 					id := ""
 					title := ""
-					
+
 					switch v := tRaw.(type) {
 					case string:
 						id = v
@@ -994,15 +994,15 @@ Examples:
 			storyDir := filepath.Join(mgr.BaseDir(), ".openexec", "stories")
 			_ = os.MkdirAll(storyDir, 0o750)
 			storyPath := filepath.Join(storyDir, genStory.ID+".md")
-			
+
 			fileExisted := false
 			if _, err := os.Stat(storyPath); err == nil {
 				fileExisted = true
 				// Check if file content says it's done
 				if data, err := os.ReadFile(storyPath); err == nil {
 					content := string(data)
-					if strings.Contains(strings.ToLower(content), "status: completed") || 
-					   strings.Contains(strings.ToLower(content), "status: done") {
+					if strings.Contains(strings.ToLower(content), "status: completed") ||
+						strings.Contains(strings.ToLower(content), "status: done") {
 						// Sync back to database if it was pending
 						if story != nil && story.Status == release.StoryStatusPending {
 							story.Status = release.StoryStatusDone
@@ -1024,7 +1024,7 @@ Examples:
 			// Create tasks for this story
 			for i, tRaw := range genStory.Tasks {
 				var genTask GeneratedTask
-				
+
 				// Handle both formats: string ID or full object
 				switch v := tRaw.(type) {
 				case string:
@@ -1434,7 +1434,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		
+
 		execute, _ := cmd.Flags().GetBool("execute")
 
 		stories := mgr.GetStories()
@@ -1480,11 +1480,11 @@ func verifyStories(cmd *cobra.Command, stories []*release.Story, execute bool) b
 	allDone := true
 	for _, s := range stories {
 		cmd.Printf("  %s %s: %s\n", statusIcon(s.Status), s.ID, s.Title)
-		
+
 		if s.Status != "done" && s.Status != "completed" && s.Status != "approved" {
 			allDone = false
 		}
-		
+
 		if s.VerificationScript != "" {
 			cmd.Printf("    Verification: %s\n", s.VerificationScript)
 			if execute {

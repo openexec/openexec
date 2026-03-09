@@ -10,10 +10,10 @@ import (
 // Watchdog monitors active pipelines for stalls and failures.
 type Watchdog struct {
 	manager *Manager
-	
+
 	// StallThreshold is the duration after which a pipeline is considered stalled.
 	StallThreshold time.Duration
-	
+
 	// CheckInterval is how often the watchdog scans pipelines.
 	CheckInterval time.Duration
 }
@@ -30,7 +30,7 @@ func NewWatchdog(m *Manager) *Watchdog {
 // Run starts the watchdog monitoring loop.
 func (w *Watchdog) Run(ctx context.Context) {
 	log.Printf("[Watchdog] Started monitoring with stall threshold %v", w.StallThreshold)
-	
+
 	ticker := time.NewTicker(w.CheckInterval)
 	defer ticker.Stop()
 
@@ -98,10 +98,10 @@ func (w *Watchdog) remediateStall(id string, info PipelineInfo) {
 	_ = w.manager.Stop(id)
 
 	// 3. Trigger Self-Fix / Restart with recovery context
-	// For now we just log it, but we could automatically call Start again 
+	// For now we just log it, but we could automatically call Start again
 	// with a modified briefing or recovery flag.
 	log.Printf("[Watchdog] [%s] stall remediated. Task reset to stopped state.", id)
-	
+
 	// In a future version, we could auto-restart:
 	// go w.manager.Start(context.Background(), id)
 }

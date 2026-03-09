@@ -24,15 +24,15 @@ import (
 )
 
 var (
-	startPort       int
-	startWorkers    int
-	startTimeout    int
-	startExecutor   string
-	startReviewer   string
-	startDaemon     bool
-	startUI         bool
-	executionBinary string
-	runNoReview     bool
+	startPort        int
+	startWorkers     int
+	startTimeout     int
+	startExecutor    string
+	startReviewer    string
+	startDaemon      bool
+	startUI          bool
+	executionBinary  string
+	runNoReview      bool
 	runMaxIterations int
 	runTimeout       int
 )
@@ -122,7 +122,7 @@ Examples:
 		// Prepare execution arguments for the integrated server
 		dataDir := filepath.Join(config.ProjectDir, ".openexec", "data")
 		auditDB := filepath.Join(dataDir, "audit.db")
-		
+
 		// Find available port if default is busy
 		finalPort, err := findAvailablePort(startPort)
 		if err != nil {
@@ -165,7 +165,7 @@ Examples:
 			cmd.Dir = config.ProjectDir
 			cmd.Stdout = logFile
 			cmd.Stderr = logFile
-			
+
 			if err := cmd.Start(); err != nil {
 				return fmt.Errorf("failed to start background process: %w", err)
 			}
@@ -216,7 +216,7 @@ Examples:
 		cmd.Printf("🚀 Starting Integrated OpenExec Server\n")
 		cmd.Printf("   Project: %s\n", config.Name)
 		cmd.Printf("   Port: %d\n", startPort)
-		
+
 		// Write PID file
 		if err := writePIDFile(config.ProjectDir, startPort); err != nil {
 			cmd.Printf("   ⚠ Warning: could not write PID file: %v\n", err)
@@ -406,7 +406,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 	// 1. Build the graph
 	nodes := make(map[string]*TaskNode)
 	totalToRun := 0
-	
+
 	for _, t := range tasks {
 		status := StatusPending
 		if t.Status == "completed" || t.Status == "done" {
@@ -414,7 +414,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		} else {
 			totalToRun++
 		}
-		
+
 		node := &TaskNode{
 			Task:      t,
 			Status:    status,
@@ -506,6 +506,20 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					if err != nil {
 						cmd.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
 						lastError = err.Error()
+						
+						if strings.Contains(lastError, "Planning Mismatch") {
+							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
+							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
+							cmd.Printf("   2. Once aligned, run 'openexec run' again.\n\n")
+							
+							node.Retries = maxRetries // Force permanent failure
+							mu.Lock()
+							node.Status = StatusFailed
+							mu.Unlock()
+							errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
+							break
+						}
+						
 						node.Retries++
 						continue
 					}
@@ -515,22 +529,22 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 					// Wait for loop to complete
 					err = waitForLoop(cmd, loopID, workerPrefix, time.Duration(runTimeout)*time.Second)
-					
+
 					if err == nil && node.Task.VerificationScript != "" {
 						cmd.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
-						
+
 						// Execute the verification script with node_modules/.bin on PATH
 						verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
 						verifyCmd.Dir = projectDir
-						
+
 						// Add node_modules/.bin to PATH cross-platform
-						newPath := fmt.Sprintf("%s%c%s", 
+						newPath := fmt.Sprintf("%s%c%s",
 							filepath.Join(projectDir, "node_modules", ".bin"),
 							filepath.ListSeparator,
 							os.Getenv("PATH"),
 						)
 						verifyCmd.Env = append(os.Environ(), "PATH="+newPath)
-						
+
 						output, verifyErr := verifyCmd.CombinedOutput()
 						if verifyErr != nil {
 							cmd.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
@@ -549,6 +563,18 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					// If we're here, either loop failed or verification failed
 					if err != nil {
 						lastError = err.Error()
+						
+						// Check for non-retriable errors (e.g. Planning Mismatch)
+						if strings.Contains(lastError, "Planning Mismatch") {
+							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE ERROR: %s\n", workerID, lastError)
+							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
+							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
+							cmd.Printf("   2. Check if .openexec/stories/%s.md matches the current state\n", node.Task.ID)
+							cmd.Printf("   3. Once aligned, run 'openexec run' again.\n\n")
+							
+							node.Retries = maxRetries // Force permanent failure
+							break
+						}
 					} else {
 						lastError = "unknown execution failure"
 					}
@@ -573,14 +599,14 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				}
 
 				node.Status = StatusCompleted
-				
+
 				// Persist completion back to tasks.json (already done, but let's be safe)
 				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
-				
+
 				// ADAPTIVE DISCOVERY: Re-scan for new tasks
 				doneCount++
 				cmd.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
-				
+
 				newTasks, err := loadPendingTasks(projectDir, mgr)
 				if err == nil {
 					for _, nt := range newTasks {
@@ -602,7 +628,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						}
 					}
 				}
-				
+
 				// If all tasks are done, signal completion
 				finished := (doneCount == totalCount)
 				mu.Unlock()
@@ -626,7 +652,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 			mu.Lock()
 			finished := (doneCount == totalCount && totalCount > 0)
 			mu.Unlock()
-			
+
 			if finished {
 				once.Do(func() {
 					close(readyTasks)
@@ -644,7 +670,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 	select {
 	case <-errors:
 		// We have errors. Collect them all.
-		// Note: we can't iterate over channel if it's not closed, 
+		// Note: we can't iterate over channel if it's not closed,
 		// but since waitgroup is done, we know no more errors will be sent.
 		count := len(errors) + 1 // +1 for the one we just read
 		return fmt.Errorf("%d task(s) failed during parallel execution", count)
@@ -730,13 +756,13 @@ var restartCmd = &cobra.Command{
 			stopExec := exec.Command(os.Args[0], stopArgs...)
 			_ = stopExec.Run()
 			time.Sleep(1 * time.Second)
-		}		
+		}
 		// Start again
 		startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
 		if startReviewer != "" {
 			startArgs = append(startArgs, "--reviewer", startReviewer)
 		}
-		
+
 		startExec := exec.Command(os.Args[0], startArgs...)
 		startExec.Stdout = os.Stdout
 		startExec.Stderr = os.Stderr
@@ -868,7 +894,7 @@ func isServerRunning(projectDir string, port int) bool {
 				return true
 			}
 		}
-		
+
 		// If explicit port failed, but we discovered a DIFFERENT port, try that too
 		if checkPort != port {
 			resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", checkPort))
@@ -965,12 +991,12 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 	// Map story ID to its task IDs for barrier injection
 	storyTaskIDs := make(map[string][]string)
 	storyContractTaskIDs := make(map[string][]string)
-	
+
 	for _, story := range sf.Stories {
 		for _, task := range story.Tasks {
 			if task.ID != "" {
 				storyTaskIDs[story.ID] = append(storyTaskIDs[story.ID], task.ID)
-				
+
 				// Identify Contract/Schema tasks for Interface-First Parallelism
 				titleLower := strings.ToLower(task.Title)
 				if strings.Contains(titleLower, "contract") || strings.Contains(titleLower, "schema") {
@@ -985,7 +1011,7 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 	for _, story := range sf.Stories {
 		if story.Status == "pending" || story.Status == "" {
 			var prevTaskInStory string
-			
+
 			for _, genTask := range story.Tasks {
 				taskID := genTask.ID
 				if taskID == "" {
@@ -997,16 +1023,16 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 				if deps == nil {
 					deps = []string{}
 				}
-				
+
 				// 1. Intra-story sequence: Each task depends on the previous task in the SAME story
 				// This ensures story progress is linear by default.
 				if prevTaskInStory != "" {
 					deps = append(deps, prevTaskInStory)
 				}
-				
+
 				// 2. Interface-First / Story Barrier injection:
 				for _, depStoryID := range story.DependsOn {
-					contracts, hasContracts := storyContractTaskIDs[depStoryID]; 
+					contracts, hasContracts := storyContractTaskIDs[depStoryID]
 					if hasContracts && len(contracts) > 0 {
 						// INTERFACE-FIRST: This story only waits for the CONTRACT tasks of the prerequisite story.
 						deps = append(deps, contracts...)
@@ -1025,7 +1051,7 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 					DependsOn:          deps,
 					VerificationScript: genTask.VerificationScript,
 				})
-				
+
 				// Move to next task in story
 				prevTaskInStory = taskID
 			}
@@ -1079,7 +1105,7 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 		stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, task.ID)
 		_, _ = http.Post(stopURL, "application/json", nil)
 		time.Sleep(1 * time.Second) // give server a moment to cleanup
-		
+
 		// Retry the create request
 		resp, err = http.Post(
 			fmt.Sprintf("http://localhost:%d/api/v1/loops", startPort),
@@ -1133,7 +1159,7 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 
 	sb.WriteString(fmt.Sprintf("TASK ID: %s\n", task.ID))
 	sb.WriteString(fmt.Sprintf("TITLE:   %s\n", task.Title))
-	
+
 	if task.Description != "" {
 		sb.WriteString(fmt.Sprintf("DESCRIPTION: %s\n", task.Description))
 	}
@@ -1158,7 +1184,7 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 		if story.Description != "" {
 			sb.WriteString(fmt.Sprintf("Scope: %s\n", story.Description))
 		}
-		
+
 		if len(story.AcceptanceCriteria) > 0 {
 			sb.WriteString("\nACCEPTANCE CRITERIA (Definition of Done):\n")
 			for _, ac := range story.AcceptanceCriteria {
@@ -1176,7 +1202,7 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	sb.WriteString("1. Analyze the task requirements and story context.\n")
 	sb.WriteString("2. Implement the necessary changes idiomatic to the project.\n")
 	sb.WriteString("3. Verify your implementation works using existing tests or by creating new ones.\n")
-	
+
 	if task.VerificationScript != "" {
 		sb.WriteString(fmt.Sprintf("   -> MANDATORY VERIFICATION SCRIPT: Run '%s' to prove the task is complete.\n", task.VerificationScript))
 	}

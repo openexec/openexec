@@ -348,11 +348,11 @@ func TestOrchestratorLocator_LocateInPackage(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		packagePath    string
-		wantErr        bool
-		wantMinFiles   int
-		expectPackage  string
+		name          string
+		packagePath   string
+		wantErr       bool
+		wantMinFiles  int
+		expectPackage string
 	}{
 		{
 			name:          "internal/mcp package",

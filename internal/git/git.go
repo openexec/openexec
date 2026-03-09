@@ -33,9 +33,9 @@ func NewClient(cfg Config) *Client {
 	if repoPath == "" {
 		repoPath = "."
 	}
-	
+
 	lockPath := filepath.Join(repoPath, ".openexec", "git.lock")
-	
+
 	return &Client{
 		repoPath: repoPath,
 		enabled:  cfg.Enabled,

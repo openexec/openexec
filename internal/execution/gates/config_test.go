@@ -73,3 +73,33 @@ quality:
 		t.Errorf("expected project name 'test-proj', got %q", cfg2.Project.Name)
 	}
 }
+
+func TestGetGate(t *testing.T) {
+	cfg := &Config{
+		Quality: QualityConfig{
+			Custom: []CustomGate{
+				{Name: "gate1", Command: "cmd1"},
+				{Name: "gate2", Command: "cmd2"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		gateName string
+		found    bool
+	}{
+		{"found gate1", "gate1", true},
+		{"found gate2", "gate2", true},
+		{"not found", "gate3", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gate := cfg.GetGate(tt.gateName)
+			if (gate != nil) != tt.found {
+				t.Errorf("GetGate(%q) found = %v, want %v", tt.gateName, gate != nil, tt.found)
+			}
+		})
+	}
+}

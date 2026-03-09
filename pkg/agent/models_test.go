@@ -472,11 +472,11 @@ func TestFormatCost(t *testing.T) {
 		expected string
 	}{
 		{0, "$0.00"},
-		{0.000001, "$0.000001"},  // < 0.01, uses 6 decimal places
-		{0.001, "$0.001000"},     // < 0.01, uses 6 decimal places
-		{0.0123, "$0.0123"},      // >= 0.01 and < 1, uses 4 decimal places
-		{0.5, "$0.5000"},         // >= 0.01 and < 1, uses 4 decimal places
-		{1.0, "$1.00"},           // >= 1, uses 2 decimal places
+		{0.000001, "$0.000001"}, // < 0.01, uses 6 decimal places
+		{0.001, "$0.001000"},    // < 0.01, uses 6 decimal places
+		{0.0123, "$0.0123"},     // >= 0.01 and < 1, uses 4 decimal places
+		{0.5, "$0.5000"},        // >= 0.01 and < 1, uses 4 decimal places
+		{1.0, "$1.00"},          // >= 1, uses 2 decimal places
 		{10.5, "$10.50"},
 		{100.0, "$100.00"},
 	}

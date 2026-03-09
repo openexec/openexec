@@ -26,15 +26,15 @@ const (
 
 // Gemini model identifiers
 const (
-	ModelGemini20FlashExp     = "gemini-2.0-flash-exp"
-	ModelGemini20Flash        = "gemini-2.0-flash"
-	ModelGemini15Pro          = "gemini-1.5-pro"
-	ModelGemini15ProLatest    = "gemini-1.5-pro-latest"
-	ModelGemini15Flash        = "gemini-1.5-flash"
-	ModelGemini15FlashLatest  = "gemini-1.5-flash-latest"
-	ModelGemini15Flash8B      = "gemini-1.5-flash-8b"
-	ModelGeminiPro            = "gemini-pro"
-	ModelGeminiProVision      = "gemini-pro-vision"
+	ModelGemini20FlashExp    = "gemini-2.0-flash-exp"
+	ModelGemini20Flash       = "gemini-2.0-flash"
+	ModelGemini15Pro         = "gemini-1.5-pro"
+	ModelGemini15ProLatest   = "gemini-1.5-pro-latest"
+	ModelGemini15Flash       = "gemini-1.5-flash"
+	ModelGemini15FlashLatest = "gemini-1.5-flash-latest"
+	ModelGemini15Flash8B     = "gemini-1.5-flash-8b"
+	ModelGeminiPro           = "gemini-pro"
+	ModelGeminiProVision     = "gemini-pro-vision"
 )
 
 // GeminiProviderConfig holds configuration for the Gemini provider.
@@ -903,7 +903,7 @@ func defaultGeminiModelInfo() map[string]*ModelInfo {
 			},
 			PricePerMInputTokens:  0.50,
 			PricePerMOutputTokens: 1.50,
-			Deprecated:           true,
+			Deprecated:            true,
 		},
 		ModelGeminiProVision: {
 			ID:       ModelGeminiProVision,
@@ -920,7 +920,7 @@ func defaultGeminiModelInfo() map[string]*ModelInfo {
 			},
 			PricePerMInputTokens:  0.50,
 			PricePerMOutputTokens: 1.50,
-			Deprecated:           true,
+			Deprecated:            true,
 		},
 	}
 }
@@ -928,12 +928,12 @@ func defaultGeminiModelInfo() map[string]*ModelInfo {
 // Gemini API request/response types
 
 type geminiGenerateContentRequest struct {
-	Contents          []geminiContent          `json:"contents"`
-	SystemInstruction *geminiContent           `json:"systemInstruction,omitempty"`
-	GenerationConfig  *geminiGenerationConfig  `json:"generationConfig,omitempty"`
-	Tools             []geminiTool             `json:"tools,omitempty"`
-	ToolConfig        *geminiToolConfig        `json:"toolConfig,omitempty"`
-	SafetySettings    []geminiSafetySetting    `json:"safetySettings,omitempty"`
+	Contents          []geminiContent         `json:"contents"`
+	SystemInstruction *geminiContent          `json:"systemInstruction,omitempty"`
+	GenerationConfig  *geminiGenerationConfig `json:"generationConfig,omitempty"`
+	Tools             []geminiTool            `json:"tools,omitempty"`
+	ToolConfig        *geminiToolConfig       `json:"toolConfig,omitempty"`
+	SafetySettings    []geminiSafetySetting   `json:"safetySettings,omitempty"`
 }
 
 type geminiContent struct {
@@ -998,16 +998,16 @@ type geminiSafetySetting struct {
 }
 
 type geminiGenerateContentResponse struct {
-	Candidates     []geminiCandidate    `json:"candidates,omitempty"`
+	Candidates     []geminiCandidate     `json:"candidates,omitempty"`
 	PromptFeedback *geminiPromptFeedback `json:"promptFeedback,omitempty"`
 	UsageMetadata  *geminiUsageMetadata  `json:"usageMetadata,omitempty"`
 }
 
 type geminiCandidate struct {
-	Content       *geminiContent        `json:"content,omitempty"`
-	FinishReason  string                `json:"finishReason,omitempty"`
-	SafetyRatings []geminiSafetyRating  `json:"safetyRatings,omitempty"`
-	Index         int                   `json:"index,omitempty"`
+	Content       *geminiContent       `json:"content,omitempty"`
+	FinishReason  string               `json:"finishReason,omitempty"`
+	SafetyRatings []geminiSafetyRating `json:"safetyRatings,omitempty"`
+	Index         int                  `json:"index,omitempty"`
 }
 
 type geminiPromptFeedback struct {

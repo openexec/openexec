@@ -25,7 +25,7 @@ func (s *Server) handleListDirectories(w http.ResponseWriter, r *http.Request) {
 
 	// Clean path and ensure it's not trying to escape root if we wanted to enforce that
 	// For now we allow browsing based on provided path
-	
+
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to read directory: "+err.Error())
@@ -33,7 +33,7 @@ func (s *Server) handleListDirectories(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dirs := make([]DirectoryInfo, 0)
-	
+
 	// Add parent directory option if not at root
 	parent := filepath.Dir(path)
 	if parent != path {
@@ -47,7 +47,7 @@ func (s *Server) handleListDirectories(w http.ResponseWriter, r *http.Request) {
 		if !entry.IsDir() {
 			continue
 		}
-		
+
 		// Skip hidden directories
 		if strings.HasPrefix(entry.Name(), ".") {
 			continue

@@ -109,7 +109,7 @@ func TestGettersAndSetters(t *testing.T) {
 
 func TestInitializeConfig_DefaultPath(t *testing.T) {
 	viper.Reset()
-	
+
 	tmpHome := t.TempDir()
 	oldHome := os.Getenv("HOME")
 	os.Setenv("HOME", tmpHome)
@@ -131,7 +131,7 @@ func TestInitializeConfig_FileReadError(t *testing.T) {
 	viper.Reset()
 	tmpDir := t.TempDir()
 	cfgFile := filepath.Join(tmpDir, "unreadable.yaml")
-	
+
 	// Create a directory with the same name to cause a read error
 	os.Mkdir(cfgFile, 0755)
 

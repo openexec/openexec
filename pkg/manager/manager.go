@@ -38,8 +38,8 @@ type Config struct {
 	MaxReviewCycles      int
 	ThrashThreshold      int
 	RetryBackoff         []time.Duration
-	CommandName          string                // test override
-	CommandArgs          []string              // test override
+	CommandName          string   // test override
+	CommandArgs          []string // test override
 	LogDir               string
 	BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
 }
@@ -222,7 +222,7 @@ func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 	}
 
 	info := e.info
-	
+
 	// Get real-time health from pipeline
 	if h, ok := e.pipeline.GetHealth(); ok {
 		info.Iteration = h.Iteration
@@ -242,7 +242,7 @@ func (m *Manager) List() []PipelineInfo {
 	result := make([]PipelineInfo, 0, len(m.pipelines))
 	for _, e := range m.pipelines {
 		info := e.info
-		
+
 		// Get real-time health from pipeline
 		if h, ok := e.pipeline.GetHealth(); ok {
 			info.Iteration = h.Iteration

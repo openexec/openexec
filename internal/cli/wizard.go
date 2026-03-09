@@ -40,10 +40,10 @@ and contracts before generating your INTENT.md and stories using the native Go e
 		cmd.Printf("   Project: %s\n", config.Name)
 		cmd.Printf("   Engine:  Native Go Wizard\n")
 		cmd.Printf("   Model:   %s\n", model)
-		
+
 		statePath := filepath.Join(".openexec", "wizard_state.json")
 		stateJSON := "{}"
-		
+
 		// Try to resume existing session
 		if data, err := os.ReadFile(statePath); err == nil {
 			cmd.Println(color.YellowString("   [Resuming existing session from %s]", statePath))
@@ -84,7 +84,7 @@ and contracts before generating your INTENT.md and stories using the native Go e
 			// Update state for next turn
 			stateBytes, _ := json.Marshal(resp.UpdatedState)
 			stateJSON = string(stateBytes)
-			
+
 			// Persist state to disk
 			_ = os.WriteFile(statePath, stateBytes, 0644)
 
@@ -111,16 +111,16 @@ and contracts before generating your INTENT.md and stories using the native Go e
 			if resp.IsComplete {
 				cmd.Println()
 				cmd.Println(color.CyanString("✔ Intent is complete! Rendering INTENT.md..."))
-				
+
 				md, err := p.RenderIntent(cmd.Context(), stateJSON)
 				if err != nil {
 					return err
 				}
-				
+
 				if err := os.WriteFile("INTENT.md", []byte(md), 0644); err != nil {
 					return fmt.Errorf("failed to write INTENT.md: %w", err)
 				}
-				
+
 				cmd.Println("Written to INTENT.md")
 				cmd.Println("\nYou can now run: " + color.GreenString("openexec plan INTENT.md"))
 				return nil

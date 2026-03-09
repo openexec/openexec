@@ -18,13 +18,13 @@ import (
 
 // Common errors for session resume operations.
 var (
-	ErrSessionResumeNotFound     = errors.New("session resume state not found")
-	ErrSessionResumeInvalid      = errors.New("invalid session resume state")
-	ErrSessionResumeExpired      = errors.New("session resume state expired")
-	ErrSessionAlreadyResumed     = errors.New("session already resumed")
-	ErrNoSessionToResume         = errors.New("no session to resume")
-	ErrSessionResumeFailed       = errors.New("session resume failed")
-	ErrSessionPersistFailed      = errors.New("session persist failed")
+	ErrSessionResumeNotFound = errors.New("session resume state not found")
+	ErrSessionResumeInvalid  = errors.New("invalid session resume state")
+	ErrSessionResumeExpired  = errors.New("session resume state expired")
+	ErrSessionAlreadyResumed = errors.New("session already resumed")
+	ErrNoSessionToResume     = errors.New("no session to resume")
+	ErrSessionResumeFailed   = errors.New("session resume failed")
+	ErrSessionPersistFailed  = errors.New("session persist failed")
 )
 
 // SessionResumeStatus represents the lifecycle status of a session resume state.

@@ -39,11 +39,11 @@ type Release struct {
 
 // ReleaseGitInfo holds git-related information for a release.
 type ReleaseGitInfo struct {
-	Branch      string `json:"branch"`                  // e.g., "release/1.0.0"
-	Tag         string `json:"tag,omitempty"`           // e.g., "v1.0.0"
-	BaseBranch  string `json:"base_branch"`             // e.g., "main"
-	MergeCommit string `json:"merge_commit,omitempty"`  // Final merge to main
-	HeadCommit  string `json:"head_commit,omitempty"`   // Latest commit on release branch
+	Branch      string `json:"branch"`                 // e.g., "release/1.0.0"
+	Tag         string `json:"tag,omitempty"`          // e.g., "v1.0.0"
+	BaseBranch  string `json:"base_branch"`            // e.g., "main"
+	MergeCommit string `json:"merge_commit,omitempty"` // Final merge to main
+	HeadCommit  string `json:"head_commit,omitempty"`  // Latest commit on release branch
 }
 
 // Goal represents a high-level project objective.
@@ -58,14 +58,14 @@ type Goal struct {
 // Story represents a user story with git and approval tracking.
 type Story struct {
 	// Core fields
-	ID          string   `json:"id"`                      // e.g., "US-001"
-	EpicID      *string  `json:"epic_id,omitempty"`       // Parent epic if any
-	GoalID      string   `json:"goal_id,omitempty"`       // Parent goal if any
-	Title       string   `json:"title"`
-	Description string   `json:"description,omitempty"`   // Short description
-	Role        string   `json:"role,omitempty"`          // As a <role>
-	Want        string   `json:"want,omitempty"`          // I want <feature>
-	Benefit     string   `json:"benefit,omitempty"`       // So that <benefit>
+	ID          string  `json:"id"`                // e.g., "US-001"
+	EpicID      *string `json:"epic_id,omitempty"` // Parent epic if any
+	GoalID      string  `json:"goal_id,omitempty"` // Parent goal if any
+	Title       string  `json:"title"`
+	Description string  `json:"description,omitempty"` // Short description
+	Role        string  `json:"role,omitempty"`        // As a <role>
+	Want        string  `json:"want,omitempty"`        // I want <feature>
+	Benefit     string  `json:"benefit,omitempty"`     // So that <benefit>
 
 	// Acceptance criteria
 	AcceptanceCriteria []string `json:"acceptance_criteria"`
@@ -97,21 +97,21 @@ type Story struct {
 
 // StoryGitInfo holds git-related information for a story.
 type StoryGitInfo struct {
-	Branch       string     `json:"branch"`                  // e.g., "feature/US-001"
-	BaseBranch   string     `json:"base_branch"`             // e.g., "release/1.0.0"
-	MergedTo     string     `json:"merged_to,omitempty"`     // Branch it was merged into
-	MergeCommit  string     `json:"merge_commit,omitempty"`  // Merge commit hash
-	MergedAt     *time.Time `json:"merged_at,omitempty"`
-	CommitCount  int        `json:"commit_count,omitempty"`  // Total commits on branch
+	Branch      string     `json:"branch"`                 // e.g., "feature/US-001"
+	BaseBranch  string     `json:"base_branch"`            // e.g., "release/1.0.0"
+	MergedTo    string     `json:"merged_to,omitempty"`    // Branch it was merged into
+	MergeCommit string     `json:"merge_commit,omitempty"` // Merge commit hash
+	MergedAt    *time.Time `json:"merged_at,omitempty"`
+	CommitCount int        `json:"commit_count,omitempty"` // Total commits on branch
 }
 
 // Task represents a work unit with git and approval tracking.
 type Task struct {
 	// Core fields
-	ID          string  `json:"id"`           // e.g., "T-001"
-	Title       string  `json:"title"`
-	Description string  `json:"description,omitempty"`
-	StoryID     string  `json:"story_id"`     // Parent story
+	ID          string `json:"id"` // e.g., "T-001"
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	StoryID     string `json:"story_id"` // Parent story
 
 	// Verification
 	VerificationScript string `json:"verification_script,omitempty"`
@@ -151,10 +151,10 @@ type Task struct {
 
 // TaskGitInfo holds git-related information for a task.
 type TaskGitInfo struct {
-	Commits     []string `json:"commits"`               // Commit hashes implementing this task
-	Branch      string   `json:"branch,omitempty"`      // Branch where work was done
-	PRNumber    *int     `json:"pr_number,omitempty"`   // Pull request number if applicable
-	PRUrl       string   `json:"pr_url,omitempty"`      // Pull request URL
+	Commits  []string `json:"commits"`             // Commit hashes implementing this task
+	Branch   string   `json:"branch,omitempty"`    // Branch where work was done
+	PRNumber *int     `json:"pr_number,omitempty"` // Pull request number if applicable
+	PRUrl    string   `json:"pr_url,omitempty"`    // Pull request URL
 }
 
 // ApprovalInfo holds approval workflow information.

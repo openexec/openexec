@@ -11,7 +11,7 @@ import (
 
 func TestHandleListDirectories(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	// Create some subdirectories
 	err := os.MkdirAll(filepath.Join(tmpDir, "dir1"), 0755)
 	if err != nil {

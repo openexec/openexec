@@ -24,9 +24,9 @@ type PreflightReport struct {
 
 // Internal check functions, can be overridden for testing
 var (
-	dockerCheckFn = checkDocker
+	dockerCheckFn    = checkDocker
 	nodeCheckCheckFn = checkNode
-	pythonCheckFn = checkPython
+	pythonCheckFn    = checkPython
 )
 
 // RunPreflightChecks runs preflight checks based on task requirements.

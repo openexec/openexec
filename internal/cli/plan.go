@@ -190,7 +190,7 @@ func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, e
 
 	c := exec.CommandContext(ctx, cliCmd, cmdArgs...)
 	c.Stdin = strings.NewReader(prompt)
-	
+
 	output, err := c.CombinedOutput()
 	if err != nil {
 		outStr := string(output)

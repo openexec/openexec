@@ -34,7 +34,7 @@ func TestDoctorCmd(t *testing.T) {
 		tmpDir := t.TempDir()
 		projDir := filepath.Join(tmpDir, "broken-proj")
 		os.MkdirAll(filepath.Join(projDir, ".openexec"), 0755)
-		
+
 		// Corrupt state.json
 		os.WriteFile(filepath.Join(projDir, ".openexec", "state.json"), []byte("invalid json"), 0644)
 
@@ -57,7 +57,7 @@ func TestDoctorCmd(t *testing.T) {
 		tmpDir := t.TempDir()
 		projDir := filepath.Join(tmpDir, "valid-proj")
 		os.MkdirAll(filepath.Join(projDir, ".openexec"), 0755)
-		
+
 		state := map[string]interface{}{"status": "idle", "phase": "none"}
 		stateData, _ := json.Marshal(state)
 		os.WriteFile(filepath.Join(projDir, ".openexec", "state.json"), stateData, 0644)
@@ -112,7 +112,7 @@ func TestDoctorIntentCmd(t *testing.T) {
 - Data Source: Local
 `
 		os.WriteFile("INTENT.md", []byte(content), 0644)
-		
+
 		b := bytes.NewBufferString("")
 		rootCmd.SetOut(b)
 		rootCmd.SetArgs([]string{"doctor", "intent"})

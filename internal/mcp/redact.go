@@ -26,40 +26,40 @@ var defaultSecretPatterns = []SecretPattern{
 	{Name: "aws_secret_key", Pattern: regexp.MustCompile(`(?i)(?:aws[_-]?secret[_-]?(?:access[_-]?)?key|secret[_-]?access[_-]?key)['":\s=]+([A-Za-z0-9/+=]{40})`)},
 
 	// Generic API Key patterns (common prefixes)
-	{Name: "api_key_prefixed", Pattern: regexp.MustCompile(`(?i)\b(sk-[a-zA-Z0-9]{32,})\b`)},                                     // OpenAI-style
-	{Name: "api_key_prefixed2", Pattern: regexp.MustCompile(`(?i)\b(pk_live_[a-zA-Z0-9]{24,})\b`)},                               // Stripe public key
-	{Name: "api_key_prefixed3", Pattern: regexp.MustCompile(`(?i)\b(sk_live_[a-zA-Z0-9]{24,})\b`)},                               // Stripe secret key
-	{Name: "api_key_prefixed4", Pattern: regexp.MustCompile(`(?i)\b(rk_live_[a-zA-Z0-9]{24,})\b`)},                               // Stripe restricted key
-	{Name: "api_key_prefixed5", Pattern: regexp.MustCompile(`(?i)\b(ghp_[a-zA-Z0-9]{36})\b`)},                                    // GitHub personal access token
-	{Name: "api_key_prefixed6", Pattern: regexp.MustCompile(`(?i)\b(gho_[a-zA-Z0-9]{36})\b`)},                                    // GitHub OAuth access token
-	{Name: "api_key_prefixed7", Pattern: regexp.MustCompile(`(?i)\b(github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})\b`)},             // GitHub fine-grained PAT
-	{Name: "api_key_prefixed8", Pattern: regexp.MustCompile(`(?i)\b(xox[baprs]-[a-zA-Z0-9-]{10,})\b`)},                           // Slack tokens
-	{Name: "api_key_prefixed9", Pattern: regexp.MustCompile(`(?i)\b(SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43})\b`)},               // SendGrid
-	{Name: "api_key_prefixed10", Pattern: regexp.MustCompile(`(?i)\b(sq0[a-z]{3}-[a-zA-Z0-9_-]{22,})\b`)},                        // Square
-	{Name: "api_key_prefixed11", Pattern: regexp.MustCompile(`(?i)\b(EZAK[a-zA-Z0-9]{54})\b`)},                                   // EasyPost
-	{Name: "api_key_prefixed12", Pattern: regexp.MustCompile(`(?i)\b(AC[a-f0-9]{32})\b`)},                                        // Twilio Account SID
-	{Name: "api_key_prefixed13", Pattern: regexp.MustCompile(`(?i)\b(key-[a-zA-Z0-9]{32})\b`)},                                   // Mailgun
-	{Name: "api_key_prefixed14", Pattern: regexp.MustCompile(`(?i)\b(glpat-[a-zA-Z0-9_-]{20,})\b`)},                              // GitLab personal access token
-	{Name: "api_key_prefixed15", Pattern: regexp.MustCompile(`(?i)\b(npm_[a-zA-Z0-9]{36})\b`)},                                   // NPM token
-	{Name: "api_key_prefixed16", Pattern: regexp.MustCompile(`(?i)\b(pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9_-]{50,})\b`)},                // PyPI token
-	{Name: "api_key_prefixed17", Pattern: regexp.MustCompile(`(?i)\b(CLOJARS_[a-f0-9]{60})\b`)},                                  // Clojars
-	{Name: "api_key_prefixed18", Pattern: regexp.MustCompile(`(?i)\b(dop_v1_[a-f0-9]{64})\b`)},                                   // DigitalOcean personal access token
-	{Name: "api_key_prefixed19", Pattern: regexp.MustCompile(`(?i)\b(doo_v1_[a-f0-9]{64})\b`)},                                   // DigitalOcean OAuth token
-	{Name: "api_key_prefixed20", Pattern: regexp.MustCompile(`(?i)\b(anthropic-[a-zA-Z0-9]{32,})\b`)},                            // Anthropic API key pattern
-	{Name: "api_key_prefixed21", Pattern: regexp.MustCompile(`(?i)\b(sk-ant-[a-zA-Z0-9]{32,})\b`)},                               // Anthropic API key
-	{Name: "api_key_prefixed22", Pattern: regexp.MustCompile(`(?i)\b(AIza[a-zA-Z0-9_-]{35})\b`)},                                 // Google API Key
-	{Name: "api_key_prefixed23", Pattern: regexp.MustCompile(`(?i)\b(ya29\.[a-zA-Z0-9_-]+)\b`)},                                  // Google OAuth token
-	{Name: "api_key_prefixed24", Pattern: regexp.MustCompile(`(?i)\b(AGC[a-zA-Z0-9_-]{40,})\b`)},                                 // Firebase Cloud Messaging
-	{Name: "api_key_prefixed25", Pattern: regexp.MustCompile(`(?i)\b(r8_[a-zA-Z0-9]{30,})\b`)},                                   // Replicate API token
-	{Name: "api_key_prefixed26", Pattern: regexp.MustCompile(`(?i)\b(hf_[a-zA-Z0-9]{34})\b`)},                                    // Hugging Face token
-	{Name: "api_key_prefixed27", Pattern: regexp.MustCompile(`(?i)\b(whsec_[a-zA-Z0-9]{32,})\b`)},                                // Webhook secret
-	{Name: "api_key_prefixed28", Pattern: regexp.MustCompile(`(?i)\b(shpss_[a-fA-F0-9]{32}|shpat_[a-fA-F0-9]{32})\b`)},           // Shopify
-	{Name: "api_key_prefixed29", Pattern: regexp.MustCompile(`(?i)\b(EAA[A-Za-z0-9]+)\b`)},                                       // Facebook access token
-	{Name: "api_key_prefixed30", Pattern: regexp.MustCompile(`(?i)\b(heroku[_-]?api[_-]?key)['":\s=]+([a-f0-9-]{36,})\b`)},       // Heroku API Key
-	{Name: "api_key_prefixed31", Pattern: regexp.MustCompile(`(?i)\b(sentry[_-]?dsn)['":\s=]+https://[^@]+@[^\s'"]+`)},           // Sentry DSN
-	{Name: "api_key_prefixed32", Pattern: regexp.MustCompile(`(?i)\b(database[_-]?url)['":\s=]+[a-z]+://[^\s'"]+@[^\s'"]+\b`)},   // Database URL with credentials
-	{Name: "api_key_prefixed33", Pattern: regexp.MustCompile(`(?i)\b(redis[_-]?url)['":\s=]+redis://[^\s'"]+@[^\s'"]+\b`)},       // Redis URL with credentials
-	{Name: "api_key_prefixed34", Pattern: regexp.MustCompile(`(?i)\b(mongodb[_-]?uri)['":\s=]+mongodb(\+srv)?://[^\s'"]+\b`)},    // MongoDB URI
+	{Name: "api_key_prefixed", Pattern: regexp.MustCompile(`(?i)\b(sk-[a-zA-Z0-9]{32,})\b`)},                                   // OpenAI-style
+	{Name: "api_key_prefixed2", Pattern: regexp.MustCompile(`(?i)\b(pk_live_[a-zA-Z0-9]{24,})\b`)},                             // Stripe public key
+	{Name: "api_key_prefixed3", Pattern: regexp.MustCompile(`(?i)\b(sk_live_[a-zA-Z0-9]{24,})\b`)},                             // Stripe secret key
+	{Name: "api_key_prefixed4", Pattern: regexp.MustCompile(`(?i)\b(rk_live_[a-zA-Z0-9]{24,})\b`)},                             // Stripe restricted key
+	{Name: "api_key_prefixed5", Pattern: regexp.MustCompile(`(?i)\b(ghp_[a-zA-Z0-9]{36})\b`)},                                  // GitHub personal access token
+	{Name: "api_key_prefixed6", Pattern: regexp.MustCompile(`(?i)\b(gho_[a-zA-Z0-9]{36})\b`)},                                  // GitHub OAuth access token
+	{Name: "api_key_prefixed7", Pattern: regexp.MustCompile(`(?i)\b(github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})\b`)},           // GitHub fine-grained PAT
+	{Name: "api_key_prefixed8", Pattern: regexp.MustCompile(`(?i)\b(xox[baprs]-[a-zA-Z0-9-]{10,})\b`)},                         // Slack tokens
+	{Name: "api_key_prefixed9", Pattern: regexp.MustCompile(`(?i)\b(SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43})\b`)},             // SendGrid
+	{Name: "api_key_prefixed10", Pattern: regexp.MustCompile(`(?i)\b(sq0[a-z]{3}-[a-zA-Z0-9_-]{22,})\b`)},                      // Square
+	{Name: "api_key_prefixed11", Pattern: regexp.MustCompile(`(?i)\b(EZAK[a-zA-Z0-9]{54})\b`)},                                 // EasyPost
+	{Name: "api_key_prefixed12", Pattern: regexp.MustCompile(`(?i)\b(AC[a-f0-9]{32})\b`)},                                      // Twilio Account SID
+	{Name: "api_key_prefixed13", Pattern: regexp.MustCompile(`(?i)\b(key-[a-zA-Z0-9]{32})\b`)},                                 // Mailgun
+	{Name: "api_key_prefixed14", Pattern: regexp.MustCompile(`(?i)\b(glpat-[a-zA-Z0-9_-]{20,})\b`)},                            // GitLab personal access token
+	{Name: "api_key_prefixed15", Pattern: regexp.MustCompile(`(?i)\b(npm_[a-zA-Z0-9]{36})\b`)},                                 // NPM token
+	{Name: "api_key_prefixed16", Pattern: regexp.MustCompile(`(?i)\b(pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9_-]{50,})\b`)},              // PyPI token
+	{Name: "api_key_prefixed17", Pattern: regexp.MustCompile(`(?i)\b(CLOJARS_[a-f0-9]{60})\b`)},                                // Clojars
+	{Name: "api_key_prefixed18", Pattern: regexp.MustCompile(`(?i)\b(dop_v1_[a-f0-9]{64})\b`)},                                 // DigitalOcean personal access token
+	{Name: "api_key_prefixed19", Pattern: regexp.MustCompile(`(?i)\b(doo_v1_[a-f0-9]{64})\b`)},                                 // DigitalOcean OAuth token
+	{Name: "api_key_prefixed20", Pattern: regexp.MustCompile(`(?i)\b(anthropic-[a-zA-Z0-9]{32,})\b`)},                          // Anthropic API key pattern
+	{Name: "api_key_prefixed21", Pattern: regexp.MustCompile(`(?i)\b(sk-ant-[a-zA-Z0-9]{32,})\b`)},                             // Anthropic API key
+	{Name: "api_key_prefixed22", Pattern: regexp.MustCompile(`(?i)\b(AIza[a-zA-Z0-9_-]{35})\b`)},                               // Google API Key
+	{Name: "api_key_prefixed23", Pattern: regexp.MustCompile(`(?i)\b(ya29\.[a-zA-Z0-9_-]+)\b`)},                                // Google OAuth token
+	{Name: "api_key_prefixed24", Pattern: regexp.MustCompile(`(?i)\b(AGC[a-zA-Z0-9_-]{40,})\b`)},                               // Firebase Cloud Messaging
+	{Name: "api_key_prefixed25", Pattern: regexp.MustCompile(`(?i)\b(r8_[a-zA-Z0-9]{30,})\b`)},                                 // Replicate API token
+	{Name: "api_key_prefixed26", Pattern: regexp.MustCompile(`(?i)\b(hf_[a-zA-Z0-9]{34})\b`)},                                  // Hugging Face token
+	{Name: "api_key_prefixed27", Pattern: regexp.MustCompile(`(?i)\b(whsec_[a-zA-Z0-9]{32,})\b`)},                              // Webhook secret
+	{Name: "api_key_prefixed28", Pattern: regexp.MustCompile(`(?i)\b(shpss_[a-fA-F0-9]{32}|shpat_[a-fA-F0-9]{32})\b`)},         // Shopify
+	{Name: "api_key_prefixed29", Pattern: regexp.MustCompile(`(?i)\b(EAA[A-Za-z0-9]+)\b`)},                                     // Facebook access token
+	{Name: "api_key_prefixed30", Pattern: regexp.MustCompile(`(?i)\b(heroku[_-]?api[_-]?key)['":\s=]+([a-f0-9-]{36,})\b`)},     // Heroku API Key
+	{Name: "api_key_prefixed31", Pattern: regexp.MustCompile(`(?i)\b(sentry[_-]?dsn)['":\s=]+https://[^@]+@[^\s'"]+`)},         // Sentry DSN
+	{Name: "api_key_prefixed32", Pattern: regexp.MustCompile(`(?i)\b(database[_-]?url)['":\s=]+[a-z]+://[^\s'"]+@[^\s'"]+\b`)}, // Database URL with credentials
+	{Name: "api_key_prefixed33", Pattern: regexp.MustCompile(`(?i)\b(redis[_-]?url)['":\s=]+redis://[^\s'"]+@[^\s'"]+\b`)},     // Redis URL with credentials
+	{Name: "api_key_prefixed34", Pattern: regexp.MustCompile(`(?i)\b(mongodb[_-]?uri)['":\s=]+mongodb(\+srv)?://[^\s'"]+\b`)},  // MongoDB URI
 
 	// Generic secret assignment patterns (key=value, key: value, key="value")
 	{Name: "generic_secret", Pattern: regexp.MustCompile(`(?i)(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|auth[_-]?token|access[_-]?token|bearer|credentials?)['":\s=]+['"]?([^\s'"]{8,})['"]?`)},

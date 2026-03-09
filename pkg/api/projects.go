@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/openexec/openexec/internal/gates"
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/project"
 )
 
@@ -63,7 +63,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 		}
 
 		projectPath := filepath.Join(s.ProjectsDir, entry.Name())
-		
+
 		// Check for openexec.yaml (or .openexec/openexec.yaml)
 		cfg, err := gates.LoadConfig(projectPath)
 		if err == nil {

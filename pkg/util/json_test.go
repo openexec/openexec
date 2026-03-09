@@ -71,7 +71,7 @@ func TestUnmarshalRobust(t *testing.T) {
 	type Data struct {
 		Key string `json:"key"`
 	}
-	
+
 	input := "```json\n{\"key\": \"value\",}\n```"
 	var d Data
 	err := UnmarshalRobust(input, &d)

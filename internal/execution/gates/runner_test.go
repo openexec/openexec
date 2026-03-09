@@ -99,7 +99,7 @@ quality:
 
 func TestRunner_FormatForExecutor(t *testing.T) {
 	runner := &Runner{}
-	
+
 	// Case 1: All passed
 	report := &GateReport{
 		Passed:  true,
@@ -123,7 +123,7 @@ func TestRunner_FormatForExecutor(t *testing.T) {
 			},
 		},
 	}
-	
+
 	formatted = runner.FormatForExecutor(report)
 	if !strings.Contains(formatted, "QUALITY GATES FAILED") {
 		t.Error("missing failure header")
@@ -138,9 +138,9 @@ func TestRunner_FormatForExecutor(t *testing.T) {
 
 func TestExtractKeyError(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  string
-		want   string
+		name  string
+		input string
+		want  string
 	}{
 		{
 			name:  "standard error",

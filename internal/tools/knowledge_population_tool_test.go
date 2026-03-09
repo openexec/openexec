@@ -20,11 +20,11 @@ func TestKnowledgePopulationTool(t *testing.T) {
 	t.Run("Populate Environment", func(t *testing.T) {
 		// Act
 		_, err := tool.Execute(ctx, map[string]interface{}{
-			"type": "environment",
-			"env": "prod",
+			"type":         "environment",
+			"env":          "prod",
 			"runtime_type": "k8s",
-			"auth_steps": `["gcloud auth login"]`,
-			"topology": `[{"ip": "10.0.0.1", "services": ["frontend", "backend"]}]`,
+			"auth_steps":   `["gcloud auth login"]`,
+			"topology":     `[{"ip": "10.0.0.1", "services": ["frontend", "backend"]}]`,
 		})
 
 		// Assert
@@ -44,9 +44,9 @@ func TestKnowledgePopulationTool(t *testing.T) {
 	t.Run("Populate API Doc", func(t *testing.T) {
 		// Act
 		_, err := tool.Execute(ctx, map[string]interface{}{
-			"type": "api_doc",
-			"path": "/api/v1/user",
-			"method": "POST",
+			"type":        "api_doc",
+			"path":        "/api/v1/user",
+			"method":      "POST",
 			"description": "Create user",
 		})
 
@@ -54,7 +54,7 @@ func TestKnowledgePopulationTool(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
-		
+
 		got, _ := store.GetAPIDoc("/api/v1/user", "POST")
 		if got.Description != "Create user" {
 			t.Errorf("got description %q", got.Description)

@@ -12,7 +12,7 @@ var (
 	hetuRegex = regexp.MustCompile(`\b\d{6}[-+A]\d{3}[0-9A-Y]\b`)
 	// IPv4 pattern
 	ipv4Regex = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
-	
+
 	// Sensitive Key patterns
 	apiKeyRegex = regexp.MustCompile(`(?i)(?:key|password|secret|token|auth|credential|pwd)["']?\s*[:=]\s*["']?([a-zA-Z0-9\-_]{8,})["']?`)
 )
@@ -24,13 +24,13 @@ func ScrubPII(input string) string {
 	}
 
 	result := input
-	
+
 	// 1. Scrub Emails
 	result = emailRegex.ReplaceAllString(result, "[EMAIL_REDACTED]")
-	
+
 	// 2. Scrub Finnish HETU
 	result = hetuRegex.ReplaceAllString(result, "[HETU_REDACTED]")
-	
+
 	// 3. Scrub API Keys / Passwords in "key=value" format
 	// We want to keep the key but redact the value
 	result = scrubKeyValues(result)

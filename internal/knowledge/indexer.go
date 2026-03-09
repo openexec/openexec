@@ -27,8 +27,10 @@ func NewIndexer(store *Store) *Indexer {
 // IndexProject scans the directory and populates symbol and API records
 func (idx *Indexer) IndexProject(projectDir string) error {
 	return filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil { return err }
-		
+		if err != nil {
+			return err
+		}
+
 		// Skip hidden directories and node_modules
 		if info.IsDir() && (strings.HasPrefix(info.Name(), ".") || info.Name() == "node_modules") {
 			return filepath.SkipDir

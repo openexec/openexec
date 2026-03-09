@@ -25,10 +25,12 @@ var knowledgeLsCmd = &cobra.Command{
 		}
 
 		cmd.Printf("Searching for knowledge bases in %s...\n", searchDir)
-		
+
 		found := 0
 		err := filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil { return nil }
+			if err != nil {
+				return nil
+			}
 			if info.Name() == "knowledge.db" && strings.Contains(path, ".openexec") {
 				// Path is something like path/to/project/.openexec/knowledge.db
 				projectPath := filepath.Dir(filepath.Dir(path))

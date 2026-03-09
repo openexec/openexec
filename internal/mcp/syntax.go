@@ -40,10 +40,10 @@ type PythonSyntaxStats struct {
 
 // PythonSyntaxValidationResult contains the result of Python syntax validation.
 type PythonSyntaxValidationResult struct {
-	Valid    bool                 `json:"valid"`    // True if syntax is valid
-	Errors   []PythonSyntaxError  `json:"errors"`   // Syntax errors found
-	Warnings []PythonSyntaxError  `json:"warnings"` // Warnings (e.g., deprecated syntax)
-	Stats    PythonSyntaxStats    `json:"stats"`    // Code statistics
+	Valid    bool                `json:"valid"`    // True if syntax is valid
+	Errors   []PythonSyntaxError `json:"errors"`   // Syntax errors found
+	Warnings []PythonSyntaxError `json:"warnings"` // Warnings (e.g., deprecated syntax)
+	Stats    PythonSyntaxStats   `json:"stats"`    // Code statistics
 }
 
 // PythonValidatorConfig contains configuration for the Python validator.

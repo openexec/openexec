@@ -36,16 +36,16 @@ func TestLoop_Run(t *testing.T) {
 			cfg := DefaultConfig()
 			cfg.CommandName = mockPath
 			cfg.CommandArgs = []string{tt.scenario}
-			
+
 			l, events := New(cfg)
-			
+
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			
+
 			go func() {
 				_ = l.Run(ctx)
 			}()
-			
+
 			found := false
 			for {
 				select {

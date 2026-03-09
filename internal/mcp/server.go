@@ -51,8 +51,8 @@ type Server struct {
 // NewServer creates an MCP server reading from in, writing to out.
 func NewServer(in io.Reader, out io.Writer) *Server {
 	return &Server{
-		in:              in,
-		out:             out,
+		in:  in,
+		out: out,
 		pythonValidator: NewPythonValidatorWithConfig(&PythonValidatorConfig{
 			PythonPath:     "python3",
 			Timeout:        5 * time.Second,
@@ -865,13 +865,13 @@ func (s *Server) handleListSessionForks(req Request, params toolsCallParams) {
 		msgBuilder.WriteString(fmt.Sprintf("Found %d fork(s) of session %s:\n\n", len(forks), lsfReq.SessionID))
 		for _, fork := range forks {
 			forkData := map[string]interface{}{
-				"id":          fork.ID,
-				"title":       fork.Title,
-				"provider":    fork.Provider,
-				"model":       fork.Model,
-				"status":      string(fork.Status),
-				"created_at":  fork.CreatedAt.Format(time.RFC3339),
-				"fork_point":  fork.GetForkPointMessageID(),
+				"id":         fork.ID,
+				"title":      fork.Title,
+				"provider":   fork.Provider,
+				"model":      fork.Model,
+				"status":     string(fork.Status),
+				"created_at": fork.CreatedAt.Format(time.RFC3339),
+				"fork_point": fork.GetForkPointMessageID(),
 			}
 			forksList = append(forksList, forkData)
 

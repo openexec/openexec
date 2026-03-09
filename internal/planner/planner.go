@@ -88,7 +88,7 @@ func (p *Planner) GeneratePlan(ctx context.Context, intent string, prdContext ma
 func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 	// Extract JSON if it's wrapped in markdown blocks
 	jsonText := response
-	
+
 	// Find the first occurrence of { or [
 	start := strings.IndexAny(response, "{[")
 	if start != -1 {
@@ -99,7 +99,7 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 		} else {
 			endChar = "]"
 		}
-		
+
 		end := strings.LastIndex(response, endChar)
 		if end != -1 && end > start {
 			jsonText = response[start : end+1]
@@ -127,7 +127,7 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 // ProcessWizardMessage handles one turn of the interactive interview
 func (p *Planner) ProcessWizardMessage(ctx context.Context, message string, currentState string) (*WizardResponse, error) {
 	prompt := fmt.Sprintf("%s\n\nCurrent Intent State:\n%s\n\nUser Message: %s", WizardSystemPrompt, currentState, message)
-	
+
 	response, err := p.provider.Complete(ctx, prompt)
 	if err != nil {
 		return nil, err

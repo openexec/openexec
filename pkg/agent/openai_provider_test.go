@@ -538,11 +538,11 @@ func TestOpenAIProvider_CompleteWithTools(t *testing.T) {
 
 func TestOpenAIProvider_CompleteWithError(t *testing.T) {
 	tests := []struct {
-		name           string
-		statusCode     int
-		errorResponse  string
-		expectedCode   string
-		expectedRetry  bool
+		name          string
+		statusCode    int
+		errorResponse string
+		expectedCode  string
+		expectedRetry bool
 	}{
 		{
 			name:       "rate limit",
@@ -1286,8 +1286,8 @@ func TestOpenAIProvider_ConvertResponse_EmptyChoices(t *testing.T) {
 	provider, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "test-key"})
 
 	openAIResp := &openAIChatCompletionResponse{
-		ID:      "chatcmpl-123",
-		Model:   ModelGPT4o,
+		ID:    "chatcmpl-123",
+		Model: ModelGPT4o,
 		Choices: []struct {
 			Index        int           `json:"index"`
 			Message      openAIMessage `json:"message"`

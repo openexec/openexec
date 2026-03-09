@@ -46,7 +46,7 @@ func (t *DeployTool) InputSchema() string {
 
 func (t *DeployTool) Execute(ctx context.Context, args map[string]interface{}) (any, error) {
 	env, _ := args["env"].(string)
-	
+
 	// Fetch deterministic instructions for this environment
 	record, err := t.store.GetEnvironment(env)
 	if err != nil {
@@ -79,9 +79,9 @@ func (t *DeployTool) Execute(ctx context.Context, args map[string]interface{}) (
 		return nil, fmt.Errorf("deployment failed: %w\nOutput: %s", err, string(output))
 	}
 
-	result := fmt.Sprintf("🚀 Successfully deployed to %s [%s runtime]\nOutput: %s", 
+	result := fmt.Sprintf("🚀 Successfully deployed to %s [%s runtime]\nOutput: %s",
 		env, record.RuntimeType, string(output))
-	
+
 	if action, ok := args["action"].(string); ok && strings.Contains(action, "force") {
 		result += "\n⚠️ Warning: Force operation was used."
 	}

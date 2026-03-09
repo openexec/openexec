@@ -12,14 +12,14 @@ import (
 
 func TestHandleListProjects(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	// Create a mock project
 	projectPath := filepath.Join(tmpDir, "test-project")
 	err := os.MkdirAll(projectPath, 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	yamlContent := "project:\n  name: test-project\n  type: fullstack-webapp"
 	err = os.WriteFile(filepath.Join(projectPath, "openexec.yaml"), []byte(yamlContent), 0644)
 	if err != nil {

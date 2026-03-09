@@ -27,7 +27,7 @@ func (o *QueueOrchestrator) SubmitTask(id, tType, payload string) error {
 // StartWorker begins a long-running worker that polls the SQLite queue
 func (o *QueueOrchestrator) StartWorker(ctx context.Context, workerID string) {
 	log.Printf("[Queue] Starting durable worker %s", workerID)
-	
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
@@ -64,7 +64,7 @@ func (o *QueueOrchestrator) processNextTask(ctx context.Context, workerID string
 	// 3. Execution logic
 	// In production, this would call the Coordinator.ProcessQuery or Agent loop
 	err = o.dummyExecute(id, tType, payload)
-	
+
 	if err != nil {
 		log.Printf("[Queue] Task %s failed: %v", id, err)
 		o.store.UpdateTaskStatus(id, "failed", err.Error())

@@ -35,7 +35,7 @@ type Config struct {
 	LogDir string
 
 	// Evidence configuration
-	EvidenceDir string
+	EvidenceDir      string
 	EvidenceBucket   string
 	EvidenceRegion   string
 	EvidenceEndpoint string

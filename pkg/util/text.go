@@ -15,7 +15,7 @@ func SanitizeInput(input string) string {
 			b.WriteRune(r)
 		}
 	}
-	
+
 	// Trim leading/trailing whitespace
 	return strings.TrimSpace(b.String())
 }

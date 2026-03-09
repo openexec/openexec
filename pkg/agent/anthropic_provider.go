@@ -305,17 +305,17 @@ func (p *AnthropicProvider) EstimateTokens(content string) int {
 
 // anthropicRequest is the request format for the Anthropic API.
 type anthropicRequest struct {
-	Model       string              `json:"model"`
-	Messages    []anthropicMessage  `json:"messages"`
-	System      string              `json:"system,omitempty"`
-	MaxTokens   int                 `json:"max_tokens"`
-	Temperature *float64            `json:"temperature,omitempty"`
-	TopP        *float64            `json:"top_p,omitempty"`
-	Stop        []string            `json:"stop_sequences,omitempty"`
-	Tools       []anthropicTool     `json:"tools,omitempty"`
+	Model       string               `json:"model"`
+	Messages    []anthropicMessage   `json:"messages"`
+	System      string               `json:"system,omitempty"`
+	MaxTokens   int                  `json:"max_tokens"`
+	Temperature *float64             `json:"temperature,omitempty"`
+	TopP        *float64             `json:"top_p,omitempty"`
+	Stop        []string             `json:"stop_sequences,omitempty"`
+	Tools       []anthropicTool      `json:"tools,omitempty"`
 	ToolChoice  *anthropicToolChoice `json:"tool_choice,omitempty"`
-	Stream      bool                `json:"stream,omitempty"`
-	Metadata    map[string]string   `json:"metadata,omitempty"`
+	Stream      bool                 `json:"stream,omitempty"`
+	Metadata    map[string]string    `json:"metadata,omitempty"`
 }
 
 // anthropicMessage represents a message in the Anthropic format.
@@ -332,8 +332,8 @@ type anthropicTextContent struct {
 
 // anthropicImageContent represents image content in a message.
 type anthropicImageContent struct {
-	Type   string                    `json:"type"`
-	Source anthropicImageSource      `json:"source"`
+	Type   string               `json:"type"`
+	Source anthropicImageSource `json:"source"`
 }
 
 // anthropicImageSource contains image data.
@@ -374,14 +374,14 @@ type anthropicToolChoice struct {
 
 // anthropicResponse is the response format from the Anthropic API.
 type anthropicResponse struct {
-	ID           string                `json:"id"`
-	Type         string                `json:"type"`
-	Role         string                `json:"role"`
+	ID           string                  `json:"id"`
+	Type         string                  `json:"type"`
+	Role         string                  `json:"role"`
 	Content      []anthropicContentBlock `json:"content"`
-	Model        string                `json:"model"`
-	StopReason   string                `json:"stop_reason"`
-	StopSequence string                `json:"stop_sequence,omitempty"`
-	Usage        anthropicUsage        `json:"usage"`
+	Model        string                  `json:"model"`
+	StopReason   string                  `json:"stop_reason"`
+	StopSequence string                  `json:"stop_sequence,omitempty"`
+	Usage        anthropicUsage          `json:"usage"`
 }
 
 // anthropicContentBlock represents a content block in the response.
@@ -770,8 +770,8 @@ func (p *AnthropicProvider) processStream(ctx context.Context, body io.ReadClose
 		case "message_start":
 			if event.Message != nil {
 				usage = &Usage{
-					PromptTokens: event.Message.Usage.InputTokens,
-					CacheReadTokens: event.Message.Usage.CacheReadInputTokens,
+					PromptTokens:     event.Message.Usage.InputTokens,
+					CacheReadTokens:  event.Message.Usage.CacheReadInputTokens,
 					CacheWriteTokens: event.Message.Usage.CacheCreationInputTokens,
 				}
 			}

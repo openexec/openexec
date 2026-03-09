@@ -364,14 +364,14 @@ func (t *Tracker) MergeStoryToRelease(storyID, releaseVersion string) (*MergeInf
 
 // MergeConflictError represents a git merge conflict.
 type MergeConflictError struct {
-	StoryID       string
-	SourceBranch  string
-	TargetBranch  string
-	RawError      error
+	StoryID      string
+	SourceBranch string
+	TargetBranch string
+	RawError     error
 }
 
 func (e *MergeConflictError) Error() string {
-	return fmt.Sprintf("merge conflict in story %s: failed to merge %s into %s: %v", 
+	return fmt.Sprintf("merge conflict in story %s: failed to merge %s into %s: %v",
 		e.StoryID, e.SourceBranch, e.TargetBranch, e.RawError)
 }
 

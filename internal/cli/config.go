@@ -13,8 +13,8 @@ import (
 // ProjectConfig holds project-level configuration.
 type ProjectConfig struct {
 	// Git integration
-	GitEnabled  bool   `json:"git_enabled"`
-	BaseBranch  string `json:"base_branch"`
+	GitEnabled bool   `json:"git_enabled"`
+	BaseBranch string `json:"base_branch"`
 
 	// Approval workflow
 	ApprovalEnabled bool `json:"approval_enabled"`

@@ -425,10 +425,10 @@ type LoopHealth struct {
 func (l *Loop) GetHealth() LoopHealth {
 	return LoopHealth{
 		Active:       !l.stopped.Load() && !l.paused.Load(),
-		Iteration:  l.iteration,
-		Status:     "running", // Simplified
-		LastUpdate: time.Now(),
+		Iteration:    l.iteration,
+		Status:       "running", // Simplified
+		LastUpdate:   time.Now(),
 		LastActivity: time.Now(),
-		CurrentPID: os.Getpid(),
+		CurrentPID:   os.Getpid(),
 	}
 }

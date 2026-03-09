@@ -83,14 +83,14 @@ func (e *OrchestratorRiskEscalator) IsOrchestratorEdit(toolName, toolInput strin
 
 // isFileModificationTool checks if a tool can modify files.
 var fileModificationTools = map[string]bool{
-	"write_file":        true,
-	"edit_file":         true,
-	"delete_file":       true,
-	"create_directory":  true,
-	"git_apply_patch":   true,
-	"rename_file":       true,
-	"move_file":         true,
-	"copy_file":         true,
+	"write_file":       true,
+	"edit_file":        true,
+	"delete_file":      true,
+	"create_directory": true,
+	"git_apply_patch":  true,
+	"rename_file":      true,
+	"move_file":        true,
+	"copy_file":        true,
 }
 
 func isFileModificationTool(toolName string) bool {

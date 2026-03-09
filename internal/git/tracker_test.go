@@ -10,7 +10,7 @@ import (
 func TestTracker(t *testing.T) {
 	repoPath := setupTestRepo(t)
 	client := NewClient(Config{Enabled: true, RepoPath: repoPath})
-	
+
 	tmpDir := t.TempDir()
 	storePath := filepath.Join(tmpDir, "tracker.json")
 
@@ -68,7 +68,7 @@ func TestTracker(t *testing.T) {
 func TestAutoLinkCommitsFromMessages(t *testing.T) {
 	repoPath := setupTestRepo(t)
 	client := NewClient(Config{Enabled: true, RepoPath: repoPath})
-	
+
 	// Add a commit with task ID in message
 	err := os.WriteFile(filepath.Join(repoPath, "file.txt"), []byte("data"), 0644)
 	if err != nil {
@@ -99,9 +99,9 @@ func TestAutoLinkCommitsFromMessages(t *testing.T) {
 func TestMergeStoryToRelease(t *testing.T) {
 	repoPath := setupTestRepo(t)
 	client := NewClient(Config{Enabled: true, RepoPath: repoPath})
-	
+
 	mainBranch, _ := client.CurrentBranch()
-	
+
 	tmpDir := t.TempDir()
 	storePath := filepath.Join(tmpDir, "tracker.json")
 	tracker, _ := NewTracker(client, storePath)
@@ -155,7 +155,7 @@ func TestTracker_MergeStory_Conflict(t *testing.T) {
 
 	mainBranch, _ := client.CurrentBranch()
 	tracker.CreateReleaseBranch("1.2.0", mainBranch)
-	
+
 	// Create conflict
 	os.WriteFile(filepath.Join(repoPath, "conflict.txt"), []byte("base"), 0644)
 	runGit(t, repoPath, "add", "conflict.txt")
@@ -213,7 +213,7 @@ func TestTracker_StoryMergeInfo(t *testing.T) {
 		MergeCommit: "hash123",
 	}
 	tracker.RecordStoryMerge("S-001", info)
-	
+
 	merge := tracker.GetStoryMerge("S-001")
 	if merge == nil || merge.MergeCommit != "hash123" {
 		t.Errorf("GetStoryMerge failed: %v", merge)
@@ -224,7 +224,7 @@ func TestNewTracker_Empty(t *testing.T) {
 	tmpDir := t.TempDir()
 	storePath := filepath.Join(tmpDir, "non-existent.json")
 	client := NewClient(Config{Enabled: false})
-	
+
 	// Should not fail if file doesn't exist, just create empty state
 	tracker, err := NewTracker(client, storePath)
 	if err != nil {
@@ -240,7 +240,7 @@ func TestTracker_GetState(t *testing.T) {
 	storePath := filepath.Join(tmpDir, "state.json")
 	client := NewClient(Config{Enabled: true})
 	tracker, _ := NewTracker(client, storePath)
-	
+
 	tracker.SetStoryBranch("S1", "branch1")
 	state := tracker.GetState()
 	if state.StoryBranches["S1"] != "branch1" {
@@ -253,7 +253,7 @@ func TestTracker_LoadError(t *testing.T) {
 	storePath := filepath.Join(tmpDir, "bad.json")
 	os.WriteFile(storePath, []byte("invalid json"), 0644)
 	client := NewClient(Config{Enabled: false})
-	
+
 	_, err := NewTracker(client, storePath)
 	if err == nil {
 		t.Error("expected error loading invalid json")
@@ -263,7 +263,7 @@ func TestTracker_LoadError(t *testing.T) {
 func TestTracker_MergeStory_Empty(t *testing.T) {
 	client := NewClient(Config{Enabled: true})
 	tracker, _ := NewTracker(client, "tracker.json")
-	
+
 	_, err := tracker.MergeStoryToRelease("S-NONE", "1.0.0")
 	if err == nil || !strings.Contains(err.Error(), "no branch found") {
 		t.Errorf("expected 'no branch' error, got %v", err)
@@ -274,7 +274,7 @@ func TestTracker_TagRelease_Existing(t *testing.T) {
 	repoPath := setupTestRepo(t)
 	client := NewClient(Config{Enabled: true, RepoPath: repoPath})
 	tracker, _ := NewTracker(client, filepath.Join(t.TempDir(), "t.json"))
-	
+
 	client.CreateTag("v1.0.0", "Init")
 	err := tracker.TagRelease("1.0.0", "Msg")
 	if err != nil {

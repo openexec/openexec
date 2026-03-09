@@ -11,23 +11,23 @@ import (
 
 // GateResult holds the result of running a single gate.
 type GateResult struct {
-	Name       string        `json:"name"`
-	Passed     bool          `json:"passed"`
-	Output     string        `json:"output"`
-	Error      string        `json:"error,omitempty"`
-	Duration   time.Duration `json:"duration_ms"`
-	ExitCode   int           `json:"exit_code"`
-	IsWarning  bool          `json:"is_warning,omitempty"`
-	FixHint    string        `json:"fix_hint,omitempty"`
+	Name      string        `json:"name"`
+	Passed    bool          `json:"passed"`
+	Output    string        `json:"output"`
+	Error     string        `json:"error,omitempty"`
+	Duration  time.Duration `json:"duration_ms"`
+	ExitCode  int           `json:"exit_code"`
+	IsWarning bool          `json:"is_warning,omitempty"`
+	FixHint   string        `json:"fix_hint,omitempty"`
 }
 
 // GateReport holds results from running all gates.
 type GateReport struct {
-	Passed       bool          `json:"passed"`
-	Results      []GateResult  `json:"results"`
-	TotalTime    time.Duration `json:"total_time_ms"`
-	FailedGates  []string      `json:"failed_gates,omitempty"`
-	Summary      string        `json:"summary"`
+	Passed      bool          `json:"passed"`
+	Results     []GateResult  `json:"results"`
+	TotalTime   time.Duration `json:"total_time_ms"`
+	FailedGates []string      `json:"failed_gates,omitempty"`
+	Summary     string        `json:"summary"`
 }
 
 // Runner executes quality gates.
@@ -197,13 +197,13 @@ func (r *Runner) generateSummary(report *GateReport) string {
 // generateFixHint provides guidance on how to fix a failed gate.
 func (r *Runner) generateFixHint(gateName, output string) string {
 	hints := map[string]string{
-		"deps_install":      "Check package.json/requirements.txt for missing or incompatible dependencies",
-		"services_start":    "Check Docker is running: 'docker ps'. Check container logs for startup errors.",
-		"services_respond":  "Services started but aren't responding. Check health endpoints and logs.",
-		"frontend_renders":  "Frontend returns blank/error page. Check browser console and Next.js build.",
-		"e2e":               "E2E tests failed. Check test output for specific failures.",
-		"typecheck":         "TypeScript/MyPy errors. Fix type annotations.",
-		"lint":              "Linting errors. Run formatter or fix code style issues.",
+		"deps_install":     "Check package.json/requirements.txt for missing or incompatible dependencies",
+		"services_start":   "Check Docker is running: 'docker ps'. Check container logs for startup errors.",
+		"services_respond": "Services started but aren't responding. Check health endpoints and logs.",
+		"frontend_renders": "Frontend returns blank/error page. Check browser console and Next.js build.",
+		"e2e":              "E2E tests failed. Check test output for specific failures.",
+		"typecheck":        "TypeScript/MyPy errors. Fix type annotations.",
+		"lint":             "Linting errors. Run formatter or fix code style issues.",
 	}
 
 	if hint, ok := hints[gateName]; ok {

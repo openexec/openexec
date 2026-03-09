@@ -94,7 +94,7 @@ The project name defaults to the current directory name if not provided.`,
 					projectName = defaultProjectName
 				}
 			}
-			
+
 			// 2. Execution Config prompt
 			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount = promptExecutionConfig(cmd)
 		} else {

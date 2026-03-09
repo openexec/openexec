@@ -114,7 +114,7 @@ func (c *Client) readPump(s *Server) {
 			}
 			break
 		}
-		
+
 		var req struct {
 			Type      string `json:"type"`
 			SessionID string `json:"sessionId"`
@@ -130,16 +130,16 @@ func (c *Client) readPump(s *Server) {
 			if c.unsub != nil {
 				c.unsub()
 			}
-			
+
 			events, unsub, err := s.Mgr.Subscribe(req.SessionID)
 			if err != nil {
 				log.Printf("[WS] failed to subscribe to %s: %v", req.SessionID, err)
 				continue
 			}
-			
+
 			c.unsub = unsub
 			log.Printf("[WS] Client subscribed to session: %s", req.SessionID)
-			
+
 			// Start event relay for this session
 			go func(sessionId string, ch <-chan loop.Event) {
 				for event := range ch {

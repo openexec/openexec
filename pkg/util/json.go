@@ -13,7 +13,7 @@ func SanitizeJSON(input string) ([]byte, error) {
 	// Strategy 1: Find JSON in markdown code blocks
 	reJSON := regexp.MustCompile("(?s)```(?:json)?\n?(.*?)\n?```")
 	matches := reJSON.FindStringSubmatch(input)
-	
+
 	jsonText := input
 	if len(matches) > 1 {
 		jsonText = matches[1]
@@ -21,13 +21,13 @@ func SanitizeJSON(input string) ([]byte, error) {
 		// Strategy 2: Extract content between first { and last }
 		first := strings.Index(input, "{")
 		last := strings.LastIndex(input, "}")
-		
+
 		// If no braces, check for arrays
 		if first == -1 {
 			first = strings.Index(input, "[")
 			last = strings.LastIndex(input, "]")
 		}
-		
+
 		if first != -1 && last != -1 && last > first {
 			jsonText = input[first : last+1]
 		}
@@ -42,7 +42,7 @@ func SanitizeJSON(input string) ([]byte, error) {
 	// Remove // comments
 	reComments := regexp.MustCompile(`(?m)//.*$`)
 	cleaned := reComments.ReplaceAllString(jsonText, "")
-	
+
 	// Remove trailing commas before } or ]
 	reCommas := regexp.MustCompile(`,\s*([\}\]])`)
 	cleaned = reCommas.ReplaceAllString(cleaned, "$1")

@@ -20,8 +20,8 @@ func TestSymbolReaderTool(t *testing.T) {
 	t.Run("Execute Success", func(t *testing.T) {
 		// Arrange
 		store.SetSymbol(&knowledge.SymbolRecord{
-			Name: "MyFunc",
-			Kind: "func",
+			Name:    "MyFunc",
+			Kind:    "func",
 			Purpose: "Testing",
 		})
 

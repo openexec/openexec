@@ -72,16 +72,16 @@ func TestSchema_SessionsTableColumns(t *testing.T) {
 	defer rows.Close()
 
 	expectedColumns := map[string]bool{
-		"id":                     false,
-		"project_path":           false,
-		"provider":               false,
-		"model":                  false,
-		"title":                  false,
-		"parent_session_id":      false,
-		"fork_point_message_id":  false,
-		"status":                 false,
-		"created_at":             false,
-		"updated_at":             false,
+		"id":                    false,
+		"project_path":          false,
+		"provider":              false,
+		"model":                 false,
+		"title":                 false,
+		"parent_session_id":     false,
+		"fork_point_message_id": false,
+		"status":                false,
+		"created_at":            false,
+		"updated_at":            false,
 	}
 
 	for rows.Next() {
@@ -339,18 +339,18 @@ func TestSchema_IndexesCreated(t *testing.T) {
 	defer rows.Close()
 
 	expectedIndexes := map[string]bool{
-		"idx_sessions_project_path":          false,
-		"idx_sessions_status":                false,
-		"idx_sessions_created_at":            false,
-		"idx_sessions_parent":                false,
-		"idx_messages_session_id":            false,
-		"idx_messages_created_at":            false,
-		"idx_messages_role":                  false,
-		"idx_tool_calls_session_id":          false,
-		"idx_tool_calls_message_id":          false,
-		"idx_tool_calls_status":              false,
-		"idx_tool_calls_tool_name":           false,
-		"idx_session_summaries_session_id":   false,
+		"idx_sessions_project_path":        false,
+		"idx_sessions_status":              false,
+		"idx_sessions_created_at":          false,
+		"idx_sessions_parent":              false,
+		"idx_messages_session_id":          false,
+		"idx_messages_created_at":          false,
+		"idx_messages_role":                false,
+		"idx_tool_calls_session_id":        false,
+		"idx_tool_calls_message_id":        false,
+		"idx_tool_calls_status":            false,
+		"idx_tool_calls_tool_name":         false,
+		"idx_session_summaries_session_id": false,
 	}
 
 	for rows.Next() {

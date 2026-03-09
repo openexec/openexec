@@ -31,12 +31,12 @@ type ServerNode struct {
 
 // EnvironmentRecord represents a complex deployment environment
 type EnvironmentRecord struct {
-	Env          string       `json:"env"`           // e.g., dev, prod, local
-	RuntimeType  string       `json:"runtime_type"`  // e.g., k8s, docker-compose, vm-docker
-	AuthSteps    string       `json:"auth_steps"`    // JSON array of strings: ["gcloud auth login"]
-	DeploySteps  string       `json:"deploy_steps"`  // JSON array of strings
-	Topology     string       `json:"topology"`      // JSON array of ServerNode
-	Instructions string       `json:"instructions"`  // Human readable fallback context
+	Env          string `json:"env"`          // e.g., dev, prod, local
+	RuntimeType  string `json:"runtime_type"` // e.g., k8s, docker-compose, vm-docker
+	AuthSteps    string `json:"auth_steps"`   // JSON array of strings: ["gcloud auth login"]
+	DeploySteps  string `json:"deploy_steps"` // JSON array of strings
+	Topology     string `json:"topology"`     // JSON array of ServerNode
+	Instructions string `json:"instructions"` // Human readable fallback context
 }
 
 // APIDocRecord represents contract metadata
@@ -57,10 +57,10 @@ type PolicyRecord struct {
 
 // PRDRecord represents a structured product requirement (Persona, Flow, Requirement)
 type PRDRecord struct {
-	Section     string `json:"section"` // e.g., "personas", "user_journeys", "functional"
-	Key         string `json:"key"`     // e.g., "admin_user", "login_flow"
-	Content     string `json:"content"` // Detailed markdown or JSON
-	Metadata    string `json:"metadata"`
+	Section  string `json:"section"` // e.g., "personas", "user_journeys", "functional"
+	Key      string `json:"key"`     // e.g., "admin_user", "login_flow"
+	Content  string `json:"content"` // Detailed markdown or JSON
+	Metadata string `json:"metadata"`
 }
 
 type Store struct {
@@ -171,14 +171,18 @@ func (s *Store) GetSymbol(name string) (*SymbolRecord, error) {
 	r := &SymbolRecord{}
 	query := `SELECT name, kind, file_path, start_line, end_line, purpose, input_params, output_params, signature FROM symbols WHERE name = ?`
 	err := s.db.QueryRow(query, name).Scan(&r.Name, &r.Kind, &r.FilePath, &r.StartLine, &r.EndLine, &r.Purpose, &r.InputParams, &r.OutputParams, &r.Signature)
-	if err == sql.ErrNoRows { return nil, nil }
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	return r, err
 }
 
 func (s *Store) ListSymbols() ([]*SymbolRecord, error) {
 	query := `SELECT name, kind, file_path, start_line, end_line, purpose FROM symbols ORDER BY name`
 	rows, err := s.db.Query(query)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	var results []*SymbolRecord
@@ -210,14 +214,18 @@ func (s *Store) GetEnvironment(env string) (*EnvironmentRecord, error) {
 	r := &EnvironmentRecord{}
 	query := `SELECT env, runtime_type, auth_steps, deploy_steps, topology, instructions FROM environments WHERE env = ?`
 	err := s.db.QueryRow(query, env).Scan(&r.Env, &r.RuntimeType, &r.AuthSteps, &r.DeploySteps, &r.Topology, &r.Instructions)
-	if err == sql.ErrNoRows { return nil, nil }
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	return r, err
 }
 
 func (s *Store) ListEnvironments() ([]*EnvironmentRecord, error) {
 	query := `SELECT env, runtime_type, topology FROM environments`
 	rows, err := s.db.Query(query)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	var results []*EnvironmentRecord
@@ -243,14 +251,18 @@ func (s *Store) GetAPIDoc(path, method string) (*APIDocRecord, error) {
 	r := &APIDocRecord{}
 	query := `SELECT path, method, request_schema, response_schema, description FROM api_docs WHERE path = ? AND method = ?`
 	err := s.db.QueryRow(query, path, method).Scan(&r.Path, &r.Method, &r.RequestSchema, &r.ResponseSchema, &r.Description)
-	if err == sql.ErrNoRows { return nil, nil }
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	return r, err
 }
 
 func (s *Store) ListAPIDocs() ([]*APIDocRecord, error) {
 	query := `SELECT path, method, description FROM api_docs ORDER BY path`
 	rows, err := s.db.Query(query)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	var results []*APIDocRecord
@@ -276,14 +288,18 @@ func (s *Store) GetPolicy(key string) (*PolicyRecord, error) {
 	r := &PolicyRecord{}
 	query := `SELECT key, value, description FROM policies WHERE key = ?`
 	err := s.db.QueryRow(query, key).Scan(&r.Key, &r.Value, &r.Description)
-	if err == sql.ErrNoRows { return nil, nil }
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	return r, err
 }
 
 func (s *Store) ListPolicies() ([]*PolicyRecord, error) {
 	query := `SELECT key, value, description FROM policies ORDER BY key`
 	rows, err := s.db.Query(query)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	var results []*PolicyRecord
@@ -309,14 +325,18 @@ func (s *Store) GetPRDRecord(section, key string) (*PRDRecord, error) {
 	r := &PRDRecord{}
 	query := `SELECT section, key, content, metadata FROM prd_specs WHERE section = ? AND key = ?`
 	err := s.db.QueryRow(query, section, key).Scan(&r.Section, &r.Key, &r.Content, &r.Metadata)
-	if err == sql.ErrNoRows { return nil, nil }
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	return r, err
 }
 
 func (s *Store) ListPRDRecords(section string) ([]*PRDRecord, error) {
 	query := `SELECT section, key, content, metadata FROM prd_specs WHERE section = ?`
 	rows, err := s.db.Query(query, section)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
 	var results []*PRDRecord
@@ -342,7 +362,7 @@ func (s *Store) ClaimTask(workerID string) (id, tType, payload string, err error
 	query := `UPDATE task_queue SET status = 'running', last_ping = CURRENT_TIMESTAMP WHERE id = (
 		SELECT id FROM task_queue WHERE status = 'pending' LIMIT 1
 	) RETURNING id, type, payload`
-	
+
 	err = s.db.QueryRow(query).Scan(&id, &tType, &payload)
 	if err == sql.ErrNoRows {
 		return "", "", "", nil

@@ -31,8 +31,8 @@ func RegisterBudgetRoutes(mux *http.ServeMux, monitor *budget.Monitor) {
 
 // BudgetStatusResponse represents the budget status API response.
 type BudgetStatusResponse struct {
-	Status    *budget.Status `json:"status"`
-	Config    *BudgetConfigResponse `json:"config,omitempty"`
+	Status *budget.Status        `json:"status"`
+	Config *BudgetConfigResponse `json:"config,omitempty"`
 }
 
 // BudgetConfigResponse represents the budget configuration for API responses.
@@ -104,14 +104,14 @@ func (h *BudgetHandler) handleGetConfig(w http.ResponseWriter, r *http.Request) 
 
 // BudgetConfigUpdateRequest represents a request to update budget configuration.
 type BudgetConfigUpdateRequest struct {
-	Enabled           *bool     `json:"enabled,omitempty"`
-	TotalBudgetUSD    *float64  `json:"total_budget_usd,omitempty"`
-	SessionBudgetUSD  *float64  `json:"session_budget_usd,omitempty"`
-	DailyBudgetUSD    *float64  `json:"daily_budget_usd,omitempty"`
-	WarningThreshold  *float64  `json:"warning_threshold,omitempty"`
-	CriticalThreshold *float64  `json:"critical_threshold,omitempty"`
-	BlockOnExceed     *bool     `json:"block_on_exceed,omitempty"`
-	AlertChannels     []string  `json:"alert_channels,omitempty"`
+	Enabled           *bool    `json:"enabled,omitempty"`
+	TotalBudgetUSD    *float64 `json:"total_budget_usd,omitempty"`
+	SessionBudgetUSD  *float64 `json:"session_budget_usd,omitempty"`
+	DailyBudgetUSD    *float64 `json:"daily_budget_usd,omitempty"`
+	WarningThreshold  *float64 `json:"warning_threshold,omitempty"`
+	CriticalThreshold *float64 `json:"critical_threshold,omitempty"`
+	BlockOnExceed     *bool    `json:"block_on_exceed,omitempty"`
+	AlertChannels     []string `json:"alert_channels,omitempty"`
 }
 
 // handleUpdateConfig updates the budget configuration.

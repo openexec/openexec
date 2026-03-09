@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -14,11 +15,11 @@ import (
 // Manager orchestrates the approval workflow for tool operations.
 // It combines policy evaluation with request lifecycle management.
 type Manager struct {
-	repo                     Repository
-	riskMappings             map[string]RiskLevel
-	sessionTrust             map[string]bool // sessionID -> has established trust
+	repo                      Repository
+	riskMappings              map[string]RiskLevel
+	sessionTrust              map[string]bool // sessionID -> has established trust
 	orchestratorRiskEscalator *OrchestratorRiskEscalator
-	mu                       sync.RWMutex
+	mu                        sync.RWMutex
 }
 
 // NewManager creates a new approval manager with the given repository.
@@ -512,11 +513,11 @@ func (m *Manager) SetDefaultPolicy(ctx context.Context, policyID string) error {
 
 // ApprovalResult represents the result of checking approval status.
 type ApprovalResult struct {
-	Request   *ApprovalRequest
-	Decision  *ApprovalDecision
-	Approved  bool
-	Pending   bool
-	Reason    string
+	Request  *ApprovalRequest
+	Decision *ApprovalDecision
+	Approved bool
+	Pending  bool
+	Reason   string
 }
 
 // CheckApproval checks the current approval status for a tool call.
@@ -1526,18 +1527,7 @@ func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
-	errStr := err.Error()
-	return containsStr(errStr, "UNIQUE constraint failed")
-}
-
-// containsStr checks if s contains substr.
-func containsStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // Ensure SQLiteRepository implements Repository interface.

@@ -107,7 +107,7 @@ func TestPlanCmd_ArchitectMode(t *testing.T) {
 	// Execution might fail because openexec-planner binary is missing,
 	// but we can check if it attempted to export PRD.
 	err := rootCmd.Execute()
-	
+
 	// Assert
 	if strings.Contains(b.String(), "Exporting 1 PRD sections") {
 		// Success: it detected and exported PRD context

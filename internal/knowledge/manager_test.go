@@ -10,7 +10,7 @@ func TestManager(t *testing.T) {
 	// Arrange
 	m := NewManager()
 	tmpDir := t.TempDir()
-	
+
 	p1 := filepath.Join(tmpDir, "project1")
 	p2 := filepath.Join(tmpDir, "project2")
 	os.MkdirAll(p1, 0755)

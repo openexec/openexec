@@ -35,28 +35,28 @@ const (
 	EventMessageReceived EventType = "message.received"
 
 	// Tool call events
-	EventToolCallRequested   EventType = "tool_call.requested"
-	EventToolCallApproved    EventType = "tool_call.approved"
-	EventToolCallRejected    EventType = "tool_call.rejected"
+	EventToolCallRequested    EventType = "tool_call.requested"
+	EventToolCallApproved     EventType = "tool_call.approved"
+	EventToolCallRejected     EventType = "tool_call.rejected"
 	EventToolCallAutoApproved EventType = "tool_call.auto_approved"
-	EventToolCallStarted     EventType = "tool_call.started"
-	EventToolCallCompleted   EventType = "tool_call.completed"
-	EventToolCallFailed      EventType = "tool_call.failed"
-	EventToolCallCancelled   EventType = "tool_call.cancelled"
+	EventToolCallStarted      EventType = "tool_call.started"
+	EventToolCallCompleted    EventType = "tool_call.completed"
+	EventToolCallFailed       EventType = "tool_call.failed"
+	EventToolCallCancelled    EventType = "tool_call.cancelled"
 
 	// LLM provider events
-	EventLLMRequestSent     EventType = "llm.request_sent"
+	EventLLMRequestSent      EventType = "llm.request_sent"
 	EventLLMResponseReceived EventType = "llm.response_received"
-	EventLLMStreamChunk     EventType = "llm.stream_chunk"
-	EventLLMError           EventType = "llm.error"
+	EventLLMStreamChunk      EventType = "llm.stream_chunk"
+	EventLLMError            EventType = "llm.error"
 
 	// Cost and usage events
-	EventUsageRecorded EventType = "usage.recorded"
-	EventBudgetWarning EventType = "usage.budget_warning"
+	EventUsageRecorded  EventType = "usage.recorded"
+	EventBudgetWarning  EventType = "usage.budget_warning"
 	EventBudgetExceeded EventType = "usage.budget_exceeded"
 
 	// Context events
-	EventContextInjected  EventType = "context.injected"
+	EventContextInjected   EventType = "context.injected"
 	EventContextSummarized EventType = "context.summarized"
 
 	// Security events

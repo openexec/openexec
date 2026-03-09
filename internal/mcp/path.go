@@ -225,7 +225,7 @@ func ValidatePathWithRoots(path string, allowedRoots []string) (string, error) {
 func ValidatePathForRead(path string, allowedRoots []string) (string, error) {
 	config := PathValidatorConfig{
 		AllowedRoots:    allowedRoots,
-		AllowSymlinks:   true, // Allow symlinks for reading, but validate target
+		AllowSymlinks:   true,  // Allow symlinks for reading, but validate target
 		RequireAbsolute: false, // Allow relative paths, they will be resolved
 		RequireExists:   true,
 		RequireFile:     true,

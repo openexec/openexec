@@ -11,7 +11,7 @@ func TestIndexer(t *testing.T) {
 	tmpDir := t.TempDir()
 	store, _ := NewStore(tmpDir)
 	defer store.Close()
-	
+
 	idx := NewIndexer(store)
 
 	// Create a dummy Go file with comments

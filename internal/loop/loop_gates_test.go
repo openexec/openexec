@@ -31,9 +31,9 @@ quality:
 		cfg.CommandName = mockPath
 		cfg.CommandArgs = []string{"signal-complete"}
 		cfg.QualityGates = true
-		
+
 		l, events := New(cfg)
-		
+
 		done := make(chan struct{})
 		var foundPassed bool
 		var foundComplete bool
@@ -48,13 +48,13 @@ quality:
 			}
 			close(done)
 		}()
-		
+
 		err := l.Run(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
 		<-done
-		
+
 		if !foundPassed {
 			t.Error("expected EventGatesPassed")
 		}
@@ -66,9 +66,9 @@ quality:
 	// 2. Retry then pass
 	t.Run("Gates Fail then Pass", func(t *testing.T) {
 		// This is tricky because we need to change the file between iterations
-		// But Loop doesn't give us an easy hook. 
+		// But Loop doesn't give us an easy hook.
 		// We can use a script that checks for a file existence.
-		
+
 		passFile := filepath.Join(tmpDir, "pass_now")
 		os.Remove(passFile)
 
@@ -89,9 +89,9 @@ quality:
 		cfg.CommandArgs = []string{"signal-complete"}
 		cfg.QualityGates = true
 		cfg.MaxGateRetries = 2
-		
+
 		l, events := New(cfg)
-		
+
 		done := make(chan struct{})
 		var fixAttempts int
 		var foundComplete bool
@@ -106,13 +106,13 @@ quality:
 			}
 			close(done)
 		}()
-		
+
 		err := l.Run(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
 		<-done
-		
+
 		if fixAttempts != 1 {
 			t.Errorf("expected 1 fix attempt, got %d", fixAttempts)
 		}

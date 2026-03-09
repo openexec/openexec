@@ -23,9 +23,9 @@ const (
 type ContentType string
 
 const (
-	ContentTypeText      ContentType = "text"
-	ContentTypeImage     ContentType = "image"
-	ContentTypeToolUse   ContentType = "tool_use"
+	ContentTypeText       ContentType = "text"
+	ContentTypeImage      ContentType = "image"
+	ContentTypeToolUse    ContentType = "tool_use"
 	ContentTypeToolResult ContentType = "tool_result"
 )
 
@@ -160,11 +160,11 @@ type Request struct {
 type StopReason string
 
 const (
-	StopReasonEnd       StopReason = "end_turn"       // Natural end of response
-	StopReasonMaxTokens StopReason = "max_tokens"     // Hit token limit
-	StopReasonToolUse   StopReason = "tool_use"       // Model wants to use a tool
-	StopReasonStop      StopReason = "stop_sequence"  // Hit a stop sequence
-	StopReasonError     StopReason = "error"          // Error occurred
+	StopReasonEnd       StopReason = "end_turn"      // Natural end of response
+	StopReasonMaxTokens StopReason = "max_tokens"    // Hit token limit
+	StopReasonToolUse   StopReason = "tool_use"      // Model wants to use a tool
+	StopReasonStop      StopReason = "stop_sequence" // Hit a stop sequence
+	StopReasonError     StopReason = "error"         // Error occurred
 )
 
 // Usage tracks token consumption for a request.
@@ -259,13 +259,13 @@ type StreamEvent struct {
 type StreamEventType string
 
 const (
-	StreamEventStart          StreamEventType = "message_start"
-	StreamEventContentStart   StreamEventType = "content_block_start"
-	StreamEventContentDelta   StreamEventType = "content_block_delta"
-	StreamEventContentStop    StreamEventType = "content_block_stop"
-	StreamEventStop           StreamEventType = "message_stop"
-	StreamEventPing           StreamEventType = "ping"
-	StreamEventError          StreamEventType = "error"
+	StreamEventStart        StreamEventType = "message_start"
+	StreamEventContentStart StreamEventType = "content_block_start"
+	StreamEventContentDelta StreamEventType = "content_block_delta"
+	StreamEventContentStop  StreamEventType = "content_block_stop"
+	StreamEventStop         StreamEventType = "message_stop"
+	StreamEventPing         StreamEventType = "ping"
+	StreamEventError        StreamEventType = "error"
 )
 
 // StreamDelta contains incremental updates in a stream.

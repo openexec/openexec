@@ -522,7 +522,7 @@ func TestPathValidator_containsTraversal(t *testing.T) {
 	validator := &PathValidator{}
 
 	tests := []struct {
-		path       string
+		path         string
 		hasTraversal bool
 	}{
 		{"/normal/path", false},

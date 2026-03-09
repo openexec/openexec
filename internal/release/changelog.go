@@ -225,12 +225,12 @@ type ChangelogSection struct {
 
 // ChangelogStory represents a story in the changelog.
 type ChangelogStory struct {
-	ID       string         `json:"id"`
-	Title    string         `json:"title"`
-	Type     string         `json:"type"`
-	Status   string         `json:"status"`
-	Git      *StoryGitInfo  `json:"git,omitempty"`
-	Approval *ApprovalInfo  `json:"approval,omitempty"`
+	ID       string          `json:"id"`
+	Title    string          `json:"title"`
+	Type     string          `json:"type"`
+	Status   string          `json:"status"`
+	Git      *StoryGitInfo   `json:"git,omitempty"`
+	Approval *ApprovalInfo   `json:"approval,omitempty"`
 	Tasks    []ChangelogTask `json:"tasks"`
 }
 

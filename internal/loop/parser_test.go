@@ -13,8 +13,8 @@ func TestParser_Parse(t *testing.T) {
 		checkEvent     func(*testing.T, Event)
 	}{
 		{
-			name: "assistant text event",
-			input: "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"hello\"}]}}\n",
+			name:           "assistant text event",
+			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"hello\"}]}}\n",
 			expectedEvents: 1,
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventAssistantText {
@@ -26,8 +26,8 @@ func TestParser_Parse(t *testing.T) {
 			},
 		},
 		{
-			name: "tool use event",
-			input: "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"write_file\", \"input\": {\"path\": \"test.txt\"}}]}}\n",
+			name:           "tool use event",
+			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"write_file\", \"input\": {\"path\": \"test.txt\"}}]}}\n",
 			expectedEvents: 1,
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventToolStart {
@@ -39,8 +39,8 @@ func TestParser_Parse(t *testing.T) {
 			},
 		},
 		{
-			name: "axon signal event",
-			input: "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"openexec_signal\", \"input\": {\"type\": \"complete\", \"reason\": \"done\"}}]}}\n",
+			name:           "axon signal event",
+			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"openexec_signal\", \"input\": {\"type\": \"complete\", \"reason\": \"done\"}}]}}\n",
 			expectedEvents: 1,
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventSignalReceived {
@@ -52,8 +52,8 @@ func TestParser_Parse(t *testing.T) {
 			},
 		},
 		{
-			name: "robust parsing of messy json line",
-			input: "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"messy\"}]}, \"extra\": \"garbage\",}\n",
+			name:           "robust parsing of messy json line",
+			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"messy\"}]}, \"extra\": \"garbage\",}\n",
 			expectedEvents: 1,
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Text != "messy" {
@@ -67,14 +67,14 @@ func TestParser_Parse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			events := make(chan Event, 10)
 			p := NewParser(events, 1)
-			
+
 			err := p.Parse(bytes.NewBufferString(tt.input))
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
-			
+
 			close(events)
-			
+
 			count := 0
 			for e := range events {
 				count++
@@ -82,7 +82,7 @@ func TestParser_Parse(t *testing.T) {
 					tt.checkEvent(t, e)
 				}
 			}
-			
+
 			if count != tt.expectedEvents {
 				t.Errorf("expected %d events, got %d", tt.expectedEvents, count)
 			}

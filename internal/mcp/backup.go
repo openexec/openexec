@@ -102,9 +102,9 @@ type BackupManagerConfig struct {
 // DefaultBackupManagerConfig returns a default configuration with sensible defaults.
 func DefaultBackupManagerConfig() BackupManagerConfig {
 	return BackupManagerConfig{
-		BackupDir:         "",                // Must be set by caller
-		MaxBackupsPerFile: 10,                // Keep 10 backups per file
-		MaxTotalBackups:   1000,              // Keep up to 1000 total backups
+		BackupDir:         "",                 // Must be set by caller
+		MaxBackupsPerFile: 10,                 // Keep 10 backups per file
+		MaxTotalBackups:   1000,               // Keep up to 1000 total backups
 		RetentionDuration: 24 * 7 * time.Hour, // Keep backups for 1 week
 		VerifyOnRestore:   true,
 	}
@@ -778,9 +778,9 @@ func (bm *BackupManager) Close() error {
 
 // Stats returns statistics about the backup manager.
 type BackupStats struct {
-	TotalBackups   int   `json:"total_backups"`
-	TotalFiles     int   `json:"total_files"`
-	TotalSizeBytes int64 `json:"total_size_bytes"`
+	TotalBackups   int        `json:"total_backups"`
+	TotalFiles     int        `json:"total_files"`
+	TotalSizeBytes int64      `json:"total_size_bytes"`
 	OldestBackup   *time.Time `json:"oldest_backup,omitempty"`
 	NewestBackup   *time.Time `json:"newest_backup,omitempty"`
 }

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/pkg/audit"
 )
 
 // LoopHook integrates the budget monitor with the agent loop event system.

@@ -94,6 +94,7 @@ func (c *Coordinator) fallbackToChat(ctx context.Context, query, reason string, 
 	log.Printf("[DCP] %s, falling back to general_chat", fmt.Sprintf(reason, args...))
 	result, err := chatTool.Execute(ctx, map[string]interface{}{"query": query})
 	if err != nil {
+		log.Printf("[DCP] Fallback to general_chat failed: %v", err)
 		return nil, false
 	}
 	return result, true

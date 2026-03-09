@@ -60,8 +60,8 @@ func TestValidatePythonSyntax_ValidCode(t *testing.T) {
 			filename: "encoded.py",
 		},
 		{
-			name:     "multiline string",
-			code:     `x = """
+			name: "multiline string",
+			code: `x = """
 This is a
 multiline string
 """`,

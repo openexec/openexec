@@ -19,12 +19,12 @@ type Validator struct {
 
 // Section represents a parsed section from the document.
 type Section struct {
-	Name       string
-	Level      int
-	StartLine  int
-	EndLine    int
-	Content    []string
-	Items      []string // Bullet/numbered items
+	Name        string
+	Level       int
+	StartLine   int
+	EndLine     int
+	Content     []string
+	Items       []string // Bullet/numbered items
 	SubSections []*Section
 }
 
@@ -40,24 +40,24 @@ type ValidationResult struct {
 
 // ValidationIssue represents a single validation problem.
 type ValidationIssue struct {
-	Rule       string
-	Severity   Severity
-	Message    string
-	Line       int
-	Hint       string
-	Section    string
+	Rule     string
+	Severity Severity
+	Message  string
+	Line     int
+	Hint     string
+	Section  string
 }
 
 // DocumentSummary provides an overview of what was found.
 type DocumentSummary struct {
-	Title           string
-	GoalsCount      int
+	Title             string
+	GoalsCount        int
 	RequirementsCount int
-	StoriesCount    int
-	ConstraintsCount int
-	SectionsFound   []string
-	StoriesWithAC   int
-	StoriesWithoutAC []string
+	StoriesCount      int
+	ConstraintsCount  int
+	SectionsFound     []string
+	StoriesWithAC     int
+	StoriesWithoutAC  []string
 }
 
 // Severity levels for validation issues.

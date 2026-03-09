@@ -264,9 +264,9 @@ func TestAnthropicProviderEstimateTokens(t *testing.T) {
 		content  string
 		expected int
 	}{
-		{"Hello", 1},           // 5 chars / 4 = 1
-		{"Hello, world!", 3},   // 13 chars / 4 = 3
-		{"", 0},                // 0 chars / 4 = 0
+		{"Hello", 1},                   // 5 chars / 4 = 1
+		{"Hello, world!", 3},           // 13 chars / 4 = 3
+		{"", 0},                        // 0 chars / 4 = 0
 		{strings.Repeat("a", 100), 25}, // 100 chars / 4 = 25
 	}
 

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/internal/protocol"
+	"github.com/openexec/openexec/pkg/audit"
 )
 
 // AlertHandler is a callback function invoked when a budget alert is triggered.

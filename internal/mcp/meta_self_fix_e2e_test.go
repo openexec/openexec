@@ -974,15 +974,15 @@ func TestE2E_MetaSelfFix_CompleteWorkflow(t *testing.T) {
 
 	t.Run("step 3: request restart with session state", func(t *testing.T) {
 		sessionState := &SessionState{
-			SessionID:       "meta-fix-session",
-			Iteration:       10,
-			TotalTokens:     5000,
-			TotalCostUSD:    0.25,
-			MessageCount:    20,
-			Model:           "claude-opus-4-5-20251101",
-			WorkDir:         root,
-			PendingPrompt:   "Continue fixing the issue",
-			ContextSummary:  "Working on meta self-fix implementation",
+			SessionID:      "meta-fix-session",
+			Iteration:      10,
+			TotalTokens:    5000,
+			TotalCostUSD:   0.25,
+			MessageCount:   20,
+			Model:          "claude-opus-4-5-20251101",
+			WorkDir:        root,
+			PendingPrompt:  "Continue fixing the issue",
+			ContextSummary: "Working on meta self-fix implementation",
 		}
 
 		request, err := restartManager.RequestRestartWithResume(

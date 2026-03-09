@@ -6,10 +6,12 @@ import (
 )
 
 // UIAssets holds the built React frontend
+//
 //go:embed all:ui/dist
 var uiAssets embed.FS
 
 // Agents holds the agent definitions
+//
 //go:embed all:agents
 var agents embed.FS
 

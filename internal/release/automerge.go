@@ -37,10 +37,10 @@ type ProcessResult struct {
 	ReleaseMergedToMain bool     `json:"release_merged_to_main"`
 	Errors              []string `json:"errors,omitempty"`
 	// Dry-run fields
-	DryRun          bool     `json:"dry_run,omitempty"`
-	WouldMerge      []string `json:"would_merge,omitempty"`
-	WouldTag        bool     `json:"would_tag,omitempty"`
-	WouldMergeToMain bool    `json:"would_merge_to_main,omitempty"`
+	DryRun           bool     `json:"dry_run,omitempty"`
+	WouldMerge       []string `json:"would_merge,omitempty"`
+	WouldTag         bool     `json:"would_tag,omitempty"`
+	WouldMergeToMain bool     `json:"would_merge_to_main,omitempty"`
 }
 
 // CompleteTask marks a task as done and triggers auto-merge if configured.

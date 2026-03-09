@@ -29,16 +29,16 @@ type Manager struct {
 // Config holds release management configuration.
 type Config struct {
 	// Git integration settings
-	GitEnabled  bool   `json:"git_enabled"`
-	BaseBranch  string `json:"base_branch"`  // Default: "main"
+	GitEnabled bool   `json:"git_enabled"`
+	BaseBranch string `json:"base_branch"` // Default: "main"
 
 	// Approval workflow settings
 	ApprovalEnabled bool `json:"approval_enabled"` // Default: false
 
 	// Auto-merge settings
-	AutoMergeStories  bool `json:"auto_merge_stories"`  // Auto-merge story when all tasks done
-	AutoMergeToMain   bool `json:"auto_merge_to_main"`  // Auto-merge release to main when complete
-	AutoTagRelease    bool `json:"auto_tag_release"`    // Auto-create tag when release complete
+	AutoMergeStories bool `json:"auto_merge_stories"` // Auto-merge story when all tasks done
+	AutoMergeToMain  bool `json:"auto_merge_to_main"` // Auto-merge release to main when complete
+	AutoTagRelease   bool `json:"auto_tag_release"`   // Auto-create tag when release complete
 
 	// Auto-link commits to tasks based on commit message patterns
 	AutoLinkCommits bool `json:"auto_link_commits"` // Default: true when git enabled

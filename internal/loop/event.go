@@ -24,13 +24,13 @@ const (
 	EventOperatorAttention EventType = "operator_attention"
 
 	// Quality gate event types.
-	EventPreflightStart   EventType = "preflight_start"
-	EventPreflightPassed  EventType = "preflight_passed"
-	EventPreflightFailed  EventType = "preflight_failed"
-	EventGatesStart       EventType = "gates_start"
-	EventGatesPassed      EventType = "gates_passed"
-	EventGatesFailed      EventType = "gates_failed"
-	EventGatesFixing      EventType = "gates_fixing"
+	EventPreflightStart  EventType = "preflight_start"
+	EventPreflightPassed EventType = "preflight_passed"
+	EventPreflightFailed EventType = "preflight_failed"
+	EventGatesStart      EventType = "gates_start"
+	EventGatesPassed     EventType = "gates_passed"
+	EventGatesFailed     EventType = "gates_failed"
+	EventGatesFixing     EventType = "gates_fixing"
 
 	// Specialized conflict events.
 	EventPlanningMismatch EventType = "planning_mismatch"

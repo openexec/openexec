@@ -10,7 +10,7 @@ func TestRunPreflightChecks(t *testing.T) {
 	oldDocker := dockerCheckFn
 	oldNode := nodeCheckCheckFn
 	oldPython := pythonCheckFn
-	
+
 	defer func() {
 		dockerCheckFn = oldDocker
 		nodeCheckCheckFn = oldNode
@@ -62,7 +62,7 @@ func TestRunPreflightChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			report := RunPreflightChecks(tt.taskTitle, tt.gateNames)
-			
+
 			// We check if the right check types were attempted
 			// We can't guarantee they pass/fail in every CI env
 			gotNames := []string{}

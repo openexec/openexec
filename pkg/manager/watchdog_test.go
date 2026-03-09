@@ -9,7 +9,7 @@ import (
 
 func TestWatchdogDetection(t *testing.T) {
 	m := New(Config{WorkDir: t.TempDir()})
-	
+
 	// Set very short stall threshold for testing
 	m.watchdog.StallThreshold = 100 * time.Millisecond
 	m.watchdog.CheckInterval = 50 * time.Millisecond
@@ -17,7 +17,7 @@ func TestWatchdogDetection(t *testing.T) {
 	// Create a dummy pipeline
 	fwuID := "STALL-01"
 	p, _ := pipeline.New(pipeline.Config{FWUID: fwuID})
-	
+
 	e := &entry{
 		pipeline: p,
 		info: PipelineInfo{
@@ -27,7 +27,7 @@ func TestWatchdogDetection(t *testing.T) {
 			LastActivity: time.Now().Add(-1 * time.Hour), // Explicitly old activity
 		},
 	}
-	
+
 	m.mu.Lock()
 	m.pipelines[fwuID] = e
 	m.mu.Unlock()

@@ -45,8 +45,12 @@ func (e *Engine) ValidateCompliance(ctx context.Context, projectDir string) (boo
 	// 1. Detect project type (Simplified for demo)
 	isGo := false
 	isPython := false
-	if _, err := os.Stat("go.mod"); err == nil { isGo = true }
-	if _, err := os.Stat("pyproject.toml"); err == nil { isPython = true }
+	if _, err := os.Stat("go.mod"); err == nil {
+		isGo = true
+	}
+	if _, err := os.Stat("pyproject.toml"); err == nil {
+		isPython = true
+	}
 
 	// 2. Execute mandatory gates
 	if isGo {
@@ -62,7 +66,7 @@ func (e *Engine) ValidateCompliance(ctx context.Context, projectDir string) (boo
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return false, fmt.Sprintf("Compliance Failure (ruff):\n%s", string(out))
 		}
-		
+
 		// Note: we use python -m mypy to ensure it uses the local environment
 		cmd = exec.CommandContext(ctx, "python3", "-m", "mypy", ".")
 		if out, err := cmd.CombinedOutput(); err != nil {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -496,9 +497,9 @@ func (r *SQLiteRepository) GetForkInfo(ctx context.Context, sessionID string) (*
 	}
 
 	info := &ForkInfo{
-		SessionID:          sessionID,
-		ForkCreatedAt:      session.CreatedAt,
-		AncestorChain:      []string{},
+		SessionID:     sessionID,
+		ForkCreatedAt: session.CreatedAt,
+		AncestorChain: []string{},
 	}
 
 	// Build ancestor chain and find root
@@ -1852,23 +1853,7 @@ func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
-	errStr := err.Error()
-	return containsString(errStr, "UNIQUE constraint failed")
-}
-
-// containsString checks if s contains substr.
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && searchSubstring(s, substr)
-}
-
-// searchSubstring performs a simple substring search.
-func searchSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // Ensure SQLiteRepository implements Repository interface.

@@ -13,9 +13,9 @@ func TestKnowledgeStore_Specialized(t *testing.T) {
 	t.Run("Symbol CRUD", func(t *testing.T) {
 		// Arrange
 		s := &SymbolRecord{
-			Name: "Execute",
-			Kind: "func",
-			Purpose: "Main entry point",
+			Name:     "Execute",
+			Kind:     "func",
+			Purpose:  "Main entry point",
 			FilePath: "main.go",
 		}
 
@@ -50,8 +50,8 @@ func TestKnowledgeStore_Specialized(t *testing.T) {
 	t.Run("APIDoc CRUD", func(t *testing.T) {
 		// Arrange
 		a := &APIDocRecord{
-			Path: "/health",
-			Method: "GET",
+			Path:        "/health",
+			Method:      "GET",
 			Description: "Health check",
 		}
 

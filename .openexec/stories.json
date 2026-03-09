@@ -11,6 +11,55 @@
   ],
   "stories": [
     {
+      "id": "US-004",
+      "goal_id": "G-001",
+      "title": "CLI Chat End-to-End Integration Test",
+      "description": "As a developer, I want automated E2E tests for the chat command so that routing regressions are caught early",
+      "acceptance_criteria": [
+        "E2E test starts server, sends queries, validates responses",
+        "Test covers: help query, unknown query, surgical tool query",
+        "Test verifies no 'could not determine intent' errors appear"
+      ],
+      "verification_script": "go test ./internal/server/... -v -run TestIntegration",
+      "tasks": [
+        "T-US-004-001",
+        "T-US-004-002",
+        "T-US-004-003"
+      ],
+      "depends_on": [
+        "US-003"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "done",
+      "created_at": "2026-03-09T20:34:53.399614+02:00"
+    },
+    {
+      "id": "US-005",
+      "goal_id": "G-001",
+      "title": "Goal Validation: Intent Routing Fix Verification",
+      "description": "As a project stakeholder, I want E2E validation that the intent routing fix works so that I can confirm the goal is achieved",
+      "acceptance_criteria": [
+        "Manual or automated test of 'openexec chat' with various inputs",
+        "All test queries receive valid responses from general_chat or appropriate tool",
+        "No 'model could not determine intent with high confidence' errors observed",
+        "Test results logged and verified"
+      ],
+      "verification_script": "go build ./cmd/openexec \u0026\u0026 echo 'help' | timeout 5 ./openexec chat --port 18765 2\u003e\u00261 | grep -v 'could not determine'",
+      "tasks": [
+        "T-US-005-001",
+        "T-US-005-002",
+        "T-US-005-003"
+      ],
+      "depends_on": [
+        "US-004"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "done",
+      "created_at": "2026-03-09T20:34:53.401603+02:00"
+    },
+    {
       "id": "US-001",
       "goal_id": "G-001",
       "title": "Discovery: Analyze Intent Routing Flow",
@@ -29,7 +78,7 @@
       ],
       "story_type": "feature",
       "priority": 0,
-      "status": "pending",
+      "status": "done",
       "created_at": "2026-03-09T20:34:53.393088+02:00"
     },
     {
@@ -56,7 +105,7 @@
       ],
       "story_type": "feature",
       "priority": 0,
-      "status": "pending",
+      "status": "done",
       "created_at": "2026-03-09T20:34:53.395246+02:00"
     },
     {
@@ -80,57 +129,8 @@
       ],
       "story_type": "feature",
       "priority": 0,
-      "status": "pending",
+      "status": "done",
       "created_at": "2026-03-09T20:34:53.397643+02:00"
-    },
-    {
-      "id": "US-004",
-      "goal_id": "G-001",
-      "title": "CLI Chat End-to-End Integration Test",
-      "description": "As a developer, I want automated E2E tests for the chat command so that routing regressions are caught early",
-      "acceptance_criteria": [
-        "E2E test starts server, sends queries, validates responses",
-        "Test covers: help query, unknown query, surgical tool query",
-        "Test verifies no 'could not determine intent' errors appear"
-      ],
-      "verification_script": "go test ./internal/server/... -v -run TestIntegration",
-      "tasks": [
-        "T-US-004-001",
-        "T-US-004-002",
-        "T-US-004-003"
-      ],
-      "depends_on": [
-        "US-003"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-09T20:34:53.399614+02:00"
-    },
-    {
-      "id": "US-005",
-      "goal_id": "G-001",
-      "title": "Goal Validation: Intent Routing Fix Verification",
-      "description": "As a project stakeholder, I want E2E validation that the intent routing fix works so that I can confirm the goal is achieved",
-      "acceptance_criteria": [
-        "Manual or automated test of 'openexec chat' with various inputs",
-        "All test queries receive valid responses from general_chat or appropriate tool",
-        "No 'model could not determine intent with high confidence' errors observed",
-        "Test results logged and verified"
-      ],
-      "verification_script": "go build ./cmd/openexec \u0026\u0026 echo 'help' | timeout 5 ./openexec chat --port 18765 2\u003e\u00261 | grep -v 'could not determine'",
-      "tasks": [
-        "T-US-005-001",
-        "T-US-005-002",
-        "T-US-005-003"
-      ],
-      "depends_on": [
-        "US-004"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-09T20:34:53.401603+02:00"
     }
   ]
 }

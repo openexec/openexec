@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -223,23 +224,7 @@ func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
-	// SQLite unique constraint error contains "UNIQUE constraint failed"
-	return containsString(err.Error(), "UNIQUE constraint failed")
-}
-
-// containsString checks if s contains substr (case-sensitive).
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && searchSubstring(s, substr)
-}
-
-// searchSubstring performs a simple substring search.
-func searchSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // Ensure SQLiteStore implements Store interface.

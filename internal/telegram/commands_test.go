@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/openexec/openexec/internal/user"
 	"github.com/openexec/openexec/internal/protocol"
+	"github.com/openexec/openexec/internal/user"
 )
 
 // mockSender is a mock implementation of MessageSender for testing.

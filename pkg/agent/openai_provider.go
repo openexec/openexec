@@ -26,15 +26,15 @@ const (
 
 // OpenAI model identifiers
 const (
-	ModelGPT4o         = "gpt-4o"
-	ModelGPT4oMini     = "gpt-4o-mini"
-	ModelGPT4Turbo     = "gpt-4-turbo"
-	ModelGPT4          = "gpt-4"
-	ModelGPT35Turbo    = "gpt-3.5-turbo"
-	ModelO1            = "o1"
-	ModelO1Mini        = "o1-mini"
-	ModelO1Preview     = "o1-preview"
-	ModelO3Mini        = "o3-mini"
+	ModelGPT4o      = "gpt-4o"
+	ModelGPT4oMini  = "gpt-4o-mini"
+	ModelGPT4Turbo  = "gpt-4-turbo"
+	ModelGPT4       = "gpt-4"
+	ModelGPT35Turbo = "gpt-3.5-turbo"
+	ModelO1         = "o1"
+	ModelO1Mini     = "o1-mini"
+	ModelO1Preview  = "o1-preview"
+	ModelO3Mini     = "o3-mini"
 )
 
 // OpenAIProviderConfig holds configuration for the OpenAI provider.
@@ -968,9 +968,9 @@ type openAIStreamChunk struct {
 	Created int64  `json:"created"`
 	Model   string `json:"model"`
 	Choices []struct {
-		Index        int           `json:"index"`
-		Delta        openAIDelta   `json:"delta"`
-		FinishReason string        `json:"finish_reason"`
+		Index        int         `json:"index"`
+		Delta        openAIDelta `json:"delta"`
+		FinishReason string      `json:"finish_reason"`
 	} `json:"choices"`
 	Usage *openAIUsage `json:"usage,omitempty"`
 }

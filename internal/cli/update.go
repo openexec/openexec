@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	versionURL = "https://openexec.io/version.txt"
+	versionURL      = "https://openexec.io/version.txt"
 	downloadBaseURL = "https://openexec.io/downloads"
 )
 
@@ -22,7 +22,7 @@ var updateCmd = &cobra.Command{
 	Short: "Update OpenExec to the latest version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Printf("🔍 Checking for updates...\n")
-		
+
 		latestVersion, err := fetchLatestVersion()
 		if err != nil {
 			return fmt.Errorf("failed to check for updates: %w", err)
@@ -37,13 +37,13 @@ var updateCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✨ A new version is available: v%s (current: v%s)\n", latestVersion, currentVersion)
-		
+
 		// Confirm update
 		fmt.Print("Do you want to update? [Y/n]: ")
 		var confirm string
 		fmt.Scanln(&confirm)
 		confirm = strings.ToLower(strings.TrimSpace(confirm))
-		
+
 		if confirm != "" && confirm != "y" && confirm != "yes" {
 			fmt.Println("Update cancelled.")
 			return nil
@@ -121,7 +121,7 @@ func performUpdate(targetVersion string) error {
 
 	// Replace binary
 	fmt.Printf("📦 Replacing binary at %s...\n", selfPath)
-	
+
 	// On Unix we can rename over the running binary.
 	// On Windows we might need to use a trick, but we'll try rename first.
 	if runtime.GOOS == "windows" {

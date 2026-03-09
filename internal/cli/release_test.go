@@ -172,7 +172,7 @@ func TestStatusIcon(t *testing.T) {
 func TestLoadReleaseConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-	
+
 	cfg := &ProjectConfig{GitEnabled: true}
 	data, _ := json.Marshal(cfg)
 	os.WriteFile(filepath.Join(tmpDir, ".openexec", "config.json"), data, 0644)

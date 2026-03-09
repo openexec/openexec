@@ -11,24 +11,24 @@ import (
 
 // PatchFile represents a single file modification in a unified diff patch.
 type PatchFile struct {
-	OldName    string       // Original file path (from --- line)
-	NewName    string       // New file path (from +++ line)
-	Hunks      []PatchHunk  // List of hunks in this file
-	IsBinary   bool         // True if this is a binary file
-	IsNew      bool         // True if this is a new file
-	IsDeleted  bool         // True if this is a deleted file
-	IsRenamed  bool         // True if this is a rename operation
-	GitHeaders []string     // Git-specific headers (index, mode, etc.)
+	OldName    string      // Original file path (from --- line)
+	NewName    string      // New file path (from +++ line)
+	Hunks      []PatchHunk // List of hunks in this file
+	IsBinary   bool        // True if this is a binary file
+	IsNew      bool        // True if this is a new file
+	IsDeleted  bool        // True if this is a deleted file
+	IsRenamed  bool        // True if this is a rename operation
+	GitHeaders []string    // Git-specific headers (index, mode, etc.)
 }
 
 // PatchHunk represents a single hunk in a unified diff.
 type PatchHunk struct {
-	OldStart int          // Starting line in old file
-	OldCount int          // Number of lines in old file
-	NewStart int          // Starting line in new file
-	NewCount int          // Number of lines in new file
-	Header   string       // The full @@ line
-	Lines    []PatchLine  // Lines in this hunk
+	OldStart int         // Starting line in old file
+	OldCount int         // Number of lines in old file
+	NewStart int         // Starting line in new file
+	NewCount int         // Number of lines in new file
+	Header   string      // The full @@ line
+	Lines    []PatchLine // Lines in this hunk
 }
 
 // PatchLine represents a single line in a hunk.
@@ -48,8 +48,8 @@ const (
 
 // Patch represents a complete unified diff patch.
 type Patch struct {
-	Files       []PatchFile // Files modified by this patch
-	RawContent  string      // Original patch content
+	Files      []PatchFile // Files modified by this patch
+	RawContent string      // Original patch content
 }
 
 // PatchStats provides statistics about a patch.
@@ -93,10 +93,10 @@ func (e *PatchValidationError) Error() string {
 
 // PatchValidationResult contains the result of patch validation.
 type PatchValidationResult struct {
-	Valid    bool                    // True if patch is valid
-	Errors   []PatchValidationError  // List of validation errors
-	Warnings []PatchValidationError  // List of validation warnings
-	Stats    PatchStats              // Patch statistics
+	Valid    bool                   // True if patch is valid
+	Errors   []PatchValidationError // List of validation errors
+	Warnings []PatchValidationError // List of validation warnings
+	Stats    PatchStats             // Patch statistics
 }
 
 // Regular expressions for parsing
@@ -183,7 +183,7 @@ func ParsePatch(content string) (*Patch, error) {
 				continue
 			}
 			if strings.HasPrefix(line, "index ") || strings.HasPrefix(line, "old mode") ||
-			   strings.HasPrefix(line, "new mode") || strings.HasPrefix(line, "similarity index") {
+				strings.HasPrefix(line, "new mode") || strings.HasPrefix(line, "similarity index") {
 				currentFile.GitHeaders = append(currentFile.GitHeaders, line)
 				continue
 			}

@@ -33,7 +33,7 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 		if err == nil {
 			projectName = config.Name
 			projectDir = config.ProjectDir
-			
+
 			// Apply config port if not overridden
 			if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
 				startPort = config.Execution.Port
@@ -43,13 +43,13 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 		// Check if server is running, if not, start it in background
 		if !isServerRunning(projectDir, startPort) {
 			fmt.Println(color.CyanString("🚀 Starting execution engine in background..."))
-			
+
 			// Set daemon flag and run start command
 			startDaemon = true
 			if err := startCmd.RunE(cmd, args); err != nil {
 				return fmt.Errorf("failed to start background engine: %w", err)
 			}
-			
+
 			// Re-read the port from PID file because it might have shifted (discovery)
 			_, actualPort, err := readPID(projectDir)
 			if err == nil {
@@ -130,7 +130,7 @@ func runChatREPL(projectName string) error {
 
 func sendChatQuery(query string) (string, error) {
 	url := fmt.Sprintf("http://localhost:%d/api/v1/dcp/query", startPort)
-	
+
 	payload := map[string]string{"query": query}
 	body, _ := json.Marshal(payload)
 
@@ -150,7 +150,7 @@ func sendChatQuery(query string) (string, error) {
 		Result   any    `json:"result"`
 		Error    string `json:"error"`
 	}
-	
+
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		if resp.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(respBody))

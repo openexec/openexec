@@ -9,7 +9,7 @@ type Tool interface {
 	Name() string
 	Description() string
 	InputSchema() string // JSON schema for tool arguments
-	
+
 	// Execute performs the tool action. It receives the knowledge store
 	// and raw arguments from the LLM.
 	Execute(ctx context.Context, args map[string]interface{}) (any, error)

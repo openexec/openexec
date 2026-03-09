@@ -67,8 +67,8 @@ type OrchestratorLocatorConfig struct {
 
 // Common errors for orchestrator location operations.
 var (
-	ErrOrchestratorNotFound = errors.New("orchestrator root directory not found")
-	ErrNotOrchestratorFile  = errors.New("path is not an orchestrator file")
+	ErrOrchestratorNotFound    = errors.New("orchestrator root directory not found")
+	ErrNotOrchestratorFile     = errors.New("path is not an orchestrator file")
 	ErrInvalidOrchestratorPath = errors.New("invalid orchestrator path")
 )
 

@@ -26,7 +26,7 @@ func (t *GeneralChatTool) InputSchema() string {
 
 func (t *GeneralChatTool) Execute(ctx context.Context, args map[string]interface{}) (any, error) {
 	query, _ := args["query"].(string)
-	
+
 	switch query {
 	case "help":
 		return "I am OpenExec, your deterministic orchestration agent. You can ask me to:\n- list project files\n- show symbols in a file\n- deploy to production\n- safe commit your changes\n- run the initialization wizard", nil

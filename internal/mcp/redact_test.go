@@ -277,11 +277,11 @@ func TestRedactGenericSecrets(t *testing.T) {
 
 func TestRedactorWithEnvVars(t *testing.T) {
 	envVars := map[string]string{
-		"MY_SECRET":    "supersecretvalue123",
-		"API_KEY":      "apikey-12345-abcdef",
-		"SHORT_VAL":    "short",        // Too short, should not be redacted
-		"EMPTY_VAL":    "",             // Empty, should not be redacted
-		"DB_PASSWORD":  "dbpass9876!@", // Should be redacted
+		"MY_SECRET":   "supersecretvalue123",
+		"API_KEY":     "apikey-12345-abcdef",
+		"SHORT_VAL":   "short",        // Too short, should not be redacted
+		"EMPTY_VAL":   "",             // Empty, should not be redacted
+		"DB_PASSWORD": "dbpass9876!@", // Should be redacted
 	}
 
 	input := `
@@ -404,17 +404,17 @@ func TestNewRedactorDefaults(t *testing.T) {
 
 func TestFilterSensitiveEnvVars(t *testing.T) {
 	envVars := map[string]string{
-		"PATH":                    "/usr/bin:/bin",
-		"HOME":                    "/home/user",
-		"API_KEY":                 "secret-api-key",
-		"DATABASE_PASSWORD":       "db-secret",
-		"AWS_SECRET_ACCESS_KEY":   "aws-secret",
-		"OPENAI_API_KEY":          "sk-openai",
-		"GITHUB_TOKEN":            "ghp-token",
-		"MY_CUSTOM_SECRET":        "custom-secret",
-		"SOME_TOKEN_VALUE":        "some-token",
-		"NORMAL_VAR":              "normal-value",
-		"LOG_LEVEL":               "debug",
+		"PATH":                  "/usr/bin:/bin",
+		"HOME":                  "/home/user",
+		"API_KEY":               "secret-api-key",
+		"DATABASE_PASSWORD":     "db-secret",
+		"AWS_SECRET_ACCESS_KEY": "aws-secret",
+		"OPENAI_API_KEY":        "sk-openai",
+		"GITHUB_TOKEN":          "ghp-token",
+		"MY_CUSTOM_SECRET":      "custom-secret",
+		"SOME_TOKEN_VALUE":      "some-token",
+		"NORMAL_VAR":            "normal-value",
+		"LOG_LEVEL":             "debug",
 	}
 
 	result := FilterSensitiveEnvVars(envVars)
@@ -713,8 +713,8 @@ func TestGetSortedEnvValues(t *testing.T) {
 func TestRedactorEnvVarOverlap(t *testing.T) {
 	// Test case where one env var value is a substring of another
 	envVars := map[string]string{
-		"PARTIAL":  "secretvalue",
-		"FULL":     "mysecretvaluehere",
+		"PARTIAL": "secretvalue",
+		"FULL":    "mysecretvaluehere",
 	}
 
 	r := NewRedactor(WithEnvVars(envVars))

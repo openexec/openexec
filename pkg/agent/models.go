@@ -101,11 +101,11 @@ type ModelFamily string
 
 const (
 	// OpenAI model families
-	FamilyGPT4o      ModelFamily = "gpt-4o"
-	FamilyGPT4       ModelFamily = "gpt-4"
-	FamilyGPT35      ModelFamily = "gpt-3.5"
-	FamilyO1         ModelFamily = "o1"
-	FamilyO3         ModelFamily = "o3"
+	FamilyGPT4o ModelFamily = "gpt-4o"
+	FamilyGPT4  ModelFamily = "gpt-4"
+	FamilyGPT35 ModelFamily = "gpt-3.5"
+	FamilyO1    ModelFamily = "o1"
+	FamilyO3    ModelFamily = "o3"
 
 	// Anthropic model families
 	FamilyClaudeOpus   ModelFamily = "claude-opus"
@@ -353,14 +353,14 @@ func NewModelCatalog() *ModelCatalog {
 		models: make(map[string]*ExtendedModelInfo),
 	}
 	catalog.initializeDefaultModels()
-	
+
 	// Attempt to load user overrides/custom models
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, ".openexec", "models.json")
 	if _, err := os.Stat(configPath); err == nil {
 		_ = catalog.LoadFromConfig(configPath)
 	}
-	
+
 	return catalog
 }
 

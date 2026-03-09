@@ -36,7 +36,7 @@ func TestLoadPendingTasks(t *testing.T) {
 	t.Run("From stories.json", func(t *testing.T) {
 		os.Remove(filepath.Join(tmpDir, "tasks.json"))
 		os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-		
+
 		storiesContent := `{
 			"stories": [
 				{
@@ -95,7 +95,7 @@ func TestBuildTaskPromptWithRetry(t *testing.T) {
 func TestSaveTaskStatus(t *testing.T) {
 	tmpDir := t.TempDir()
 	tasksPath := filepath.Join(tmpDir, "tasks.json")
-	
+
 	tasks := TasksFile{
 		Tasks: []Task{
 			{ID: "T-001", Status: "pending"},
@@ -120,7 +120,7 @@ func TestSaveTaskStatus(t *testing.T) {
 
 func TestEnsureMCPConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	path, err := ensureMCPConfig(tmpDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -137,7 +137,7 @@ func TestEnsureMCPConfig(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	var config map[string]interface{}
 	json.Unmarshal(data, &config)
-	
+
 	if _, ok := config["mcpServers"]; !ok {
 		t.Error("missing mcpServers in config")
 	}
@@ -191,4 +191,3 @@ func TestPortDiscovery(t *testing.T) {
 		}
 	})
 }
-

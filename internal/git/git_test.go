@@ -160,7 +160,7 @@ func TestGitClient(t *testing.T) {
 	t.Run("CommitsOnBranch", func(t *testing.T) {
 		mainBranch, _ := client.CurrentBranch()
 		client.CreateBranch("other")
-		
+
 		// Add a commit to main that is NOT on other
 		err := os.WriteFile(filepath.Join(repoPath, "new.txt"), []byte("new"), 0644)
 		if err != nil {
@@ -188,7 +188,7 @@ func TestGitClient(t *testing.T) {
 	t.Run("MergeBranch", func(t *testing.T) {
 		mainBranch, _ := client.CurrentBranch()
 		client.CreateBranch("feature/merge-test")
-		
+
 		err := os.WriteFile(filepath.Join(repoPath, "merge.txt"), []byte("merge data"), 0644)
 		if err != nil {
 			t.Fatal(err)

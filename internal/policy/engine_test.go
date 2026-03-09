@@ -44,8 +44,8 @@ func TestPolicyEngine(t *testing.T) {
 	})
 
 	t.Run("ValidateCompliance - Block on failure", func(t *testing.T) {
-		// In a real test we'd mock the exec calls, but for this AAA test 
-		// we'll just check that it executes. 
+		// In a real test we'd mock the exec calls, but for this AAA test
+		// we'll just check that it executes.
 		// Since we're in a temp dir without go.mod, it should pass by default.
 		passed, _ := engine.ValidateCompliance(ctx, tmpDir)
 		if !passed {
