@@ -1,11 +1,12 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/openexec/openexec/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/openexec/openexec/internal/config"
 )
 
 var cfgFile string
@@ -22,7 +23,13 @@ managing projects, kicking off intents, and verifying system statuses.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// If no subcommand is provided, start the chat mode
 		if len(args) == 0 {
-			return chatCmd.RunE(cmd, args)
+			err := chatCmd.RunE(cmd, args)
+			if err != nil {
+				// Don't return the error directly to prevent Cobra from printing usage
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+			return nil
 		}
 		return cmd.Help()
 	},

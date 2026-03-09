@@ -20,27 +20,38 @@ var chatCmd = &cobra.Command{
 	Long: `Start a real-time conversational session with the OpenExec agent.
 Talk to your project, ask questions about the codebase, or trigger automated tasks.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load project configuration
+		// Try to load project configuration
 		config, err := project.LoadProjectConfig(".")
-		if err != nil {
-			return fmt.Errorf("project not initialized: run 'openexec init' first")
-		}
+		projectName := "global"
+		projectDir := "."
 
-		// Apply config port if not overridden
-		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
-			startPort = config.Execution.Port
+		if err == nil {
+			projectName = config.Name
+			projectDir = config.ProjectDir
+			
+			// Apply config port if not overridden
+			if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
+				startPort = config.Execution.Port
+			}
 		}
 
 		// Check if server is running
-		if !isServerRunning(config.ProjectDir, startPort) {
+		if !isServerRunning(projectDir, startPort) {
 			fmt.Println(color.YellowString("⚠ Execution engine is not running."))
 			fmt.Println("Start it in another terminal with:")
 			fmt.Println(color.CyanString("  openexec start"))
 			fmt.Println()
+			
+			if err != nil {
+				fmt.Println(color.WhiteString("Note: You are not in an initialized OpenExec project."))
+				fmt.Println("To enable full orchestration features, run: " + color.CyanString("openexec init"))
+				fmt.Println()
+			}
+			
 			return fmt.Errorf("engine required for chat")
 		}
 
-		return runChatREPL(config.Name)
+		return runChatREPL(projectName)
 	},
 }
 
