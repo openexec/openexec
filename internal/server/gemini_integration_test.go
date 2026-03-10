@@ -100,14 +100,16 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 	// Wait for the loop to hit the provider
 	// Since it's provider-backed, it should be very fast
 	deadline := time.Now().Add(5 * time.Second)
+	found := false
 	for time.Now().Before(deadline) {
 		if mock.Called {
+			found = true
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	if !mock.Called {
+	if !found {
 		t.Error("Gemini provider was never called - engine didn't route to provider-backed path")
 	}
 
@@ -123,6 +125,11 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 	_ = json.NewDecoder(statusResp.Body).Decode(&info)
 	
 	t.Logf("Task status: %s, Agent: %s", info.Status, info.Agent)
+	
+	// Task should be running or starting if provider was hit
+	if info.Status == "" {
+		t.Error("Empty task status")
+	}
 }
 
 func TestGeminiRunnerMapping(t *testing.T) {
