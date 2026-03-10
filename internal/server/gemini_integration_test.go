@@ -80,9 +80,10 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 	// Create a dummy task
 	taskID := "T-GEMINI-001"
 	task := struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}{ID: taskID, Title: "Test Gemini Task"}
+		TaskID  string `json:"task_id"`
+		Prompt  string `json:"prompt"`
+		WorkDir string `json:"work_dir"`
+	}{TaskID: taskID, Prompt: "Test Gemini Task", WorkDir: tmpDir}
 	taskData, _ := json.Marshal(task)
 
 	// Start a loop via API
