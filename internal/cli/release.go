@@ -398,29 +398,11 @@ var releaseApproveCmd = &cobra.Command{
 			return nil
 		}
 
-		approver, _ := cmd.Flags().GetString("approver")
-		email, _ := cmd.Flags().GetString("email")
+		approverID, err := resolveApproverIdentity(cmd, mgr)
+		if err != nil {
+			return err
+		}
 		comments, _ := cmd.Flags().GetString("comments")
-
-		// Get approver identity from git config if not specified
-		if approver == "" || email == "" {
-			gitName, gitEmail := mgr.GetGitIdentity()
-			if approver == "" {
-				approver = gitName
-			}
-			if email == "" {
-				email = gitEmail
-			}
-		}
-
-		if approver == "" {
-			return fmt.Errorf("--approver is required (or configure git user.name)")
-		}
-
-		approverID := approver
-		if email != "" {
-			approverID = fmt.Sprintf("%s <%s>", approver, email)
-		}
 
 		if err := mgr.ApproveRelease(approverID, comments); err != nil {
 			return err
@@ -706,29 +688,11 @@ var storyApproveCmd = &cobra.Command{
 			return nil
 		}
 
-		approver, _ := cmd.Flags().GetString("approver")
-		email, _ := cmd.Flags().GetString("email")
+		approverID, err := resolveApproverIdentity(cmd, mgr)
+		if err != nil {
+			return err
+		}
 		comments, _ := cmd.Flags().GetString("comments")
-
-		// Get approver identity from git config if not specified
-		if approver == "" || email == "" {
-			gitName, gitEmail := mgr.GetGitIdentity()
-			if approver == "" {
-				approver = gitName
-			}
-			if email == "" {
-				email = gitEmail
-			}
-		}
-
-		if approver == "" {
-			return fmt.Errorf("--approver is required (or configure git user.name)")
-		}
-
-		approverID := approver
-		if email != "" {
-			approverID = fmt.Sprintf("%s <%s>", approver, email)
-		}
 
 		if err := mgr.ApproveStory(storyID, approverID, comments); err != nil {
 			return err
@@ -1432,30 +1396,11 @@ var taskApproveCmd = &cobra.Command{
 			return nil
 		}
 
-		approver, _ := cmd.Flags().GetString("approver")
-		email, _ := cmd.Flags().GetString("email")
+		approverID, err := resolveApproverIdentity(cmd, mgr)
+		if err != nil {
+			return err
+		}
 		comments, _ := cmd.Flags().GetString("comments")
-
-		// Get approver identity from git config if not specified
-		if approver == "" || email == "" {
-			gitName, gitEmail := mgr.GetGitIdentity()
-			if approver == "" {
-				approver = gitName
-			}
-			if email == "" {
-				email = gitEmail
-			}
-		}
-
-		if approver == "" {
-			return fmt.Errorf("--approver is required (or configure git user.name)")
-		}
-
-		// Include email in approver identity
-		approverID := approver
-		if email != "" {
-			approverID = fmt.Sprintf("%s <%s>", approver, email)
-		}
 
 		if err := mgr.ApproveTask(taskID, approverID, comments); err != nil {
 			return err
@@ -1556,6 +1501,24 @@ func verifyStories(cmd *cobra.Command, stories []*release.Story, execute bool) b
 	return allDone
 }
 
+var releaseResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset all stories and tasks to pending status",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		mgr, err := getReleaseManager(cmd)
+		if err != nil {
+			return err
+		}
+
+		if err := mgr.ResetStatuses(); err != nil {
+			return err
+		}
+
+		cmd.Println("✓ All stories and tasks have been reset to pending status.")
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(releaseCmd)
 
@@ -1571,6 +1534,8 @@ func init() {
 
 	releaseCmd.AddCommand(releaseShowCmd)
 	releaseShowCmd.Flags().Bool("json", false, "Output as JSON")
+
+	releaseCmd.AddCommand(releaseResetCmd)
 
 	releaseCmd.AddCommand(releaseChangelogCmd)
 	releaseChangelogCmd.Flags().Bool("json", false, "Output as JSON")
@@ -1670,60 +1635,35 @@ func getReleaseManager(cmd *cobra.Command) (*release.Manager, error) {
 }
 
 func loadReleaseConfig(projectDir string) *release.Config {
-	cfg := release.DefaultConfig()
+	return release.LoadConfig(projectDir)
+}
 
-	// Try to load from config file
-	configPath := projectDir + "/.openexec/config.json"
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return cfg
-	}
+// resolveApproverIdentity resolves the approver and email from flags or git config.
+// Returns the full approverID string (e.g., "Name <email>"), approver name only if
+// empty, or error if approver cannot be determined.
+func resolveApproverIdentity(cmd *cobra.Command, mgr *release.Manager) (string, error) {
+	approver, _ := cmd.Flags().GetString("approver")
+	email, _ := cmd.Flags().GetString("email")
 
-	var fileConfig struct {
-		GitEnabled          *bool   `json:"git_enabled"`
-		ApprovalEnabled     *bool   `json:"approval_enabled"`
-		BaseBranch          *string `json:"base_branch"`
-		AutoMergeStories    *bool   `json:"auto_merge_stories"`
-		AutoMergeToMain     *bool   `json:"auto_merge_to_main"`
-		AutoTagRelease      *bool   `json:"auto_tag_release"`
-		AutoLinkCommits     *bool   `json:"auto_link_commits"`
-		ReleaseBranchPrefix *string `json:"release_branch_prefix"`
-		FeatureBranchPrefix *string `json:"feature_branch_prefix"`
-	}
-
-	if err := json.Unmarshal(data, &fileConfig); err != nil {
-		return cfg
+	// Get approver identity from git config if not specified
+	if approver == "" || email == "" {
+		gitName, gitEmail := mgr.GetGitIdentity()
+		if approver == "" {
+			approver = gitName
+		}
+		if email == "" {
+			email = gitEmail
+		}
 	}
 
-	if fileConfig.GitEnabled != nil {
-		cfg.GitEnabled = *fileConfig.GitEnabled
-	}
-	if fileConfig.ApprovalEnabled != nil {
-		cfg.ApprovalEnabled = *fileConfig.ApprovalEnabled
-	}
-	if fileConfig.BaseBranch != nil {
-		cfg.BaseBranch = *fileConfig.BaseBranch
-	}
-	if fileConfig.AutoMergeStories != nil {
-		cfg.AutoMergeStories = *fileConfig.AutoMergeStories
-	}
-	if fileConfig.AutoMergeToMain != nil {
-		cfg.AutoMergeToMain = *fileConfig.AutoMergeToMain
-	}
-	if fileConfig.AutoTagRelease != nil {
-		cfg.AutoTagRelease = *fileConfig.AutoTagRelease
-	}
-	if fileConfig.AutoLinkCommits != nil {
-		cfg.AutoLinkCommits = *fileConfig.AutoLinkCommits
-	}
-	if fileConfig.ReleaseBranchPrefix != nil {
-		cfg.ReleaseBranchPrefix = *fileConfig.ReleaseBranchPrefix
-	}
-	if fileConfig.FeatureBranchPrefix != nil {
-		cfg.FeatureBranchPrefix = *fileConfig.FeatureBranchPrefix
+	if approver == "" {
+		return "", fmt.Errorf("--approver is required (or configure git user.name)")
 	}
 
-	return cfg
+	if email != "" {
+		return fmt.Sprintf("%s <%s>", approver, email), nil
+	}
+	return approver, nil
 }
 
 func statusIcon(status string) string {

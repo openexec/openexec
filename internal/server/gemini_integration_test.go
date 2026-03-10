@@ -95,7 +95,9 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("Expected 201 Created, got %d", resp.StatusCode)
+		var errData map[string]interface{}
+		_ = json.NewDecoder(resp.Body).Decode(&errData)
+		t.Fatalf("Expected 201 Created, got %d. Error: %v", resp.StatusCode, errData)
 	}
 
 	// Wait for the loop to hit the provider

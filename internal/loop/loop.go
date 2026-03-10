@@ -118,9 +118,9 @@ func (l *Loop) Run(ctx context.Context) error {
             // Initialize providers from env (best-effort)
             agent.InitializeDefaultRegistry()
 
-            // Determine model (from CommandArgs[0] if present)
-            model := ""
-            if len(l.cfg.CommandArgs) > 0 {
+            // Determine model: prioritize ExecutorModel if set, else fall back to CommandArgs[0]
+            model := l.cfg.ExecutorModel
+            if model == "" && len(l.cfg.CommandArgs) > 0 {
                 model = l.cfg.CommandArgs[0]
             }
             if model == "" {

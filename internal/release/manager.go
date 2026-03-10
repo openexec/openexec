@@ -100,6 +100,21 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 	return m, nil
 }
 
+// ResetStatuses resets all stories and tasks to pending status.
+func (m *Manager) ResetStatuses() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, s := range m.stories {
+		s.Status = StoryStatusPending
+	}
+	for _, t := range m.tasks {
+		t.Status = TaskStatusPending
+	}
+
+	return m.saveUnlocked()
+}
+
 // GetConfig returns the current configuration.
 func (m *Manager) GetConfig() *Config {
 	return m.config
@@ -173,74 +188,7 @@ func (m *Manager) Load() error {
 func (m *Manager) Save() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	openexecDir := filepath.Join(m.baseDir, ".openexec")
-	if err := os.MkdirAll(openexecDir, 0o750); err != nil {
-		return err
-	}
-
-	// Save release
-	if m.release != nil {
-		releasePath := filepath.Join(openexecDir, "release.json")
-		data, err := json.MarshalIndent(m.release, "", "  ")
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(releasePath, data, 0o600); err != nil {
-			return err
-		}
-	}
-
-	// Save stories and goals — only if we have data, to avoid overwriting
-	// the planner's stories.json (which uses a different nested Task format).
-	if len(m.stories) > 0 || len(m.goals) > 0 {
-		storiesPath := filepath.Join(openexecDir, "stories.json")
-		storiesList := make([]Story, 0, len(m.stories))
-		for _, s := range m.stories {
-			storiesList = append(storiesList, *s)
-		}
-		goalsList := make([]Goal, 0, len(m.goals))
-		for _, g := range m.goals {
-			goalsList = append(goalsList, *g)
-		}
-
-		sf := struct {
-			SchemaVersion string  `json:"schema_version"`
-			Goals         []Goal  `json:"goals"`
-			Stories       []Story `json:"stories"`
-		}{
-			SchemaVersion: "1.1",
-			Goals:         goalsList,
-			Stories:       storiesList,
-		}
-
-		data, err := json.MarshalIndent(sf, "", "  ")
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
-			return err
-		}
-	}
-
-	// Save tasks
-	tasksPath := filepath.Join(openexecDir, "tasks.json")
-	tasksList := make([]Task, 0, len(m.tasks))
-	for _, t := range m.tasks {
-		tasksList = append(tasksList, *t)
-	}
-	tasksData := struct {
-		Tasks []Task `json:"tasks"`
-	}{Tasks: tasksList}
-	data, err := json.MarshalIndent(tasksData, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(tasksPath, data, 0o600); err != nil {
-		return err
-	}
-
-	return nil
+	return m.saveUnlocked()
 }
 
 // GetRelease returns the current release.
