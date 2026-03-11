@@ -6,33 +6,18 @@ Analyze the intent document below and generate a JSON array of user stories.
 
 RULES:
 1. Create ONE story per requirement (REQ-XXX) in the document.
-2. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.) from the Goals section of the intent. If no Goal IDs exist, infer them from the titles.
-3. VERTICAL SLICE / TEST-DRIVEN: Tasks within a feature story MUST follow a Test-Driven sequence:
-   - Task 1: Define API Schema / Contract & Error Codes
-   - Task 2: Implement Mock Handlers & Unit Tests
-   - Task 3: Implement Core Logic & DB Integration
-4. REFACTOR DISCOVERY: If the intent specifies a REFACTOR flow, the FIRST story must be a Discovery story with these tasks:
-   - Extract existing environment variables and dependencies.
-   - Map existing API surface area (inputs/outputs).
-   - Verify local buildability of legacy state.
-5. DEPENDENCIES: Model execution dependencies via "depends_on" lists (IDs only).
-   - Foundational stories (Docker, DB Schema, Configs, Shared Types) must be dependencies for stories that use them.
-   - Sequential tasks within a story must also include "depends_on".
-6. VERIFIABILITY: Generate an executable 'verification_script' (a shell command, e.g. 'curl -f http://localhost:3000/api/health' or 'npm test') that automatically verifies the acceptance criteria.
-7. CONTRACTS: Generate a 'contract' field for stories that provide an API or interface, allowing parallel dependent stories to use it as a mock source.
-8. TESTING: Ensure that implementation stories include tasks specifically for authoring unit tests (>90%% code coverage) and, where appropriate for the shape, End-to-End (E2E) tests.
-9. DOCKER VALIDATION: For projects involving Docker/Containerization, a mandatory task MUST be included to verify that all containers start successfully and pass their health checks.
-10. SKELETON SEEDING: For visual workflow or UI platforms (n8n, Langflow, etc.), the initial infrastructure stories MUST include a task to automatically import or seed a 'Starter Skeleton' workflow/template so the system is not empty upon first launch.
-11. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story using E2E testing (e.g., Playwright) to verify primary goals.
-12. MATURITY ENGINE: Implementation must support declarative progression rules in the DSL, node-level caching via input fingerprinting, and run-id based artifact organization.
-13. GRANULARITY & FAT TASKS: Group tightly coupled logic (e.g., state class + its registry + init file) into single "Chassis" tasks to reduce round-trips. However, keep feature implementations granular.
-14. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" field. This is a 2-sentence blueprint for the implementation agent, including required imports, specific class types (e.g., Pydantic vs Dict), and common senior-level pitfalls to avoid (e.g., 'Import Any to avoid NameError', 'Use backslashes for multi-line Docker RUN').
-15. AUTONOMOUS INNER-LOOP: Mandate that the implementation agent remains in an autonomous "test-fail-fix" cycle. It must not report "completed" until its local verification script passes.
-16. ISO-COMPLIANT REVIEWS: Implementation follows a two-tier review protocol:
-    - Task-Tier (Verification): Autonomous verification via scripts (Evidence is logged in audit.db).
-    - Story-Tier (Validation): Once all tasks in a story are verified, a final 'Validation Review' MUST be performed to ensure the integrated feature satisfies the acceptance criteria and Goal ID.
-17. Task IDs should follow format: T-US-XXX-YYY where XXX is story number, YYY is task number.
-18. Avoid redundancy - do not create multiple stories for the same functionality.
+2. DISCOVERY FIRST: If the project involves fixing, refactoring, or optimizing (like US-001 in AgileDay), the VERY FIRST story must be a Discovery story. It must depend on nothing and all other functional stories must depend on it.
+3. SERIALIZATION: Avoid massive parallelism. Implementation stories should form a logical sequence (Story A -> Story B -> Story C). Do not let more than 2 feature stories be "ready" at the same time unless they are truly orthogonal.
+4. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
+5. VERTICAL SLICE / TEST-DRIVEN: Tasks within a feature story MUST follow a Test-Driven sequence:
+   - Task 1: Diagnose/Research (Capture logs, identify root cause)
+   - Task 2: Stabilize/Implement (Fix core logic, update selectors)
+   - Task 3: Verify/Quarantine (Run exact CI command, verify fix)
+6. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command). This script must specifically verify the GOAL it is linked to.
+7. DEPENDENCIES: Use "depends_on" aggressively to enforce the architectural order (Discovery -> Foundation -> Implementation -> Validation).
+8. Task IDs: T-US-XXX-YYY format. Sequential tasks within a story must depend on their predecessor.
+9. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories.
+10. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint).
 
 OUTPUT FORMAT (JSON object):
 {
@@ -100,19 +85,15 @@ REVIEW THE STORIES AGAINST THESE CRITERIA:
 1. **Requirement Coverage**: Each REQ-XXX in the intent must map to exactly ONE story.
    No requirements should be missing or buried.
 
-2. **Goal Convergence**: Every story must link to a Goal ID. Most importantly, do
-   these stories collectively ACHIEVE the goals defined in the intent? If a goal
-   (e.g., G-001) has no stories that directly satisfy its success criteria,
-   reject the plan.
+2. **Goal Convergence & Verifiability**: Every story must link to a Goal ID. Most importantly:
+   - Does every Goal defined in the intent have at least ONE story mapped to it?
+   - Does every implementation story have a functional 'verification_script'?
+   - If a goal has no stories, or a story has no verification script, REJECT.
 
-3. **No Redundancy**: Stories should not overlap. If US-001, US-005, and US-010 all
-   cover "basic setup", they must be merged into one.
-
-4. **Dependency Correctness**: Check the "depends_on" lists.
-   - Foundational stories (Docker, Schema, Shared Types) must be dependencies
-     for feature stories.
-   - Sequential tasks within a story must have internal dependencies.
-   - Independent stories/tasks should have empty "depends_on" to allow parallelism.
+3. **Dependency Correctness (Pragmatic Ordering)**: 
+   - Is there a Discovery story that all others depend on?
+   - Are implementation stories serialized (forming a chain)?
+   - If stories are excessively parallel (missing depends_on), REJECT.
 
 5. **Quality & Correctness**: No parsing errors, hallucinations, or corrupted titles.
 

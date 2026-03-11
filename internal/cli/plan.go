@@ -170,7 +170,43 @@ Examples:
 			return fmt.Errorf("planner returned an empty plan. Check your intent file or try a more capable model")
 		}
 
-		// 4. Validate and Save to stories.json
+		// 4. PRAGMATIC PLANNING GATE: Enforce high-quality plan structure
+		cmd.Println("  Running Planning Gate checks...")
+		
+		// Rule A: Goal Coverage
+		goalCoverage := make(map[string]bool)
+		for _, s := range plan.Stories {
+			if s.GoalID != "" && s.VerificationScript != "" {
+				goalCoverage[s.GoalID] = true
+			}
+		}
+		for _, g := range plan.Goals {
+			if !goalCoverage[g.ID] {
+				return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script. Improve your intent and re-plan", g.ID, g.Title)
+			}
+		}
+
+		// Rule B: Discovery First (if refactoring/fixing)
+		isRefactor := strings.Contains(strings.ToLower(string(intentContent)), "fix") || 
+					  strings.Contains(strings.ToLower(string(intentContent)), "refactor") ||
+					  strings.Contains(strings.ToLower(string(intentContent)), "discovery")
+		
+		if isRefactor {
+			hasDiscovery := false
+			for _, s := range plan.Stories {
+				title := strings.ToLower(s.Title)
+				if strings.Contains(title, "discovery") || strings.Contains(title, "analyze") || strings.Contains(title, "inventory") {
+					hasDiscovery = true
+					break
+				}
+			}
+			if !hasDiscovery {
+				return fmt.Errorf("PLANNING GATE FAILED: Refactor/Fix project requires a 'Discovery' story to analyze existing state. Add a Discovery requirement to your intent")
+			}
+		}
+		cmd.Println("  ✓ Planning Gate passed.")
+
+		// 5. Validate and Save to stories.json
 		storiesPath := filepath.Join(config.TractStore, "stories.json")
 		data, err := json.MarshalIndent(plan, "", "  ")
 		if err != nil {
