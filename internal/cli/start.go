@@ -543,6 +543,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 								mu.Lock()
 								node.Status = StatusCompleted
 								mu.Unlock()
+								success = true
 								break 
 							}
 
@@ -612,6 +613,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 								mu.Lock()
 								node.Status = StatusCompleted
 								mu.Unlock()
+								success = true
 								break 
 							}
 
