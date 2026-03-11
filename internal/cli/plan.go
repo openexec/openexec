@@ -18,10 +18,11 @@ import (
 )
 
 var planCmd = &cobra.Command{
-	Use:   "plan <intent-file>",
+	Use:   "plan [intent-file]",
 	Short: "Generate project plan from intent document",
 	Long: `Generate a project plan from an intent document using the native Go orchestration engine.
 
+If no file is provided, it searches for INTENT.md in the current directory or docs/ directory.
 The generated plan is stored in the Tract store for reference and execution.
 
 By default, INTENT.md is validated before planning. Critical issues will
@@ -33,16 +34,33 @@ Validation flags:
   --fix            With --validate-only, show stubs for missing sections
 
 Examples:
-  openexec plan INTENT.md                        # Validate then plan
-  openexec plan INTENT.md --validate-only        # Validate only
-  openexec plan INTENT.md --no-validate          # Skip validation`,
-	Args: cobra.ExactArgs(1),
+  openexec plan                                  # Search for INTENT.md then plan
+  openexec plan docs/intent.md                   # Specific file
+  openexec plan --validate-only                  # Validate only`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		intentFile := args[0]
+		intentFile := "INTENT.md"
+		if len(args) > 0 {
+			intentFile = args[0]
+		}
 
-		// Validate intent file exists
-		if _, err := os.Stat(intentFile); err != nil {
-			return fmt.Errorf("intent file not found: %s", intentFile)
+		// Resolve intent file path with fallbacks
+		if _, err := os.Stat(intentFile); os.IsNotExist(err) {
+			fallbacks := []string{"intent.md", "docs/INTENT.md", "docs/intent.md"}
+			found := false
+			for _, f := range fallbacks {
+				if _, err := os.Stat(f); err == nil {
+					intentFile = f
+					found = true
+					break
+				}
+			}
+			if !found {
+				if len(args) > 0 {
+					return fmt.Errorf("intent file not found: %s", args[0])
+				}
+				return fmt.Errorf("no intent file found. Create INTENT.md or run 'openexec wizard' to generate one")
+			}
 		}
 
 		// Get flags
@@ -79,13 +97,13 @@ Examples:
 				if !result.Valid {
 					return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
 				}
-				cmd.Println("Validation passed. Run without --validate-only to generate plan.")
+				cmd.Println("Validation passed. Run 'openexec plan' to generate stories.")
 				return nil
 			}
 
 			// If validation failed and not validate-only, fail before planning
 			if !result.Valid {
-				cmd.Println("\nHint: Run 'openexec knowledge show prd' to check requirements")
+				cmd.Println("\nHint: Fix the issues above or run 'openexec wizard' to re-align your intent.")
 				return fmt.Errorf("cannot plan: intent document has %d critical issue(s)", len(result.Critical))
 			}
 
@@ -113,7 +131,6 @@ Examples:
 		cmd.Printf("Generating plan from: %s\n", intentFile)
 		cmd.Printf("  Engine:         Native Go Orchestrator\n")
 		cmd.Printf("  Planner model:  %s\n", plannerModel)
-		cmd.Printf("  Tract store:    %s\n", config.TractStore)
 
 		// Fetch PRD context from Knowledge Store
 		var prdContext map[string][]*knowledge.PRDRecord
@@ -149,14 +166,29 @@ Examples:
 			return err
 		}
 
-		// 4. Save to stories.json
+		if plan == nil || len(plan.Stories) == 0 {
+			return fmt.Errorf("planner returned an empty plan. Check your intent file or try a more capable model")
+		}
+
+		// 4. Validate and Save to stories.json
 		storiesPath := filepath.Join(config.TractStore, "stories.json")
-		data, _ := json.MarshalIndent(plan, "", "  ")
+		data, err := json.MarshalIndent(plan, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal plan: %w", err)
+		}
+
+		// STRUCTURAL VALIDATION: Ensure it's valid before saving
+		var dummy planner.ProjectPlan
+		if err := json.Unmarshal(data, &dummy); err != nil {
+			return fmt.Errorf("ABORTING: Generated plan is structurally invalid: %w", err)
+		}
+
 		if err := os.WriteFile(storiesPath, data, 0644); err != nil {
 			return fmt.Errorf("failed to save stories: %w", err)
 		}
 
 		cmd.Printf("✓ Stories generated: %s (%d stories)\n", storiesPath, len(plan.Stories))
+		cmd.Printf("\n🚀 NEXT STEP: Run 'openexec run' to begin autonomous execution.\n")
 		return nil
 	},
 }

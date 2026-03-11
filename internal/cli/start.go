@@ -1225,6 +1225,40 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 					}
 				}
 
+				// SILENT INITIALIZATION: Ensure task exists in DB and materialize file
+				if mgr != nil {
+					// Ensure story exists
+					if mgr.GetStory(story.ID) == nil {
+						_ = mgr.CreateStory(&release.Story{
+							ID:        story.ID,
+							Title:     story.Title,
+							Status:    release.StoryStatusPending,
+							DependsOn: story.DependsOn,
+						})
+					}
+					// Ensure task exists
+					if mgr.GetTask(taskID) == nil {
+						_ = mgr.CreateTask(&release.Task{
+							ID:                 taskID,
+							Title:              genTask.Title,
+							Description:        genTask.Description,
+							StoryID:            story.ID,
+							DependsOn:          deps,
+							VerificationScript: genTask.VerificationScript,
+							Status:             release.TaskStatusPending,
+						})
+					}
+
+					// Materialize context file for the agent
+					fwuDir := filepath.Join(projectDir, ".openexec", "fwu")
+					_ = os.MkdirAll(fwuDir, 0750)
+					taskFile := filepath.Join(fwuDir, taskID+".md")
+					if _, err := os.Stat(taskFile); os.IsNotExist(err) {
+						content := fmt.Sprintf("# Task %s: %s\n\n%s\n\nStatus: pending\n", taskID, genTask.Title, genTask.Description)
+						_ = os.WriteFile(taskFile, []byte(content), 0644)
+					}
+				}
+
 				tasks = append(tasks, Task{
 					ID:                 taskID,
 					Title:              genTask.Title,
