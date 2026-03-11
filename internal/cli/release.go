@@ -781,6 +781,7 @@ Examples:
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		reassign, _ := cmd.Flags().GetBool("reassign")
+		pruneOrphans, _ := cmd.Flags().GetBool("prune-orphans")
 
 		// Read stories file
 		data, err := os.ReadFile(inputFile)
@@ -1080,13 +1081,15 @@ Examples:
 			}
 		}
 
-		// Prune legacy tasks not in incoming plan
-		allTasks := mgr.GetTasks()
+		// Prune legacy tasks not in incoming plan (Only if --prune-orphans is set)
 		prunedCount := 0
-		for _, t := range allTasks {
-			if !incomingTaskIDs[t.ID] {
-				if err := mgr.DeleteTask(t.ID); err == nil {
-					prunedCount++
+		if pruneOrphans {
+			allTasks := mgr.GetTasks()
+			for _, t := range allTasks {
+				if !incomingTaskIDs[t.ID] {
+					if err := mgr.DeleteTask(t.ID); err == nil {
+						prunedCount++
+					}
 				}
 			}
 		}
@@ -1621,9 +1624,10 @@ func init() {
 	storyApproveCmd.Flags().String("email", "", "Approver email (uses git email if not specified)")
 	storyApproveCmd.Flags().String("comments", "", "Approval comments")
 
-	storyCmd.AddCommand(storyImportCmd)
 	storyImportCmd.Flags().Bool("dry-run", false, "Preview import without creating stories/tasks")
 	storyImportCmd.Flags().Bool("reassign", false, "Reassign existing tasks to stories if StoryID is missing")
+	storyImportCmd.Flags().Bool("prune-orphans", false, "Prune legacy tasks not listed in the stories file")
+	storyCmd.AddCommand(storyImportCmd)
 
 	// Task subcommands
 	rootCmd.AddCommand(taskCmd)
