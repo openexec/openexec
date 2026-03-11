@@ -22,7 +22,13 @@ To prevent thrashing and stalling during task execution, agents MUST adhere to t
 - **Mock Integrity**: Ensure mocks exactly match the current API response format (check `snake_case` vs `camelCase`).
 
 ### 4. Learning Loop (Engram)
-- When a complex bug is solved (like the Popover/Vitest timing issue), the agent should summarize the "Lesson Learned" and persist it to `.openexec/engram/learning_log.json`.
+- When a complex bug is solved (like the Popover/Vitest timing issue), the agent should summarize the "Lesson Learned" and summarize it to `.openexec/engram/learning_log.json`.
+
+### 5. Git & Remote Policy (Production Safety)
+- **Local Commits ONLY**: Agents must strictly perform git commits LOCALLY. 
+- **NO Automatic Pushing**: Never execute `git push` or any command that synchronizes with a remote repository automatically. 
+- **Manual Promotion**: Code promotion to production or remote branches is a human-only task. This prevents accidental breakages during autonomous execution loops.
+- **Branching**: Agents should create feature branches for their work, but these branches must remain local until manually reviewed and pushed by the Operator.
 
 ---
 

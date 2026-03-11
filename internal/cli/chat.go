@@ -1,17 +1,16 @@
 package cli
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/pkg/client"
 	"github.com/spf13/cobra"
 )
 
@@ -92,6 +91,9 @@ func runChatREPL(projectName string) error {
 	fmt.Println("Type your intent or 'exit' to quit.")
 	fmt.Println()
 
+	// Initialize API client
+	apiClient := client.New(fmt.Sprintf("http://localhost:%d", startPort))
+
 	for {
 		line, err := l.Readline()
 		if err == readline.ErrInterrupt {
@@ -112,8 +114,8 @@ func runChatREPL(projectName string) error {
 			break
 		}
 
-		// Send query to server
-		response, err := sendChatQuery(line)
+		// Send query to server via client
+		response, err := apiClient.Query(context.Background(), line)
 		if err != nil {
 			fmt.Printf(color.RedString("Error: %v\n"), err)
 			continue
@@ -126,66 +128,6 @@ func runChatREPL(projectName string) error {
 	}
 
 	return nil
-}
-
-func sendChatQuery(query string) (string, error) {
-	url := fmt.Sprintf("http://localhost:%d/api/v1/dcp/query", startPort)
-
-	payload := map[string]string{"query": query}
-	body, _ := json.Marshal(payload)
-
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("failed to connect to server: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if chatDebug {
-		fmt.Printf(color.YellowString("\n[DEBUG] HTTP %d\n[DEBUG] Body: %s\n"), resp.StatusCode, string(respBody))
-	}
-
-	var result struct {
-		Response string `json:"response"`
-		Result   any    `json:"result"`
-		Error    string `json:"error"`
-	}
-
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(respBody))
-		}
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	// Check for application-level error in the body
-	if result.Error != "" {
-		return "", fmt.Errorf("agent error: %s", result.Error)
-	}
-
-	// Format result
-	var finalResult string
-	if result.Result != nil {
-		switch v := result.Result.(type) {
-		case string:
-			finalResult = v
-		default:
-			// Pretty print non-string results
-			data, _ := json.MarshalIndent(v, "", "  ")
-			finalResult = string(data)
-		}
-	} else if result.Response != "" {
-		finalResult = result.Response
-	}
-
-	if finalResult == "" {
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("server returned status %d", resp.StatusCode)
-		}
-		return "(no response from agent; add --debug for raw output)", nil
-	}
-
-	return finalResult, nil
 }
 
 func init() {

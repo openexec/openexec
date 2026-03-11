@@ -25,15 +25,14 @@ func (t *SafeCommitTool) Name() string {
 }
 
 func (t *SafeCommitTool) Description() string {
-	return "Surgically validates code quality (lint, type-check) and commits changes to git only if all gates pass."
+	return "Surgically validates code quality (lint, type-check) and commits changes to git LOCALLY only if all gates pass. Note: This tool NEVER pushes to remote."
 }
 
 func (t *SafeCommitTool) InputSchema() string {
 	return `{
 		"type": "object",
 		"properties": {
-			"message": { "type": "string", "description": "Git commit message" },
-			"push": { "type": "boolean", "default": false, "description": "Whether to push after commit" }
+			"message": { "type": "string", "description": "Git commit message" }
 		},
 		"required": ["message"]
 	}`
@@ -41,7 +40,6 @@ func (t *SafeCommitTool) InputSchema() string {
 
 func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{}) (any, error) {
 	message, _ := args["message"].(string)
-	push, _ := args["push"].(bool)
 
 	// 1. Run Mandatory Quality Gates (DCP Enforcement)
 	passed, reason := t.policy.ValidateCompliance(ctx, ".")
@@ -63,7 +61,7 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 		return nil, fmt.Errorf("git commit failed: %w\n%s", err, string(out))
 	}
 
-	result := fmt.Sprintf("✓ Successfully validated and committed changes: %q", message)
+	result := fmt.Sprintf("✓ Successfully validated and committed changes LOCALLY: %q", message)
 
 	// 4. Autonomous Sync: Re-index modified files to handle Line Drift
 	if t.syncer != nil {
@@ -78,15 +76,6 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 			}
 			result += fmt.Sprintf("\n✓ Knowledge Base synchronized for %d files.", len(files))
 		}
-	}
-
-	// 5. Optional Push
-	if push {
-		cmd = exec.CommandContext(ctx, "git", "push")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("git push failed: %w\n%s", err, string(out))
-		}
-		result += "\n✓ Changes pushed to remote."
 	}
 
 	return result, nil

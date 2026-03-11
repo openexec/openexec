@@ -112,9 +112,20 @@ func (l *Loop) Run(ctx context.Context) error {
         l.iteration++
         l.emit(Event{Type: EventIterationStart, Iteration: l.iteration})
 
-        // Provider-backed execution path: when CommandName maps to a cloud provider
-        // (e.g., openai/gemini), we currently do not spawn an external CLI.
-        if name := filepath.Base(l.cfg.CommandName); name == "openai" || name == "gemini" {
+        // Provider-backed execution path: 
+        // Only use this if no explicit RunnerCommand override was provided in config,
+        // AND the resolved command name matches a known provider (openai/gemini).
+        // This ensures local CLI binaries (like gemini-cli) take precedence if configured.
+        forceProvider := os.Getenv("OPENEXEC_FORCE_PROVIDER") == "1"
+        isProviderBinary := false
+        if l.cfg.CommandName != "" {
+            name := filepath.Base(l.cfg.CommandName)
+            isProviderBinary = (name == "openai" || name == "gemini")
+        }
+
+        useProvider := (isProviderBinary && l.cfg.RunnerCommand == "") || forceProvider
+
+        if useProvider {
             // Initialize providers from env (best-effort)
             agent.InitializeDefaultRegistry()
 
@@ -125,6 +136,7 @@ func (l *Loop) Run(ctx context.Context) error {
             }
             if model == "" {
                 // Fallback: pick a default per provider name
+                name := filepath.Base(l.cfg.CommandName)
                 if name == "openai" {
                     model = "gpt-4o"
                 } else if name == "gemini" {
