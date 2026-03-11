@@ -35,6 +35,7 @@ var (
 	runNoReview      bool
 	runMaxIterations int
 	runTimeout       int
+	runVerbose       bool
 )
 
 // Task represents a task to execute
@@ -491,9 +492,14 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 			}
 
 			if allDone {
+				if runVerbose {
+					cmd.Printf("[Scheduler] Task %s is ready (all dependencies completed)\n", node.Task.ID)
+				}
 				// Mark as ready FIRST to prevent double-enqueuing in concurrent checkReady calls
 				node.Status = StatusReady
 				readyTasks <- node
+			} else if runVerbose {
+				cmd.Printf("[Scheduler] Task %s is waiting for dependencies\n", node.Task.ID)
 			}
 		}
 	}
@@ -537,8 +543,15 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						if strings.Contains(lastError, "Planning Mismatch") {
 							// If the agent also mentioned implementation is done, AUTO-HEAL!
 							lowerErr := strings.ToLower(lastError)
-							if strings.Contains(lowerErr, "complete") || strings.Contains(lowerErr, "done") || strings.Contains(lowerErr, "criteria appear to be met") {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete. Syncing state...\n", workerID)
+							isComplete := strings.Contains(lowerErr, "complete") || 
+										 strings.Contains(lowerErr, "done") || 
+										 strings.Contains(lowerErr, "criteria appear to be met") ||
+										 strings.Contains(lowerErr, "fully satisfied") ||
+										 strings.Contains(lowerErr, "no actual task definition") ||
+										 strings.Contains(lowerErr, "contains only a stub")
+							
+							if isComplete {
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete or redundant. Syncing state...\n", workerID)
 								_, _ = mgr.CompleteTask(node.Task.ID)
 								mu.Lock()
 								node.Status = StatusCompleted
@@ -607,8 +620,15 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						if strings.Contains(lastError, "Planning Mismatch") {
 							// If the agent also mentioned implementation is done, AUTO-HEAL!
 							lowerErr := strings.ToLower(lastError)
-							if strings.Contains(lowerErr, "complete") || strings.Contains(lowerErr, "done") || strings.Contains(lowerErr, "criteria appear to be met") {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete. Syncing state...\n", workerID)
+							isComplete := strings.Contains(lowerErr, "complete") || 
+										 strings.Contains(lowerErr, "done") || 
+										 strings.Contains(lowerErr, "criteria appear to be met") ||
+										 strings.Contains(lowerErr, "fully satisfied") ||
+										 strings.Contains(lowerErr, "no actual task definition") ||
+										 strings.Contains(lowerErr, "contains only a stub")
+							
+							if isComplete {
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete or redundant. Syncing state...\n", workerID)
 								_, _ = mgr.CompleteTask(node.Task.ID)
 								mu.Lock()
 								node.Status = StatusCompleted
@@ -842,6 +862,7 @@ func init() {
 	runCmd.Flags().StringVar(&startExecutor, "executor", "", "Executor model for task execution (overrides config)")
 	runCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (overrides config)")
 	runCmd.Flags().BoolVar(&runNoReview, "no-review", false, "Disable code review (overrides config)")
+	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Display detailed scheduling information")
 
 	// stop command flags
 	stopCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
