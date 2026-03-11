@@ -940,14 +940,65 @@ func isServerRunning(projectDir string, port int) bool {
 	return false
 }
 
-// loadPendingTasks loads all tasks from the release manager, tasks.json, or stories.json
+// loadPendingTasks loads all tasks from the release manager (Source of Truth), tasks.json, or stories.json
 func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
+	// Pre-flight: Load stories.json to use as a "map of intent" for reconciliation
+	incomingTaskStories := make(map[string]string)
+	storiesFile := filepath.Join(projectDir, ".openexec", "stories.json")
+	if data, err := os.ReadFile(storiesFile); err == nil {
+		var sf struct {
+			Stories []struct {
+				ID    string `json:"id"`
+				Tasks []any  `json:"tasks"`
+			} `json:"stories"`
+		}
+		if err := json.Unmarshal(data, &sf); err == nil {
+			for _, s := range sf.Stories {
+				for _, tRaw := range s.Tasks {
+					id := ""
+					switch v := tRaw.(type) {
+					case string: id = v
+					case map[string]any: id, _ = v["id"].(string)
+					}
+					if id != "" {
+						incomingTaskStories[id] = s.ID
+					}
+				}
+			}
+		}
+	}
+
 	// 1. Try Release Manager first (Source of Truth)
 	if mgr != nil {
 		relTasks := mgr.GetTasks()
 		if len(relTasks) > 0 {
 			var tasks []Task
 			for _, rt := range relTasks {
+				// RECONCILIATION: Check for StoryID mismatch or missing
+				expectedStoryID, inPlan := incomingTaskStories[rt.ID]
+				if inPlan && rt.StoryID != expectedStoryID {
+					rt.StoryID = expectedStoryID
+					_ = mgr.UpdateTask(rt)
+				}
+
+				// STATUS SYNC: Check if markdown file says it's done
+				storyPath := filepath.Join(projectDir, ".openexec", "stories", rt.StoryID+".md")
+				if data, err := os.ReadFile(storyPath); err == nil {
+					content := strings.ToLower(string(data))
+					if strings.Contains(content, "status: completed") || strings.Contains(content, "status: done") {
+						if rt.Status == "pending" {
+							rt.Status = "completed"
+							_ = mgr.UpdateTask(rt)
+						}
+					}
+				}
+
+				// Only include tasks that are actually in the current Plan of Record
+				// (Non-destructive pruning: we don't delete them from DB, just don't schedule them)
+				if !inPlan {
+					continue
+				}
+
 				tasks = append(tasks, Task{
 					ID:                 rt.ID,
 					Title:              rt.Title,
@@ -981,8 +1032,8 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 	}
 
 	// 4. Fallback to stories.json (Planner Output)
-	storiesFile := filepath.Join(projectDir, ".openexec", "stories.json")
-	data, err := os.ReadFile(storiesFile)
+	storiesFile = filepath.Join(projectDir, ".openexec", "stories.json")
+	storiesData, err := os.ReadFile(storiesFile)
 	if err != nil {
 		return nil, fmt.Errorf("no tasks found: %w", err)
 	}
@@ -1007,7 +1058,7 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 		} `json:"stories"`
 	}
 
-	if err := json.Unmarshal(data, &sf); err != nil {
+	if err := json.Unmarshal(storiesData, &sf); err != nil {
 		return nil, fmt.Errorf("invalid stories.json: %w", err)
 	}
 
