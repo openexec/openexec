@@ -993,6 +993,15 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 					}
 				}
 
+				// MATERIALIZATION: Ensure the agent's work file exists (Self-Healing)
+				fwuDir := filepath.Join(projectDir, ".openexec", "fwu")
+				_ = os.MkdirAll(fwuDir, 0750)
+				taskFile := filepath.Join(fwuDir, rt.ID+".md")
+				if _, err := os.Stat(taskFile); os.IsNotExist(err) {
+					content := fmt.Sprintf("# Task %s: %s\n\n%s\n\nStatus: pending\n", rt.ID, rt.Title, rt.Description)
+					_ = os.WriteFile(taskFile, []byte(content), 0644)
+				}
+
 				// Only include tasks that are actually in the current Plan of Record
 				// (Non-destructive pruning: we don't delete them from DB, just don't schedule them)
 				if !inPlan {
@@ -1009,6 +1018,78 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 					VerificationScript: rt.VerificationScript,
 				})
 			}
+
+			// POST-RECONCILIATION AUDIT: Ensure all tasks from stories.json are actually loaded
+			missingIDs := []string{}
+			loadedMap := make(map[string]bool)
+			for _, t := range tasks {
+				loadedMap[t.ID] = true
+			}
+			for tid := range incomingTaskStories {
+				if !loadedMap[tid] {
+					missingIDs = append(missingIDs, tid)
+				}
+			}
+
+			// ACTIVE DEEP HEALING: If tasks are missing, try to re-import them automatically
+			if len(missingIDs) > 0 {
+				fmt.Printf("  ⚠ Warning: %d task(s) missing from database. Attempting active deep healing...\n", len(missingIDs))
+				
+				// Re-read stories.json to get full task data for missing items
+				data, err := os.ReadFile(storiesFile)
+				if err == nil {
+					// We'll reuse the struct from the fallback logic later
+					type GeneratedTask struct {
+						ID                 string   `json:"id"`
+						Title              string   `json:"title"`
+						Description        string   `json:"description"`
+						DependsOn          []string `json:"depends_on"`
+						VerificationScript string   `json:"verification_script,omitempty"`
+					}
+					var sf struct {
+						Stories []struct {
+							ID    string          `json:"id"`
+							Tasks []GeneratedTask `json:"tasks"`
+						} `json:"stories"`
+					}
+					if err := json.Unmarshal(data, &sf); err == nil {
+						for _, s := range sf.Stories {
+							for _, gt := range s.Tasks {
+								isMissing := false
+								for _, mid := range missingIDs {
+									if gt.ID == mid { isMissing = true; break }
+								}
+								if isMissing {
+									// Create the missing task
+									newTask := &release.Task{
+										ID:                 gt.ID,
+										Title:              gt.Title,
+										Description:        gt.Description,
+										StoryID:            s.ID,
+										DependsOn:          gt.DependsOn,
+										VerificationScript: gt.VerificationScript,
+										Status:             release.TaskStatusPending,
+									}
+									if err := mgr.CreateTask(newTask); err == nil {
+										fmt.Printf("  ✨ Deep-Healed: Restored missing task %s\n", gt.ID)
+										// Add to local set so it's runnable immediately
+										tasks = append(tasks, Task{
+											ID:                 gt.ID,
+											Title:              gt.Title,
+											Description:        gt.Description,
+											StoryID:            s.ID,
+											Status:             "pending",
+											DependsOn:          gt.DependsOn,
+											VerificationScript: gt.VerificationScript,
+										})
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			return tasks, nil
 		}
 	}

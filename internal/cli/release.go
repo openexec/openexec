@@ -1091,6 +1091,36 @@ Examples:
 			}
 		}
 
+		// Integrity Audit: Verify the final state matches the incoming plan
+		allFinalTasks := mgr.GetTasks()
+		taskMap := make(map[string]*release.Task)
+		for _, t := range allFinalTasks {
+			taskMap[t.ID] = t
+		}
+
+		missingTasks := 0
+		mislinkedTasks := 0
+		for _, s := range stories {
+			for _, tRaw := range s.Tasks {
+				id := ""
+				switch v := tRaw.(type) {
+				case string: id = v
+				case map[string]any: id, _ = v["id"].(string)
+				}
+				
+				if id == "" { continue }
+
+				t, exists := taskMap[id]
+				if !exists {
+					cmd.Printf("  [audit-error] %s: task missing from database after import\n", id)
+					missingTasks++
+				} else if t.StoryID != s.ID {
+					cmd.Printf("  [audit-error] %s: task is linked to story %s, expected %s\n", id, t.StoryID, s.ID)
+					mislinkedTasks++
+				}
+			}
+		}
+
 		cmd.Printf("\nImport complete:\n")
 		cmd.Printf("  Stories created: %d\n", storiesCreated)
 		cmd.Printf("  Tasks created:   %d\n", tasksCreated)
@@ -1098,6 +1128,13 @@ Examples:
 		if prunedCount > 0 {
 			cmd.Printf("  Legacy tasks pruned: %d\n", prunedCount)
 		}
+
+		if missingTasks > 0 || mislinkedTasks > 0 {
+			cmd.Printf("\n⚠️  INTEGRITY WARNING: %d task(s) missing, %d task(s) mislinked.\n", missingTasks, mislinkedTasks)
+			return fmt.Errorf("integrity check failed")
+		}
+		
+		cmd.Printf("✓ Integrity Audit passed: all tasks present and correctly linked.\n")
 		return nil
 	},
 }
