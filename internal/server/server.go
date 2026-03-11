@@ -86,16 +86,13 @@ func New(cfg Config) (*Server, error) {
 	// Resolve runner command from project execution model.
 	runnerCmd := ""
 	var runnerArgs []string
-	var executorModel, runnerCommand string
-	var runnerArgsFromCfg []string
+	var modelUsed string
 	if projCfg, err := project.LoadProjectConfig(cfg.ProjectsDir); err == nil {
-		executorModel = projCfg.Execution.ExecutorModel
-		runnerCommand = projCfg.Execution.RunnerCommand
-		runnerArgsFromCfg = projCfg.Execution.RunnerArgs
+		modelUsed = projCfg.Execution.ExecutorModel
 		rc, ra, err := runner.Resolve(
-			executorModel,
-			runnerCommand,
-			runnerArgsFromCfg,
+			modelUsed,
+			projCfg.Execution.RunnerCommand,
+			projCfg.Execution.RunnerArgs,
 		)
 		if err != nil {
 			log.Printf("[Server] Warning: runner resolution failed: %v", err)
@@ -103,17 +100,16 @@ func New(cfg Config) (*Server, error) {
 			runnerCmd = rc
 			runnerArgs = ra
 			log.Printf("[Server] Runner: model=%s command=%s args=%v",
-				executorModel, runnerCmd, runnerArgs)
+				modelUsed, runnerCmd, runnerArgs)
 		}
 	}
 
-	// For Claude, we want to use the internal buildCommand defaults (no-inline prompt)
-	// unless explicit overrides were provided.
-	finalCmd := runnerCmd
-	finalArgs := runnerArgs
+	// For Claude, keep CommandName empty to use internal buildClaudeArgs defaults.
+	loopCmd := runnerCmd
+	loopArgs := runnerArgs
 	if strings.Contains(strings.ToLower(runnerCmd), "claude") {
-		finalCmd = ""
-		finalArgs = nil
+		loopCmd = ""
+		loopArgs = nil
 	}
 
 	mgr := manager.New(manager.Config{
@@ -121,11 +117,9 @@ func New(cfg Config) (*Server, error) {
 		TractStore:    cfg.DataDir,
 		AgentsFS:      agentsFS,
 		LogDir:        logDir,
-		ExecutorModel: executorModel,
-		RunnerCommand: runnerCommand,
-		RunnerArgs:    runnerArgsFromCfg,
-		CommandName:   finalCmd,
-		CommandArgs:   finalArgs,
+		ExecutorModel: modelUsed,
+		CommandName:   loopCmd,
+		CommandArgs:   loopArgs,
 	})
 	// 3. Initialize Deterministic Control Plane (DCP)
 	// Error ignored: knowledge store is optional; DCP tools gracefully handle nil/empty store
@@ -235,8 +229,10 @@ func (s *Server) handleKnowledgeEnvs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	runnerName := "claude"
+	modelName := ""
 	if s.Mgr != nil {
 		cfg := s.Mgr.GetConfig()
+		modelName = cfg.ExecutorModel
 		if cfg.CommandName != "" {
 			runnerName = filepath.Base(cfg.CommandName)
 		}
@@ -245,6 +241,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status":  "ok",
 		"version": version.Version,
 		"runner":  runnerName,
+		"model":   modelName,
 	})
 }
 
