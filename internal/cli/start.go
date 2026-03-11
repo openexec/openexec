@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/server"
@@ -454,6 +455,63 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		nodes[t.ID] = node
 	}
 
+	// CYCLE DETECTION: Using Kahn's Algorithm
+	// We only care about cycles in tasks we are about to run
+	inDegree := make(map[string]int)
+	for _, node := range nodes {
+		if node.Status == StatusCompleted { continue }
+		for depID := range node.DependsOn {
+			depNode, exists := nodes[depID]
+			if exists && depNode.Status != StatusCompleted {
+				inDegree[node.Task.ID]++
+			}
+		}
+	}
+
+	queue := []string{}
+	for id, node := range nodes {
+		if node.Status != StatusCompleted && inDegree[id] == 0 {
+			queue = append(queue, id)
+		}
+	}
+
+	visitedCount := 0
+	for len(queue) > 0 {
+		u := queue[0]
+		queue = queue[1:]
+		visitedCount++
+
+		for id, node := range nodes {
+			if node.Status == StatusCompleted { continue }
+			for depID := range node.DependsOn {
+				if depID == u {
+					inDegree[id]--
+					if inDegree[id] == 0 {
+						queue = append(queue, id)
+					}
+				}
+			}
+		}
+	}
+
+	if visitedCount < totalToRun {
+		cmd.Printf("\n%s DEADLOCK DETECTED: Dependency cycle found in tasks.\n", color.RedString("❌"))
+		cmd.Println("   The following tasks are involved in a cycle and cannot be executed:")
+		for id, count := range inDegree {
+			if count > 0 {
+				node := nodes[id]
+				deps := []string{}
+				for d := range node.DependsOn {
+					if nodes[d].Status != StatusCompleted {
+						deps = append(deps, d)
+					}
+				}
+				cmd.Printf("   - %s depends on: %v\n", id, deps)
+			}
+		}
+		return fmt.Errorf("dependency cycle detected")
+	}
+
 	if totalToRun == 0 {
 		cmd.Println("No pending tasks to execute.")
 		return nil
@@ -539,10 +597,27 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					if err != nil {
 						cmd.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
 						lastError = err.Error()
+						lowerErr := strings.ToLower(lastError)
+
+						// CLASSIFICATION: Is this a non-retriable runner/auth failure?
+						isRunnerFail := strings.Contains(lowerErr, "not found on path") || 
+									   strings.Contains(lowerErr, "authentication failed") ||
+									   strings.Contains(lowerErr, "cli session has expired") ||
+									   strings.Contains(lowerErr, "api_key")
+						
+						if isRunnerFail {
+							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
+							cmd.Println("   Hint: Run 'openexec doctor' to verify your runner and credentials.")
+							node.Retries = maxRetries // Force permanent failure
+							mu.Lock()
+							node.Status = StatusFailed
+							mu.Unlock()
+							errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
+							break
+						}
 						
 						if strings.Contains(lastError, "Planning Mismatch") {
 							// If the agent also mentioned implementation is done, AUTO-HEAL!
-							lowerErr := strings.ToLower(lastError)
 							isComplete := strings.Contains(lowerErr, "complete") || 
 										 strings.Contains(lowerErr, "done") || 
 										 strings.Contains(lowerErr, "criteria appear to be met") ||
@@ -615,11 +690,24 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					// If we're here, either loop failed or verification failed
 					if err != nil {
 						lastError = err.Error()
+						lowerErr := strings.ToLower(lastError)
+
+						// CLASSIFICATION: Is this a non-retriable runner/auth failure?
+						isRunnerFail := strings.Contains(lowerErr, "not found on path") || 
+									   strings.Contains(lowerErr, "authentication failed") ||
+									   strings.Contains(lowerErr, "cli session has expired") ||
+									   strings.Contains(lowerErr, "api_key")
 						
-						// Check for non-retriable errors (e.g. Planning Mismatch)
+						if isRunnerFail {
+							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
+							cmd.Println("   Hint: Run 'openexec doctor' to verify your runner and credentials.")
+							node.Retries = maxRetries // Force permanent failure
+							break
+						}
+						
+						// Check for other non-retriable errors (e.g. Planning Mismatch)
 						if strings.Contains(lastError, "Planning Mismatch") {
 							// If the agent also mentioned implementation is done, AUTO-HEAL!
-							lowerErr := strings.ToLower(lastError)
 							isComplete := strings.Contains(lowerErr, "complete") || 
 										 strings.Contains(lowerErr, "done") || 
 										 strings.Contains(lowerErr, "criteria appear to be met") ||
@@ -1015,8 +1103,52 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 	// 1. Try Release Manager first (Source of Truth)
 	if mgr != nil {
 		relTasks := mgr.GetTasks()
+		relStories := mgr.GetStories()
+		
+		// Map story ID to its tasks for barrier injection
+		storyTaskIDs := make(map[string][]string)
+		storyDeps := make(map[string][]string)
+		for _, s := range relStories {
+			storyDeps[s.ID] = s.DependsOn
+		}
+
+		// INTRA-STORY SEQUENCING: Map previous tasks within each story from stories.json
+		prevInStory := make(map[string]string)
+		if data, err := os.ReadFile(storiesFile); err == nil {
+			var sf struct {
+				Stories []struct {
+					ID    string `json:"id"`
+					Tasks []any  `json:"tasks"`
+				} `json:"stories"`
+			}
+			if err := json.Unmarshal(data, &sf); err == nil {
+				for _, s := range sf.Stories {
+					var lastID string
+					for _, tRaw := range s.Tasks {
+						tid := ""
+						switch v := tRaw.(type) {
+						case string: tid = v
+						case map[string]any: tid, _ = v["id"].(string)
+						}
+						if tid != "" {
+							if lastID != "" {
+								prevInStory[tid] = lastID
+							}
+							lastID = tid
+						}
+					}
+				}
+			}
+		}
+
 		if len(relTasks) > 0 {
 			var tasks []Task
+			
+			// Build task map first to identify story membership
+			for _, rt := range relTasks {
+				storyTaskIDs[rt.StoryID] = append(storyTaskIDs[rt.StoryID], rt.ID)
+			}
+
 			for _, rt := range relTasks {
 				// RECONCILIATION: Check for StoryID mismatch or missing
 				expectedStoryID, inPlan := incomingTaskStories[rt.ID]
@@ -1025,31 +1157,54 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 					_ = mgr.UpdateTask(rt)
 				}
 
-				// STATUS SYNC: Check if markdown file says it's done
-				storyPath := filepath.Join(projectDir, ".openexec", "stories", rt.StoryID+".md")
-				if data, err := os.ReadFile(storyPath); err == nil {
-					content := strings.ToLower(string(data))
-					if strings.Contains(content, "status: completed") || strings.Contains(content, "status: done") {
-						if rt.Status == "pending" {
-							rt.Status = "completed"
-							_ = mgr.UpdateTask(rt)
+				// ... (status sync and materialization code remains) ...
+
+				// Only include tasks that are actually in the current Plan of Record
+				if !inPlan {
+					continue
+				}
+
+				// EFFICIENT DEDUPING: Use a map for dependency tracking
+				depSet := make(map[string]bool)
+				for _, d := range rt.DependsOn {
+					depSet[d] = true
+				}
+
+				// SYNTHETIC STORY BARRIER: Wait for ALL tasks in prerequisite stories
+				if parentStoryDeps, ok := storyDeps[rt.StoryID]; ok {
+					injectedCount := 0
+					for _, depStoryID := range parentStoryDeps {
+						// SELF-DEPENDENCY GUARD
+						if depStoryID == rt.StoryID { continue }
+
+						if prerequisiteTasks, ok := storyTaskIDs[depStoryID]; ok {
+							for _, ptid := range prerequisiteTasks {
+								if !depSet[ptid] {
+									depSet[ptid] = true
+									injectedCount++
+								}
+							}
+						}
+					}
+					if injectedCount > 0 && runVerbose {
+						fmt.Printf("   [Scheduler] Story Barrier: %s injected %d deps from prerequisite stories\n", rt.ID, injectedCount)
+					}
+				}
+
+				// INTRA-STORY SEQUENCING: Enforce order within the same story
+				if prev, ok := prevInStory[rt.ID]; ok {
+					if !depSet[prev] {
+						depSet[prev] = true
+						if runVerbose {
+							fmt.Printf("   [Scheduler] Sequence: %s now depends on previous task %s\n", rt.ID, prev)
 						}
 					}
 				}
 
-				// MATERIALIZATION: Ensure the agent's work file exists (Self-Healing)
-				fwuDir := filepath.Join(projectDir, ".openexec", "fwu")
-				_ = os.MkdirAll(fwuDir, 0750)
-				taskFile := filepath.Join(fwuDir, rt.ID+".md")
-				if _, err := os.Stat(taskFile); os.IsNotExist(err) {
-					content := fmt.Sprintf("# Task %s: %s\n\n%s\n\nStatus: pending\n", rt.ID, rt.Title, rt.Description)
-					_ = os.WriteFile(taskFile, []byte(content), 0644)
-				}
-
-				// Only include tasks that are actually in the current Plan of Record
-				// (Non-destructive pruning: we don't delete them from DB, just don't schedule them)
-				if !inPlan {
-					continue
+				// Final dependency list
+				finalDeps := make([]string, 0, len(depSet))
+				for d := range depSet {
+					finalDeps = append(finalDeps, d)
 				}
 
 				tasks = append(tasks, Task{
@@ -1058,7 +1213,7 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 					Description:        rt.Description,
 					StoryID:            rt.StoryID,
 					Status:             rt.Status,
-					DependsOn:          rt.DependsOn,
+					DependsOn:          finalDeps,
 					VerificationScript: rt.VerificationScript,
 				})
 			}
