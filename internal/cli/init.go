@@ -80,7 +80,7 @@ The project name defaults to the current directory name if not provided.`,
 
 		// Interactive mode if not explicitly set via flags
 		var plannerModel, executorModel, reviewerModel string
-		var reviewEnabled, parallelEnabled bool
+		var reviewEnabled, parallelEnabled, gitCommitEnabled, gitPushEnabled bool
 		var workerCount int
 
 		if !initNonInteractive {
@@ -96,7 +96,7 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			// 2. Execution Config prompt
-			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount = promptExecutionConfig(cmd)
+			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled = promptExecutionConfig(cmd)
 		} else {
 			if projectName == "" {
 				projectName = defaultProjectName
@@ -107,6 +107,8 @@ The project name defaults to the current directory name if not provided.`,
 			reviewerModel = initReviewerModel
 			parallelEnabled = true
 			workerCount = 4
+			gitCommitEnabled = false
+			gitPushEnabled = false
 		}
 
 		// Initialize the project structure
@@ -116,6 +118,8 @@ The project name defaults to the current directory name if not provided.`,
 		}
 
 		// Set execution config
+		cfg.GitCommitEnabled = gitCommitEnabled
+		cfg.GitPushEnabled = gitPushEnabled
 		cfg.Execution = project.ExecutionConfig{
 			PlannerModel:    plannerModel,
 			ExecutorModel:   executorModel,
@@ -161,7 +165,7 @@ func init() {
 }
 
 // promptExecutionConfig interactively prompts for execution configuration
-func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int) {
+func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int, gitCommitEnabled bool, gitPushEnabled bool) {
 	reader := bufio.NewReader(cmd.InOrStdin())
 
 	fmt.Println("\n=== Execution Settings ===")
@@ -194,6 +198,25 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		reviewerModel = selectModelInteractively(reader, "reviewer", initReviewerModel)
 	}
 
+	// Git configuration
+	fmt.Printf("\nEnable autonomous local commits? [y/N]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	gitCommitEnabled = false
+	if answer == "y" || answer == "yes" {
+		gitCommitEnabled = true
+	}
+
+	gitPushEnabled = false
+	if gitCommitEnabled {
+		fmt.Printf("Enable autonomous remote push on release completion? [y/N]: ")
+		answer, _ = reader.ReadString('\n')
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer == "y" || answer == "yes" {
+			gitPushEnabled = true
+		}
+	}
+
 	// Parallel configuration
 	fmt.Printf("\nEnable parallel task execution? [Y/n]: ")
 	answer, _ = reader.ReadString('\n')
@@ -214,7 +237,7 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		}
 	}
 
-	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount
+	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled
 }
 
 // ensureGitignore ensures .gitignore exists and contains .openexec entries.

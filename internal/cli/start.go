@@ -755,6 +755,47 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					if updateErr != nil {
 						cmd.Printf("[Worker %d] ⚠ Warning: failed to update status for %s: %v\n", workerID, node.Task.ID, updateErr)
 					}
+
+					// STORY INTEGRATION (Local GitFlow):
+					// If this was the last task in the story, merge the feature branch into the release branch.
+					story := mgr.GetStory(node.Task.StoryID)
+					if story != nil && story.Status == release.StoryStatusDone {
+						cmd.Printf("[Worker %d] 🧬 Story %s complete. Integrating local branch...\n", workerID, story.ID)
+						
+						// Resolve branch names from config
+						relPrefix := "release/"
+						featPrefix := "feature/"
+						baseBranch := "main"
+						if projCfg, err := project.LoadProjectConfig("."); err == nil {
+							if projCfg.ReleaseBranchPrefix != "" { relPrefix = projCfg.ReleaseBranchPrefix }
+							if projCfg.FeatureBranchPrefix != "" { featPrefix = projCfg.FeatureBranchPrefix }
+							if projCfg.BaseBranch != "" { baseBranch = projCfg.BaseBranch }
+						}
+
+						// Resolve release branch name
+						releaseBranch := relPrefix + "current"
+						fromVersion, _ := exec.Command("openexec", "version", "--short").Output()
+						if v := strings.TrimSpace(string(fromVersion)); v != "" {
+							releaseBranch = relPrefix + v
+						}
+						
+						storyBranch := featPrefix + story.ID
+
+						// 1. Switch to release branch
+						_ = exec.Command("git", "checkout", releaseBranch).Run()
+						// 2. Merge story branch
+						mergeCmd := exec.Command("git", "merge", "--no-ff", "-m", fmt.Sprintf("Integrate story %s", story.ID), storyBranch)
+						if out, err := mergeCmd.CombinedOutput(); err != nil {
+							cmd.Printf("[Worker %d] ⚠ Integration failed for story %s: %v\n%s\n", workerID, story.ID, err, string(out))
+						} else {
+							cmd.Printf("[Worker %d] ✓ Integrated %s into %s\n", workerID, storyBranch, releaseBranch)
+							// 3. Delete local story branch (Cleanup)
+							_ = exec.Command("git", "branch", "-d", storyBranch).Run()
+						}
+						
+						// 4. Return to base branch (or stay on release)
+						_ = exec.Command("git", "checkout", baseBranch).Run()
+					}
 				}
 
 				node.Status = StatusCompleted
@@ -788,8 +829,31 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					}
 				}
 
-				// If all tasks are done, signal completion
+				// If all tasks are done, signal completion and handle final push
 				finished := (doneCount == totalCount)
+				if finished {
+					// FINAL RELEASE PUSH (Optional):
+					// If all tasks in all stories are complete, and git_push_enabled is true,
+					// push the release branch to remote.
+					if projCfg, err := project.LoadProjectConfig("."); err == nil && projCfg.GitPushEnabled {
+						// Resolve release branch name
+						relPrefix := "release/"
+						if projCfg.ReleaseBranchPrefix != "" { relPrefix = projCfg.ReleaseBranchPrefix }
+						releaseBranch := relPrefix + "current"
+						fromVersion, _ := exec.Command("openexec", "version", "--short").Output()
+						if v := strings.TrimSpace(string(fromVersion)); v != "" {
+							releaseBranch = relPrefix + v
+						}
+
+						cmd.Printf("\n🚀 %s complete! Pushing release branch %s to remote...\n", projCfg.Name, releaseBranch)
+						pushCmd := exec.Command("git", "push", "origin", releaseBranch)
+						if out, err := pushCmd.CombinedOutput(); err != nil {
+							cmd.Printf("  ⚠ Remote push failed: %v\n%s\n", err, string(out))
+						} else {
+							cmd.Printf("  ✓ Successfully pushed %s to origin\n", releaseBranch)
+						}
+					}
+				}
 				mu.Unlock()
 
 				if finished {
@@ -1160,7 +1224,9 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 				// ... (status sync and materialization code remains) ...
 
 				// Only include tasks that are actually in the current Plan of Record
-				if !inPlan {
+				// (Non-destructive pruning: we don't delete them from DB, just don't schedule them)
+				// FIX: If incomingTaskStories is empty, we don't prune anything.
+				if len(incomingTaskStories) > 0 && !inPlan {
 					continue
 				}
 
@@ -1560,6 +1626,12 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	if task.TechnicalStrategy != "" {
 		sb.WriteString(fmt.Sprintf("TECHNICAL STRATEGY: %s\n", task.TechnicalStrategy))
 	}
+
+	sb.WriteString("\nGIT POLICY:\n")
+	sb.WriteString("- This project uses a branch-per-story strategy.\n")
+	sb.WriteString(fmt.Sprintf("- When calling 'safe_commit', you MUST provide 'story_id': %q and 'task_id': %q.\n", task.StoryID, task.ID))
+	sb.WriteString("- Commits will be made to a local feature branch branched off a local release branch.\n")
+	sb.WriteString("- NEVER attempt to push to remote.\n")
 
 	if lastError != "" {
 		sb.WriteString("\n⚠️ SELF-HEALING CONTEXT:\n")

@@ -13,8 +13,12 @@ type ProjectConfig struct {
 	ProjectDir  string `json:"project_dir,omitempty"`
 	TractStore  string `json:"tract_store"`
 	EngramStore string `json:"engram_store"`
-	GitEnabled  bool   `json:"git_enabled,omitempty"`
-	BaseBranch  string `json:"base_branch,omitempty"`
+	GitEnabled         bool   `json:"git_enabled,omitempty"`
+	GitCommitEnabled   bool   `json:"git_commit_enabled,omitempty"` // Allow autonomous local commits
+	GitPushEnabled     bool   `json:"git_push_enabled,omitempty"`   // Allow autonomous remote push on release completion
+	BaseBranch         string `json:"base_branch,omitempty"`
+	ReleaseBranchPrefix string `json:"release_branch_prefix,omitempty"` // e.g. "release/"
+	FeatureBranchPrefix string `json:"feature_branch_prefix,omitempty"` // e.g. "feature/"
 
 	// Execution settings
 	Execution ExecutionConfig `json:"execution,omitempty"`

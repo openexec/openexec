@@ -17,7 +17,7 @@ RULES:
 7. DEPENDENCIES: Use "depends_on" aggressively to enforce the architectural order (Discovery -> Foundation -> Implementation -> Validation).
 8. Task IDs: T-US-XXX-YYY format. Sequential tasks within a story must depend on their predecessor.
 9. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories.
-10. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint).
+10. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
 
 OUTPUT FORMAT (JSON object):
 {
