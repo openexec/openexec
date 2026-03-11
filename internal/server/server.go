@@ -95,13 +95,13 @@ func New(cfg Config) (*Server, error) {
 			projCfg.Execution.RunnerArgs,
 		)
 		if err != nil {
-			log.Printf("[Server] Warning: runner resolution failed: %v", err)
-		} else {
-			runnerCmd = rc
-			runnerArgs = ra
-			log.Printf("[Server] Runner: model=%s command=%s args=%v",
-				modelUsed, runnerCmd, runnerArgs)
+			// FAIL FAST: Abort startup if runner is missing (unless explicitly forced)
+			return nil, fmt.Errorf("CRITICAL: runner resolution failed: %w. Install the CLI or check your config", err)
 		}
+		runnerCmd = rc
+		runnerArgs = ra
+		log.Printf("[Server] Runner: model=%s command=%s args=%v",
+			modelUsed, runnerCmd, runnerArgs)
 	}
 
 	// For Claude, keep CommandName empty to use internal buildClaudeArgs defaults.
@@ -118,6 +118,8 @@ func New(cfg Config) (*Server, error) {
 		AgentsFS:      agentsFS,
 		LogDir:        logDir,
 		ExecutorModel: modelUsed,
+		RunnerCommand: func() string { if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil { return pc.Execution.RunnerCommand }; return "" }(),
+		RunnerArgs:    func() []string { if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil { return pc.Execution.RunnerArgs }; return nil }(),
 		CommandName:   loopCmd,
 		CommandArgs:   loopArgs,
 	})
@@ -228,20 +230,34 @@ func (s *Server) handleKnowledgeEnvs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	runnerName := "claude"
+	runnerCmd := "claude"
+	runnerArgs := runner.ClaudeArgs
 	modelName := ""
+	
 	if s.Mgr != nil {
 		cfg := s.Mgr.GetConfig()
 		modelName = cfg.ExecutorModel
-		if cfg.CommandName != "" {
-			runnerName = filepath.Base(cfg.CommandName)
+		
+		// If custom runner was configured, use those
+		if cfg.RunnerCommand != "" {
+			runnerCmd = cfg.RunnerCommand
+			runnerArgs = cfg.RunnerArgs
+		} else if cfg.CommandName != "" {
+			// Resolved from model
+			runnerCmd = filepath.Base(cfg.CommandName)
+			_, ra, _ := runner.Resolve(modelName, "", nil)
+			runnerArgs = ra
 		}
 	}
+
 	s.respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "ok",
 		"version": version.Version,
-		"runner":  runnerName,
-		"model":   modelName,
+		"runner": map[string]interface{}{
+			"command": runnerCmd,
+			"args":    runnerArgs,
+			"model":   modelName,
+		},
 	})
 }
 
