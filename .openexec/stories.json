@@ -25,47 +25,6 @@
   ],
   "stories": [
     {
-      "id": "US-004",
-      "goal_id": "G-002",
-      "title": "Project Goal Validation",
-      "description": "As a maintainer, I want to verify all primary goals via E2E testing to ensure the system is production-ready.",
-      "acceptance_criteria": [
-        "Wizard, Router, and Healing goals (G-001, G-002, G-003) are verified via E2E tests.",
-        "CI/CD pipeline is fully green."
-      ],
-      "verification_script": "make test \u0026\u0026 make lint",
-      "tasks": [],
-      "depends_on": [
-        "US-003"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-10T00:04:53.812481+02:00"
-    },
-    {
-      "id": "US-001",
-      "goal_id": "G-003",
-      "title": "Discovery and Legacy System Audit",
-      "description": "As a developer, I want to map the existing environment and API surface area so that I can safely restore the system without breaking legacy compatibility.",
-      "acceptance_criteria": [
-        "Environment variables and dependencies are extracted.",
-        "Existing API surface area is mapped for Wizard, Stories, DCP, and Router.",
-        "Local buildability of the legacy state is verified."
-      ],
-      "verification_script": "go mod verify \u0026\u0026 go build ./...",
-      "tasks": [
-        "T-US-001-003",
-        "T-US-001-003",
-        "T-US-001-003",
-        "T-US-001-003"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-10T00:04:53.809236+02:00"
-    },
-    {
       "id": "US-002",
       "goal_id": "G-002",
       "title": "Core CLI Architecture Restoration",
@@ -133,6 +92,47 @@
       "priority": 0,
       "status": "pending",
       "created_at": "2026-03-10T00:04:53.81129+02:00"
+    },
+    {
+      "id": "US-004",
+      "goal_id": "G-002",
+      "title": "Project Goal Validation",
+      "description": "As a maintainer, I want to verify all primary goals via E2E testing to ensure the system is production-ready.",
+      "acceptance_criteria": [
+        "Wizard, Router, and Healing goals (G-001, G-002, G-003) are verified via E2E tests.",
+        "CI/CD pipeline is fully green."
+      ],
+      "verification_script": "make test \u0026\u0026 make lint",
+      "tasks": [],
+      "depends_on": [
+        "US-003"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.812481+02:00"
+    },
+    {
+      "id": "US-001",
+      "goal_id": "G-003",
+      "title": "Discovery and Legacy System Audit",
+      "description": "As a developer, I want to map the existing environment and API surface area so that I can safely restore the system without breaking legacy compatibility.",
+      "acceptance_criteria": [
+        "Environment variables and dependencies are extracted.",
+        "Existing API surface area is mapped for Wizard, Stories, DCP, and Router.",
+        "Local buildability of the legacy state is verified."
+      ],
+      "verification_script": "go mod verify \u0026\u0026 go build ./...",
+      "tasks": [
+        "T-US-001-003",
+        "T-US-001-003",
+        "T-US-001-003",
+        "T-US-001-003"
+      ],
+      "story_type": "feature",
+      "priority": 0,
+      "status": "pending",
+      "created_at": "2026-03-10T00:04:53.809236+02:00"
     }
   ]
 }

@@ -288,6 +288,27 @@ func (h *CommandHandler) GetAlertNotificationSender() *AlertNotificationSender {
 	return h.alertNotificationSender
 }
 
+// checkAuth validates the user from an update and returns the auth result.
+// Returns nil if authorization fails (error messages are sent automatically).
+func (h *CommandHandler) checkAuth(ctx context.Context, update tgbotapi.Update) *AuthResult {
+	chatID := update.Message.Chat.ID
+	telegramUser := update.Message.From
+
+	if telegramUser == nil {
+		h.sendMessage(chatID, "Error: Unable to identify user.")
+		return nil
+	}
+
+	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
+
+	if !result.Allowed {
+		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+		return nil
+	}
+
+	return &result
+}
+
 // HandleUpdate processes an incoming Telegram update and routes commands.
 func (h *CommandHandler) HandleUpdate(ctx context.Context, update tgbotapi.Update) {
 	// Handle callback queries (inline button presses)
@@ -336,18 +357,8 @@ func (h *CommandHandler) HandleUpdate(ctx context.Context, update tgbotapi.Updat
 // It returns the current system status for authorized users.
 func (h *CommandHandler) handleStatus(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	if h.checkAuth(ctx, update) == nil {
 		return
 	}
 
@@ -418,18 +429,8 @@ func formatStatusMessage(status *protocol.StatusResponse) string {
 // It broadcasts a status request to all connected OpenExec clients and returns aggregated results.
 func (h *CommandHandler) handleClients(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	if h.checkAuth(ctx, update) == nil {
 		return
 	}
 
@@ -458,18 +459,8 @@ func (h *CommandHandler) handleClients(ctx context.Context, update tgbotapi.Upda
 // It returns a list of all projects with active connections.
 func (h *CommandHandler) handleProjects(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	if h.checkAuth(ctx, update) == nil {
 		return
 	}
 
@@ -523,18 +514,9 @@ func formatProjectsList(projects []ProjectInfo) string {
 // Use /switch without arguments to clear the current project.
 func (h *CommandHandler) handleSwitch(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	result := h.checkAuth(ctx, update)
+	if result == nil {
 		return
 	}
 
@@ -592,18 +574,9 @@ func (h *CommandHandler) handleSwitch(ctx context.Context, update tgbotapi.Updat
 // Requires 'executor' or 'admin' role.
 func (h *CommandHandler) handleRun(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	result := h.checkAuth(ctx, update)
+	if result == nil {
 		return
 	}
 
@@ -696,18 +669,9 @@ func formatRunResult(result *RunCommandResult) string {
 // Requires 'executor' or 'admin' role.
 func (h *CommandHandler) handleLogs(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	result := h.checkAuth(ctx, update)
+	if result == nil {
 		return
 	}
 
@@ -776,18 +740,9 @@ func (h *CommandHandler) handleLogs(ctx context.Context, update tgbotapi.Update)
 // Requires 'executor' or 'admin' role.
 func (h *CommandHandler) handleCancel(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	result := h.checkAuth(ctx, update)
+	if result == nil {
 		return
 	}
 
@@ -881,18 +836,9 @@ func formatCancelResult(result *CancelCommandResult) string {
 // Requires 'executor' or 'admin' role.
 func (h *CommandHandler) handleCreateTask(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	result := h.checkAuth(ctx, update)
+	if result == nil {
 		return
 	}
 
@@ -913,7 +859,7 @@ func (h *CommandHandler) handleCreateTask(ctx context.Context, update tgbotapi.U
 	if len(args) == 0 {
 		// No arguments provided - start the interactive wizard
 		if h.createTaskWizard != nil {
-			if err := h.createTaskWizard.Start(ctx, telegramUser.ID, chatID); err != nil {
+			if err := h.createTaskWizard.Start(ctx, update.Message.From.ID, chatID); err != nil {
 				h.sendMessage(chatID, fmt.Sprintf("❌ Failed to start task wizard: %v", err))
 			}
 			return
@@ -1007,18 +953,9 @@ func formatCreateTaskResult(result *CreateTaskCommandResult) string {
 // Requires 'executor' or 'admin' role.
 func (h *CommandHandler) handleDeploy(ctx context.Context, update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	telegramUser := update.Message.From
 
-	if telegramUser == nil {
-		h.sendMessage(chatID, "Error: Unable to identify user.")
-		return
-	}
-
-	// Check authorization
-	result := h.authMiddleware.CheckUserID(ctx, telegramUser.ID)
-
-	if !result.Allowed {
-		h.sendMessage(chatID, "Access denied. You are not authorized to use this command.")
+	result := h.checkAuth(ctx, update)
+	if result == nil {
 		return
 	}
 
@@ -1248,9 +1185,9 @@ func formatAggregatedStatus(status *AggregatedClientStatus) string {
 		clientLine := fmt.Sprintf("  %s ", clientIcon)
 
 		if client.ProjectID != "" {
-			clientLine += fmt.Sprintf("%s", client.ProjectID)
+			clientLine += client.ProjectID
 		} else {
-			clientLine += fmt.Sprintf("%s", truncateID(client.ClientID))
+			clientLine += truncateID(client.ClientID)
 		}
 
 		if client.MachineID != "" {

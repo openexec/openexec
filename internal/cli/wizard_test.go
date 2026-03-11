@@ -20,8 +20,8 @@ func TestWizard_ExitCommandRecognition(t *testing.T) {
 	}{
 		{"exit", true, false},
 		{"quit", true, false},
-		{"EXIT", false, false}, // case-sensitive per implementation
-		{"QUIT", false, false},
+		{"EXIT", false, false}, // not recognized - wizard uses lowercase comparison only
+		{"QUIT", false, false}, // not recognized - wizard uses lowercase comparison only
 		{"exit ", true, false},  // trailing space becomes "exit" after TrimSpace
 		{" exit", true, false},  // leading space becomes "exit" after TrimSpace
 		{"", false, true},       // empty input continues loop
@@ -257,16 +257,12 @@ func TestWizard_StateUpdateOnMessageProcess(t *testing.T) {
 	statePath := filepath.Join(openexecDir, "wizard_state.json")
 	os.MkdirAll(openexecDir, 0755)
 
-	// Initial state
-	stateJSON := "{}"
-
 	// Simulate first response updating state
 	updatedState := planner.IntentState{
 		ProjectName: "FirstUpdate",
 		Flow:        "greenfield",
 	}
 	stateBytes, _ := json.Marshal(updatedState)
-	stateJSON = string(stateBytes)
 
 	// Persist state to disk (as wizard does after each turn)
 	if err := os.WriteFile(statePath, stateBytes, 0644); err != nil {
@@ -286,7 +282,6 @@ func TestWizard_StateUpdateOnMessageProcess(t *testing.T) {
 	updatedState.AppType = "web"
 	updatedState.ProblemStatement = "Build a thing"
 	stateBytes, _ = json.Marshal(updatedState)
-	stateJSON = string(stateBytes)
 	os.WriteFile(statePath, stateBytes, 0644)
 
 	// Verify second update persisted
@@ -299,7 +294,178 @@ func TestWizard_StateUpdateOnMessageProcess(t *testing.T) {
 	if savedState.ProblemStatement != "Build a thing" {
 		t.Errorf("ProblemStatement not updated: got %s", savedState.ProblemStatement)
 	}
+}
 
-	// stateJSON is used to prevent unused variable warning
-	_ = stateJSON
+// =============================================================================
+// Wizard Session Persistence Tests (T-US-001-003)
+// =============================================================================
+
+// TestWizard_SessionResumption verifies that a wizard session can be resumed
+// from an existing wizard_state.json file (T-US-001-003 behavioral scenario 1).
+func TestWizard_SessionResumption(t *testing.T) {
+	t.Run("Existing state file is loaded on session start", func(t *testing.T) {
+		// GIVEN an existing wizard_state.json with saved progress
+		tmpDir := t.TempDir()
+		openexecDir := filepath.Join(tmpDir, ".openexec")
+		statePath := filepath.Join(openexecDir, "wizard_state.json")
+
+		if err := os.MkdirAll(openexecDir, 0755); err != nil {
+			t.Fatalf("Failed to create directory: %v", err)
+		}
+
+		// Save state representing partial interview completion
+		savedState := planner.IntentState{
+			ProjectName:      "ResumedProject",
+			Flow:             "greenfield",
+			AppType:          "api",
+			ProblemStatement: "Build an API service",
+			// Missing: Goals, Constraints, Entities - interview not complete
+		}
+		stateBytes, err := json.Marshal(savedState)
+		if err != nil {
+			t.Fatalf("Failed to marshal state: %v", err)
+		}
+		if err := os.WriteFile(statePath, stateBytes, 0644); err != nil {
+			t.Fatalf("Failed to write state: %v", err)
+		}
+
+		// WHEN the wizard session is resumed (simulated by reading existing state)
+		data, err := os.ReadFile(statePath)
+		if err != nil {
+			t.Fatalf("Failed to read state file: %v", err)
+		}
+
+		var loadedState planner.IntentState
+		if err := json.Unmarshal(data, &loadedState); err != nil {
+			t.Fatalf("Failed to parse saved state: %v", err)
+		}
+
+		// THEN session should resume with saved state
+		if loadedState.ProjectName != "ResumedProject" {
+			t.Errorf("ProjectName = %q, want \"ResumedProject\"", loadedState.ProjectName)
+		}
+		if loadedState.Flow != "greenfield" {
+			t.Errorf("Flow = %q, want \"greenfield\"", loadedState.Flow)
+		}
+		if loadedState.AppType != "api" {
+			t.Errorf("AppType = %q, want \"api\"", loadedState.AppType)
+		}
+		if loadedState.ProblemStatement != "Build an API service" {
+			t.Errorf("ProblemStatement = %q, want \"Build an API service\"", loadedState.ProblemStatement)
+		}
+
+		// AND state should not be ready (incomplete)
+		if loadedState.IsReady() {
+			t.Error("Loaded state should not be ready (missing required fields)")
+		}
+	})
+
+	t.Run("No state file starts fresh session", func(t *testing.T) {
+		// GIVEN no existing wizard_state.json
+		tmpDir := t.TempDir()
+		openexecDir := filepath.Join(tmpDir, ".openexec")
+		statePath := filepath.Join(openexecDir, "wizard_state.json")
+
+		// Ensure the directory exists but no state file
+		if err := os.MkdirAll(openexecDir, 0755); err != nil {
+			t.Fatalf("Failed to create directory: %v", err)
+		}
+
+		// WHEN checking for existing state
+		_, err := os.ReadFile(statePath)
+
+		// THEN state file should not exist
+		if err == nil {
+			t.Error("Expected state file to not exist for fresh session")
+		}
+		if !os.IsNotExist(err) {
+			t.Errorf("Expected os.IsNotExist error, got: %v", err)
+		}
+
+		// AND a fresh IntentState would be used
+		freshState := planner.IntentState{}
+		if freshState.IsReady() {
+			t.Error("Fresh state should not be ready")
+		}
+	})
+
+	t.Run("Corrupted state file is handled gracefully", func(t *testing.T) {
+		// GIVEN a corrupted wizard_state.json
+		tmpDir := t.TempDir()
+		openexecDir := filepath.Join(tmpDir, ".openexec")
+		statePath := filepath.Join(openexecDir, "wizard_state.json")
+
+		if err := os.MkdirAll(openexecDir, 0755); err != nil {
+			t.Fatalf("Failed to create directory: %v", err)
+		}
+
+		// Write corrupted JSON
+		if err := os.WriteFile(statePath, []byte("{invalid json"), 0644); err != nil {
+			t.Fatalf("Failed to write corrupted state: %v", err)
+		}
+
+		// WHEN reading the corrupted state
+		data, err := os.ReadFile(statePath)
+		if err != nil {
+			t.Fatalf("Failed to read state file: %v", err)
+		}
+
+		var loadedState planner.IntentState
+		err = json.Unmarshal(data, &loadedState)
+
+		// THEN JSON parse should fail
+		if err == nil {
+			t.Error("Expected JSON parse error for corrupted state")
+		}
+
+		// AND a fresh state can be used as fallback
+		freshState := planner.IntentState{}
+		if freshState.ProjectName != "" {
+			t.Error("Fresh fallback state should have empty ProjectName")
+		}
+	})
+
+	t.Run("Complete state file indicates ready to render", func(t *testing.T) {
+		// GIVEN an existing wizard_state.json with all required fields
+		tmpDir := t.TempDir()
+		openexecDir := filepath.Join(tmpDir, ".openexec")
+		statePath := filepath.Join(openexecDir, "wizard_state.json")
+
+		if err := os.MkdirAll(openexecDir, 0755); err != nil {
+			t.Fatalf("Failed to create directory: %v", err)
+		}
+
+		// Save complete state
+		completeState := planner.IntentState{
+			ProjectName:      "CompleteProject",
+			Flow:             "greenfield",
+			AppType:          "web",
+			ProblemStatement: "Build a complete web app",
+			PrimaryGoals:     []planner.Goal{{ID: "G-001", Description: "Primary goal"}},
+			Constraints:      []planner.Constraint{{ID: "C-001", Description: "Constraint"}},
+			Entities:         []planner.Entity{{Name: "User", DataSource: "postgres"}},
+		}
+		stateBytes, err := json.Marshal(completeState)
+		if err != nil {
+			t.Fatalf("Failed to marshal state: %v", err)
+		}
+		if err := os.WriteFile(statePath, stateBytes, 0644); err != nil {
+			t.Fatalf("Failed to write state: %v", err)
+		}
+
+		// WHEN loading the state
+		data, err := os.ReadFile(statePath)
+		if err != nil {
+			t.Fatalf("Failed to read state: %v", err)
+		}
+		var loadedState planner.IntentState
+		if err := json.Unmarshal(data, &loadedState); err != nil {
+			t.Fatalf("Failed to unmarshal state: %v", err)
+		}
+
+		// THEN state should be ready for INTENT.md rendering
+		if !loadedState.IsReady() {
+			t.Error("Complete loaded state should be ready")
+		}
+	})
 }

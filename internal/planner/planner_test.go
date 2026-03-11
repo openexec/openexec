@@ -354,3 +354,90 @@ func TestProcessWizardMessage_HandlesMarkdownWrappedJSON(t *testing.T) {
 		t.Errorf("UpdatedState.ProjectName = %q, want MarkdownApp", resp.UpdatedState.ProjectName)
 	}
 }
+
+// =============================================================================
+// Story Schema Compatibility Tests (T-US-001-003)
+// =============================================================================
+
+// TestProjectPlan_SchemaVersion verifies that generated stories use schema version "1.1"
+// This is a key contract for story compatibility across the system.
+func TestProjectPlan_SchemaVersion(t *testing.T) {
+	t.Run("GeneratePlan returns schema version 1.1", func(t *testing.T) {
+		// GIVEN a mock LLM provider that returns a valid ProjectPlan with schema version
+		mock := &mockProvider{
+			response: `{
+				"schema_version": "1.1",
+				"goals": [
+					{"id": "G-001", "title": "Test Goal", "description": "Desc", "success_criteria": "Criteria", "verification_method": "Test"}
+				],
+				"stories": [
+					{"id": "US-001", "title": "Test Story", "goal_id": "G-001", "tasks": []}
+				]
+			}`,
+		}
+		p := New(mock)
+		ctx := context.Background()
+
+		// WHEN GeneratePlan is called
+		plan, err := p.GeneratePlan(ctx, "# Test Intent", nil)
+
+		// THEN schema_version is "1.1"
+		if err != nil {
+			t.Fatalf("GeneratePlan failed: %v", err)
+		}
+		if plan.SchemaVersion != "1.1" {
+			t.Errorf("SchemaVersion = %q, want \"1.1\"", plan.SchemaVersion)
+		}
+	})
+
+	t.Run("parseResponse sets default schema version when missing", func(t *testing.T) {
+		// GIVEN a response without schema_version
+		p := &Planner{}
+		resp := `{"stories": [{"id": "US-001", "title": "Story", "tasks": []}]}`
+
+		// WHEN parseResponse is called
+		plan, err := p.parseResponse(resp)
+
+		// THEN plan is valid (schema_version may be empty but parsing succeeds)
+		if err != nil {
+			t.Fatalf("parseResponse failed: %v", err)
+		}
+		if plan == nil {
+			t.Fatal("parseResponse returned nil plan")
+		}
+		// Note: Empty schema version is acceptable for backward compatibility
+		// The important thing is that valid JSON parses correctly
+		if len(plan.Stories) != 1 {
+			t.Errorf("Expected 1 story, got %d", len(plan.Stories))
+		}
+	})
+
+	t.Run("ProjectPlan JSON round-trip preserves schema version", func(t *testing.T) {
+		// GIVEN a ProjectPlan with schema version 1.1
+		original := &ProjectPlan{
+			SchemaVersion: "1.1",
+			Goals: []Goal{
+				{ID: "G-001", Title: "Goal", Description: "Desc", SuccessCriteria: "Criteria", VerificationMethod: "Test"},
+			},
+			Stories: []Story{
+				{ID: "US-001", Title: "Story", GoalID: "G-001", Tasks: []Task{}},
+			},
+		}
+
+		// WHEN serialized and deserialized
+		data, err := json.Marshal(original)
+		if err != nil {
+			t.Fatalf("Marshal failed: %v", err)
+		}
+
+		var restored ProjectPlan
+		if err := json.Unmarshal(data, &restored); err != nil {
+			t.Fatalf("Unmarshal failed: %v", err)
+		}
+
+		// THEN schema version is preserved
+		if restored.SchemaVersion != "1.1" {
+			t.Errorf("SchemaVersion = %q, want \"1.1\"", restored.SchemaVersion)
+		}
+	})
+}

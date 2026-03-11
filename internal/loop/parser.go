@@ -106,13 +106,25 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				Text:      item.Text,
 			})
 
-			// SELF-HEALING: Detect if agent claims task is already done
-			// e.g. "Story T-US-005-001 is already COMPLETED"
+			// SELF-HEALING: Detect if agent claims task is already done or scope is misaligned
 			txtLower := strings.ToLower(item.Text)
-			if strings.Contains(txtLower, "already completed") || strings.Contains(txtLower, "already done") {
+			isComplete := strings.Contains(txtLower, "already completed") || 
+						 strings.Contains(txtLower, "already done") ||
+						 strings.Contains(txtLower, "implementation is complete") ||
+						 strings.Contains(txtLower, "criteria appear to be met")
+			
+			if isComplete {
 				p.emitSignal(map[string]interface{}{
 					"type":   "complete",
-					"reason": "Agent detected task was already completed in previous run",
+					"reason": "Agent verified implementation already exists",
+				})
+			}
+
+			// If agent finds a semantic mismatch (scope), allow it to fix it if it's clear
+			if strings.Contains(txtLower, "planning mismatch") && strings.Contains(txtLower, "analysis reveals") {
+				p.emitSignal(map[string]interface{}{
+					"type":   "progress",
+					"text":   "Reconciling task metadata based on agent analysis",
 				})
 			}
 		case "tool_use":

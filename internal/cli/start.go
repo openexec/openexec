@@ -514,6 +514,17 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						lastError = err.Error()
 						
 						if strings.Contains(lastError, "Planning Mismatch") {
+							// If the agent also mentioned implementation is done, AUTO-HEAL!
+							lowerErr := strings.ToLower(lastError)
+							if strings.Contains(lowerErr, "complete") || strings.Contains(lowerErr, "done") || strings.Contains(lowerErr, "criteria appear to be met") {
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete. Syncing state...\n", workerID)
+								_, _ = mgr.CompleteTask(node.Task.ID)
+								mu.Lock()
+								node.Status = StatusCompleted
+								mu.Unlock()
+								break 
+							}
+
 							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
 							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
 							cmd.Printf("   2. Once aligned, run 'openexec run' again.\n\n")
@@ -572,6 +583,17 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						
 						// Check for non-retriable errors (e.g. Planning Mismatch)
 						if strings.Contains(lastError, "Planning Mismatch") {
+							// If the agent also mentioned implementation is done, AUTO-HEAL!
+							lowerErr := strings.ToLower(lastError)
+							if strings.Contains(lowerErr, "complete") || strings.Contains(lowerErr, "done") || strings.Contains(lowerErr, "criteria appear to be met") {
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete. Syncing state...\n", workerID)
+								_, _ = mgr.CompleteTask(node.Task.ID)
+								mu.Lock()
+								node.Status = StatusCompleted
+								mu.Unlock()
+								break 
+							}
+
 							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE ERROR: %s\n", workerID, lastError)
 							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
 							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")

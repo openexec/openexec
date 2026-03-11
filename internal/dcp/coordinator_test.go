@@ -901,3 +901,159 @@ func assertLogAttributeExists(t *testing.T, entry map[string]interface{}, key st
 		t.Errorf("Log attribute %q is empty", key)
 	}
 }
+
+// =============================================================================
+// Tool Registration Propagation Tests (T-US-001-003)
+// =============================================================================
+
+// mockTrackingRouter tracks RegisterTool calls to verify propagation
+type mockTrackingRouter struct {
+	registrations []toolRegistration
+}
+
+type toolRegistration struct {
+	name        string
+	description string
+	schema      string
+}
+
+func (m *mockTrackingRouter) ParseIntent(ctx context.Context, query string) (*router.Intent, error) {
+	return &router.Intent{
+		ToolName:   "general_chat",
+		Args:       map[string]interface{}{"query": query},
+		Confidence: 0.5,
+	}, nil
+}
+
+func (m *mockTrackingRouter) RegisterTool(name, description, schema string) error {
+	m.registrations = append(m.registrations, toolRegistration{
+		name:        name,
+		description: description,
+		schema:      schema,
+	})
+	return nil
+}
+
+// TestCoordinator_ToolRegistrationPropagation verifies that tool registration
+// on the Coordinator propagates to the Router (T-US-001-003 behavioral scenario).
+func TestCoordinator_ToolRegistrationPropagation(t *testing.T) {
+	t.Run("RegisterTool propagates to router", func(t *testing.T) {
+		// GIVEN a Coordinator with a tracking router
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		trackingRouter := &mockTrackingRouter{}
+		coord := NewCoordinator(trackingRouter, store)
+
+		// WHEN a tool is registered on the Coordinator
+		testTool := &mockDescriptiveTool{
+			name:        "test_tool",
+			description: "A test tool for verification",
+			schema:      `{"type": "object", "properties": {"input": {"type": "string"}}}`,
+		}
+		coord.RegisterTool(testTool)
+
+		// THEN the Router should have received the registration
+		if len(trackingRouter.registrations) != 1 {
+			t.Fatalf("Expected 1 registration, got %d", len(trackingRouter.registrations))
+		}
+
+		reg := trackingRouter.registrations[0]
+		if reg.name != "test_tool" {
+			t.Errorf("Router received name %q, want \"test_tool\"", reg.name)
+		}
+		if reg.description != "A test tool for verification" {
+			t.Errorf("Router received description %q, want \"A test tool for verification\"", reg.description)
+		}
+		if reg.schema != `{"type": "object", "properties": {"input": {"type": "string"}}}` {
+			t.Errorf("Router received schema %q, want JSON schema", reg.schema)
+		}
+	})
+
+	t.Run("Multiple tool registrations propagate correctly", func(t *testing.T) {
+		// GIVEN a Coordinator with a tracking router
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		trackingRouter := &mockTrackingRouter{}
+		coord := NewCoordinator(trackingRouter, store)
+
+		// WHEN multiple tools are registered
+		coord.RegisterTool(&mockDescriptiveTool{name: "tool_a", description: "Tool A", schema: "{}"})
+		coord.RegisterTool(&mockDescriptiveTool{name: "tool_b", description: "Tool B", schema: "{}"})
+		coord.RegisterTool(&mockDescriptiveTool{name: "tool_c", description: "Tool C", schema: "{}"})
+
+		// THEN all registrations are propagated
+		if len(trackingRouter.registrations) != 3 {
+			t.Fatalf("Expected 3 registrations, got %d", len(trackingRouter.registrations))
+		}
+
+		expectedNames := []string{"tool_a", "tool_b", "tool_c"}
+		for i, expected := range expectedNames {
+			if trackingRouter.registrations[i].name != expected {
+				t.Errorf("Registration %d: got name %q, want %q", i, trackingRouter.registrations[i].name, expected)
+			}
+		}
+	})
+
+	t.Run("Registered tool is available for execution", func(t *testing.T) {
+		// GIVEN a Coordinator with a mock router that returns a specific tool
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "custom_tool",
+				Args:       map[string]interface{}{"value": "test"},
+				Confidence: 0.9,
+			},
+		}
+		coord := NewCoordinator(mockRouter, store)
+
+		// WHEN a tool is registered
+		executed := false
+		customTool := &mockDescriptiveTool{
+			name:        "custom_tool",
+			description: "Custom tool",
+			schema:      "{}",
+			onExecute: func(args map[string]interface{}) (any, error) {
+				executed = true
+				return "custom_result", nil
+			},
+		}
+		coord.RegisterTool(customTool)
+
+		// AND a query is processed that routes to that tool
+		ctx := context.Background()
+		result, err := coord.ProcessQuery(ctx, "test query")
+
+		// THEN the tool is executed
+		if err != nil {
+			t.Fatalf("ProcessQuery failed: %v", err)
+		}
+		if !executed {
+			t.Error("Custom tool was not executed")
+		}
+		if result != "custom_result" {
+			t.Errorf("Result = %v, want \"custom_result\"", result)
+		}
+	})
+}
+
+// mockDescriptiveTool is a configurable mock tool for testing
+type mockDescriptiveTool struct {
+	name        string
+	description string
+	schema      string
+	onExecute   func(args map[string]interface{}) (any, error)
+}
+
+func (m *mockDescriptiveTool) Name() string        { return m.name }
+func (m *mockDescriptiveTool) Description() string { return m.description }
+func (m *mockDescriptiveTool) InputSchema() string { return m.schema }
+func (m *mockDescriptiveTool) Execute(ctx context.Context, args map[string]interface{}) (any, error) {
+	if m.onExecute != nil {
+		return m.onExecute(args)
+	}
+	return "executed", nil
+}
