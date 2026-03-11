@@ -11,6 +11,7 @@ import (
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/pipeline"
+	"github.com/openexec/openexec/internal/release"
 )
 
 // PipelineStatus represents the lifecycle state of a managed pipeline.
@@ -99,6 +100,28 @@ func New(cfg Config) *Manager {
 		cfg:       cfg,
 		pipelines: make(map[string]*entry),
 	}
+
+	// SELF-HEALING: Ghost State Cleanup
+	// If the server crashed while tasks were running, they are stuck in the DB
+	// as 'running' or 'starting'. We must reset them to 'pending' on startup.
+	if cfg.WorkDir != "" {
+		relMgr, err := m.getInternalReleaseManager()
+		if err == nil {
+			tasks := relMgr.GetTasks()
+			resetCount := 0
+			for _, t := range tasks {
+				if t.Status == "running" || t.Status == "starting" {
+					t.Status = "pending"
+					_ = relMgr.UpdateTask(t)
+					resetCount++
+				}
+			}
+			if resetCount > 0 {
+				log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
+			}
+		}
+	}
+
 	m.watchdog = NewWatchdog(m)
 	go m.watchdog.Run(context.Background())
 	return m
@@ -265,4 +288,15 @@ func (m *Manager) List() []PipelineInfo {
 // GetConfig returns the manager's configuration.
 func (m *Manager) GetConfig() Config {
 	return m.cfg
+}
+
+func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
+	rel, err := release.NewManager(m.cfg.WorkDir, release.DefaultConfig())
+	if err != nil {
+		return nil, err
+	}
+	if err := rel.Load(); err != nil {
+		return nil, err
+	}
+	return rel, nil
 }

@@ -97,11 +97,15 @@ func (w *Watchdog) remediateStall(id string, info PipelineInfo) {
 	// 2. Stop the pipeline to clean up state
 	_ = w.manager.Stop(id)
 
-	// 3. Trigger Self-Fix / Restart with recovery context
-	// For now we just log it, but we could automatically call Start again
-	// with a modified briefing or recovery flag.
-	log.Printf("[Watchdog] [%s] stall remediated. Task reset to stopped state.", id)
-
-	// In a future version, we could auto-restart:
-	// go w.manager.Start(context.Background(), id)
+	// 3. AUTO-HEAL: Automatically restart the pipeline
+	log.Printf("[Watchdog] [%s] stall remediated. Triggering auto-restart...", id)
+	go func() {
+		// Give it a moment to fully cleanup
+		time.Sleep(2 * time.Second)
+		if err := w.manager.Start(context.Background(), id); err != nil {
+			log.Printf("[Watchdog] [%s] auto-restart failed: %v", id, err)
+		} else {
+			log.Printf("[Watchdog] [%s] ✨ Successfully auto-restarted pipeline", id)
+		}
+	}()
 }

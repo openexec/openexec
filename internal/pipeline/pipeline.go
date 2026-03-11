@@ -169,26 +169,49 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			ReviewCycle: p.sm.ReviewCycles(),
 		})
 
-		// Fetch fresh briefing.
-		briefing, err := briefingFn(ctx, p.cfg.FWUID)
-		if err != nil {
-			return fmt.Errorf("briefing for phase %s: %w", phase, err)
+		// Run Loop, consume events (with retries for transient orchestrator errors)
+		var phaseCompleted, routed, blocked bool
+		var runErr error
+		
+		for retry := 0; retry <= p.cfg.MaxRetries; retry++ {
+			if retry > 0 {
+				p.emit(loop.Event{
+					Type: loop.EventError,
+					Text: fmt.Sprintf("phase %s failed (attempt %d/%d), retrying in %v...", phase, retry, p.cfg.MaxRetries+1, p.cfg.RetryBackoff[retry-1]),
+				})
+				time.Sleep(p.cfg.RetryBackoff[retry-1])
+			}
+
+			// Fetch fresh briefing.
+			briefing, err := briefingFn(ctx, p.cfg.FWUID)
+			if err != nil {
+				runErr = fmt.Errorf("briefing for phase %s: %w", phase, err)
+				continue
+			}
+
+			// Create Loop for this phase.
+			l, loopCh, err := p.factory.Create(briefing, phaseCfg)
+			if err != nil {
+				runErr = fmt.Errorf("create loop for phase %s: %w", phase, err)
+				continue
+			}
+
+			p.mu.Lock()
+			p.currentLoop = l
+			p.mu.Unlock()
+
+			phaseCompleted, routed, blocked, runErr = p.runPhase(ctx, l, loopCh, phase, phaseCfg)
+			if runErr == nil {
+				break
+			}
+			
+			// If we reached here, it's a phase execution error.
+			// Only retry transient-looking errors. 
+			// (Future: improve classification)
 		}
 
-		// Create Loop for this phase.
-		l, loopCh, err := p.factory.Create(briefing, phaseCfg)
-		if err != nil {
-			return fmt.Errorf("create loop for phase %s: %w", phase, err)
-		}
-
-		p.mu.Lock()
-		p.currentLoop = l
-		p.mu.Unlock()
-
-		// Run Loop, consume events.
-		phaseCompleted, routed, blocked, err := p.runPhase(ctx, l, loopCh, phase, phaseCfg)
-		if err != nil {
-			return err
+		if runErr != nil {
+			return runErr
 		}
 
 		p.mu.Lock()

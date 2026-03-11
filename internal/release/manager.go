@@ -798,6 +798,17 @@ func (m *Manager) saveUnlocked() error {
 		if err != nil {
 			return err
 		}
+
+		// VALIDATION: Ensure data is unmarshalable before writing
+		var dummy struct {
+			SchemaVersion string  `json:"schema_version"`
+			Goals         []Goal  `json:"goals"`
+			Stories       []Story `json:"stories"`
+		}
+		if err := json.Unmarshal(data, &dummy); err != nil {
+			return fmt.Errorf("ABORTING SAVE: generated stories.json is structurally invalid: %w", err)
+		}
+
 		if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
 			return err
 		}
@@ -816,6 +827,15 @@ func (m *Manager) saveUnlocked() error {
 	if err != nil {
 		return err
 	}
+
+	// VALIDATION: Ensure tasks data is unmarshalable before writing
+	var dummyTasks struct {
+		Tasks []Task `json:"tasks"`
+	}
+	if err := json.Unmarshal(data, &dummyTasks); err != nil {
+		return fmt.Errorf("ABORTING SAVE: generated tasks.json is structurally invalid: %w", err)
+	}
+
 	if err := os.WriteFile(tasksPath, data, 0o600); err != nil {
 		return err
 	}

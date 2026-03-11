@@ -313,7 +313,28 @@ Examples:
 			return err
 		}
 
-		// Load tasks
+		// PRE-FLIGHT ACTIVE HEALING:
+		// Ensure any existing loops are stopped and ghost states are reset
+		// This makes 'openexec run' safe to call from cron or after a crash.
+		cmd.Println("🔍 Running Pre-flight Active Healing...")
+		relTasks := mgr.GetTasks()
+		resetCount := 0
+		for _, rt := range relTasks {
+			if rt.Status == "running" || rt.Status == "starting" {
+				// Force stop on the server if it happens to be running
+				stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, rt.ID)
+				_, _ = http.Post(stopURL, "application/json", nil)
+				
+				rt.Status = "pending"
+				_ = mgr.UpdateTask(rt)
+				resetCount++
+			}
+		}
+		if resetCount > 0 {
+			cmd.Printf("   ✨ Self-Healed: Reset %d ghost tasks to pending\n", resetCount)
+		}
+
+		// Load tasks (now includes implicit reconciliation)
 		tasks, err := loadPendingTasks(config.ProjectDir, mgr)
 		if err != nil {
 			return fmt.Errorf("failed to load tasks: %w", err)
