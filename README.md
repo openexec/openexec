@@ -102,7 +102,7 @@ To update to the latest version at any time:
 openexec update
 ```
 
-### 3. The Execution Flow
+## The Execution Flow
 Follow these steps to transform an idea into a verified project:
 
 1.  **Initialize (`git init && openexec init`)**
@@ -114,7 +114,16 @@ Follow these steps to transform an idea into a verified project:
 4.  **Start Server (`openexec start --ui`)**
     Launch the integrated server and open the web dashboard. Use `--daemon` for background mode with **Automated PID Tracking**.
 5.  **Run (`openexec run`)**
-    The agents begin implementing your tasks, protected by the **Autonomous Compliance Shield**. The CLI automatically detects and connects to the background engine.
+    The agents begin implementing your tasks through a specialized **Autonomous Pipeline**.
+
+### Task Lifecycle Phases
+Every task in OpenExec automatically progresses through five distinct phases, each handled by a specialized agent persona:
+
+- **TD (Technical Design / clario):** Research, codebase mapping, and strategy formulation.
+- **IM (Implementation / spark):** Actual code modification and task execution.
+- **RV (Review / blade):** Independent quality assurance and architectural validation.
+- **RF (Refinement / hon):** Post-review adjustments and optimization.
+- **FL (Finalize / clario):** Verification of all goals and state synchronization.
 
 ---
 
