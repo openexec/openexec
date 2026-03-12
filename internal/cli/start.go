@@ -457,13 +457,25 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	var closeOnce sync.Once
 	readyTasks := make(chan *TaskNode, len(tasks))
 	errors := make(chan error, len(tasks))
+	finishedCount := 0
 	doneCount := 0
+
+	safeClose := func() {
+		closeOnce.Do(func() {
+			close(readyTasks)
+		})
+	}
 
 	checkReady := func() {
 		mu.Lock()
 		defer mu.Unlock()
+
+		if len(errors) > 0 || finishedCount == totalToRun {
+			return
+		}
 
 		for _, node := range nodes {
 			if node.Status != StatusPending { continue }
@@ -585,11 +597,13 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				}
 
 				mu.Lock()
+				finishedCount++
 				if !success {
 					node.Status = StatusFailed
 					errors <- fmt.Errorf("task %s failed", node.Task.ID)
+					safeClose()
 					mu.Unlock()
-					continue
+					return
 				}
 
 				if mgr != nil {
@@ -606,6 +620,11 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				node.Status = StatusCompleted
 				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
 				doneCount++
+				cmd.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalToRun)
+				
+				if finishedCount == totalToRun {
+					safeClose()
+				}
 				mu.Unlock()
 				checkReady()
 			}
@@ -613,6 +632,9 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 	}
 
 	wg.Wait()
+	if len(errors) > 0 {
+		return <-errors
+	}
 	return nil
 }
 
