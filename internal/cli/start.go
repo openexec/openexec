@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/server"
@@ -35,6 +36,7 @@ var (
 	runMaxIterations int
 	runTimeout       int
 	runVerbose       bool
+	runNoAutoPlan    bool
 )
 
 // Task represents a task to execute
@@ -176,6 +178,67 @@ var runCmd = &cobra.Command{
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
+		// 1. AUTO-START ENGINE: If not running, start it in background
+		if !isServerRunning(config.ProjectDir, startPort) {
+			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
+			startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
+			execPath, _ := os.Executable()
+			startExec := exec.Command(execPath, startArgs...)
+			startExec.Dir = config.ProjectDir
+			if err := startExec.Run(); err != nil {
+				return fmt.Errorf("failed to auto-start execution engine: %w", err)
+			}
+			if err := waitForServer(startPort, 15*time.Second); err != nil {
+				return fmt.Errorf("engine failed to become ready: %w", err)
+			}
+			cmd.Println("✓ Execution engine started successfully.")
+		}
+
+		// 2. AUTO-PLAN: Handle missing/stale plans
+		if !runNoAutoPlan {
+			intentPath := "INTENT.md"
+			storiesPath := filepath.Join(config.TractStore, "stories.json")
+			wizardPath := filepath.Join(config.TractStore, "wizard_state.json")
+
+			needsPlanning := false
+			
+			// A. Intent missing but wizard state ready?
+			if _, err := os.Stat(intentPath); os.IsNotExist(err) {
+				if _, err := os.Stat(wizardPath); err == nil {
+					cmd.Println("📝 INTENT.md missing but wizard state found. Rendering intent...")
+					// Load wizard state and render
+					if data, err := os.ReadFile(wizardPath); err == nil {
+						var ws struct { UpdatedState planner.IntentState `json:"updated_state"` }
+						if err := json.Unmarshal(data, &ws); err == nil {
+							intentContent := ws.UpdatedState.RenderIntentMD()
+							_ = os.WriteFile(intentPath, []byte(intentContent), 0644)
+							cmd.Println("✓ INTENT.md rendered from wizard state.")
+							needsPlanning = true
+						}
+					}
+				}
+			}
+
+			// B. Plan missing or stale?
+			if _, err := os.Stat(storiesPath); os.IsNotExist(err) {
+				needsPlanning = true
+			} else {
+				// Check mtime
+				intentStat, _ := os.Stat(intentPath)
+				storiesStat, _ := os.Stat(storiesPath)
+				if intentStat != nil && storiesStat != nil && intentStat.ModTime().After(storiesStat.ModTime()) {
+					cmd.Println("🔄 INTENT.md was modified. Re-generating plan...")
+					needsPlanning = true
+				}
+			}
+
+			if needsPlanning {
+				if err := GenerateAndSave(cmd, intentPath, config.ProjectDir); err != nil {
+					return fmt.Errorf("auto-planning failed: %w", err)
+				}
+			}
+		}
+
 		if !cmd.Flags().Changed("executor") && config.Execution.ExecutorModel != "" {
 			startExecutor = config.Execution.ExecutorModel
 		}
@@ -192,10 +255,6 @@ var runCmd = &cobra.Command{
 		}
 		if !cmd.Flags().Changed("timeout") && config.Execution.TimeoutSeconds > 0 {
 			runTimeout = config.Execution.TimeoutSeconds
-		}
-
-		if !isServerRunning(config.ProjectDir, startPort) {
-			return fmt.Errorf("execution engine not running\n\nStart it with:\n  openexec start --daemon")
 		}
 
 		mgr, err := getReleaseManager(cmd)
@@ -426,7 +485,12 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				node.Status = StatusRunning
 				mu.Unlock()
 
-				cmd.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
+				isChassis := strings.Contains(strings.ToLower(node.Task.Title), "chassis")
+				if isChassis {
+					cmd.Printf("[Worker %d] ⚡ FAST-TRACK: Executing combined Chassis task %s\n", workerID, node.Task.ID)
+				} else {
+					cmd.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
+				}
 
 				var lastError string
 				maxRetries := 3
@@ -488,7 +552,13 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						continue
 					}
 
-					err = waitForLoop(cmd, loopID, fmt.Sprintf("[Worker %d]", workerID), time.Duration(runTimeout)*time.Second)
+					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
+					// If Chassis, simplify polling logs
+					if isChassis {
+						workerPrefix = fmt.Sprintf("[Worker %d] (chassis)", workerID)
+					}
+					
+					err = waitForLoop(cmd, loopID, workerPrefix, time.Duration(runTimeout)*time.Second)
 					if err == nil {
 						success = true
 						break
@@ -710,7 +780,6 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 	return fmt.Errorf("timeout")
 }
 
-// saveTaskStatus persists task status to .openexec/tasks.json and root tasks.json
 func saveTaskStatus(projectDir string, taskID string, status string) error {
 	paths := []string{
 		filepath.Join(projectDir, "tasks.json"),
@@ -812,6 +881,7 @@ func init() {
 	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Max iterations")
 	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
 	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
+	runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)

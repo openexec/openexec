@@ -8,7 +8,8 @@ import (
 // IntentState represents the structured state of the project intent
 type IntentState struct {
 	ProjectName      string       `json:"project_name"`
-	Flow             string       `json:"flow"` // greenfield, refactor, unknown
+	Flow             string       `json:"flow"`  // greenfield, existing
+	Scope            string       `json:"scope"` // epic, surgical
 	AppType          string       `json:"app_type"`
 	Platforms        []string     `json:"platforms"`
 	ProblemStatement string       `json:"problem_statement"`
@@ -86,7 +87,9 @@ func (s *IntentState) IsReady() bool {
 // RenderIntentMD converts the state into a formatted INTENT.md
 func (s *IntentState) RenderIntentMD() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("# Intent: %s\n\n", s.ProjectName))
+	sb.WriteString(fmt.Sprintf("# Intent: %s\n", s.ProjectName))
+	sb.WriteString(fmt.Sprintf("> Flow: %s\n", s.Flow))
+	sb.WriteString(fmt.Sprintf("> Scope: %s\n\n", s.Scope))
 
 	sb.WriteString("## Goals\n")
 	sb.WriteString(fmt.Sprintf("- %s\n", s.ProblemStatement))
