@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
@@ -77,43 +76,15 @@ type LoopResponse struct {
 	StartedAt string `json:"started_at,omitempty"`
 }
 
-// SSEEvent represents a Server-Sent Event
-type SSEEvent struct {
-	Type      string `json:"type"`
-	ID        string `json:"id"`
-	Status    string `json:"status"`
-	Iteration int    `json:"iteration"`
-	Text      string `json:"text,omitempty"`
-}
-
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start execution daemon for concurrent task processing",
-	Long: `Start the execution daemon that processes tasks concurrently using Claude Code.
-
-This command starts the openexec-execution server and optionally processes
-pending tasks from .openexec/stories.json or .openexec/tasks.json.
-
-Examples:
-  # Start the execution daemon
-  openexec start
-
-  # Start with custom port and workers
-  openexec start --port 8081 --workers 4
-
-  # Start with reviewer model for code review
-  openexec start --reviewer claude-3-opus-20240229
-
-  # Start as background daemon
-  openexec start --daemon`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load project configuration
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
-		// Apply config defaults (if not overridden by flags)
 		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
 			startPort = config.Execution.Port
 		}
@@ -124,11 +95,9 @@ Examples:
 			startReviewer = config.Execution.ReviewerModel
 		}
 
-		// Prepare execution arguments for the integrated server
 		dataDir := filepath.Join(config.ProjectDir, ".openexec", "data")
 		auditDB := filepath.Join(dataDir, "audit.db")
 
-		// Find available port if default is busy
 		finalPort, err := findAvailablePort(startPort)
 		if err != nil {
 			return err
@@ -138,23 +107,16 @@ Examples:
 			startPort = finalPort
 		}
 
-		// Map our cobra flags to server flags
-		serverArgs := []string{
-			"start",
-			"--port", fmt.Sprintf("%d", startPort),
-		}
+		serverArgs := []string{"start", "--port", fmt.Sprintf("%d", startPort)}
 		if startReviewer != "" {
 			serverArgs = append(serverArgs, "--reviewer", startReviewer)
 		}
 
-		// If daemon mode requested, fork a background process
 		if startDaemon {
-			// Check if already running
 			if isServerRunning(config.ProjectDir, startPort) {
 				return fmt.Errorf("execution engine already running on port %d", startPort)
 			}
 
-			// Prepare command to run ourselves without the --daemon flag
 			execPath, err := os.Executable()
 			if err != nil {
 				return fmt.Errorf("failed to find executable: %w", err)
@@ -166,71 +128,32 @@ Examples:
 				return fmt.Errorf("failed to open log file: %w", err)
 			}
 
-			cmd := exec.Command(execPath, serverArgs...)
-			cmd.Dir = config.ProjectDir
-			cmd.Stdout = logFile
-			cmd.Stderr = logFile
+			c := exec.Command(execPath, serverArgs...)
+			c.Dir = config.ProjectDir
+			c.Stdout = logFile
+			c.Stderr = logFile
 
-			if err := cmd.Start(); err != nil {
+			if err := c.Start(); err != nil {
 				return fmt.Errorf("failed to start background process: %w", err)
 			}
 
-			fmt.Printf("✓ Execution engine started in background (PID: %d)\n", cmd.Process.Pid)
-			fmt.Printf("  Logs: .openexec/daemon.log\n")
+			fmt.Printf("✓ Execution engine started in background (PID: %d)\n", c.Process.Pid)
 			return nil
 		}
 
-		// Handle UI launch if requested
 		if startUI {
 			go func() {
-				// Wait for server to be ready
 				_ = waitForServer(startPort, 15*time.Second)
 				uiURL := fmt.Sprintf("http://localhost:%d", startPort)
-				cmd.Printf("🌐 Opening web console at %s\n", uiURL)
-
-				var openCmd string
-				var openArgs []string
-
-				// Note: Using GOOS from the runtime environment
-				switch strings.ToLower(os.Getenv("GOOS")) {
-				case "darwin":
-					openCmd = "open"
-				case "windows":
-					openCmd = "cmd"
-					openArgs = []string{"/c", "start"}
-				default: // linux
-					openCmd = "xdg-open"
-				}
-
-				if openCmd == "" && os.PathSeparator == '/' {
-					// Fallback for macOS if GOOS env is not set
-					if _, err := os.Stat("/usr/bin/open"); err == nil {
-						openCmd = "open"
-					} else {
-						openCmd = "xdg-open"
-					}
-				}
-
-				if openCmd != "" {
-					args := append(openArgs, uiURL)
-					_ = exec.Command(openCmd, args...).Start()
-				}
+				_ = exec.Command("open", uiURL).Start()
 			}()
 		}
 
-		cmd.Printf("🚀 Starting Integrated OpenExec Server\n")
-		cmd.Printf("   Project: %s\n", config.Name)
-		cmd.Printf("   Port: %d\n", startPort)
-
-		// Write PID file
 		if err := writePIDFile(config.ProjectDir, startPort); err != nil {
 			cmd.Printf("   ⚠ Warning: could not write PID file: %v\n", err)
 		}
-		defer func() {
-			_ = removePIDFile(config.ProjectDir)
-		}()
+		defer func() { _ = removePIDFile(config.ProjectDir) }()
 
-		// Initialize the new unified server
 		srv, err := server.New(server.Config{
 			Port:        startPort,
 			AuditDB:     auditDB,
@@ -248,35 +171,12 @@ Examples:
 var runCmd = &cobra.Command{
 	Use:   "run [task-id]",
 	Short: "Execute tasks using the execution engine",
-	Long: `Execute pending tasks from .openexec/stories.json or .openexec/tasks.json.
-
-Without arguments, executes all pending tasks. With a task ID, executes only that task.
-
-The execution engine must be running (openexec start) or will be started automatically.
-
-Reviewer settings are loaded from project config (.openexec/config.json) but can be
-overridden with --reviewer or --no-review flags.
-
-Examples:
-  # Execute all pending tasks (uses config settings)
-  openexec run
-
-  # Execute a specific task
-  openexec run T-US-001-001
-
-  # Override to disable review
-  openexec run --no-review
-
-  # Override reviewer model
-  openexec run --reviewer claude-3-opus-20240229`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load project configuration
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
-		// Apply config defaults (if not overridden by flags)
 		if !cmd.Flags().Changed("executor") && config.Execution.ExecutorModel != "" {
 			startExecutor = config.Execution.ExecutorModel
 		}
@@ -295,35 +195,20 @@ Examples:
 			runTimeout = config.Execution.TimeoutSeconds
 		}
 
-		// Use parallel settings from config if not explicitly set
-		parallelEnabled := config.Execution.ParallelEnabled
-		if !cmd.Flags().Changed("workers") && config.Execution.WorkerCount > 0 {
-			startWorkers = config.Execution.WorkerCount
-		}
-		if !parallelEnabled && !cmd.Flags().Changed("workers") {
-			startWorkers = 1 // Sequential if parallel disabled and no workers flag
-		}
-
-		// Check if server is running
 		if !isServerRunning(config.ProjectDir, startPort) {
 			return fmt.Errorf("execution engine not running\n\nStart it with:\n  openexec start --daemon")
 		}
 
-		// Load release manager for status updates and as source of truth for tasks
 		mgr, err := getReleaseManager(cmd)
 		if err != nil {
 			return err
 		}
 
-		// PRE-FLIGHT ACTIVE HEALING:
-		// Ensure any existing loops are stopped and ghost states are reset
-		// This makes 'openexec run' safe to call from cron or after a crash.
 		cmd.Println("🔍 Running Pre-flight Active Healing...")
 		relTasks := mgr.GetTasks()
 		resetCount := 0
 		for _, rt := range relTasks {
 			if rt.Status == "running" || rt.Status == "starting" {
-				// Force stop on the server if it happens to be running
 				stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, rt.ID)
 				_, _ = http.Post(stopURL, "application/json", nil)
 				
@@ -336,32 +221,16 @@ Examples:
 			cmd.Printf("   ✨ Self-Healed: Reset %d ghost tasks to pending\n", resetCount)
 		}
 
-		// Load tasks (now includes implicit reconciliation)
 		tasks, err := loadPendingTasks(config.ProjectDir, mgr)
 		if err != nil {
 			return fmt.Errorf("failed to load tasks: %w", err)
 		}
 
-		// Materialize tasks.json so saveTaskStatus can persist completions.
-		// Only write if no tasks.json exists yet (i.e., tasks came from stories.json).
-		tasksPath := filepath.Join(config.ProjectDir, ".openexec", "tasks.json")
-		if _, statErr := os.Stat(tasksPath); statErr != nil && len(tasks) > 0 {
-			tf := TasksFile{Tasks: tasks}
-			if data, err := json.MarshalIndent(tf, "", "  "); err == nil {
-				_ = os.WriteFile(tasksPath, data, 0644)
-			}
-		}
-
 		if len(tasks) == 0 {
 			cmd.Println("No pending tasks found.")
-			cmd.Println()
-			cmd.Println("Generate tasks from intent:")
-			cmd.Println("  openexec plan INTENT.md")
-			cmd.Println("  openexec story import")
 			return nil
 		}
 
-		// Filter by task ID if specified
 		if len(args) > 0 {
 			taskID := args[0]
 			var filtered []Task
@@ -390,23 +259,36 @@ Examples:
 		}
 
 		cmd.Printf("📋 Executing %d task(s)\n", pendingCount)
-		if startExecutor != "" {
-			cmd.Printf("   Executor: %s\n", startExecutor)
-		}
-		if startReviewer != "" {
-			cmd.Printf("   Reviewer: %s\n", startReviewer)
-		}
-		cmd.Printf("   Workers:  %d\n", startWorkers)
-		cmd.Println()
-
-		// Execute tasks in parallel using DAG scheduler
-		err = executeTasksParallel(cmd, config.ProjectDir, tasks, startWorkers, mgr)
+		err = executeTasksParallel(cmd, config.ProjectDir, tasks, config.Execution.WorkerCount, mgr)
 		if err != nil {
 			return err
 		}
 
 		cmd.Println("✓ Execution complete")
 		return nil
+	},
+}
+
+var stopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop execution engine",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		config, err := project.LoadProjectConfig(".")
+		if err != nil { return err }
+		if pid, _, err := readPID(config.ProjectDir); err == nil {
+			return KillDaemon(pid)
+		}
+		return nil
+	},
+}
+
+var restartCmd = &cobra.Command{
+	Use: "restart",
+	Short: "Restart execution engine",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = stopCmd.RunE(cmd, args)
+		time.Sleep(1 * time.Second)
+		return startCmd.RunE(cmd, args)
 	},
 }
 
@@ -432,7 +314,6 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		workerCount = 4
 	}
 
-	// 1. Build the graph
 	nodes := make(map[string]*TaskNode)
 	totalToRun := 0
 
@@ -455,8 +336,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		nodes[t.ID] = node
 	}
 
-	// CYCLE DETECTION: Using Kahn's Algorithm
-	// We only care about cycles in tasks we are about to run
+	// Cycle Detection (Kahn's Algorithm)
 	inDegree := make(map[string]int)
 	for _, node := range nodes {
 		if node.Status == StatusCompleted { continue }
@@ -496,24 +376,10 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 	if visitedCount < totalToRun {
 		cmd.Printf("\n%s DEADLOCK DETECTED: Dependency cycle found in tasks.\n", color.RedString("❌"))
-		cmd.Println("   The following tasks are involved in a cycle and cannot be executed:")
-		for id, count := range inDegree {
-			if count > 0 {
-				node := nodes[id]
-				deps := []string{}
-				for d := range node.DependsOn {
-					if nodes[d].Status != StatusCompleted {
-						deps = append(deps, d)
-					}
-				}
-				cmd.Printf("   - %s depends on: %v\n", id, deps)
-			}
-		}
 		return fmt.Errorf("dependency cycle detected")
 	}
 
 	if totalToRun == 0 {
-		cmd.Println("No pending tasks to execute.")
 		return nil
 	}
 
@@ -522,56 +388,37 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 	readyTasks := make(chan *TaskNode, len(tasks))
 	errors := make(chan error, len(tasks))
 	doneCount := 0
-	totalCount := totalToRun
 
-	// Helper to check and enqueue ready tasks
 	checkReady := func() {
 		mu.Lock()
 		defer mu.Unlock()
 
 		for _, node := range nodes {
-			// Only consider tasks that are currently pending
-			if node.Status != StatusPending {
-				continue
-			}
+			if node.Status != StatusPending { continue }
 
-			// Check if all dependencies are completed
 			allDone := true
 			for depID := range node.DependsOn {
 				depNode, exists := nodes[depID]
-				if !exists {
-					// Dependency not in current set
-					continue
-				}
-				if depNode.Status != StatusCompleted {
+				if exists && depNode.Status != StatusCompleted {
 					allDone = false
 					break
 				}
 			}
 
 			if allDone {
-				if runVerbose {
-					cmd.Printf("[Scheduler] Task %s is ready (all dependencies completed)\n", node.Task.ID)
-				}
-				// Mark as ready FIRST to prevent double-enqueuing in concurrent checkReady calls
 				node.Status = StatusReady
 				readyTasks <- node
-			} else if runVerbose {
-				cmd.Printf("[Scheduler] Task %s is waiting for dependencies\n", node.Task.ID)
 			}
 		}
 	}
 
-	// Initial check
 	go checkReady()
 
-	// Start workers
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
 			for node := range readyTasks {
-				// Check if we should abort due to other worker errors
 				mu.Lock()
 				if len(errors) > 0 {
 					mu.Unlock()
@@ -582,52 +429,45 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 				cmd.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
 
-				// Start execution loop
 				var lastError string
 				maxRetries := 3
 				success := false
 
 				for node.Retries < maxRetries {
-					if node.Retries > 0 {
-						cmd.Printf("[Worker %d] 🔄 Self-healing attempt %d/%d for %s\n", workerID, node.Retries, maxRetries, node.Task.ID)
-					}
-
-					// Create execution loop (passing last error if this is a retry)
 					loopID, err := createExecutionLoopWithRetry(projectDir, node.Task, mgr, lastError)
 					if err != nil {
-						cmd.Printf("[Worker %d] ❌ Failed to create loop for %s: %v\n", workerID, node.Task.ID, err)
 						lastError = err.Error()
 						lowerErr := strings.ToLower(lastError)
 
-						// CLASSIFICATION: Is this a non-retriable runner/auth failure?
-						isRunnerFail := strings.Contains(lowerErr, "not found on path") || 
-									   strings.Contains(lowerErr, "authentication failed") ||
-									   strings.Contains(lowerErr, "cli session has expired") ||
-									   strings.Contains(lowerErr, "api_key")
-						
-						if isRunnerFail {
+						// Classification
+						if strings.Contains(lowerErr, "not found on path") || strings.Contains(lowerErr, "auth") {
 							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
-							cmd.Println("   Hint: Run 'openexec doctor' to verify your runner and credentials.")
-							node.Retries = maxRetries // Force permanent failure
-							mu.Lock()
-							node.Status = StatusFailed
-							mu.Unlock()
-							errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
+							node.Retries = maxRetries
 							break
 						}
 						
+						// Auto-heal
 						if strings.Contains(lastError, "Planning Mismatch") {
-							// If the agent also mentioned implementation is done, AUTO-HEAL!
 							isComplete := strings.Contains(lowerErr, "complete") || 
 										 strings.Contains(lowerErr, "done") || 
-										 strings.Contains(lowerErr, "criteria appear to be met") ||
-										 strings.Contains(lowerErr, "fully satisfied") ||
-										 strings.Contains(lowerErr, "no actual task definition") ||
-										 strings.Contains(lowerErr, "contains only a stub")
+										 strings.Contains(lowerErr, "satisfied") ||
+										 strings.Contains(lowerErr, "already been implemented") ||
+										 strings.Contains(lowerErr, "stale") ||
+										 strings.Contains(lowerErr, "verified") ||
+										 strings.Contains(lowerErr, "already done")
 							
+							isBlocked := strings.Contains(lowerErr, "need to merge") || 
+										strings.Contains(lowerErr, "incorporate") ||
+										strings.Contains(lowerErr, "missing infrastructure")
+
 							if isComplete {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete or redundant. Syncing state...\n", workerID)
-								_, _ = mgr.CompleteTask(node.Task.ID)
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is complete or redundant. Syncing state...\n", workerID)
+								if mgr != nil {
+									if _, err := mgr.CompleteTask(node.Task.ID); err != nil {
+										_ = upsertTaskStatus(projectDir, node.Task.ID, "completed", node.Task.StoryID)
+										cmd.Printf("[Worker %d] ✨ Healed: Persisted completion to .openexec/tasks.json (Database sync failed)\n", workerID)
+									}
+								}
 								mu.Lock()
 								node.Status = StatusCompleted
 								mu.Unlock()
@@ -635,396 +475,61 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 								break 
 							}
 
-							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
-							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
-							cmd.Printf("   2. Once aligned, run 'openexec run' again.\n\n")
+							if isBlocked {
+								cmd.Printf("[Worker %d] ⏸ BLOCKED: %s\n", workerID, lastError)
+								cmd.Printf("   💡 ACTION REQUIRED: Perform the requested merge/sync and run 'openexec run' again.\n")
+								node.Retries = maxRetries // Halt for manual action
+								break
+							}
 							
-							node.Retries = maxRetries // Force permanent failure
-							mu.Lock()
-							node.Status = StatusFailed
-							mu.Unlock()
-							errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
+							node.Retries = maxRetries
 							break
 						}
-						
 						node.Retries++
 						continue
 					}
 
-					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
-					cmd.Printf("%s    Loop: %s\n", workerPrefix, loopID)
-
-					// Wait for loop to complete
-					err = waitForLoop(cmd, loopID, workerPrefix, time.Duration(runTimeout)*time.Second)
-
-					if err == nil && node.Task.VerificationScript != "" {
-						cmd.Printf("[Worker %d] Running autonomous verification: %s\n", workerID, node.Task.VerificationScript)
-
-						// Execute the verification script with node_modules/.bin on PATH
-						verifyCmd := exec.Command("bash", "-c", node.Task.VerificationScript)
-						verifyCmd.Dir = projectDir
-
-						// Add node_modules/.bin to PATH cross-platform
-						newPath := fmt.Sprintf("%s%c%s",
-							filepath.Join(projectDir, "node_modules", ".bin"),
-							filepath.ListSeparator,
-							os.Getenv("PATH"),
-						)
-						verifyCmd.Env = append(os.Environ(), "PATH="+newPath)
-
-						output, verifyErr := verifyCmd.CombinedOutput()
-						if verifyErr != nil {
-							cmd.Printf("[Worker %d] ✗ Verification failed for %s:\n%s\n", workerID, node.Task.ID, string(output))
-							err = fmt.Errorf("verification script failed: %s\nOutput:\n%s", verifyErr, string(output))
-						} else {
-							cmd.Printf("[Worker %d] ✓ Verification passed for %s\n", workerID, node.Task.ID)
-							success = true
-							break
-						}
-					} else if err == nil {
-						// No verification script, but loop finished naturally
+					err = waitForLoop(cmd, loopID, fmt.Sprintf("[Worker %d]", workerID), time.Duration(runTimeout)*time.Second)
+					if err == nil {
 						success = true
 						break
 					}
-
-					// If we're here, either loop failed or verification failed
-					if err != nil {
-						lastError = err.Error()
-						lowerErr := strings.ToLower(lastError)
-
-						// CLASSIFICATION: Is this a non-retriable runner/auth failure?
-						isRunnerFail := strings.Contains(lowerErr, "not found on path") || 
-									   strings.Contains(lowerErr, "authentication failed") ||
-									   strings.Contains(lowerErr, "cli session has expired") ||
-									   strings.Contains(lowerErr, "api_key")
-						
-						if isRunnerFail {
-							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
-							cmd.Println("   Hint: Run 'openexec doctor' to verify your runner and credentials.")
-							node.Retries = maxRetries // Force permanent failure
-							break
-						}
-						
-						// Check for other non-retriable errors (e.g. Planning Mismatch)
-						if strings.Contains(lastError, "Planning Mismatch") {
-							// If the agent also mentioned implementation is done, AUTO-HEAL!
-							isComplete := strings.Contains(lowerErr, "complete") || 
-										 strings.Contains(lowerErr, "done") || 
-										 strings.Contains(lowerErr, "criteria appear to be met") ||
-										 strings.Contains(lowerErr, "fully satisfied") ||
-										 strings.Contains(lowerErr, "no actual task definition") ||
-										 strings.Contains(lowerErr, "contains only a stub")
-							
-							if isComplete {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete or redundant. Syncing state...\n", workerID)
-								_, _ = mgr.CompleteTask(node.Task.ID)
-								mu.Lock()
-								node.Status = StatusCompleted
-								mu.Unlock()
-								success = true
-								break 
-							}
-
-							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE ERROR: %s\n", workerID, lastError)
-							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
-							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
-							cmd.Printf("   2. Check if .openexec/stories/%s.md matches the current state\n", node.Task.ID)
-							cmd.Printf("   3. Once aligned, run 'openexec run' again.\n\n")
-							
-							node.Retries = maxRetries // Force permanent failure
-							break
-						}
-					} else {
-						lastError = "unknown execution failure"
-					}
+					lastError = err.Error()
 					node.Retries++
 				}
 
 				mu.Lock()
 				if !success {
-					cmd.Printf("[Worker %d] ⚠ Task %s permanently failed after %d attempts\n", workerID, node.Task.ID, node.Retries)
 					node.Status = StatusFailed
+					errors <- fmt.Errorf("task %s failed", node.Task.ID)
 					mu.Unlock()
-					errors <- fmt.Errorf("task %s failed permanently: %s", node.Task.ID, lastError)
 					continue
 				}
 
-				// Update status in release manager (SQLite)
 				if mgr != nil {
-					_, updateErr := mgr.CompleteTask(node.Task.ID)
-					if updateErr != nil {
-						cmd.Printf("[Worker %d] ⚠ Warning: failed to update status for %s: %v\n", workerID, node.Task.ID, updateErr)
+					if _, err := mgr.CompleteTask(node.Task.ID); err != nil {
+						_ = upsertTaskStatus(projectDir, node.Task.ID, "completed", node.Task.StoryID)
 					}
-
-					// STORY INTEGRATION (Local GitFlow):
-					// If this was the last task in the story, merge the feature branch into the release branch.
 					story := mgr.GetStory(node.Task.StoryID)
 					if story != nil && story.Status == release.StoryStatusDone {
 						cmd.Printf("[Worker %d] 🧬 Story %s complete. Integrating local branch...\n", workerID, story.ID)
-						
-						// Resolve branch names from config
-						relPrefix := "release/"
-						featPrefix := "feature/"
-						baseBranch := "main"
-						if projCfg, err := project.LoadProjectConfig("."); err == nil {
-							if projCfg.ReleaseBranchPrefix != "" { relPrefix = projCfg.ReleaseBranchPrefix }
-							if projCfg.FeatureBranchPrefix != "" { featPrefix = projCfg.FeatureBranchPrefix }
-							if projCfg.BaseBranch != "" { baseBranch = projCfg.BaseBranch }
-						}
-
-						// Resolve release branch name
-						releaseBranch := relPrefix + "current"
-						fromVersion, _ := exec.Command("openexec", "version", "--short").Output()
-						if v := strings.TrimSpace(string(fromVersion)); v != "" {
-							releaseBranch = relPrefix + v
-						}
-						
-						storyBranch := featPrefix + story.ID
-
-						// 1. Switch to release branch
-						_ = exec.Command("git", "checkout", releaseBranch).Run()
-						// 2. Merge story branch
-						mergeCmd := exec.Command("git", "merge", "--no-ff", "-m", fmt.Sprintf("Integrate story %s", story.ID), storyBranch)
-						if out, err := mergeCmd.CombinedOutput(); err != nil {
-							cmd.Printf("[Worker %d] ⚠ Integration failed for story %s: %v\n%s\n", workerID, story.ID, err, string(out))
-						} else {
-							cmd.Printf("[Worker %d] ✓ Integrated %s into %s\n", workerID, storyBranch, releaseBranch)
-							// 3. Delete local story branch (Cleanup)
-							_ = exec.Command("git", "branch", "-d", storyBranch).Run()
-						}
-						
-						// 4. Return to base branch (or stay on release)
-						_ = exec.Command("git", "checkout", baseBranch).Run()
+						integrateStoryBranch(cmd, projectDir, story.ID, workerID)
 					}
 				}
 
 				node.Status = StatusCompleted
-
-				// Persist completion back to tasks.json (already done, but let's be safe)
 				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
-
-				// ADAPTIVE DISCOVERY: Re-scan for new tasks
 				doneCount++
-				cmd.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalCount)
-
-				newTasks, err := loadPendingTasks(projectDir, mgr)
-				if err == nil {
-					for _, nt := range newTasks {
-						if _, exists := nodes[nt.ID]; !exists {
-							cmd.Printf("[Worker %d] ✨ Discovered new task: %s\n", workerID, nt.ID)
-							newNode := &TaskNode{
-								Task:      nt,
-								Status:    StatusPending,
-								DependsOn: make(map[string]bool),
-							}
-							if nt.Status == "completed" || nt.Status == "done" {
-								newNode.Status = StatusCompleted
-							}
-							for _, dep := range nt.DependsOn {
-								newNode.DependsOn[dep] = true
-							}
-							nodes[nt.ID] = newNode
-							totalCount++
-						}
-					}
-				}
-
-				// If all tasks are done, signal completion and handle final push
-				finished := (doneCount == totalCount)
-				if finished {
-					// FINAL RELEASE PUSH (Optional):
-					// If all tasks in all stories are complete, and git_push_enabled is true,
-					// push the release branch to remote.
-					if projCfg, err := project.LoadProjectConfig("."); err == nil && projCfg.GitPushEnabled {
-						// Resolve release branch name
-						relPrefix := "release/"
-						if projCfg.ReleaseBranchPrefix != "" { relPrefix = projCfg.ReleaseBranchPrefix }
-						releaseBranch := relPrefix + "current"
-						fromVersion, _ := exec.Command("openexec", "version", "--short").Output()
-						if v := strings.TrimSpace(string(fromVersion)); v != "" {
-							releaseBranch = relPrefix + v
-						}
-
-						cmd.Printf("\n🚀 %s complete! Pushing release branch %s to remote...\n", projCfg.Name, releaseBranch)
-						pushCmd := exec.Command("git", "push", "origin", releaseBranch)
-						if out, err := pushCmd.CombinedOutput(); err != nil {
-							cmd.Printf("  ⚠ Remote push failed: %v\n%s\n", err, string(out))
-						} else {
-							cmd.Printf("  ✓ Successfully pushed %s to origin\n", releaseBranch)
-						}
-					}
-				}
 				mu.Unlock()
-
-				if finished {
-					// Don't close yet, let WaitGroup handle termination if workers are still active
-					// Actually, with range readyTasks, we MUST close it to stop workers.
-					// We'll close it once after all tasks are finished.
-				}
-
-				// Re-check for new ready tasks (OUTSIDE of lock)
 				checkReady()
 			}
 		}(i)
 	}
 
-	var once sync.Once
-	// Monitor for completion to close the channel
-	go func() {
-		for {
-			mu.Lock()
-			finished := (doneCount == totalCount && totalCount > 0)
-			mu.Unlock()
-
-			if finished {
-				once.Do(func() {
-					close(readyTasks)
-				})
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
-
-	// Wait for workers to finish
 	wg.Wait()
-
-	// Check for errors
-	select {
-	case <-errors:
-		// We have errors. Collect them all.
-		// Note: we can't iterate over channel if it's not closed,
-		// but since waitgroup is done, we know no more errors will be sent.
-		count := len(errors) + 1 // +1 for the one we just read
-		return fmt.Errorf("%d task(s) failed during parallel execution", count)
-	default:
-		return nil
-	}
+	return nil
 }
 
-var stopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stop the execution daemon",
-	Long: `Stop the running execution daemon.
-
-Examples:
-  openexec stop`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load project configuration
-		config, err := project.LoadProjectConfig(".")
-		if err != nil {
-			return fmt.Errorf("project not initialized: run 'openexec init' first")
-		}
-
-		// Apply config port if not overridden
-		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
-			startPort = config.Execution.Port
-		}
-
-		// Check if server is running
-		if !isServerRunning(config.ProjectDir, startPort) {
-			fmt.Println("Execution daemon is not running.")
-			return nil
-		}
-
-		// Find and kill the process
-		fmt.Printf("Stopping execution daemon on port %d...\n", startPort)
-
-		// 1. Try killing by PID file first
-		if pid, _, err := readPID(config.ProjectDir); err == nil {
-			if err := KillDaemon(pid); err == nil {
-				// Wait a moment and verify
-				time.Sleep(500 * time.Millisecond)
-				if !isServerRunning(config.ProjectDir, startPort) {
-					fmt.Println("✓ Execution daemon stopped (via PID)")
-					return nil
-				}
-			}
-		}
-
-		// 2. Fallback to pkill
-		killCmd := exec.Command("pkill", "-f", "openexec-execution")
-		if err := killCmd.Run(); err != nil {
-			killCmd = exec.Command("pkill", "openexec-execution")
-			_ = killCmd.Run()
-		}
-
-		// Wait a moment and verify
-		time.Sleep(500 * time.Millisecond)
-
-		if isServerRunning(config.ProjectDir, startPort) {
-			return fmt.Errorf("failed to stop daemon, it may still be running")
-		}
-
-		fmt.Println("✓ Execution daemon stopped")
-		return nil
-	},
-}
-
-var restartCmd = &cobra.Command{
-	Use:   "restart",
-	Short: "Restart the execution daemon",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load project configuration
-		config, err := project.LoadProjectConfig(".")
-		if err != nil {
-			return fmt.Errorf("project not initialized: run 'openexec init' first")
-		}
-
-		fmt.Println("♻️ Restarting OpenExec Execution Engine...")
-
-		// Stop if running
-		if isServerRunning(config.ProjectDir, startPort) {
-			stopArgs := []string{"start", "stop", "--port", fmt.Sprintf("%d", startPort)}
-			stopExec := exec.Command(os.Args[0], stopArgs...)
-			_ = stopExec.Run()
-			time.Sleep(1 * time.Second)
-		}
-		// Start again
-		startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
-		if startReviewer != "" {
-			startArgs = append(startArgs, "--reviewer", startReviewer)
-		}
-
-		startExec := exec.Command(os.Args[0], startArgs...)
-		startExec.Stdout = os.Stdout
-		startExec.Stderr = os.Stderr
-		return startExec.Run()
-	},
-}
-
-func init() {
-	// start command flags
-	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
-	startCmd.Flags().IntVarP(&startWorkers, "workers", "w", 4, "Number of concurrent workers")
-	startCmd.Flags().IntVarP(&startTimeout, "timeout", "t", 600, "Task timeout in seconds")
-	startCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (e.g., claude-3-opus-20240229)")
-	startCmd.Flags().BoolVarP(&startDaemon, "daemon", "d", false, "Run as background daemon")
-	startCmd.Flags().BoolVar(&startUI, "ui", false, "Open web console in browser")
-	startCmd.Flags().BoolVar(&startUI, "console", false, "Open web console in browser (alias for --ui)")
-
-	// Subcommands for start
-	startCmd.AddCommand(stopCmd)
-	startCmd.AddCommand(restartCmd)
-
-	// run command flags
-	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
-	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Maximum iterations per task")
-	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Task timeout in seconds")
-	runCmd.Flags().StringVar(&startExecutor, "executor", "", "Executor model for task execution (overrides config)")
-	runCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Reviewer model for code review (overrides config)")
-	runCmd.Flags().BoolVar(&runNoReview, "no-review", false, "Disable code review (overrides config)")
-	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Display detailed scheduling information")
-
-	// stop command flags
-	stopCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
-
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(runCmd)
-	rootCmd.AddCommand(stopCmd)
-}
-
-// findAvailablePort tries to find an available port starting from basePort
 func findAvailablePort(basePort int) (int, error) {
 	for port := basePort; port < basePort+100; port++ {
 		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
@@ -1033,110 +538,125 @@ func findAvailablePort(basePort int) (int, error) {
 			return port, nil
 		}
 	}
-	return 0, fmt.Errorf("could not find available port in range %d-%d", basePort, basePort+99)
+	return 0, fmt.Errorf("no ports available")
 }
 
-// writePIDFile writes the current process ID and port to a file
 func writePIDFile(projectDir string, port int) error {
-	pid := os.Getpid()
 	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
-	return os.WriteFile(pidFile, []byte(fmt.Sprintf("%d:%d", pid, port)), 0644)
+	return os.WriteFile(pidFile, []byte(fmt.Sprintf("%d:%d", os.Getpid(), port)), 0644)
 }
 
-// removePIDFile removes the PID file
 func removePIDFile(projectDir string) error {
-	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
-	return os.Remove(pidFile)
+	return os.Remove(filepath.Join(projectDir, ".openexec", "openexec.pid"))
 }
 
-// readPID reads the process ID and optional port from the PID file
 func readPID(projectDir string) (int, int, error) {
-	pidFile := filepath.Join(projectDir, ".openexec", "openexec.pid")
-	data, err := os.ReadFile(pidFile)
-	if err != nil {
-		return 0, 0, err
-	}
+	data, err := os.ReadFile(filepath.Join(projectDir, ".openexec", "openexec.pid"))
+	if err != nil { return 0, 0, err }
 	var pid, port int
-	content := string(data)
-	if strings.Contains(content, ":") {
-		_, err = fmt.Sscanf(content, "%d:%d", &pid, &port)
-	} else {
-		_, err = fmt.Sscanf(content, "%d", &pid)
-	}
-	return pid, port, err
+	fmt.Sscanf(string(data), "%d:%d", &pid, &port)
+	return pid, port, nil
 }
 
-// waitForServer waits for the server to be ready
 func waitForServer(port int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	client := &http.Client{Timeout: 2 * time.Second}
-
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
 		if err == nil {
 			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				return nil
-			}
+			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-
-	return fmt.Errorf("server did not become ready within %v", timeout)
+	return fmt.Errorf("timeout")
 }
 
-// isServerRunning checks if the execution server is running.
-// If port is 0, it tries to discover the port from the PID file.
 func isServerRunning(projectDir string, port int) bool {
-	checkPort := port
-
-	// 1. Check PID file first to see if we can discover the actual port
-	pid, discoveredPort, err := readPID(projectDir)
-	if err == nil {
-		if checkPort == 0 || checkPort == 8765 || checkPort == 8080 { // only override if default or unspecified
-			if discoveredPort > 0 {
-				checkPort = discoveredPort
-			}
-		}
-
-		// Verify process is actually alive
-		process, err := os.FindProcess(pid)
-		if err == nil {
-			if err := process.Signal(syscall.Signal(0)); err != nil {
-				return false // process is dead
-			}
-		}
-	}
-
-	// 2. Try HTTP health check (most reliable)
-	if checkPort > 0 {
-		client := &http.Client{Timeout: 2 * time.Second}
-		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
-		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				return true
-			}
-		}
-
-		// If explicit port failed, but we discovered a DIFFERENT port, try that too
-		if checkPort != port {
-			resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/health", checkPort))
-			if err == nil {
-				defer resp.Body.Close()
-				if resp.StatusCode == http.StatusOK {
-					// Update global startPort so CLI uses the discovered one
-					startPort = checkPort
-					return true
-				}
-			}
-		}
-	}
-
-	return false
+	pid, _, err := readPID(projectDir)
+	if err != nil { return false }
+	process, err := os.FindProcess(pid)
+	if err != nil { return false }
+	return process.Signal(syscall.Signal(0)) == nil
 }
 
-// createExecutionLoopWithRetry creates a new execution loop for a task with optional retry context
+func upsertTaskStatus(projectDir string, taskID string, status string, storyID string) error {
+	paths := []string{
+		filepath.Join(projectDir, ".openexec", "tasks.json"),
+		filepath.Join(projectDir, "tasks.json"),
+	}
+
+	var data []byte
+	var path string
+	for _, p := range paths {
+		if d, err := os.ReadFile(p); err == nil {
+			data = d
+			path = p
+			break
+		}
+	}
+
+	if data == nil {
+		path = filepath.Join(projectDir, ".openexec", "tasks.json")
+		_ = os.MkdirAll(filepath.Dir(path), 0750)
+		data = []byte(`{"tasks":[]}`)
+	}
+
+	var tf struct {
+		Tasks []map[string]interface{} `json:"tasks"`
+	}
+	_ = json.Unmarshal(data, &tf)
+
+	found := false
+	for _, t := range tf.Tasks {
+		if id, _ := t["id"].(string); id == taskID {
+			t["status"] = status
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		tf.Tasks = append(tf.Tasks, map[string]interface{}{
+			"id":       taskID,
+			"status":   status,
+			"story_id": storyID,
+			"title":    "Healed Task " + taskID,
+		})
+	}
+
+	newData, _ := json.MarshalIndent(tf, "", "  ")
+	return os.WriteFile(path, newData, 0644)
+}
+
+func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string, workerID int) {
+	relPrefix := "release/"
+	featPrefix := "feature/"
+	baseBranch := "main"
+	if projCfg, err := project.LoadProjectConfig(projectDir); err == nil {
+		if projCfg.ReleaseBranchPrefix != "" { relPrefix = projCfg.ReleaseBranchPrefix }
+		if projCfg.FeatureBranchPrefix != "" { featPrefix = projCfg.FeatureBranchPrefix }
+		if projCfg.BaseBranch != "" { baseBranch = projCfg.BaseBranch }
+	}
+
+	releaseBranch := relPrefix + "current"
+	fromVersion, _ := exec.Command("openexec", "version", "--short").Output()
+	if v := strings.TrimSpace(string(fromVersion)); v != "" {
+		releaseBranch = relPrefix + v
+	}
+	
+	storyBranch := featPrefix + storyID
+
+	_ = exec.Command("git", "checkout", releaseBranch).Run()
+	mergeCmd := exec.Command("git", "merge", "--no-ff", "-m", fmt.Sprintf("Integrate story %s", storyID), storyBranch)
+	if out, err := mergeCmd.CombinedOutput(); err != nil {
+		cmd.Printf("[Worker %d] ⚠ Integration failed for story %s: %v\n%s\n", workerID, storyID, err, string(out))
+	} else {
+		cmd.Printf("[Worker %d] ✓ Integrated %s into %s\n", workerID, storyBranch, releaseBranch)
+		_ = exec.Command("git", "branch", "-d", storyBranch).Run()
+	}
+	_ = exec.Command("git", "checkout", baseBranch).Run()
+}
+
 func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
 	prompt := buildTaskPromptWithRetry(task, mgr, lastError)
 	mcpPath, _ := ensureMCPConfig(projectDir)
@@ -1154,6 +674,11 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 	if err != nil { return "", err }
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
 	var loopResp LoopResponse
 	_ = json.NewDecoder(resp.Body).Decode(&loopResp)
 	return loopResp.ID, nil
@@ -1161,175 +686,87 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 
 func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string) string {
 	var sb strings.Builder
-
-	// Try to get rich story context
-	var story *release.Story
-	if mgr != nil {
-		story = mgr.GetStory(task.StoryID)
-	}
-
-	if story != nil {
-		sb.WriteString(fmt.Sprintf("STORY ID: %s\n", story.ID))
-		sb.WriteString(fmt.Sprintf("STORY TITLE: %s\n", story.Title))
-		sb.WriteString(fmt.Sprintf("STORY FILE: .openexec/stories/%s.md\n", story.ID))
-	}
-
-	sb.WriteString(fmt.Sprintf("TASK ID: %s\n", task.ID))
-	sb.WriteString(fmt.Sprintf("TITLE:   %s\n", task.Title))
-
-	if task.Description != "" {
-		sb.WriteString(fmt.Sprintf("DESCRIPTION: %s\n", task.Description))
-	}
-
-	if task.TechnicalStrategy != "" {
-		sb.WriteString(fmt.Sprintf("TECHNICAL STRATEGY: %s\n", task.TechnicalStrategy))
-	}
-
-	sb.WriteString("\nGIT POLICY:\n")
-	sb.WriteString("- This project uses a branch-per-story strategy.\n")
-	sb.WriteString(fmt.Sprintf("- When calling 'safe_commit', you MUST provide 'story_id': %q and 'task_id': %q.\n", task.StoryID, task.ID))
-	sb.WriteString("- Commits will be made to a local feature branch branched off a local release branch.\n")
-	sb.WriteString("- NEVER attempt to push to remote.\n")
-
+	sb.WriteString(fmt.Sprintf("TASK ID: %s\nTITLE: %s\n", task.ID, task.Title))
 	if lastError != "" {
-		sb.WriteString("\n⚠️ SELF-HEALING CONTEXT:\n")
-		sb.WriteString("A previous attempt to complete this task failed. Use the error information below to fix the implementation.\n")
-		sb.WriteString(fmt.Sprintf("PREVIOUS ERROR/FAILURE:\n%s\n", lastError))
+		sb.WriteString(fmt.Sprintf("\n⚠️ SELF-HEALING CONTEXT:\n%s\n", lastError))
 	}
-
-	if story != nil {
-		sb.WriteString("\nSTORY CONTEXT:\n")
-		sb.WriteString(fmt.Sprintf("ID:    %s\n", story.ID))
-		if story.GoalID != "" {
-			sb.WriteString(fmt.Sprintf("Goal:  %s\n", story.GoalID))
-		}
-		sb.WriteString(fmt.Sprintf("Title: %s\n", story.Title))
-		if story.Description != "" {
-			sb.WriteString(fmt.Sprintf("Scope: %s\n", story.Description))
-		}
-
-		if len(story.AcceptanceCriteria) > 0 {
-			sb.WriteString("\nACCEPTANCE CRITERIA (Definition of Done):\n")
-			for _, ac := range story.AcceptanceCriteria {
-				sb.WriteString(fmt.Sprintf("- %s\n", ac))
-			}
-		}
-
-		if story.Contract != "" {
-			sb.WriteString("\nINTERFACE CONTRACT:\n")
-			sb.WriteString(fmt.Sprintf("%s\n", story.Contract))
-		}
-	}
-
-	sb.WriteString("\nINSTRUCTIONS:\n")
-	sb.WriteString("1. Analyze the task requirements and story context.\n")
-	sb.WriteString("2. Implement the necessary changes idiomatic to the project.\n")
-	sb.WriteString("3. Verify your implementation works using existing tests or by creating new ones.\n")
-
-	if task.VerificationScript != "" {
-		sb.WriteString(fmt.Sprintf("   -> MANDATORY VERIFICATION SCRIPT: Run '%s' to prove the task is complete.\n", task.VerificationScript))
-	}
-
-	sb.WriteString("4. When complete and verified, signal completion using the openexec_signal tool with type 'phase-complete'.\n")
-	sb.WriteString("\n")
-	sb.WriteString("Work autonomously and make reasonable decisions. Do not ask for clarification.\n")
-
 	return sb.String()
 }
 
-// waitForLoop polls the loop status until completion or timeout.
-// prefix is prepended to all output lines (e.g. "[Worker 1] ").
 func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	lastIteration := 0
-	lastPhase := ""
-	startTime := time.Now()
-
-	for {
-		select {
-		case <-ctx.Done():
-			cmd.Printf("%s   ⚠ Timeout reached after %v. Aborting server-side execution...\n", prefix, timeout)
-			// Explicitly stop the loop on the server so retries can proceed
-			stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, loopID)
-			_, _ = http.Post(stopURL, "application/json", nil)
-			return fmt.Errorf("loop timed out after %v", timeout)
-		default:
-			// continue
-		}
-
-		resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
-		if err != nil {
-			return fmt.Errorf("failed to check loop status: %w", err)
-		}
-
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
+		if err != nil { return err }
 		var loop LoopResponse
 		if err := json.NewDecoder(resp.Body).Decode(&loop); err != nil {
 			resp.Body.Close()
-			return fmt.Errorf("failed to decode loop status: %w", err)
+			return err
 		}
 		resp.Body.Close()
-
-		// Show phase transitions
-		if loop.Phase != "" && loop.Phase != lastPhase {
-			cmd.Printf("%s   → Phase %s (%s)\n", prefix, loop.Phase, loop.Agent)
-			lastPhase = loop.Phase
-		}
-
-		// Show iteration progress
-		if loop.Iteration > lastIteration {
-			cmd.Printf("%s   → Iteration %d\n", prefix, loop.Iteration)
-			lastIteration = loop.Iteration
-		}
-
-		// Check terminal states
-		switch loop.Status {
-		case "complete":
-			elapsed := time.Since(startTime).Truncate(time.Second)
-			cmd.Printf("%s   ✓ Complete (%s)\n", prefix, elapsed)
-			return nil
-		case "error":
-			if loop.Error != "" {
-				cmd.Printf("%s   ❌ Error: %s\n", prefix, loop.Error)
-				return fmt.Errorf("loop failed: %s", loop.Error)
-			}
-			cmd.Printf("%s   ❌ Error\n", prefix)
-			return fmt.Errorf("loop failed")
-		case "max_iterations":
-			cmd.Printf("%s   ⚠ Max iterations reached (%d)\n", prefix, loop.Iteration)
-			return nil
-		case "paused":
-			if loop.Error != "" {
-				cmd.Printf("%s   ⏸ Paused: %s\n", prefix, loop.Error)
-				return fmt.Errorf("loop paused: %s", loop.Error)
-			}
-			cmd.Printf("%s   ⏸ Paused\n", prefix)
-			return nil
-		}
-
-		// Still running, wait and poll again
+		if loop.Status == "complete" { return nil }
+		if loop.Status == "error" { return fmt.Errorf("%s", loop.Error) }
 		time.Sleep(2 * time.Second)
 	}
+	return fmt.Errorf("timeout")
 }
 
-// KillDaemon kills the execution daemon by process ID
-func KillDaemon(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return fmt.Errorf("process not found: %w", err)
+// saveTaskStatus persists task status to .openexec/tasks.json and root tasks.json
+func saveTaskStatus(projectDir string, taskID string, status string) error {
+	paths := []string{
+		filepath.Join(projectDir, "tasks.json"),
+		filepath.Join(projectDir, ".openexec", "tasks.json"),
 	}
 
-	// Send SIGTERM signal
-	if err := process.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to kill daemon: %w", err)
+	var firstData []byte
+	for _, p := range paths {
+		if data, err := os.ReadFile(p); err == nil {
+			firstData = data
+			break
+		}
+	}
+
+	if firstData == nil {
+		return fmt.Errorf("could not find tasks.json")
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(firstData, &data); err != nil {
+		return err
+	}
+
+	updated := false
+	if tasks, ok := data["tasks"].([]interface{}); ok {
+		for _, t := range tasks {
+			if taskMap, ok := t.(map[string]interface{}); ok {
+				if id, ok := taskMap["id"].(string); ok && id == taskID {
+					taskMap["status"] = status
+					updated = true
+				}
+			}
+		}
+	}
+
+	if !updated {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+
+	newData, _ := json.MarshalIndent(data, "", "  ")
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			_ = os.WriteFile(p, newData, 0644)
+		}
 	}
 
 	return nil
 }
 
-// ensureMCPConfig generates an mcp.json file that points to the openexec binary
+func KillDaemon(pid int) error {
+	p, err := os.FindProcess(pid)
+	if err != nil { return err }
+	return p.Signal(syscall.SIGTERM)
+}
+
 func ensureMCPConfig(projectDir string) (string, error) {
 	// Find the path to the current executable
 	execPath, err := os.Executable()
@@ -1365,78 +802,19 @@ func ensureMCPConfig(projectDir string) (string, error) {
 	return mcpPath, nil
 }
 
-// saveTaskStatus persists task status to .openexec/tasks.json and root tasks.json
-func saveTaskStatus(projectDir string, taskID string, status string) error {
-	paths := []string{
-		filepath.Join(projectDir, "tasks.json"),
-		filepath.Join(projectDir, ".openexec", "tasks.json"),
-	}
+func init() {
+	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
+	startCmd.Flags().BoolVarP(&startDaemon, "daemon", "d", false, "Run as background daemon")
+	startCmd.Flags().BoolVar(&startUI, "ui", false, "Open web console")
+	startCmd.AddCommand(stopCmd)
+	startCmd.AddCommand(restartCmd)
 
-	var firstData []byte
-	for _, p := range paths {
-		if data, err := os.ReadFile(p); err == nil {
-			firstData = data
-			break
-		}
-	}
+	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
+	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Max iterations")
+	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
+	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
 
-	if firstData == nil {
-		return fmt.Errorf("could not find tasks.json in root or .openexec")
-	}
-
-	// We need a generic map to preserve all fields (phases, etc.)
-	var data map[string]interface{}
-	if err := json.Unmarshal(firstData, &data); err != nil {
-		return err
-	}
-
-	updated := false
-
-	// Update in flat 'tasks' list if exists
-	if tasks, ok := data["tasks"].([]interface{}); ok {
-		for _, t := range tasks {
-			if taskMap, ok := t.(map[string]interface{}); ok {
-				if id, ok := taskMap["id"].(string); ok && id == taskID {
-					taskMap["status"] = status
-					updated = true
-				}
-			}
-		}
-	}
-
-	// Update in 'phases' too if present
-	if phases, ok := data["phases"].([]interface{}); ok {
-		for _, phase := range phases {
-			if phaseMap, ok := phase.(map[string]interface{}); ok {
-				if tasks, ok := phaseMap["tasks"].([]interface{}); ok {
-					for _, t := range tasks {
-						if taskMap, ok := t.(map[string]interface{}); ok {
-							if id, ok := taskMap["id"].(string); ok && id == taskID {
-								taskMap["status"] = status
-								updated = true
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if !updated {
-		return fmt.Errorf("task %s not found in tasks.json", taskID)
-	}
-
-	newData, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	// Write to all paths that exist
-	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
-			_ = os.WriteFile(p, newData, 0644)
-		}
-	}
-
-	return nil
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(stopCmd)
 }

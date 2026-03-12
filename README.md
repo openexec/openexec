@@ -199,3 +199,15 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 <p align="center">
   Built with AI, for AI-assisted development.
 </p>
+
+
+
+## Architecture & Visualization
+
+- Read the high‑level architecture at `docs/ARCHITECTURE.md`.
+- Use `docs/VISUALIZATION_GUIDE.md` to generate diagrams (swimlanes, nodes/edges, Mermaid starter, runner/health callouts).
+
+Key references:
+- Artifacts: INTENT.md (PRD), goals[], .openexec/stories.json, .openexec/tasks.json, .openexec/stories/*.md, .openexec/fwu/*.md
+- Ordering: story.depends_on injects ALL tasks from prerequisite stories; tasks in each story run in listed order
+- Runner: server resolves model→CLI once at startup; `GET /api/health` returns `{ runner: { command, args, model } }`

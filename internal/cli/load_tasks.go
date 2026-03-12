@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/openexec/openexec/internal/release"
@@ -214,68 +213,41 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 		return nil, fmt.Errorf("no tasks found: %w", err)
 	}
 
-	type GeneratedTask struct {
-		ID                 string   `json:"id"`
-		Title              string   `json:"title"`
-		Description        string   `json:"description"`
-		DependsOn          []string `json:"depends_on"`
-		VerificationScript string   `json:"verification_script,omitempty"`
-		TechnicalStrategy  string   `json:"technical_strategy,omitempty"`
-	}
-
 	var sf struct {
 		Stories []struct {
-			ID        string          `json:"id"`
-			Title     string          `json:"title"`
-			Status    string          `json:"status"`
-			DependsOn []string        `json:"depends_on"`
-			Tasks     []GeneratedTask `json:"tasks"`
+			ID        string `json:"id"`
+			Title     string `json:"title"`
+			Status    string `json:"status"`
+			DependsOn []string `json:"depends_on"`
+			Tasks     []struct {
+				ID                 string   `json:"id"`
+				Title              string   `json:"title"`
+				Description        string   `json:"description"`
+				DependsOn          []string `json:"depends_on"`
+				VerificationScript string   `json:"verification_script,omitempty"`
+			} `json:"tasks"`
 		} `json:"stories"`
 	}
 
-	if err := json.Unmarshal(storiesData, &sf); err != nil {
-		return nil, fmt.Errorf("invalid stories.json: %w", err)
-	}
-
-	// Sort stories by ID first
-	sort.Slice(sf.Stories, func(i, j int) bool {
-		return sf.Stories[i].ID < sf.Stories[j].ID
-	})
-
-	var tasks []Task
-	// Extract tasks from stories
-	for _, story := range sf.Stories {
-		var prevTaskInStory string
-		for _, genTask := range story.Tasks {
-			taskID := genTask.ID
-			if taskID == "" { continue }
-
-			deps := genTask.DependsOn
-			if prevTaskInStory != "" {
-				deps = append(deps, prevTaskInStory)
+	if err := json.Unmarshal(storiesData, &sf); err == nil {
+		var tasks []Task
+		for _, story := range sf.Stories {
+			var prevTaskID string
+			for _, genTask := range story.Tasks {
+				deps := genTask.DependsOn
+				if prevTaskID != "" { deps = append(deps, prevTaskID) }
+				tasks = append(tasks, Task{
+					ID:                 genTask.ID,
+					Title:              genTask.Title,
+					Description:        genTask.Description,
+					StoryID:            story.ID,
+					Status:             "pending",
+					DependsOn:          deps,
+					VerificationScript: genTask.VerificationScript,
+				})
+				prevTaskID = genTask.ID
 			}
-
-			// Map story barriers if needed (simplified for fallback)
-			for _, depStoryID := range story.DependsOn {
-				// In fallback mode, we don't have full storyTaskIDs mapping yet
-				// but the worker will handle dependencies correctly once DB is initialized.
-				_ = depStoryID 
-			}
-
-			tasks = append(tasks, Task{
-				ID:                 taskID,
-				Title:              genTask.Title,
-				Description:        genTask.Description,
-				StoryID:            story.ID,
-				Status:             "pending",
-				DependsOn:          deps,
-				VerificationScript: genTask.VerificationScript,
-			})
-			prevTaskInStory = taskID
 		}
-	}
-
-	if len(tasks) > 0 {
 		return tasks, nil
 	}
 

@@ -207,5 +207,50 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 		}
 	}
 
+	// 4. Fallback to stories.json (Planner Output)
+	storiesFile = filepath.Join(projectDir, ".openexec", "stories.json")
+	storiesData, err := os.ReadFile(storiesFile)
+	if err != nil {
+		return nil, fmt.Errorf("no tasks found: %w", err)
+	}
+
+	var sf struct {
+		Stories []struct {
+			ID        string `json:"id"`
+			Title     string `json:"title"`
+			Status    string `json:"status"`
+			DependsOn []string `json:"depends_on"`
+			Tasks     []struct {
+				ID                 string   `json:"id"`
+				Title              string   `json:"title"`
+				Description        string   `json:"description"`
+				DependsOn          []string `json:"depends_on"`
+				VerificationScript string   `json:"verification_script,omitempty"`
+			} `json:"tasks"`
+		} `json:"stories"`
+	}
+
+	if err := json.Unmarshal(storiesData, &sf); err == nil {
+		var tasks []Task
+		for _, story := range sf.Stories {
+			var prevTaskID string
+			for _, genTask := range story.Tasks {
+				deps := genTask.DependsOn
+				if prevTaskID != "" { deps = append(deps, prevTaskID) }
+				tasks = append(tasks, Task{
+					ID:                 genTask.ID,
+					Title:              genTask.Title,
+					Description:        genTask.Description,
+					StoryID:            story.ID,
+					Status:             "pending",
+					DependsOn:          deps,
+					VerificationScript: genTask.VerificationScript,
+				})
+				prevTaskID = genTask.ID
+			}
+		}
+		return tasks, nil
+	}
+
 	return nil, fmt.Errorf("no tasks found")
 }
