@@ -31,16 +31,20 @@ import (
 
 // Server is the unified OpenExec API and UI host.
 type Server struct {
-	Mgr         *manager.Manager
-	SessionRepo session.Repository
-	AuditLogger audit.Logger
-	Coordinator *dcp.Coordinator
-	Checker     *health.Checker
-	ProjectsDir string
-	Mux         *http.ServeMux
-	HttpServer  *http.Server
-	mu          sync.RWMutex
-	axonBridge  *api.Server
+    Mgr         *manager.Manager
+    SessionRepo session.Repository
+    AuditLogger audit.Logger
+    Coordinator *dcp.Coordinator
+    Checker     *health.Checker
+    ProjectsDir string
+    Mux         *http.ServeMux
+    HttpServer  *http.Server
+    mu          sync.RWMutex
+    axonBridge  *api.Server
+    // Observability
+    runnerCommand string
+    runnerArgs    []string
+    runnerModel   string
 }
 
 // Config defines settings for the unified server
@@ -140,20 +144,23 @@ func New(cfg Config) (*Server, error) {
 
 	// 4. Initialize API Layer
 	mux := http.NewServeMux()
-	s := &Server{
-		Mgr:         mgr,
-		SessionRepo: sessionRepo,
-		AuditLogger: auditLogger,
-		Coordinator: coordinator,
-		Checker:     health.NewChecker(),
-		ProjectsDir: cfg.ProjectsDir,
-		Mux:         mux,
-		axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
-		HttpServer: &http.Server{
-			Addr:    fmt.Sprintf(":%d", cfg.Port),
-			Handler: mux,
-		},
-	}
+    s := &Server{
+        Mgr:         mgr,
+        SessionRepo: sessionRepo,
+        AuditLogger: auditLogger,
+        Coordinator: coordinator,
+        Checker:     health.NewChecker(),
+        ProjectsDir: cfg.ProjectsDir,
+        Mux:         mux,
+        axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
+        HttpServer: &http.Server{
+            Addr:    fmt.Sprintf(":%d", cfg.Port),
+            Handler: mux,
+        },
+        runnerCommand: runnerCmd,
+        runnerArgs:    runnerArgs,
+        runnerModel:   modelUsed,
+    }
 
 	s.registerRoutes()
 

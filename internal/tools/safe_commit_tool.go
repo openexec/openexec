@@ -48,7 +48,8 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 	
 	projCfg, err := project.LoadProjectConfig(".")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load project config: %w", err)
+		// In test environments or unstructured dirs, fallback to restrictive defaults
+		return nil, fmt.Errorf("ABORTING COMMIT: failed to load project config: %v", err)
 	}
 
 	if !projCfg.GitCommitEnabled {

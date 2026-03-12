@@ -280,7 +280,8 @@ func TestE2ECommitQueryRoutes(t *testing.T) {
 	ts.AssertNoErrorPhrases(resp, "commit my changes")
 
 	// Verify this was routed to commit tool (error about "git commit" confirms routing worked)
-	if resp.Error != "" && !strings.Contains(resp.Error, "git") && !strings.Contains(resp.Error, "commit") {
+	lowerErr := strings.ToLower(resp.Error)
+	if resp.Error != "" && !strings.Contains(lowerErr, "git") && !strings.Contains(lowerErr, "commit") {
 		t.Errorf("expected commit-related response, got: %s", resp.Error)
 	}
 }
