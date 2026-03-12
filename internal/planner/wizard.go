@@ -40,48 +40,10 @@ type WizardResponse struct {
 	NewAssumptions  []string    `json:"new_assumptions"`
 }
 
-// IsReady checks if the minimum viable intent has been gathered
+// IsReady returns true if the intent state has enough information to generate a plan
 func (s *IntentState) IsReady() bool {
-	if s.Flow == "" || s.Flow == "unknown" {
-		return false
-	}
-	if s.AppType == "" || s.AppType == "unknown" {
-		return false
-	}
-	if s.ProblemStatement == "" {
-		return false
-	}
-	if len(s.PrimaryGoals) == 0 {
-		return false
-	}
-	if len(s.Constraints) == 0 {
-		return false
-	}
-
-	// Check entities
-	if len(s.Entities) == 0 {
-		return false
-	}
-	hasDataSource := false
-	for _, e := range s.Entities {
-		if e.DataSource != "" {
-			hasDataSource = true
-			break
-		}
-	}
-	if !hasDataSource {
-		return false
-	}
-
-	if (s.AppType == "desktop" || s.AppType == "mobile") && len(s.Platforms) == 0 {
-		return false
-	}
-
-	if s.Flow == "refactor" && s.LegacyRepoPath == "" {
-		return false
-	}
-
-	return true
+	// Minimum required fields for planning
+	return s.Flow != "" && s.AppType != "" && s.ProblemStatement != "" && len(s.PrimaryGoals) > 0
 }
 
 // RenderIntentMD converts the state into a formatted INTENT.md

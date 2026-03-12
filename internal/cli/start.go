@@ -190,7 +190,6 @@ var runCmd = &cobra.Command{
 			}
 			
 			// CORRECTNESS FIX: Read effective port from PID file after spawn
-			// Wait a brief moment for PID file to be written
 			time.Sleep(500 * time.Millisecond)
 			if _, effectivePort, err := readPID(config.ProjectDir); err == nil {
 				if effectivePort != startPort {
@@ -528,54 +527,21 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						lastError = err.Error()
 						lowerErr := strings.ToLower(lastError)
 
-						// Classification
-						if strings.Contains(lowerErr, "not found on path") || strings.Contains(lowerErr, "auth") {
-							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
-							node.Retries = maxRetries
-							break
-						}
-						
-						// Auto-heal
-						if strings.Contains(lastError, "Planning Mismatch") {
-							isComplete := strings.Contains(lowerErr, "complete") || 
-										 strings.Contains(lowerErr, "done") || 
-										 strings.Contains(lowerErr, "satisfied") ||
-										 strings.Contains(lowerErr, "already been implemented") ||
-										 strings.Contains(lowerErr, "stale") ||
-										 strings.Contains(lowerErr, "verified") ||
-										 strings.Contains(lowerErr, "already done")
-							
-							isBlocked := strings.Contains(lowerErr, "need to merge") || 
-										strings.Contains(lowerErr, "incorporate") ||
-										strings.Contains(lowerErr, "missing infrastructure")
-
-							if isComplete {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is complete or redundant. Syncing state...\n", workerID)
-								if mgr != nil {
-									if _, err := mgr.CompleteTask(node.Task.ID); err != nil {
-										_ = upsertTaskStatus(projectDir, node.Task.ID, "completed", node.Task.StoryID)
-										cmd.Printf("[Worker %d] ✨ Healed: Persisted completion to .openexec/tasks.json (Database sync failed)\n", workerID)
-									}
-								}
-								mu.Lock()
-								node.Status = StatusCompleted
-								mu.Unlock()
-								success = true
-								break 
-							}
-
-							if isBlocked {
-								cmd.Printf("[Worker %d] ⏸ BLOCKED: %s\n", workerID, lastError)
-								cmd.Printf("   💡 ACTION REQUIRED: Perform the requested merge/sync and run 'openexec run' again.\n")
-								node.Retries = maxRetries // Halt for manual action
+						// 409 HANDLE: If loop already active, fetch status and proceed to wait
+						if strings.Contains(lowerErr, "409") || strings.Contains(lowerErr, "already active") {
+							loopID = node.Task.ID
+							err = nil
+						} else {
+							// Classification
+							if strings.Contains(lowerErr, "not found on path") || strings.Contains(lowerErr, "auth") {
+								cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
+								node.Retries = maxRetries
 								break
 							}
 							
-							node.Retries = maxRetries
-							break
+							node.Retries++
+							continue
 						}
-						node.Retries++
-						continue
 					}
 
 					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
@@ -600,7 +566,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				finishedCount++
 				if !success {
 					node.Status = StatusFailed
-					errors <- fmt.Errorf("task %s failed", node.Task.ID)
+					errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, lastError)
 					safeClose()
 					mu.Unlock()
 					return
@@ -822,9 +788,11 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 			isComplete := strings.Contains(lowerErr, "complete") || 
 						 strings.Contains(lowerErr, "done") || 
 						 strings.Contains(lowerErr, "already been implemented") ||
-						 strings.Contains(lowerErr, "satisfied")
+						 strings.Contains(lowerErr, "satisfied") ||
+						 strings.Contains(lowerErr, "criteria verified")
 			
 			if isComplete {
+				cmd.Printf("%s ✨ AUTO-HEAL: Agent verified task is complete or redundant.\n", prefix)
 				return nil // Return success to trigger the CLI-side auto-heal persistence
 			}
 			return fmt.Errorf("%s", loop.Error)
@@ -924,6 +892,7 @@ func ensureMCPConfig(projectDir string) (string, error) {
 
 	return mcpPath, nil
 }
+
 
 func init() {
 	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
