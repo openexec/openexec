@@ -188,8 +188,19 @@ var runCmd = &cobra.Command{
 			if err := startExec.Run(); err != nil {
 				return fmt.Errorf("failed to auto-start execution engine: %w", err)
 			}
+			
+			// CORRECTNESS FIX: Read effective port from PID file after spawn
+			// Wait a brief moment for PID file to be written
+			time.Sleep(500 * time.Millisecond)
+			if _, effectivePort, err := readPID(config.ProjectDir); err == nil {
+				if effectivePort != startPort {
+					cmd.Printf("   ℹ️ Engine started on effective port %d (PID file sync)\n", effectivePort)
+					startPort = effectivePort
+				}
+			}
+
 			if err := waitForServer(startPort, 15*time.Second); err != nil {
-				return fmt.Errorf("engine failed to become ready: %w", err)
+				return fmt.Errorf("engine failed to become ready on port %d: %w", startPort, err)
 			}
 			cmd.Println("✓ Execution engine started successfully.")
 		}
@@ -205,15 +216,18 @@ var runCmd = &cobra.Command{
 			// A. Intent missing but wizard state ready?
 			if _, err := os.Stat(intentPath); os.IsNotExist(err) {
 				if _, err := os.Stat(wizardPath); err == nil {
-					cmd.Println("📝 INTENT.md missing but wizard state found. Rendering intent...")
 					// Load wizard state and render
 					if data, err := os.ReadFile(wizardPath); err == nil {
 						var ws struct { UpdatedState planner.IntentState `json:"updated_state"` }
 						if err := json.Unmarshal(data, &ws); err == nil {
-							intentContent := ws.UpdatedState.RenderIntentMD()
-							_ = os.WriteFile(intentPath, []byte(intentContent), 0644)
-							cmd.Println("✓ INTENT.md rendered from wizard state.")
-							needsPlanning = true
+							// READINESS CHECK: Only render if state is complete
+							if ws.UpdatedState.IsReady() {
+								cmd.Println("📝 INTENT.md missing but wizard state complete. Rendering intent...")
+								intentContent := ws.UpdatedState.RenderIntentMD()
+								_ = os.WriteFile(intentPath, []byte(intentContent), 0644)
+								cmd.Println("✓ INTENT.md rendered from wizard state.")
+								needsPlanning = true
+							}
 						}
 					}
 				}
@@ -553,12 +567,15 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					}
 
 					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
-					// If Chassis, simplify polling logs
+					effectiveTimeout := time.Duration(runTimeout) * time.Second
+					
+					// CHASSIS OPTIMIZATION: Reduce timeout by 40% for faster fail-over
 					if isChassis {
 						workerPrefix = fmt.Sprintf("[Worker %d] (chassis)", workerID)
+						effectiveTimeout = time.Duration(float64(runTimeout)*0.6) * time.Second
 					}
 					
-					err = waitForLoop(cmd, loopID, workerPrefix, time.Duration(runTimeout)*time.Second)
+					err = waitForLoop(cmd, loopID, workerPrefix, effectiveTimeout)
 					if err == nil {
 						success = true
 						break
