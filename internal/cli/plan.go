@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/fatih/color"
+	"github.com/openexec/openexec/internal/intent"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
@@ -50,7 +51,7 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 		found := false
 		for _, f := range fallbacks {
 			if _, err := os.Stat(filepath.Join(projectDir, f)); err == nil {
-				intentFile = f
+				intentFile = filepath.Join(projectDir, f)
 				found = true
 				break
 			}
@@ -60,10 +61,57 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 		}
 	}
 
+	// 1.5 Validation
+	if !planNoValidate {
+		validator := intent.NewValidator(intentFile)
+		result, err := validator.Validate()
+		if err != nil {
+			return fmt.Errorf("validation error: %w", err)
+		}
+
+		if planFix && planValidateOnly {
+			fixer := intent.NewFixer(result)
+			cmd.Println(fixer.Preview())
+			if !result.Valid {
+				return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
+			}
+			return nil
+		}
+
+		if planValidateOnly || !result.Valid {
+			reporter := intent.NewReporter(result)
+			cmd.Println(reporter.Generate())
+		}
+
+		if planValidateOnly {
+			if !result.Valid {
+				return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
+			}
+			cmd.Println("Validation passed. Run 'openexec plan' to generate stories.")
+			return nil
+		}
+
+		if !result.Valid {
+			cmd.Println("\nHint: Fix the issues above or run 'openexec wizard' to re-align your intent.")
+			return fmt.Errorf("cannot plan: intent document has %d critical issue(s)", len(result.Critical))
+		}
+
+		if result.Valid && len(result.Warnings) > 0 {
+			cmd.Printf("Validation passed with %d warning(s)\n\n", len(result.Warnings))
+		}
+	}
+
 	// 2. Load project configuration
 	config, err := project.LoadProjectConfig(projectDir)
 	if err != nil {
-		return fmt.Errorf("project not initialized: run 'openexec init' first")
+		// Fallback for tests or uninitialized projects
+		config = &project.ProjectConfig{
+			ProjectDir: projectDir,
+			TractStore: filepath.Join(projectDir, ".openexec"),
+			Execution: project.ExecutionConfig{
+				PlannerModel: "sonnet",
+			},
+		}
 	}
 
 	plannerModel := config.Execution.PlannerModel

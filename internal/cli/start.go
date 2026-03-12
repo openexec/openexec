@@ -203,134 +203,141 @@ var runCmd = &cobra.Command{
 			cmd.Println("✓ Execution engine started successfully.")
 		}
 
-		// 2. AUTO-PLAN
-		if !runNoAutoPlan {
-			intentPath := "INTENT.md"
-			storiesPath := filepath.Join(config.TractStore, "stories.json")
-			wizardPath := filepath.Join(config.TractStore, "wizard_state.json")
+		// 2. MAIN EXECUTION LOOP (Supports Autonomous Plan-Healing Restarts)
+		for {
+			// AUTO-PLAN
+			if !runNoAutoPlan {
+				intentPath := "INTENT.md"
+				storiesPath := filepath.Join(config.TractStore, "stories.json")
+				wizardPath := filepath.Join(config.TractStore, "wizard_state.json")
 
-			needsPlanning := false
-			
-			if _, err := os.Stat(intentPath); os.IsNotExist(err) {
-				if _, err := os.Stat(wizardPath); err == nil {
-					if data, err := os.ReadFile(wizardPath); err == nil {
-						var ws struct { UpdatedState planner.IntentState `json:"updated_state"` }
-						if err := json.Unmarshal(data, &ws); err == nil {
-							if ws.UpdatedState.IsReady() {
-								cmd.Println("📝 INTENT.md missing but wizard state complete. Rendering intent...")
-								intentContent := ws.UpdatedState.RenderIntentMD()
-								_ = os.WriteFile(intentPath, []byte(intentContent), 0644)
-								cmd.Println("✓ INTENT.md rendered from wizard state.")
-								needsPlanning = true
+				needsPlanning := false
+				
+				if _, err := os.Stat(intentPath); os.IsNotExist(err) {
+					if _, err := os.Stat(wizardPath); err == nil {
+						if data, err := os.ReadFile(wizardPath); err == nil {
+							var ws struct { UpdatedState planner.IntentState `json:"updated_state"` }
+							if err := json.Unmarshal(data, &ws); err == nil {
+								if ws.UpdatedState.IsReady() {
+									cmd.Println("📝 INTENT.md missing but wizard state complete. Rendering intent...")
+									intentContent := ws.UpdatedState.RenderIntentMD()
+									_ = os.WriteFile(intentPath, []byte(intentContent), 0644)
+									cmd.Println("✓ INTENT.md rendered from wizard state.")
+									needsPlanning = true
+								}
 							}
 						}
 					}
 				}
-			}
 
-			if _, err := os.Stat(storiesPath); os.IsNotExist(err) {
-				needsPlanning = true
-			} else {
-				intentStat, _ := os.Stat(intentPath)
-				storiesStat, _ := os.Stat(storiesPath)
-				if intentStat != nil && storiesStat != nil && intentStat.ModTime().After(storiesStat.ModTime()) {
-					cmd.Println("🔄 INTENT.md was modified. Re-generating plan...")
+				if _, err := os.Stat(storiesPath); os.IsNotExist(err) {
 					needsPlanning = true
+				} else {
+					intentStat, _ := os.Stat(intentPath)
+					storiesStat, _ := os.Stat(storiesPath)
+					if intentStat != nil && storiesStat != nil && intentStat.ModTime().After(storiesStat.ModTime()) {
+						cmd.Println("🔄 INTENT.md was modified. Re-generating plan...")
+						needsPlanning = true
+					}
+				}
+
+				if needsPlanning {
+					if err := GenerateAndSave(cmd, intentPath, config.ProjectDir); err != nil {
+						return fmt.Errorf("auto-planning failed: %w", err)
+					}
 				}
 			}
 
-			if needsPlanning {
-				if err := GenerateAndSave(cmd, intentPath, config.ProjectDir); err != nil {
-					return fmt.Errorf("auto-planning failed: %w", err)
+			if !cmd.Flags().Changed("executor") && config.Execution.ExecutorModel != "" {
+				startExecutor = config.Execution.ExecutorModel
+			}
+			if !cmd.Flags().Changed("reviewer") && !cmd.Flags().Changed("no-review") {
+				if config.Execution.ReviewEnabled {
+					startReviewer = config.Execution.ReviewerModel
 				}
 			}
-		}
-
-		if !cmd.Flags().Changed("executor") && config.Execution.ExecutorModel != "" {
-			startExecutor = config.Execution.ExecutorModel
-		}
-		if !cmd.Flags().Changed("reviewer") && !cmd.Flags().Changed("no-review") {
-			if config.Execution.ReviewEnabled {
-				startReviewer = config.Execution.ReviewerModel
+			if runNoReview {
+				startReviewer = ""
 			}
-		}
-		if runNoReview {
-			startReviewer = ""
-		}
-		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
-			startPort = config.Execution.Port
-		}
-		if !cmd.Flags().Changed("timeout") && config.Execution.TimeoutSeconds > 0 {
-			runTimeout = config.Execution.TimeoutSeconds
-		}
-
-		mgr, err := getReleaseManager(cmd)
-		if err != nil {
-			return err
-		}
-
-		cmd.Println("🔍 Running Pre-flight Active Healing...")
-		relTasks := mgr.GetTasks()
-		resetCount := 0
-		for _, rt := range relTasks {
-			if rt.Status == "running" || rt.Status == "starting" {
-				stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, rt.ID)
-				_, _ = http.Post(stopURL, "application/json", nil)
-				
-				rt.Status = "pending"
-				_ = mgr.UpdateTask(rt)
-				resetCount++
+			if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
+				startPort = config.Execution.Port
 			}
-		}
-		if resetCount > 0 {
-			cmd.Printf("   ✨ Self-Healed: Reset %d ghost tasks to pending\n", resetCount)
-		}
+			if !cmd.Flags().Changed("timeout") && config.Execution.TimeoutSeconds > 0 {
+				runTimeout = config.Execution.TimeoutSeconds
+			}
 
-		tasks, err := loadPendingTasks(config.ProjectDir, mgr)
-		if err != nil {
-			return fmt.Errorf("failed to load tasks: %w", err)
-		}
+			mgr, err := getReleaseManager(cmd)
+			if err != nil {
+				return err
+			}
 
-		if len(tasks) == 0 {
-			cmd.Println("No pending tasks found.")
-			return nil
-		}
+			cmd.Println("🔍 Running Pre-flight Active Healing...")
+			relTasks := mgr.GetTasks()
+			resetCount := 0
+			for _, rt := range relTasks {
+				if rt.Status == "running" || rt.Status == "starting" {
+					stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, rt.ID)
+					_, _ = http.Post(stopURL, "application/json", nil)
+					
+					rt.Status = "pending"
+					_ = mgr.UpdateTask(rt)
+					resetCount++
+				}
+			}
+			if resetCount > 0 {
+				cmd.Printf("   ✨ Self-Healed: Reset %d ghost tasks to pending\n", resetCount)
+			}
 
-		if len(args) > 0 {
-			taskID := args[0]
-			var filtered []Task
+			tasks, err := loadPendingTasks(config.ProjectDir, mgr)
+			if err != nil {
+				return fmt.Errorf("failed to load tasks: %w", err)
+			}
+
+			if len(tasks) == 0 {
+				cmd.Println("No pending tasks found.")
+				return nil
+			}
+
+			if len(args) > 0 {
+				taskID := args[0]
+				var filtered []Task
+				for _, t := range tasks {
+					if t.ID == taskID {
+						filtered = append(filtered, t)
+						break
+					}
+				}
+				if len(filtered) == 0 {
+					return fmt.Errorf("task %s not found", taskID)
+				}
+				tasks = filtered
+			}
+
+			pendingCount := 0
 			for _, t := range tasks {
-				if t.ID == taskID {
-					filtered = append(filtered, t)
-					break
+				if t.Status != "completed" && t.Status != "done" {
+					pendingCount++
 				}
 			}
-			if len(filtered) == 0 {
-				return fmt.Errorf("task %s not found", taskID)
-			}
-			tasks = filtered
-		}
 
-		pendingCount := 0
-		for _, t := range tasks {
-			if t.Status != "completed" && t.Status != "done" {
-				pendingCount++
+			if pendingCount == 0 {
+				cmd.Println("No pending tasks found.")
+				return nil
 			}
-		}
 
-		if pendingCount == 0 {
-			cmd.Println("No pending tasks found.")
+			cmd.Printf("📋 Executing %d task(s)\n", pendingCount)
+			err = executeTasksParallel(cmd, config.ProjectDir, tasks, config.Execution.WorkerCount, mgr)
+			if err != nil {
+				if strings.Contains(err.Error(), "plan_healed") {
+					cmd.Println("🔄 Orchestrator: Plan was autonomously healed. Restarting run loop to pick up new tasks...")
+					continue
+				}
+				return err
+			}
+
+			cmd.Println("✓ Execution complete")
 			return nil
 		}
-
-		cmd.Printf("📋 Executing %d task(s)\n", pendingCount)
-		err = executeTasksParallel(cmd, config.ProjectDir, tasks, config.Execution.WorkerCount, mgr)
-		if err != nil {
-			return err
-		}
-
-		cmd.Println("✓ Execution complete")
-		return nil
 	},
 }
 
@@ -567,10 +574,22 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						
 						if !isComplete {
 							cmd.Printf("[Worker %d] 🔄 PLAN-HEALING: Agent requested plan update. Re-generating with failure context...\n", workerID)
+							
+							// Stop the active task so it doesn't conflict later
+							stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, loopID)
+							_, _ = http.Post(stopURL, "application/json", nil)
+
 							if err := GenerateAndSave(cmd, "INTENT.md", projectDir); err == nil {
-								cmd.Printf("[Worker %d] ✓ Plan healed. Restarting task...\n", workerID)
-								node.Retries = 0 // Reset for fresh attempt
-								continue 
+								mu.Lock()
+								if len(errors) == 0 {
+									// Signal outer loop to restart with new plan
+									errors <- fmt.Errorf("plan_healed")
+								}
+								safeClose()
+								mu.Unlock()
+								return // Abort this worker to trigger the restart
+							} else {
+								cmd.Printf("[Worker %d] ⚠ Plan-healing failed: %v\n", workerID, err)
 							}
 						}
 					}
