@@ -623,17 +623,11 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 										 strings.Contains(lowerErr, "criteria appear to be met") ||
 										 strings.Contains(lowerErr, "fully satisfied") ||
 										 strings.Contains(lowerErr, "no actual task definition") ||
-										 strings.Contains(lowerErr, "contains only a stub") ||
-										 strings.Contains(lowerErr, "already done")
+										 strings.Contains(lowerErr, "contains only a stub")
 							
 							if isComplete {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is complete or redundant. Syncing state...\n", workerID)
-								if mgr != nil {
-									if _, err := mgr.CompleteTask(node.Task.ID); err != nil {
-										_ = upsertTaskStatus(projectDir, node.Task.ID, "completed", node.Task.StoryID)
-										cmd.Printf("[Worker %d] ✨ Healed: Persisted completion to .openexec/tasks.json\n", workerID)
-									}
-								}
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete or redundant. Syncing state...\n", workerID)
+								_, _ = mgr.CompleteTask(node.Task.ID)
 								mu.Lock()
 								node.Status = StatusCompleted
 								mu.Unlock()
@@ -642,9 +636,8 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 							}
 
 							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
-							cmd.Printf("   1. Verify task status in %s/.openexec/tasks.json\n", projectDir)
-							cmd.Printf("   2. Check if %s/.openexec/stories/%s.md matches the current state\n", projectDir, node.Task.ID)
-							cmd.Printf("   3. Once aligned, run 'openexec run' again.\n\n")
+							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
+							cmd.Printf("   2. Once aligned, run 'openexec run' again.\n\n")
 							
 							node.Retries = maxRetries // Force permanent failure
 							mu.Lock()
@@ -720,17 +713,11 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 										 strings.Contains(lowerErr, "criteria appear to be met") ||
 										 strings.Contains(lowerErr, "fully satisfied") ||
 										 strings.Contains(lowerErr, "no actual task definition") ||
-										 strings.Contains(lowerErr, "contains only a stub") ||
-										 strings.Contains(lowerErr, "already done")
+										 strings.Contains(lowerErr, "contains only a stub")
 							
 							if isComplete {
-								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is complete or redundant. Syncing state...\n", workerID)
-								if mgr != nil {
-									if _, err := mgr.CompleteTask(node.Task.ID); err != nil {
-										_ = upsertTaskStatus(projectDir, node.Task.ID, "completed", node.Task.StoryID)
-										cmd.Printf("[Worker %d] ✨ Healed: Persisted completion to .openexec/tasks.json\n", workerID)
-									}
-								}
+								cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Agent verified task is actually complete or redundant. Syncing state...\n", workerID)
+								_, _ = mgr.CompleteTask(node.Task.ID)
 								mu.Lock()
 								node.Status = StatusCompleted
 								mu.Unlock()
@@ -740,8 +727,8 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 							cmd.Printf("[Worker %d] ❌ NON-RETRIABLE ERROR: %s\n", workerID, lastError)
 							cmd.Printf("\n💡 REPAIR TIP: The orchestrator's state is inconsistent with the filesystem.\n")
-							cmd.Printf("   1. Verify task status in %s/.openexec/tasks.json\n", projectDir)
-							cmd.Printf("   2. Check if %s/.openexec/stories/%s.md matches the current state\n", projectDir, node.Task.ID)
+							cmd.Printf("   1. Verify task status in .openexec/tasks.json and .openexec/stories.json\n")
+							cmd.Printf("   2. Check if .openexec/stories/%s.md matches the current state\n", node.Task.ID)
 							cmd.Printf("   3. Once aligned, run 'openexec run' again.\n\n")
 							
 							node.Retries = maxRetries // Force permanent failure
@@ -1151,14 +1138,8 @@ func isServerRunning(projectDir string, port int) bool {
 
 // createExecutionLoopWithRetry creates a new execution loop for a task with optional retry context
 func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
-	// Build prompt for the task
 	prompt := buildTaskPromptWithRetry(task, mgr, lastError)
-
-	// Ensure MCP config is present
-	mcpPath, err := ensureMCPConfig(projectDir)
-	if err != nil {
-		fmt.Printf("   ⚠ Warning: could not setup MCP tools: %v\n", err)
-	}
+	mcpPath, _ := ensureMCPConfig(projectDir)
 
 	req := CreateLoopRequest{
 		Prompt:        prompt,
@@ -1168,68 +1149,16 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 		MCPConfigPath: mcpPath,
 	}
 
-	// Add reviewer model if configured
-	if startReviewer != "" {
-		req.ReviewerModel = startReviewer
-	}
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := http.Post(
-		fmt.Sprintf("http://localhost:%d/api/v1/loops", startPort),
-		"application/json",
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		return "", err
-	}
+	body, _ := json.Marshal(req)
+	resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/loops", startPort), "application/json", bytes.NewReader(body))
+	if err != nil { return "", err }
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusConflict {
-		// Pipeline already active! During self-healing, we should aggressively stop it.
-		stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, task.ID)
-		_, _ = http.Post(stopURL, "application/json", nil)
-		time.Sleep(1 * time.Second) // give server a moment to cleanup
-
-		// Retry the create request
-		resp, err = http.Post(
-			fmt.Sprintf("http://localhost:%d/api/v1/loops", startPort),
-			"application/json",
-			bytes.NewReader(body),
-		)
-		if err != nil {
-			return "", fmt.Errorf("failed to retry after stop: %w", err)
-		}
-		defer resp.Body.Close()
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		respBody, _ := io.ReadAll(resp.Body)
-		var errData struct {
-			Error      string `json:"error"`
-			Suggestion string `json:"suggestion"`
-		}
-		if err := json.Unmarshal(respBody, &errData); err == nil {
-			if errData.Suggestion != "" {
-				return "", fmt.Errorf("server error: %s\n💡 Suggestion: %s", errData.Error, errData.Suggestion)
-			}
-			return "", fmt.Errorf("server error: %s", errData.Error)
-		}
-		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
-	}
-
 	var loopResp LoopResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loopResp); err != nil {
-		return "", err
-	}
-
+	_ = json.NewDecoder(resp.Body).Decode(&loopResp)
 	return loopResp.ID, nil
 }
 
-// buildTaskPromptWithRetry builds a Claude Code prompt for a task, including failure context if it's a retry
 func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string) string {
 	var sb strings.Builder
 
