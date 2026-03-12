@@ -790,8 +790,24 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 			return err
 		}
 		resp.Body.Close()
+		
 		if loop.Status == "complete" { return nil }
 		if loop.Status == "error" { return fmt.Errorf("%s", loop.Error) }
+		
+		// SEMANTIC HEALING: If loop is paused due to planning mismatch but agent says it's done
+		if loop.Status == "paused" && strings.Contains(loop.Error, "Planning Mismatch") {
+			lowerErr := strings.ToLower(loop.Error)
+			isComplete := strings.Contains(lowerErr, "complete") || 
+						 strings.Contains(lowerErr, "done") || 
+						 strings.Contains(lowerErr, "already been implemented") ||
+						 strings.Contains(lowerErr, "satisfied")
+			
+			if isComplete {
+				return nil // Return success to trigger the CLI-side auto-heal persistence
+			}
+			return fmt.Errorf("%s", loop.Error)
+		}
+
 		time.Sleep(2 * time.Second)
 	}
 	return fmt.Errorf("timeout")
