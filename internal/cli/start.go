@@ -178,7 +178,7 @@ var runCmd = &cobra.Command{
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
-		// 1. AUTO-START ENGINE: If not running, start it in background
+		// 1. AUTO-START ENGINE
 		if !isServerRunning(config.ProjectDir, startPort) {
 			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
 			startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
@@ -189,7 +189,6 @@ var runCmd = &cobra.Command{
 				return fmt.Errorf("failed to auto-start execution engine: %w", err)
 			}
 			
-			// CORRECTNESS FIX: Read effective port from PID file after spawn
 			time.Sleep(500 * time.Millisecond)
 			if _, effectivePort, err := readPID(config.ProjectDir); err == nil {
 				if effectivePort != startPort {
@@ -204,7 +203,7 @@ var runCmd = &cobra.Command{
 			cmd.Println("✓ Execution engine started successfully.")
 		}
 
-		// 2. AUTO-PLAN: Handle missing/stale plans
+		// 2. AUTO-PLAN
 		if !runNoAutoPlan {
 			intentPath := "INTENT.md"
 			storiesPath := filepath.Join(config.TractStore, "stories.json")
@@ -212,14 +211,11 @@ var runCmd = &cobra.Command{
 
 			needsPlanning := false
 			
-			// A. Intent missing but wizard state ready?
 			if _, err := os.Stat(intentPath); os.IsNotExist(err) {
 				if _, err := os.Stat(wizardPath); err == nil {
-					// Load wizard state and render
 					if data, err := os.ReadFile(wizardPath); err == nil {
 						var ws struct { UpdatedState planner.IntentState `json:"updated_state"` }
 						if err := json.Unmarshal(data, &ws); err == nil {
-							// READINESS CHECK: Only render if state is complete
 							if ws.UpdatedState.IsReady() {
 								cmd.Println("📝 INTENT.md missing but wizard state complete. Rendering intent...")
 								intentContent := ws.UpdatedState.RenderIntentMD()
@@ -232,11 +228,9 @@ var runCmd = &cobra.Command{
 				}
 			}
 
-			// B. Plan missing or stale?
 			if _, err := os.Stat(storiesPath); os.IsNotExist(err) {
 				needsPlanning = true
 			} else {
-				// Check mtime
 				intentStat, _ := os.Stat(intentPath)
 				storiesStat, _ := os.Stat(storiesPath)
 				if intentStat != nil && storiesStat != nil && intentStat.ModTime().After(storiesStat.ModTime()) {
@@ -407,7 +401,6 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		nodes[t.ID] = node
 	}
 
-	// Cycle Detection (Kahn's Algorithm)
 	inDegree := make(map[string]int)
 	for _, node := range nodes {
 		if node.Status == StatusCompleted { continue }
@@ -527,12 +520,10 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						lastError = err.Error()
 						lowerErr := strings.ToLower(lastError)
 
-						// 409 HANDLE: If loop already active, fetch status and proceed to wait
 						if strings.Contains(lowerErr, "409") || strings.Contains(lowerErr, "already active") {
 							loopID = node.Task.ID
 							err = nil
 						} else {
-							// Classification
 							if strings.Contains(lowerErr, "not found on path") || strings.Contains(lowerErr, "auth") {
 								cmd.Printf("[Worker %d] ❌ NON-RETRIABLE RUNNER ERROR: %s\n", workerID, lastError)
 								node.Retries = maxRetries
@@ -547,7 +538,6 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
 					effectiveTimeout := time.Duration(runTimeout) * time.Second
 					
-					// CHASSIS OPTIMIZATION: Reduce timeout by 40% for faster fail-over
 					if isChassis {
 						workerPrefix = fmt.Sprintf("[Worker %d] (chassis)", workerID)
 						effectiveTimeout = time.Duration(float64(runTimeout)*0.6) * time.Second
@@ -559,6 +549,38 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						break
 					}
 					lastError = err.Error()
+					
+					// UNIVERSAL SELF-HEALING Logic
+					lowerErr := strings.ToLower(lastError)
+					
+					// A. Plan-Healing (Design Mismatch)
+					isRefinementRequired := strings.Contains(lowerErr, "design must be updated") ||
+										   strings.Contains(lowerErr, "update the strategy") ||
+										   strings.Contains(lowerErr, "plan needs") ||
+										   strings.Contains(lowerErr, "planning mismatch")
+
+					if isRefinementRequired {
+						// Filter out completion signals first
+						isComplete := strings.Contains(lowerErr, "complete") || 
+									 strings.Contains(lowerErr, "done") || 
+									 strings.Contains(lowerErr, "satisfied")
+						
+						if !isComplete {
+							cmd.Printf("[Worker %d] 🔄 PLAN-HEALING: Agent requested plan update. Re-generating with failure context...\n", workerID)
+							if err := GenerateAndSave(cmd, "INTENT.md", projectDir); err == nil {
+								cmd.Printf("[Worker %d] ✓ Plan healed. Restarting task...\n", workerID)
+								node.Retries = 0 // Reset for fresh attempt
+								continue 
+							}
+						}
+					}
+
+					// B. Strategy Pivoting (Logic Failures)
+					if node.Retries == 1 {
+						cmd.Printf("[Worker %d] ⚠️ Failure detected. Command: PIVOT STRATEGY for next retry.\n", workerID)
+						lastError = "⚠️ PIVOT STRATEGY MANDATE: Your previous approach failed with: " + lastError + ". You MUST try a radically different implementation strategy now."
+					}
+
 					node.Retries++
 				}
 
@@ -635,7 +657,7 @@ func readPID(projectDir string) (int, int, error) {
 func waitForServer(port int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/health", port))
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/ready", port))
 		if err == nil {
 			resp.Body.Close()
 			return nil
@@ -764,6 +786,14 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	if lastError != "" {
 		sb.WriteString(fmt.Sprintf("\n⚠️ SELF-HEALING CONTEXT:\n%s\n", lastError))
 	}
+	
+	// Inject Environment Context
+	out, err := exec.Command("git", "status", "--short").Output()
+	if err == nil && len(out) > 0 {
+		sb.WriteString("\n📋 CURRENT ENVIRONMENT (GIT STATUS):\n")
+		sb.WriteString(string(out))
+	}
+	
 	return sb.String()
 }
 
@@ -782,7 +812,6 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		if loop.Status == "complete" { return nil }
 		if loop.Status == "error" { return fmt.Errorf("%s", loop.Error) }
 		
-		// SEMANTIC HEALING: If loop is paused due to planning mismatch but agent says it's done
 		if loop.Status == "paused" && strings.Contains(loop.Error, "Planning Mismatch") {
 			lowerErr := strings.ToLower(loop.Error)
 			isComplete := strings.Contains(lowerErr, "complete") || 
@@ -793,7 +822,7 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 			
 			if isComplete {
 				cmd.Printf("%s ✨ AUTO-HEAL: Agent verified task is complete or redundant.\n", prefix)
-				return nil // Return success to trigger the CLI-side auto-heal persistence
+				return nil
 			}
 			return fmt.Errorf("%s", loop.Error)
 		}
@@ -859,7 +888,6 @@ func KillDaemon(pid int) error {
 }
 
 func ensureMCPConfig(projectDir string) (string, error) {
-	// Find the path to the current executable
 	execPath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("failed to find current executable: %w", err)
@@ -892,7 +920,6 @@ func ensureMCPConfig(projectDir string) (string, error) {
 
 	return mcpPath, nil
 }
-
 
 func init() {
 	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
