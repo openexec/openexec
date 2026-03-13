@@ -15,6 +15,10 @@ type Assembler struct {
 	personas  *persona.Store
 	workflows *workflow.Store
 	manifests *manifest.Store
+
+	lastBriefing   string
+	lastWorkflowID string
+	lastAgent      string
 }
 
 // NewAssembler creates an Assembler that reads decomposed agent definitions from the given filesystem.
@@ -34,6 +38,13 @@ func NewAssembler(f fs.FS) *Assembler {
 // Compose builds a complete system prompt for the given agent, workflow, and briefing.
 // Returns the prompt string or an error if the agent, workflow, or params are invalid.
 func (a *Assembler) Compose(agent, workflowID, briefing string) (string, error) {
+	isContinuation := a.lastBriefing == briefing && a.lastWorkflowID == workflowID && a.lastAgent == agent
+	
+	// Update cache
+	a.lastBriefing = briefing
+	a.lastWorkflowID = workflowID
+	a.lastAgent = agent
+
 	// Load agent manifest.
 	mf, err := a.manifests.Get(agent)
 	if err != nil {
@@ -92,8 +103,13 @@ func (a *Assembler) Compose(agent, workflowID, briefing string) (string, error) 
 
 	// Briefing (pre-formatted, may be empty)
 	if briefing != "" {
-		b.WriteString(briefing)
-		b.WriteString("\n\n")
+		if isContinuation {
+			b.WriteString("## Briefing: CONTINUATION\n\n")
+			b.WriteString("The briefing for this task remains identical to your previous phase. Maintain all existing design decisions and constraints. Focus on completing the remaining workflow steps for this same task.\n\n")
+		} else {
+			b.WriteString(briefing)
+			b.WriteString("\n\n")
+		}
 	}
 
 	// Protocols

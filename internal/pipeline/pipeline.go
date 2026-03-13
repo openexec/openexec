@@ -52,6 +52,8 @@ type Pipeline struct {
 	factory *LoopFactory
 	events  chan loop.Event
 
+	briefingCache string
+
 	currentLoop *loop.Loop
 	mu          sync.Mutex
 
@@ -169,6 +171,12 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			ReviewCycle: p.sm.ReviewCycles(),
 		})
 
+		// Fetch fresh briefing once per phase.
+		briefing, err := briefingFn(ctx, p.cfg.FWUID)
+		if err != nil {
+			return fmt.Errorf("briefing for phase %s: %w", phase, err)
+		}
+
 		// Run Loop, consume events (with retries for transient orchestrator errors)
 		var phaseCompleted, routed, blocked bool
 		var runErr error
@@ -180,13 +188,11 @@ func (p *Pipeline) Run(ctx context.Context) error {
 					Text: fmt.Sprintf("phase %s failed (attempt %d/%d), retrying in %v...", phase, retry, p.cfg.MaxRetries+1, p.cfg.RetryBackoff[retry-1]),
 				})
 				time.Sleep(p.cfg.RetryBackoff[retry-1])
-			}
-
-			// Fetch fresh briefing.
-			briefing, err := briefingFn(ctx, p.cfg.FWUID)
-			if err != nil {
-				runErr = fmt.Errorf("briefing for phase %s: %w", phase, err)
-				continue
+				
+				// Re-fetch on retry if requested by user for extra "active healing"
+				if b, err := briefingFn(ctx, p.cfg.FWUID); err == nil {
+					briefing = b
+				}
 			}
 
 			// Create Loop for this phase.

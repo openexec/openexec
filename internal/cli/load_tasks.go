@@ -11,7 +11,7 @@ import (
 )
 
 // loadPendingTasks loads all tasks from the release manager (Source of Truth), tasks.json, or stories.json
-func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
+func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) ([]Task, error) {
 	// Pre-flight: Load stories.json to use as a "map of intent" for reconciliation
 	incomingTaskStories := make(map[string]string)
 	plannedTitles := make(map[string]string)
@@ -82,7 +82,11 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 		
 		for tid, sid := range incomingTaskStories {
 			if !existingMap[tid] {
-				fmt.Printf("  ✨ Deep-Healed: Restoring missing task %s to database...\n", tid)
+				if isInitial {
+					fmt.Printf("  ✨ Importing planned task %s...\n", tid)
+				} else {
+					fmt.Printf("  ✨ Deep-Healed: Restoring missing task %s to database...\n", tid)
+				}
 				title := plannedTitles[tid]
 				if title == "" { title = "Imported Task " + tid }
 				

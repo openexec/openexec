@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/gorilla/websocket"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
@@ -288,7 +289,7 @@ var runCmd = &cobra.Command{
 				cmd.Printf("   ✨ Self-Healed: Reset %d ghost tasks to pending\n", resetCount)
 			}
 
-			tasks, err := loadPendingTasks(config.ProjectDir, mgr)
+			tasks, err := loadPendingTasks(config.ProjectDir, mgr, true)
 			if err != nil {
 				return fmt.Errorf("failed to load tasks: %w", err)
 			}
@@ -526,7 +527,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					if node.Retries > 0 {
 						stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, node.Task.ID)
 						_, _ = http.Post(stopURL, "application/json", nil)
-						time.Sleep(1 * time.Second) // Give the server a moment to kill the process
+						time.Sleep(2 * time.Second) // Increased sleep to give server more time
 					}
 
 					loopID, err := createExecutionLoopWithRetry(projectDir, node.Task, mgr, lastError)
@@ -544,6 +545,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 								break
 							}
 							
+							cmd.Printf("[Worker %d] ⚠ Loop creation failed (attempt %d/%d): %v\n", workerID, node.Retries+1, maxRetries, err)
 							node.Retries++
 							continue
 						}
@@ -602,9 +604,12 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					}
 
 					// B. Strategy Pivoting (Logic Failures)
-					if node.Retries == 1 {
+					if node.Retries == 0 {
 						cmd.Printf("[Worker %d] ⚠️ Failure detected. Command: PIVOT STRATEGY for next retry.\n", workerID)
 						lastError = "⚠️ PIVOT STRATEGY MANDATE: Your previous approach failed with: " + lastError + ". You MUST try a radically different implementation strategy now."
+					} else if node.Retries == 1 {
+						cmd.Printf("[Worker %d] ⚠️ Second failure. Command: FINAL ATTEMPT with diagnostic mandate.\n", workerID)
+						lastError = "⚠️ FINAL ATTEMPT MANDATE: Two attempts have failed. Previous error: " + lastError + ". Focus on absolute simplicity and verify every assumption."
 					}
 
 					node.Retries++
@@ -647,7 +652,19 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 	wg.Wait()
 	if len(errors) > 0 {
-		return <-errors
+		// Prioritize plan_healed signal to ensure the orchestrator restarts
+		for i := 0; i < len(errors); i++ {
+			err := <-errors
+			if strings.Contains(err.Error(), "plan_healed") {
+				return err
+			}
+			// Put it back if it's not what we want (but only if we have more to check)
+			if i < len(errors)-1 {
+				errors <- err
+			} else {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -828,29 +845,88 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 	lastIteration := -1
 	lastProgressTime := time.Now()
 
+	// Try WebSocket connection first
+	wsURL := fmt.Sprintf("ws://localhost:%d/ws", startPort)
+	dialer := websocket.DefaultDialer
+	conn, _, err := dialer.Dial(wsURL, nil)
+	
+	if err == nil {
+		defer conn.Close()
+		
+		// Subscribe to the loop session
+		subscribeMsg := map[string]interface{}{
+			"type":      "subscribe",
+			"sessionId": loopID,
+		}
+		if err := conn.WriteJSON(subscribeMsg); err != nil {
+			// Fallback to polling if subscription fails
+			err = nil 
+		} else {
+			// Listen for events via WebSocket
+			type wsMessage struct {
+				Type      string      `json:"type"`
+				SessionID string      `json:"sessionId"`
+				Payload   interface{} `json:"payload"`
+			}
+			
+			// We still need to check deadline and heartbeat
+			go func() {
+				for {
+					var msg wsMessage
+					if err := conn.ReadJSON(&msg); err != nil {
+						return
+					}
+					
+					if msg.Type == "event" {
+						// Payload is a loop.Event (or similar map)
+						if payload, ok := msg.Payload.(map[string]interface{}); ok {
+							eventType, _ := payload["Type"].(string)
+							iteration, _ := payload["Iteration"].(float64)
+							
+							if int(iteration) > lastIteration {
+								lastIteration = int(iteration)
+								lastProgressTime = time.Now()
+							}
+							
+							if eventType == "complete" {
+								// We'll let the main loop detect completion via polling or status check
+								// to ensure consistency with the existing logic
+							}
+						}
+					}
+				}
+			}()
+		}
+	}
+
+	// Main monitoring loop (uses polling as secondary/heartbeat mechanism)
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
-		if err != nil { return err }
-		var loop LoopResponse
-		if err := json.NewDecoder(resp.Body).Decode(&loop); err != nil {
+		if err != nil { 
+			time.Sleep(2 * time.Second)
+			continue 
+		}
+		var loopResp LoopResponse
+		if err := json.NewDecoder(resp.Body).Decode(&loopResp); err != nil {
 			resp.Body.Close()
-			return err
+			time.Sleep(2 * time.Second)
+			continue
 		}
 		resp.Body.Close()
 		
-		if loop.Status == "complete" { return nil }
-		if loop.Status == "error" { return fmt.Errorf("%s", loop.Error) }
+		if loopResp.Status == "complete" { return nil }
+		if loopResp.Status == "error" { return fmt.Errorf("%s", loopResp.Error) }
 		
 		// HEARTBEAT MONITOR: Detect if runner is making progress
-		if loop.Iteration > lastIteration {
-			lastIteration = loop.Iteration
+		if loopResp.Iteration > lastIteration {
+			lastIteration = loopResp.Iteration
 			lastProgressTime = time.Now()
 		} else if time.Since(lastProgressTime) > 5*time.Minute {
 			return fmt.Errorf("runner stalled: no iteration progress for 5 minutes")
 		}
 
-		if loop.Status == "paused" && strings.Contains(loop.Error, "Planning Mismatch") {
-			lowerErr := strings.ToLower(loop.Error)
+		if loopResp.Status == "paused" && strings.Contains(loopResp.Error, "Planning Mismatch") {
+			lowerErr := strings.ToLower(loopResp.Error)
 			isComplete := strings.Contains(lowerErr, "complete") || 
 						 strings.Contains(lowerErr, "done") || 
 						 strings.Contains(lowerErr, "already been implemented") ||
@@ -861,10 +937,15 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 				cmd.Printf("%s ✨ AUTO-HEAL: Agent verified task is complete or redundant.\n", prefix)
 				return nil
 			}
-			return fmt.Errorf("%s", loop.Error)
+			return fmt.Errorf("%s", loopResp.Error)
 		}
 
-		time.Sleep(2 * time.Second)
+		// With WebSocket active, we can poll much less frequently
+		pollInterval := 5 * time.Second
+		if conn == nil {
+			pollInterval = 2 * time.Second
+		}
+		time.Sleep(pollInterval)
 	}
 	return fmt.Errorf("timeout")
 }
