@@ -18,7 +18,9 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 	storiesFile := filepath.Join(projectDir, ".openexec", "stories.json")
 	if data, err := os.ReadFile(storiesFile); err == nil {
 		var sf struct {
-			Stories []struct {
+			SchemaVersion string `json:"schema_version"`
+			Goals         []any  `json:"goals"`
+			Stories       []struct {
 				ID    string `json:"id"`
 				Tasks []any  `json:"tasks"`
 			} `json:"stories"`
@@ -47,7 +49,9 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 	prevInStory := make(map[string]string)
 	if data, err := os.ReadFile(storiesFile); err == nil {
 		var sf struct {
-			Stories []struct {
+			SchemaVersion string `json:"schema_version"`
+			Goals         []any  `json:"goals"`
+			Stories       []struct {
 				ID    string `json:"id"`
 				Tasks []any  `json:"tasks"`
 			} `json:"stories"`
