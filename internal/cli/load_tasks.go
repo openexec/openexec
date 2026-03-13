@@ -16,6 +16,7 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 	incomingTaskStories := make(map[string]string)
 	plannedTitles := make(map[string]string)
 	storiesFile := filepath.Join(projectDir, ".openexec", "stories.json")
+	
 	if data, err := os.ReadFile(storiesFile); err == nil {
 		var sf struct {
 			SchemaVersion string `json:"schema_version"`
@@ -42,7 +43,22 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 					}
 				}
 			}
+		} else {
+			fmt.Printf("  ⚠ Warning: Failed to parse stories.json: %v\n", err)
 		}
+	} else if os.IsNotExist(err) {
+		// Try root directory as fallback
+		storiesFile = filepath.Join(projectDir, "stories.json")
+		if _, err := os.Stat(storiesFile); err == nil {
+			// Recurse once with new path
+			return loadPendingTasks(projectDir, mgr, isInitial)
+		}
+	} else {
+		fmt.Printf("  ⚠ Warning: Failed to read stories.json: %v\n", err)
+	}
+
+	if len(incomingTaskStories) == 0 {
+		fmt.Printf("  🔍 Debug: No tasks found in stories.json (path: %s)\n", storiesFile)
 	}
 
 	// INTRA-STORY SEQUENCING: Map previous tasks within each story from stories.json
