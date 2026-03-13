@@ -47,9 +47,18 @@ cd "$OPENEXEC_DIR"
 COMMIT=$(git rev-parse --short HEAD)
 LDFLAGS="-X github.com/openexec/openexec/pkg/version.Commit=$COMMIT"
 
+mkdir -p bin
+
+echo "   - Building local binary..."
 go build -ldflags "$LDFLAGS" -o openexec ./cmd/openexec
+
+echo "   - Building darwin/arm64..."
 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/openexec-darwin-arm64 ./cmd/openexec
+
+echo "   - Building darwin/amd64..."
 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-darwin-amd64 ./cmd/openexec
+
+echo "   - Building linux/amd64..."
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-linux-amd64 ./cmd/openexec
 
 echo "3. Copying binaries to openexec-web..."
