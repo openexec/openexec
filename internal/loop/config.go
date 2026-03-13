@@ -3,6 +3,9 @@ package loop
 import (
 	"context"
 	"time"
+
+	"github.com/openexec/openexec/internal/summarize"
+	"github.com/openexec/openexec/pkg/agent"
 )
 
 // Uploader defines the interface for uploading session artifacts.
@@ -115,7 +118,21 @@ type Config struct {
 
 	// RunnerArgs optionally overrides the CLI arguments.
 	RunnerArgs []string
+
+	// Summarizer is the session history summarizer (optional).
+	// If nil, no summarization is performed.
+	Summarizer Summarizer `json:"-"`
 }
+
+// Summarizer defines the interface for session history summarization.
+type Summarizer interface {
+	ShouldSummarize(messages []agent.Message, contextLimit int) *summarize.TriggerCheckResult
+	Summarize(ctx context.Context, sessionID string, messages []agent.Message, reason summarize.TriggerReason) (*summarize.SummaryResult, error)
+	BuildContextWithSummary(ctx context.Context, sessionID string, recentMessages []agent.Message) ([]agent.Message, error)
+}
+
+// summarize.TriggerCheckResult must be imported for the interface to work.
+// I'll check imports in loop/config.go.
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {

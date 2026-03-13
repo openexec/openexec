@@ -16,9 +16,10 @@ type Assembler struct {
 	workflows *workflow.Store
 	manifests *manifest.Store
 
-	lastBriefing   string
-	lastWorkflowID string
-	lastAgent      string
+	lastBriefing    string
+	lastWorkflowID  string
+	lastAgent       string
+	lastStaticBlock string
 }
 
 // NewAssembler creates an Assembler that reads decomposed agent definitions from the given filesystem.
@@ -40,19 +41,40 @@ func NewAssembler(f fs.FS) *Assembler {
 func (a *Assembler) Compose(agent, workflowID, briefing string) (string, error) {
 	isContinuation := a.lastBriefing == briefing && a.lastWorkflowID == workflowID && a.lastAgent == agent
 	
+	var staticBlock string
+	if a.lastAgent == agent && a.lastStaticBlock != "" {
+		staticBlock = a.lastStaticBlock
+	} else {
+		// Build new static block (Agent + Persona)
+		mf, err := a.manifests.Get(agent)
+		if err != nil {
+			return "", fmt.Errorf("compose manifest: %w", err)
+		}
+
+		p, err := a.personas.Get(mf.Persona)
+		if err != nil {
+			return "", fmt.Errorf("compose persona: %w", err)
+		}
+
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "# Agent: %s\n\n", mf.Title)
+		sb.WriteString("## Persona\n\n")
+		fmt.Fprintf(&sb, "**Role:** %s\n\n", p.Role)
+		fmt.Fprintf(&sb, "**Identity:** %s\n\n", p.Identity)
+		fmt.Fprintf(&sb, "**Communication Style:** %s\n\n", p.CommunicationStyle)
+		fmt.Fprintf(&sb, "**Principles:** %s\n\n", p.Principles)
+		
+		staticBlock = sb.String()
+		a.lastStaticBlock = staticBlock
+	}
+
 	// Update cache
 	a.lastBriefing = briefing
 	a.lastWorkflowID = workflowID
 	a.lastAgent = agent
 
-	// Load agent manifest.
+	// Load agent manifest for workflow params
 	mf, err := a.manifests.Get(agent)
-	if err != nil {
-		return "", fmt.Errorf("compose: %w", err)
-	}
-
-	// Load and merge persona.
-	p, err := a.personas.Get(mf.Persona)
 	if err != nil {
 		return "", fmt.Errorf("compose: %w", err)
 	}
@@ -81,18 +103,9 @@ func (a *Assembler) Compose(agent, workflowID, briefing string) (string, error) 
 		return "", fmt.Errorf("compose: workflow %q process: %w", workflowID, err)
 	}
 
-	// Build prompt — same sections and order as the original assembler.
+	// Build final prompt
 	var b strings.Builder
-
-	// Agent header
-	fmt.Fprintf(&b, "# Agent: %s\n\n", mf.Title)
-
-	// Persona section
-	b.WriteString("## Persona\n\n")
-	fmt.Fprintf(&b, "**Role:** %s\n\n", p.Role)
-	fmt.Fprintf(&b, "**Identity:** %s\n\n", p.Identity)
-	fmt.Fprintf(&b, "**Communication Style:** %s\n\n", p.CommunicationStyle)
-	fmt.Fprintf(&b, "**Principles:** %s\n\n", p.Principles)
+	b.WriteString(staticBlock)
 
 	// Workflow section
 	b.WriteString("## Workflow\n\n")

@@ -93,6 +93,10 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 	if data == nil {
 		return
 	}
+
+	// Emit activity heartbeat
+	p.emit(Event{Type: EventProgress, Iteration: p.iteration})
+
 	var body messageBody
 	if err := util.UnmarshalRobust(string(data), &body); err != nil {
 		return
@@ -146,26 +150,33 @@ func (p *Parser) parseToolResult(data json.RawMessage) {
 	if data == nil {
 		return
 	}
+
+	// Emit activity heartbeat
+	p.emit(Event{Type: EventProgress, Iteration: p.iteration})
+
 	// Content can be a string or a structured array. Try string first.
 	var s string
-	if err := util.UnmarshalRobust(string(data), &s); err == nil {
+	if err := util.UnmarshalRobust(string(data), &s); err != nil {
+		// Fall back to stringifying the raw JSON.
 		p.emit(Event{
 			Type:      EventToolResult,
 			Iteration: p.iteration,
-			Text:      s,
+			Text:      string(data),
 		})
 		return
 	}
-	// Fall back to stringifying the raw JSON.
+	
 	p.emit(Event{
 		Type:      EventToolResult,
 		Iteration: p.iteration,
-		Text:      string(data),
+		Text:      s,
 	})
 }
 
 func (p *Parser) emit(e Event) {
-	p.events <- e
+	if p.events != nil {
+		p.events <- e
+	}
 }
 
 // isOpenExecSignal returns true if the tool name is an openexec_signal or axon_signal call.

@@ -11,9 +11,9 @@ import (
     "sync/atomic"
     "time"
 
+    "github.com/openexec/openexec/internal/summarize"
     "github.com/openexec/openexec/pkg/agent"
-)
-
+    )
 // Loop is the core iteration executor. It spawns Claude Code repeatedly,
 // parsing stream-JSON output into typed Events, with retry and lifecycle control.
 type Loop struct {
@@ -42,6 +42,9 @@ type Loop struct {
 
 	// gateFixPrompt is appended to the prompt when gates fail.
 	gateFixPrompt string
+
+	// history tracks the message conversation for provider-backed loops.
+	history []agent.Message
 }
 
 // New creates a Loop with the given config and returns it along with a
@@ -64,6 +67,7 @@ func New(cfg Config) (*Loop, <-chan Event) {
 		tracker:    NewSignalTracker(cfg.ThrashThreshold),
 		sleepFn:    time.Sleep,
 		middleware: m,
+		history:    make([]agent.Message, 0),
 	}
 	now := time.Now()
 	l.lastActivity.Store(&now)
@@ -149,21 +153,48 @@ func (l *Loop) Run(ctx context.Context) error {
                 }
             }
 
-            // Build a simple request using system+user separation
+            // 1. Add current prompt to history
+            l.history = append(l.history, agent.NewTextMessage(agent.RoleUser, l.cfg.Prompt))
+
+            // 2. Manage context window via summarization (if enabled)
+            messages := l.history
+            if l.cfg.Summarizer != nil {
+                // Check if we need to summarize (using a standard 128k limit as heuristic if unknown)
+                limit := 128000
+                check := l.cfg.Summarizer.ShouldSummarize(l.history, limit)
+                
+                if check.ShouldSummarize {
+                    l.emit(Event{
+                        Type: EventProgress, 
+                        Text: fmt.Sprintf("Summarizing session history to save tokens (saving ~%d tokens)", check.EstimatedSavings),
+                    })
+                    
+                    if _, err := l.cfg.Summarizer.Summarize(ctx, l.cfg.FwuID, l.history, summarize.TriggerReasonTokenThreshold); err == nil {
+                        // Build context with the new summary
+                        if summarized, err := l.cfg.Summarizer.BuildContextWithSummary(ctx, l.cfg.FwuID, l.history); err == nil {
+                            messages = summarized
+                        }
+                    }
+                }
+            }
+
+            // Build a request using full history
             req := agent.Request{
                 Model:  model,
                 System: "You are an autonomous coding agent. " +
                     "Work independently without interactive prompts. Return only the final code changes or actionable reasoning.",
-                Messages: []agent.Message{
-                    agent.NewTextMessage(agent.RoleUser, l.cfg.Prompt),
-                },
-                MaxTokens: 2048,
+                Messages:  messages,
+                MaxTokens: 4096,
             }
 
-            if _, err := agent.DefaultRegistry.Complete(ctx, req); err != nil {
+            resp, err := agent.DefaultRegistry.Complete(ctx, req)
+            if err != nil {
                 l.emit(Event{Type: EventError, ErrText: fmt.Sprintf("provider run failed: %v", err), Err: err})
                 return err
             }
+
+            // 3. Save assistant response to history
+            l.history = append(l.history, agent.Message{Role: agent.RoleAssistant, Content: resp.Content})
 
             // On success, mark complete
             l.emit(Event{Type: EventComplete, Iteration: l.iteration})

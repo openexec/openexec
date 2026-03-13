@@ -560,7 +560,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 						effectiveTimeout = time.Duration(float64(runTimeout)*0.6) * time.Second
 					}
 					
-					err = waitForLoop(cmd, loopID, workerPrefix, effectiveTimeout)
+					err = waitForLoop(cmd, loopID, workerPrefix, effectiveTimeout, isChassis)
 					if err == nil {
 						success = true
 						break
@@ -841,10 +841,26 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	return sb.String()
 }
 
-func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration) error {
+func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration, isChassis bool) error {
 	deadline := time.Now().Add(timeout)
 	lastIteration := -1
+	lastPhase := ""
+	lastAgent := ""
 	lastActivity := time.Now()
+
+	// DYNAMIC STALL THRESHOLD: max(6m, min(15m, timeout/3)); double for Chassis.
+	stallMinutes := 6.0
+	calculated := (timeout.Minutes() / 3.0)
+	if calculated > stallMinutes {
+		stallMinutes = calculated
+	}
+	if stallMinutes > 15.0 {
+		stallMinutes = 15.0
+	}
+	if isChassis {
+		stallMinutes *= 2.0
+	}
+	stallThreshold := time.Duration(stallMinutes) * time.Minute
 
 	// Try WebSocket connection first
 	wsURL := fmt.Sprintf("ws://localhost:%d/ws", startPort)
@@ -882,12 +898,14 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 						// Payload is a loop.Event (or similar map)
 						if payload, ok := msg.Payload.(map[string]interface{}); ok {
 							iteration, _ := payload["Iteration"].(float64)
+							phase, _ := payload["Phase"].(string)
+							agent, _ := payload["Agent"].(string)
+							eventType, _ := payload["Type"].(string)
 							
-							if int(iteration) > lastIteration {
+							if int(iteration) > lastIteration || phase != lastPhase || agent != lastAgent || eventType == "heartbeat" || eventType == "progress" {
 								lastIteration = int(iteration)
-								lastActivity = time.Now()
-							} else {
-								// Any event counts as activity (heartbeats, text output, tool calls)
+								lastPhase = phase
+								lastAgent = agent
 								lastActivity = time.Now()
 							}
 						}
@@ -915,16 +933,18 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		if loopResp.Status == "complete" { return nil }
 		if loopResp.Status == "error" { return fmt.Errorf("%s", loopResp.Error) }
 		
-		// HEARTBEAT MONITOR: Detect if runner is making progress
-		if loopResp.Iteration > lastIteration {
+		// HEARTBEAT MONITOR: Detect if runner is making progress (iteration, phase, agent or heartbeat)
+		if loopResp.Iteration > lastIteration || loopResp.Phase != lastPhase || loopResp.Agent != lastAgent {
 			lastIteration = loopResp.Iteration
+			lastPhase = loopResp.Phase
+			lastAgent = loopResp.Agent
 			lastActivity = time.Now()
 		} else if !loopResp.LastActivity.IsZero() && loopResp.LastActivity.After(lastActivity) {
 			lastActivity = loopResp.LastActivity
 		}
 		
-		if time.Since(lastActivity) > 15*time.Minute {
-			return fmt.Errorf("runner stalled: no activity progress for 15 minutes")
+		if time.Since(lastActivity) > stallThreshold {
+			return fmt.Errorf("runner stalled: no activity progress for %v", stallThreshold)
 		}
 
 		if loopResp.Status == "paused" && strings.Contains(loopResp.Error, "Planning Mismatch") {
