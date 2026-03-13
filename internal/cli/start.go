@@ -960,6 +960,27 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		if loopResp.Status == "complete" { return nil }
 		if loopResp.Status == "error" { return fmt.Errorf("%s", loopResp.Error) }
 		
+		if loopResp.Status == "paused" {
+			if strings.Contains(loopResp.Error, "Planning Mismatch") {
+				lowerErr := strings.ToLower(loopResp.Error)
+				isComplete := strings.Contains(lowerErr, "complete") || 
+							 strings.Contains(lowerErr, "done") || 
+							 strings.Contains(lowerErr, "already been implemented") ||
+							 strings.Contains(lowerErr, "satisfied") ||
+							 strings.Contains(lowerErr, "criteria verified")
+				
+				if isComplete {
+					cmd.Printf("%s ✨ AUTO-HEAL: Agent verified task is complete or redundant.\n", prefix)
+					return nil
+				}
+				// Plan-healing requested
+				return fmt.Errorf("%s", loopResp.Error)
+			}
+			
+			// For generic paused status (e.g. decision-point), return as terminal so orchestrator knows it's not running
+			return fmt.Errorf("agent paused: %s", loopResp.Error)
+		}
+		
 		// HEARTBEAT MONITOR: Detect if runner is making progress (iteration, phase, agent or heartbeat)
 		if loopResp.Iteration > lastIteration || loopResp.Phase != lastPhase || loopResp.Agent != lastAgent {
 			lastIteration = loopResp.Iteration
@@ -972,21 +993,6 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		
 		if time.Since(lastActivity) > stallThreshold {
 			return fmt.Errorf("runner stalled: no activity progress for %v", stallThreshold)
-		}
-
-		if loopResp.Status == "paused" && strings.Contains(loopResp.Error, "Planning Mismatch") {
-			lowerErr := strings.ToLower(loopResp.Error)
-			isComplete := strings.Contains(lowerErr, "complete") || 
-						 strings.Contains(lowerErr, "done") || 
-						 strings.Contains(lowerErr, "already been implemented") ||
-						 strings.Contains(lowerErr, "satisfied") ||
-						 strings.Contains(lowerErr, "criteria verified")
-			
-			if isComplete {
-				cmd.Printf("%s ✨ AUTO-HEAL: Agent verified task is complete or redundant.\n", prefix)
-				return nil
-			}
-			return fmt.Errorf("%s", loopResp.Error)
 		}
 
 		// With WebSocket active, we can poll much less frequently

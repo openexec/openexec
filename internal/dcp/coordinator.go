@@ -1,3 +1,16 @@
+// Package dcp provides the Deterministic Control Plane - a thin tool-routing
+// service layer for OpenExec.
+//
+// Architecture Note: The DCP is NOT an orchestration plane. All state management
+// and phase transitions flow through Pipeline + Loop (internal/pipeline, internal/loop).
+// The Coordinator's sole responsibilities are:
+//   - BitNet intent routing (parsing queries into tool invocations)
+//   - Tool registration and dispatch
+//   - PII sanitization of inputs
+//   - Confidence-based fallback to general_chat
+//
+// This separation ensures a single source of truth for orchestration state while
+// allowing the DCP to focus purely on deterministic tool execution.
 package dcp
 
 import (
@@ -20,7 +33,10 @@ const (
 	FallbackReasonChatFailed    = "fallback_failed"
 )
 
-// Coordinator orchestrates the Deterministic Control Plane
+// Coordinator is a thin tool-routing layer for the Deterministic Control Plane.
+// It routes queries to registered tools via BitNet intent parsing and handles
+// fallback logic. It does NOT manage state, phases, or orchestration - those
+// responsibilities belong to Pipeline and Loop.
 type Coordinator struct {
 	router  router.Router
 	store   *knowledge.Store

@@ -225,10 +225,11 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 	parallelEnabled = true
 	if answer == "n" || answer == "no" {
 		parallelEnabled = false
+		workerCount = 1
 	}
 
-	workerCount = 4
 	if parallelEnabled {
+		workerCount = 4
 		fmt.Printf("Number of concurrent workers [%d]: ", workerCount)
 		line, _ := reader.ReadString('\n')
 		line = strings.TrimSpace(line)

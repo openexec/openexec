@@ -320,3 +320,150 @@ func TestPipelineDefPhaseConfigs(t *testing.T) {
 		t.Errorf("RV routes = %d, want 2", len(rvCfg.Routes))
 	}
 }
+
+// =============================================================================
+// Contract Tests: Single Source of Truth (T-US-002-003)
+// =============================================================================
+
+// TestPipeline_SingleSourceOfTruth verifies that all state transitions flow through
+// the Pipeline's StateMachine. This is a contract test that ensures the architectural
+// invariant: Pipeline + Loop is the single orchestration plane.
+func TestPipeline_SingleSourceOfTruth(t *testing.T) {
+	// This test validates that:
+	// 1. All phase transitions are controlled by StateMachine.Advance() or StateMachine.Route()
+	// 2. There is no external state modification
+	// 3. The StateMachine is the authoritative source for current phase
+
+	t.Run("StateMachine exclusively controls phase transitions", func(t *testing.T) {
+		// GIVEN a fresh state machine
+		sm := NewStateMachine(DefaultPhaseOrder(), DefaultPhaseConfigs(), 3)
+
+		// Track all phases we visit
+		phases := []Phase{sm.Current()}
+
+		// WHEN we walk through all transitions
+		// TD → IM (linear)
+		next, err := sm.Advance()
+		if err != nil {
+			t.Fatalf("Advance TD→IM: %v", err)
+		}
+		phases = append(phases, next)
+
+		// IM → RV (linear)
+		next, err = sm.Advance()
+		if err != nil {
+			t.Fatalf("Advance IM→RV: %v", err)
+		}
+		phases = append(phases, next)
+
+		// RV → RF (via route)
+		next, err = sm.Route("hon")
+		if err != nil {
+			t.Fatalf("Route RV→RF: %v", err)
+		}
+		phases = append(phases, next)
+
+		// RF → FL (linear)
+		next, err = sm.Advance()
+		if err != nil {
+			t.Fatalf("Advance RF→FL: %v", err)
+		}
+		phases = append(phases, next)
+
+		// FL → Done (linear)
+		next, err = sm.Advance()
+		if err != nil {
+			t.Fatalf("Advance FL→Done: %v", err)
+		}
+		phases = append(phases, next)
+
+		// THEN the phase sequence is exactly as expected
+		expected := []Phase{PhaseTD, PhaseIM, PhaseRV, PhaseRF, PhaseFL, PhaseDone}
+		if len(phases) != len(expected) {
+			t.Fatalf("phases = %v, want %v", phases, expected)
+		}
+		for i, p := range expected {
+			if phases[i] != p {
+				t.Errorf("phases[%d] = %s, want %s", i, phases[i], p)
+			}
+		}
+	})
+
+	t.Run("Current() always reflects last transition", func(t *testing.T) {
+		// GIVEN a state machine
+		sm := NewStateMachine(DefaultPhaseOrder(), DefaultPhaseConfigs(), 3)
+
+		// WHEN we advance
+		sm.Advance()
+
+		// THEN Current() reflects the change
+		if sm.Current() != PhaseIM {
+			t.Errorf("Current() = %s, want IM", sm.Current())
+		}
+
+		// AND after another advance
+		sm.Advance()
+
+		// Current() again reflects it
+		if sm.Current() != PhaseRV {
+			t.Errorf("Current() = %s, want RV", sm.Current())
+		}
+	})
+
+	t.Run("ReviewCycles tracks backward routes through StateMachine only", func(t *testing.T) {
+		// GIVEN a state machine
+		sm := NewStateMachine(DefaultPhaseOrder(), DefaultPhaseConfigs(), 3)
+
+		// Move to RV
+		sm.Advance() // TD → IM
+		sm.Advance() // IM → RV
+
+		// WHEN we route backward
+		initialCycles := sm.ReviewCycles()
+		sm.Route("spark") // RV → IM (backward)
+
+		// THEN review cycles increment through StateMachine
+		if sm.ReviewCycles() != initialCycles+1 {
+			t.Errorf("ReviewCycles() = %d, want %d", sm.ReviewCycles(), initialCycles+1)
+		}
+
+		// AND forward routes don't increment
+		sm.Advance()       // IM → RV
+		sm.Route("hon")    // RV → RF (forward)
+		if sm.ReviewCycles() != initialCycles+1 {
+			t.Errorf("ReviewCycles() after forward = %d, want %d", sm.ReviewCycles(), initialCycles+1)
+		}
+	})
+
+	t.Run("StateMachine enforces routing phase constraints", func(t *testing.T) {
+		// GIVEN a state machine at TD (non-routing phase)
+		sm := NewStateMachine(DefaultPhaseOrder(), DefaultPhaseConfigs(), 3)
+
+		// WHEN we try to route
+		_, err := sm.Route("spark")
+
+		// THEN it fails (Route only valid from phases with routes defined)
+		if err == nil {
+			t.Error("Route from TD should fail (no routes defined)")
+		}
+	})
+
+	t.Run("StateMachine enforces max review cycles", func(t *testing.T) {
+		// GIVEN a state machine with maxReviewCycles = 1
+		sm := NewStateMachine(DefaultPhaseOrder(), DefaultPhaseConfigs(), 1)
+
+		// Move to RV and route back once
+		sm.Advance()      // TD → IM
+		sm.Advance()      // IM → RV
+		sm.Route("spark") // RV → IM (cycle 1)
+		sm.Advance()      // IM → RV
+
+		// WHEN we try to route back again
+		_, err := sm.Route("spark")
+
+		// THEN it fails (max cycles exceeded)
+		if err == nil {
+			t.Error("Second backward route should fail (max cycles = 1)")
+		}
+	})
+}

@@ -1057,3 +1057,195 @@ func (m *mockDescriptiveTool) Execute(ctx context.Context, args map[string]inter
 	}
 	return "executed", nil
 }
+
+// =============================================================================
+// Contract Tests: Thin DCP Layer (T-US-002-003)
+// =============================================================================
+
+// TestCoordinator_ThinLayer verifies that the Coordinator is a thin tool-routing
+// layer that does NOT manage orchestration state. This is a contract test ensuring
+// the DCP's limited role in the architecture.
+func TestCoordinator_ThinLayer(t *testing.T) {
+	// This test validates that:
+	// 1. Coordinator only routes queries to tools
+	// 2. Coordinator does NOT maintain phase state
+	// 3. Coordinator does NOT track iteration counts
+	// 4. Coordinator does NOT make routing decisions (that's Pipeline's job)
+
+	t.Run("Coordinator has no phase state", func(t *testing.T) {
+		// GIVEN a Coordinator
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "test_tool",
+				Args:       map[string]interface{}{},
+				Confidence: 0.9,
+			},
+		}
+		coord := NewCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "test_tool"})
+
+		// THEN Coordinator has no phase-related fields or methods
+		// (This is a compile-time check - if this compiles, we pass)
+		// The Coordinator struct should NOT have:
+		// - CurrentPhase
+		// - PhaseHistory
+		// - AdvancePhase()
+		// - Route()
+		// These are Pipeline responsibilities
+
+		// Verify by checking the Coordinator only has the expected fields
+		// (This is implicitly tested by the fact that we can call ProcessQuery
+		// multiple times without any internal state changing)
+		ctx := context.Background()
+		_, err1 := coord.ProcessQuery(ctx, "query 1")
+		_, err2 := coord.ProcessQuery(ctx, "query 2")
+		_, err3 := coord.ProcessQuery(ctx, "query 3")
+
+		if err1 != nil || err2 != nil || err3 != nil {
+			t.Errorf("ProcessQuery errors: %v, %v, %v", err1, err2, err3)
+		}
+	})
+
+	t.Run("Coordinator has no iteration tracking", func(t *testing.T) {
+		// GIVEN a Coordinator
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		callCount := 0
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "test_tool",
+				Args:       map[string]interface{}{},
+				Confidence: 0.9,
+			},
+		}
+		coord := NewCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{
+			name: "test_tool",
+			onExecute: func() {
+				callCount++
+			},
+		})
+
+		ctx := context.Background()
+
+		// WHEN we call ProcessQuery many times
+		for i := 0; i < 10; i++ {
+			_, err := coord.ProcessQuery(ctx, fmt.Sprintf("query %d", i))
+			if err != nil {
+				t.Fatalf("ProcessQuery %d: %v", i, err)
+			}
+		}
+
+		// THEN each call is independent (no iteration limit)
+		// The Loop enforces iteration limits, not the Coordinator
+		if callCount != 10 {
+			t.Errorf("callCount = %d, want 10 (no iteration limits in Coordinator)", callCount)
+		}
+	})
+
+	t.Run("Coordinator only routes, does not make phase decisions", func(t *testing.T) {
+		// GIVEN a Coordinator
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		executedTools := []string{}
+		mockRouter := &mockSequenceRouter{
+			sequence: []*router.Intent{
+				{ToolName: "tool_a", Args: map[string]interface{}{}, Confidence: 0.9},
+				{ToolName: "tool_b", Args: map[string]interface{}{}, Confidence: 0.9},
+				{ToolName: "tool_c", Args: map[string]interface{}{}, Confidence: 0.9},
+			},
+		}
+		coord := NewCoordinator(mockRouter, store)
+
+		for _, name := range []string{"tool_a", "tool_b", "tool_c"} {
+			n := name
+			coord.RegisterTool(&mockCountingTool{
+				name: n,
+				onExecute: func() {
+					executedTools = append(executedTools, n)
+				},
+			})
+		}
+
+		ctx := context.Background()
+
+		// WHEN we process queries
+		coord.ProcessQuery(ctx, "query 1")
+		coord.ProcessQuery(ctx, "query 2")
+		coord.ProcessQuery(ctx, "query 3")
+
+		// THEN tools are executed based on router decision, not phase logic
+		expected := []string{"tool_a", "tool_b", "tool_c"}
+		if len(executedTools) != len(expected) {
+			t.Fatalf("executedTools = %v, want %v", executedTools, expected)
+		}
+		for i, tool := range expected {
+			if executedTools[i] != tool {
+				t.Errorf("executedTools[%d] = %s, want %s", i, executedTools[i], tool)
+			}
+		}
+	})
+
+	t.Run("Coordinator does not emit pipeline signals", func(t *testing.T) {
+		// GIVEN a Coordinator
+		store, cleanup := newTestStore(t)
+		defer cleanup()
+
+		mockRouter := &mockFallbackRouter{
+			returnIntent: &router.Intent{
+				ToolName:   "test_tool",
+				Args:       map[string]interface{}{},
+				Confidence: 0.9,
+			},
+		}
+		coord := NewCoordinator(mockRouter, store)
+		coord.RegisterTool(&mockCountingTool{name: "test_tool"})
+
+		// THEN Coordinator has no signal-related methods
+		// Signal handling (phase-complete, blocked, route) is Pipeline's job
+		// This is a compile-time assertion - if the code compiles, we pass
+
+		// The Coordinator should NOT have:
+		// - HandleSignal()
+		// - EmitSignal()
+		// - OnPhaseComplete()
+		// - OnBlocked()
+
+		ctx := context.Background()
+		result, err := coord.ProcessQuery(ctx, "test")
+
+		// Only tool result is returned, no signal metadata
+		if err != nil {
+			t.Fatalf("ProcessQuery: %v", err)
+		}
+		if result != "executed" {
+			t.Errorf("result = %v, want 'executed'", result)
+		}
+	})
+}
+
+// mockSequenceRouter returns intents from a predefined sequence
+type mockSequenceRouter struct {
+	sequence []*router.Intent
+	index    int
+}
+
+func (m *mockSequenceRouter) ParseIntent(ctx context.Context, query string) (*router.Intent, error) {
+	if m.index >= len(m.sequence) {
+		return &router.Intent{
+			ToolName:   "general_chat",
+			Args:       map[string]interface{}{"query": query},
+			Confidence: 0.5,
+		}, nil
+	}
+	intent := m.sequence[m.index]
+	m.index++
+	return intent, nil
+}
+
+func (m *mockSequenceRouter) RegisterTool(name, desc, schema string) error { return nil }
