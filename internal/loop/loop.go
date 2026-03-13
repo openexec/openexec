@@ -24,6 +24,9 @@ type Loop struct {
 	iteration int
 	tracker   *SignalTracker
 
+	// lastActivity tracks the last time ANY event was emitted
+	lastActivity atomic.Pointer[time.Time]
+
 	// cancel kills the current process context when Stop is called.
 	cancel context.CancelFunc
 	mu     sync.Mutex
@@ -62,6 +65,8 @@ func New(cfg Config) (*Loop, <-chan Event) {
 		sleepFn:    time.Sleep,
 		middleware: m,
 	}
+	now := time.Now()
+	l.lastActivity.Store(&now)
 	return l, ch
 }
 
@@ -245,11 +250,27 @@ func (l *Loop) Run(ctx context.Context) error {
 			}
 		}()
 
+		// Start heartbeat goroutine to keep orchestrator informed during long runs.
+		heartbeatCtx, heartbeatCancel := context.WithCancel(iterCtx)
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					l.emit(Event{Type: EventHeartbeat, Iteration: l.iteration})
+				case <-heartbeatCtx.Done():
+					return
+				}
+			}
+		}()
+
 		// Wait for stdout/stderr goroutines to finish reading pipes.
 		// This MUST happen before proc.Wait() because Wait() closes the
 		// pipe file descriptors (per Go's exec.Cmd.StdoutPipe docs),
 		// which would truncate in-flight reads and lose signal data.
 		wg.Wait()
+		heartbeatCancel()
 
 		// Now safe to call Wait — all pipe data has been consumed.
 		procErr := proc.Wait()
@@ -402,6 +423,8 @@ func (l *Loop) uploadEvidence(ctx context.Context, recorder *SessionRecorder) {
 }
 
 func (l *Loop) emit(e Event) {
+	now := time.Now()
+	l.lastActivity.Store(&now)
 	l.events <- e
 }
 
@@ -478,12 +501,16 @@ type LoopHealth struct {
 
 // GetHealth returns the current health status of the loop.
 func (l *Loop) GetHealth() LoopHealth {
+	lastAct := time.Now()
+	if ptr := l.lastActivity.Load(); ptr != nil {
+		lastAct = *ptr
+	}
 	return LoopHealth{
 		Active:       !l.stopped.Load() && !l.paused.Load(),
 		Iteration:    l.iteration,
 		Status:       "running", // Simplified
 		LastUpdate:   time.Now(),
-		LastActivity: time.Now(),
+		LastActivity: lastAct,
 		CurrentPID:   os.Getpid(),
 	}
 }

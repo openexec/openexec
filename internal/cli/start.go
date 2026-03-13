@@ -69,13 +69,14 @@ type CreateLoopRequest struct {
 
 // LoopResponse is the API response for loop operations
 type LoopResponse struct {
-	ID        string `json:"id"`
-	Status    string `json:"status"`
-	Iteration int    `json:"iteration"`
-	Error     string `json:"error,omitempty"`
-	Phase     string `json:"phase,omitempty"`
-	Agent     string `json:"agent,omitempty"`
-	StartedAt string `json:"started_at,omitempty"`
+	ID           string    `json:"id"`
+	Status       string    `json:"status"`
+	Iteration    int       `json:"iteration"`
+	Error        string    `json:"error,omitempty"`
+	Phase        string    `json:"phase,omitempty"`
+	Agent        string    `json:"agent,omitempty"`
+	StartedAt    string    `json:"started_at,omitempty"`
+	LastActivity time.Time `json:"last_activity,omitempty"`
 }
 
 var startCmd = &cobra.Command{
@@ -843,7 +844,7 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	lastIteration := -1
-	lastProgressTime := time.Now()
+	lastActivity := time.Now()
 
 	// Try WebSocket connection first
 	wsURL := fmt.Sprintf("ws://localhost:%d/ws", startPort)
@@ -880,17 +881,14 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 					if msg.Type == "event" {
 						// Payload is a loop.Event (or similar map)
 						if payload, ok := msg.Payload.(map[string]interface{}); ok {
-							eventType, _ := payload["Type"].(string)
 							iteration, _ := payload["Iteration"].(float64)
 							
 							if int(iteration) > lastIteration {
 								lastIteration = int(iteration)
-								lastProgressTime = time.Now()
-							}
-							
-							if eventType == "complete" {
-								// We'll let the main loop detect completion via polling or status check
-								// to ensure consistency with the existing logic
+								lastActivity = time.Now()
+							} else {
+								// Any event counts as activity (heartbeats, text output, tool calls)
+								lastActivity = time.Now()
 							}
 						}
 					}
@@ -920,9 +918,13 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		// HEARTBEAT MONITOR: Detect if runner is making progress
 		if loopResp.Iteration > lastIteration {
 			lastIteration = loopResp.Iteration
-			lastProgressTime = time.Now()
-		} else if time.Since(lastProgressTime) > 5*time.Minute {
-			return fmt.Errorf("runner stalled: no iteration progress for 5 minutes")
+			lastActivity = time.Now()
+		} else if !loopResp.LastActivity.IsZero() && loopResp.LastActivity.After(lastActivity) {
+			lastActivity = loopResp.LastActivity
+		}
+		
+		if time.Since(lastActivity) > 15*time.Minute {
+			return fmt.Errorf("runner stalled: no activity progress for 15 minutes")
 		}
 
 		if loopResp.Status == "paused" && strings.Contains(loopResp.Error, "Planning Mismatch") {

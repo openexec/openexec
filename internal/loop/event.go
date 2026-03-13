@@ -35,6 +35,10 @@ const (
 	// Specialized conflict events.
 	EventPlanningMismatch EventType = "planning_mismatch"
 	EventUsageRecorded    EventType = "usage_recorded"
+
+	// Heartbeat and progress events.
+	EventHeartbeat EventType = "heartbeat"
+	EventProgress  EventType = "progress"
 )
 
 // EventKind identifies the high-level category of an event.
