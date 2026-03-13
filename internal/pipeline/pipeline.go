@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -177,6 +178,12 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			return fmt.Errorf("briefing for phase %s: %w", phase, err)
 		}
 
+		// Doc-only fast-path: if this is a Study/Mapping task and we just finished TD,
+		// jump straight to Feedback Loop (FL) to finalize.
+		isStudy := strings.Contains(strings.ToLower(briefing), "study") || 
+				  strings.Contains(strings.ToLower(briefing), "mapping") ||
+				  strings.Contains(strings.ToLower(briefing), "map")
+		
 		// Run Loop, consume events (with retries for transient orchestrator errors)
 		var phaseCompleted, routed, blocked bool
 		var runErr error
@@ -260,8 +267,16 @@ func (p *Pipeline) Run(ctx context.Context) error {
 				return fmt.Errorf("advance from %s: %w", phase, err)
 			}
 		} else {
-			if _, err := p.sm.Advance(); err != nil {
-				return fmt.Errorf("advance from %s: %w", phase, err)
+			// Linear advancement.
+			if isStudy && phase == PhaseTD {
+				// Fast-track for doc-only study/mapping tasks
+				if err := p.sm.JumpTo(PhaseFL); err != nil {
+					return fmt.Errorf("jump to FL for study task: %w", err)
+				}
+			} else {
+				if _, err := p.sm.Advance(); err != nil {
+					return fmt.Errorf("advance from %s: %w", phase, err)
+				}
 			}
 		}
 	}

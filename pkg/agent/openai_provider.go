@@ -33,14 +33,14 @@ const (
 	ModelGPT35Turbo = "gpt-3.5-turbo"
 	ModelO1         = "o1"
 	ModelO1Mini     = "o1-mini"
-	ModelO1Preview = "o1-preview"
-	ModelO3Mini    = "o3-mini"
+	ModelO1Preview  = "o1-preview"
+	ModelO3Mini     = "o3-mini"
 
 	// GPT-5.3 (Codex) models
 	ModelGPT53           = "gpt-5.3"
 	ModelGPT53Codex      = "gpt-5.3-codex"
 	ModelGPT53CodexSpark = "gpt-5.3-codex-spark"
-	)
+)
 
 // OpenAIProviderConfig holds configuration for the OpenAI provider.
 type OpenAIProviderConfig struct {
@@ -891,7 +891,7 @@ func defaultOpenAIModelInfo() map[string]*ModelInfo {
 				Streaming:        true,
 				Vision:           false,
 				ToolUse:          true,
-				SystemPrompt:     true,
+				SystemPrompt:     false, // o3-mini uses developer messages, not system prompts
 				MultiTurn:        true,
 				MaxContextTokens: 200000,
 				MaxOutputTokens:  100000,
@@ -947,8 +947,8 @@ func defaultOpenAIModelInfo() map[string]*ModelInfo {
 			PricePerMInputTokens:  5.00,
 			PricePerMOutputTokens: 15.00,
 		},
-		}
-		}
+	}
+}
 
 // OpenAI API request/response types
 

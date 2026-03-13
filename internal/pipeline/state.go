@@ -113,6 +113,27 @@ func (sm *StateMachine) Route(target string) (Phase, error) {
 	return sm.current, nil
 }
 
+// JumpTo forces the state machine to a specific phase, bypassing normal transitions.
+func (sm *StateMachine) JumpTo(phase Phase) error {
+	if phase == PhaseDone {
+		sm.current = PhaseDone
+		return nil
+	}
+	// Verify phase exists in config
+	found := false
+	for _, p := range sm.order {
+		if p == phase {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("cannot jump to unknown phase %s", phase)
+	}
+	sm.current = phase
+	return nil
+}
+
 // advanceLinear moves to the next phase in order, skipping route checks.
 func (sm *StateMachine) advanceLinear() (Phase, error) {
 	next, err := sm.nextPhase(sm.current)

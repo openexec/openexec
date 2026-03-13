@@ -243,8 +243,11 @@ export const StatusIcons: Record<string, React.FC<IconProps>> = {
 }
 
 /**
- * Get status icon component for a given status
+ * Render a status icon element for a given status.
+ * Use this instead of getStatusIcon when you need a JSX element to avoid
+ * the "component created during render" anti-pattern.
  */
-export const getStatusIcon = (status: string): React.FC<IconProps> => {
-  return StatusIcons[status] ?? PendingIcon
+export const renderStatusIcon = (status: string, props?: IconProps): React.ReactElement => {
+  const Icon = StatusIcons[status] ?? PendingIcon
+  return <Icon {...props} />
 }

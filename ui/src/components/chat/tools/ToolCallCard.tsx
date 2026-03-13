@@ -17,14 +17,9 @@ import {
 } from '../../../utils/theme'
 import { formatDuration, getToolDisplayName } from '../../../utils/formatters'
 import {
-  PendingIcon,
-  RunningIcon,
-  CompletedIcon,
   ErrorIcon,
-  CancelledIcon,
-  TimeoutIcon,
   ChevronDownIcon,
-  getStatusIcon,
+  renderStatusIcon,
 } from '../../../utils/icons'
 
 export interface ToolCallCardProps {
@@ -45,7 +40,6 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
 
   // Get status info from centralized config
   const statusInfo = getStatusInfo(toolCall.status)
-  const StatusIconComponent = getStatusIcon(toolCall.status)
   const riskColor = getRiskColor(toolCall.riskLevel as 'low' | 'medium' | 'high' | undefined)
   const isPending = toolCall.approvalStatus === 'pending'
   const hasOutput = toolCall.toolOutput !== undefined
@@ -81,7 +75,7 @@ const ToolCallCard: React.FC<ToolCallCardProps> = ({
             color: statusInfo.color,
           }}
         >
-          <StatusIconComponent />
+          {renderStatusIcon(toolCall.status)}
         </span>
 
         {/* Tool name */}

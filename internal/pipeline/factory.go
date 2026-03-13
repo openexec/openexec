@@ -61,12 +61,20 @@ func TractBriefingFunc(tractStore string) BriefingFunc {
 	return func(ctx context.Context, fwuID string) (string, error) {
 		client, err := tract.StartSubprocess(ctx, tractStore)
 		if err != nil {
+			msg := fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID)
+			
+			// Detect if this is likely a doc-only task from the ID or context
+			// (Future: pass more metadata to briefingFn)
+			if strings.Contains(strings.ToLower(fwuID), "study") || strings.Contains(strings.ToLower(fwuID), "mapping") {
+				msg += "\n**MANDATE:** This is a documentation/analysis task. DO NOT attempt to compile code or run tests. Focus on mapping and documenting boundaries.\n"
+			}
+
 			if strings.Contains(err.Error(), "executable file not found") {
 				log.Printf("[Briefing] tract binary not in path, using minimal briefing for %s", fwuID)
 			} else {
 				log.Printf("[Briefing] tract unavailable for %s, using minimal briefing: %v", fwuID, err)
 			}
-			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
+			return msg, nil
 		}
 		defer func() { _ = client.Close() }()
 
