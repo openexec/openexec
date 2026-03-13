@@ -818,6 +818,9 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 
 func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	lastIteration := -1
+	lastProgressTime := time.Now()
+
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
 		if err != nil { return err }
@@ -831,6 +834,14 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		if loop.Status == "complete" { return nil }
 		if loop.Status == "error" { return fmt.Errorf("%s", loop.Error) }
 		
+		// HEARTBEAT MONITOR: Detect if runner is making progress
+		if loop.Iteration > lastIteration {
+			lastIteration = loop.Iteration
+			lastProgressTime = time.Now()
+		} else if time.Since(lastProgressTime) > 5*time.Minute {
+			return fmt.Errorf("runner stalled: no iteration progress for 5 minutes")
+		}
+
 		if loop.Status == "paused" && strings.Contains(loop.Error, "Planning Mismatch") {
 			lowerErr := strings.ToLower(loop.Error)
 			isComplete := strings.Contains(lowerErr, "complete") || 

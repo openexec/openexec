@@ -85,11 +85,19 @@ func loadPendingTasks(projectDir string, mgr *release.Manager) ([]Task, error) {
 				fmt.Printf("  ✨ Deep-Healed: Restoring missing task %s to database...\n", tid)
 				title := plannedTitles[tid]
 				if title == "" { title = "Imported Task " + tid }
+				
+				// RECONSTRUCT DEPENDENCIES from the Plan of Record
+				var deps []string
+				if prev, ok := prevInStory[tid]; ok {
+					deps = append(deps, prev)
+				}
+
 				_ = mgr.CreateTask(&release.Task{
 					ID: tid, 
 					StoryID: sid, 
 					Title: title, 
 					Status: release.TaskStatusPending,
+					DependsOn: deps,
 				})
 			}
 		}
