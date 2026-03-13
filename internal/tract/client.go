@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 
@@ -35,7 +36,16 @@ func NewClient(in io.Writer, out io.Reader) *Client {
 // StartSubprocess launches `tract serve --store <name>` and returns a connected Client.
 // The subprocess is killed when Close is called or ctx is cancelled.
 func StartSubprocess(ctx context.Context, store string) (*Client, error) {
+	// Try "tract" first
 	cmd := exec.CommandContext(ctx, "tract", "serve", "--store", store)
+	
+	// Fallback to "openexec tract-serve" if tract is not in path
+	if _, err := exec.LookPath("tract"); err != nil {
+		if execPath, err := os.Executable(); err == nil {
+			cmd = exec.CommandContext(ctx, execPath, "tract-serve", "--store", store)
+		}
+	}
+
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("tract stdin pipe: %w", err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/openexec/openexec/internal/loop"
@@ -60,7 +61,11 @@ func TractBriefingFunc(tractStore string) BriefingFunc {
 	return func(ctx context.Context, fwuID string) (string, error) {
 		client, err := tract.StartSubprocess(ctx, tractStore)
 		if err != nil {
-			log.Printf("[Briefing] tract unavailable for %s, using minimal briefing: %v", fwuID, err)
+			if strings.Contains(err.Error(), "executable file not found") {
+				log.Printf("[Briefing] tract binary not in path, using minimal briefing for %s", fwuID)
+			} else {
+				log.Printf("[Briefing] tract unavailable for %s, using minimal briefing: %v", fwuID, err)
+			}
 			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
 		}
 		defer func() { _ = client.Close() }()

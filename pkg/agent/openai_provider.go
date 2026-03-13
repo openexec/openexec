@@ -33,9 +33,14 @@ const (
 	ModelGPT35Turbo = "gpt-3.5-turbo"
 	ModelO1         = "o1"
 	ModelO1Mini     = "o1-mini"
-	ModelO1Preview  = "o1-preview"
-	ModelO3Mini     = "o3-mini"
-)
+	ModelO1Preview = "o1-preview"
+	ModelO3Mini    = "o3-mini"
+
+	// GPT-5.3 (Codex) models
+	ModelGPT53           = "gpt-5.3"
+	ModelGPT53Codex      = "gpt-5.3-codex"
+	ModelGPT53CodexSpark = "gpt-5.3-codex-spark"
+	)
 
 // OpenAIProviderConfig holds configuration for the OpenAI provider.
 type OpenAIProviderConfig struct {
@@ -740,6 +745,9 @@ func defaultOpenAIModels() []string {
 		ModelO1Mini,
 		ModelO1Preview,
 		ModelO3Mini,
+		ModelGPT53,
+		ModelGPT53Codex,
+		ModelGPT53CodexSpark,
 	}
 }
 
@@ -877,13 +885,13 @@ func defaultOpenAIModelInfo() map[string]*ModelInfo {
 		},
 		ModelO3Mini: {
 			ID:       ModelO3Mini,
-			Name:     "O3 Mini",
+			Name:     "o3-mini",
 			Provider: "openai",
 			Capabilities: ProviderCapabilities{
 				Streaming:        true,
 				Vision:           false,
-				ToolUse:          true, // O3 supports function calling
-				SystemPrompt:     false,
+				ToolUse:          true,
+				SystemPrompt:     true,
 				MultiTurn:        true,
 				MaxContextTokens: 200000,
 				MaxOutputTokens:  100000,
@@ -891,8 +899,56 @@ func defaultOpenAIModelInfo() map[string]*ModelInfo {
 			PricePerMInputTokens:  1.10,
 			PricePerMOutputTokens: 4.40,
 		},
-	}
-}
+		ModelGPT53: {
+			ID:       ModelGPT53,
+			Name:     "GPT-5.3",
+			Provider: "openai",
+			Capabilities: ProviderCapabilities{
+				Streaming:        true,
+				Vision:           true,
+				ToolUse:          true,
+				SystemPrompt:     true,
+				MultiTurn:        true,
+				MaxContextTokens: 256000,
+				MaxOutputTokens:  16384,
+			},
+			PricePerMInputTokens:  5.00,
+			PricePerMOutputTokens: 15.00,
+		},
+		ModelGPT53Codex: {
+			ID:       ModelGPT53Codex,
+			Name:     "GPT-5.3 Codex",
+			Provider: "openai",
+			Capabilities: ProviderCapabilities{
+				Streaming:        true,
+				Vision:           true,
+				ToolUse:          true,
+				SystemPrompt:     true,
+				MultiTurn:        true,
+				MaxContextTokens: 256000,
+				MaxOutputTokens:  16384,
+			},
+			PricePerMInputTokens:  5.00,
+			PricePerMOutputTokens: 15.00,
+		},
+		ModelGPT53CodexSpark: {
+			ID:       ModelGPT53CodexSpark,
+			Name:     "GPT-5.3 Codex Spark",
+			Provider: "openai",
+			Capabilities: ProviderCapabilities{
+				Streaming:        true,
+				Vision:           true,
+				ToolUse:          true,
+				SystemPrompt:     true,
+				MultiTurn:        true,
+				MaxContextTokens: 256000,
+				MaxOutputTokens:  16384,
+			},
+			PricePerMInputTokens:  5.00,
+			PricePerMOutputTokens: 15.00,
+		},
+		}
+		}
 
 // OpenAI API request/response types
 

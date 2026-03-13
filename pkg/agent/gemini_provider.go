@@ -33,6 +33,8 @@ const (
 	ModelGemini15Flash       = "gemini-1.5-flash"
 	ModelGemini15FlashLatest = "gemini-1.5-flash-latest"
 	ModelGemini15Flash8B     = "gemini-1.5-flash-8b"
+	ModelGemini31ProPreview  = "gemini-3.1-pro-preview"
+	ModelGemini31FlashPreview = "gemini-3.1-flash-preview"
 	ModelGeminiPro           = "gemini-pro"
 	ModelGeminiProVision     = "gemini-pro-vision"
 )
@@ -768,6 +770,8 @@ func defaultGeminiModels() []string {
 		ModelGemini15Flash,
 		ModelGemini15FlashLatest,
 		ModelGemini15Flash8B,
+		ModelGemini31ProPreview,
+		ModelGemini31FlashPreview,
 		ModelGeminiPro,
 		ModelGeminiProVision,
 	}
@@ -887,6 +891,38 @@ func defaultGeminiModelInfo() map[string]*ModelInfo {
 			},
 			PricePerMInputTokens:  0.0375,
 			PricePerMOutputTokens: 0.15,
+		},
+		ModelGemini31ProPreview: {
+			ID:       ModelGemini31ProPreview,
+			Name:     "Gemini 3.1 Pro Preview",
+			Provider: "gemini",
+			Capabilities: ProviderCapabilities{
+				Streaming:        true,
+				Vision:           true,
+				ToolUse:          true,
+				SystemPrompt:     true,
+				MultiTurn:        true,
+				MaxContextTokens: 2097152,
+				MaxOutputTokens:  8192,
+			},
+			PricePerMInputTokens:  1.25,
+			PricePerMOutputTokens: 3.75,
+		},
+		ModelGemini31FlashPreview: {
+			ID:       ModelGemini31FlashPreview,
+			Name:     "Gemini 3.1 Flash Preview",
+			Provider: "gemini",
+			Capabilities: ProviderCapabilities{
+				Streaming:        true,
+				Vision:           true,
+				ToolUse:          true,
+				SystemPrompt:     true,
+				MultiTurn:        true,
+				MaxContextTokens: 1048576,
+				MaxOutputTokens:  8192,
+			},
+			PricePerMInputTokens:  0.10,
+			PricePerMOutputTokens: 0.40,
 		},
 		ModelGeminiPro: {
 			ID:       ModelGeminiPro,

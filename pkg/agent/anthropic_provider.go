@@ -112,6 +112,28 @@ func (p *AnthropicProvider) initModels() {
 		PricePerMOutputTokens: 15.0,
 	}
 
+	p.models["claude-4-6-haiku-20260215"] = &ModelInfo{
+		ID:       "claude-4-6-haiku-20260215",
+		Name:     "Claude 4.6 Haiku",
+		Provider: "anthropic",
+		Capabilities: ProviderCapabilities{
+			Streaming:        true,
+			Vision:           true,
+			ToolUse:          true,
+			SystemPrompt:     true,
+			MultiTurn:        true,
+			MaxContextTokens: 200000,
+			MaxOutputTokens:  16000,
+		},
+		PricePerMInputTokens:  0.25,
+		PricePerMOutputTokens: 1.25,
+	}
+
+	// Aliases for init command compatibility
+	p.models["sonnet"] = p.models["claude-4-6-sonnet-20260215"]
+	p.models["opus"] = p.models["claude-4-6-opus-20260215"]
+	p.models["haiku"] = p.models["claude-4-6-haiku-20260215"]
+
 	p.models["claude-opus-4-5-20251101"] = &ModelInfo{
 		ID:       "claude-opus-4-5-20251101",
 		Name:     "Claude Opus 4.5",
