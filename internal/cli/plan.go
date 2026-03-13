@@ -69,7 +69,9 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 			return fmt.Errorf("validation error: %w", err)
 		}
 
-		if planFix && planValidateOnly {
+		shouldFix := planFix || doctorIntentFix
+
+		if shouldFix && (planValidateOnly || doctorIntentFix) {
 			fixer := intent.NewFixer(result)
 			cmd.Println(fixer.Preview())
 			if !result.Valid {

@@ -344,9 +344,9 @@ func (v *Validator) validateConstraints(result *ValidationResult) {
 	}
 
 	if !hasPlatform {
-		result.Critical = append(result.Critical, ValidationIssue{
+		result.Warnings = append(result.Warnings, ValidationIssue{
 			Rule:     "platform_missing",
-			Severity: SeverityCritical,
+			Severity: SeverityWarning,
 			Message:  "Target platform not explicitly defined",
 			Hint:     "Add target platform (e.g., macOS, Linux, Web, Docker) to Constraints or Requirements",
 			Section:  "Constraints",
@@ -364,9 +364,9 @@ func (v *Validator) validateConstraints(result *ValidationResult) {
 	}
 
 	if !hasShape {
-		result.Critical = append(result.Critical, ValidationIssue{
+		result.Warnings = append(result.Warnings, ValidationIssue{
 			Rule:     "shape_missing",
-			Severity: SeverityCritical,
+			Severity: SeverityWarning,
 			Message:  "Application shape/type not defined",
 			Hint:     "Specify if this is a CLI, Web App, Mobile App, API, etc.",
 			Section:  "Constraints",

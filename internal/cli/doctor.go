@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	doctorAPIBase string
+	doctorAPIBase  string
+	doctorIntentFix bool
 )
 
 var doctorCmd = &cobra.Command{
@@ -25,6 +26,15 @@ var doctorCmd = &cobra.Command{
 	Long:  `Check if required runner CLIs are installed and authenticated, and verify project configuration.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runDoctor(cmd)
+	},
+}
+
+var doctorIntentCmd = &cobra.Command{
+	Use:   "intent",
+	Short: "Validate and optionally fix INTENT.md",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Just call plan validation logic
+		return GenerateAndSave(cmd, "INTENT.md", ".")
 	},
 }
 
@@ -124,5 +134,9 @@ func runDoctor(cmd *cobra.Command) error {
 
 func init() {
 	doctorCmd.Flags().StringVar(&doctorAPIBase, "api", "", "Check remote execution API health (e.g. http://localhost:8765)")
+	
+	doctorIntentCmd.Flags().BoolVar(&doctorIntentFix, "fix", false, "Scaffold missing sections in INTENT.md")
+	doctorCmd.AddCommand(doctorIntentCmd)
+	
 	rootCmd.AddCommand(doctorCmd)
 }
