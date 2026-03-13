@@ -522,6 +522,13 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				success := false
 
 				for node.Retries < maxRetries {
+					// STALL RECOVERY: If this is a retry, stop the existing loop first to ensure a fresh process
+					if node.Retries > 0 {
+						stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, node.Task.ID)
+						_, _ = http.Post(stopURL, "application/json", nil)
+						time.Sleep(1 * time.Second) // Give the server a moment to kill the process
+					}
+
 					loopID, err := createExecutionLoopWithRetry(projectDir, node.Task, mgr, lastError)
 					if err != nil {
 						lastError = err.Error()
