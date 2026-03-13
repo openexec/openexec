@@ -1111,8 +1111,12 @@ Note: 'openexec run' now performs this step automatically via deep-healing.`,
 					cmd.Printf("  [audit-error] %s: task missing from database after import\n", id)
 					missingTasks++
 				} else if t.StoryID != s.ID {
-					cmd.Printf("  [audit-error] %s: task is linked to story %s, expected %s\n", id, t.StoryID, s.ID)
-					mislinkedTasks++
+					if reassign {
+						cmd.Printf("  [audit-fix] %s: task was mislinked but reassigned to story %s\n", id, s.ID)
+					} else {
+						cmd.Printf("  [audit-error] %s: task is linked to story %s, expected %s (run with --reassign to fix)\n", id, t.StoryID, s.ID)
+						mislinkedTasks++
+					}
 				}
 			}
 		}

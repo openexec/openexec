@@ -181,8 +181,9 @@ var runCmd = &cobra.Command{
 		}
 
 		// 1. AUTO-START ENGINE
-		if !isServerRunning(config.ProjectDir, startPort) {
+		if !isServerRunning(config.ProjectDir, 0) { // Check if ANY engine is running for this project
 			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
+			// Start with requested port, but it might move if busy
 			startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
 			execPath, _ := os.Executable()
 			startExec := exec.Command(execPath, startArgs...)
@@ -191,18 +192,20 @@ var runCmd = &cobra.Command{
 				return fmt.Errorf("failed to auto-start execution engine: %w", err)
 			}
 			
-			time.Sleep(500 * time.Millisecond)
-			if _, effectivePort, err := readPID(config.ProjectDir); err == nil {
-				if effectivePort != startPort {
-					cmd.Printf("   ℹ️ Engine started on effective port %d (PID file sync)\n", effectivePort)
-					startPort = effectivePort
-				}
-			}
+			// Wait for PID file to be written and engine to initialize
+			time.Sleep(1 * time.Second)
+		}
 
-			if err := waitForServer(startPort, 15*time.Second); err != nil {
-				return fmt.Errorf("engine failed to become ready on port %d: %w", startPort, err)
+		// Always sync port from PID file to handle auto-migration (port busy)
+		if _, effectivePort, err := readPID(config.ProjectDir); err == nil {
+			if effectivePort != startPort {
+				cmd.Printf("   ℹ️ Syncing with engine on port %d (PID file sync)\n", effectivePort)
+				startPort = effectivePort
 			}
-			cmd.Println("✓ Execution engine started successfully.")
+		}
+
+		if err := waitForServer(startPort, 15*time.Second); err != nil {
+			return fmt.Errorf("engine failed to become ready on port %d: %w", startPort, err)
 		}
 
 		// 2. MAIN EXECUTION LOOP (Supports Autonomous Plan-Healing Restarts)
@@ -712,11 +715,35 @@ func waitForServer(port int, timeout time.Duration) error {
 }
 
 func isServerRunning(projectDir string, port int) bool {
-	pid, _, err := readPID(projectDir)
-	if err != nil { return false }
+	pid, runningPort, err := readPID(projectDir)
+	if err != nil {
+		return false
+	}
+
+	// 1. Check if PID is alive
 	process, err := os.FindProcess(pid)
-	if err != nil { return false }
-	return process.Signal(syscall.Signal(0)) == nil
+	if err != nil {
+		return false
+	}
+	// On Unix, findProcess always succeeds, so we must check Signal(0)
+	if process.Signal(syscall.Signal(0)) != nil {
+		return false
+	}
+
+	// 2. Check if port is responding
+	// If port is 0, we use the port from the PID file
+	checkPort := runningPort
+	if port > 0 {
+		checkPort = port
+	}
+
+	client := http.Client{Timeout: 500 * time.Millisecond}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/ready", checkPort))
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 func upsertTaskStatus(projectDir string, taskID string, status string, storyID string) error {
