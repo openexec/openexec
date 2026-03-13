@@ -18,6 +18,8 @@ var (
 	initReviewEnabled  bool
 	initReviewerModel  string
 	initNonInteractive bool
+	initParallel       bool
+	initWorkerCount    int
 	initForce          bool
 )
 
@@ -105,8 +107,14 @@ The project name defaults to the current directory name if not provided.`,
 			executorModel = initExecutorModel
 			reviewEnabled = initReviewEnabled
 			reviewerModel = initReviewerModel
-			parallelEnabled = true
-			workerCount = 4
+			
+			// Respect flag if provided in non-interactive mode
+			parallelEnabled = initParallel
+			workerCount = initWorkerCount
+			if !parallelEnabled {
+				workerCount = 1
+			}
+			
 			gitCommitEnabled = false
 			gitPushEnabled = false
 		}
@@ -159,6 +167,8 @@ func init() {
 	initCmd.Flags().BoolVar(&initNonInteractive, "no-review", false, "Disable code review (non-interactive)")
 	initCmd.Flags().StringVar(&initReviewerModel, "reviewer", "opus", "Model to use for code review")
 	initCmd.Flags().BoolVarP(&initNonInteractive, "yes", "y", false, "Non-interactive mode (use defaults)")
+	initCmd.Flags().BoolVar(&initParallel, "parallel", true, "Enable parallel task execution (non-interactive)")
+	initCmd.Flags().IntVar(&initWorkerCount, "worker-count", 4, "Number of concurrent workers (non-interactive)")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Force re-initialization of an existing project")
 
 	rootCmd.AddCommand(initCmd)

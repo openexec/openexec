@@ -10,12 +10,13 @@ func TestParser_Parse(t *testing.T) {
 		name           string
 		input          string
 		expectedEvents int
-		checkEvent     func(*testing.T, Event)
+		// checkEvent verifies the non-progress event(s). Progress heartbeats are filtered out.
+		checkEvent func(*testing.T, Event)
 	}{
 		{
 			name:           "assistant text event",
 			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"hello\"}]}}\n",
-			expectedEvents: 1,
+			expectedEvents: 2, // progress heartbeat + text event
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventAssistantText {
 					t.Errorf("expected EventAssistantText, got %v", e.Type)
@@ -28,7 +29,7 @@ func TestParser_Parse(t *testing.T) {
 		{
 			name:           "tool use event",
 			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"write_file\", \"input\": {\"path\": \"test.txt\"}}]}}\n",
-			expectedEvents: 1,
+			expectedEvents: 2, // progress heartbeat + tool event
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventToolStart {
 					t.Errorf("expected EventToolStart, got %v", e.Type)
@@ -41,7 +42,7 @@ func TestParser_Parse(t *testing.T) {
 		{
 			name:           "axon signal event",
 			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"openexec_signal\", \"input\": {\"type\": \"complete\", \"reason\": \"done\"}}]}}\n",
-			expectedEvents: 1,
+			expectedEvents: 2, // progress heartbeat + signal event
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Type != EventSignalReceived {
 					t.Errorf("expected EventSignalReceived, got %v", e.Type)
@@ -54,7 +55,7 @@ func TestParser_Parse(t *testing.T) {
 		{
 			name:           "robust parsing of messy json line",
 			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"messy\"}]}, \"extra\": \"garbage\",}\n",
-			expectedEvents: 1,
+			expectedEvents: 2, // progress heartbeat + text event
 			checkEvent: func(t *testing.T, e Event) {
 				if e.Text != "messy" {
 					t.Errorf("expected 'messy', got %q", e.Text)
@@ -78,6 +79,10 @@ func TestParser_Parse(t *testing.T) {
 			count := 0
 			for e := range events {
 				count++
+				// Skip progress heartbeats when checking event content
+				if e.Type == EventProgress {
+					continue
+				}
 				if tt.checkEvent != nil {
 					tt.checkEvent(t, e)
 				}
