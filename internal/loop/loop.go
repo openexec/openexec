@@ -128,8 +128,9 @@ func (l *Loop) Run(ctx context.Context) error {
         forceProvider := os.Getenv("OPENEXEC_FORCE_PROVIDER") == "1"
         isProviderBinary := false
         if l.cfg.CommandName != "" {
-            name := filepath.Base(l.cfg.CommandName)
-            isProviderBinary = (name == "openai" || name == "gemini")
+            // Only hijack if it's EXACTLY "openai" or "gemini" (no path)
+            // If it's a path like /usr/local/bin/gemini, it's an external tool.
+            isProviderBinary = (l.cfg.CommandName == "openai" || l.cfg.CommandName == "gemini")
         }
 
         useProvider := (isProviderBinary && l.cfg.RunnerCommand == "") || forceProvider

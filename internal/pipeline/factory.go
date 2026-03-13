@@ -72,6 +72,7 @@ func TractBriefingFunc(tractStore string) BriefingFunc {
 
 		brief, err := client.Brief(fwuID)
 		if err != nil {
+			// Catch read response errors (like unexpected EOF) and other protocol failures
 			log.Printf("[Briefing] tract briefing failed for %s, using minimal briefing: %v", fwuID, err)
 			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
 		}
