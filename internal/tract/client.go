@@ -2,6 +2,7 @@ package tract
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ type Client struct {
 	in     io.Writer      // send requests to Tract
 	out    *bufio.Scanner // read responses from Tract
 	cmd    *exec.Cmd      // nil when created from raw io (tests)
+	stderr *bytes.Buffer  // capture subprocess errors
 	nextID int
 	mu     sync.Mutex
 }
@@ -31,6 +33,7 @@ func NewClient(in io.Writer, out io.Reader) *Client {
 		in:     in,
 		out:    scanner,
 		nextID: 1,
+		stderr: new(bytes.Buffer),
 	}
 }
 
@@ -55,6 +58,10 @@ func StartSubprocess(ctx context.Context, store string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tract stdout pipe: %w", err)
 	}
+	
+	stderr := new(bytes.Buffer)
+	cmd.Stderr = stderr
+
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("tract start: %w", err)
 	}
@@ -62,8 +69,15 @@ func StartSubprocess(ctx context.Context, store string) (*Client, error) {
 	// Give the subprocess a moment to initialize its IO pipes
 	time.Sleep(100 * time.Millisecond)
 
+	// Check if process died immediately
+	state := cmd.ProcessState
+	if state != nil && state.Exited() {
+		return nil, fmt.Errorf("tract process exited immediately: %s", stderr.String())
+	}
+
 	c := NewClient(stdin, stdout)
 	c.cmd = cmd
+	c.stderr = stderr
 	return c, nil
 }
 
@@ -150,7 +164,10 @@ func (c *Client) call(method string, params interface{}) (*mcp.Response, error) 
 	}
 
 	if err := c.send(req); err != nil {
-		return nil, err
+		if c.stderr != nil && c.stderr.Len() > 0 {
+			return nil, fmt.Errorf("send: %w (stderr: %s)", err, c.stderr.String())
+		}
+		return nil, fmt.Errorf("send: %w", err)
 	}
 
 	return c.readResponse()
@@ -180,10 +197,14 @@ func (c *Client) send(req mcp.Request) error {
 
 func (c *Client) readResponse() (*mcp.Response, error) {
 	if !c.out.Scan() {
+		errMsg := "unexpected EOF"
 		if err := c.out.Err(); err != nil {
-			return nil, fmt.Errorf("read response: %w", err)
+			errMsg = err.Error()
 		}
-		return nil, fmt.Errorf("read response: unexpected EOF")
+		if c.stderr != nil && c.stderr.Len() > 0 {
+			return nil, fmt.Errorf("read response: %s (stderr: %s)", errMsg, c.stderr.String())
+		}
+		return nil, fmt.Errorf("read response: %s", errMsg)
 	}
 
 	var resp mcp.Response
