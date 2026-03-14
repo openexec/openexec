@@ -269,9 +269,10 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		} else {
 			// Linear advancement.
 			if isStudy && phase == PhaseTD {
-				// Fast-track for doc-only study/mapping tasks
-				if err := p.sm.JumpTo(PhaseFL); err != nil {
-					return fmt.Errorf("jump to FL for study task: %w", err)
+				// Fast-track: Study tasks are done after Technical Design.
+				// No need for IM (Implement), RV (Review), RF (Refactor), or FL (Feedback Loop).
+				if err := p.sm.JumpTo(PhaseDone); err != nil {
+					return fmt.Errorf("complete study task: %w", err)
 				}
 			} else {
 				if _, err := p.sm.Advance(); err != nil {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/openexec/openexec/internal/mcp"
 )
@@ -57,6 +58,10 @@ func StartSubprocess(ctx context.Context, store string) (*Client, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("tract start: %w", err)
 	}
+	
+	// Give the subprocess a moment to initialize its IO pipes
+	time.Sleep(100 * time.Millisecond)
+
 	c := NewClient(stdin, stdout)
 	c.cmd = cmd
 	return c, nil
