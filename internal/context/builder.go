@@ -3,8 +3,12 @@ package context
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -419,9 +423,19 @@ func DefaultBuilderOptions() *ContextBuilderOptions {
 }
 
 // BuildContext is a convenience function that builds context with the given options.
+// It includes a simple in-memory cache to reuse context within the same process
+// when project state hasn't changed.
 func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderOptions) (*BuilderResult, error) {
 	if opts == nil {
 		opts = DefaultBuilderOptions()
+	}
+
+	// Try cache if enabled (default true for performance)
+	cacheKey := deriveCacheKey(projectPath, opts)
+	if cacheKey != "" {
+		if cached, ok := globalContextCache.Load(cacheKey); ok {
+			return cached.(*BuilderResult), nil
+		}
 	}
 
 	// Create or use provided registry
@@ -459,7 +473,32 @@ func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderO
 		builder = b
 	}
 
-	return builder.Build(ctx, projectPath)
+	result, err := builder.Build(ctx, projectPath)
+	if err == nil && cacheKey != "" {
+		globalContextCache.Store(cacheKey, result)
+	}
+	return result, err
+}
+
+var globalContextCache sync.Map
+
+func deriveCacheKey(projectPath string, opts *ContextBuilderOptions) string {
+	// Base key is the project path
+	key := projectPath
+
+	// Add git state if available
+	if data, err := os.ReadFile(filepath.Join(projectPath, ".git", "HEAD")); err == nil {
+		key += ":" + strings.TrimSpace(string(data))
+	}
+
+	// Add options hash to differentiate between different gathering settings
+	if opts != nil {
+		optsJSON, _ := json.Marshal(opts)
+		hash := sha256.Sum256(optsJSON)
+		key += ":" + hex.EncodeToString(hash[:])
+	}
+
+	return key
 }
 
 // filterRegistry creates a new registry with filtered gatherers.

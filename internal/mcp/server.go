@@ -200,13 +200,39 @@ func (s *Server) handleToolsCall(req Request) {
 		s.handleReadFile(req, params)
 	case "write_file":
 		s.handleWriteFile(req, params)
-    case "run_shell_command":
-        // Disable shell execution by default for safety; require explicit danger mode.
-        if os.Getenv("OPENEXEC_MODE") != "danger-full-access" {
-            s.writeToolError(req.ID, "run_shell_command is disabled unless OPENEXEC_MODE=danger-full-access")
-            return
-        }
-        s.handleRunShellCommand(req, params)
+	case "run_shell_command":
+		// Disable shell execution by default for safety; require explicit danger mode.
+		if os.Getenv("OPENEXEC_MODE") != "danger-full-access" {
+			s.writeToolError(req.ID, "run_shell_command is disabled unless OPENEXEC_MODE=danger-full-access")
+			return
+		}
+
+		// Security: Implement a command allowlist even in danger mode.
+		var rscReq struct {
+			Command string `json:"command"`
+		}
+		if err := json.Unmarshal(params.Arguments, &rscReq); err == nil {
+			allowedCommands := map[string]bool{
+				"go": true, "npm": true, "ls": true, "pwd": true, "git": true,
+				"cat": true, "grep": true, "find": true, "mkdir": true, "rm": true,
+				"touch": true, "cp": true, "mv": true, "chmod": true, "chown": true,
+				"pytest": true, "ruff": true, "mypy": true, "black": true, "isort": true,
+				"tsc": true, "vitest": true, "eslint": true, "prettier": true, "python": true, "python3": true,
+				"uv": true, "pip": true, "poetry": true, "make": true, "just": true,
+			}
+			fields := strings.Fields(rscReq.Command)
+			if len(fields) == 0 {
+				s.writeToolError(req.ID, "empty command")
+				return
+			}
+			baseCmd := filepath.Base(fields[0])
+			if !allowedCommands[baseCmd] {
+				s.writeToolError(req.ID, fmt.Sprintf("command '%s' is not in the allowlist", baseCmd))
+				return
+			}
+		}
+
+		s.handleRunShellCommand(req, params)
 	case "git_apply_patch":
 		s.handleGitApplyPatch(req, params)
 	case "fork_session":
@@ -256,7 +282,7 @@ func (s *Server) handleReadFile(req Request, params toolsCallParams) {
 	}
 
     // Validate path security against workspace root
-    allowed := []string{}
+    allowed := DefaultPathValidatorConfig().AllowedRoots
     if root := os.Getenv("WORKSPACE_ROOT"); root != "" {
         allowed = []string{root}
     }
@@ -337,7 +363,7 @@ func (s *Server) handleWriteFile(req Request, params toolsCallParams) {
         s.writeToolError(req.ID, "write is not allowed in read-only mode")
         return
     }
-    allowed := []string{}
+    allowed := DefaultPathValidatorConfig().AllowedRoots
     if root := os.Getenv("WORKSPACE_ROOT"); root != "" {
         allowed = []string{root}
     }
