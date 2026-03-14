@@ -61,10 +61,18 @@ GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-darwin-amd
 echo "   - Building linux/amd64..."
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-linux-amd64 ./cmd/openexec
 
+echo "   - Building linux/arm64..."
+GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/openexec-linux-arm64 ./cmd/openexec
+
+echo "   - Building windows/amd64..."
+GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-windows-amd64.exe ./cmd/openexec
+
 echo "3. Copying binaries to openexec-web..."
 cp "$OPENEXEC_DIR/bin/openexec-darwin-arm64" "$PROJECTS_DIR/openexec-web/public/downloads/"
 cp "$OPENEXEC_DIR/bin/openexec-darwin-amd64" "$PROJECTS_DIR/openexec-web/public/downloads/"
 cp "$OPENEXEC_DIR/bin/openexec-linux-amd64" "$PROJECTS_DIR/openexec-web/public/downloads/"
+cp "$OPENEXEC_DIR/bin/openexec-linux-arm64" "$PROJECTS_DIR/openexec-web/public/downloads/"
+cp "$OPENEXEC_DIR/bin/openexec-windows-amd64.exe" "$PROJECTS_DIR/openexec-web/public/downloads/"
 
 echo "$VERSION" > "$PROJECTS_DIR/openexec-web/public/version.txt"
 
@@ -80,20 +88,20 @@ echo "5. Committing and Pushing..."
 cd "$PROJECTS_DIR/openexec-web"
 git add .
 git commit -m "release: v$VERSION" || true
-git push origin main || true
+# git push origin main || true
 
 # openexec-docs
 cd "$PROJECTS_DIR/openexec-docs"
 git add .
 git commit -m "docs: bump version to v$VERSION" || true
-git push origin main || true
+# git push origin main || true
 
 # openexec
 cd "$OPENEXEC_DIR"
 git add .
 git commit -m "release: v$VERSION" || true
-git push origin main || true
+# git push origin main || true
 git tag -f "v$VERSION"
-git push origin -f "v$VERSION"
+# git push origin -f "v$VERSION"
 
 echo "✅ Release v$VERSION completed successfully!"
