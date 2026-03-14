@@ -2232,3 +2232,303 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// ==================== ValidatePatchPathsInWorkspace Tests (Goal G-004) ====================
+
+func TestValidatePatchPathsInWorkspace_ValidPathsInWorkspace(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "src/main.go", NewName: "src/main.go"},
+			{OldName: "tests/test.go", NewName: "tests/test.go"},
+			{OldName: "README.md", NewName: "README.md"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for valid paths: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_NewFile(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "/dev/null", NewName: "src/newfile.go", IsNew: true},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for new file: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_DeletedFile(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "src/deprecated.go", NewName: "/dev/null", IsDeleted: true},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for deleted file: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_PathTraversalAttack(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// Attempt to escape workspace via path traversal
+			{OldName: "../../../etc/passwd", NewName: "../../../etc/passwd"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error for path traversal attack")
+	}
+	if validationErr, ok := err.(*ValidationError); ok {
+		if validationErr.Field != "patch" {
+			t.Errorf("expected field 'patch', got %q", validationErr.Field)
+		}
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_AbsolutePathOutsideWorkspace(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// Absolute path pointing outside workspace
+			{OldName: "/etc/passwd", NewName: "/etc/passwd"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error for absolute path outside workspace")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_AbsolutePathInsideWorkspace(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// Absolute path inside workspace should be allowed
+			{OldName: "/home/user/project/src/main.go", NewName: "/home/user/project/src/main.go"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for absolute path inside workspace: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_MixedPaths(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// Valid relative path
+			{OldName: "src/main.go", NewName: "src/main.go"},
+			// Path traversal attempt mixed in
+			{OldName: "../../secret/file", NewName: "../../secret/file"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error when any path is outside workspace")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_NilPatch(t *testing.T) {
+	err := ValidatePatchPathsInWorkspace(nil, "/workspace")
+	if err == nil {
+		t.Error("expected error for nil patch")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_EmptyWorkspaceRoot(t *testing.T) {
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "file.txt", NewName: "file.txt"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, "")
+	if err == nil {
+		t.Error("expected error for empty workspace root")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_EmptyPatchFiles(t *testing.T) {
+	patch := &Patch{
+		Files: []PatchFile{},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, "/workspace")
+	if err != nil {
+		t.Errorf("unexpected error for empty patch files: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_DeepNestedPath(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "a/b/c/d/e/f/g/deeply/nested/file.go", NewName: "a/b/c/d/e/f/g/deeply/nested/file.go"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for deeply nested path: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_PathWithSpaces(t *testing.T) {
+	workspaceRoot := "/home/user/my project"
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "src/my file.go", NewName: "src/my file.go"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for path with spaces: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_SymlinkStylePath(t *testing.T) {
+	// Even if paths look like they might resolve via symlinks,
+	// we validate the literal path against workspace root
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// This is a sneaky path that tries to use ".." after a directory
+			{OldName: "src/subdir/../../../outside/file", NewName: "src/subdir/../../../outside/file"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error for path with embedded traversal")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_RenameWithinWorkspace(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// Rename file within workspace
+			{OldName: "old_name.go", NewName: "new_name.go", IsRenamed: true},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err != nil {
+		t.Errorf("unexpected error for rename within workspace: %v", err)
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_RenameToOutsideWorkspace(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// Attempt to rename to outside workspace
+			{OldName: "src/file.go", NewName: "/tmp/stolen_file.go", IsRenamed: true},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error for rename to outside workspace")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_DotDotInFilename(t *testing.T) {
+	// A file literally named "..something" is different from path traversal
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			// File named "..secret" (not path traversal)
+			{OldName: "src/..secret.txt", NewName: "src/..secret.txt"},
+		},
+	}
+
+	// This should fail because the path contains ".." pattern
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error for path containing '..' pattern")
+	}
+}
+
+func TestValidatePatchPathsInWorkspace_NullByteInPath(t *testing.T) {
+	workspaceRoot := "/home/user/project"
+	patch := &Patch{
+		Files: []PatchFile{
+			{OldName: "src/file\x00.go", NewName: "src/file\x00.go"},
+		},
+	}
+
+	err := ValidatePatchPathsInWorkspace(patch, workspaceRoot)
+	if err == nil {
+		t.Error("expected error for path with null byte")
+	}
+}
+
+func TestIsAbsolutePath(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"/absolute/path", true},
+		{"/", true},
+		{"relative/path", false},
+		{"./relative", false},
+		{"../parent", false},
+		{"", false},
+		{"C:/windows/path", true},
+		{"C:\\windows\\path", true},
+		{"file.txt", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := isAbsolutePath(tt.path)
+			if result != tt.expected {
+				t.Errorf("isAbsolutePath(%q) = %v, want %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestJoinPath(t *testing.T) {
+	tests := []struct {
+		root    string
+		relPath string
+	}{
+		{"/workspace", "file.txt"},
+		{"/workspace", "src/main.go"},
+		{"/workspace/", "file.txt"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.root+"/"+tt.relPath, func(t *testing.T) {
+			result := joinPath(tt.root, tt.relPath)
+			if result == "" {
+				t.Error("joinPath should not return empty string")
+			}
+			// Result should be an absolute path
+			if !isAbsolutePath(result) {
+				t.Errorf("joinPath result should be absolute, got %q", result)
+			}
+		})
+	}
+}

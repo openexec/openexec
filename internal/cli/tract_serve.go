@@ -31,7 +31,7 @@ var tractServeCmd = &cobra.Command{
 
 		// Pass-through to real tract
 		serveArgs := []string{"serve", "--store", tractStorePath}
-		
+
 		// Use syscall.Exec to replace current process
 		return syscall.Exec(bin, append([]string{bin}, serveArgs...), os.Environ())
 	},

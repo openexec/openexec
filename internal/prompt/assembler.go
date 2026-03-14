@@ -39,21 +39,28 @@ func NewAssembler(f fs.FS) *Assembler {
 // Compose builds a complete system prompt for the given agent, workflow, and briefing.
 // Returns the prompt string or an error if the agent, workflow, or params are invalid.
 func (a *Assembler) Compose(agent, workflowID, briefing string) (string, error) {
-	isContinuation := a.lastBriefing == briefing && a.lastWorkflowID == workflowID && a.lastAgent == agent
-	
-	var staticBlock string
+    _, _, full, err := a.ComposeParts(agent, workflowID, briefing)
+    return full, err
+}
+
+// ComposeParts builds the prompt and returns (stablePrefix, volatileTail, fullPrompt).
+// Stable prefix should remain byte-identical across runs to maximize provider caching.
+func (a *Assembler) ComposeParts(agent, workflowID, briefing string) (string, string, string, error) {
+    isContinuation := a.lastBriefing == briefing && a.lastWorkflowID == workflowID && a.lastAgent == agent
+    
+    var staticBlock string
 	if a.lastAgent == agent && a.lastStaticBlock != "" {
 		staticBlock = a.lastStaticBlock
 	} else {
 		// Build new static block (Agent + Persona)
 		mf, err := a.manifests.Get(agent)
 		if err != nil {
-			return "", fmt.Errorf("compose manifest: %w", err)
+        return "", "", "", fmt.Errorf("compose manifest: %w", err)
 		}
 
 		p, err := a.personas.Get(mf.Persona)
 		if err != nil {
-			return "", fmt.Errorf("compose persona: %w", err)
+        return "", "", "", fmt.Errorf("compose persona: %w", err)
 		}
 
 		var sb strings.Builder
@@ -74,62 +81,60 @@ func (a *Assembler) Compose(agent, workflowID, briefing string) (string, error) 
 	a.lastAgent = agent
 
 	// Load agent manifest for workflow params
-	mf, err := a.manifests.Get(agent)
-	if err != nil {
-		return "", fmt.Errorf("compose: %w", err)
-	}
+    mf, err := a.manifests.Get(agent)
+    if err != nil {
+        return "", "", "", fmt.Errorf("compose: %w", err)
+    }
 
 	// Load workflow template.
-	tmpl, err := a.workflows.Get(workflowID)
-	if err != nil {
-		return "", fmt.Errorf("compose: %w", err)
-	}
+    tmpl, err := a.workflows.Get(workflowID)
+    if err != nil {
+        return "", "", "", fmt.Errorf("compose: %w", err)
+    }
 
 	// Get param values from manifest for this workflow.
 	params := mf.WorkflowParams(workflowID)
 
 	// Validate params.
-	if err := workflow.Validate(tmpl.Params, params); err != nil {
-		return "", fmt.Errorf("compose: workflow %q for agent %q: %w", workflowID, agent, err)
-	}
+    if err := workflow.Validate(tmpl.Params, params); err != nil {
+        return "", "", "", fmt.Errorf("compose: workflow %q for agent %q: %w", workflowID, agent, err)
+    }
 
 	// Expand template placeholders.
-	instructions, err := workflow.Expand(tmpl.Instructions, params)
-	if err != nil {
-		return "", fmt.Errorf("compose: workflow %q instructions: %w", workflowID, err)
-	}
-	process, err := workflow.Expand(tmpl.Process, params)
-	if err != nil {
-		return "", fmt.Errorf("compose: workflow %q process: %w", workflowID, err)
-	}
+    instructions, err := workflow.Expand(tmpl.Instructions, params)
+    if err != nil {
+        return "", "", "", fmt.Errorf("compose: workflow %q instructions: %w", workflowID, err)
+    }
+    process, err := workflow.Expand(tmpl.Process, params)
+    if err != nil {
+        return "", "", "", fmt.Errorf("compose: workflow %q process: %w", workflowID, err)
+    }
 
-	// Build final prompt
-	var b strings.Builder
-	b.WriteString(staticBlock)
+    // Build stable prefix: persona + workflow + protocols
+    var stable strings.Builder
+    stable.WriteString(staticBlock)
+    stable.WriteString("## Workflow\n\n")
+    stable.WriteString(instructions)
+    stable.WriteString("\n\n")
+    stable.WriteString(process)
+    stable.WriteString("\n\n")
+    stable.WriteString(SignalProtocol())
+    stable.WriteString("\n\n")
+    stable.WriteString(ConsultProtocol())
+    stable.WriteString("\n")
 
-	// Workflow section
-	b.WriteString("## Workflow\n\n")
-	b.WriteString(instructions)
-	b.WriteString("\n\n")
-	b.WriteString(process)
-	b.WriteString("\n\n")
+    // Volatile tail: briefing only
+    var volatile strings.Builder
+    if briefing != "" {
+        if isContinuation {
+            volatile.WriteString("## Briefing: CONTINUATION\n\n")
+            volatile.WriteString("The briefing for this task remains identical to your previous phase. Maintain all existing design decisions and constraints. Focus on completing the remaining workflow steps for this same task.\n\n")
+        } else {
+            volatile.WriteString(briefing)
+            volatile.WriteString("\n\n")
+        }
+    }
 
-	// Briefing (pre-formatted, may be empty)
-	if briefing != "" {
-		if isContinuation {
-			b.WriteString("## Briefing: CONTINUATION\n\n")
-			b.WriteString("The briefing for this task remains identical to your previous phase. Maintain all existing design decisions and constraints. Focus on completing the remaining workflow steps for this same task.\n\n")
-		} else {
-			b.WriteString(briefing)
-			b.WriteString("\n\n")
-		}
-	}
-
-	// Protocols
-	b.WriteString(SignalProtocol())
-	b.WriteString("\n\n")
-	b.WriteString(ConsultProtocol())
-	b.WriteString("\n")
-
-	return b.String(), nil
+    full := stable.String() + volatile.String()
+    return stable.String(), volatile.String(), full, nil
 }

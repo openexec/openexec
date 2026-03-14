@@ -364,9 +364,9 @@ func (v *Validator) validateConstraints(result *ValidationResult) {
 	}
 
 	if !hasShape {
-		result.Warnings = append(result.Warnings, ValidationIssue{
+		result.Critical = append(result.Critical, ValidationIssue{
 			Rule:     "shape_missing",
-			Severity: SeverityWarning,
+			Severity: SeverityCritical,
 			Message:  "Application shape/type not defined",
 			Hint:     "Specify if this is a CLI, Web App, Mobile App, API, etc.",
 			Section:  "Constraints",

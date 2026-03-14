@@ -37,9 +37,10 @@ func NewTestServer(t *testing.T) *TestServer {
 	t.Helper()
 
 	cfg := Config{
-		Port:        0, // random port
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
+		Port:          0, // random port
+		ProjectsDir:   t.TempDir(),
+		DataDir:       t.TempDir(),
+		SkipPreflight: true, // Skip preflight checks that require real runner
 	}
 
 	s, err := New(cfg)
@@ -663,11 +664,11 @@ func TestIntegrationCLIChatE2EMatrix(t *testing.T) {
 	ts := NewTestServer(t)
 
 	testCases := []struct {
-		name        string
-		query       string
-		category    string // help, unknown, or surgical
-		wantInResp  string // optional substring to verify
-		allowEmpty  bool   // allow empty result (for tool execution errors)
+		name       string
+		query      string
+		category   string // help, unknown, or surgical
+		wantInResp string // optional substring to verify
+		allowEmpty bool   // allow empty result (for tool execution errors)
 	}{
 		// AC2: Help queries
 		{"help_basic", "help", "help", "OpenExec", false},
@@ -682,7 +683,7 @@ func TestIntegrationCLIChatE2EMatrix(t *testing.T) {
 
 		// AC2: Surgical tool queries
 		{"surgical_deploy", "deploy to prod", "surgical", "", false},
-		{"surgical_commit", "commit my changes", "surgical", "", true}, // may error without git context
+		{"surgical_commit", "commit my changes", "surgical", "", true},  // may error without git context
 		{"surgical_symbol", "show function main", "surgical", "", true}, // may error without symbol index
 	}
 
@@ -723,14 +724,14 @@ func TestIntegrationCLIChatNoConfidenceErrors(t *testing.T) {
 
 	// Fuzz-like inputs that could potentially trigger edge cases
 	edgeCaseInputs := []string{
-		"",                         // empty
-		"   ",                      // whitespace only
-		"a",                        // single char
-		"你好",                        // unicode
-		"!@#$%",                    // special chars
-		`{"json": "object"}`,       // JSON
-		"deploy commit push",       // multiple keywords
-		strings.Repeat("x", 5000),  // long input
+		"",                        // empty
+		"   ",                     // whitespace only
+		"a",                       // single char
+		"你好",                      // unicode
+		"!@#$%",                   // special chars
+		`{"json": "object"}`,      // JSON
+		"deploy commit push",      // multiple keywords
+		strings.Repeat("x", 5000), // long input
 	}
 
 	for _, input := range edgeCaseInputs {

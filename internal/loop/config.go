@@ -30,8 +30,14 @@ type Config struct {
 	// If nil, no uploader is used.
 	UploaderFactory UploaderFactory `json:"-"`
 
-	// Prompt is the system prompt passed to Claude Code via -p flag.
-	Prompt string
+    // Prompt is the system prompt passed to Claude Code via -p flag.
+    Prompt string
+
+    // StablePrompt is the cached, byte-identical stable prefix for provider caching.
+    StablePrompt string
+
+    // VolatilePrompt is the dynamic tail (e.g., briefing) appended after the stable prefix.
+    VolatilePrompt string
 
 	// WorkDir is the working directory for the Claude Code process.
 	WorkDir string
@@ -90,11 +96,11 @@ type Config struct {
 	// EvidencePrefix is the key prefix for uploaded files.
 	EvidencePrefix string
 
-	// DeepTraceCfg configures the Deep-Trace middleware for ISO 27001 compliance.
-	// If nil, middleware is disabled.
-	DeepTraceCfg *DeepTraceConfig
+    // DeepTraceCfg configures the Deep-Trace middleware for ISO 27001 compliance.
+    // If nil, middleware is disabled.
+    DeepTraceCfg *DeepTraceConfig
 
-	// QualityGates enables quality gate validation after task completion.
+    // QualityGates enables quality gate validation after task completion.
 	// When enabled, gates from openexec.yaml are run after each phase-complete signal.
 	QualityGates bool
 
@@ -119,9 +125,20 @@ type Config struct {
 	// RunnerArgs optionally overrides the CLI arguments.
 	RunnerArgs []string
 
-	// Summarizer is the session history summarizer (optional).
-	// If nil, no summarization is performed.
-	Summarizer Summarizer `json:"-"`
+    // Summarizer is the session history summarizer (optional).
+    // If nil, no summarization is performed.
+    Summarizer Summarizer `json:"-"`
+
+    // ExecMode controls write permissions for the spawned process.
+    // Accepted: "read-only", "workspace-write", "danger-full-access".
+    // Propagated via environment variables to the runner.
+    ExecMode string
+
+    // PromptHash is the SHA-256 (hex) of the composed prompt for observability.
+    PromptHash string
+
+    // StablePromptHash is the SHA-256 (hex) of the stable prefix for cache keying.
+    StablePromptHash string
 }
 
 // Summarizer defines the interface for session history summarization.

@@ -283,7 +283,7 @@ func TestCLIChatForbiddenErrorsComprehensive(t *testing.T) {
 		"123456",                 // numbers only
 		"你好",                     // Chinese
 		"مرحبا",                  // Arabic
-		"🚀🔥💻",                   // emoji only
+		"🚀🔥💻",                    // emoji only
 		"deploy",                 // single keyword
 		"commit push deploy",     // multiple keywords
 		"what is 2+2?",           // question

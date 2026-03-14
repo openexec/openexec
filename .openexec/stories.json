@@ -5,222 +5,442 @@
       "id": "G-001",
       "title": "Reduce Orchestration Overhead",
       "description": "Reduce orchestration overhead and token use for each task",
-      "success_criteria": "Single orchestration plane with minimal subprocess churn and reduced prompt token consumption",
-      "verification_method": "Build succeeds and prompt caching is active"
+      "success_criteria": "Single orchestration plane with minimal token consumption per task cycle",
+      "verification_method": "Measure token usage before/after; verify single Pipeline/Loop core exists"
     },
     {
       "id": "G-002",
       "title": "Stabilize Run Loop",
-      "description": "Stabilize run loop and self-healing to avoid false stalls and improve retries",
-      "success_criteria": "Heartbeat-based stall detection with dynamic thresholds prevents false positives",
-      "verification_method": "Run loop completes without false stall detections"
+      "description": "Stabilize run loop and self-healing (avoid false stalls, improve retries)",
+      "success_criteria": "Heartbeat-based stall detection with dynamic thresholds; no false-positive stalls",
+      "verification_method": "Run loop under simulated delays; verify stall detection triggers correctly"
     },
     {
       "id": "G-003",
-      "title": "Unify State and Actions",
+      "title": "Unified State and Actions",
       "description": "Improve determinism and recovery by unifying state and actions",
-      "success_criteria": "SQLite is canonical state store with typed action schemas for routing",
-      "verification_method": "Session and Audit tests pass"
+      "success_criteria": "SQLite is canonical state; typed action schemas replace text heuristics",
+      "verification_method": "Verify all state reads from SQLite; validate action schema parsing"
     },
     {
       "id": "G-004",
       "title": "Safe Reviewable Code Changes",
       "description": "Enforce safe, reviewable code changes via diffs scoped to the repo",
       "success_criteria": "All code edits use deterministic diff/patch application within workspace_root",
-      "verification_method": "Git diff shows only scoped changes"
+      "verification_method": "Verify patches apply cleanly; check no writes outside workspace_root"
     },
     {
       "id": "G-005",
       "title": "Soft-Fail Verification",
       "description": "Maintain usability with soft-fail verification when builds/tests fail",
-      "success_criteria": "Build failures capture diagnostics and loop continues with smaller patches",
-      "verification_method": "Simulated build failure does not abort the run loop"
+      "success_criteria": "Build failures captured as diagnostics; loop continues with smaller safe changes",
+      "verification_method": "Simulate build failure; verify loop records diagnostics and advances"
     }
   ],
   "stories": [
     {
-      "id": "US-004",
+      "id": "US-000",
+      "title": "Codebase Study \u0026 Mapping",
+      "description": "As an engineer, I need to understand the existing OpenExec architecture so that I can safely refactor without breaking functionality",
+      "requirement_id": "STUDY",
       "goal_id": "G-003",
-      "title": "Typed Action Schemas",
-      "description": "As a developer, I want typed action schemas for routing and tool control so that text heuristics are eliminated",
+      "depends_on": [],
       "acceptance_criteria": [
-        "Action types defined as Go structs with JSON tags",
-        "Router uses type assertions instead of string matching",
-        "Schema validation rejects malformed actions"
+        "Document current orchestration planes (Pipeline, Loop, DCP)",
+        "Map SQLite schema and JSON artifact relationships",
+        "Identify all text heuristic parsing locations",
+        "Document current diff/patch mechanisms",
+        "Map stall detection and retry logic"
       ],
-      "verification_script": "echo '{\"action\":\"noop\"}' | jq '.' \u003e/dev/null 2\u003e\u00261 \u0026\u0026 go build ./... || echo schema-soft-fail",
+      "verification_script": "test -f .openexec/engram/architecture_map.md \u0026\u0026 echo study-complete || echo study-pending",
+      "contract": "",
       "tasks": [
-        "T-US-004-CHS"
+        {
+          "id": "T-US-000-001",
+          "title": "Chassis: Map Orchestration Architecture",
+          "description": "Study and document Pipeline, Loop, and DCP components including their interactions and responsibilities",
+          "technical_strategy": "Read internal/pipeline/, internal/loop/, and internal/dcp/ directories. Document component responsibilities, interfaces, and data flow in .openexec/engram/architecture_map.md. Use safe_commit --story US-000 --task T-US-000-001 to persist findings.",
+          "depends_on": [],
+          "verification_script": "grep -q 'Pipeline' .openexec/engram/architecture_map.md \u0026\u0026 grep -q 'Loop' .openexec/engram/architecture_map.md || echo mapping-incomplete"
+        },
+        {
+          "id": "T-US-000-002",
+          "title": "Chassis: Map State Management",
+          "description": "Document SQLite schema, JSON artifacts, and their relationships",
+          "technical_strategy": "Analyze internal/db/, internal/audit/, and any JSON serialization points. Document schema in architecture_map.md with table relationships and artifact dependencies. Use safe_commit --story US-000 --task T-US-000-002 to persist findings.",
+          "depends_on": [
+            "T-US-000-001"
+          ],
+          "verification_script": "grep -q 'SQLite' .openexec/engram/architecture_map.md \u0026\u0026 grep -q 'JSON' .openexec/engram/architecture_map.md || echo state-mapping-incomplete"
+        },
+        {
+          "id": "T-US-000-003",
+          "title": "Chassis: Map Action Routing and Tool Control",
+          "description": "Identify text heuristic parsing locations and current action routing mechanisms",
+          "technical_strategy": "Search for string parsing, regex matching, and action dispatch in internal/. Document each heuristic location and its purpose in architecture_map.md. Use safe_commit --story US-000 --task T-US-000-003 to persist findings.",
+          "depends_on": [
+            "T-US-000-002"
+          ],
+          "verification_script": "grep -q 'heuristic' .openexec/engram/architecture_map.md || grep -q 'action' .openexec/engram/architecture_map.md || echo routing-mapping-incomplete"
+        }
+      ]
+    },
+    {
+      "id": "US-001",
+      "title": "Collapse Orchestration Planes",
+      "description": "As a developer, I want a single orchestration plane (Pipeline/Loop as core) so that DCP becomes a thin local-tools adapter, reducing overhead",
+      "requirement_id": "REQ-001",
+      "goal_id": "G-001",
+      "depends_on": [
+        "US-000"
       ],
+      "acceptance_criteria": [
+        "Pipeline/Loop is the single orchestration core",
+        "DCP functions only as local-tools adapter",
+        "No duplicate orchestration logic exists",
+        "Build completes successfully (soft-fail acceptable)"
+      ],
+      "verification_script": "go build ./... || echo build-soft-fail",
+      "contract": "",
+      "tasks": [
+        {
+          "id": "T-US-001-001",
+          "title": "Diagnose: Identify Orchestration Overlap",
+          "description": "Identify overlapping responsibilities between Pipeline, Loop, and DCP based on study findings",
+          "technical_strategy": "Using architecture_map.md, identify duplicated orchestration logic between components. Create a consolidation plan documenting what moves where. Use safe_commit --story US-001 --task T-US-001-001 to persist diagnosis.",
+          "depends_on": [],
+          "verification_script": "test -f .openexec/engram/consolidation_plan.md || echo plan-missing"
+        },
+        {
+          "id": "T-US-001-002",
+          "title": "Implement: Refactor DCP to Thin Adapter",
+          "description": "Remove orchestration logic from DCP, keeping only local-tools adapter functionality",
+          "technical_strategy": "Move orchestration logic from DCP to Pipeline/Loop per consolidation plan. DCP should only translate local tool calls. Use safe_commit --story US-001 --task T-US-001-002 after each verified refactor step.",
+          "depends_on": [
+            "T-US-001-001"
+          ],
+          "verification_script": "go build ./internal/dcp/... || echo dcp-build-soft-fail"
+        },
+        {
+          "id": "T-US-001-003",
+          "title": "Verify: Orchestration Consolidation",
+          "description": "Verify single orchestration plane is functional and build succeeds",
+          "technical_strategy": "Run full build and targeted tests on Pipeline/Loop integration. Verify DCP only handles tool translation. Use safe_commit --story US-001 --task T-US-001-003 to finalize.",
+          "depends_on": [
+            "T-US-001-002"
+          ],
+          "verification_script": "go build ./... \u0026\u0026 go test ./internal/... -run Pipeline|Loop || echo verify-soft-fail"
+        }
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "SQLite Canonical State",
+      "description": "As a developer, I want SQLite as the canonical state source so that JSON artifacts become read-only exports or are phased out",
+      "requirement_id": "REQ-002",
+      "goal_id": "G-003",
+      "depends_on": [
+        "US-001"
+      ],
+      "acceptance_criteria": [
+        "All state reads come from SQLite",
+        "JSON artifacts are read-only exports only",
+        "Session and Audit tests pass (soft-fail acceptable)"
+      ],
+      "verification_script": "go test ./internal/... -run Session|Audit || echo tests-soft-fail",
+      "contract": "",
+      "tasks": [
+        {
+          "id": "T-US-002-001",
+          "title": "Diagnose: Map JSON to SQLite Migration",
+          "description": "Identify all JSON artifact usage and plan migration to SQLite-first reads",
+          "technical_strategy": "Search for JSON file reads/writes in internal/. Document each usage and its SQLite equivalent table/column. Use safe_commit --story US-002 --task T-US-002-001 to persist migration map.",
+          "depends_on": [],
+          "verification_script": "test -f .openexec/engram/json_migration_map.md || echo migration-map-missing"
+        },
+        {
+          "id": "T-US-002-002",
+          "title": "Implement: Migrate State Reads to SQLite",
+          "description": "Refactor code to read state from SQLite instead of JSON artifacts",
+          "technical_strategy": "Update state-reading functions to query SQLite. JSON writes become optional exports triggered explicitly. Use safe_commit --story US-002 --task T-US-002-002 after each migration chunk.",
+          "depends_on": [
+            "T-US-002-001"
+          ],
+          "verification_script": "go build ./internal/db/... || echo db-build-soft-fail"
+        },
+        {
+          "id": "T-US-002-003",
+          "title": "Verify: SQLite State Integrity",
+          "description": "Verify all state operations use SQLite and tests pass",
+          "technical_strategy": "Run Session and Audit tests to verify SQLite operations. Confirm no JSON reads for canonical state. Use safe_commit --story US-002 --task T-US-002-003 to finalize.",
+          "depends_on": [
+            "T-US-002-002"
+          ],
+          "verification_script": "go test ./internal/... -run Session|Audit || echo tests-soft-fail"
+        }
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Typed Action Schemas",
+      "description": "As a developer, I want typed action schemas for routing and tool control so that text heuristics are replaced with deterministic parsing",
+      "requirement_id": "REQ-003",
+      "goal_id": "G-003",
+      "depends_on": [
+        "US-002"
+      ],
+      "acceptance_criteria": [
+        "Action schemas defined as Go structs with JSON tags",
+        "All action routing uses typed schema parsing",
+        "No text heuristics for action detection"
+      ],
+      "verification_script": "echo '{\"action\":\"noop\"}' | jq '.' \u003e/dev/null 2\u003e\u00261 || echo schema-soft-fail",
+      "contract": "",
+      "tasks": [
+        {
+          "id": "T-US-003-001",
+          "title": "Chassis: Define Action Schema Types",
+          "description": "Create Go struct definitions for all action types with JSON serialization",
+          "technical_strategy": "Based on architecture_map.md heuristic locations, define typed Action structs in internal/action/schema.go. Include validation methods and JSON tags. Use safe_commit --story US-003 --task T-US-003-001 to persist schema definitions.",
+          "depends_on": [],
+          "verification_script": "test -f internal/action/schema.go \u0026\u0026 go build ./internal/action/... || echo schema-build-soft-fail"
+        },
+        {
+          "id": "T-US-003-002",
+          "title": "Chassis: Replace Heuristics with Schema Parsing",
+          "description": "Replace text heuristic parsing with typed schema unmarshal calls",
+          "technical_strategy": "Find each heuristic location from architecture_map.md. Replace string parsing with json.Unmarshal into typed structs. Use safe_commit --story US-003 --task T-US-003-002 after each replacement.",
+          "depends_on": [
+            "T-US-003-001"
+          ],
+          "verification_script": "go build ./internal/... \u0026\u0026 go test ./internal/action/... || echo action-soft-fail"
+        }
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Deterministic Diff/Patch Application",
+      "description": "As a developer, I want code edits to use deterministic diff/patch application scoped to workspace_root so that changes are safe and reviewable",
+      "requirement_id": "REQ-004",
+      "goal_id": "G-004",
       "depends_on": [
         "US-003"
       ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.254232+02:00"
+      "acceptance_criteria": [
+        "All code edits generate and apply unified diffs",
+        "Edits are scoped to workspace_root only",
+        "Patches can be reviewed before application"
+      ],
+      "verification_script": "git diff --quiet || echo patch-applied; test -d . || echo workspace-root",
+      "contract": "",
+      "tasks": [
+        {
+          "id": "T-US-004-001",
+          "title": "Chassis: Implement Diff Generator",
+          "description": "Create diff generation utility that produces unified diffs for code changes",
+          "technical_strategy": "Implement internal/patch/diff.go with functions to generate unified diffs between old and new content. Ensure workspace_root scoping validation. Use safe_commit --story US-004 --task T-US-004-001 to persist implementation.",
+          "depends_on": [],
+          "verification_script": "test -f internal/patch/diff.go \u0026\u0026 go build ./internal/patch/... || echo diff-build-soft-fail"
+        },
+        {
+          "id": "T-US-004-002",
+          "title": "Chassis: Implement Patch Applicator",
+          "description": "Create patch application utility that applies unified diffs deterministically",
+          "technical_strategy": "Implement internal/patch/apply.go with functions to parse and apply unified diffs. Validate target paths are within workspace_root before writing. Use safe_commit --story US-004 --task T-US-004-002 to persist implementation.",
+          "depends_on": [
+            "T-US-004-001"
+          ],
+          "verification_script": "test -f internal/patch/apply.go \u0026\u0026 go build ./internal/patch/... || echo apply-build-soft-fail"
+        },
+        {
+          "id": "T-US-004-003",
+          "title": "Chassis: Integrate Patch System with Tools",
+          "description": "Update tool handlers to use diff/patch system instead of direct file writes",
+          "technical_strategy": "Modify file editing tools in internal/tools/ to use patch package. All writes go through patch applicator with workspace_root validation. Use safe_commit --story US-004 --task T-US-004-003 to finalize integration.",
+          "depends_on": [
+            "T-US-004-002"
+          ],
+          "verification_script": "go build ./internal/tools/... \u0026\u0026 go test ./internal/patch/... || echo patch-integration-soft-fail"
+        }
+      ]
     },
     {
       "id": "US-005",
-      "goal_id": "G-004",
-      "title": "Deterministic Diff/Patch Edits",
-      "description": "As a developer, I want code edits to use deterministic diff/patch application scoped to workspace_root so that changes are safe and reviewable",
-      "acceptance_criteria": [
-        "All file edits go through patch application",
-        "Patches are scoped to workspace_root",
-        "Edits outside workspace_root are rejected",
-        "Git diff shows applied changes"
-      ],
-      "verification_script": "git diff --quiet || echo patch-applied; test -d . \u0026\u0026 echo workspace-root-valid",
-      "tasks": [
-        "T-US-005-CHS"
-      ],
+      "title": "Prompt Cost Reduction and Stall Detection",
+      "description": "As a developer, I want reduced prompt costs and heartbeat-based stall detection so that the system is efficient and self-healing",
+      "requirement_id": "REQ-005",
+      "goal_id": "G-002",
       "depends_on": [
         "US-004"
       ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.255572+02:00"
+      "acceptance_criteria": [
+        "System/briefing blocks are cached to reduce token usage",
+        "History windowing limits context size",
+        "Heartbeat-based stall detection with dynamic thresholds",
+        "CLI version command works"
+      ],
+      "verification_script": "openexec version \u003e/dev/null 2\u003e\u00261 || echo cli-ok",
+      "contract": "",
+      "tasks": [
+        {
+          "id": "T-US-005-001",
+          "title": "Chassis: Implement Prompt Caching",
+          "description": "Add caching for system and briefing prompt blocks to reduce token usage",
+          "technical_strategy": "Implement internal/prompt/cache.go with hash-based caching for static prompt sections. Cache hit returns cached tokens, miss stores and returns. Use safe_commit --story US-005 --task T-US-005-001 to persist implementation.",
+          "depends_on": [],
+          "verification_script": "test -f internal/prompt/cache.go \u0026\u0026 go build ./internal/prompt/... || echo cache-build-soft-fail"
+        },
+        {
+          "id": "T-US-005-002",
+          "title": "Chassis: Implement History Windowing",
+          "description": "Add history windowing to limit context size while preserving important messages",
+          "technical_strategy": "Implement internal/prompt/window.go with sliding window that preserves system messages and recent history. Configurable window size. Use safe_commit --story US-005 --task T-US-005-002 to persist implementation.",
+          "depends_on": [
+            "T-US-005-001"
+          ],
+          "verification_script": "test -f internal/prompt/window.go \u0026\u0026 go build ./internal/prompt/... || echo window-build-soft-fail"
+        },
+        {
+          "id": "T-US-005-003",
+          "title": "Chassis: Implement Heartbeat Stall Detection",
+          "description": "Add heartbeat-based stall detection with dynamic thresholds",
+          "technical_strategy": "Implement internal/loop/heartbeat.go with periodic heartbeat checks. Dynamic thresholds adjust based on task complexity. Integrate with existing loop. Use safe_commit --story US-005 --task T-US-005-003 to persist implementation.",
+          "depends_on": [
+            "T-US-005-002"
+          ],
+          "verification_script": "test -f internal/loop/heartbeat.go \u0026\u0026 go build ./internal/loop/... || echo heartbeat-build-soft-fail"
+        }
+      ]
     },
     {
       "id": "US-006",
-      "goal_id": "G-002",
-      "title": "Prompt Cost Reduction and Heartbeat Stall Detection",
-      "description": "As a developer, I want reduced prompt costs via caching and heartbeat-based stall detection so that runs are cheaper and more reliable",
-      "acceptance_criteria": [
-        "System/briefing blocks are cached between iterations",
-        "History windowing limits context tokens",
-        "Heartbeat-based stall detection with dynamic thresholds",
-        "No false stalls on long single-iteration work"
-      ],
-      "verification_script": "openexec version \u003e/dev/null 2\u003e\u00261 || go build ./cmd/openexec \u0026\u0026 echo cli-ok",
-      "tasks": [
-        "T-US-006-CHS"
-      ],
+      "title": "Soft-Fail Build Recovery",
+      "description": "As a developer, I want the system to capture diagnostics and continue with smaller patches on build failure so that the loop doesn't hard-fail",
+      "requirement_id": "REQ-005",
+      "goal_id": "G-005",
       "depends_on": [
         "US-005"
       ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.25695+02:00"
-    },
-    {
-      "id": "US-007",
-      "goal_id": "G-005",
-      "title": "Soft-Fail Verification Policy",
-      "description": "As a developer, I want the loop to continue with smaller patches when builds fail so that progress is not blocked by transient failures",
       "acceptance_criteria": [
-        "Build failures capture diagnostics to SQLite",
-        "Loop checkpoints work and continues",
-        "Smaller patch strategy is attempted on failure",
-        "Run does not hard-fail on build errors"
+        "Build failures are captured as diagnostics",
+        "Loop checkpoints work and advances to next safe change",
+        "No hard-fail on recoverable build errors"
       ],
-      "verification_script": "go build ./... || echo build-soft-fail; go test ./internal/loop/... -run SoftFail || echo test-soft-fail",
+      "verification_script": "go build ./... || echo build-soft-fail",
+      "contract": "",
       "tasks": [
-        "T-US-007-CHS"
-      ],
-      "depends_on": [
-        "US-006"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.258322+02:00"
+        {
+          "id": "T-US-006-001",
+          "title": "Chassis: Implement Build Diagnostics Capture",
+          "description": "Capture and store build failure diagnostics for analysis",
+          "technical_strategy": "Implement internal/diagnostic/capture.go to parse build errors, extract file/line info, and store in SQLite. Include stderr capture and structured error types. Use safe_commit --story US-006 --task T-US-006-001 to persist implementation.",
+          "depends_on": [],
+          "verification_script": "test -f internal/diagnostic/capture.go \u0026\u0026 go build ./internal/diagnostic/... || echo diagnostic-build-soft-fail"
+        },
+        {
+          "id": "T-US-006-002",
+          "title": "Chassis: Implement Checkpoint and Recovery",
+          "description": "Add checkpoint mechanism to save progress and enable recovery on failure",
+          "technical_strategy": "Implement internal/loop/checkpoint.go with state serialization to SQLite. On failure, revert to checkpoint and attempt smaller change. Integrate with patch system. Use safe_commit --story US-006 --task T-US-006-002 to persist implementation.",
+          "depends_on": [
+            "T-US-006-001"
+          ],
+          "verification_script": "test -f internal/loop/checkpoint.go \u0026\u0026 go build ./internal/loop/... || echo checkpoint-build-soft-fail"
+        },
+        {
+          "id": "T-US-006-003",
+          "title": "Verify: Soft-Fail Integration",
+          "description": "Verify the complete soft-fail pipeline works end-to-end",
+          "technical_strategy": "Test failure scenarios: simulate build failure, verify diagnostic capture, checkpoint creation, and recovery to smaller patch. Use safe_commit --story US-006 --task T-US-006-003 to finalize.",
+          "depends_on": [
+            "T-US-006-002"
+          ],
+          "verification_script": "go test ./internal/loop/... -run Checkpoint|Recovery || echo recovery-soft-fail"
+        }
+      ]
     },
     {
-      "id": "US-008",
-      "goal_id": "G-001",
+      "id": "US-999",
       "title": "Goal Validation",
-      "description": "As a developer, I want to validate that all refactoring goals are met so that the epic is complete",
-      "acceptance_criteria": [
-        "openexec run executes end-to-end without manual plan/story import",
-        "Server /api/health reports resolved runner and DB status",
-        "Build failures trigger soft-fail recovery, not abort",
-        "All goals G-001 through G-005 are satisfied"
-      ],
-      "verification_script": "go build ./... \u0026\u0026 go test ./internal/... || echo validation-soft-fail",
-      "tasks": [
-        "T-US-008-CHS"
-      ],
+      "description": "As a project stakeholder, I want to validate all goals are met so that the refactoring is complete and verified",
+      "requirement_id": "VALIDATION",
+      "goal_id": "G-001",
       "depends_on": [
+        "US-001",
         "US-002",
         "US-003",
         "US-004",
         "US-005",
-        "US-006",
-        "US-007"
+        "US-006"
       ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.24863+02:00"
-    },
-    {
-      "id": "US-001",
-      "goal_id": "G-003",
-      "title": "Codebase Study \u0026 Mapping",
-      "description": "As a developer, I want to understand the existing OpenExec architecture so that I can safely refactor the orchestration plane",
       "acceptance_criteria": [
-        "Current orchestration flow documented (Pipeline, Loop, DCP relationships)",
-        "State management patterns mapped (JSON vs SQLite usage)",
-        "Action routing heuristics identified",
-        "Stall detection logic documented"
+        "openexec run executes end-to-end without manual plan/story import",
+        "Server /api/health reports resolved runner and DB status",
+        "Simulated build failure results in diagnostics capture and loop continuation",
+        "All goals G-001 through G-005 verified"
       ],
-      "verification_script": "test -f .openexec/engram/architecture_map.md \u0026\u0026 echo study-complete || echo study-pending",
+      "verification_script": "go build ./... \u0026\u0026 go test ./internal/... -run Loop|Pipeline \u0026\u0026 openexec version || echo validation-soft-fail",
+      "contract": "",
       "tasks": [
-        "T-US-001-CHS"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.249859+02:00"
-    },
-    {
-      "id": "US-002",
-      "goal_id": "G-001",
-      "title": "Collapse to Single Orchestration Plane",
-      "description": "As a developer, I want Pipeline/Loop to be the single orchestration core with DCP as a thin adapter so that subprocess churn is eliminated",
-      "acceptance_criteria": [
-        "Pipeline/Loop is the single orchestration entry point",
-        "DCP refactored to thin local-tools adapter",
-        "No per-phase subprocess spawning",
-        "Build succeeds"
-      ],
-      "verification_script": "go build ./... || echo build-soft-fail",
-      "tasks": [
-        "T-US-002-CHS"
-      ],
-      "depends_on": [
-        "US-001"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.251194+02:00"
-    },
-    {
-      "id": "US-003",
-      "goal_id": "G-003",
-      "title": "SQLite Canonical State",
-      "description": "As a developer, I want SQLite to be the single source of truth so that state drift between JSON and DB is eliminated",
-      "acceptance_criteria": [
-        "All runtime state reads from SQLite",
-        "JSON artifacts are read-only exports or removed",
-        "Session and Audit tests pass"
-      ],
-      "verification_script": "go test ./internal/... -run Session|Audit || echo tests-soft-fail",
-      "tasks": [
-        "T-US-003-CHS"
-      ],
-      "depends_on": [
-        "US-002"
-      ],
-      "story_type": "feature",
-      "priority": 0,
-      "status": "pending",
-      "created_at": "2026-03-14T01:57:02.252814+02:00"
+        {
+          "id": "T-US-999-001",
+          "title": "Verify: Goal G-001 Orchestration Overhead",
+          "description": "Validate single orchestration plane reduces overhead",
+          "technical_strategy": "Verify DCP is thin adapter only. Measure component count reduction. Document overhead reduction in validation report. Use safe_commit --story US-999 --task T-US-999-001 to persist validation.",
+          "depends_on": [],
+          "verification_script": "go build ./... || echo g001-soft-fail"
+        },
+        {
+          "id": "T-US-999-002",
+          "title": "Verify: Goal G-002 Run Loop Stability",
+          "description": "Validate heartbeat stall detection and retry improvements",
+          "technical_strategy": "Run loop under simulated delays. Verify no false stalls trigger. Test retry logic handles transient failures. Use safe_commit --story US-999 --task T-US-999-002 to persist validation.",
+          "depends_on": [
+            "T-US-999-001"
+          ],
+          "verification_script": "go test ./internal/loop/... -run Heartbeat|Stall || echo g002-soft-fail"
+        },
+        {
+          "id": "T-US-999-003",
+          "title": "Verify: Goal G-003 Unified State",
+          "description": "Validate SQLite is canonical and actions use typed schemas",
+          "technical_strategy": "Verify all state reads from SQLite. Test action schema parsing for all action types. Confirm no text heuristics remain. Use safe_commit --story US-999 --task T-US-999-003 to persist validation.",
+          "depends_on": [
+            "T-US-999-002"
+          ],
+          "verification_script": "go test ./internal/... -run Session|Audit|Action || echo g003-soft-fail"
+        },
+        {
+          "id": "T-US-999-004",
+          "title": "Verify: Goal G-004 Safe Code Changes",
+          "description": "Validate diff/patch system scopes changes to workspace_root",
+          "technical_strategy": "Test patch application with boundary cases. Verify writes outside workspace_root are rejected. Confirm diffs are reviewable. Use safe_commit --story US-999 --task T-US-999-004 to persist validation.",
+          "depends_on": [
+            "T-US-999-003"
+          ],
+          "verification_script": "go test ./internal/patch/... || echo g004-soft-fail"
+        },
+        {
+          "id": "T-US-999-005",
+          "title": "Verify: Goal G-005 Soft-Fail Verification",
+          "description": "Validate soft-fail behavior on build/test failures",
+          "technical_strategy": "Simulate build failure and verify loop captures diagnostics and continues. Test checkpoint/recovery cycle. Confirm no hard-fails on recoverable errors. Use safe_commit --story US-999 --task T-US-999-005 to persist validation.",
+          "depends_on": [
+            "T-US-999-004"
+          ],
+          "verification_script": "go test ./internal/loop/... -run Checkpoint|Recovery|SoftFail || echo g005-soft-fail"
+        },
+        {
+          "id": "T-US-999-006",
+          "title": "Verify: End-to-End Integration",
+          "description": "Run full openexec integration test",
+          "technical_strategy": "Execute openexec run on test project. Verify /api/health endpoint. Confirm all acceptance criteria met. Generate final validation report. Use safe_commit --story US-999 --task T-US-999-006 to finalize project.",
+          "depends_on": [
+            "T-US-999-005"
+          ],
+          "verification_script": "go build ./... \u0026\u0026 openexec version \u0026\u0026 echo integration-complete || echo integration-soft-fail"
+        }
+      ]
     }
   ]
 }

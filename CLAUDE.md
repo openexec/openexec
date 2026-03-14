@@ -1,31 +1,98 @@
-# OpenExec Engineering Standards (CLAUDE.md)
+# CLAUDE.md
 
-This document provides foundational mandates for AI agents working on OpenExec. These take precedence over general defaults.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Senior Engineering Mandate: "Observe, then Resolve"
+## Build & Development Commands
 
-To prevent thrashing and stalling during task execution, agents MUST adhere to these practices:
+```bash
+# Build
+make build                    # Build binary → bin/openexec
+go build -o openexec ./cmd/openexec  # Alternative direct build
 
-### 1. Async & UI Testing (React/Vitest)
-- **Prefer `findBy*`**: Always use `screen.findByText()` or `screen.findByRole()` for elements that appear after an async action (like a button click).
-- **`userEvent` over `fireEvent`**: Use `@testing-library/user-event` for all interactions to ensure proper event bubbling and `act()` wrapping.
-- **Acknowledge State Transitions**: If a component has multiple states (e.g., `idle` -> `loading` -> `success`), ensure the test explicitly waits for the transition using `waitFor()`.
-- **Avoid `setTimeout`**: Never use manual delays in tests. Use Vitest's `vi.useFakeTimers()` or robust `waitFor` polling.
+# Test
+make test                     # All tests (Go + UI)
+go test ./...                 # Go tests only
+go test -v ./internal/loop/... -run TestLoop  # Single test/package
+cd ui && npm test             # UI tests (watch mode)
+cd ui && npx vitest run --fileParallelism=false  # UI tests (CI mode)
 
-### 2. Error Diagnostics & Hypothesis
-- **Verbosity First**: If a test fails once, do not immediately attempt a "fix." Instead, run the test again with `--verbose` or add `screen.debug()` to see the DOM state.
-- **Hypothesis Requirement**: Before modifying any code to fix a bug/test, the agent loop should state a clear hypothesis for the failure (e.g., "Hypothesis: The click is unmounting the component before the state update completes").
-- **No Progress = Revert**: If a change does not fix the reported error after one attempt, **REVERT** the file before trying a different strategy. Do not stack unverified changes.
+# Lint & Type Check
+make lint                     # Go vet + golangci-lint + UI ESLint
+make type-check               # Go build check + UI tsc
+cd ui && npm run lint         # UI only
 
-### 3. Environment & Preflights
-- **Verify Backend**: For UI tasks that interact with APIs, always verify the API schema (e.g., checking `internal/api/` or `types/`) before implementing the UI.
-- **Mock Integrity**: Ensure mocks exactly match the current API response format (check `snake_case` vs `camelCase`).
+# UI Development
+cd ui && npm install && npm run dev -- --port 3001  # Dev server with HMR
+```
 
-### 4. Learning Loop (Engram)
-- When a complex bug is solved (like the Popover/Vitest timing issue), the agent should summarize the "Lesson Learned" and persist it to `.openexec/engram/learning_log.json`.
+## Architecture Overview
+
+OpenExec is a **single-binary AI orchestration framework** that transforms high-level intent into production code through a deterministic pipeline.
+
+### Core Execution Flow
+```
+CLI Command → Manager → Pipeline → Loop → AI Provider (Claude/OpenAI/Gemini)
+                ↓
+         SQLite State Store
+```
+
+### Pipeline Phases (5-phase state machine)
+Each task progresses through: **TD → IM → RV → RF → FL**
+- **TD** (clario): Technical Design - research and strategy
+- **IM** (spark): Implementation - code changes
+- **RV** (blade): Review - quality assurance with routing back to IM if needed
+- **RF** (hon): Refinement - post-review optimization
+- **FL** (clario): Finalize - verification and state sync
+
+### Key Packages
+
+| Package | Purpose |
+|---------|---------|
+| `cmd/openexec/` | Entry point, calls `cli.Execute()` |
+| `internal/cli/` | Cobra commands (init, plan, start, run, chat, doctor) |
+| `internal/loop/` | Core iteration engine - spawns AI, parses events |
+| `internal/pipeline/` | Phase orchestration and state machine |
+| `internal/mcp/` | Model Context Protocol server (JSON-RPC stdio) |
+| `internal/prompt/` | Prompt assembly from personas/workflows/manifests |
+| `internal/release/` | SQLite-backed task/story state management |
+| `pkg/agent/` | AI provider adapters (anthropic, openai, gemini) |
+| `pkg/manager/` | Multi-pipeline orchestrator |
+| `pkg/api/` | HTTP handlers and WebSocket |
+| `ui/` | React 18 + TypeScript + Vite (embedded in binary) |
+
+### Agent Definitions
+Agent personas, workflows, and manifests live in `agents/`:
+- `agents/personas/` - Role definitions (YAML)
+- `agents/workflows/` - Prompt templates
+- `agents/manifests/` - Agent metadata linking persona to workflow
+
+### State & Persistence
+- **SQLite**: Canonical state store at `.openexec/data/audit.db`
+- **Tract**: Separate JSON-RPC microservice for story/task storage
+- **Config**: `.openexec/config.json` for project settings
 
 ---
 
-## Known Project Quirks
-- **Vitest & JSDOM**: Be aware that JSDOM does not perfectly simulate all layout-related events (like `onMouseEnter`). If tests fail on interactions, check if the component depends on layout properties.
-- **Audit Database**: The real source of truth for task progress is `openexec/.openexec/data/audit.db`.
+## Engineering Mandates
+
+### Observe, then Resolve
+To prevent thrashing during task execution:
+
+**Error Diagnostics**
+- If a test fails, rerun with `--verbose` or `screen.debug()` before attempting fixes
+- State a clear hypothesis before modifying code
+- If a change doesn't fix the error after one attempt, **REVERT** before trying a different strategy
+
+**UI Testing (React/Vitest)**
+- Use `findBy*` for elements appearing after async actions
+- Use `userEvent` over `fireEvent` for proper event bubbling
+- Wait for state transitions with `waitFor()`, never `setTimeout`
+- Verify API schemas in `internal/api/` or `types/` before implementing UI
+- Ensure mocks match current API response format (snake_case vs camelCase)
+
+### Known Quirks
+- **JSDOM limitations**: Doesn't fully simulate layout events (onMouseEnter). Check if failing tests depend on layout properties
+- **Audit DB**: Source of truth for task progress is `.openexec/data/audit.db`
+
+### Learning Loop
+When solving complex bugs, persist lessons to `.openexec/engram/learning_log.json`

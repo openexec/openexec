@@ -47,30 +47,14 @@ OpenExec bridges the gap between machine speed and institutional trust by embedd
 
 ---
 
-## Deterministic Control Plane (DCP)
+## Local Knowledge Map
 
-OpenExec introduces a **Deterministic Control Plane** that transforms AI agents from "generative guessers" into "surgical operators." By moving project knowledge into structured relational tables, we eliminate hallucinations and drastically reduce latency.
+OpenExec maintains local project context to improve precision and reduce prompt bloat. Indexers and gatherers assemble deterministic context packs for execution steps.
 
-### Core Pillars
-- **Surgical Memory:** Specialized SQLite tables for code symbols, environment topologies, and API contracts.
-- **Local Intent Routing:** 1-bit LLM wrapper for high-speed local tool selection.
-- **Hard Policy Enforcement:** A local validation layer that blocks dangerous actions before they ever reach your project.
+- Precision: focus execution on the smallest necessary code slices.
+- Privacy: keep source local; only minimal context is sent to providers when required.
 
-### Knowledge CLI
-Manage your project's deterministic brain directly from the terminal:
-```bash
-# Index your source code (populates surgical pointers)
-openexec knowledge index .
-
-# List all DCP-enabled projects on your system
-openexec knowledge ls
-
-# Inspect recorded symbols or environment topologies
-openexec knowledge show symbols
-openexec knowledge show envs
-```
-
-**Full Documentation:** [docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md)
+Context indexing is optional and used internally by the orchestrator; no special CLI is required to get started.
 
 ---
 
@@ -133,34 +117,22 @@ OpenExec is a **Self-Contained Monolith** designed for atomic deployment and max
 
 ```mermaid
 graph TD
-    User([User CLI/UI]) --> BitNet[Local BitNet 1-bit Router]
-    
-    subgraph "Deterministic Control Plane (DCP)"
-        BitNet -->|1. Select Tool| Coord[DCP Coordinator]
-        Coord -->|2. Fetch Records| Store[(SQLite Knowledge Store)]
-        
-        Store -.->|Symbols| Sym[Pointer Records]
-        Store -.->|Envs| Env[Topology Records]
-        Store -.->|Policies| Pol[Hard Gate Records]
-    end
+    User([CLI / UI]) --> Orchestrator[Deterministic Orchestrator]
 
     subgraph "Execution Layer"
-        Coord -->|3. Inject Surgical Context| LLM[Primary LLM: Claude/GPT]
-        LLM -->|4. Generate Action| Workers[Durable Worker Pool]
-        Workers -->|5. Validate| Policy[Policy Engine]
-        Policy -->|6. Execute| Tools[Surgical Tools: deploy, safe_commit]
+        Orchestrator --> Loop[Phase State Machine]
+        Loop --> Tools[Tool Harness (read/write/patch/run/git)]
+        Tools --> Gates[Quality Gates]
+        Gates --> Commit[Safe Commit]
     end
 
-    subgraph "Autonomous Sync"
-        Tools -->|Modified Code| Indexer[AST Indexer]
-        Indexer -->|Update Pointers| Store
+    subgraph "Persistence"
+        Orchestrator --> DB[(SQLite: sessions, runs, events)]
     end
 
     style User fill:#238636,color:#fff
-    style BitNet fill:#1f6feb,color:#fff
-    style Store fill:#161b22,color:#c9d1d9
-    style LLM fill:#8957e5,color:#fff
-    style Policy fill:#da3633,color:#fff
+    style Orchestrator fill:#1f6feb,color:#fff
+    style DB fill:#161b22,color:#c9d1d9
 ```
 
 | Component | Role | Implementation |
@@ -169,7 +141,6 @@ graph TD
 | **Planner** | Story & Goal Generation | Chat with AI Agent |
 | **Wizard** | Requirement Gathering | Chat with AI Agent |
 | **Orchestrator** | Durable Task Execution | Go + SQLite |
-| **DCP** | Deterministic Knowledge | SQLite + BitNet (Local) |
 | **Dashboard** | Visual Hub | React (Embedded in binary) |
 
 ---
@@ -211,3 +182,4 @@ Key references:
 - Artifacts: INTENT.md (PRD), goals[], .openexec/stories.json, .openexec/tasks.json, .openexec/stories/*.md, .openexec/fwu/*.md
 - Ordering: story.depends_on injects ALL tasks from prerequisite stories; tasks in each story run in listed order
 - Runner: server resolves model→CLI once at startup; `GET /api/health` returns `{ runner: { command, args, model } }`
+- Runs: create via `POST /api/v1/runs` then `POST /api/v1/runs/{id}/start`; or start a task via `POST /api/fwu/{task_id}/start`. Poll status with `GET /api/fwu/{task_id}/status`.

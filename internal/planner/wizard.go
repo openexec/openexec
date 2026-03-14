@@ -40,10 +40,68 @@ type WizardResponse struct {
 	NewAssumptions  []string    `json:"new_assumptions"`
 }
 
+// validFlows contains the known flow types
+var validFlows = map[string]bool{
+	"greenfield": true,
+	"existing":   true,
+	"refactor":   true,
+}
+
+// validAppTypes contains the known application types
+var validAppTypes = map[string]bool{
+	"web":     true,
+	"cli":     true,
+	"api":     true,
+	"mobile":  true,
+	"desktop": true,
+	"library": true,
+}
+
 // IsReady returns true if the intent state has enough information to generate a plan
 func (s *IntentState) IsReady() bool {
-	// Minimum required fields for planning
-	return s.Flow != "" && s.AppType != "" && s.ProblemStatement != "" && len(s.PrimaryGoals) > 0
+	// Flow must be valid
+	if !validFlows[s.Flow] {
+		return false
+	}
+
+	// AppType must be valid
+	if !validAppTypes[s.AppType] {
+		return false
+	}
+
+	// Basic required fields
+	if s.ProblemStatement == "" || len(s.PrimaryGoals) == 0 {
+		return false
+	}
+
+	// Constraints are required
+	if len(s.Constraints) == 0 {
+		return false
+	}
+
+	// Entities are required and must have data sources
+	if len(s.Entities) == 0 {
+		return false
+	}
+	for _, e := range s.Entities {
+		if e.DataSource == "" {
+			return false
+		}
+	}
+
+	// Desktop and mobile require platforms
+	if s.AppType == "desktop" || s.AppType == "mobile" {
+		if len(s.Platforms) == 0 {
+			return false
+		}
+	}
+
+	// Refactor flow requires legacy repo path
+	if s.Flow == "refactor" && s.LegacyRepoPath == "" {
+		return false
+	}
+
+	return true
 }
 
 // RenderIntentMD converts the state into a formatted INTENT.md

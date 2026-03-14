@@ -67,7 +67,11 @@ const (
 	// System events
 	EventSystemStartup  EventType = "system.startup"
 	EventSystemShutdown EventType = "system.shutdown"
-	EventSystemError    EventType = "system.error"
+    EventSystemError    EventType = "system.error"
+
+    // Run lifecycle events (deterministic execution)
+    EventRunCreated EventType = "run.created"
+    EventRunStep    EventType = "run.step"
 )
 
 // ValidEventTypes contains all valid audit event type values.
@@ -102,7 +106,9 @@ var ValidEventTypes = []EventType{
 	EventSecurityAuthFailure,
 	EventSystemStartup,
 	EventSystemShutdown,
-	EventSystemError,
+    EventSystemError,
+    EventRunCreated,
+    EventRunStep,
 }
 
 // IsValid checks if the event type is a valid audit event type value.

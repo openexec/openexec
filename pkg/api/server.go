@@ -60,9 +60,13 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/fwu/{id}/stop", s.handleStop)
 	mux.HandleFunc("GET /api/fwu/{id}/events", s.handleEvents)
 
-	// v1 Loops compatibility routes (for openexec run)
-	mux.HandleFunc("POST /api/v1/loops", s.handleCreateLoop)
-	mux.HandleFunc("GET /api/v1/loops/{id}", s.handleGetLoop)
+    // v1 Loops compatibility routes removed; use /api/fwu/* or /api/v1/runs
+
+    // v1 Runs (deterministic run creation)
+    mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
+    mux.HandleFunc("POST /api/v1/runs/{id}/start", s.handleStartRun)
+    mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
+    mux.HandleFunc("GET /api/v1/runs/{id}/steps", s.handleGetRunSteps)
 
 	// Session routes
 	mux.HandleFunc("GET /api/sessions", s.handleListSessions)

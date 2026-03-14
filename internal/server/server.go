@@ -18,9 +18,9 @@ import (
 	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
-	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/policy"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/runner"
 	"github.com/openexec/openexec/internal/tools"
@@ -29,34 +29,37 @@ import (
 	"github.com/openexec/openexec/pkg/db/session"
 	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/pkg/version"
-    "strings"
+	"strings"
 )
 
 // Server is the unified OpenExec API and UI host.
 type Server struct {
-    Mgr         *manager.Manager
-    SessionRepo session.Repository
-    AuditLogger audit.Logger
-    Coordinator *dcp.Coordinator
-    Checker     *health.Checker
-    ProjectsDir string
-    Mux         *http.ServeMux
-    HttpServer  *http.Server
-    mu          sync.RWMutex
-    axonBridge  *api.Server
-    // Observability
-    runnerCommand string
-    runnerArgs    []string
-    runnerModel   string
+	Mgr         *manager.Manager
+	SessionRepo session.Repository
+	AuditLogger audit.Logger
+	Coordinator *dcp.Coordinator
+	Checker     *health.Checker
+	ProjectsDir string
+	Mux         *http.ServeMux
+	HttpServer  *http.Server
+	mu          sync.RWMutex
+	axonBridge  *api.Server
+	// Observability
+	runnerCommand  string
+	runnerArgs     []string
+	runnerModel    string
+	skipPreflight  bool // For testing: skip preflight checks
 }
 
 // Config defines settings for the unified server
 type Config struct {
-	Port        int
-	DataDir     string
-	AuditDB     string
-	ModelsPath  string
-	ProjectsDir string
+    Port          int
+    DataDir       string
+    AuditDB       string
+    ModelsPath    string
+    ProjectsDir   string
+    SkipPreflight bool // For testing: skip preflight checks that require real runner
+    EnableDCP     bool // Feature flag: enable Deterministic Control Plane (default: false)
 }
 
 // New creates a new unified OpenExec server
@@ -119,68 +122,96 @@ func New(cfg Config) (*Server, error) {
 		loopArgs = nil
 	}
 
-	mgr := manager.New(manager.Config{
-		WorkDir:       projectsAbs,
-		TractStore:    cfg.DataDir,
-		AgentsFS:      agentsFS,
-		LogDir:        logDir,
-		ExecutorModel: modelUsed,
-		RunnerCommand: func() string { if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil { return pc.Execution.RunnerCommand }; return "" }(),
-		RunnerArgs:    func() []string { if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil { return pc.Execution.RunnerArgs }; return nil }(),
-		CommandName:   loopCmd,
-		CommandArgs:   loopArgs,
-	})
-	// 3. Initialize Deterministic Control Plane (DCP)
-	// Error ignored: knowledge store is optional; DCP tools gracefully handle nil/empty store
-	// by returning "not found" errors for symbol lookups.
-	kStore, _ := knowledge.NewStore(".")
-	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
-	bRouter.SetSkipAvailabilityCheck(true) // Default to skip for easy startup
-
-	pEngine := policy.NewEngine(kStore)
-	coordinator := dcp.NewCoordinator(bRouter, kStore)
-	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
-	coordinator.RegisterTool(tools.NewDeployTool(kStore))
-	coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
-	// Global fallback tool for conversational queries and routing failures
-	coordinator.RegisterTool(tools.NewGeneralChatTool())
-
-	// 4. Initialize API Layer
-	mux := http.NewServeMux()
-    s := &Server{
-        Mgr:         mgr,
-        SessionRepo: sessionRepo,
+    mgr := manager.New(manager.Config{
+        WorkDir:       projectsAbs,
+        TractStore:    cfg.DataDir,
+        AgentsFS:      agentsFS,
+        LogDir:        logDir,
+        ExecutorModel: modelUsed,
+		RunnerCommand: func() string {
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
+				return pc.Execution.RunnerCommand
+			}
+			return ""
+		}(),
+		RunnerArgs: func() []string {
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
+				return pc.Execution.RunnerArgs
+			}
+			return nil
+		}(),
+        CommandName: loopCmd,
+        CommandArgs: loopArgs,
         AuditLogger: auditLogger,
-        Coordinator: coordinator,
-        Checker:     health.NewChecker(),
-        ProjectsDir: cfg.ProjectsDir,
-        Mux:         mux,
-        axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
-        HttpServer: &http.Server{
-            Addr:    fmt.Sprintf(":%d", cfg.Port),
-            Handler: mux,
-        },
-        runnerCommand: runnerCmd,
-        runnerArgs:    runnerArgs,
-        runnerModel:   modelUsed,
+    })
+    // 3. Initialize Deterministic Control Plane (DCP) — optional
+    // Controlled via Config.EnableDCP or OPENEXEC_ENABLE_DCP env var.
+    enableDCP := cfg.EnableDCP
+    if !enableDCP {
+        if v := os.Getenv("OPENEXEC_ENABLE_DCP"); v != "" {
+            lower := strings.ToLower(v)
+            enableDCP = (lower == "1" || lower == "true" || lower == "yes")
+        }
+    }
+    var coordinator *dcp.Coordinator
+    if enableDCP {
+        // Error ignored: knowledge store is optional; DCP tools handle nil/empty store
+        kStore, _ := knowledge.NewStore(".")
+        bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
+        // In enabled mode, do not skip availability by default
+        bRouter.SetSkipAvailabilityCheck(false)
+        pEngine := policy.NewEngine(kStore)
+        coordinator = dcp.NewCoordinator(bRouter, kStore)
+        coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
+        coordinator.RegisterTool(tools.NewDeployTool(kStore))
+        coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
+        coordinator.RegisterTool(tools.NewGeneralChatTool()) // conversational fallback
+        log.Printf("[Server] DCP enabled: BitNet routing active")
+    } else {
+        log.Printf("[Server] DCP disabled: using Pipeline/Manager only")
     }
 
-	s.registerRoutes()
+    // 4. Initialize API Layer
+    mux := http.NewServeMux()
+    s := &Server{
+		Mgr:         mgr,
+		SessionRepo: sessionRepo,
+		AuditLogger: auditLogger,
+        Coordinator: coordinator,
+		Checker:     health.NewChecker(),
+		ProjectsDir: cfg.ProjectsDir,
+		Mux:         mux,
+		axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
+		HttpServer: &http.Server{
+			Addr:    fmt.Sprintf(":%d", cfg.Port),
+			Handler: mux,
+		},
+		runnerCommand: runnerCmd,
+		runnerArgs:    runnerArgs,
+		runnerModel:   modelUsed,
+		skipPreflight: cfg.SkipPreflight,
+	}
 
-	// Start background indexing
-	go coordinator.SyncKnowledge(".")
+    s.registerRoutes()
+
+    if s.Coordinator != nil {
+        // Start background indexing only when DCP is enabled
+        go s.Coordinator.SyncKnowledge(".")
+    }
 
 	return s, nil
 }
 
 func (s *Server) registerRoutes() {
-	// --- Legacy/High-Level OpenExec Routes (pkg/api bridge) ---
-	s.axonBridge.RegisterRoutes(s.Mux)
+    // --- Legacy/High-Level OpenExec Routes (pkg/api bridge) ---
+    s.axonBridge.RegisterRoutes(s.Mux)
 
-	// --- DCP Surgical Routes ---
-	s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)
-	s.Mux.HandleFunc("GET /api/v1/knowledge/symbols", s.handleKnowledgeSymbols)
-	s.Mux.HandleFunc("GET /api/v1/knowledge/envs", s.handleKnowledgeEnvs)
+    // --- DCP Surgical Routes ---
+    if s.Coordinator != nil {
+        s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)
+        s.Mux.HandleFunc("GET /api/v1/knowledge/symbols", s.handleKnowledgeSymbols)
+        s.Mux.HandleFunc("GET /api/v1/knowledge/envs", s.handleKnowledgeEnvs)
+    }
 
 	// --- Health & System Routes ---
 	s.Mux.HandleFunc("GET /api/health", s.handleHealth)
@@ -241,13 +272,13 @@ func (s *Server) handleKnowledgeEnvs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	runnerCmd := "claude"
-	runnerArgs := runner.ClaudeArgs
+	runnerArgs := runner.ClaudeDefaultArgs
 	modelName := ""
-	
+
 	if s.Mgr != nil {
 		cfg := s.Mgr.GetConfig()
 		modelName = cfg.ExecutorModel
-		
+
 		// If custom runner was configured, use those
 		if cfg.RunnerCommand != "" {
 			runnerCmd = cfg.RunnerCommand
@@ -404,10 +435,12 @@ func (s *Server) registerPreflightChecks() {
 
 // Start runs the server and blocks
 func (s *Server) Start(ctx context.Context) error {
-	// Register and run preflight checks before starting
-	s.registerPreflightChecks()
-	if err := s.Checker.RunPreflight(ctx); err != nil {
-		return fmt.Errorf("preflight failed: %w", err)
+	// Register and run preflight checks before starting (unless skipped for testing)
+	if !s.skipPreflight {
+		s.registerPreflightChecks()
+		if err := s.Checker.RunPreflight(ctx); err != nil {
+			return fmt.Errorf("preflight failed: %w", err)
+		}
 	}
 
 	log.Printf("[Server] Unified OpenExec API listening on %s", s.HttpServer.Addr)

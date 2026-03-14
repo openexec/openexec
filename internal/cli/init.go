@@ -107,14 +107,14 @@ The project name defaults to the current directory name if not provided.`,
 			executorModel = initExecutorModel
 			reviewEnabled = initReviewEnabled
 			reviewerModel = initReviewerModel
-			
+
 			// Respect flag if provided in non-interactive mode
 			parallelEnabled = initParallel
 			workerCount = initWorkerCount
 			if !parallelEnabled {
 				workerCount = 1
 			}
-			
+
 			gitCommitEnabled = false
 			gitPushEnabled = false
 		}

@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"github.com/fatih/color"	
 	"encoding/json"
 	"fmt"
+	"github.com/fatih/color"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +21,60 @@ var releaseCmd = &cobra.Command{
 and generating ISO 27001 compliant documentation.
 
 Git integration and approval workflows can be enabled via configuration.`,
+}
+
+// story export: write the current DB stories/tasks to .openexec/stories.json (export-only)
+var storyExportCmd = &cobra.Command{
+    Use:   "export",
+    Short: "Export stories and tasks from DB to .openexec/stories.json (read-only export)",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        mgr, err := getReleaseManager(cmd)
+        if err != nil { return err }
+
+        stories := mgr.GetStories()
+        tasks := mgr.GetTasks()
+        // build map from story ID to task summaries
+        byStory := make(map[string][]map[string]interface{})
+        for _, t := range tasks {
+            byStory[t.StoryID] = append(byStory[t.StoryID], map[string]interface{}{
+                "id":                 t.ID,
+                "title":              t.Title,
+                "description":        t.Description,
+                "depends_on":         t.DependsOn,
+                "verification_script": t.VerificationScript,
+            })
+        }
+
+        export := map[string]interface{}{
+            "schema_version": "1.1",
+            "goals":          []interface{}{}, // goals not persisted here; export stories/tasks only
+            "stories":        []interface{}{},
+        }
+        for _, s := range stories {
+            export["stories"] = append(export["stories"].([]interface{}), map[string]interface{}{
+                "id":                 s.ID,
+                "goal_id":            s.GoalID,
+                "title":              s.Title,
+                "description":        s.Description,
+                "acceptance_criteria": s.AcceptanceCriteria,
+                "verification_script": s.VerificationScript,
+                "depends_on":         s.DependsOn,
+                "tasks":              byStory[s.ID],
+                "story_type":         s.StoryType,
+                "priority":           s.Priority,
+                "status":             s.Status,
+            })
+        }
+
+        outPath := filepath.Join(".openexec", "stories.json")
+        _ = os.MkdirAll(filepath.Dir(outPath), 0750)
+        data, _ := json.MarshalIndent(export, "", "  ")
+        if err := os.WriteFile(outPath, data, 0644); err != nil {
+            return fmt.Errorf("failed to write %s: %w", outPath, err)
+        }
+        cmd.Printf("✓ Exported stories to %s\n", outPath)
+        return nil
+    },
 }
 
 var releaseCreateCmd = &cobra.Command{
@@ -899,7 +953,7 @@ Note: 'openexec run' now performs this step automatically via deep-healing.`,
 		cmd.Printf("Importing %d stories from %s...\n\n", len(stories), inputFile)
 
 		storyIDPattern := regexp.MustCompile(`^(US|REQ)-\d{3}$`)
-		
+
 		// Map to track which tasks are currently in the incoming stories.json
 		incomingTaskIDs := make(map[string]bool)
 		for _, s := range stories {
@@ -1019,31 +1073,31 @@ Note: 'openexec run' now performs this step automatically via deep-healing.`,
 				}
 
 				// Check if task already exists
-                existingTask := mgr.GetTask(taskID)
-                if existingTask != nil {
-                    // Optionally reassign existing tasks to this story and sync status
-                    if reassign {
-                        if existingTask.StoryID == "" || existingTask.StoryID != genStory.ID {
-                            if err := mgr.ReassignTask(existingTask.ID, genStory.ID); err == nil {
-                                cmd.Printf("    [reassign] %s: linked to story %s\n", taskID, genStory.ID)
-                            } else {
-                                cmd.Printf("    [error] %s: failed to reassign: %v\n", taskID, err)
-                            }
-                        }
-                        // If story is done, mark task done too
-                        if story != nil && story.Status == release.StoryStatusDone && existingTask.Status != release.TaskStatusDone {
-                            if err := mgr.SetTaskStatus(existingTask.ID, release.TaskStatusDone); err == nil {
-                                cmd.Printf("    [sync] %s: marked done to match story status\n", taskID)
-                            }
-                        }
-                    } else {
-                        // Without reassign, just warn about mismatched linkage
-                        if existingTask.StoryID != genStory.ID {
-                            cmd.Printf("    [warning] %s: exists but belongs to story %s\n", taskID, existingTask.StoryID)
-                        }
-                    }
-                    continue
-                }
+				existingTask := mgr.GetTask(taskID)
+				if existingTask != nil {
+					// Optionally reassign existing tasks to this story and sync status
+					if reassign {
+						if existingTask.StoryID == "" || existingTask.StoryID != genStory.ID {
+							if err := mgr.ReassignTask(existingTask.ID, genStory.ID); err == nil {
+								cmd.Printf("    [reassign] %s: linked to story %s\n", taskID, genStory.ID)
+							} else {
+								cmd.Printf("    [error] %s: failed to reassign: %v\n", taskID, err)
+							}
+						}
+						// If story is done, mark task done too
+						if story != nil && story.Status == release.StoryStatusDone && existingTask.Status != release.TaskStatusDone {
+							if err := mgr.SetTaskStatus(existingTask.ID, release.TaskStatusDone); err == nil {
+								cmd.Printf("    [sync] %s: marked done to match story status\n", taskID)
+							}
+						}
+					} else {
+						// Without reassign, just warn about mismatched linkage
+						if existingTask.StoryID != genStory.ID {
+							cmd.Printf("    [warning] %s: exists but belongs to story %s\n", taskID, existingTask.StoryID)
+						}
+					}
+					continue
+				}
 
 				task := &release.Task{
 					ID:                 taskID,
@@ -1055,14 +1109,14 @@ Note: 'openexec run' now performs this step automatically via deep-healing.`,
 					Status:             release.TaskStatusPending,
 				}
 
-                if task.Title == "" {
-                    task.Title = "Imported Task " + taskID
-                }
+				if task.Title == "" {
+					task.Title = "Imported Task " + taskID
+				}
 
-                // If the parent story is already done, sync task status to done
-                if story != nil && story.Status == release.StoryStatusDone {
-                    task.Status = release.TaskStatusDone
-                }
+				// If the parent story is already done, sync task status to done
+				if story != nil && story.Status == release.StoryStatusDone {
+					task.Status = release.TaskStatusDone
+				}
 
 				if err := mgr.CreateTask(task); err != nil {
 					cmd.Printf("    [error] %s: %v\n", taskID, err)
@@ -1100,11 +1154,15 @@ Note: 'openexec run' now performs this step automatically via deep-healing.`,
 			for _, tRaw := range s.Tasks {
 				id := ""
 				switch v := tRaw.(type) {
-				case string: id = v
-				case map[string]any: id, _ = v["id"].(string)
+				case string:
+					id = v
+				case map[string]any:
+					id, _ = v["id"].(string)
 				}
-				
-				if id == "" { continue }
+
+				if id == "" {
+					continue
+				}
 
 				t, exists := taskMap[id]
 				if !exists {
@@ -1133,7 +1191,7 @@ Note: 'openexec run' now performs this step automatically via deep-healing.`,
 			cmd.Printf("\n⚠️  INTEGRITY WARNING: %d task(s) missing, %d task(s) mislinked.\n", missingTasks, mislinkedTasks)
 			return fmt.Errorf("integrity check failed")
 		}
-		
+
 		cmd.Printf("✓ Integrity Audit passed: all tasks present and correctly linked.\n")
 		return nil
 	},
@@ -1574,7 +1632,11 @@ func init() {
 
 	releaseCmd.AddCommand(releaseResetCmd)
 
-	releaseCmd.AddCommand(releaseChangelogCmd)
+    releaseCmd.AddCommand(releaseChangelogCmd)
+    // story subcommands
+    storyCmd := &cobra.Command{Use: "story", Short: "Manage stories and tasks (import/export)"}
+    storyCmd.AddCommand(storyExportCmd)
+    rootCmd.AddCommand(storyCmd)
 	releaseChangelogCmd.Flags().Bool("json", false, "Output as JSON")
 	releaseChangelogCmd.Flags().String("output", "", "Write to file instead of stdout")
 	releaseChangelogCmd.Flags().String("repo-url", "", "Repository URL for commit links")

@@ -362,6 +362,7 @@ export interface LoopEvent {
   signal?: SignalInfo
   metadata?: Record<string, unknown>
   currentPid?: number
+  artifacts?: Record<string, string>
 }
 
 // =============================================================================
@@ -420,6 +421,8 @@ export type WebSocketMessageType =
   | 'subscribe'
   | 'unsubscribe'
   | 'event'
+  | 'step'
+  | 'notice'
   | 'message'
   | 'streaming_chunk'
   | 'tool_call_update'

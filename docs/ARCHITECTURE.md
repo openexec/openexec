@@ -8,6 +8,8 @@ This document explains how OpenExec turns an idea into executable work by moving
 - Planning Gate: validates structure (schema version, goal coverage, verification scripts).
 - Import & Reconciliation: materializes stories and tasks, fixes linkages, and enforces ordering.
 - Execution Pipeline: runs TD → IM → RV → RF → FL with the resolved CLI runner (claude/codex/gemini).
+  - **Fast-Track:** Study/Mapping tasks jump directly from TD → FL to save time on documentation work.
+- Built-in State (Tract): Context briefings are generated directly from the release manager state without external service dependencies.
 - Auto‑Healing: repairs known mismatches (e.g., already implemented) and persists state.
 - Observability: /api/health exposes the resolved runner; logs and per‑loop stderr tails aid debugging.
 

@@ -13,13 +13,13 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
+    "time"
 
 	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
 	"github.com/openexec/openexec/internal/planner"
-	"github.com/openexec/openexec/internal/project"
-	"github.com/openexec/openexec/internal/release"
+    "github.com/openexec/openexec/internal/project"
+    "github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -38,6 +38,9 @@ var (
 	runTimeout       int
 	runVerbose       bool
 	runNoAutoPlan    bool
+	runQuickfix      string
+	runVerify        string
+	runMode          string
 )
 
 // Task represents a task to execute
@@ -57,28 +60,7 @@ type TasksFile struct {
 	Tasks []Task `json:"tasks"`
 }
 
-// CreateLoopRequest is the request body for creating a loop
-type CreateLoopRequest struct {
-	Prompt        string `json:"prompt"`
-	WorkDir       string `json:"work_dir"`
-	MaxIterations int    `json:"max_iterations,omitempty"`
-	ReviewerModel string `json:"reviewer_model,omitempty"`
-	TaskID        string `json:"task_id,omitempty"`
-	MCPConfigPath string `json:"mcp_config_path,omitempty"`
-	IsStudy       bool   `json:"is_study,omitempty"`
-}
-
-// LoopResponse is the API response for loop operations
-type LoopResponse struct {
-	ID           string    `json:"id"`
-	Status       string    `json:"status"`
-	Iteration    int       `json:"iteration"`
-	Error        string    `json:"error,omitempty"`
-	Phase        string    `json:"phase,omitempty"`
-	Agent        string    `json:"agent,omitempty"`
-	StartedAt    string    `json:"started_at,omitempty"`
-	LastActivity time.Time `json:"last_activity,omitempty"`
-}
+// Legacy loop request/response removed; CLI now uses /api/fwu and /api/v1/runs
 
 var startCmd = &cobra.Command{
 	Use:   "start",
@@ -158,12 +140,20 @@ var startCmd = &cobra.Command{
 		}
 		defer func() { _ = removePIDFile(config.ProjectDir) }()
 
-		srv, err := server.New(server.Config{
-			Port:        startPort,
-			AuditDB:     auditDB,
-			DataDir:     dataDir,
-			ProjectsDir: config.ProjectDir,
-		})
+        // Enable DCP only when explicitly requested via env
+        enableDCP := false
+        if v := os.Getenv("OPENEXEC_ENABLE_DCP"); v != "" {
+            lv := strings.ToLower(v)
+            enableDCP = (lv == "1" || lv == "true" || lv == "yes")
+        }
+
+        srv, err := server.New(server.Config{
+            Port:        startPort,
+            AuditDB:     auditDB,
+            DataDir:     dataDir,
+            ProjectsDir: config.ProjectDir,
+            EnableDCP:   enableDCP,
+        })
 		if err != nil {
 			return err
 		}
@@ -192,7 +182,7 @@ var runCmd = &cobra.Command{
 			if err := startExec.Run(); err != nil {
 				return fmt.Errorf("failed to auto-start execution engine: %w", err)
 			}
-			
+
 			// Wait for PID file to be written and engine to initialize
 			time.Sleep(1 * time.Second)
 		}
@@ -218,11 +208,13 @@ var runCmd = &cobra.Command{
 				wizardPath := filepath.Join(config.TractStore, "wizard_state.json")
 
 				needsPlanning := false
-				
+
 				if _, err := os.Stat(intentPath); os.IsNotExist(err) {
 					if _, err := os.Stat(wizardPath); err == nil {
 						if data, err := os.ReadFile(wizardPath); err == nil {
-							var ws struct { UpdatedState planner.IntentState `json:"updated_state"` }
+							var ws struct {
+								UpdatedState planner.IntentState `json:"updated_state"`
+							}
 							if err := json.Unmarshal(data, &ws); err == nil {
 								if ws.UpdatedState.IsReady() {
 									cmd.Println("📝 INTENT.md missing but wizard state complete. Rendering intent...")
@@ -272,10 +264,34 @@ var runCmd = &cobra.Command{
 				runTimeout = config.Execution.TimeoutSeconds
 			}
 
-			mgr, err := getReleaseManager(cmd)
-			if err != nil {
-				return err
+		mgr, err := getReleaseManager(cmd)
+		if err != nil {
+			return err
+		}
+
+		// QUICKFIX FLOW: Deterministic single-task execution without planning
+		if strings.TrimSpace(runQuickfix) != "" {
+			title := strings.TrimSpace(runQuickfix)
+			verify := strings.TrimSpace(runVerify)
+			if verify == "" {
+				verify = "echo quickfix-verify"
 			}
+			if strings.ToLower(runMode) == "read-only" {
+				return fmt.Errorf("quickfix requires write access. Set --mode workspace-write or danger-full-access, or run with --verify only (no edits)")
+			}
+			qf := Task{
+				ID:                 "T-QF-001",
+				Title:              "Chassis: " + title,
+				Description:        "Deterministic quickfix execution (no planning)",
+				StoryID:            "US-QF",
+				Status:             "pending",
+				DependsOn:          nil,
+				VerificationScript: verify,
+				TechnicalStrategy:  "FAST-TRACK: Apply minimal, reviewable change and validate using the provided verification script.",
+			}
+			cmd.Printf("📋 Executing quickfix task: %s\n", qf.Title)
+			return executeTasksParallel(cmd, config.ProjectDir, []Task{qf}, 1, mgr)
+		}
 
 			cmd.Println("🔍 Running Pre-flight Active Healing...")
 			relTasks := mgr.GetTasks()
@@ -284,7 +300,7 @@ var runCmd = &cobra.Command{
 				if rt.Status == "running" || rt.Status == "starting" {
 					stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, rt.ID)
 					_, _ = http.Post(stopURL, "application/json", nil)
-					
+
 					rt.Status = "pending"
 					_ = mgr.UpdateTask(rt)
 					resetCount++
@@ -294,15 +310,23 @@ var runCmd = &cobra.Command{
 				cmd.Printf("   ✨ Self-Healed: Reset %d ghost tasks to pending\n", resetCount)
 			}
 
-			tasks, err := loadPendingTasks(config.ProjectDir, mgr, true)
-			if err != nil {
-				return fmt.Errorf("failed to load tasks: %w", err)
-			}
+        tasks, err := loadPendingTasks(config.ProjectDir, mgr, false)
+            if err != nil || len(tasks) == 0 {
+                // AUTO-IMPORT: If runtime DB is empty, try importing from .openexec/stories.json once
+                if tryAutoImportStories(config.ProjectDir, mgr, cmd) {
+                    // Reload after import
+                    tasks, err = loadPendingTasks(config.ProjectDir, mgr, false)
+                }
+            }
+            if err != nil {
+                return fmt.Errorf("failed to load tasks: %w", err)
+            }
 
-			if len(tasks) == 0 {
-				cmd.Println("No pending tasks found.")
-				return nil
-			}
+            if len(tasks) == 0 {
+                cmd.Println("No pending tasks found.")
+                cmd.Println("Hint: add stories to .openexec/stories.json or run 'openexec story import' manually.")
+                return nil
+            }
 
 			if len(args) > 0 {
 				taskID := args[0]
@@ -352,7 +376,9 @@ var stopCmd = &cobra.Command{
 	Short: "Stop execution engine",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		config, err := project.LoadProjectConfig(".")
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if pid, _, err := readPID(config.ProjectDir); err == nil {
 			return KillDaemon(pid)
 		}
@@ -361,7 +387,7 @@ var stopCmd = &cobra.Command{
 }
 
 var restartCmd = &cobra.Command{
-	Use: "restart",
+	Use:   "restart",
 	Short: "Restart execution engine",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_ = stopCmd.RunE(cmd, args)
@@ -385,6 +411,19 @@ type TaskNode struct {
 	Status    TaskStatus
 	DependsOn map[string]bool
 	Retries   int
+}
+
+// isStudyTask returns true if the task title indicates a study/mapping task.
+func isStudyTask(title string) bool {
+	lower := strings.ToLower(title)
+	return strings.Contains(lower, "study") ||
+		strings.Contains(lower, "mapping") ||
+		strings.Contains(lower, "map")
+}
+
+// isChassisTask returns true if the task title indicates a chassis task.
+func isChassisTask(title string) bool {
+	return strings.Contains(strings.ToLower(title), "chassis")
 }
 
 func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, workerCount int, mgr *release.Manager) error {
@@ -416,7 +455,9 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 	inDegree := make(map[string]int)
 	for _, node := range nodes {
-		if node.Status == StatusCompleted { continue }
+		if node.Status == StatusCompleted {
+			continue
+		}
 		for depID := range node.DependsOn {
 			depNode, exists := nodes[depID]
 			if exists && depNode.Status != StatusCompleted {
@@ -439,7 +480,9 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		visitedCount++
 
 		for id, node := range nodes {
-			if node.Status == StatusCompleted { continue }
+			if node.Status == StatusCompleted {
+				continue
+			}
 			for depID := range node.DependsOn {
 				if depID == u {
 					inDegree[id]--
@@ -483,7 +526,9 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 		}
 
 		for _, node := range nodes {
-			if node.Status != StatusPending { continue }
+			if node.Status != StatusPending {
+				continue
+			}
 
 			allDone := true
 			for depID := range node.DependsOn {
@@ -516,14 +561,15 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				node.Status = StatusRunning
 				mu.Unlock()
 
-				isChassis := strings.Contains(strings.ToLower(node.Task.Title), "chassis")
-				isStudy := strings.Contains(strings.ToLower(node.Task.Title), "study") || strings.Contains(strings.ToLower(node.Task.Title), "map") || strings.Contains(strings.ToLower(node.Task.Title), "mapping")
-				
+				isChassis := isChassisTask(node.Task.Title)
+				isStudy := isStudyTask(node.Task.Title)
 				isFastTrack := isChassis || isStudy
 
 				if isFastTrack {
 					trackName := "Chassis"
-					if isStudy { trackName = "Study" }
+					if isStudy {
+						trackName = "Study"
+					}
 					cmd.Printf("[Worker %d] ⚡ FAST-TRACK: Executing combined %s task %s\n", workerID, trackName, node.Task.ID)
 				} else {
 					cmd.Printf("[Worker %d] Executing %s: %s\n", workerID, node.Task.ID, node.Task.Title)
@@ -555,7 +601,7 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 								node.Retries = maxRetries
 								break
 							}
-							
+
 							cmd.Printf("[Worker %d] ⚠ Loop creation failed (attempt %d/%d): %v\n", workerID, node.Retries+1, maxRetries, err)
 							node.Retries++
 							continue
@@ -564,37 +610,37 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 					workerPrefix := fmt.Sprintf("[Worker %d]", workerID)
 					effectiveTimeout := time.Duration(runTimeout) * time.Second
-					
+
 					if isFastTrack {
 						workerPrefix = fmt.Sprintf("[Worker %d] (fast-track)", workerID)
 						effectiveTimeout = time.Duration(float64(runTimeout)*0.6) * time.Second
 					}
-					
+
 					err = waitForLoop(cmd, loopID, workerPrefix, effectiveTimeout, isFastTrack)
 					if err == nil {
 						success = true
 						break
 					}
 					lastError = err.Error()
-					
+
 					// UNIVERSAL SELF-HEALING Logic
 					lowerErr := strings.ToLower(lastError)
-					
+
 					// A. Plan-Healing (Design Mismatch)
 					isRefinementRequired := strings.Contains(lowerErr, "design must be updated") ||
-										   strings.Contains(lowerErr, "update the strategy") ||
-										   strings.Contains(lowerErr, "plan needs") ||
-										   strings.Contains(lowerErr, "planning mismatch")
+						strings.Contains(lowerErr, "update the strategy") ||
+						strings.Contains(lowerErr, "plan needs") ||
+						strings.Contains(lowerErr, "planning mismatch")
 
 					if isRefinementRequired {
 						// Filter out completion signals first
-						isComplete := strings.Contains(lowerErr, "complete") || 
-									 strings.Contains(lowerErr, "done") || 
-									 strings.Contains(lowerErr, "satisfied")
-						
+						isComplete := strings.Contains(lowerErr, "complete") ||
+							strings.Contains(lowerErr, "done") ||
+							strings.Contains(lowerErr, "satisfied")
+
 						if !isComplete {
 							cmd.Printf("[Worker %d] 🔄 PLAN-HEALING: Agent requested plan update. Re-generating with failure context...\n", workerID)
-							
+
 							// Stop the active task so it doesn't conflict later
 							stopURL := fmt.Sprintf("http://localhost:%d/api/fwu/%s/stop", startPort, loopID)
 							_, _ = http.Post(stopURL, "application/json", nil)
@@ -617,11 +663,11 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 					// B. Documentation/Analysis Completion (Surgical auto-complete)
 					if isStudy {
 						isDocComplete := strings.Contains(lowerErr, "outside") && strings.Contains(lowerErr, "scope") ||
-										strings.Contains(lowerErr, "test mismatch") ||
-										strings.Contains(lowerErr, "unrelated failing test") ||
-										strings.Contains(lowerErr, "already been implemented") ||
-										strings.Contains(lowerErr, "cannot complete") && strings.Contains(lowerErr, "red tests")
-						
+							strings.Contains(lowerErr, "test mismatch") ||
+							strings.Contains(lowerErr, "unrelated failing test") ||
+							strings.Contains(lowerErr, "already been implemented") ||
+							strings.Contains(lowerErr, "cannot complete") && strings.Contains(lowerErr, "red tests")
+
 						if isDocComplete {
 							cmd.Printf("[Worker %d] ✨ AUTO-HEAL: Documentation/Study task completed despite minor environment noise.\n", workerID)
 							success = true
@@ -653,7 +699,8 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 
 				if mgr != nil {
 					if _, err := mgr.CompleteTask(node.Task.ID); err != nil {
-						_ = upsertTaskStatus(projectDir, node.Task.ID, "completed", node.Task.StoryID)
+						// Fallback: update via SetTaskStatus if CompleteTask fails
+						_ = mgr.SetTaskStatus(node.Task.ID, release.TaskStatusDone)
 					}
 					story := mgr.GetStory(node.Task.StoryID)
 					if story != nil && story.Status == release.StoryStatusDone {
@@ -663,10 +710,10 @@ func executeTasksParallel(cmd *cobra.Command, projectDir string, tasks []Task, w
 				}
 
 				node.Status = StatusCompleted
-				_ = saveTaskStatus(projectDir, node.Task.ID, "completed")
+				// Note: State is persisted via manager.CompleteTask/SetTaskStatus (SQLite canonical)
 				doneCount++
 				cmd.Printf("[Worker %d] ✓ Completed %s (%d/%d)\n", workerID, node.Task.ID, doneCount, totalToRun)
-				
+
 				if finishedCount == totalToRun {
 					safeClose()
 				}
@@ -717,7 +764,9 @@ func removePIDFile(projectDir string) error {
 
 func readPID(projectDir string) (int, int, error) {
 	data, err := os.ReadFile(filepath.Join(projectDir, ".openexec", "openexec.pid"))
-	if err != nil { return 0, 0, err }
+	if err != nil {
+		return 0, 0, err
+	}
 	var pid, port int
 	fmt.Sscanf(string(data), "%d:%d", &pid, &port)
 	return pid, port, nil
@@ -768,63 +817,23 @@ func isServerRunning(projectDir string, port int) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-func upsertTaskStatus(projectDir string, taskID string, status string, storyID string) error {
-	paths := []string{
-		filepath.Join(projectDir, ".openexec", "tasks.json"),
-		filepath.Join(projectDir, "tasks.json"),
-	}
-
-	var data []byte
-	var path string
-	for _, p := range paths {
-		if d, err := os.ReadFile(p); err == nil {
-			data = d
-			path = p
-			break
-		}
-	}
-
-	if data == nil {
-		path = filepath.Join(projectDir, ".openexec", "tasks.json")
-		_ = os.MkdirAll(filepath.Dir(path), 0750)
-		data = []byte(`{"tasks":[]}`)
-	}
-
-	var tf struct {
-		Tasks []map[string]interface{} `json:"tasks"`
-	}
-	_ = json.Unmarshal(data, &tf)
-
-	found := false
-	for _, t := range tf.Tasks {
-		if id, _ := t["id"].(string); id == taskID {
-			t["status"] = status
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		tf.Tasks = append(tf.Tasks, map[string]interface{}{
-			"id":       taskID,
-			"status":   status,
-			"story_id": storyID,
-			"title":    "Healed Task " + taskID,
-		})
-	}
-
-	newData, _ := json.MarshalIndent(tf, "", "  ")
-	return os.WriteFile(path, newData, 0644)
-}
+// upsertTaskStatus removed: SQLite is now the canonical state store.
+// Task status updates go through release.Manager which persists to SQLite.
 
 func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string, workerID int) {
 	relPrefix := "release/"
 	featPrefix := "feature/"
 	baseBranch := "main"
 	if projCfg, err := project.LoadProjectConfig(projectDir); err == nil {
-		if projCfg.ReleaseBranchPrefix != "" { relPrefix = projCfg.ReleaseBranchPrefix }
-		if projCfg.FeatureBranchPrefix != "" { featPrefix = projCfg.FeatureBranchPrefix }
-		if projCfg.BaseBranch != "" { baseBranch = projCfg.BaseBranch }
+		if projCfg.ReleaseBranchPrefix != "" {
+			relPrefix = projCfg.ReleaseBranchPrefix
+		}
+		if projCfg.FeatureBranchPrefix != "" {
+			featPrefix = projCfg.FeatureBranchPrefix
+		}
+		if projCfg.BaseBranch != "" {
+			baseBranch = projCfg.BaseBranch
+		}
 	}
 
 	releaseBranch := relPrefix + "current"
@@ -832,7 +841,7 @@ func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string,
 	if v := strings.TrimSpace(string(fromVersion)); v != "" {
 		releaseBranch = relPrefix + v
 	}
-	
+
 	storyBranch := featPrefix + storyID
 
 	_ = exec.Command("git", "checkout", releaseBranch).Run()
@@ -847,35 +856,26 @@ func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string,
 }
 
 func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
-	prompt := buildTaskPromptWithRetry(task, mgr, lastError)
-	mcpPath, _ := ensureMCPConfig(projectDir)
+    // prompt and MCP config are handled server-side for FWU start
 
-	isStudy := strings.Contains(strings.ToLower(task.Title), "study") || 
-			  strings.Contains(strings.ToLower(task.Title), "mapping") ||
-			  strings.Contains(strings.ToLower(task.Title), "map")
+	isStudy := isStudyTask(task.Title)
 
-	req := CreateLoopRequest{
-		Prompt:        prompt,
-		WorkDir:       projectDir,
-		MaxIterations: runMaxIterations,
-		TaskID:        task.ID,
-		MCPConfigPath: mcpPath,
-		IsStudy:       isStudy,
+    payload := map[string]any{}
+    if isStudy { payload["is_study"] = true }
+    if runMode != "" { payload["mode"] = runMode }
+    body, _ := json.Marshal(payload)
+    resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/fwu/%s/start", startPort, task.ID), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", err
 	}
-
-	body, _ := json.Marshal(req)
-	resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/loops", startPort), "application/json", bytes.NewReader(body))
-	if err != nil { return "", err }
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
-	}
+    if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+        respBody, _ := io.ReadAll(resp.Body)
+        return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
+    }
 
-	var loopResp LoopResponse
-	_ = json.NewDecoder(resp.Body).Decode(&loopResp)
-	return loopResp.ID, nil
+    return task.ID, nil
 }
 
 func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string) string {
@@ -884,14 +884,14 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	if lastError != "" {
 		sb.WriteString(fmt.Sprintf("\n⚠️ SELF-HEALING CONTEXT:\n%s\n", lastError))
 	}
-	
+
 	// Inject Environment Context
 	out, err := exec.Command("git", "status", "--short").Output()
 	if err == nil && len(out) > 0 {
 		sb.WriteString("\n📋 CURRENT ENVIRONMENT (GIT STATUS):\n")
 		sb.WriteString(string(out))
 	}
-	
+
 	return sb.String()
 }
 
@@ -920,10 +920,10 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 	wsURL := fmt.Sprintf("ws://localhost:%d/ws", startPort)
 	dialer := websocket.DefaultDialer
 	conn, _, err := dialer.Dial(wsURL, nil)
-	
+
 	if err == nil {
 		defer conn.Close()
-		
+
 		// Subscribe to the loop session
 		subscribeMsg := map[string]interface{}{
 			"type":      "subscribe",
@@ -931,7 +931,7 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		}
 		if err := conn.WriteJSON(subscribeMsg); err != nil {
 			// Fallback to polling if subscription fails
-			err = nil 
+			err = nil
 		} else {
 			// Listen for events via WebSocket
 			type wsMessage struct {
@@ -939,7 +939,7 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 				SessionID string      `json:"sessionId"`
 				Payload   interface{} `json:"payload"`
 			}
-			
+
 			// We still need to check deadline and heartbeat
 			go func() {
 				for {
@@ -947,7 +947,7 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 					if err := conn.ReadJSON(&msg); err != nil {
 						return
 					}
-					
+
 					if msg.Type == "event" {
 						// Payload is a loop.Event (or similar map)
 						if payload, ok := msg.Payload.(map[string]interface{}); ok {
@@ -955,7 +955,7 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 							phase, _ := payload["Phase"].(string)
 							agent, _ := payload["Agent"].(string)
 							eventType, _ := payload["Type"].(string)
-							
+
 							if int(iteration) > lastIteration || phase != lastPhase || agent != lastAgent || eventType == "heartbeat" || eventType == "progress" {
 								lastIteration = int(iteration)
 								lastPhase = phase
@@ -971,31 +971,42 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 
 	// Main monitoring loop (uses polling as secondary/heartbeat mechanism)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/loops/%s", startPort, loopID))
-		if err != nil { 
+        resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/fwu/%s/status", startPort, loopID))
+		if err != nil {
 			time.Sleep(2 * time.Second)
-			continue 
+			continue
 		}
-		var loopResp LoopResponse
+        var loopResp struct{
+            Status string `json:"status"`
+            Iteration int `json:"iteration"`
+            Error string `json:"error"`
+            Phase string `json:"phase"`
+            Agent string `json:"agent"`
+            LastActivity time.Time `json:"last_activity"`
+        }
 		if err := json.NewDecoder(resp.Body).Decode(&loopResp); err != nil {
 			resp.Body.Close()
 			time.Sleep(2 * time.Second)
 			continue
 		}
 		resp.Body.Close()
-		
-		if loopResp.Status == "complete" { return nil }
-		if loopResp.Status == "error" { return fmt.Errorf("%s", loopResp.Error) }
-		
+
+		if loopResp.Status == "complete" {
+			return nil
+		}
+		if loopResp.Status == "error" {
+			return fmt.Errorf("%s", loopResp.Error)
+		}
+
 		if loopResp.Status == "paused" {
 			if strings.Contains(loopResp.Error, "Planning Mismatch") {
 				lowerErr := strings.ToLower(loopResp.Error)
-				isComplete := strings.Contains(lowerErr, "complete") || 
-							 strings.Contains(lowerErr, "done") || 
-							 strings.Contains(lowerErr, "already been implemented") ||
-							 strings.Contains(lowerErr, "satisfied") ||
-							 strings.Contains(lowerErr, "criteria verified")
-				
+				isComplete := strings.Contains(lowerErr, "complete") ||
+					strings.Contains(lowerErr, "done") ||
+					strings.Contains(lowerErr, "already been implemented") ||
+					strings.Contains(lowerErr, "satisfied") ||
+					strings.Contains(lowerErr, "criteria verified")
+
 				if isComplete {
 					cmd.Printf("%s ✨ AUTO-HEAL: Agent verified task is complete or redundant.\n", prefix)
 					return nil
@@ -1003,11 +1014,11 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 				// Plan-healing requested
 				return fmt.Errorf("%s", loopResp.Error)
 			}
-			
+
 			// For generic paused status (e.g. decision-point), return as terminal so orchestrator knows it's not running
 			return fmt.Errorf("agent paused: %s", loopResp.Error)
 		}
-		
+
 		// HEARTBEAT MONITOR: Detect if runner is making progress (iteration, phase, agent or heartbeat)
 		if loopResp.Iteration > lastIteration || loopResp.Phase != lastPhase || loopResp.Agent != lastAgent {
 			lastIteration = loopResp.Iteration
@@ -1017,7 +1028,7 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		} else if !loopResp.LastActivity.IsZero() && loopResp.LastActivity.After(lastActivity) {
 			lastActivity = loopResp.LastActivity
 		}
-		
+
 		if time.Since(lastActivity) > stallThreshold {
 			return fmt.Errorf("runner stalled: no activity progress for %v", stallThreshold)
 		}
@@ -1032,58 +1043,14 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 	return fmt.Errorf("timeout")
 }
 
-func saveTaskStatus(projectDir string, taskID string, status string) error {
-	paths := []string{
-		filepath.Join(projectDir, "tasks.json"),
-		filepath.Join(projectDir, ".openexec", "tasks.json"),
-	}
-
-	var firstData []byte
-	for _, p := range paths {
-		if data, err := os.ReadFile(p); err == nil {
-			firstData = data
-			break
-		}
-	}
-
-	if firstData == nil {
-		return fmt.Errorf("could not find tasks.json")
-	}
-
-	var data map[string]interface{}
-	if err := json.Unmarshal(firstData, &data); err != nil {
-		return err
-	}
-
-	updated := false
-	if tasks, ok := data["tasks"].([]interface{}); ok {
-		for _, t := range tasks {
-			if taskMap, ok := t.(map[string]interface{}); ok {
-				if id, ok := taskMap["id"].(string); ok && id == taskID {
-					taskMap["status"] = status
-					updated = true
-				}
-			}
-		}
-	}
-
-	if !updated {
-		return fmt.Errorf("task %s not found", taskID)
-	}
-
-	newData, _ := json.MarshalIndent(data, "", "  ")
-	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
-			_ = os.WriteFile(p, newData, 0644)
-		}
-	}
-
-	return nil
-}
+// saveTaskStatus removed: SQLite is now the canonical state store.
+// Task status updates go through release.Manager which persists to SQLite.
 
 func KillDaemon(pid int) error {
 	p, err := os.FindProcess(pid)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return p.Signal(syscall.SIGTERM)
 }
 
@@ -1130,11 +1097,91 @@ func init() {
 
 	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Max iterations")
-	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
-	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
-	runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
+    runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
+    runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
+    runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
+    runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Execute a single deterministic quickfix without planning (task title)")
+    runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
+    runCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
+}
+
+// tryAutoImportStories attempts to import stories from .openexec/stories.json into the DB
+// Returns true if an import was performed (regardless of success), false otherwise.
+func tryAutoImportStories(projectDir string, mgr *release.Manager, cmd *cobra.Command) bool {
+    storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
+    data, err := os.ReadFile(storiesPath)
+    if err != nil { return false }
+    var sf struct {
+        Stories []GeneratedStory `json:"stories"`
+    }
+    if err := json.Unmarshal(data, &sf); err != nil {
+        // try legacy array-only format
+        var bare []GeneratedStory
+        if err2 := json.Unmarshal(data, &bare); err2 == nil {
+            sf.Stories = bare
+        } else {
+            return false
+        }
+    }
+    if len(sf.Stories) == 0 { return false }
+
+    // Import minimal story/task records
+    created := 0
+    for _, s := range sf.Stories {
+        if mgr.GetStory(s.ID) == nil {
+            st := &release.Story{
+                ID:                 s.ID,
+                GoalID:             s.GoalID,
+                Title:              s.Title,
+                Description:        s.Description,
+                AcceptanceCriteria: s.AcceptanceCriteria,
+                VerificationScript: s.VerificationScript,
+                DependsOn:          s.DependsOn,
+                Status:             "pending",
+                CreatedAt:          time.Now(),
+            }
+            _ = mgr.CreateStory(st)
+        }
+        // Create tasks under story
+        var prevTaskID string
+        for _, tRaw := range s.Tasks {
+            var id, title, desc string
+            var deps []string
+            switch v := tRaw.(type) {
+            case string:
+                id = v
+            case map[string]any:
+                if v["id"] != nil { id, _ = v["id"].(string) }
+                if v["title"] != nil { title, _ = v["title"].(string) }
+                if v["description"] != nil { desc, _ = v["description"].(string) }
+                if arr, ok := v["depends_on"].([]any); ok {
+                    for _, a := range arr { if s, ok := a.(string); ok { deps = append(deps, s) } }
+                }
+            }
+            if id == "" { continue }
+            if mgr.GetTask(id) == nil {
+                if prevTaskID != "" { deps = append(deps, prevTaskID) }
+                task := &release.Task{
+                    ID:          id,
+                    Title:       title,
+                    Description: desc,
+                    StoryID:     s.ID,
+                    DependsOn:   deps,
+                    Status:      "pending",
+                    CreatedAt:   time.Now(),
+                }
+                _ = mgr.CreateTask(task)
+                prevTaskID = id
+                created++
+            }
+        }
+    }
+    if created > 0 && cmd != nil {
+        cmd.Printf("Imported %d tasks from %s (auto)\n", created, storiesPath)
+    }
+    return true
 }

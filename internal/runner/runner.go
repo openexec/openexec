@@ -8,14 +8,13 @@ import (
 
 // CLI default argument templates
 var (
-	ClaudeArgs = []string{
-		"--dangerously-skip-permissions",
-		"--output-format", "stream-json",
-		"--verbose",
-		"--max-turns", "50",
-	}
-	CodexArgs  = []string{"--prompt", "-"}
-	GeminiArgs = []string{"--prompt", "-", "--yolo"}
+    ClaudeDefaultArgs = []string{
+        "--output-format", "stream-json",
+        "--verbose",
+        "--max-turns", "50",
+    }
+    CodexDefaultArgs  = []string{"--prompt", "-"}
+    GeminiDefaultArgs = []string{"--prompt", "-"}
 )
 
 // Resolve maps a model name to a local CLI command and its default arguments.
@@ -34,15 +33,17 @@ func Resolve(model string, overrideCmd string, overrideArgs []string) (string, [
 		switch {
 		case m == "", strings.Contains(m, "claude"), strings.Contains(m, "sonnet"), strings.Contains(m, "opus"), strings.Contains(m, "haiku"):
 			cmd = "claude"
-			args = append([]string{}, ClaudeArgs...)
+			args = append([]string{}, ClaudeDefaultArgs...)
 		case strings.HasPrefix(m, "gpt-") || strings.Contains(m, "codex") || strings.Contains(m, "openai"):
 			cmd = "codex"
-			args = append([]string{}, CodexArgs...)
+			args = append([]string{}, CodexDefaultArgs...)
 		case strings.HasPrefix(m, "gemini"):
 			cmd = "gemini"
-			args = append([]string{}, GeminiArgs...)
+			args = append([]string{}, GeminiDefaultArgs...)
 		default:
-			return "", nil, fmt.Errorf("no known runner for model %q; specify runner_command in config", model)
+			// Unknown models fall back to claude as the default runner
+			cmd = "claude"
+			args = append([]string{}, ClaudeDefaultArgs...)
 		}
 	}
 

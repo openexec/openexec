@@ -65,23 +65,33 @@ type CostInfo struct {
 
 // Event represents a single occurrence in the loop lifecycle.
 type Event struct {
-	Type         EventType              `json:"type"`
-	Kind         EventKind              `json:"kind,omitempty"`
-	Iteration    int                    `json:"iteration,omitempty"`
-	Text         string                 `json:"text,omitempty"`
-	Tool         string                 `json:"tool,omitempty"`
-	ToolInput    map[string]interface{} `json:"tool_input,omitempty"`
-	Err          error                  `json:"-"`
-	ErrText      string                 `json:"error,omitempty"`
-	SignalType   string                 `json:"signal_type,omitempty"`
-	SignalTarget string                 `json:"signal_target,omitempty"`
-	Cost         *CostInfo              `json:"cost,omitempty"`
-	SessionID    string                 `json:"session_id,omitempty"`
+    Type         EventType              `json:"type"`
+    Kind         EventKind              `json:"kind,omitempty"`
+    Iteration    int                    `json:"iteration,omitempty"`
+    Text         string                 `json:"text,omitempty"`
+    Tool         string                 `json:"tool,omitempty"`
+    ToolInput    map[string]interface{} `json:"tool_input,omitempty"`
+    Err          error                  `json:"-"`
+    ErrText      string                 `json:"error,omitempty"`
+    SignalType   string                 `json:"signal_type,omitempty"`
+    SignalTarget string                 `json:"signal_target,omitempty"`
+    Cost         *CostInfo              `json:"cost,omitempty"`
+    SessionID    string                 `json:"session_id,omitempty"`
 
-	// Pipeline context fields (V4). Omitted for standalone Loop usage.
-	Phase       string `json:"phase,omitempty"`
-	FWUID       string `json:"fwu_id,omitempty"`
-	Agent       string `json:"agent,omitempty"`
-	ReviewCycle int    `json:"review_cycle,omitempty"`
-	RouteTarget string `json:"route_target,omitempty"`
+    // Pipeline context fields (V4). Omitted for standalone Loop usage.
+    Phase       string `json:"phase,omitempty"`
+    FWUID       string `json:"fwu_id,omitempty"`
+    Agent       string `json:"agent,omitempty"`
+    ReviewCycle int    `json:"review_cycle,omitempty"`
+    RouteTarget string `json:"route_target,omitempty"`
+
+    // Observability fields
+    PromptHash string `json:"prompt_hash,omitempty"`
+
+    // Artifacts extracted from tool results (e.g., patch hash/path)
+    Artifacts map[string]string `json:"artifacts,omitempty"`
+
+    // Trace context for replay/observability
+    TraceID string `json:"trace_id,omitempty"`
+    StepID  int    `json:"step_id,omitempty"`
 }

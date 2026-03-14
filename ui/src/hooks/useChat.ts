@@ -306,6 +306,8 @@ export function useChat(config: ChatConfig): UseChatReturn {
   )
 
   const handleLoopEvent = useCallback((event: LoopEvent) => {
+    // Always record the event for timeline/debug (including artifacts)
+    addEvent(event)
     switch (event.type) {
       case 'loop.start':
         setLoopState((prev) => ({
@@ -351,7 +353,7 @@ export function useChat(config: ChatConfig): UseChatReturn {
         }))
         break
     }
-  }, [])
+  }, [addEvent])
 
   const clearEvents = useCallback(() => {
     setEvents([])

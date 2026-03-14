@@ -52,14 +52,21 @@ type PathValidatorConfig struct {
 }
 
 // DefaultPathValidatorConfig returns a default configuration with secure defaults.
+// AllowedRoots defaults to WORKSPACE_ROOT when set, otherwise the current working directory.
 func DefaultPathValidatorConfig() PathValidatorConfig {
-	return PathValidatorConfig{
-		AllowedRoots:    nil, // No restriction by default
-		AllowSymlinks:   false,
-		RequireAbsolute: true,
-		RequireExists:   true,
-		RequireFile:     true,
-	}
+    root := os.Getenv("WORKSPACE_ROOT")
+    if root == "" {
+        if wd, err := os.Getwd(); err == nil {
+            root = wd
+        }
+    }
+    return PathValidatorConfig{
+        AllowedRoots:    []string{root},
+        AllowSymlinks:   false,
+        RequireAbsolute: true,
+        RequireExists:   true,
+        RequireFile:     true,
+    }
 }
 
 // PathValidator provides path validation with configurable security checks.

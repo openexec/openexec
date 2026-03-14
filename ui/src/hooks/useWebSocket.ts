@@ -304,6 +304,11 @@ export function useWebSocket(
             }
             break
 
+          case 'step':
+            // Treat server 'step' messages as loop events and forward
+            handlersRef.current.onEvent?.(message.payload as LoopEvent)
+            break
+
           case 'error':
             handlersRef.current.onError?.(message.payload as string)
             break

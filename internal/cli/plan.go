@@ -1,13 +1,13 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"context"
 
 	"github.com/fatih/color"
 	"github.com/openexec/openexec/internal/intent"
@@ -174,13 +174,13 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 	if strings.Contains(intentLower, "scope: surgical") {
 		scope = "surgical"
 	}
-	
+
 	cmd.Printf("  Hardening plan (Flow: %s, Scope: %s)...\n", flow, scope)
 	planner.EnforceFastTrack(plan, scope, flow)
 
 	// 6. PRAGMATIC PLANNING GATE
 	cmd.Println("  Running Planning Gate checks...")
-	
+
 	// Rule A: Goal Coverage
 	goalCoverage := make(map[string]bool)
 	for _, s := range plan.Stories {
@@ -217,7 +217,7 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 			}
 		}
 	}
-	
+
 	cmd.Println("  ✓ Planning Gate passed.")
 
 	// 7. Validate and Save to stories.json

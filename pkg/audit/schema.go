@@ -96,6 +96,19 @@ CREATE TABLE IF NOT EXISTS encrypted_audit_entries (
 CREATE INDEX IF NOT EXISTS idx_encrypted_entries_timestamp ON encrypted_audit_entries(timestamp);
 CREATE INDEX IF NOT EXISTS idx_encrypted_entries_event_type ON encrypted_audit_entries(event_type);
 CREATE INDEX IF NOT EXISTS idx_encrypted_entries_session_id ON encrypted_audit_entries(session_id);
+
+-- run_checkpoints: per-step checkpoints for replay/resume
+CREATE TABLE IF NOT EXISTS run_checkpoints (
+    id TEXT PRIMARY KEY NOT NULL,
+    run_id TEXT NOT NULL,
+    phase TEXT,
+    iteration INTEGER,
+    timestamp TEXT NOT NULL,
+    artifacts TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_checkpoints_run ON run_checkpoints(run_id, timestamp);
 `
 
 // MigrationSQL contains SQL to migrate from legacy tables to the new schema.

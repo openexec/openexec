@@ -1,19 +1,21 @@
 package mcp
 
 import (
-	"bufio"
-	"bytes"
-	"context"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
+    "bufio"
+    "bytes"
+    "context"
+    "encoding/base64"
+    "encoding/json"
+    "fmt"
+    "io"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "syscall"
+    "time"
+    "crypto/sha256"
+    "encoding/hex"
 )
 
 const protocolVersion = "2024-11-05"
@@ -123,26 +125,26 @@ func (s *Server) handleInitialize(req Request) {
 }
 
 func (s *Server) handleToolsList(req Request) {
-	tools := []interface{}{
-		axonSignalToolDef(),
-		ReadFileToolDef(),
-		WriteFileToolDef(),
-		RunShellCommandToolDef(),
-		GitApplyPatchToolDef(),
-	}
+    tools := []interface{}{
+        axonSignalToolDef(),
+        ReadFileToolDef(),
+        GitApplyPatchToolDef(),
+        // Keep run_shell_command schema for compatibility; execution remains gated
+        RunShellCommandToolDef(),
+    }
 
-	// Add fork tools if fork manager is configured
-	if s.forkManager != nil {
-		tools = append(tools,
-			ForkSessionToolDef(),
-			GetForkInfoToolDef(),
-			ListSessionForksToolDef(),
-		)
-	}
+    // Add fork tools if fork manager is configured
+    if s.forkManager != nil {
+        tools = append(tools,
+            ForkSessionToolDef(),
+            GetForkInfoToolDef(),
+            ListSessionForksToolDef(),
+        )
+    }
 
-	s.writeResult(req.ID, map[string]interface{}{
-		"tools": tools,
-	})
+    s.writeResult(req.ID, map[string]interface{}{
+        "tools": tools,
+    })
 }
 
 func axonSignalToolDef() map[string]interface{} {
@@ -198,8 +200,13 @@ func (s *Server) handleToolsCall(req Request) {
 		s.handleReadFile(req, params)
 	case "write_file":
 		s.handleWriteFile(req, params)
-	case "run_shell_command":
-		s.handleRunShellCommand(req, params)
+    case "run_shell_command":
+        // Disable shell execution by default for safety; require explicit danger mode.
+        if os.Getenv("OPENEXEC_MODE") != "danger-full-access" {
+            s.writeToolError(req.ID, "run_shell_command is disabled unless OPENEXEC_MODE=danger-full-access")
+            return
+        }
+        s.handleRunShellCommand(req, params)
 	case "git_apply_patch":
 		s.handleGitApplyPatch(req, params)
 	case "fork_session":
@@ -248,8 +255,12 @@ func (s *Server) handleReadFile(req Request, params toolsCallParams) {
 		return
 	}
 
-	// Validate path security (no root restrictions for now)
-	validPath, err := ValidatePathForRead(rfReq.Path, nil)
+    // Validate path security against workspace root
+    allowed := []string{}
+    if root := os.Getenv("WORKSPACE_ROOT"); root != "" {
+        allowed = []string{root}
+    }
+    validPath, err := ValidatePathForRead(rfReq.Path, allowed)
 	if err != nil {
 		s.writeToolError(req.ID, fmt.Sprintf("path error: %v", err))
 		return
@@ -321,8 +332,16 @@ func (s *Server) handleWriteFile(req Request, params toolsCallParams) {
 		return
 	}
 
-	// Validate path security (no root restrictions for now)
-	validPath, err := ValidatePathForWrite(wfReq.Path, nil)
+    // Enforce workspace-scoped writes
+    if os.Getenv("OPENEXEC_MODE") == "read-only" {
+        s.writeToolError(req.ID, "write is not allowed in read-only mode")
+        return
+    }
+    allowed := []string{}
+    if root := os.Getenv("WORKSPACE_ROOT"); root != "" {
+        allowed = []string{root}
+    }
+    validPath, err := ValidatePathForWrite(wfReq.Path, allowed)
 	if err != nil {
 		s.writeToolError(req.ID, fmt.Sprintf("path error: %v", err))
 		return
@@ -599,6 +618,15 @@ func (s *Server) handleGitApplyPatch(req Request, params toolsCallParams) {
 		return
 	}
 
+	// SECURITY: Validate that all patch file paths are within workspace_root (Goal G-004)
+	// This prevents patches from modifying files outside the workspace boundary.
+	if patch != nil {
+		if err := ValidatePatchPathsInWorkspace(patch, workDir); err != nil {
+			s.writeToolError(req.ID, fmt.Sprintf("security error: %v", err))
+			return
+		}
+	}
+
 	// Build git apply command arguments
 	args := []string{"apply"}
 
@@ -636,50 +664,73 @@ func (s *Server) handleGitApplyPatch(req Request, params toolsCallParams) {
 
 	err := cmd.Run()
 
-	// Build result
-	stdoutStr := stdout.String()
-	stderrStr := stderr.String()
+    // Build result and persist patch artifact
+    stdoutStr := stdout.String()
+    stderrStr := stderr.String()
 
-	var resultText string
-	if gapReq.CheckOnly {
-		if err == nil {
-			resultText = fmt.Sprintf("Patch can be applied cleanly (%d file(s), +%d/-%d lines)",
-				patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
-		} else {
-			resultText = fmt.Sprintf("Patch cannot be applied cleanly:\n%s", stderrStr)
-		}
-	} else {
-		if err == nil {
-			if gapReq.Reverse {
-				resultText = fmt.Sprintf("Patch unapplied successfully (%d file(s), +%d/-%d lines)",
-					patchStats.FilesChanged, patchStats.Deletions, patchStats.Additions)
-			} else {
-				resultText = fmt.Sprintf("Patch applied successfully (%d file(s), +%d/-%d lines)",
-					patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
-			}
-			if stdoutStr != "" {
-				resultText += "\n" + stdoutStr
-			}
-		} else {
-			resultText = fmt.Sprintf("Failed to apply patch:\n%s", stderrStr)
-		}
-	}
+    // Persist patch artifact under .openexec/artifacts/patches
+    workspace := os.Getenv("WORKSPACE_ROOT")
+    if workspace == "" { workspace = workDir }
+    artHash := ""
+    artPath := ""
+    if workspace != "" {
+        sum := sha256.Sum256([]byte(gapReq.Patch))
+        artHash = hex.EncodeToString(sum[:])
+        dir := filepath.Join(workspace, ".openexec", "artifacts", "patches")
+        _ = os.MkdirAll(dir, 0o755)
+        p := filepath.Join(dir, artHash+".patch")
+        _ = os.WriteFile(p, []byte(gapReq.Patch), 0o644)
+        artPath = p
+    }
 
-	result := map[string]interface{}{
-		"content": []interface{}{
-			map[string]interface{}{
-				"type": "text",
-				"text": resultText,
-			},
-		},
-		"stats": map[string]interface{}{
-			"files_changed": patchStats.FilesChanged,
-			"additions":     patchStats.Additions,
-			"deletions":     patchStats.Deletions,
-			"hunks":         patchStats.Hunks,
-		},
-		"affected_files": affectedFiles,
-	}
+    var resultText string
+    if gapReq.CheckOnly {
+        if err == nil {
+            resultText = fmt.Sprintf("Patch can be applied cleanly (%d file(s), +%d/-%d lines)",
+                patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
+        } else {
+            resultText = fmt.Sprintf("Patch cannot be applied cleanly:\n%s", stderrStr)
+        }
+    } else {
+        if err == nil {
+            if gapReq.Reverse {
+                resultText = fmt.Sprintf("Patch unapplied successfully (%d file(s), +%d/-%d lines)",
+                    patchStats.FilesChanged, patchStats.Deletions, patchStats.Additions)
+            } else {
+                resultText = fmt.Sprintf("Patch applied successfully (%d file(s), +%d/-%d lines)",
+                    patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
+            }
+            if stdoutStr != "" {
+                resultText += "\n" + stdoutStr
+            }
+        } else {
+            resultText = fmt.Sprintf("Failed to apply patch:\n%s", stderrStr)
+        }
+    }
+    if artHash != "" {
+        resultText += "\nARTIFACT:patch " + artHash + " " + artPath
+    }
+
+    result := map[string]interface{}{
+        "content": []interface{}{
+            map[string]interface{}{
+                "type": "text",
+                "text": resultText,
+            },
+        },
+        "stats": map[string]interface{}{
+            "files_changed": patchStats.FilesChanged,
+            "additions":     patchStats.Additions,
+            "deletions":     patchStats.Deletions,
+            "hunks":         patchStats.Hunks,
+        },
+        "affected_files": affectedFiles,
+        "artifact": map[string]interface{}{
+            "type": "patch",
+            "hash": artHash,
+            "path": artPath,
+        },
+    }
 
 	if err != nil {
 		result["isError"] = true

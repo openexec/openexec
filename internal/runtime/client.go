@@ -1,3 +1,5 @@
+//go:build beam
+
 package runtime
 
 import (

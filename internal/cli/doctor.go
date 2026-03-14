@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	doctorAPIBase  string
+	doctorAPIBase   string
 	doctorIntentFix bool
 )
 
@@ -40,7 +40,7 @@ var doctorIntentCmd = &cobra.Command{
 
 func runDoctor(cmd *cobra.Command) error {
 	cmd.Println(color.CyanString("=== OpenExec Doctor: Checking Health ==="))
-	
+
 	issues := 0
 
 	// 1. Check Project Config
@@ -74,7 +74,7 @@ func runDoctor(cmd *cobra.Command) error {
 			issues++
 		} else {
 			cmd.Printf("  %s Runner available: %s\n", color.GreenString("✓"), rCmd)
-			
+
 			// 4. Try basic runner version/auth check (Best effort)
 			base := strings.ToLower(rCmd)
 			if strings.Contains(base, "claude") {
@@ -127,16 +127,16 @@ func runDoctor(cmd *cobra.Command) error {
 		cmd.Printf("%s Doctor found %d issue(s). Resolve them to ensure stable execution.\n", color.RedString("✗"), issues)
 		return fmt.Errorf("doctor check failed")
 	}
-	
+
 	cmd.Println(color.GreenString("✨ Your environment looks healthy!"))
 	return nil
 }
 
 func init() {
 	doctorCmd.Flags().StringVar(&doctorAPIBase, "api", "", "Check remote execution API health (e.g. http://localhost:8765)")
-	
+
 	doctorIntentCmd.Flags().BoolVar(&doctorIntentFix, "fix", false, "Scaffold missing sections in INTENT.md")
 	doctorCmd.AddCommand(doctorIntentCmd)
-	
+
 	rootCmd.AddCommand(doctorCmd)
 }

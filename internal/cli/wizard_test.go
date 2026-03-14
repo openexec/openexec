@@ -22,9 +22,9 @@ func TestWizard_ExitCommandRecognition(t *testing.T) {
 		{"quit", true, false},
 		{"EXIT", false, false}, // not recognized - wizard uses lowercase comparison only
 		{"QUIT", false, false}, // not recognized - wizard uses lowercase comparison only
-		{"exit ", true, false},  // trailing space becomes "exit" after TrimSpace
-		{" exit", true, false},  // leading space becomes "exit" after TrimSpace
-		{"", false, true},       // empty input continues loop
+		{"exit ", true, false}, // trailing space becomes "exit" after TrimSpace
+		{" exit", true, false}, // leading space becomes "exit" after TrimSpace
+		{"", false, true},      // empty input continues loop
 		{"continue", false, false},
 		{"exit now", false, false}, // not exact match
 	}

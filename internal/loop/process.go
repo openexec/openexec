@@ -24,10 +24,19 @@ type Process struct {
 // Optional writers can be provided to tee stdout and stderr.
 // Middleware wraps stdin/stdout/stderr for Deep-Trace interception if provided.
 func StartProcess(ctx context.Context, cfg Config, stdoutW, stderrW io.Writer, m Middleware) (*Process, error) {
-	name, args := buildCommand(cfg)
-	// name is either "claude" or a test-controlled override
-	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
-	cmd.Dir = cfg.WorkDir
+    name, args := buildCommand(cfg)
+    // name is either "claude" or a test-controlled override
+    cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
+    cmd.Dir = cfg.WorkDir
+    // Propagate execution mode and workspace root to the child process
+    env := os.Environ()
+    if cfg.ExecMode != "" {
+        env = append(env, "OPENEXEC_MODE="+cfg.ExecMode)
+    }
+    if cfg.WorkDir != "" {
+        env = append(env, "WORKSPACE_ROOT="+cfg.WorkDir)
+    }
+    cmd.Env = env
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -152,9 +161,10 @@ func (b *stderrTailBuffer) String() string {
 // autonomousPreamble is prepended to every prompt to ensure Claude operates
 // autonomously without attempting interactive workflows.
 const autonomousPreamble = `IMPORTANT: You are running autonomously in a non-interactive pipeline. ` +
-	`There is no human operator present. Do NOT plan — proceed directly with implementation. ` +
-	`Work independently and make reasonable decisions. ` +
-	`If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
+    `There is no human operator present. Do NOT plan — proceed directly with implementation. ` +
+    `Work independently and make reasonable decisions. ` +
+    `All code edits MUST be applied as unified diffs using the git_apply_patch MCP tool. Do NOT use write_file for source changes. ` +
+    `If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
 
 ` + `If the project does not yet have a .gitignore file, create an appropriate one for the tech stack before writing other code.
 
@@ -190,19 +200,21 @@ func buildCommand(cfg Config) (string, []string) {
 		return cliCmd, buildClaudeArgs(cfg)
 	}
 
-	// For Gemini, we want to ensure --yolo is present to avoid interactive hangs.
-	if strings.Contains(strings.ToLower(cliCmd), "gemini") {
-		hasYolo := false
-		for _, a := range cmdArgs {
-			if a == "--yolo" {
-				hasYolo = true
-				break
-			}
-		}
-		if !hasYolo {
-			cmdArgs = append(cmdArgs, "--yolo")
-		}
-	}
+    // For Gemini, gate --yolo by execution mode (danger only)
+    if strings.Contains(strings.ToLower(cliCmd), "gemini") {
+        danger := cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access"
+        if danger {
+            hasYolo := false
+            for _, a := range cmdArgs {
+                if a == "--yolo" { hasYolo = true; break }
+            }
+            if !hasYolo { cmdArgs = append(cmdArgs, "--yolo") }
+        } else {
+            filtered := make([]string, 0, len(cmdArgs))
+            for _, a := range cmdArgs { if a != "--yolo" { filtered = append(filtered, a) } }
+            cmdArgs = filtered
+        }
+    }
 
 	return cliCmd, cmdArgs
 }
@@ -210,14 +222,17 @@ func buildCommand(cfg Config) (string, []string) {
 func buildClaudeArgs(cfg Config) []string {
 	prompt := autonomousPreamble + cfg.Prompt
 
-	args := []string{
-		"--dangerously-skip-permissions",
-		"-p", prompt,
-		"--output-format", "stream-json",
-		"--verbose",
-		"--max-turns", "50",
-		"--disallowedTools", strings.Join(disabledTools, ","),
-	}
+    args := []string{
+        "-p", prompt,
+        "--output-format", "stream-json",
+        "--verbose",
+        "--max-turns", "50",
+        "--disallowedTools", strings.Join(disabledTools, ","),
+    }
+    // Only add bypass flag when explicitly in danger mode
+    if cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access" {
+        args = append([]string{"--dangerously-skip-permissions"}, args...)
+    }
 	if cfg.MCPConfigPath != "" {
 		args = append(args, "--mcp-config", cfg.MCPConfigPath)
 	}

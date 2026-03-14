@@ -147,30 +147,48 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 }
 
 func (p *Parser) parseToolResult(data json.RawMessage) {
-	if data == nil {
-		return
-	}
+    if data == nil {
+        return
+    }
 
 	// Emit activity heartbeat
 	p.emit(Event{Type: EventProgress, Iteration: p.iteration})
 
-	// Content can be a string or a structured array. Try string first.
-	var s string
-	if err := util.UnmarshalRobust(string(data), &s); err != nil {
-		// Fall back to stringifying the raw JSON.
-		p.emit(Event{
-			Type:      EventToolResult,
-			Iteration: p.iteration,
-			Text:      string(data),
-		})
-		return
-	}
-	
-	p.emit(Event{
-		Type:      EventToolResult,
-		Iteration: p.iteration,
-		Text:      s,
-	})
+    // Content can be an array of items or a simple string.
+    // Prefer array parsing to extract structured text and artifact markers.
+    var items []contentItem
+    if err := util.UnmarshalRobust(string(data), &items); err == nil && len(items) > 0 {
+        var b strings.Builder
+        artifacts := map[string]string{}
+        for _, it := range items {
+            if it.Type == "text" && it.Text != "" {
+                if b.Len() > 0 { b.WriteString("\n") }
+                b.WriteString(it.Text)
+                // Detect artifact markers like: ARTIFACT:patch <hash> <path>
+                for _, line := range strings.Split(it.Text, "\n") {
+                    line = strings.TrimSpace(line)
+                    if strings.HasPrefix(line, "ARTIFACT:patch ") {
+                        parts := strings.SplitN(line, " ", 3)
+                        if len(parts) >= 3 {
+                            artifacts["patch_hash"] = parts[1]
+                            artifacts["patch_path"] = parts[2]
+                        }
+                    }
+                }
+            }
+        }
+        p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: b.String(), Artifacts: artifacts})
+        return
+    }
+
+    // Fallback to plain string
+    var s string
+    if err := util.UnmarshalRobust(string(data), &s); err == nil {
+        p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: s})
+        return
+    }
+    // Last resort: raw JSON string
+    p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: string(data)})
 }
 
 func (p *Parser) emit(e Event) {

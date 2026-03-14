@@ -31,7 +31,7 @@ func TestHandleCreateLoop(t *testing.T) {
 	}
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/v1/loops", bytes.NewReader(body))
+    req := httptest.NewRequest("POST", "/api/v1/runs", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -56,7 +56,7 @@ func TestHandleGetLoop(t *testing.T) {
 	mgr.Start(context.Background(), "T-001")
 	time.Sleep(50 * time.Millisecond)
 
-	req := httptest.NewRequest("GET", "/api/v1/loops/T-001", nil)
+    req := httptest.NewRequest("GET", "/api/v1/runs/T-001", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 

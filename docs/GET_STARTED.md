@@ -66,10 +66,10 @@ Follow the interactive prompts to configure your **Task-Specific Brains**. OpenE
 
 ## 3. The Power of the Knowledge Map
 
-OpenExec isn't just a chat interface. It uses a **Local Knowledge Map (DCP)** that surgically indexes your code.
+OpenExec maintains a local knowledge map that indexes your code to enable precise, minimal context during execution.
 
-- **Precision:** Agents know the exact byte-offset of every function.
-- **Efficiency:** Because the map is local, OpenExec only sends the *exact* snippets needed to the AI. This drastically reduces the information sent to APIs, saving you tokens and improving accuracy compared to tools that "dump" entire files into the context.
+- **Precision:** Focuses on the smallest necessary code slices.
+- **Efficiency:** Minimizes data sent to providers, improving accuracy and reducing cost.
 
 ## 4. Generate a Plan
 

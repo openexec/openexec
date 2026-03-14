@@ -44,8 +44,11 @@ type Config struct {
 	EvidenceDir      string
 	EvidenceBucket   string
 	EvidenceRegion   string
-	EvidenceEndpoint string
-	EvidencePrefix   string
+    EvidenceEndpoint string
+    EvidencePrefix   string
+
+    // ExecMode: read-only | workspace-write | danger-full-access
+    ExecMode string
 }
 
 // Pipeline drives an FWU through TD → IM → RV → RF → FL phases.
@@ -67,44 +70,55 @@ type Pipeline struct {
 // New creates a Pipeline and returns it along with a read-only event channel.
 // The channel is closed when Run returns.
 func New(cfg Config) (*Pipeline, <-chan loop.Event) {
-	factory := NewLoopFactory(LoopFactoryConfig{
-		FWUID:                cfg.FWUID,
-		WorkDir:              cfg.WorkDir,
-		TractStore:           cfg.TractStore,
-		AgentsFS:             cfg.AgentsFS,
-		DefaultMaxIterations: cfg.DefaultMaxIterations,
-		MaxRetries:           cfg.MaxRetries,
-		MaxReviewCycles:      cfg.MaxReviewCycles,
-		RetryBackoff:         cfg.RetryBackoff,
-		ThrashThreshold:      cfg.ThrashThreshold,
-		ExecutorModel:        cfg.ExecutorModel,
-		RunnerCommand:        cfg.RunnerCommand,
-		RunnerArgs:           cfg.RunnerArgs,
-		CommandName:          cfg.CommandName,
-		CommandArgs:          cfg.CommandArgs,
-		LogDir:               cfg.LogDir,
-		EvidenceDir:          cfg.EvidenceDir,
-		EvidenceBucket:       cfg.EvidenceBucket,
-		EvidenceRegion:       cfg.EvidenceRegion,
-		EvidenceEndpoint:     cfg.EvidenceEndpoint,
-		EvidencePrefix:       cfg.EvidencePrefix,
-	})
-	return NewWithFactory(cfg, factory)
+    factory := NewLoopFactory(LoopFactoryConfig{
+        FWUID:                cfg.FWUID,
+        WorkDir:              cfg.WorkDir,
+        TractStore:           cfg.TractStore,
+        AgentsFS:             cfg.AgentsFS,
+        DefaultMaxIterations: cfg.DefaultMaxIterations,
+        MaxRetries:           cfg.MaxRetries,
+        MaxReviewCycles:      cfg.MaxReviewCycles,
+        RetryBackoff:         cfg.RetryBackoff,
+        ThrashThreshold:      cfg.ThrashThreshold,
+        ExecutorModel:        cfg.ExecutorModel,
+        RunnerCommand:        cfg.RunnerCommand,
+        RunnerArgs:           cfg.RunnerArgs,
+        CommandName:          cfg.CommandName,
+        CommandArgs:          cfg.CommandArgs,
+        LogDir:               cfg.LogDir,
+        EvidenceDir:          cfg.EvidenceDir,
+        EvidenceBucket:       cfg.EvidenceBucket,
+        EvidenceRegion:       cfg.EvidenceRegion,
+        EvidenceEndpoint:     cfg.EvidenceEndpoint,
+        EvidencePrefix:       cfg.EvidencePrefix,
+        ExecMode:             cfg.ExecMode,
+    })
+    return NewWithFactory(cfg, factory)
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
 func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Event) {
-	// Apply defaults. Pipeline takes precedence over Phases/Order.
-	if cfg.Pipeline != nil {
-		cfg.Order = cfg.Pipeline.PhaseOrder()
-		cfg.Phases = cfg.Pipeline.PhaseConfigs()
-	}
-	if cfg.Order == nil {
-		cfg.Order = DefaultPhaseOrder()
-	}
-	if cfg.Phases == nil {
-		cfg.Phases = DefaultPhaseConfigs()
-	}
+    // Apply defaults. Pipeline takes precedence over Phases/Order.
+    if cfg.Pipeline != nil {
+        cfg.Order = cfg.Pipeline.PhaseOrder()
+        cfg.Phases = cfg.Pipeline.PhaseConfigs()
+    }
+    if cfg.Order == nil {
+        cfg.Order = DefaultPhaseOrder()
+    }
+    if cfg.Phases == nil {
+        cfg.Phases = DefaultPhaseConfigs()
+    }
+    // Collapse Study tasks to TD -> FL only
+    if cfg.IsStudy {
+        cfg.Order = []Phase{PhaseTD, PhaseFL}
+        // Ensure phases exist for TD and FL
+        ph := DefaultPhaseConfigs()
+        cfg.Phases = map[Phase]PhaseConfig{
+            PhaseTD: ph[PhaseTD],
+            PhaseFL: ph[PhaseFL],
+        }
+    }
 	if cfg.MaxReviewCycles == 0 {
 		cfg.MaxReviewCycles = config.DefaultMaxReviewCycles
 	}
@@ -152,28 +166,29 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 
 	// Build factory.
-	p.factory = NewLoopFactory(LoopFactoryConfig{
-		FWUID:                p.cfg.FWUID,
-		WorkDir:              p.cfg.WorkDir,
-		TractStore:           p.cfg.TractStore,
-		AgentsFS:             p.cfg.AgentsFS,
-		MCPConfigPath:        mcpPath,
-		DefaultMaxIterations: p.cfg.DefaultMaxIterations,
-		MaxRetries:           p.cfg.MaxRetries,
-		RetryBackoff:         p.cfg.RetryBackoff,
-		ThrashThreshold:      p.cfg.ThrashThreshold,
-		ExecutorModel:        p.cfg.ExecutorModel,
-		RunnerCommand:        p.cfg.RunnerCommand,
-		RunnerArgs:           p.cfg.RunnerArgs,
-		CommandName:          p.cfg.CommandName,
-		CommandArgs:          p.cfg.CommandArgs,
-		LogDir:               p.cfg.LogDir,
-		EvidenceDir:          p.cfg.EvidenceDir,
-		EvidenceBucket:       p.cfg.EvidenceBucket,
-		EvidenceRegion:       p.cfg.EvidenceRegion,
-		EvidenceEndpoint:     p.cfg.EvidenceEndpoint,
-		EvidencePrefix:       p.cfg.EvidencePrefix,
-	})
+    p.factory = NewLoopFactory(LoopFactoryConfig{
+        FWUID:                p.cfg.FWUID,
+        WorkDir:              p.cfg.WorkDir,
+        TractStore:           p.cfg.TractStore,
+        AgentsFS:             p.cfg.AgentsFS,
+        MCPConfigPath:        mcpPath,
+        DefaultMaxIterations: p.cfg.DefaultMaxIterations,
+        MaxRetries:           p.cfg.MaxRetries,
+        RetryBackoff:         p.cfg.RetryBackoff,
+        ThrashThreshold:      p.cfg.ThrashThreshold,
+        ExecutorModel:        p.cfg.ExecutorModel,
+        RunnerCommand:        p.cfg.RunnerCommand,
+        RunnerArgs:           p.cfg.RunnerArgs,
+        CommandName:          p.cfg.CommandName,
+        CommandArgs:          p.cfg.CommandArgs,
+        LogDir:               p.cfg.LogDir,
+        EvidenceDir:          p.cfg.EvidenceDir,
+        EvidenceBucket:       p.cfg.EvidenceBucket,
+        EvidenceRegion:       p.cfg.EvidenceRegion,
+        EvidenceEndpoint:     p.cfg.EvidenceEndpoint,
+        EvidencePrefix:       p.cfg.EvidencePrefix,
+        ExecMode:             p.cfg.ExecMode,
+    })
 
 	// Phase loop.
 	for p.sm.Current() != PhaseDone {
@@ -194,13 +209,13 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		}
 
 		// Emit phase_start.
-		p.emit(loop.Event{
-			Type:        loop.EventPhaseStart,
-			Phase:       string(phase),
-			FWUID:       p.cfg.FWUID,
-			Agent:       phaseCfg.Agent,
-			ReviewCycle: p.sm.ReviewCycles(),
-		})
+        p.emit(loop.Event{
+            Type:        loop.EventPhaseStart,
+            Phase:       string(phase),
+            FWUID:       p.cfg.FWUID,
+            Agent:       phaseCfg.Agent,
+            ReviewCycle: p.sm.ReviewCycles(),
+        })
 
 		// Fetch fresh briefing once per phase.
 		briefing, err := briefingFn(ctx, p.cfg.FWUID)
@@ -241,10 +256,10 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			p.currentLoop = l
 			p.mu.Unlock()
 
-			phaseCompleted, routed, blocked, runErr = p.runPhase(ctx, l, loopCh, phase, phaseCfg)
-			if runErr == nil {
-				break
-			}
+            phaseCompleted, routed, blocked, runErr = p.runPhase(ctx, l, loopCh, phase, phaseCfg)
+            if runErr == nil {
+                break
+            }
 			
 			// If we reached here, it's a phase execution error.
 			// Only retry transient-looking errors. 
@@ -273,13 +288,14 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		}
 
 		// Emit phase_complete.
-		p.emit(loop.Event{
-			Type:        loop.EventPhaseComplete,
-			Phase:       string(phase),
-			FWUID:       p.cfg.FWUID,
-			Agent:       phaseCfg.Agent,
-			ReviewCycle: p.sm.ReviewCycles(),
-		})
+        p.emit(loop.Event{
+            Type:        loop.EventPhaseComplete,
+            Phase:       string(phase),
+            FWUID:       p.cfg.FWUID,
+            Agent:       phaseCfg.Agent,
+            ReviewCycle: p.sm.ReviewCycles(),
+            PromptHash:  func() string { if p.currentLoop != nil { return p.currentLoop.PromptHash() }; return "" }(),
+        })
 
 		// Advance state machine.
 		if routed {

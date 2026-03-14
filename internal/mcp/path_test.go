@@ -16,11 +16,19 @@ func TestPathValidationError(t *testing.T) {
 }
 
 func TestDefaultPathValidatorConfig(t *testing.T) {
-	config := DefaultPathValidatorConfig()
+    // Ensure deterministic root via env
+    wd, _ := os.Getwd()
+    os.Setenv("WORKSPACE_ROOT", wd)
+    defer os.Unsetenv("WORKSPACE_ROOT")
 
-	if config.AllowedRoots != nil {
-		t.Error("AllowedRoots should be nil by default")
-	}
+    config := DefaultPathValidatorConfig()
+
+    if config.AllowedRoots == nil || len(config.AllowedRoots) == 0 {
+        t.Fatal("AllowedRoots should default to workspace root")
+    }
+    if config.AllowedRoots[0] != wd {
+        t.Errorf("AllowedRoots[0] = %q, want %q", config.AllowedRoots[0], wd)
+    }
 	if config.AllowSymlinks {
 		t.Error("AllowSymlinks should be false by default")
 	}

@@ -1,9 +1,12 @@
 package manager
 
 import (
-	"log"
+    "context"
+    "log"
+    "time"
 
-	"github.com/openexec/openexec/internal/loop"
+    "github.com/openexec/openexec/internal/loop"
+    "github.com/openexec/openexec/pkg/audit"
 )
 
 const subscriberBufSize = 64
@@ -11,8 +14,20 @@ const subscriberBufSize = 64
 // consumeEvents reads pipeline events, updates entry info, and fans out to SSE subscribers.
 // Runs as a goroutine per pipeline. Closes all subscriber channels when the pipeline channel closes.
 func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
-	for event := range events {
-		switch event.Type {
+    for event := range events {
+        // Initialize trace on first sight
+        m.mu.Lock()
+        e, ok := m.pipelines[fwuID]
+        if ok {
+            if e.traceID == "" {
+                e.traceID = fwuID // deterministic default; could be uuid
+            }
+            e.stepSeq++
+            event.TraceID = e.traceID
+            event.StepID = e.stepSeq
+        }
+        m.mu.Unlock()
+        switch event.Type {
 		case loop.EventError:
 			log.Printf("[Manager] Event %s [%s]: ERROR: %s", fwuID, event.Type, event.ErrText)
 		case loop.EventPhaseStart, loop.EventPhaseComplete, loop.EventPipelineComplete:
@@ -23,17 +38,64 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 			log.Printf("[Manager] Event %s [%s]: loop complete", fwuID, event.Type)
 		}
 
-		m.mu.Lock()
-		e, ok := m.pipelines[fwuID]
-		if ok {
-			updateInfo(&e.info, event)
-		}
-		m.mu.Unlock()
+        m.mu.Lock()
+        e, ok = m.pipelines[fwuID]
+        if ok {
+            updateInfo(&e.info, event)
+        }
+        m.mu.Unlock()
 
-		if ok {
-			m.fanOut(fwuID, event)
-		}
-	}
+        if ok {
+            m.fanOut(fwuID, event)
+        }
+
+        // Audit run-step event if logger is configured
+        if m.cfg.AuditLogger != nil {
+            // Map loop event to audit severity
+            severity := audit.SeverityInfo
+            if event.Type == loop.EventError {
+                severity = audit.SeverityError
+            }
+            builder, err := audit.NewEntry(audit.EventRunStep, "openexec", "system")
+            if err == nil {
+                md := map[string]interface{}{
+                    "run_id":          fwuID,
+                    "step_id":         event.StepID,
+                    "trace_id":        event.TraceID,
+                    "type":            event.Type,
+                    "phase":           event.Phase,
+                    "agent":           event.Agent,
+                    "iteration":       event.Iteration,
+                    "review_cycles":   event.ReviewCycle,
+                    "text":            event.Text,
+                    "error":           event.ErrText,
+                    "prompt_hash":     event.PromptHash,
+                    "artifact_hashes": []string{},
+                    "artifacts":       event.Artifacts,
+                    "timestamp":       time.Now().UTC().Format(time.RFC3339Nano),
+                }
+                // Back-compat: if patch artifact present, populate artifact_hashes
+                if event.Artifacts != nil {
+                    if h, ok := event.Artifacts["patch_hash"]; ok && h != "" {
+                        md["artifact_hashes"] = []string{h}
+                    }
+                }
+                e, _ := builder.WithProject(m.cfg.WorkDir).
+                    WithSeverity(severity).
+                    WithMetadata(md).Build()
+                _ = m.cfg.AuditLogger.Log(context.Background(), e)
+            }
+        }
+
+        // Write JSONL checkpoint when artifacts are present (e.g., patch applied)
+        if len(event.Artifacts) > 0 {
+            writeCheckpointJSONL(m.cfg.WorkDir, fwuID, event)
+            // Also write to SQLite for resume/replay
+            if m.cfg.AuditLogger != nil {
+                writeCheckpointSQLite(m.cfg.AuditLogger.GetDB(), fwuID, event)
+            }
+        }
+    }
 
 	// Pipeline channel closed — close all subscriber channels.
 	m.mu.Lock()
@@ -88,23 +150,24 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 
 // fanOut sends an event to all subscribers of a pipeline using non-blocking sends.
 func (m *Manager) fanOut(fwuID string, event loop.Event) {
-	m.mu.RLock()
-	e, ok := m.pipelines[fwuID]
-	m.mu.RUnlock()
-	if !ok {
-		return
-	}
+    m.mu.RLock()
+    e, ok := m.pipelines[fwuID]
+    m.mu.RUnlock()
+    if !ok {
+        return
+    }
 
-	e.subsMu.Lock()
-	defer e.subsMu.Unlock()
+    e.subsMu.Lock()
+    defer e.subsMu.Unlock()
 
-	for _, ch := range e.subs {
-		select {
-		case ch <- event:
-		default:
-			// Slow subscriber — drop event.
-		}
-	}
+    for _, ch := range e.subs {
+        select {
+        case ch <- event:
+        default:
+            // Slow subscriber — drop event. Increase drop counter.
+            e.drops++
+        }
+    }
 }
 
 // Subscribe registers an SSE subscriber for a pipeline.

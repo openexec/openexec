@@ -92,31 +92,8 @@ func TestBuildTaskPromptWithRetry(t *testing.T) {
 	})
 }
 
-func TestSaveTaskStatus(t *testing.T) {
-	tmpDir := t.TempDir()
-	tasksPath := filepath.Join(tmpDir, "tasks.json")
-
-	tasks := TasksFile{
-		Tasks: []Task{
-			{ID: "T-001", Status: "pending"},
-		},
-	}
-	data, _ := json.Marshal(tasks)
-	os.WriteFile(tasksPath, data, 0644)
-
-	err := saveTaskStatus(tmpDir, "T-001", "completed")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Verify
-	data, _ = os.ReadFile(tasksPath)
-	var tf TasksFile
-	json.Unmarshal(data, &tf)
-	if tf.Tasks[0].Status != "completed" {
-		t.Errorf("got status %q, want %q", tf.Tasks[0].Status, "completed")
-	}
-}
+// TestSaveTaskStatus removed: Task status updates now go through release.Manager
+// which persists to SQLite. See internal/release/manager_test.go for tests.
 
 func TestEnsureMCPConfig(t *testing.T) {
 	tmpDir := t.TempDir()

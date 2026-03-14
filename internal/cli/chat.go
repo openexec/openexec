@@ -1,17 +1,15 @@
 package cli
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"strings"
-	"time"
+    "fmt"
+    "io"
+    "strings"
+    "time"
 
-	"github.com/chzyer/readline"
-	"github.com/fatih/color"
-	"github.com/openexec/openexec/internal/project"
-	"github.com/openexec/openexec/pkg/client"
-	"github.com/spf13/cobra"
+    "github.com/chzyer/readline"
+    "github.com/fatih/color"
+    "github.com/openexec/openexec/internal/project"
+    "github.com/spf13/cobra"
 )
 
 var (
@@ -91,11 +89,8 @@ func runChatREPL(projectName string) error {
 	fmt.Println("Type your intent or 'exit' to quit.")
 	fmt.Println()
 
-	// Initialize API client
-	apiClient := client.New(fmt.Sprintf("http://localhost:%d", startPort))
-
-	for {
-		line, err := l.Readline()
+    for {
+        line, err := l.Readline()
 		if err == readline.ErrInterrupt {
 			if len(line) == 0 {
 				break
@@ -114,18 +109,12 @@ func runChatREPL(projectName string) error {
 			break
 		}
 
-		// Send query to server via client
-		response, err := apiClient.Query(context.Background(), line)
-		if err != nil {
-			fmt.Printf(color.RedString("Error: %v\n"), err)
-			continue
-		}
-
-		fmt.Println()
-		fmt.Print(color.GreenString("Agent: "))
-		fmt.Println(response)
-		fmt.Println()
-	}
+        // Conversational DCP has been removed. Guide the user.
+        fmt.Println()
+        fmt.Print(color.GreenString("Agent: "))
+        fmt.Println("Conversational mode has been removed. Use 'openexec run' to execute tasks or the web UI to track runs.")
+        fmt.Println()
+    }
 
 	return nil
 }

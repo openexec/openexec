@@ -1,17 +1,18 @@
 package manager
 
 import (
-	"context"
-	"fmt"
-	"io/fs"
-	"log"
-	"sync"
-	"time"
+    "context"
+    "fmt"
+    "io/fs"
+    "log"
+    "sync"
+    "time"
 
-	"github.com/openexec/openexec/internal/config"
-	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/internal/pipeline"
-	"github.com/openexec/openexec/internal/release"
+    "github.com/openexec/openexec/internal/config"
+    "github.com/openexec/openexec/internal/loop"
+    "github.com/openexec/openexec/internal/pipeline"
+    "github.com/openexec/openexec/internal/release"
+    "github.com/openexec/openexec/pkg/audit"
 )
 
 // PipelineStatus represents the lifecycle state of a managed pipeline.
@@ -45,7 +46,10 @@ type Config struct {
 	CommandName          string   // test override
 	CommandArgs          []string // test override
 	LogDir               string
-	BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
+    BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
+    // ExecMode: read-only | workspace-write | danger-full-access
+    ExecMode             string
+    AuditLogger          audit.Logger
 }
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
@@ -60,15 +64,19 @@ type PipelineInfo struct {
 	Elapsed      string         `json:"elapsed"`
 	Error        string         `json:"error,omitempty"`
 	LastActivity time.Time      `json:"last_activity"`
-	CurrentPID   int            `json:"current_pid,omitempty"`
+    CurrentPID   int            `json:"current_pid,omitempty"`
+    DroppedEvents int           `json:"dropped_events,omitempty"`
 }
 
 type entry struct {
-	pipeline *pipeline.Pipeline
-	info     PipelineInfo
-	cancel   context.CancelFunc
-	subs     []chan loop.Event
-	subsMu   sync.Mutex
+    pipeline *pipeline.Pipeline
+    info     PipelineInfo
+    cancel   context.CancelFunc
+    subs     []chan loop.Event
+    subsMu   sync.Mutex
+    drops    int
+    stepSeq  int
+    traceID  string
 }
 
 // Manager orchestrates multiple concurrent FWU pipelines.
@@ -137,9 +145,16 @@ type StartOption func(*pipeline.Config)
 
 // WithIsStudy flags the pipeline as documentation/analysis only.
 func WithIsStudy(isStudy bool) StartOption {
-	return func(cfg *pipeline.Config) {
-		cfg.IsStudy = isStudy
-	}
+    return func(cfg *pipeline.Config) {
+        cfg.IsStudy = isStudy
+    }
+}
+
+// WithExecMode sets execution mode for this pipeline
+func WithExecMode(mode string) StartOption {
+    return func(cfg *pipeline.Config) {
+        cfg.ExecMode = mode
+    }
 }
 
 // Start launches a new pipeline for the given FWU ID.
@@ -158,27 +173,28 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		return fmt.Errorf("load release manager: %w", err)
 	}
 
-	pCfg := pipeline.Config{
-		FWUID:                fwuID,
-		WorkDir:              m.cfg.WorkDir,
-		TractStore:           m.cfg.TractStore,
-		AgentsFS:             m.cfg.AgentsFS,
-		ExecutorModel:        m.cfg.ExecutorModel,
-		RunnerCommand:        m.cfg.RunnerCommand,
-		RunnerArgs:           m.cfg.RunnerArgs,
-		Pipeline:             m.cfg.Pipeline,
-		Phases:               m.cfg.Phases,
-		Order:                m.cfg.Order,
-		DefaultMaxIterations: m.cfg.DefaultMaxIterations,
-		MaxRetries:           m.cfg.MaxRetries,
-		MaxReviewCycles:      m.cfg.MaxReviewCycles,
-		ThrashThreshold:      m.cfg.ThrashThreshold,
-		RetryBackoff:         m.cfg.RetryBackoff,
-		CommandName:          m.cfg.CommandName,
-		CommandArgs:          m.cfg.CommandArgs,
-		LogDir:               m.cfg.LogDir,
-		BriefingFunc:         m.cfg.BriefingFunc,
-	}
+    pCfg := pipeline.Config{
+        FWUID:                fwuID,
+        WorkDir:              m.cfg.WorkDir,
+        TractStore:           m.cfg.TractStore,
+        AgentsFS:             m.cfg.AgentsFS,
+        ExecutorModel:        m.cfg.ExecutorModel,
+        RunnerCommand:        m.cfg.RunnerCommand,
+        RunnerArgs:           m.cfg.RunnerArgs,
+        Pipeline:             m.cfg.Pipeline,
+        Phases:               m.cfg.Phases,
+        Order:                m.cfg.Order,
+        DefaultMaxIterations: m.cfg.DefaultMaxIterations,
+        MaxRetries:           m.cfg.MaxRetries,
+        MaxReviewCycles:      m.cfg.MaxReviewCycles,
+        ThrashThreshold:      m.cfg.ThrashThreshold,
+        RetryBackoff:         m.cfg.RetryBackoff,
+        CommandName:          m.cfg.CommandName,
+        CommandArgs:          m.cfg.CommandArgs,
+        LogDir:               m.cfg.LogDir,
+        BriefingFunc:         m.cfg.BriefingFunc,
+        ExecMode:             m.cfg.ExecMode,
+    }
 
 	// Default to built-in Tract briefing if not overridden
 	if pCfg.BriefingFunc == nil {
@@ -190,24 +206,25 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	}
 
 	// Create factory using the same manager
-	factory := pipeline.NewLoopFactory(pipeline.LoopFactoryConfig{
-		FWUID:                pCfg.FWUID,
-		WorkDir:              pCfg.WorkDir,
-		TractStore:           pCfg.TractStore,
-		AgentsFS:             pCfg.AgentsFS,
-		ReleaseManager:       rel,
-		DefaultMaxIterations: pCfg.DefaultMaxIterations,
-		MaxRetries:           pCfg.MaxRetries,
-		MaxReviewCycles:      pCfg.MaxReviewCycles,
-		RetryBackoff:         pCfg.RetryBackoff,
-		ThrashThreshold:      pCfg.ThrashThreshold,
-		ExecutorModel:        pCfg.ExecutorModel,
-		RunnerCommand:        pCfg.RunnerCommand,
-		RunnerArgs:           pCfg.RunnerArgs,
-		CommandName:          pCfg.CommandName,
-		CommandArgs:          pCfg.CommandArgs,
-		LogDir:               pCfg.LogDir,
-	})
+    factory := pipeline.NewLoopFactory(pipeline.LoopFactoryConfig{
+        FWUID:                pCfg.FWUID,
+        WorkDir:              pCfg.WorkDir,
+        TractStore:           pCfg.TractStore,
+        AgentsFS:             pCfg.AgentsFS,
+        ReleaseManager:       rel,
+        DefaultMaxIterations: pCfg.DefaultMaxIterations,
+        MaxRetries:           pCfg.MaxRetries,
+        MaxReviewCycles:      pCfg.MaxReviewCycles,
+        RetryBackoff:         pCfg.RetryBackoff,
+        ThrashThreshold:      pCfg.ThrashThreshold,
+        ExecutorModel:        pCfg.ExecutorModel,
+        RunnerCommand:        pCfg.RunnerCommand,
+        RunnerArgs:           pCfg.RunnerArgs,
+        CommandName:          pCfg.CommandName,
+        CommandArgs:          pCfg.CommandArgs,
+        LogDir:               pCfg.LogDir,
+        ExecMode:             pCfg.ExecMode,
+    })
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
@@ -303,8 +320,14 @@ func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 		info.CurrentPID = h.CurrentPID
 	}
 
-	info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
-	return info, nil
+    info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
+    // include drop count
+    m.mu.RLock()
+    if e, ok := m.pipelines[fwuID]; ok {
+        info.DroppedEvents = e.drops
+    }
+    m.mu.RUnlock()
+    return info, nil
 }
 
 // List returns info snapshots for all known pipelines.
@@ -323,10 +346,11 @@ func (m *Manager) List() []PipelineInfo {
 			info.CurrentPID = h.CurrentPID
 		}
 
-		info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
-		result = append(result, info)
-	}
-	return result
+        info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
+        info.DroppedEvents = e.drops
+        result = append(result, info)
+    }
+    return result
 }
 
 // GetConfig returns the manager's configuration.

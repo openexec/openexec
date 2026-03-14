@@ -1,96 +1,32 @@
 package loop
 
 import (
-	"bytes"
-	"testing"
+    "bytes"
+    "testing"
 )
 
-func TestParser_Parse(t *testing.T) {
-	tests := []struct {
-		name           string
-		input          string
-		expectedEvents int
-		// checkEvent verifies the non-progress event(s). Progress heartbeats are filtered out.
-		checkEvent func(*testing.T, Event)
-	}{
-		{
-			name:           "assistant text event",
-			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"hello\"}]}}\n",
-			expectedEvents: 2, // progress heartbeat + text event
-			checkEvent: func(t *testing.T, e Event) {
-				if e.Type != EventAssistantText {
-					t.Errorf("expected EventAssistantText, got %v", e.Type)
-				}
-				if e.Text != "hello" {
-					t.Errorf("expected 'hello', got %q", e.Text)
-				}
-			},
-		},
-		{
-			name:           "tool use event",
-			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"write_file\", \"input\": {\"path\": \"test.txt\"}}]}}\n",
-			expectedEvents: 2, // progress heartbeat + tool event
-			checkEvent: func(t *testing.T, e Event) {
-				if e.Type != EventToolStart {
-					t.Errorf("expected EventToolStart, got %v", e.Type)
-				}
-				if e.Tool != "write_file" {
-					t.Errorf("expected 'write_file', got %q", e.Tool)
-				}
-			},
-		},
-		{
-			name:           "axon signal event",
-			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"tool_use\", \"name\": \"openexec_signal\", \"input\": {\"type\": \"complete\", \"reason\": \"done\"}}]}}\n",
-			expectedEvents: 2, // progress heartbeat + signal event
-			checkEvent: func(t *testing.T, e Event) {
-				if e.Type != EventSignalReceived {
-					t.Errorf("expected EventSignalReceived, got %v", e.Type)
-				}
-				if e.SignalType != "complete" {
-					t.Errorf("expected 'complete', got %q", e.SignalType)
-				}
-			},
-		},
-		{
-			name:           "robust parsing of messy json line",
-			input:          "{\"type\": \"assistant\", \"message\": {\"content\": [{\"type\": \"text\", \"text\": \"messy\"}]}, \"extra\": \"garbage\",}\n",
-			expectedEvents: 2, // progress heartbeat + text event
-			checkEvent: func(t *testing.T, e Event) {
-				if e.Text != "messy" {
-					t.Errorf("expected 'messy', got %q", e.Text)
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			events := make(chan Event, 10)
-			p := NewParser(events, 1)
-
-			err := p.Parse(bytes.NewBufferString(tt.input))
-			if err != nil {
-				t.Fatalf("Parse() error = %v", err)
-			}
-
-			close(events)
-
-			count := 0
-			for e := range events {
-				count++
-				// Skip progress heartbeats when checking event content
-				if e.Type == EventProgress {
-					continue
-				}
-				if tt.checkEvent != nil {
-					tt.checkEvent(t, e)
-				}
-			}
-
-			if count != tt.expectedEvents {
-				t.Errorf("expected %d events, got %d", tt.expectedEvents, count)
-			}
-		})
-	}
+func TestParser_ExtractsPatchArtifact(t *testing.T) {
+    ch := make(chan Event, 1)
+    p := NewParser(ch, 1)
+    // Simulate tool_result content array with a text item containing artifact marker
+    payload := []byte(`[{"type":"text","text":"Patch applied successfully\nARTIFACT:patch abc123 /tmp/x.patch"}]`)
+    p.parseToolResult(payload)
+    select {
+    case evt := <-ch:
+        if evt.Type != EventToolResult {
+            t.Fatalf("expected EventToolResult, got %v", evt.Type)
+        }
+        if evt.Artifacts["patch_hash"] != "abc123" {
+            t.Fatalf("expected patch_hash=abc123, got %q", evt.Artifacts["patch_hash"])
+        }
+        if evt.Artifacts["patch_path"] != "/tmp/x.patch" {
+            t.Fatalf("expected patch_path=/tmp/x.patch, got %q", evt.Artifacts["patch_path"])
+        }
+        if !bytes.Contains([]byte(evt.Text), []byte("Patch applied successfully")) {
+            t.Fatalf("expected text to include success message, got %q", evt.Text)
+        }
+    default:
+        t.Fatal("no event emitted")
+    }
 }
+

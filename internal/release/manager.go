@@ -1,6 +1,8 @@
 package release
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/openexec/openexec/internal/git"
 	"github.com/openexec/openexec/internal/tract"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // Manager handles release, story, and task management with git integration.
@@ -19,9 +23,10 @@ type Manager struct {
 	gitClient  *git.Client
 	gitTracker *git.Tracker
 	config     *Config
+	store      Store // SQLite-backed state store
 	mu         sync.RWMutex
 
-	// Cached data
+	// Cached data (populated from SQLite, not JSON)
 	release *Release
 	goals   map[string]*Goal
 	stories map[string]*Story
@@ -76,6 +81,25 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 		tasks:   make(map[string]*Task),
 	}
 
+	// Initialize SQLite store
+	dataDir := filepath.Join(baseDir, ".openexec", "data")
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	dbPath := filepath.Join(dataDir, "state.db")
+	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open state database: %w", err)
+	}
+
+	store, err := NewSQLiteStore(db)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to create state store: %w", err)
+	}
+	m.store = store
+
 	// Initialize git client if enabled
 	if cfg.GitEnabled {
 		gitCfg := git.Config{
@@ -87,6 +111,7 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 		trackerPath := filepath.Join(baseDir, ".openexec", "git-tracker.json")
 		tracker, err := git.NewTracker(m.gitClient, trackerPath)
 		if err != nil {
+			m.store.Close()
 			return nil, fmt.Errorf("failed to create git tracker: %w", err)
 		}
 		m.gitTracker = tracker
@@ -96,10 +121,19 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 
 	// Load existing data
 	if err := m.Load(); err != nil {
+		m.store.Close()
 		return nil, err
 	}
 
 	return m, nil
+}
+
+// Close closes the manager and its underlying store.
+func (m *Manager) Close() error {
+	if m.store != nil {
+		return m.store.Close()
+	}
+	return nil
 }
 
 // ResetStatuses resets all stories and tasks to pending status.
@@ -127,23 +161,48 @@ func (m *Manager) BaseDir() string {
 	return m.baseDir
 }
 
-// Load loads all data from disk.
+// Load loads all data from SQLite store, with JSON bootstrap fallback.
 func (m *Manager) Load() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	ctx := context.Background()
+
+	// Check if SQLite has data
+	storyCount, err := m.store.CountStories(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to count stories: %w", err)
+	}
+
+	// If SQLite is empty, bootstrap from JSON files (one-time migration)
+	if storyCount == 0 {
+		if err := m.bootstrapFromJSONUnlocked(ctx); err != nil {
+			// Bootstrap is best-effort; log and continue
+			// The system can still work with an empty store
+		}
+	}
+
+	// Load from SQLite into cache
+	return m.refreshCacheUnlocked(ctx)
+}
+
+// bootstrapFromJSONUnlocked imports data from JSON files into SQLite (one-time migration).
+// Caller must hold the lock.
+func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 	openexecDir := filepath.Join(m.baseDir, ".openexec")
 
-	// Load release
+	// Load and migrate release
 	releasePath := filepath.Join(openexecDir, "release.json")
 	if data, err := os.ReadFile(releasePath); err == nil {
 		var release Release
 		if err := json.Unmarshal(data, &release); err == nil {
-			m.release = &release
+			if err := m.store.CreateRelease(ctx, &release); err != nil && err != ErrReleaseAlreadyExist {
+				return fmt.Errorf("failed to bootstrap release: %w", err)
+			}
 		}
 	}
 
-	// Load stories and goals
+	// Load and migrate stories and goals
 	storiesPath := filepath.Join(openexecDir, "stories.json")
 	if data, err := os.ReadFile(storiesPath); err == nil {
 		var sf struct {
@@ -153,34 +212,87 @@ func (m *Manager) Load() error {
 		}
 
 		if err := json.Unmarshal(data, &sf); err == nil {
+			// Bulk create goals first
+			goals := make([]*Goal, len(sf.Goals))
 			for i := range sf.Goals {
-				m.goals[sf.Goals[i].ID] = &sf.Goals[i]
+				goals[i] = &sf.Goals[i]
 			}
+			if err := m.store.BulkCreateGoals(ctx, goals); err != nil {
+				return fmt.Errorf("failed to bootstrap goals: %w", err)
+			}
+
+			// Bulk create stories
+			stories := make([]*Story, len(sf.Stories))
 			for i := range sf.Stories {
-				m.stories[sf.Stories[i].ID] = &sf.Stories[i]
+				stories[i] = &sf.Stories[i]
 			}
-		} else {
-			// Fallback for legacy format
-			var bareStories []Story
-			if errArray := json.Unmarshal(data, &bareStories); errArray == nil {
-				for i := range bareStories {
-					m.stories[bareStories[i].ID] = &bareStories[i]
-				}
+			if err := m.store.BulkCreateStories(ctx, stories); err != nil {
+				return fmt.Errorf("failed to bootstrap stories: %w", err)
 			}
 		}
 	}
 
-	// Load tasks
+	// Load and migrate tasks
 	tasksPath := filepath.Join(openexecDir, "tasks.json")
 	if data, err := os.ReadFile(tasksPath); err == nil {
 		var tasksData struct {
 			Tasks []Task `json:"tasks"`
 		}
 		if err := json.Unmarshal(data, &tasksData); err == nil {
+			tasks := make([]*Task, len(tasksData.Tasks))
 			for i := range tasksData.Tasks {
-				m.tasks[tasksData.Tasks[i].ID] = &tasksData.Tasks[i]
+				tasks[i] = &tasksData.Tasks[i]
+			}
+			if err := m.store.BulkCreateTasks(ctx, tasks); err != nil {
+				return fmt.Errorf("failed to bootstrap tasks: %w", err)
 			}
 		}
+	}
+
+	return nil
+}
+
+// refreshCacheUnlocked populates the in-memory cache from SQLite.
+// Caller must hold the lock.
+func (m *Manager) refreshCacheUnlocked(ctx context.Context) error {
+	// Clear existing cache
+	m.goals = make(map[string]*Goal)
+	m.stories = make(map[string]*Story)
+	m.tasks = make(map[string]*Task)
+	m.release = nil
+
+	// Load release
+	release, err := m.store.GetRelease(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load release: %w", err)
+	}
+	m.release = release
+
+	// Load goals
+	goals, err := m.store.ListGoals(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load goals: %w", err)
+	}
+	for _, g := range goals {
+		m.goals[g.ID] = g
+	}
+
+	// Load stories
+	stories, err := m.store.ListStories(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load stories: %w", err)
+	}
+	for _, s := range stories {
+		m.stories[s.ID] = s
+	}
+
+	// Load tasks
+	tasks, err := m.store.ListTasks(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load tasks: %w", err)
+	}
+	for _, t := range tasks {
+		m.tasks[t.ID] = t
 	}
 
 	return nil
@@ -492,75 +604,75 @@ func (m *Manager) CreateTask(task *Task) error {
 // If the StoryID changes, it will remove the task from the old story and
 // append it to the new story's task list.
 func (m *Manager) UpdateTask(updated *Task) error {
-    m.mu.Lock()
-    defer m.mu.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-    existing, ok := m.tasks[updated.ID]
-    if !ok {
-        return fmt.Errorf("task %s not found", updated.ID)
-    }
+	existing, ok := m.tasks[updated.ID]
+	if !ok {
+		return fmt.Errorf("task %s not found", updated.ID)
+	}
 
-    // Track old story to repair story.Tasks list if StoryID changes
-    oldStoryID := existing.StoryID
+	// Track old story to repair story.Tasks list if StoryID changes
+	oldStoryID := existing.StoryID
 
-    // Replace fields
-    m.tasks[updated.ID] = updated
+	// Replace fields
+	m.tasks[updated.ID] = updated
 
-    // Move task between story task lists if needed
-    if oldStoryID != updated.StoryID {
-        if old, ok := m.stories[oldStoryID]; ok {
-            // Filter out the task from old story
-            filtered := make([]string, 0, len(old.Tasks))
-            for _, id := range old.Tasks {
-                if id != updated.ID {
-                    filtered = append(filtered, id)
-                }
-            }
-            old.Tasks = filtered
-        }
-        if ns, ok := m.stories[updated.StoryID]; ok {
-            // Avoid duplicates
-            present := false
-            for _, id := range ns.Tasks {
-                if id == updated.ID {
-                    present = true
-                    break
-                }
-            }
-            if !present {
-                ns.Tasks = append(ns.Tasks, updated.ID)
-            }
-        }
-    }
+	// Move task between story task lists if needed
+	if oldStoryID != updated.StoryID {
+		if old, ok := m.stories[oldStoryID]; ok {
+			// Filter out the task from old story
+			filtered := make([]string, 0, len(old.Tasks))
+			for _, id := range old.Tasks {
+				if id != updated.ID {
+					filtered = append(filtered, id)
+				}
+			}
+			old.Tasks = filtered
+		}
+		if ns, ok := m.stories[updated.StoryID]; ok {
+			// Avoid duplicates
+			present := false
+			for _, id := range ns.Tasks {
+				if id == updated.ID {
+					present = true
+					break
+				}
+			}
+			if !present {
+				ns.Tasks = append(ns.Tasks, updated.ID)
+			}
+		}
+	}
 
-    return m.saveUnlocked()
+	return m.saveUnlocked()
 }
 
 // ReassignTask changes a task's StoryID and persists the update.
 func (m *Manager) ReassignTask(taskID, newStoryID string) error {
-    m.mu.RLock()
-    t, ok := m.tasks[taskID]
-    m.mu.RUnlock()
-    if !ok {
-        return fmt.Errorf("task %s not found", taskID)
-    }
-    // Copy to avoid mutating shared pointer inadvertently; keep existing as base
-    updated := *t
-    updated.StoryID = newStoryID
-    return m.UpdateTask(&updated)
+	m.mu.RLock()
+	t, ok := m.tasks[taskID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+	// Copy to avoid mutating shared pointer inadvertently; keep existing as base
+	updated := *t
+	updated.StoryID = newStoryID
+	return m.UpdateTask(&updated)
 }
 
 // SetTaskStatus updates the lifecycle status of a task and persists it.
 func (m *Manager) SetTaskStatus(taskID string, status string) error {
-    m.mu.RLock()
-    t, ok := m.tasks[taskID]
-    m.mu.RUnlock()
-    if !ok {
-        return fmt.Errorf("task %s not found", taskID)
-    }
-    updated := *t
-    updated.Status = status
-    return m.UpdateTask(&updated)
+	m.mu.RLock()
+	t, ok := m.tasks[taskID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+	updated := *t
+	updated.Status = status
+	return m.UpdateTask(&updated)
 }
 
 // DeleteTask removes a task from the tracking system and its parent story.
@@ -823,16 +935,103 @@ func (m *Manager) validateBaseBranchUnlocked(baseBranch string) error {
 	return nil
 }
 
-// saveUnlocked saves data without acquiring the lock (caller must hold lock).
+// saveUnlocked persists state to SQLite without acquiring the lock (caller must hold lock).
+// Note: This method no longer writes JSON files - SQLite is the canonical state store.
+// Use ExportJSON() for read-only JSON artifact generation.
 func (m *Manager) saveUnlocked() error {
-	openexecDir := filepath.Join(m.baseDir, ".openexec")
-	if err := os.MkdirAll(openexecDir, 0o750); err != nil {
+	ctx := context.Background()
+
+	// Sync release to SQLite
+	if m.release != nil {
+		// Try to get existing release
+		existing, err := m.store.GetRelease(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to check release: %w", err)
+		}
+
+		if existing == nil {
+			// Create new release
+			if err := m.store.CreateRelease(ctx, m.release); err != nil {
+				return fmt.Errorf("failed to create release: %w", err)
+			}
+		} else {
+			// Update existing release
+			if err := m.store.UpdateRelease(ctx, m.release); err != nil {
+				return fmt.Errorf("failed to update release: %w", err)
+			}
+		}
+	}
+
+	// Sync goals to SQLite
+	for _, goal := range m.goals {
+		existing, err := m.store.GetGoal(ctx, goal.ID)
+		if err == ErrGoalNotFound {
+			// Create new goal
+			if err := m.store.CreateGoal(ctx, goal); err != nil && err != ErrGoalAlreadyExist {
+				return fmt.Errorf("failed to create goal %s: %w", goal.ID, err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to check goal %s: %w", goal.ID, err)
+		} else if existing != nil {
+			// Update existing goal
+			if err := m.store.UpdateGoal(ctx, goal); err != nil {
+				return fmt.Errorf("failed to update goal %s: %w", goal.ID, err)
+			}
+		}
+	}
+
+	// Sync stories to SQLite
+	for _, story := range m.stories {
+		existing, err := m.store.GetStory(ctx, story.ID)
+		if err == ErrStoryNotFound {
+			// Create new story
+			if err := m.store.CreateStory(ctx, story); err != nil && err != ErrStoryAlreadyExist {
+				return fmt.Errorf("failed to create story %s: %w", story.ID, err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to check story %s: %w", story.ID, err)
+		} else if existing != nil {
+			// Update existing story
+			if err := m.store.UpdateStory(ctx, story); err != nil {
+				return fmt.Errorf("failed to update story %s: %w", story.ID, err)
+			}
+		}
+	}
+
+	// Sync tasks to SQLite
+	for _, task := range m.tasks {
+		existing, err := m.store.GetTask(ctx, task.ID)
+		if err == ErrTaskNotFound {
+			// Create new task
+			if err := m.store.CreateTask(ctx, task); err != nil && err != ErrTaskAlreadyExist {
+				return fmt.Errorf("failed to create task %s: %w", task.ID, err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("failed to check task %s: %w", task.ID, err)
+		} else if existing != nil {
+			// Update existing task
+			if err := m.store.UpdateTask(ctx, task); err != nil {
+				return fmt.Errorf("failed to update task %s: %w", task.ID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ExportJSON exports the current state to JSON files in the specified directory.
+// This is for read-only artifact generation only - SQLite remains the canonical state.
+func (m *Manager) ExportJSON(exportDir string) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if err := os.MkdirAll(exportDir, 0o750); err != nil {
 		return err
 	}
 
-	// Save release
+	// Export release
 	if m.release != nil {
-		releasePath := filepath.Join(openexecDir, "release.json")
+		releasePath := filepath.Join(exportDir, "release.json")
 		data, err := json.MarshalIndent(m.release, "", "  ")
 		if err != nil {
 			return err
@@ -842,10 +1041,9 @@ func (m *Manager) saveUnlocked() error {
 		}
 	}
 
-	// Save stories and goals — only if we have data, to avoid overwriting
-	// the planner's stories.json (which uses a different nested Task format).
+	// Export stories and goals
 	if len(m.stories) > 0 || len(m.goals) > 0 {
-		storiesPath := filepath.Join(openexecDir, "stories.json")
+		storiesPath := filepath.Join(exportDir, "stories.json")
 		storiesList := make([]Story, 0, len(m.stories))
 		for _, s := range m.stories {
 			storiesList = append(storiesList, *s)
@@ -869,24 +1067,13 @@ func (m *Manager) saveUnlocked() error {
 		if err != nil {
 			return err
 		}
-
-		// VALIDATION: Ensure data is unmarshalable before writing
-		var dummy struct {
-			SchemaVersion string  `json:"schema_version"`
-			Goals         []Goal  `json:"goals"`
-			Stories       []Story `json:"stories"`
-		}
-		if err := json.Unmarshal(data, &dummy); err != nil {
-			return fmt.Errorf("ABORTING SAVE: generated stories.json is structurally invalid: %w", err)
-		}
-
 		if err := os.WriteFile(storiesPath, data, 0o600); err != nil {
 			return err
 		}
 	}
 
-	// Save tasks
-	tasksPath := filepath.Join(openexecDir, "tasks.json")
+	// Export tasks
+	tasksPath := filepath.Join(exportDir, "tasks.json")
 	tasksList := make([]Task, 0, len(m.tasks))
 	for _, t := range m.tasks {
 		tasksList = append(tasksList, *t)
@@ -898,15 +1085,6 @@ func (m *Manager) saveUnlocked() error {
 	if err != nil {
 		return err
 	}
-
-	// VALIDATION: Ensure tasks data is unmarshalable before writing
-	var dummyTasks struct {
-		Tasks []Task `json:"tasks"`
-	}
-	if err := json.Unmarshal(data, &dummyTasks); err != nil {
-		return fmt.Errorf("ABORTING SAVE: generated tasks.json is structurally invalid: %w", err)
-	}
-
 	if err := os.WriteFile(tasksPath, data, 0o600); err != nil {
 		return err
 	}

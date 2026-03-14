@@ -4,6 +4,7 @@ package mcp
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -54,6 +55,14 @@ type ReadFileRequest struct {
 // DefaultEncoding is the default file encoding for read_file.
 const DefaultEncoding = "utf-8"
 
+// validEncodings is the set of valid encoding values for file operations.
+var validEncodings = map[string]bool{
+	"utf-8":  true,
+	"utf-16": true,
+	"ascii":  true,
+	"binary": true,
+}
+
 // ValidateReadFileRequest validates a ReadFileRequest and sets defaults.
 func ValidateReadFileRequest(req *ReadFileRequest) error {
 	if req.Path == "" {
@@ -66,12 +75,6 @@ func ValidateReadFileRequest(req *ReadFileRequest) error {
 	}
 
 	// Validate encoding
-	validEncodings := map[string]bool{
-		"utf-8":  true,
-		"utf-16": true,
-		"ascii":  true,
-		"binary": true,
-	}
 	if !validEncodings[req.Encoding] {
 		return &ValidationError{Field: "encoding", Message: "invalid encoding: must be one of utf-8, utf-16, ascii, binary"}
 	}
@@ -86,7 +89,7 @@ func ValidateReadFileRequest(req *ReadFileRequest) error {
 		return &ValidationError{Field: "length", Message: "length must be positive"}
 	}
 
-	return nil
+    return nil
 }
 
 // ValidationError represents a validation error for tool inputs.
@@ -168,12 +171,6 @@ func ValidateWriteFileRequest(req *WriteFileRequest) error {
 	}
 
 	// Validate encoding
-	validEncodings := map[string]bool{
-		"utf-8":  true,
-		"utf-16": true,
-		"ascii":  true,
-		"binary": true,
-	}
 	if !validEncodings[req.Encoding] {
 		return &ValidationError{Field: "encoding", Message: "invalid encoding: must be one of utf-8, utf-16, ascii, binary"}
 	}
@@ -192,7 +189,7 @@ func ValidateWriteFileRequest(req *WriteFileRequest) error {
 		return &ValidationError{Field: "mode", Message: "invalid mode: must be one of overwrite, append"}
 	}
 
-	return nil
+    return nil
 }
 
 // RunShellCommandToolDef returns the MCP tool definition for the run_shell_command tool.
@@ -548,3 +545,94 @@ func ValidateGitApplyPatchRequest(req *GitApplyPatchRequest) error {
 
 	return nil
 }
+
+// ValidatePatchPathsInWorkspace validates that all file paths in a patch are within
+// the specified workspace root directory. This is a security measure to prevent
+// patches from modifying files outside the workspace boundary (Goal G-004).
+//
+// Returns an error if any patch file path would resolve to a location outside
+// the workspace root, or if paths contain traversal attempts.
+func ValidatePatchPathsInWorkspace(patch *Patch, workspaceRoot string) error {
+	if patch == nil {
+		return &ValidationError{Field: "patch", Message: "patch is nil"}
+	}
+	if workspaceRoot == "" {
+		return &ValidationError{Field: "workspace_root", Message: "workspace root is empty"}
+	}
+
+	// Create a path validator configured for workspace boundary enforcement
+	config := PathValidatorConfig{
+		AllowedRoots:    []string{workspaceRoot},
+		AllowSymlinks:   false, // Disallow symlinks for security
+		RequireAbsolute: false, // Paths may be relative
+		RequireExists:   false, // Files may not exist yet (new files)
+		RequireFile:     false, // Can't require file since it may not exist
+	}
+	validator := NewPathValidator(config)
+
+	// Collect all file paths from the patch
+	var invalidPaths []string
+	for _, file := range patch.Files {
+		// Check both old and new names, as either could be targeted
+		pathsToCheck := []string{}
+
+		if file.OldName != "" && file.OldName != "/dev/null" {
+			pathsToCheck = append(pathsToCheck, file.OldName)
+		}
+		if file.NewName != "" && file.NewName != "/dev/null" {
+			// Avoid duplicates for modified files (same name)
+			if file.NewName != file.OldName {
+				pathsToCheck = append(pathsToCheck, file.NewName)
+			}
+		}
+
+		for _, pathToCheck := range pathsToCheck {
+			// Convert relative path to absolute based on workspace root
+			var absPath string
+			if !isAbsolutePath(pathToCheck) {
+				absPath = joinPath(workspaceRoot, pathToCheck)
+			} else {
+				absPath = pathToCheck
+			}
+
+			// Validate the resolved path is within workspace
+			_, err := validator.Validate(absPath)
+			if err != nil {
+				invalidPaths = append(invalidPaths, fmt.Sprintf("%s: %v", pathToCheck, err))
+			}
+		}
+	}
+
+	if len(invalidPaths) > 0 {
+		return &ValidationError{
+			Field:   "patch",
+			Message: fmt.Sprintf("patch contains paths outside workspace root: %s", strings.Join(invalidPaths, "; ")),
+		}
+	}
+
+	return nil
+}
+
+// isAbsolutePath checks if a path is absolute (platform-independent check).
+func isAbsolutePath(path string) bool {
+	if len(path) == 0 {
+		return false
+	}
+	// Unix absolute path
+	if path[0] == '/' {
+		return true
+	}
+	// Windows absolute path (e.g., C:\)
+	if len(path) >= 3 && path[1] == ':' && (path[2] == '/' || path[2] == '\\') {
+		return true
+	}
+	return false
+}
+
+// joinPath joins workspace root with a relative path, handling edge cases.
+func joinPath(root, relPath string) string {
+	// Use filepath.Join which handles path cleaning
+	return filepath.Join(root, relPath)
+}
+
+// filepath import is needed - but it should already be in the package via path.go

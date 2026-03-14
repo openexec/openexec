@@ -74,6 +74,9 @@ func New(cfg Config) (*Loop, <-chan Event) {
 	return l, ch
 }
 
+// PromptHash returns the prompt hash assigned to this loop's configuration.
+func (l *Loop) PromptHash() string { return l.cfg.PromptHash }
+
 // Run executes the loop until completion, max iterations, stop, or context cancellation.
 // It closes the event channel when it returns.
 func (l *Loop) Run(ctx context.Context) error {
@@ -154,8 +157,10 @@ func (l *Loop) Run(ctx context.Context) error {
                 }
             }
 
-            // 1. Add current prompt to history
-            l.history = append(l.history, agent.NewTextMessage(agent.RoleUser, l.cfg.Prompt))
+            // 1. Add volatile prompt (briefing) to history; keep stable in System
+            if l.cfg.VolatilePrompt != "" {
+                l.history = append(l.history, agent.NewTextMessage(agent.RoleUser, l.cfg.VolatilePrompt))
+            }
 
             // 2. Manage context window via summarization (if enabled)
             messages := l.history
@@ -182,10 +187,12 @@ func (l *Loop) Run(ctx context.Context) error {
             // Build a request using full history
             req := agent.Request{
                 Model:  model,
-                System: "You are an autonomous coding agent. " +
-                    "Work independently without interactive prompts. Return only the final code changes or actionable reasoning.",
+                System: l.cfg.StablePrompt,
                 Messages:  messages,
                 MaxTokens: 4096,
+                Metadata: map[string]interface{}{
+                    "prompt_cache_key": l.cfg.StablePromptHash,
+                },
             }
 
             resp, err := agent.DefaultRegistry.Complete(ctx, req)
