@@ -94,6 +94,8 @@ const UsageSummary: React.FC<UsageSummaryProps> = ({
     const successRate = usage.totalRequests > 0
       ? (usage.successfulRequests / usage.totalRequests) * 100
       : 0
+    const cacheHitRate = usage.cacheHitRate || 0
+    const costSavings = usage.costSavingsUsd || 0
     const toolApprovalRate = toolCalls.totalRequested > 0
       ? ((toolCalls.totalApproved + toolCalls.totalAutoApproved) / toolCalls.totalRequested) * 100
       : 0
@@ -104,6 +106,8 @@ const UsageSummary: React.FC<UsageSummaryProps> = ({
     return {
       totalTokens,
       successRate,
+      cacheHitRate,
+      costSavings,
       toolApprovalRate,
       toolSuccessRate,
     }
@@ -192,6 +196,19 @@ const UsageSummary: React.FC<UsageSummaryProps> = ({
             </div>
           </div>
         )}
+
+        {/* Savings/Cache card */}
+        <div className="usage-summary__card" style={styles.card}>
+          <SavingsIcon />
+          <div className="usage-summary__card-content" style={styles.cardContent}>
+            <span className="usage-summary__card-value" style={{ ...styles.cardValue, color: '#10b981' }}>
+              {formatCost(stats.costSavings)}
+            </span>
+            <span className="usage-summary__card-label" style={styles.cardLabel}>
+              Saved ({stats.cacheHitRate.toFixed(1)}%)
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Detailed breakdown (not shown in compact mode) */}
@@ -428,6 +445,12 @@ const RequestIcon: React.FC = () => (
 const ToolIcon: React.FC = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffd33d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  </svg>
+)
+
+const SavingsIcon: React.FC = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 )
 

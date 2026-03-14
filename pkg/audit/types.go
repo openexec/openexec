@@ -215,6 +215,9 @@ type Entry struct {
 	// TokensOutput is the number of output tokens (for LLM events).
 	TokensOutput sql.NullInt64 `json:"tokens_output,omitempty"`
 
+	// TokensCached is the number of input tokens served from cache (for LLM events).
+	TokensCached sql.NullInt64 `json:"tokens_cached,omitempty"`
+
 	// CostUSD is the cost in USD (for usage events).
 	CostUSD sql.NullFloat64 `json:"cost_usd,omitempty"`
 
@@ -329,6 +332,12 @@ func (b *EntryBuilder) WithProvider(provider, model string) *EntryBuilder {
 func (b *EntryBuilder) WithTokens(input, output int64) *EntryBuilder {
 	b.entry.TokensInput = sql.NullInt64{Int64: input, Valid: true}
 	b.entry.TokensOutput = sql.NullInt64{Int64: output, Valid: true}
+	return b
+}
+
+// WithCachedTokens sets the cached input token count.
+func (b *EntryBuilder) WithCachedTokens(cached int64) *EntryBuilder {
+	b.entry.TokensCached = sql.NullInt64{Int64: cached, Valid: true}
 	return b
 }
 
@@ -467,12 +476,18 @@ type QueryResult struct {
 
 // UsageStats represents aggregated usage statistics from audit entries.
 type UsageStats struct {
-	// TotalTokensInput is the total input tokens used.
+	// TotalTokensInput is the total input tokens used (including cached).
 	TotalTokensInput int64 `json:"total_tokens_input"`
+	// CachedTokensInput is the total number of input tokens served from cache.
+	CachedTokensInput int64 `json:"cached_tokens_input"`
+	// CacheHitRate is the percentage of input tokens served from cache (0-100).
+	CacheHitRate float64 `json:"cache_hit_rate"`
 	// TotalTokensOutput is the total output tokens used.
 	TotalTokensOutput int64 `json:"total_tokens_output"`
 	// TotalCostUSD is the total cost in USD.
 	TotalCostUSD float64 `json:"total_cost_usd"`
+	// CostSavingsUSD is the estimated cost savings from caching in USD.
+	CostSavingsUSD float64 `json:"cost_savings_usd"`
 	// TotalRequests is the total number of LLM requests.
 	TotalRequests int64 `json:"total_requests"`
 	// SuccessfulRequests is the number of successful requests.
@@ -489,8 +504,10 @@ type UsageStats struct {
 type ProviderStats struct {
 	Provider          string  `json:"provider"`
 	TotalTokensInput  int64   `json:"total_tokens_input"`
+	CachedTokensInput int64   `json:"cached_tokens_input"`
 	TotalTokensOutput int64   `json:"total_tokens_output"`
 	TotalCostUSD      float64 `json:"total_cost_usd"`
+	CostSavingsUSD    float64 `json:"cost_savings_usd"`
 	TotalRequests     int64   `json:"total_requests"`
 }
 

@@ -374,6 +374,7 @@ func (l *AuditLogger) GetUsageStats(ctx context.Context, filter *QueryFilter) (*
 		SELECT
 			COALESCE(SUM(tokens_input), 0) as total_tokens_input,
 			COALESCE(SUM(tokens_output), 0) as total_tokens_output,
+			COALESCE(SUM(tokens_cached), 0) as total_tokens_cached,
 			COALESCE(SUM(cost_usd), 0) as total_cost_usd,
 			COUNT(*) as total_requests,
 			COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0) as successful_requests,
@@ -387,6 +388,7 @@ func (l *AuditLogger) GetUsageStats(ctx context.Context, filter *QueryFilter) (*
 	err := l.db.QueryRowContext(ctx, query, args...).Scan(
 		&stats.TotalTokensInput,
 		&stats.TotalTokensOutput,
+		&stats.CachedTokensInput,
 		&stats.TotalCostUSD,
 		&stats.TotalRequests,
 		&stats.SuccessfulRequests,
@@ -397,12 +399,23 @@ func (l *AuditLogger) GetUsageStats(ctx context.Context, filter *QueryFilter) (*
 		return nil, fmt.Errorf("failed to get usage stats: %w", err)
 	}
 
+	// Calculate cache hit rate and estimated savings
+	if stats.TotalTokensInput > 0 {
+		stats.CacheHitRate = (float64(stats.CachedTokensInput) / float64(stats.TotalTokensInput)) * 100.0
+		// Estimated savings calculation: if we have cost and tokens, derive average per non-cached input token
+		if stats.TotalCostUSD > 0 && (stats.TotalTokensInput-stats.CachedTokensInput) > 0 {
+			avgInputPrice := stats.TotalCostUSD / float64(stats.TotalTokensInput-stats.CachedTokensInput)
+			stats.CostSavingsUSD = float64(stats.CachedTokensInput) * avgInputPrice
+		}
+	}
+
 	// Get per-provider stats
 	providerQuery := `
 		SELECT
 			provider,
 			COALESCE(SUM(tokens_input), 0) as total_tokens_input,
 			COALESCE(SUM(tokens_output), 0) as total_tokens_output,
+			COALESCE(SUM(tokens_cached), 0) as total_tokens_cached,
 			COALESCE(SUM(cost_usd), 0) as total_cost_usd,
 			COUNT(*) as total_requests
 		FROM audit_entries
@@ -419,9 +432,23 @@ func (l *AuditLogger) GetUsageStats(ctx context.Context, filter *QueryFilter) (*
 
 	for rows.Next() {
 		ps := &ProviderStats{}
-		if err := rows.Scan(&ps.Provider, &ps.TotalTokensInput, &ps.TotalTokensOutput, &ps.TotalCostUSD, &ps.TotalRequests); err != nil {
+		if err := rows.Scan(
+			&ps.Provider, 
+			&ps.TotalTokensInput, 
+			&ps.TotalTokensOutput, 
+			&ps.CachedTokensInput,
+			&ps.TotalCostUSD, 
+			&ps.TotalRequests,
+		); err != nil {
 			return nil, fmt.Errorf("failed to scan provider stats: %w", err)
 		}
+		
+		// Calculate savings per provider
+		if ps.TotalTokensInput > 0 && ps.TotalCostUSD > 0 && (ps.TotalTokensInput-ps.CachedTokensInput) > 0 {
+			avgInputPrice := ps.TotalCostUSD / float64(ps.TotalTokensInput-ps.CachedTokensInput)
+			ps.CostSavingsUSD = float64(ps.CachedTokensInput) * avgInputPrice
+		}
+		
 		stats.ByProvider[ps.Provider] = ps
 	}
 

@@ -529,10 +529,14 @@ export interface ProviderStats {
   provider: string
   /** Total input tokens used */
   totalTokensInput: number
+  /** Number of input tokens that were served from cache */
+  cachedTokensInput: number
   /** Total output tokens used */
   totalTokensOutput: number
   /** Total cost in USD */
   totalCostUsd: number
+  /** Estimated cost savings from caching in USD */
+  costSavingsUsd: number
   /** Total number of requests */
   totalRequests: number
 }
@@ -543,10 +547,16 @@ export interface ProviderStats {
 export interface UsageStats {
   /** Total input tokens used */
   totalTokensInput: number
+  /** Number of input tokens that were served from cache */
+  cachedTokensInput: number
+  /** Percentage of input tokens served from cache (0-100) */
+  cacheHitRate: number
   /** Total output tokens used */
   totalTokensOutput: number
   /** Total cost in USD */
   totalCostUsd: number
+  /** Estimated cost savings from caching in USD */
+  costSavingsUsd: number
   /** Total number of LLM requests */
   totalRequests: number
   /** Number of successful requests */

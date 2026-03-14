@@ -10,6 +10,10 @@
 import React, { useState } from 'react'
 import ChatPage from './pages/ChatPage'
 import KnowledgeHub from './pages/KnowledgeHub'
+import UsageDashboard from './pages/UsageDashboard'
+
+// Placeholder for ReplayPage until created in a separate file
+const ReplayPage = () => <div style={{ padding: '2rem', color: '#c9d1d9' }}>Replay Tooling (v2) - Visualizing audit run steps...</div>
 
 /**
  * Application configuration
@@ -81,7 +85,7 @@ const navStyles = {
  */
 const App: React.FC<AppProps> = ({ config }) => {
   const mergedConfig = { ...defaultConfig, ...config }
-  const [view, setView] = useState<'chat' | 'knowledge'>('chat')
+  const [view, setView] = useState<'chat' | 'knowledge' | 'usage' | 'replay'>('chat')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
@@ -98,12 +102,28 @@ const App: React.FC<AppProps> = ({ config }) => {
         >
           Knowledge Hub
         </button>
+        <button 
+          style={{ ...navStyles.btn, ...(view === 'usage' ? navStyles.activeBtn : {}) }}
+          onClick={() => setView('usage')}
+        >
+          Usage
+        </button>
+        <button 
+          style={{ ...navStyles.btn, ...(view === 'replay' ? navStyles.activeBtn : {}) }}
+          onClick={() => setView('replay')}
+        >
+          Replay
+        </button>
       </nav>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {view === 'chat' ? (
           <ChatPage config={mergedConfig} />
-        ) : (
+        ) : view === 'knowledge' ? (
           <KnowledgeHub />
+        ) : view === 'usage' ? (
+          <UsageDashboard config={{ apiBaseUrl: mergedConfig.apiUrl }} />
+        ) : (
+          <ReplayPage />
         )}
       </div>
     </div>

@@ -22,9 +22,12 @@ import type { CostDataPoint } from '../components/chat/cost/CostTimelineChart'
  */
 interface UsageSummaryResponse {
   total_tokens_input: number
+  cached_tokens_input: number
+  cache_hit_rate: number
   total_tokens_output: number
   total_tokens: number
   total_cost_usd: number
+  cost_savings_usd: number
   total_requests: number
   successful_requests: number
   failed_requests: number
@@ -39,8 +42,10 @@ interface UsageSummaryResponse {
 interface ProviderStatsResponse {
   provider: string
   total_tokens_input: number
+  cached_tokens_input: number
   total_tokens_output: number
   total_cost_usd: number
+  cost_savings_usd: number
   total_requests: number
 }
 
@@ -176,8 +181,11 @@ export interface UseUsageDataReturn {
 function transformUsageStats(response: UsageSummaryResponse): UsageStats {
   const stats: UsageStats = {
     totalTokensInput: response.total_tokens_input,
+    cachedTokensInput: response.cached_tokens_input,
+    cacheHitRate: response.cache_hit_rate,
     totalTokensOutput: response.total_tokens_output,
     totalCostUsd: response.total_cost_usd,
+    costSavingsUsd: response.cost_savings_usd,
     totalRequests: response.total_requests,
     successfulRequests: response.successful_requests,
     failedRequests: response.failed_requests,
@@ -190,8 +198,10 @@ function transformUsageStats(response: UsageSummaryResponse): UsageStats {
       stats.byProvider[key] = {
         provider: value.provider,
         totalTokensInput: value.total_tokens_input,
+        cachedTokensInput: value.cached_tokens_input,
         totalTokensOutput: value.total_tokens_output,
         totalCostUsd: value.total_cost_usd,
+        costSavingsUsd: value.cost_savings_usd,
         totalRequests: value.total_requests,
       }
     }
@@ -207,8 +217,10 @@ function transformProviderStats(response: ProviderUsageResponse): ProviderStats[
   return response.providers.map(p => ({
     provider: p.provider,
     totalTokensInput: p.total_tokens_input,
+    cachedTokensInput: 0, // Not provided by this endpoint
     totalTokensOutput: p.total_tokens_output,
     totalCostUsd: p.total_cost_usd,
+    costSavingsUsd: 0, // Not provided by this endpoint
     totalRequests: p.message_count, // Use message_count as request proxy
   }))
 }

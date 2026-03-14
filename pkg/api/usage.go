@@ -68,9 +68,12 @@ func (s *UsageServer) Handler() http.Handler {
 // UsageSummaryResponse represents the overall usage summary.
 type UsageSummaryResponse struct {
 	TotalTokensInput   int64                             `json:"total_tokens_input"`
+	CachedTokensInput  int64                             `json:"cached_tokens_input"`
+	CacheHitRate       float64                           `json:"cache_hit_rate"`
 	TotalTokensOutput  int64                             `json:"total_tokens_output"`
 	TotalTokens        int64                             `json:"total_tokens"`
 	TotalCostUSD       float64                           `json:"total_cost_usd"`
+	CostSavingsUSD     float64                           `json:"cost_savings_usd"`
 	TotalRequests      int64                             `json:"total_requests"`
 	SuccessfulRequests int64                             `json:"successful_requests"`
 	FailedRequests     int64                             `json:"failed_requests"`
@@ -83,8 +86,10 @@ type UsageSummaryResponse struct {
 type ProviderStatsResponse struct {
 	Provider          string  `json:"provider"`
 	TotalTokensInput  int64   `json:"total_tokens_input"`
+	CachedTokensInput int64   `json:"cached_tokens_input"`
 	TotalTokensOutput int64   `json:"total_tokens_output"`
 	TotalCostUSD      float64 `json:"total_cost_usd"`
+	CostSavingsUSD    float64 `json:"cost_savings_usd"`
 	TotalRequests     int64   `json:"total_requests"`
 }
 
