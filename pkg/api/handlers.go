@@ -19,6 +19,7 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 		TaskID        string `json:"task_id,omitempty"`
 		MCPConfigPath string `json:"mcp_config_path,omitempty"`
 		ReviewerModel string `json:"reviewer_model,omitempty"`
+		IsStudy       bool   `json:"is_study,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -33,7 +34,12 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 
 	// Start the pipeline/loop via manager.
 	// Use background context — the pipeline must outlive the HTTP request.
-	err := s.Mgr.Start(context.Background(), req.TaskID)
+	var opts []manager.StartOption
+	if req.IsStudy {
+		opts = append(opts, manager.WithIsStudy(true))
+	}
+
+	err := s.Mgr.Start(context.Background(), req.TaskID, opts...)
 	if err != nil {
 		if strings.Contains(err.Error(), "already active") {
 			WriteErrorWithSuggestion(w, http.StatusConflict, err.Error(), "Try stopping the existing execution with 'openexec stop' before running again.")

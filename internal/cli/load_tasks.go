@@ -17,45 +17,55 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 	plannedTitles := make(map[string]string)
 	storiesFile := filepath.Join(projectDir, ".openexec", "stories.json")
 	
-	if data, err := os.ReadFile(storiesFile); err == nil {
-		var sf struct {
-			SchemaVersion string `json:"schema_version"`
-			Goals         []any  `json:"goals"`
-			Stories       []struct {
-				ID    string `json:"id"`
-				Tasks []any  `json:"tasks"`
-			} `json:"stories"`
-		}
-		if err := json.Unmarshal(data, &sf); err == nil {
-			for _, s := range sf.Stories {
-				for _, tRaw := range s.Tasks {
-					id := ""
-					title := ""
-					switch v := tRaw.(type) {
-					case string: id = v
-					case map[string]any: 
-						id, _ = v["id"].(string)
-						title, _ = v["title"].(string)
-					}
-					if id != "" {
-						incomingTaskStories[id] = s.ID
-						plannedTitles[id] = title
-					}
-				}
-			}
-		} else {
-			fmt.Printf("  ⚠ Warning: Failed to parse stories.json: %v\n", err)
-		}
-	} else if os.IsNotExist(err) {
-		// Try root directory as fallback
-		storiesFile = filepath.Join(projectDir, "stories.json")
-		if _, err := os.Stat(storiesFile); err == nil {
-			// Recurse once with new path
-			return loadPendingTasks(projectDir, mgr, isInitial)
-		}
-	} else {
-		fmt.Printf("  ⚠ Warning: Failed to read stories.json: %v\n", err)
-	}
+    if data, err := os.ReadFile(storiesFile); err == nil {
+        var sf struct {
+            SchemaVersion string `json:"schema_version"`
+            Goals         []any  `json:"goals"`
+            Stories       []struct {
+                ID    string `json:"id"`
+                Title string `json:"title"`
+                Tasks []any  `json:"tasks"`
+            } `json:"stories"`
+        }
+        if err := json.Unmarshal(data, &sf); err == nil {
+            for _, s := range sf.Stories {
+                if len(s.Tasks) == 0 {
+                    // Auto-synthesize a Chassis task when a story has no explicit tasks
+                    synthID := "T-" + s.ID + "-CHS"
+                    synthTitle := "Chassis: " + s.Title
+                    incomingTaskStories[synthID] = s.ID
+                    plannedTitles[synthID] = synthTitle
+                    continue
+                }
+                for _, tRaw := range s.Tasks {
+                    id := ""
+                    title := ""
+                    switch v := tRaw.(type) {
+                    case string:
+                        id = v
+                    case map[string]any:
+                        id, _ = v["id"].(string)
+                        title, _ = v["title"].(string)
+                    }
+                    if id != "" {
+                        incomingTaskStories[id] = s.ID
+                        plannedTitles[id] = title
+                    }
+                }
+            }
+        } else {
+            fmt.Printf("  ⚠ Warning: Failed to parse stories.json: %v\n", err)
+        }
+    } else if os.IsNotExist(err) {
+        // Try root directory as fallback
+        storiesFile = filepath.Join(projectDir, "stories.json")
+        if _, err := os.Stat(storiesFile); err == nil {
+            // Recurse once with new path
+            return loadPendingTasks(projectDir, mgr, isInitial)
+        }
+    } else {
+        fmt.Printf("  ⚠ Warning: Failed to read stories.json: %v\n", err)
+    }
 
 	if len(incomingTaskStories) == 0 {
 		fmt.Printf("  🔍 Debug: No tasks found in stories.json (path: %s)\n", storiesFile)
@@ -63,34 +73,39 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 
 	// INTRA-STORY SEQUENCING: Map previous tasks within each story from stories.json
 	prevInStory := make(map[string]string)
-	if data, err := os.ReadFile(storiesFile); err == nil {
-		var sf struct {
-			SchemaVersion string `json:"schema_version"`
-			Goals         []any  `json:"goals"`
-			Stories       []struct {
-				ID    string `json:"id"`
-				Tasks []any  `json:"tasks"`
-			} `json:"stories"`
-		}
-		if err := json.Unmarshal(data, &sf); err == nil {
-			for _, s := range sf.Stories {
-				var lastID string
-				for _, tRaw := range s.Tasks {
-					tid := ""
-					switch v := tRaw.(type) {
-					case string: tid = v
-					case map[string]any: tid, _ = v["id"].(string)
-					}
-					if tid != "" {
-						if lastID != "" {
-							prevInStory[tid] = lastID
-						}
-						lastID = tid
-					}
-				}
-			}
-		}
-	}
+    if data, err := os.ReadFile(storiesFile); err == nil {
+        var sf struct {
+            SchemaVersion string `json:"schema_version"`
+            Goals         []any  `json:"goals"`
+            Stories       []struct {
+                ID    string `json:"id"`
+                Title string `json:"title"`
+                Tasks []any  `json:"tasks"`
+            } `json:"stories"`
+        }
+        if err := json.Unmarshal(data, &sf); err == nil {
+            for _, s := range sf.Stories {
+                var lastID string
+                // If we synthesized a single task earlier, there is no intra-story sequencing to compute
+                if len(s.Tasks) == 0 {
+                    continue
+                }
+                for _, tRaw := range s.Tasks {
+                    tid := ""
+                    switch v := tRaw.(type) {
+                    case string: tid = v
+                    case map[string]any: tid, _ = v["id"].(string)
+                    }
+                    if tid != "" {
+                        if lastID != "" {
+                            prevInStory[tid] = lastID
+                        }
+                        lastID = tid
+                    }
+                }
+            }
+        }
+    }
 
 	// 1. Try Release Manager first (Source of Truth)
 	if mgr != nil {
@@ -245,43 +260,60 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 		return nil, fmt.Errorf("no tasks found: %w", err)
 	}
 
-	var sf struct {
-		Stories []struct {
-			ID        string `json:"id"`
-			Title     string `json:"title"`
-			Status    string `json:"status"`
-			DependsOn []string `json:"depends_on"`
-			Tasks     []struct {
-				ID                 string   `json:"id"`
-				Title              string   `json:"title"`
-				Description        string   `json:"description"`
-				DependsOn          []string `json:"depends_on"`
-				VerificationScript string   `json:"verification_script,omitempty"`
-			} `json:"tasks"`
-		} `json:"stories"`
-	}
+    var sf struct {
+        Stories []struct {
+            ID                 string   `json:"id"`
+            Title              string   `json:"title"`
+            Status             string   `json:"status"`
+            DependsOn          []string `json:"depends_on"`
+            VerificationScript string   `json:"verification_script,omitempty"`
+            Tasks              []struct {
+                ID                 string   `json:"id"`
+                Title              string   `json:"title"`
+                Description        string   `json:"description"`
+                DependsOn          []string `json:"depends_on"`
+                VerificationScript string   `json:"verification_script,omitempty"`
+            } `json:"tasks"`
+        } `json:"stories"`
+    }
 
-	if err := json.Unmarshal(storiesData, &sf); err == nil {
-		var tasks []Task
-		for _, story := range sf.Stories {
-			var prevTaskID string
-			for _, genTask := range story.Tasks {
-				deps := genTask.DependsOn
-				if prevTaskID != "" { deps = append(deps, prevTaskID) }
-				tasks = append(tasks, Task{
-					ID:                 genTask.ID,
-					Title:              genTask.Title,
-					Description:        genTask.Description,
-					StoryID:            story.ID,
-					Status:             "pending",
-					DependsOn:          deps,
-					VerificationScript: genTask.VerificationScript,
-				})
-				prevTaskID = genTask.ID
-			}
-		}
-		return tasks, nil
-	}
+    if err := json.Unmarshal(storiesData, &sf); err == nil {
+        var tasks []Task
+        for _, story := range sf.Stories {
+            // If a story has no explicit tasks, auto-synthesize a single Chassis task
+            if len(story.Tasks) == 0 {
+                synthID := "T-" + story.ID + "-CHS"
+                synthTitle := "Chassis: " + story.Title
+                tasks = append(tasks, Task{
+                    ID:                 synthID,
+                    Title:              synthTitle,
+                    Description:        "Auto-synthesized task for story with no explicit tasks",
+                    StoryID:            story.ID,
+                    Status:             "pending",
+                    DependsOn:          story.DependsOn,
+                    VerificationScript: story.VerificationScript,
+                })
+                continue
+            }
+
+            var prevTaskID string
+            for _, genTask := range story.Tasks {
+                deps := genTask.DependsOn
+                if prevTaskID != "" { deps = append(deps, prevTaskID) }
+                tasks = append(tasks, Task{
+                    ID:                 genTask.ID,
+                    Title:              genTask.Title,
+                    Description:        genTask.Description,
+                    StoryID:            story.ID,
+                    Status:             "pending",
+                    DependsOn:          deps,
+                    VerificationScript: genTask.VerificationScript,
+                })
+                prevTaskID = genTask.ID
+            }
+        }
+        return tasks, nil
+    }
 
 	return nil, fmt.Errorf("no tasks found")
 }

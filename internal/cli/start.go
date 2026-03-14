@@ -65,6 +65,7 @@ type CreateLoopRequest struct {
 	ReviewerModel string `json:"reviewer_model,omitempty"`
 	TaskID        string `json:"task_id,omitempty"`
 	MCPConfigPath string `json:"mcp_config_path,omitempty"`
+	IsStudy       bool   `json:"is_study,omitempty"`
 }
 
 // LoopResponse is the API response for loop operations
@@ -849,12 +850,17 @@ func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Man
 	prompt := buildTaskPromptWithRetry(task, mgr, lastError)
 	mcpPath, _ := ensureMCPConfig(projectDir)
 
+	isStudy := strings.Contains(strings.ToLower(task.Title), "study") || 
+			  strings.Contains(strings.ToLower(task.Title), "mapping") ||
+			  strings.Contains(strings.ToLower(task.Title), "map")
+
 	req := CreateLoopRequest{
 		Prompt:        prompt,
 		WorkDir:       projectDir,
 		MaxIterations: runMaxIterations,
 		TaskID:        task.ID,
 		MCPConfigPath: mcpPath,
+		IsStudy:       isStudy,
 	}
 
 	body, _ := json.Marshal(req)

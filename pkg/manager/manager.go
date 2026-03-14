@@ -132,10 +132,20 @@ func isTerminal(s PipelineStatus) bool {
 	return s == StatusComplete || s == StatusError || s == StatusStopped
 }
 
+// StartOption defines functional options for Start.
+type StartOption func(*pipeline.Config)
+
+// WithIsStudy flags the pipeline as documentation/analysis only.
+func WithIsStudy(isStudy bool) StartOption {
+	return func(cfg *pipeline.Config) {
+		cfg.IsStudy = isStudy
+	}
+}
+
 // Start launches a new pipeline for the given FWU ID.
 // Returns error if the pipeline is already active (non-terminal state).
 // Allows re-start after complete/error/stopped.
-func (m *Manager) Start(ctx context.Context, fwuID string) error {
+func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -163,6 +173,10 @@ func (m *Manager) Start(ctx context.Context, fwuID string) error {
 		CommandArgs:          m.cfg.CommandArgs,
 		LogDir:               m.cfg.LogDir,
 		BriefingFunc:         m.cfg.BriefingFunc,
+	}
+
+	for _, opt := range opts {
+		opt(&pCfg)
 	}
 
 	p, events := pipeline.New(pCfg)

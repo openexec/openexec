@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,6 +33,9 @@ type Config struct {
 	BriefingFunc         BriefingFunc // nil = TractBriefingFunc(TractStore)
 	CommandName          string       // test override
 	CommandArgs          []string     // test override
+
+	// IsStudy flags the task as documentation/analysis only (collapses phases).
+	IsStudy bool
 
 	// Log configuration
 	LogDir string
@@ -180,9 +182,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 
 		// Doc-only fast-path: if this is a Study/Mapping task and we just finished TD,
 		// jump straight to Feedback Loop (FL) to finalize.
-		isStudy := strings.Contains(strings.ToLower(briefing), "study") || 
-				  strings.Contains(strings.ToLower(briefing), "mapping") ||
-				  strings.Contains(strings.ToLower(briefing), "map")
+		isStudy := p.cfg.IsStudy
 		
 		// Run Loop, consume events (with retries for transient orchestrator errors)
 		var phaseCompleted, routed, blocked bool

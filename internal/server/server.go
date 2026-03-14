@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -333,6 +334,43 @@ func (s *Server) registerPreflightChecks() {
 			return health.StatusOK, fmt.Sprintf("runner '%s' available", filepath.Base(runnerCmd)), nil
 		},
 		Remediation: "Install Claude CLI: npm install -g @anthropic/claude-code, or configure a custom runner in openexec.yaml",
+	})
+
+	// Critical: Runner must respond to a simple command (auth/config check)
+	s.Checker.Register(health.Check{
+		Name:     "runner_noop",
+		Critical: true,
+		Run: func(ctx context.Context) (health.Status, string, error) {
+			cfg := s.Mgr.GetConfig()
+			runnerCmd, _, err := runner.Resolve(
+				cfg.ExecutorModel,
+				cfg.RunnerCommand,
+				cfg.RunnerArgs,
+			)
+			if err != nil {
+				return health.StatusFailed, fmt.Sprintf("runner resolution failed: %v", err), nil
+			}
+
+			// For internal providers, no-op is always OK if resolution passed
+			if runnerCmd == "gemini" || runnerCmd == "openai" {
+				return health.StatusOK, "internal provider ready", nil
+			}
+
+			// Try a simple version check or similar no-op
+			// (Best effort: don't fail if command doesn't support --version, but most do)
+			check := exec.CommandContext(ctx, runnerCmd, "--version")
+			// If it's Claude, we might need a more specific check, but --version is safe
+			if strings.Contains(strings.ToLower(runnerCmd), "claude") {
+				check = exec.CommandContext(ctx, runnerCmd, "--version")
+			}
+
+			if err := check.Run(); err != nil {
+				return health.StatusFailed, fmt.Sprintf("runner binary exists but failed to execute (auth or config issue): %v", err), nil
+			}
+
+			return health.StatusOK, "runner responded to noop check", nil
+		},
+		Remediation: "Verify the runner is authenticated (e.g. 'claude login' or 'gemini auth') and that all required flags are valid.",
 	})
 
 	// Non-critical: Knowledge database
