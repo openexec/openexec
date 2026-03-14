@@ -45,7 +45,9 @@ npm run build
 cd "$OPENEXEC_DIR"
 
 COMMIT=$(git rev-parse --short HEAD)
-LDFLAGS="-X github.com/openexec/openexec/pkg/version.Commit=$COMMIT"
+# -s: Omit the symbol table and debug information.
+# -w: Omit the DWARF symbol table.
+LDFLAGS="-s -w -X github.com/openexec/openexec/pkg/version.Commit=$COMMIT"
 
 mkdir -p bin
 
@@ -87,7 +89,7 @@ echo "5. Committing and Pushing..."
 # openexec-web
 cd "$PROJECTS_DIR/openexec-web"
 git add .
-git commit -m "release: v$VERSION" || true
+git commit -m "release: v$VERSION (optimized binary sizes)" || true
 # git push origin main || true
 
 # openexec-docs
@@ -99,7 +101,7 @@ git commit -m "docs: bump version to v$VERSION" || true
 # openexec
 cd "$OPENEXEC_DIR"
 git add .
-git commit -m "release: v$VERSION" || true
+git commit -m "release: v$VERSION (optimized binary sizes)" || true
 # git push origin main || true
 git tag -f "v$VERSION"
 # git push origin -f "v$VERSION"
