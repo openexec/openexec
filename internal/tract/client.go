@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -40,16 +41,26 @@ func NewClient(in io.Writer, out io.Reader) *Client {
 // StartSubprocess launches `tract serve --store <name>` and returns a connected Client.
 // The subprocess is killed when Close is called or ctx is cancelled.
 func StartSubprocess(ctx context.Context, store string) (*Client, error) {
-	// Try "tract" first
-	cmd := exec.CommandContext(ctx, "tract", "serve", "--store", store)
-	
-	// Fallback to "openexec tract-serve" if tract is not in path
-	if _, err := exec.LookPath("tract"); err != nil {
+	// 1. Try "tract" in system path first
+	bin := "tract"
+	if _, err := exec.LookPath(bin); err != nil {
+		// 2. Try sibling directory (dev environment)
 		if execPath, err := os.Executable(); err == nil {
-			cmd = exec.CommandContext(ctx, execPath, "tract-serve", "--store", store)
+			siblingTract := filepath.Join(filepath.Dir(filepath.Dir(execPath)), "tract", "tract")
+			if _, err := os.Stat(siblingTract); err == nil {
+				bin = siblingTract
+			} else {
+				// 3. Try standard installation path
+				home, _ := os.UserHomeDir()
+				homeBin := filepath.Join(home, "bin", "tract")
+				if _, err := os.Stat(homeBin); err == nil {
+					bin = homeBin
+				}
+			}
 		}
 	}
 
+	cmd := exec.CommandContext(ctx, bin, "serve", "--store", store)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("tract stdin pipe: %w", err)

@@ -42,7 +42,14 @@ func TestPipeline_CreatesLoopPerPhase(t *testing.T) {
 		})
 
 		// WHEN we create Loops for each phase
-		phaseConfigs := DefaultPhaseConfigs()
+		// Use test-agent (available in testdata) with available workflow templates
+		phaseConfigs := map[Phase]PhaseConfig{
+			PhaseTD: {Agent: "test-agent", Workflow: "technical-design"},
+			PhaseIM: {Agent: "test-agent", Workflow: "implement"},
+			PhaseRV: {Agent: "test-agent", Workflow: "review"},
+			PhaseRF: {Agent: "test-agent", Workflow: "refactor"},
+			PhaseFL: {Agent: "test-agent", Workflow: "feedback-loop"},
+		}
 		briefing := "## Test Briefing\n**Status:** in_progress"
 
 		loopsCreated := 0
@@ -205,7 +212,7 @@ func TestOrchestration_SingleEntryPoint(t *testing.T) {
 	t.Run("Pipeline.Run is the only entry point", func(t *testing.T) {
 		// Verify Pipeline has Run method with correct signature
 		var _ interface {
-			Run(interface{}) error
+			Run(context.Context) error
 		} = (*Pipeline)(nil)
 
 		// Pipeline.Run():
@@ -254,7 +261,7 @@ func TestPipeline_BriefingRetryOnFailure(t *testing.T) {
 
 	// Briefing that fails once then succeeds
 	var callCount atomic.Int32
-	briefingFn := func(ctx interface{}, fwuID string) (string, error) {
+	briefingFn := func(ctx context.Context, fwuID string) (string, error) {
 		count := callCount.Add(1)
 		// First call per phase might fail in real scenarios
 		// but we can't easily test retry without modifying pipeline internals
@@ -271,9 +278,9 @@ func TestPipeline_BriefingRetryOnFailure(t *testing.T) {
 		MaxReviewCycles:      3,
 		DefaultMaxIterations: 10,
 		MaxRetries:           2,
-		RetryBackoff:         []int{0, 0},
+		RetryBackoff:         []time.Duration{0, 0},
 		ThrashThreshold:      0,
-		BriefingFunc:         func(_ interface{}, id string) (string, error) { return briefingFn(nil, id) },
+		BriefingFunc:         briefingFn,
 		CommandName:          bin,
 	}
 
@@ -286,7 +293,7 @@ func TestPipeline_BriefingRetryOnFailure(t *testing.T) {
 		close(done)
 	}()
 
-	err := p.Run(nil)
+	err := p.Run(context.Background())
 	<-done
 
 	if err != nil {
