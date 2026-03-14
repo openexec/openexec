@@ -2,18 +2,23 @@ package loop
 
 import (
     "context"
+    "encoding/json"
     "fmt"
     "io"
     "os"
     "os/exec"
     "path/filepath"
+    "strings"
     "sync"
     "sync/atomic"
     "time"
 
     "github.com/openexec/openexec/internal/summarize"
     "github.com/openexec/openexec/pkg/agent"
-    )
+    "github.com/openexec/openexec/pkg/telemetry"
+    "go.opentelemetry.io/otel/attribute"
+    "go.opentelemetry.io/otel/trace"
+)
 // Loop is the core iteration executor. It spawns Claude Code repeatedly,
 // parsing stream-JSON output into typed Events, with retry and lifecycle control.
 type Loop struct {
@@ -80,6 +85,12 @@ func (l *Loop) PromptHash() string { return l.cfg.PromptHash }
 // Run executes the loop until completion, max iterations, stop, or context cancellation.
 // It closes the event channel when it returns.
 func (l *Loop) Run(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "Loop.Run", trace.WithAttributes(
+		attribute.String("fwu_id", l.cfg.FwuID),
+		attribute.Int("max_iterations", l.cfg.MaxIterations),
+	))
+	defer span.End()
+
 	defer close(l.events)
 	defer func() {
 		if l.middleware != nil {
@@ -204,8 +215,33 @@ func (l *Loop) Run(ctx context.Context) error {
             // 3. Save assistant response to history
             l.history = append(l.history, agent.Message{Role: agent.RoleAssistant, Content: resp.Content})
 
-            // On success, mark complete
-            l.emit(Event{Type: EventComplete, Iteration: l.iteration})
+            // V5: Parse constrained StepResult from assistant output
+            var stepRes *StepResult
+            for _, block := range resp.Content {
+                if block.Type == "text" && strings.Contains(block.Text, "STEP_RESULT:") {
+                    parts := strings.SplitN(block.Text, "STEP_RESULT:", 2)
+                    if len(parts) > 1 {
+                        var res StepResult
+                        if err := json.Unmarshal([]byte(strings.TrimSpace(parts[1])), &res); err == nil {
+                            stepRes = &res
+                            break
+                        }
+                    }
+                }
+            }
+
+            if stepRes == nil {
+                err := fmt.Errorf("agent failed to provide constrained STEP_RESULT JSON in output")
+                l.emit(Event{Type: EventError, ErrText: err.Error()})
+                return err
+            }
+
+            // On success, mark complete with result
+            l.emit(Event{
+                Type:      EventComplete, 
+                Iteration: l.iteration,
+                Result:    stepRes,
+            })
             return nil
         }
 

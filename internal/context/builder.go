@@ -8,10 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // BuilderResult represents the result of building context with token budgeting.
@@ -26,6 +29,8 @@ type BuilderResult struct {
 	ExcludedItems []*ContextItem `json:"excluded_items"`
 	// Errors contains any errors encountered during gathering.
 	Errors []GatherError `json:"errors,omitempty"`
+	// Timestamp is when the result was generated (V1 TTL)
+	Timestamp time.Time `json:"timestamp"`
 	// Budget is the budget configuration used.
 	Budget *ContextBudget `json:"budget"`
 	// TokensAvailable is the token budget that was available for context.
@@ -434,8 +439,17 @@ func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderO
 	cacheKey := deriveCacheKey(projectPath, opts)
 	if cacheKey != "" {
 		if cached, ok := globalContextCache.Load(cacheKey); ok {
+			atomic.AddUint64(&cacheHits, 1)
 			return cached.(*BuilderResult), nil
 		}
+		
+		// Try disk cache
+		if result, err := loadContextPack(projectPath, cacheKey); err == nil {
+			atomic.AddUint64(&cacheHits, 1)
+			globalContextCache.Store(cacheKey, result)
+			return result, nil
+		}
+		atomic.AddUint64(&cacheMisses, 1)
 	}
 
 	// Create or use provided registry
@@ -474,21 +488,87 @@ func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderO
 	}
 
 	result, err := builder.Build(ctx, projectPath)
-	if err == nil && cacheKey != "" {
-		globalContextCache.Store(cacheKey, result)
+	if err == nil {
+		result.Timestamp = time.Now()
+		if cacheKey != "" {
+			globalContextCache.Store(cacheKey, result)
+			
+			// V5: Persist to artifact store for cross-process reuse
+			persistContextPack(projectPath, cacheKey, result)
+		}
 	}
 	return result, err
 }
 
-var globalContextCache sync.Map
+func persistContextPack(projectPath, key string, result *BuilderResult) {
+	dir := filepath.Join(projectPath, ".openexec", "artifacts", "context")
+	_ = os.MkdirAll(dir, 0750)
+	
+	// Create content-addressed hash of the key
+	h := sha256.Sum256([]byte(key))
+	hashStr := hex.EncodeToString(h[:])
+	
+	path := filepath.Join(dir, "context_" + hashStr + ".json")
+	data, _ := json.Marshal(result)
+	_ = os.WriteFile(path, data, 0644)
+}
+
+func loadContextPack(projectPath, key string) (*BuilderResult, error) {
+	h := sha256.Sum256([]byte(key))
+	hashStr := hex.EncodeToString(h[:])
+	path := filepath.Join(projectPath, ".openexec", "artifacts", "context", "context_" + hashStr + ".json")
+	
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	
+	var result BuilderResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, err
+	}
+
+	// TTL Check: 24 hours
+	if !result.Timestamp.IsZero() && time.Since(result.Timestamp) > 24*time.Hour {
+		return nil, fmt.Errorf("context pack expired")
+	}
+
+	return &result, nil
+}
+
+var (
+	globalContextCache sync.Map
+	cacheHits          uint64
+	cacheMisses        uint64
+)
+
+// GetCacheMetrics returns the hit and miss counts for the context cache.
+func GetCacheMetrics() (hits, misses uint64) {
+	return atomic.LoadUint64(&cacheHits), atomic.LoadUint64(&cacheMisses)
+}
 
 func deriveCacheKey(projectPath string, opts *ContextBuilderOptions) string {
 	// Base key is the project path
 	key := projectPath
 
-	// Add git state if available
+	// Add git state if available.
+	// For non-git repos: silently fall back to path-only key with TTL invalidation.
+	// This is expected behavior - no error logging needed.
 	if data, err := os.ReadFile(filepath.Join(projectPath, ".git", "HEAD")); err == nil {
 		key += ":" + strings.TrimSpace(string(data))
+
+		// Add dirty status to key to invalidate if files changed (V1 Hardening)
+		// Use short timeout to avoid hangs on slow/unresponsive git
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+		cmd.Dir = projectPath
+		out, err := cmd.Output()
+		cancel()
+		if err == nil && len(out) > 0 {
+			// Hash the porcelain output to keep the key stable but unique per dirty state
+			h := sha256.Sum256(out)
+			key += ":dirty:" + hex.EncodeToString(h[:8])
+		}
 	}
 
 	// Add options hash to differentiate between different gathering settings

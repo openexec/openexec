@@ -42,11 +42,39 @@ type Story struct {
 	Tasks              []Task   `json:"tasks"`
 }
 
+// PlanSchemaVersion is the current version of the plan artifact schema.
+const PlanSchemaVersion = "1.0.0"
+
 // ProjectPlan is the complete output schema for story generation
 type ProjectPlan struct {
 	SchemaVersion string  `json:"schema_version"`
 	Goals         []Goal  `json:"goals"`
 	Stories       []Story `json:"stories"`
+}
+
+// Validate checks that the plan has required fields and is well-formed.
+// Returns an error if the plan is invalid.
+func (p *ProjectPlan) Validate() error {
+	if p == nil {
+		return fmt.Errorf("plan is nil")
+	}
+	if p.SchemaVersion == "" {
+		p.SchemaVersion = PlanSchemaVersion
+	}
+	// Ensure at least one story or goal exists
+	if len(p.Goals) == 0 && len(p.Stories) == 0 {
+		return fmt.Errorf("plan must have at least one goal or story")
+	}
+	// Validate stories have required fields
+	for i, story := range p.Stories {
+		if story.ID == "" {
+			return fmt.Errorf("story %d: missing ID", i)
+		}
+		if story.Title == "" {
+			return fmt.Errorf("story %s: missing title", story.ID)
+		}
+	}
+	return nil
 }
 
 // LLMProvider defines the interface for calling an AI model

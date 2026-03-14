@@ -4,17 +4,73 @@ import (
     "context"
     "encoding/json"
     "fmt"
+    "log"
     "net/http"
+    "strconv"
     "strings"
     "time"
 
     "github.com/openexec/openexec/pkg/audit"
+    "github.com/openexec/openexec/pkg/db/state"
     "github.com/openexec/openexec/pkg/manager"
 )
+
+// parseIntParam parses an integer query parameter with a default value.
+func parseIntParam(r *http.Request, key string, defaultVal int) int {
+    if v := r.URL.Query().Get(key); v != "" {
+        if i, err := strconv.Atoi(v); err == nil && i >= 0 {
+            return i
+        }
+    }
+    return defaultVal
+}
 
 // Legacy loops endpoint removed; use /api/fwu/{id}/start or /api/v1/runs
 
 // Legacy loops endpoint removed; use /api/fwu/{id}/status
+
+// handlePlan executes the planning workflow on the server and returns a plan artifact.
+func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
+	var req manager.PlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	result, err := s.Mgr.Plan(r.Context(), req)
+	if err != nil {
+		// Return 400 for input validation errors (path traversal, denylist, not found)
+		if _, ok := err.(*manager.PlanInputError); ok {
+			WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, result)
+}
+
+// handleExecuteRuns triggers the orchestration of multiple tasks on the server.
+func (s *Server) handleExecuteRuns(w http.ResponseWriter, r *http.Request) {
+	var req manager.RunOptions
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Use background context for the long-running execution
+	go func() {
+		err := s.Mgr.ExecuteTasks(context.Background(), req)
+		if err != nil {
+			log.Printf("[Server] ExecuteTasks failed: %v", err)
+		}
+	}()
+
+	WriteJSON(w, http.StatusAccepted, map[string]string{
+		"status": "execution_started",
+	})
+}
 
 // handleCreateRun creates a new run from an explicit request and returns a run_id.
 // This improves determinism by persisting the inputs up front.
@@ -94,43 +150,118 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-// handleGetRun returns the status for a run id (alias of loop status).
+// handleGetRun returns the status for a run id.
+// When OPENEXEC_USE_UNIFIED_READS=1, falls back to state store if not found in memory.
 func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
     id := r.PathValue("id")
     if id == "" {
         WriteError(w, http.StatusBadRequest, "missing run id")
         return
     }
+
+    // Try in-memory first (active runs)
     info, err := s.Mgr.Status(id)
-    if err != nil {
-        WriteError(w, http.StatusNotFound, err.Error())
+    if err == nil {
+        WriteJSON(w, http.StatusOK, map[string]interface{}{
+            "run_id":       info.FWUID,
+            "status":       info.Status,
+            "phase":        info.Phase,
+            "agent":        info.Agent,
+            "iteration":    info.Iteration,
+            "elapsed":      info.Elapsed,
+            "lastActivity": info.LastActivity,
+            "error":        info.Error,
+        })
         return
     }
-    WriteJSON(w, http.StatusOK, map[string]interface{}{
-        "run_id":     info.FWUID,
-        "status":     info.Status,
-        "phase":      info.Phase,
-        "agent":      info.Agent,
-        "iteration":  info.Iteration,
-        "elapsed":    info.Elapsed,
-        "lastActivity": info.LastActivity,
-        "error":      info.Error,
-    })
+
+    // Fallback to unified DB if enabled
+    if s.UseUnifiedReads && s.StateStore != nil {
+        run, dbErr := s.StateStore.GetRun(r.Context(), id)
+        if dbErr != nil {
+            log.Printf("[API] GetRun DB error: %v", dbErr)
+            WriteError(w, http.StatusInternalServerError, "database error")
+            return
+        }
+        if run != nil {
+            errMsg := ""
+            if run.ErrorMessage.Valid {
+                errMsg = run.ErrorMessage.String
+            }
+            WriteJSON(w, http.StatusOK, map[string]interface{}{
+                "run_id":     run.ID,
+                "status":     run.Status,
+                "mode":       run.Mode,
+                "created_at": run.CreatedAt,
+                "updated_at": run.UpdatedAt,
+                "error":      errMsg,
+            })
+            return
+        }
+    }
+
+    // Friendlier error message when run not found in both memory and DB
+    WriteError(w, http.StatusNotFound, fmt.Sprintf("run %q not found", id))
 }
 
-// handleGetRunSteps returns recent run.step audit events for a run id.
+// handleGetRunSteps returns run steps for a run id.
+// When OPENEXEC_USE_UNIFIED_READS=1, uses state store; otherwise falls back to audit logger.
+// Query params: ?limit=100&offset=0
 func (s *Server) handleGetRunSteps(w http.ResponseWriter, r *http.Request) {
     id := r.PathValue("id")
     if id == "" {
         WriteError(w, http.StatusBadRequest, "missing run id")
         return
     }
+
+    limit := parseIntParam(r, "limit", 200)
+    offset := parseIntParam(r, "offset", 0)
+
+    // Use unified DB if enabled
+    if s.UseUnifiedReads && s.StateStore != nil {
+        steps, err := s.StateStore.ListRunSteps(r.Context(), id, limit, offset)
+        if err != nil {
+            log.Printf("[API] ListRunSteps DB error: %v", err)
+            WriteError(w, http.StatusInternalServerError, "database error")
+            return
+        }
+        result := make([]map[string]interface{}, 0, len(steps))
+        for _, step := range steps {
+            stepMap := map[string]interface{}{
+                "id":         step.ID,
+                "run_id":     step.RunID,
+                "phase":      step.Phase,
+                "iteration":  step.Iteration,
+                "status":     step.Status,
+                "started_at": step.StartedAt,
+            }
+            if step.TraceID.Valid {
+                stepMap["trace_id"] = step.TraceID.String
+            }
+            if step.Agent.Valid {
+                stepMap["agent"] = step.Agent.String
+            }
+            if step.CompletedAt.Valid {
+                stepMap["completed_at"] = step.CompletedAt.String
+            }
+            if step.InputsHash.Valid {
+                stepMap["inputs_hash"] = step.InputsHash.String
+            }
+            if step.OutputsHash.Valid {
+                stepMap["outputs_hash"] = step.OutputsHash.String
+            }
+            result = append(result, stepMap)
+        }
+        WriteJSON(w, http.StatusOK, map[string]interface{}{"run_id": id, "steps": result})
+        return
+    }
+
+    // Fallback to audit logger
     if s.AuditLogger == nil {
         WriteError(w, http.StatusServiceUnavailable, "audit logger unavailable")
         return
     }
-    // Query last N run.step entries; default limit 200
-    limit := 200
+    // Query run.step entries with limit from query params
     q := &audit.QueryFilter{EventTypes: []audit.EventType{audit.EventRunStep}, Limit: limit}
     res, err := s.AuditLogger.Query(r.Context(), q)
     if err != nil {
@@ -152,6 +283,59 @@ func (s *Server) handleGetRunSteps(w http.ResponseWriter, r *http.Request) {
         }
     }
     WriteJSON(w, http.StatusOK, map[string]interface{}{"run_id": id, "steps": steps})
+}
+
+// handleListRuns returns a list of runs, optionally filtered.
+// When OPENEXEC_USE_UNIFIED_READS=1, uses state store; otherwise uses manager's in-memory list.
+// Query params: ?project_path=...&status=...&limit=100&offset=0
+func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
+    // Use unified DB if enabled
+    if s.UseUnifiedReads && s.StateStore != nil {
+        projectPath := r.URL.Query().Get("project_path")
+        status := r.URL.Query().Get("status")
+        limit := parseIntParam(r, "limit", 100)
+        offset := parseIntParam(r, "offset", 0)
+
+        runs, err := s.StateStore.ListRuns(r.Context(), state.RunFilter{
+            ProjectPath: projectPath,
+            Status:      status,
+            Limit:       limit,
+            Offset:      offset,
+        })
+        if err != nil {
+            log.Printf("[API] ListRuns DB error: %v", err)
+            WriteError(w, http.StatusInternalServerError, "database error")
+            return
+        }
+
+        result := make([]map[string]interface{}, 0, len(runs))
+        for _, run := range runs {
+            runMap := map[string]interface{}{
+                "run_id":       run.ID,
+                "project_path": run.ProjectPath,
+                "mode":         run.Mode,
+                "status":       run.Status,
+                "created_at":   run.CreatedAt,
+                "updated_at":   run.UpdatedAt,
+            }
+            if run.SessionID.Valid {
+                runMap["session_id"] = run.SessionID.String
+            }
+            if run.TaskID.Valid {
+                runMap["task_id"] = run.TaskID.String
+            }
+            if run.ErrorMessage.Valid {
+                runMap["error"] = run.ErrorMessage.String
+            }
+            result = append(result, runMap)
+        }
+        WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": result})
+        return
+    }
+
+    // Fallback to in-memory list
+    list := s.Mgr.List()
+    WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": list})
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {

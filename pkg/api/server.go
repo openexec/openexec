@@ -3,38 +3,68 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/session"
+	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/manager"
 )
 
 // Server exposes the Manager and Session Repository over HTTP.
 type Server struct {
-	Mgr         *manager.Manager
-	SessionRepo session.Repository
-	AuditLogger audit.Logger
-	ProjectsDir string
-	Server      *http.Server
-	Mux         *http.ServeMux
-	Hub         *Hub
+	Mgr             *manager.Manager
+	SessionRepo     session.Repository
+	AuditLogger     audit.Logger
+	StateStore      *state.Store // Unified state store for runs/steps/artifacts
+	UseUnifiedReads bool         // Feature flag: OPENEXEC_USE_UNIFIED_READS=1
+	ProjectsDir     string
+	Server          *http.Server
+	Mux             *http.ServeMux
+	Hub             *Hub
+}
+
+// ServerOption configures the Server.
+type ServerOption func(*Server)
+
+// WithStateStore sets the unified state store for database reads.
+func WithStateStore(store *state.Store) ServerOption {
+	return func(s *Server) {
+		s.StateStore = store
+	}
 }
 
 // New creates an HTTP Server bound to the given address.
-func New(mgr *manager.Manager, sessionRepo session.Repository, auditLogger audit.Logger, projectsDir string, addr string) *Server {
+func New(mgr *manager.Manager, sessionRepo session.Repository, auditLogger audit.Logger, projectsDir string, addr string, opts ...ServerOption) *Server {
 	mux := http.NewServeMux()
+
+	// Check feature flag for unified DB reads
+	useUnifiedReads := false
+	if v := os.Getenv("OPENEXEC_USE_UNIFIED_READS"); v != "" {
+		lower := strings.ToLower(v)
+		useUnifiedReads = (lower == "1" || lower == "true" || lower == "yes")
+	}
+
 	s := &Server{
-		Mgr:         mgr,
-		SessionRepo: sessionRepo,
-		AuditLogger: auditLogger,
-		ProjectsDir: projectsDir,
-		Mux:         mux,
-		Hub:         NewHub(),
+		Mgr:             mgr,
+		SessionRepo:     sessionRepo,
+		AuditLogger:     auditLogger,
+		UseUnifiedReads: useUnifiedReads,
+		ProjectsDir:     projectsDir,
+		Mux:             mux,
+		Hub:             NewHub(),
 		Server: &http.Server{
 			Addr:    addr,
 			Handler: mux,
 		},
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(s)
+	}
+
 	s.registerRoutes()
 
 	// Start the WebSocket hub
@@ -63,7 +93,10 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
     // v1 Loops compatibility routes removed; use /api/fwu/* or /api/v1/runs
 
     // v1 Runs (deterministic run creation)
+    mux.HandleFunc("GET /api/v1/runs", s.handleListRuns)
     mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
+    mux.HandleFunc("POST /api/v1/runs:plan", s.handlePlan)
+    mux.HandleFunc("POST /api/v1/runs:execute", s.handleExecuteRuns)
     mux.HandleFunc("POST /api/v1/runs/{id}/start", s.handleStartRun)
     mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
     mux.HandleFunc("GET /api/v1/runs/{id}/steps", s.handleGetRunSteps)

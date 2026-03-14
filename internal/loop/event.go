@@ -63,6 +63,17 @@ type CostInfo struct {
 	TotalUSD     float64 `json:"total_usd"`
 }
 
+// StepResult is the constrained output schema for an execution step.
+// This is used to enforce determinism and limit excessive agency.
+type StepResult struct {
+	Status      string            `json:"status"`       // complete, error, pivot, retry
+	Reason      string            `json:"reason"`       // explanation for the status
+	NextPhase   string            `json:"next_phase"`   // requested transition
+	Artifacts   map[string]string `json:"artifacts"`    // hash-addressed results
+	Confidence  float64           `json:"confidence"`   // 0.0 to 1.0
+	Diagnostics string            `json:"diagnostics"`  // optional internal reasoning
+}
+
 // Event represents a single occurrence in the loop lifecycle.
 type Event struct {
     Type         EventType              `json:"type"`
@@ -84,6 +95,9 @@ type Event struct {
     Agent       string `json:"agent,omitempty"`
     ReviewCycle int    `json:"review_cycle,omitempty"`
     RouteTarget string `json:"route_target,omitempty"`
+
+    // Result is the constrained output from the runner (V5).
+    Result *StepResult `json:"result,omitempty"`
 
     // Observability fields
     PromptHash string `json:"prompt_hash,omitempty"`

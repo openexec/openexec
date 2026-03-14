@@ -13,8 +13,11 @@ import (
     "github.com/openexec/openexec/internal/pipeline"
     "github.com/openexec/openexec/internal/release"
     "github.com/openexec/openexec/pkg/audit"
+    "github.com/openexec/openexec/pkg/db/state"
+    "github.com/openexec/openexec/pkg/telemetry"
+    "go.opentelemetry.io/otel/attribute"
+    "go.opentelemetry.io/otel/trace"
 )
-
 // PipelineStatus represents the lifecycle state of a managed pipeline.
 type PipelineStatus string
 
@@ -49,7 +52,8 @@ type Config struct {
     BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
     // ExecMode: read-only | workspace-write | danger-full-access
     ExecMode             string
-    AuditLogger          audit.Logger
+    StateStore           *state.Store
+    AuditLogger          audit.Logger // optional audit logger for run-step events
 }
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
@@ -77,6 +81,7 @@ type entry struct {
     drops    int
     stepSeq  int
     traceID  string
+    runSpan  trace.Span // OTel span for the entire run lifecycle
 }
 
 // Manager orchestrates multiple concurrent FWU pipelines.
@@ -85,6 +90,7 @@ type Manager struct {
 	pipelines map[string]*entry
 	mu        sync.RWMutex
 	watchdog  *Watchdog
+	state     *state.Store
 }
 
 // New creates a Manager with the given server-level config.
@@ -107,6 +113,7 @@ func New(cfg Config) *Manager {
 	m := &Manager{
 		cfg:       cfg,
 		pipelines: make(map[string]*entry),
+		state:     cfg.StateStore,
 	}
 
 	// SELF-HEALING: Ghost State Cleanup
@@ -228,7 +235,9 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
-	pipeCtx, cancel := context.WithCancel(ctx)
+	// Create OTel span for the entire run lifecycle
+	runCtx, runSpan := telemetry.StartRunSpan(ctx, fwuID, m.cfg.WorkDir, pCfg.ExecMode)
+	pipeCtx, cancel := context.WithCancel(runCtx)
 
 	e := &entry{
 		pipeline: p,
@@ -237,9 +246,17 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 			Status:    StatusStarting,
 			StartedAt: time.Now(),
 		},
-		cancel: cancel,
+		cancel:  cancel,
+		runSpan: runSpan,
 	}
 	m.pipelines[fwuID] = e
+
+	// Write run to unified DB (parallel, non-blocking)
+	if m.state != nil {
+		m.state.WriteAsync(ctx, func(ctx context.Context) error {
+			return m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode)
+		})
+	}
 
 	// Start event consumer before pipeline run.
 	go m.consumeEvents(fwuID, events)
@@ -255,11 +272,18 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 				e.info.Status = StatusError
 				e.info.Error = err.Error()
 				log.Printf("[Manager] Pipeline %s: failed with error: %v", fwuID, err)
+				// Record error on run span
+				e.runSpan.RecordError(err)
+				e.runSpan.SetAttributes(attribute.String("run.status", string(StatusError)))
 			} else if err != nil {
 				log.Printf("[Manager] Pipeline %s: finished (terminal status=%s) with error: %v", fwuID, e.info.Status, err)
+				e.runSpan.SetAttributes(attribute.String("run.status", string(e.info.Status)))
 			} else {
 				log.Printf("[Manager] Pipeline %s: finished with status=%s", fwuID, e.info.Status)
+				e.runSpan.SetAttributes(attribute.String("run.status", string(e.info.Status)))
 			}
+			// End the run span when pipeline completes
+			e.runSpan.End()
 		}
 	}()
 
@@ -359,11 +383,8 @@ func (m *Manager) GetConfig() Config {
 }
 
 func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
-	rel, err := release.NewManager(m.cfg.WorkDir, release.DefaultConfig())
+	rel, err := release.NewManagerWithDB(m.cfg.WorkDir, release.DefaultConfig(), m.state.GetDB())
 	if err != nil {
-		return nil, err
-	}
-	if err := rel.Load(); err != nil {
 		return nil, err
 	}
 	return rel, nil

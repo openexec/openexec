@@ -110,6 +110,21 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				Text:      item.Text,
 			})
 
+			// Constrained Output Detection (V5): Check for STEP_RESULT: {JSON}
+			if strings.Contains(item.Text, "STEP_RESULT:") {
+				parts := strings.SplitN(item.Text, "STEP_RESULT:", 2)
+				if len(parts) > 1 {
+					var res StepResult
+					if err := json.Unmarshal([]byte(strings.TrimSpace(parts[1])), &res); err == nil {
+						p.emit(Event{
+							Type:      EventComplete,
+							Iteration: p.iteration,
+							Result:    &res,
+						})
+					}
+				}
+			}
+
 			// SELF-HEALING: Detect if agent claims task is already done or scope is misaligned
 			txtLower := strings.ToLower(item.Text)
 			isComplete := strings.Contains(txtLower, "already completed") || 

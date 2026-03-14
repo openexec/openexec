@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS audit_entries (
 	model TEXT,
 	tokens_input INTEGER,
 	tokens_output INTEGER,
+	tokens_cached INTEGER,
 	cost_usd REAL,
 	duration_ms INTEGER,
 	success INTEGER,

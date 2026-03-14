@@ -79,6 +79,47 @@ func NewPathValidator(config PathValidatorConfig) *PathValidator {
 	return &PathValidator{config: config}
 }
 
+// isDenied returns true if the path points to a sensitive system or project file.
+// This is a best-effort denylist to prevent accidental exposure of secrets.
+// The list is subject to expansion; see internal security guidelines for updates.
+// Defense in depth: this check runs before path validation as an early exit.
+func isDenied(path string) bool {
+	// Normalize path for case-insensitive matching (handles mixed-case on macOS/Windows)
+	lowerPath := strings.ToLower(path)
+	base := filepath.Base(path)
+	lowerBase := strings.ToLower(base)
+
+	// Block hidden configuration and secret files
+	sensitiveFiles := []string{
+		".env", ".netrc", ".ssh", ".gnupg",
+		"id_rsa", "id_ed25519", "id_dsa",
+		"credentials", "secrets", "passwords",
+	}
+
+	for _, s := range sensitiveFiles {
+		if strings.Contains(lowerBase, s) {
+			return true
+		}
+	}
+
+	// Block certificate/key files by extension
+	if strings.HasSuffix(lowerBase, ".pem") || strings.HasSuffix(lowerBase, ".key") || strings.HasSuffix(lowerBase, ".p12") {
+		return true
+	}
+
+	// Block access to the .git directory (case-insensitive)
+	if strings.Contains(lowerPath, "/.git/") || strings.HasSuffix(lowerPath, "/.git") {
+		return true
+	}
+
+	// Block AWS/cloud credentials directories
+	if strings.Contains(lowerPath, "/.aws/") || strings.Contains(lowerPath, "/.gcp/") || strings.Contains(lowerPath, "/.azure/") {
+		return true
+	}
+
+	return false
+}
+
 // Validate validates a file path according to the validator's configuration.
 // It returns the canonicalized absolute path if valid, or an error if invalid.
 func (v *PathValidator) Validate(path string) (string, error) {
@@ -90,6 +131,11 @@ func (v *PathValidator) Validate(path string) (string, error) {
 	// Check for null bytes (security: null byte injection)
 	if strings.ContainsRune(path, '\x00') {
 		return "", &PathValidationError{Path: path, Message: ErrNullByte.Error()}
+	}
+
+	// V1 Hardening: Block sensitive files early
+	if isDenied(path) {
+		return "", &PathValidationError{Path: path, Message: "access to sensitive file is prohibited by policy"}
 	}
 
 	// Clean the path to remove redundant separators and resolve . and ..
@@ -192,12 +238,19 @@ func (v *PathValidator) containsTraversal(path string) bool {
 
 // isWithinAllowedRoots checks if the given path is within any of the allowed root directories.
 func (v *PathValidator) isWithinAllowedRoots(path string) bool {
+	// Resolve symlinks in the path for accurate comparison (e.g., /var -> /private/var on macOS)
+	resolvedPath := resolvePathSymlinks(path)
+
 	for _, root := range v.config.AllowedRoots {
 		cleanRoot := filepath.Clean(root)
 		absRoot, err := filepath.Abs(cleanRoot)
 		if err != nil {
 			continue
 		}
+
+		// Resolve symlinks in the root as well using the same resolution logic
+		// This handles cases where the root path doesn't exist but contains symlinked components
+		absRoot = resolvePathSymlinks(absRoot)
 
 		// Ensure root ends with separator for proper prefix checking
 		rootWithSep := absRoot
@@ -206,11 +259,48 @@ func (v *PathValidator) isWithinAllowedRoots(path string) bool {
 		}
 
 		// Check if path is exactly the root or starts with root/
-		if path == absRoot || strings.HasPrefix(path, rootWithSep) {
+		if resolvedPath == absRoot || strings.HasPrefix(resolvedPath, rootWithSep) {
 			return true
 		}
 	}
 	return false
+}
+
+// resolvePathSymlinks resolves symlinks in a path, handling cases where the path
+// or its parent directories may not exist yet (e.g., for new files in nested dirs).
+func resolvePathSymlinks(path string) string {
+	// First try direct resolution (works if path exists)
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+
+	// Get absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+
+	// Walk up the directory tree to find the first existing directory,
+	// then rebuild the path with resolved symlinks
+	parts := strings.Split(absPath, string(filepath.Separator))
+	for i := len(parts) - 1; i >= 0; i-- {
+		partialPath := strings.Join(parts[:i+1], string(filepath.Separator))
+		if partialPath == "" {
+			partialPath = string(filepath.Separator)
+		}
+
+		if resolvedPartial, err := filepath.EvalSymlinks(partialPath); err == nil {
+			// Found an existing directory - append the remaining parts
+			remaining := parts[i+1:]
+			if len(remaining) > 0 {
+				return filepath.Join(resolvedPartial, filepath.Join(remaining...))
+			}
+			return resolvedPartial
+		}
+	}
+
+	// Couldn't resolve any part; return original absolute path
+	return absPath
 }
 
 // ValidatePath is a convenience function that validates a path using default configuration.

@@ -33,16 +33,31 @@ const (
 	FallbackReasonChatFailed    = "fallback_failed"
 )
 
+// IntentSuggestion represents a parsed intent without execution.
+// Used when DCP is in suggest-only mode (default).
+type IntentSuggestion struct {
+	ToolName    string                 `json:"tool_name"`
+	Args        map[string]interface{} `json:"args"`
+	Confidence  float64                `json:"confidence"`
+	Description string                 `json:"description"`
+	IsFallback  bool                   `json:"is_fallback"`
+}
+
 // Coordinator is a thin tool-routing layer for the Deterministic Control Plane.
 // It routes queries to registered tools via BitNet intent parsing and handles
 // fallback logic. It does NOT manage state, phases, or orchestration - those
 // responsibilities belong to Pipeline and Loop.
+//
+// IMPORTANT: By default, DCP operates in suggest-only mode and does NOT execute tools.
+// Tool execution is handled exclusively by MCP. Set AllowExecution=true to enable
+// execution (requires explicit opt-in for security reasons).
 type Coordinator struct {
-	router  router.Router
-	store   *knowledge.Store
-	indexer *knowledge.Indexer
-	tools   map[string]tools.Tool
-	log     *logging.Logger
+	router         router.Router
+	store          *knowledge.Store
+	indexer        *knowledge.Indexer
+	tools          map[string]tools.Tool
+	log            *logging.Logger
+	AllowExecution bool // If false (default), only returns IntentSuggestion; MCP handles execution
 }
 
 // CoordinatorOption allows optional configuration of the Coordinator
@@ -52,6 +67,15 @@ type CoordinatorOption func(*Coordinator)
 func WithLogger(l *logging.Logger) CoordinatorOption {
 	return func(c *Coordinator) {
 		c.log = l.WithComponent("dcp")
+	}
+}
+
+// WithExecution enables tool execution mode (default is suggest-only).
+// WARNING: Only enable this for trusted, controlled environments.
+// In production, MCP should handle all tool execution.
+func WithExecution(enabled bool) CoordinatorOption {
+	return func(c *Coordinator) {
+		c.AllowExecution = enabled
 	}
 }
 
@@ -96,41 +120,86 @@ func (c *Coordinator) SyncFile(filePath string) error {
 	return c.indexer.IndexFile(filePath)
 }
 
-// ProcessQuery uses BitNet to parse intent and execute the correct surgical tool
+// ProcessQuery uses BitNet to parse intent and returns an IntentSuggestion.
+// By default (AllowExecution=false), this returns a suggestion for MCP to execute.
+// When AllowExecution=true, the tool is directly executed (use with caution).
 func (c *Coordinator) ProcessQuery(ctx context.Context, query string) (any, error) {
 	qHash := queryHash(query)
 
 	// 1. Local Intent Routing (BitNet)
 	intent, err := c.router.ParseIntent(ctx, query)
 	if err != nil {
+		// In suggest-only mode, return a fallback suggestion
+		if !c.AllowExecution {
+			return &IntentSuggestion{
+				ToolName:    router.GeneralChatTool,
+				Args:        map[string]interface{}{"query": query},
+				Confidence:  0.0,
+				Description: "Intent parsing failed; suggesting general chat",
+				IsFallback:  true,
+			}, nil
+		}
 		if result, ok := c.fallbackToChatWithReason(ctx, query, qHash, FallbackReasonRouterError, "", 0, err); ok {
 			return result, nil
 		}
 		return nil, fmt.Errorf("intent routing failed: %w", err)
 	}
 
-	// 2. Threshold check: if confidence is too low, fallback to general chat.
-	// Below the router's low-confidence threshold, the local model is likely guessing.
+	// 2. Threshold check: if confidence is too low, suggest general chat
 	if intent.Confidence < router.LowConfidenceThreshold {
+		if !c.AllowExecution {
+			return &IntentSuggestion{
+				ToolName:    router.GeneralChatTool,
+				Args:        map[string]interface{}{"query": query},
+				Confidence:  intent.Confidence,
+				Description: fmt.Sprintf("Low confidence (%.2f); suggesting general chat instead of %s", intent.Confidence, intent.ToolName),
+				IsFallback:  true,
+			}, nil
+		}
 		if result, ok := c.fallbackToChatWithReason(ctx, query, qHash, FallbackReasonLowConfidence, intent.ToolName, intent.Confidence, nil); ok {
 			return result, nil
 		}
-		// Fallback failed (general_chat not registered or errored), proceed with original tool execution
 	}
 
 	// 3. Sanitize model outputs
 	sanitizeArgs(intent.Args)
 
-	// 4. Fetch Tool
+	// 4. Fetch Tool (verify it exists)
 	tool, ok := c.tools[intent.ToolName]
 	if !ok {
+		if !c.AllowExecution {
+			return &IntentSuggestion{
+				ToolName:    router.GeneralChatTool,
+				Args:        map[string]interface{}{"query": query},
+				Confidence:  intent.Confidence,
+				Description: fmt.Sprintf("Tool %q not registered; suggesting general chat", intent.ToolName),
+				IsFallback:  true,
+			}, nil
+		}
 		if result, ok := c.fallbackToChatWithReason(ctx, query, qHash, FallbackReasonMissingTool, intent.ToolName, intent.Confidence, nil); ok {
 			return result, nil
 		}
 		return nil, fmt.Errorf("tool %q selected by router but not registered in DCP", intent.ToolName)
 	}
 
-	// 5. Deterministic Execution
+	// 5. Return suggestion or execute based on mode
+	if !c.AllowExecution {
+		// SUGGEST-ONLY MODE (default): Return intent for MCP to execute
+		c.log.Info("Suggesting tool (no execution)",
+			"tool", intent.ToolName,
+			"confidence", intent.Confidence,
+			"query_hash", qHash,
+		)
+		return &IntentSuggestion{
+			ToolName:    intent.ToolName,
+			Args:        intent.Args,
+			Confidence:  intent.Confidence,
+			Description: tool.Description(),
+			IsFallback:  false,
+		}, nil
+	}
+
+	// EXECUTION MODE: Execute directly (requires explicit opt-in)
 	c.log.Info("Executing tool",
 		"tool", intent.ToolName,
 		"confidence", intent.Confidence,

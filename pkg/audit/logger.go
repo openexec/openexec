@@ -75,6 +75,15 @@ func NewLogger(dbPath string) (*AuditLogger, error) {
 	return logger, nil
 }
 
+// NewLoggerWithDB creates a new AuditLogger using an existing database connection.
+func NewLoggerWithDB(db *sql.DB) (*AuditLogger, error) {
+	logger := &AuditLogger{db: db}
+	if err := logger.initSchema(); err != nil {
+		return nil, err
+	}
+	return logger, nil
+}
+
 // GetDB returns the underlying database handle.
 func (l *AuditLogger) GetDB() *sql.DB {
 	l.mu.RLock()
@@ -117,9 +126,9 @@ func (l *AuditLogger) Log(ctx context.Context, entry *Entry) error {
 	query := `
 		INSERT INTO audit_entries (
 			id, timestamp, event_type, severity, session_id, message_id, tool_call_id,
-			actor_id, actor_type, project_path, provider, model, tokens_input, tokens_output,
+			actor_id, actor_type, project_path, provider, model, tokens_input, tokens_output, tokens_cached,
 			cost_usd, duration_ms, success, error_message, metadata, iteration, ip_address, user_agent, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := l.db.ExecContext(ctx, query,
@@ -137,6 +146,7 @@ func (l *AuditLogger) Log(ctx context.Context, entry *Entry) error {
 		nullString(entry.Model),
 		nullInt64(entry.TokensInput),
 		nullInt64(entry.TokensOutput),
+		nullInt64(entry.TokensCached),
 		nullFloat64(entry.CostUSD),
 		nullInt64(entry.DurationMs),
 		nullBool(entry.Success),

@@ -475,6 +475,7 @@ func TestValidEventTypes_Coverage(t *testing.T) {
 		EventContextInjected, EventContextSummarized,
 		EventSecurityPathViolation, EventSecurityRateLimit, EventSecurityAuthFailure,
 		EventSystemStartup, EventSystemShutdown, EventSystemError,
+		EventRunCreated, EventRunStep,
 	}
 
 	for _, event := range allEvents {

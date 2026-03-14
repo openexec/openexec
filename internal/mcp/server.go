@@ -16,6 +16,8 @@ import (
     "time"
     "crypto/sha256"
     "encoding/hex"
+
+    "github.com/openexec/openexec/pkg/telemetry"
 )
 
 const protocolVersion = "2024-11-05"
@@ -42,25 +44,94 @@ type RPCError struct {
 	Message string `json:"message"`
 }
 
-// Server is a minimal MCP server that exposes the openexec_signal tool.
-type Server struct {
-	in              io.Reader
-	out             io.Writer
-	pythonValidator *PythonValidator
-	forkManager     *SessionForkManager
+// ServerConfig holds configuration for the MCP server.
+type ServerConfig struct {
+	// WorkDir is the workspace directory for path scoping.
+	// Falls back to WORKSPACE_ROOT env var, then current working directory.
+	WorkDir string
+
+	// Mode overrides OPENEXEC_MODE env var for permission tier.
+	Mode string
 }
 
-// NewServer creates an MCP server reading from in, writing to out.
+// Server is a minimal MCP server that exposes the openexec_signal tool.
+type Server struct {
+	in                  io.Reader
+	out                 io.Writer
+	pythonValidator     *PythonValidator
+	forkManager         *SessionForkManager
+	broker              *ToolBroker
+	workspaceRoots      []string
+	ctx                 context.Context     // Tracing context
+	runID               string              // Current run ID for tracing
+	idempotencyChecker  IdempotencyChecker  // Resume support
+	resumeMode          bool                // True when resuming a prior run
+}
+
+// SetContext sets the tracing context and run ID for the server.
+func (s *Server) SetContext(ctx context.Context, runID string) {
+	s.ctx = ctx
+	s.runID = runID
+	s.broker.SetRunID(runID)
+}
+
+// SetIdempotencyChecker sets the checker for resume support.
+func (s *Server) SetIdempotencyChecker(checker IdempotencyChecker) {
+	s.idempotencyChecker = checker
+}
+
+// SetResumeMode enables or disables resume mode.
+// When enabled, tool calls are checked against prior applications.
+func (s *Server) SetResumeMode(enabled bool) {
+	s.resumeMode = enabled
+}
+
+// ErrNoWorkspaceRoot is returned when no valid workspace root can be determined.
+var ErrNoWorkspaceRoot = fmt.Errorf("no valid workspace root: set WORKSPACE_ROOT or provide WorkDir in config")
+
+// NewServer creates a new MCP server reading from in and writing to out.
 func NewServer(in io.Reader, out io.Writer) *Server {
+	return NewServerWithConfig(in, out, ServerConfig{})
+}
+
+// NewServerWithConfig creates a new MCP server with explicit configuration.
+// Returns a server instance. Use ValidateConfig() to check workspace roots before Serve().
+func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) *Server {
+	// Determine workspace roots with fallback chain
+	var roots []string
+	if envRoot := os.Getenv("WORKSPACE_ROOT"); envRoot != "" {
+		roots = []string{envRoot}
+	} else if cfg.WorkDir != "" {
+		roots = []string{cfg.WorkDir}
+	} else if cwd, err := os.Getwd(); err == nil && cwd != "" {
+		roots = []string{cwd}
+	}
+
 	return &Server{
-		in:  in,
-		out: out,
+		in:             in,
+		out:            out,
+		broker:         NewToolBroker(cfg.Mode),
+		workspaceRoots: roots,
 		pythonValidator: NewPythonValidatorWithConfig(&PythonValidatorConfig{
 			PythonPath:     "python3",
 			Timeout:        5 * time.Second,
 			SkipIfNoPython: true, // Don't fail writes if Python is unavailable
 		}),
 	}
+}
+
+// ValidateConfig checks that the server has valid workspace configuration.
+// Call this before Serve() to ensure path scoping can be enforced.
+func (s *Server) ValidateConfig() error {
+	if len(s.workspaceRoots) == 0 || s.workspaceRoots[0] == "" {
+		return ErrNoWorkspaceRoot
+	}
+	return nil
+}
+
+// WorkspaceRoots returns the configured workspace roots for path scoping.
+func (s *Server) WorkspaceRoots() []string {
+	return s.workspaceRoots
 }
 
 // WithForkManager sets the session fork manager for the server.
@@ -125,12 +196,20 @@ func (s *Server) handleInitialize(req Request) {
 }
 
 func (s *Server) handleToolsList(req Request) {
+    // Core tools available in all modes
     tools := []interface{}{
         axonSignalToolDef(),
         ReadFileToolDef(),
         GitApplyPatchToolDef(),
-        // Keep run_shell_command schema for compatibility; execution remains gated
-        RunShellCommandToolDef(),
+    }
+
+    // Dangerous tools only advertised in danger-full-access mode
+    // This prevents clients from seeing tools they can't use
+    if s.broker.Mode() == ModeFullAuto {
+        tools = append(tools,
+            WriteFileToolDef(),
+            RunShellCommandToolDef(),
+        )
     }
 
     // Add fork tools if fork manager is configured
@@ -193,57 +272,126 @@ func (s *Server) handleToolsCall(req Request) {
 		return
 	}
 
+	// Security: Check permissions via Tool Broker (V1 Alignment)
+	if allowed, reason := s.broker.Authorize(params.Name, string(params.Arguments)); !allowed {
+		s.writeToolError(req.ID, reason)
+		return
+	}
+
+	// Parse arguments for tracing and idempotency
+	var argsMap map[string]interface{}
+	_ = json.Unmarshal(params.Arguments, &argsMap)
+
+	// Resume support: Check if this tool call was already applied
+    var idempotencyKey string
+    // Determine idempotency eligibility (tool-specific)
+    eligible := false
+    switch params.Name {
+    case "write_file", "git_apply_patch":
+        eligible = true
+    case "run_shell_command":
+        // Best-effort: consider idempotent only for safe, read-only commands
+        // Extract command/args
+        var shellArgs struct{ Command string `json:"command"` }
+        _ = json.Unmarshal(params.Arguments, &shellArgs)
+        fields := strings.Fields(shellArgs.Command)
+        if len(fields) > 0 {
+            cmd := fields[0]
+            args := []string{}
+            if len(fields) > 1 { args = fields[1:] }
+            if IsShellIdempotent(cmd, args) {
+                eligible = true
+            }
+        }
+    }
+
+    if s.resumeMode && s.idempotencyChecker != nil && eligible {
+        // Per-run scoped key to avoid global deduplication
+        idempotencyKey = GenerateIdempotencyKey(s.runID, params.Name, argsMap)
+        wasApplied, err := s.idempotencyChecker.WasApplied(idempotencyKey)
+        if err == nil && wasApplied {
+			// Skip execution and return cached result indicator
+			s.writeResult(req.ID, map[string]interface{}{
+				"content": []interface{}{
+					map[string]interface{}{
+						"type": "text",
+						"text": fmt.Sprintf("[Resume] Tool call '%s' was already applied (key: %s...); skipping re-execution", params.Name, idempotencyKey[:12]),
+					},
+				},
+				"idempotency": map[string]interface{}{
+					"skipped": true,
+					"key":     idempotencyKey,
+					"run_id":  s.runID,
+				},
+			})
+			return
+		}
+	}
+
+	// Start OTel span for tool invocation
+	ctx := s.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_, span := telemetry.StartToolSpan(ctx, s.runID, params.Name, argsMap)
+	defer span.End()
+
+	// Execute the tool
 	switch params.Name {
 	case "openexec_signal":
 		s.handleOpenExecSignal(req, params)
+		telemetry.RecordToolSuccess(span, "")
 	case "read_file":
 		s.handleReadFile(req, params)
+		telemetry.RecordToolSuccess(span, "")
 	case "write_file":
 		s.handleWriteFile(req, params)
+		telemetry.RecordToolSuccess(span, "")
+		s.markToolApplied(idempotencyKey, params.Name)
 	case "run_shell_command":
-		// Disable shell execution by default for safety; require explicit danger mode.
-		if os.Getenv("OPENEXEC_MODE") != "danger-full-access" {
-			s.writeToolError(req.ID, "run_shell_command is disabled unless OPENEXEC_MODE=danger-full-access")
-			return
-		}
-
-		// Security: Implement a command allowlist even in danger mode.
-		var rscReq struct {
-			Command string `json:"command"`
-		}
-		if err := json.Unmarshal(params.Arguments, &rscReq); err == nil {
-			allowedCommands := map[string]bool{
-				"go": true, "npm": true, "ls": true, "pwd": true, "git": true,
-				"cat": true, "grep": true, "find": true, "mkdir": true, "rm": true,
-				"touch": true, "cp": true, "mv": true, "chmod": true, "chown": true,
-				"pytest": true, "ruff": true, "mypy": true, "black": true, "isort": true,
-				"tsc": true, "vitest": true, "eslint": true, "prettier": true, "python": true, "python3": true,
-				"uv": true, "pip": true, "poetry": true, "make": true, "just": true,
-			}
-			fields := strings.Fields(rscReq.Command)
-			if len(fields) == 0 {
-				s.writeToolError(req.ID, "empty command")
-				return
-			}
-			baseCmd := filepath.Base(fields[0])
-			if !allowedCommands[baseCmd] {
-				s.writeToolError(req.ID, fmt.Sprintf("command '%s' is not in the allowlist", baseCmd))
-				return
-			}
-		}
-
+		// Shell commands are NOT marked as applied - they are non-idempotent by design.
+		// Re-running shell commands on resume is safer than skipping them, as partial
+		// side effects from a previous run may have left state inconsistent.
 		s.handleRunShellCommand(req, params)
+		telemetry.RecordToolSuccess(span, "")
+		// NOTE: Intentionally NOT calling s.markToolApplied() for shell commands
 	case "git_apply_patch":
 		s.handleGitApplyPatch(req, params)
+		telemetry.RecordToolSuccess(span, "")
+		s.markToolApplied(idempotencyKey, params.Name)
 	case "fork_session":
 		s.handleForkSession(req, params)
+		telemetry.RecordToolSuccess(span, "")
 	case "get_fork_info":
 		s.handleGetForkInfo(req, params)
+		telemetry.RecordToolSuccess(span, "")
 	case "list_session_forks":
 		s.handleListSessionForks(req, params)
+		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))
+		telemetry.RecordToolError(span, fmt.Errorf("unknown tool: %s", params.Name))
 	}
+}
+
+// isIdempotentTool returns true if the tool has side effects that can be safely deduplicated.
+// Shell commands are explicitly NOT idempotent - they should always re-run on resume
+// to avoid issues with partial side effects from previous runs.
+func isIdempotentTool(name string) bool {
+    switch name {
+    case "write_file", "git_apply_patch":
+        return true
+    default:
+        return false
+    }
+}
+
+// markToolApplied records that a tool was successfully applied.
+func (s *Server) markToolApplied(key, toolName string) {
+	if key == "" || s.idempotencyChecker == nil {
+		return
+	}
+	_ = s.idempotencyChecker.MarkApplied(key, toolName, "")
 }
 
 func (s *Server) handleOpenExecSignal(req Request, params toolsCallParams) {
@@ -281,10 +429,11 @@ func (s *Server) handleReadFile(req Request, params toolsCallParams) {
 		return
 	}
 
-    // Validate path security against workspace root
-    allowed := DefaultPathValidatorConfig().AllowedRoots
-    if root := os.Getenv("WORKSPACE_ROOT"); root != "" {
-        allowed = []string{root}
+    // Validate path security against workspace root (centralized in server config)
+    allowed := s.workspaceRoots
+    if len(allowed) == 0 {
+        s.writeToolError(req.ID, "no workspace root configured; cannot validate path")
+        return
     }
     validPath, err := ValidatePathForRead(rfReq.Path, allowed)
 	if err != nil {
@@ -358,14 +507,15 @@ func (s *Server) handleWriteFile(req Request, params toolsCallParams) {
 		return
 	}
 
-    // Enforce workspace-scoped writes
+    // Enforce workspace-scoped writes (centralized in server config)
     if os.Getenv("OPENEXEC_MODE") == "read-only" {
         s.writeToolError(req.ID, "write is not allowed in read-only mode")
         return
     }
-    allowed := DefaultPathValidatorConfig().AllowedRoots
-    if root := os.Getenv("WORKSPACE_ROOT"); root != "" {
-        allowed = []string{root}
+    allowed := s.workspaceRoots
+    if len(allowed) == 0 {
+        s.writeToolError(req.ID, "no workspace root configured; cannot validate path")
+        return
     }
     validPath, err := ValidatePathForWrite(wfReq.Path, allowed)
 	if err != nil {
@@ -695,8 +845,10 @@ func (s *Server) handleGitApplyPatch(req Request, params toolsCallParams) {
     stderrStr := stderr.String()
 
     // Persist patch artifact under .openexec/artifacts/patches
-    workspace := os.Getenv("WORKSPACE_ROOT")
-    if workspace == "" { workspace = workDir }
+    workspace := workDir
+    if len(s.workspaceRoots) > 0 && s.workspaceRoots[0] != "" {
+        workspace = s.workspaceRoots[0]
+    }
     artHash := ""
     artPath := ""
     if workspace != "" {

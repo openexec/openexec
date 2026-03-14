@@ -27,7 +27,9 @@ import (
 	"github.com/openexec/openexec/pkg/api"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/session"
+	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/manager"
+	"github.com/openexec/openexec/pkg/telemetry"
 	"github.com/openexec/openexec/pkg/version"
 	"strings"
 )
@@ -41,9 +43,10 @@ type Server struct {
 	Checker     *health.Checker
 	ProjectsDir string
 	Mux         *http.ServeMux
-	HttpServer  *http.Server
-	mu          sync.RWMutex
-	axonBridge  *api.Server
+    HttpServer  *http.Server
+    mu          sync.RWMutex
+    axonBridge  *api.Server
+    StateStore  *state.Store
 	// Observability
 	runnerCommand  string
 	runnerArgs     []string
@@ -55,7 +58,7 @@ type Server struct {
 type Config struct {
     Port          int
     DataDir       string
-    AuditDB       string
+    UnifiedDB     string
     ModelsPath    string
     ProjectsDir   string
     SkipPreflight bool // For testing: skip preflight checks that require real runner
@@ -65,16 +68,19 @@ type Config struct {
 // New creates a new unified OpenExec server
 func New(cfg Config) (*Server, error) {
 	// 1. Initialize Storage
-	auditLogger, err := audit.NewLogger(cfg.AuditDB)
+	dbPath := cfg.UnifiedDB
+	if dbPath == "" {
+		dbPath = filepath.Join(cfg.DataDir, "openexec.db")
+	}
+	stateStore, err := state.NewStore(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init audit logger: %w", err)
+		return nil, fmt.Errorf("failed to init unified state store: %w", err)
 	}
 
-	db := auditLogger.GetDB()
-	sessionRepo, err := session.NewSQLiteRepository(db)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init session repo: %w", err)
-	}
+	// Legacy adapters for backward compatibility during transition
+	db := stateStore.GetDB()
+	auditLogger, _ := audit.NewLoggerWithDB(db)
+	sessionRepo, _ := session.NewSQLiteRepository(db)
 
 	// 2. Initialize Core Engine
 	// Resolve to absolute path — ProjectsDir may be "." from config.
@@ -142,7 +148,7 @@ func New(cfg Config) (*Server, error) {
 		}(),
         CommandName: loopCmd,
         CommandArgs: loopArgs,
-        AuditLogger: auditLogger,
+        StateStore:  stateStore,
     })
     // 3. Initialize Deterministic Control Plane (DCP) — optional
     // Controlled via Config.EnableDCP or OPENEXEC_ENABLE_DCP env var.
@@ -156,7 +162,7 @@ func New(cfg Config) (*Server, error) {
     var coordinator *dcp.Coordinator
     if enableDCP {
         // Error ignored: knowledge store is optional; DCP tools handle nil/empty store
-        kStore, _ := knowledge.NewStore(".")
+        kStore, _ := knowledge.NewStoreWithDB(db)
         bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
         // In enabled mode, do not skip availability by default
         bRouter.SetSkipAvailabilityCheck(false)
@@ -174,23 +180,24 @@ func New(cfg Config) (*Server, error) {
     // 4. Initialize API Layer
     mux := http.NewServeMux()
     s := &Server{
-		Mgr:         mgr,
-		SessionRepo: sessionRepo,
-		AuditLogger: auditLogger,
+        Mgr:         mgr,
+        SessionRepo: sessionRepo,
+        AuditLogger: auditLogger,
         Coordinator: coordinator,
-		Checker:     health.NewChecker(),
-		ProjectsDir: cfg.ProjectsDir,
-		Mux:         mux,
-		axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
-		HttpServer: &http.Server{
-			Addr:    fmt.Sprintf(":%d", cfg.Port),
-			Handler: mux,
-		},
-		runnerCommand: runnerCmd,
-		runnerArgs:    runnerArgs,
-		runnerModel:   modelUsed,
-		skipPreflight: cfg.SkipPreflight,
-	}
+        Checker:     health.NewChecker(),
+        ProjectsDir: cfg.ProjectsDir,
+        Mux:         mux,
+        axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
+        HttpServer: &http.Server{
+            Addr:    fmt.Sprintf(":%d", cfg.Port),
+            Handler: mux,
+        },
+        runnerCommand: runnerCmd,
+        runnerArgs:    runnerArgs,
+        runnerModel:   modelUsed,
+        skipPreflight: cfg.SkipPreflight,
+        StateStore:    stateStore,
+    }
 
     s.registerRoutes()
 
@@ -199,7 +206,45 @@ func New(cfg Config) (*Server, error) {
         go s.Coordinator.SyncKnowledge(".")
     }
 
+    // Log active feature flags for operators
+    logFeatureFlags()
+
 	return s, nil
+}
+
+// logFeatureFlags logs the state of all feature flags on startup.
+func logFeatureFlags() {
+    flags := []struct {
+        name    string
+        envVar  string
+        enabled bool
+    }{
+        {"DCP", "OPENEXEC_ENABLE_DCP", isEnvTrue("OPENEXEC_ENABLE_DCP")},
+        {"UnifiedReads", "OPENEXEC_USE_UNIFIED_READS", isEnvTrue("OPENEXEC_USE_UNIFIED_READS")},
+        {"LegacyFWU", "OPENEXEC_ENABLE_LEGACY_FWU", isEnvTrue("OPENEXEC_ENABLE_LEGACY_FWU")},
+    }
+
+    var enabled, disabled []string
+    for _, f := range flags {
+        if f.enabled {
+            enabled = append(enabled, f.name)
+        } else {
+            disabled = append(disabled, f.name)
+        }
+    }
+
+    if len(enabled) > 0 {
+        log.Printf("[Server] Feature flags enabled: %s", strings.Join(enabled, ", "))
+    }
+    if len(disabled) > 0 {
+        log.Printf("[Server] Feature flags disabled: %s", strings.Join(disabled, ", "))
+    }
+}
+
+// isEnvTrue returns true if the environment variable is set to a truthy value.
+func isEnvTrue(key string) bool {
+    v := strings.ToLower(os.Getenv(key))
+    return v == "1" || v == "true" || v == "yes"
 }
 
 func (s *Server) registerRoutes() {
@@ -435,6 +480,14 @@ func (s *Server) registerPreflightChecks() {
 
 // Start runs the server and blocks
 func (s *Server) Start(ctx context.Context) error {
+	// Initialize OpenTelemetry
+	shutdown, err := telemetry.InitOTel(ctx, "openexec-daemon", os.Stdout)
+	if err != nil {
+		log.Printf("[Server] ⚠ Warning: failed to initialize OTel: %v", err)
+	} else {
+		defer func() { _ = shutdown(context.Background()) }()
+	}
+
 	// Register and run preflight checks before starting (unless skipped for testing)
 	if !s.skipPreflight {
 		s.registerPreflightChecks()
@@ -453,10 +506,15 @@ func (s *Server) Start(ctx context.Context) error {
 		errCh <- s.HttpServer.ListenAndServe()
 	}()
 
-	select {
-	case err := <-errCh:
-		return err
-	case <-ctx.Done():
-		return s.HttpServer.Shutdown(context.Background())
-	}
+    select {
+    case err := <-errCh:
+        // Server terminated (error or closed). Flush state store and return.
+        if s.StateStore != nil { _ = s.StateStore.Close() }
+        return err
+    case <-ctx.Done():
+        // Graceful shutdown path
+        _ = s.HttpServer.Shutdown(context.Background())
+        if s.StateStore != nil { _ = s.StateStore.Close() }
+        return nil
+    }
 }

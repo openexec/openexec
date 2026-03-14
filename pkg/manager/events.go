@@ -2,11 +2,17 @@ package manager
 
 import (
     "context"
+    "encoding/json"
+    "fmt"
     "log"
     "time"
 
+    "github.com/google/uuid"
     "github.com/openexec/openexec/internal/loop"
+    "github.com/openexec/openexec/internal/mcp"
+    "github.com/openexec/openexec/internal/prompt"
     "github.com/openexec/openexec/pkg/audit"
+    "github.com/openexec/openexec/pkg/db/state"
 )
 
 const subscriberBufSize = 64
@@ -73,6 +79,10 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     "artifact_hashes": []string{},
                     "artifacts":       event.Artifacts,
                     "timestamp":       time.Now().UTC().Format(time.RFC3339Nano),
+                    // Version metadata for reproducibility and debugging
+                    "prompt_version":            prompt.PromptVersion,
+                    "tool_registry_version":     mcp.ToolRegistryVersion,
+                    "run_state_machine_version": prompt.RunStateMachineVersion,
                 }
                 // Back-compat: if patch artifact present, populate artifact_hashes
                 if event.Artifacts != nil {
@@ -91,9 +101,14 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
         if len(event.Artifacts) > 0 {
             writeCheckpointJSONL(m.cfg.WorkDir, fwuID, event)
             // Also write to SQLite for resume/replay
-            if m.cfg.AuditLogger != nil {
-                writeCheckpointSQLite(m.cfg.AuditLogger.GetDB(), fwuID, event)
+            if m.state != nil {
+                writeCheckpointSQLite(m.state.GetDB(), fwuID, event)
             }
+        }
+
+        // Parallel write to unified DB (non-blocking)
+        if m.state != nil {
+            m.writeRunStepAsync(fwuID, event)
         }
     }
 
@@ -207,4 +222,79 @@ type NotFoundError struct {
 
 func (e *NotFoundError) Error() string {
 	return "pipeline " + e.FWUID + " not found"
+}
+
+// writeRunStepAsync writes run step and artifact data to the unified DB asynchronously.
+// This is a parallel write that doesn't block event processing.
+func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
+    if m.state == nil {
+        return
+    }
+
+    // Use WriteAsync for non-blocking parallel writes
+    m.state.WriteAsync(context.Background(), func(ctx context.Context) error {
+        // Write run step for phase events
+        if event.Type == loop.EventPhaseStart || event.Type == loop.EventPhaseComplete ||
+           event.Type == loop.EventIterationStart || event.Type == loop.EventComplete {
+            stepID := fmt.Sprintf("%s-%d", runID, event.StepID)
+
+            // Build metadata JSON
+            md := map[string]interface{}{
+                "type":         event.Type,
+                "text":         event.Text,
+                "prompt_hash":  event.PromptHash,
+                "review_cycle": event.ReviewCycle,
+            }
+            mdJSON, _ := json.Marshal(md)
+
+            status := "running"
+            if event.Type == loop.EventPhaseComplete || event.Type == loop.EventComplete {
+                status = "completed"
+            }
+
+            err := m.state.AddRunStepFull(ctx,
+                stepID, runID, event.TraceID,
+                event.Phase, event.Agent, event.Iteration,
+                status, event.PromptHash, string(mdJSON))
+            if err != nil {
+                log.Printf("[Manager] Parallel DB write (run_step) failed: %v", err)
+            }
+        }
+
+        // Write artifacts if present
+        if len(event.Artifacts) > 0 {
+            for hash, path := range event.Artifacts {
+                if hash == "" || path == "" {
+                    continue
+                }
+                // Determine artifact type from path or default
+                artifactType := "patch"
+                if len(path) > 0 {
+                    if path[len(path)-4:] == ".log" {
+                        artifactType = "test_log"
+                    }
+                }
+                // Record artifact (size 0 as placeholder - actual size computed on write)
+                err := m.state.RecordArtifact(ctx, hash, artifactType, path, 0)
+                if err != nil {
+                    log.Printf("[Manager] Parallel DB write (artifact) failed: %v", err)
+                }
+            }
+
+            // Write checkpoint for resume support
+            cp := state.CheckpointData{
+                ID:        uuid.New().String(),
+                RunID:     runID,
+                Phase:     event.Phase,
+                Iteration: event.Iteration,
+                Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+                Artifacts: event.Artifacts,
+            }
+            if err := m.state.RecordCheckpoint(ctx, cp); err != nil {
+                log.Printf("[Manager] Parallel DB write (checkpoint) failed: %v", err)
+            }
+        }
+
+        return nil
+    })
 }

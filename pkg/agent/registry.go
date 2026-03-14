@@ -9,6 +9,10 @@ import (
 	"os"
 	"sort"
 	"sync"
+
+	"github.com/openexec/openexec/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ProviderName represents a provider identifier.
@@ -341,16 +345,6 @@ func (r *ProviderRegistry) Clear() {
 	r.modelIndex = make(map[string]ProviderName)
 }
 
-// Complete sends a completion request to the appropriate provider for the model.
-func (r *ProviderRegistry) Complete(ctx context.Context, req Request) (*Response, error) {
-	provider, err := r.GetForModel(req.Model)
-	if err != nil {
-		return nil, err
-	}
-
-	return provider.Complete(ctx, req)
-}
-
 // Stream sends a streaming request to the appropriate provider for the model.
 func (r *ProviderRegistry) Stream(ctx context.Context, req Request) (<-chan StreamEvent, error) {
 	provider, err := r.GetForModel(req.Model)
@@ -544,6 +538,35 @@ func (s *ModelSelector) SelectNonDeprecated() []*ModelInfo {
 	}
 
 	return active
+}
+
+// Complete selects the appropriate provider for the request and calls its Complete method.
+// It includes OTel tracing for observability.
+func (r *ProviderRegistry) Complete(ctx context.Context, req Request) (*Response, error) {
+	ctx, span := telemetry.StartSpan(ctx, "Agent.Complete", trace.WithAttributes(
+		attribute.String("gen_ai.request.model", req.Model),
+		attribute.Int("gen_ai.request.max_tokens", req.MaxTokens),
+	))
+	defer span.End()
+
+	provider, err := r.GetForModel(req.Model)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	resp, err := provider.Complete(ctx, req)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	span.SetAttributes(
+		attribute.Int("gen_ai.response.input_tokens", resp.Usage.PromptTokens),
+		attribute.Int("gen_ai.response.output_tokens", resp.Usage.CompletionTokens),
+	)
+
+	return resp, nil
 }
 
 // DefaultModelSelector uses the default registry.

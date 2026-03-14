@@ -1,8 +1,11 @@
 package cli
 
 import (
+    "encoding/json"
     "fmt"
     "io"
+    "net/http"
+    "os"
     "strings"
     "time"
 
@@ -69,11 +72,11 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 			}
 		}
 
-		return runChatREPL(projectName)
+		return runChatREPL(cmd, projectName)
 	},
 }
 
-func runChatREPL(projectName string) error {
+func runChatREPL(cmd *cobra.Command, projectName string) error {
 	l, err := readline.NewEx(&readline.Config{
 		Prompt:          color.CyanString("openexec(%s) > ", projectName),
 		HistoryFile:     "/tmp/openexec-chat.tmp",
@@ -88,6 +91,10 @@ func runChatREPL(projectName string) error {
 	fmt.Println(color.HiBlueString("Welcome to OpenExec Conversational Mode"))
 	fmt.Println("Type your intent or 'exit' to quit.")
 	fmt.Println()
+
+    // V5: Create a conversational session on start
+    sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
+    fmt.Printf("   ℹ️ Session: %s\n\n", sessionID)
 
     for {
         line, err := l.Readline()
@@ -109,10 +116,31 @@ func runChatREPL(projectName string) error {
 			break
 		}
 
-        // Conversational DCP has been removed. Guide the user.
-        fmt.Println()
+        // Conversational V5: Create a run for the message
+        runReq := map[string]any{
+            "session_id":     sessionID,
+            "quickfix_title": line,
+            "mode":           os.Getenv("OPENEXEC_MODE"),
+        }
+        body, _ := json.Marshal(runReq)
+        resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs", startPort), "application/json", strings.NewReader(string(body)))
+        if err != nil {
+            fmt.Printf("Error: %v\n", err)
+            continue
+        }
+        
+        var runResp struct {
+            RunID string `json:"run_id"`
+        }
+        _ = json.NewDecoder(resp.Body).Decode(&runResp)
+        resp.Body.Close()
+
+        // Start the run
+        http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", startPort, runResp.RunID), "application/json", nil)
+
+        // Monitor the run
         fmt.Print(color.GreenString("Agent: "))
-        fmt.Println("Conversational mode has been removed. Use 'openexec run' to execute tasks or the web UI to track runs.")
+        _ = waitForLoop(cmd, runResp.RunID, "[Chat]", 5*time.Minute, false)
         fmt.Println()
     }
 

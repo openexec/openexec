@@ -11,6 +11,9 @@ import (
 
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Config controls pipeline behavior.
@@ -19,9 +22,9 @@ type Config struct {
 	WorkDir              string
 	TractStore           string
 	AgentsFS             fs.FS
-	ExecutorModel        string   // model for runner resolution
-	RunnerCommand        string   // CLI override
-	RunnerArgs           []string // CLI args override
+	ExecutorModel        string                // model for runner resolution
+	RunnerCommand        string                // CLI override
+	RunnerArgs           []string              // CLI args override
 	Pipeline             *PipelineDef          // if set, overrides Phases/Order
 	Phases               map[Phase]PhaseConfig // defaults to DefaultPhaseConfigs()
 	Order                []Phase               // defaults to DefaultPhaseOrder()
@@ -44,11 +47,11 @@ type Config struct {
 	EvidenceDir      string
 	EvidenceBucket   string
 	EvidenceRegion   string
-    EvidenceEndpoint string
-    EvidencePrefix   string
+	EvidenceEndpoint string
+	EvidencePrefix   string
 
-    // ExecMode: read-only | workspace-write | danger-full-access
-    ExecMode string
+	// ExecMode: read-only | workspace-write | danger-full-access
+	ExecMode string
 }
 
 // Pipeline drives an FWU through TD → IM → RV → RF → FL phases.
@@ -70,55 +73,55 @@ type Pipeline struct {
 // New creates a Pipeline and returns it along with a read-only event channel.
 // The channel is closed when Run returns.
 func New(cfg Config) (*Pipeline, <-chan loop.Event) {
-    factory := NewLoopFactory(LoopFactoryConfig{
-        FWUID:                cfg.FWUID,
-        WorkDir:              cfg.WorkDir,
-        TractStore:           cfg.TractStore,
-        AgentsFS:             cfg.AgentsFS,
-        DefaultMaxIterations: cfg.DefaultMaxIterations,
-        MaxRetries:           cfg.MaxRetries,
-        MaxReviewCycles:      cfg.MaxReviewCycles,
-        RetryBackoff:         cfg.RetryBackoff,
-        ThrashThreshold:      cfg.ThrashThreshold,
-        ExecutorModel:        cfg.ExecutorModel,
-        RunnerCommand:        cfg.RunnerCommand,
-        RunnerArgs:           cfg.RunnerArgs,
-        CommandName:          cfg.CommandName,
-        CommandArgs:          cfg.CommandArgs,
-        LogDir:               cfg.LogDir,
-        EvidenceDir:          cfg.EvidenceDir,
-        EvidenceBucket:       cfg.EvidenceBucket,
-        EvidenceRegion:       cfg.EvidenceRegion,
-        EvidenceEndpoint:     cfg.EvidenceEndpoint,
-        EvidencePrefix:       cfg.EvidencePrefix,
-        ExecMode:             cfg.ExecMode,
-    })
-    return NewWithFactory(cfg, factory)
+	factory := NewLoopFactory(LoopFactoryConfig{
+		FWUID:                cfg.FWUID,
+		WorkDir:              cfg.WorkDir,
+		TractStore:           cfg.TractStore,
+		AgentsFS:             cfg.AgentsFS,
+		DefaultMaxIterations: cfg.DefaultMaxIterations,
+		MaxRetries:           cfg.MaxRetries,
+		MaxReviewCycles:      cfg.MaxReviewCycles,
+		RetryBackoff:         cfg.RetryBackoff,
+		ThrashThreshold:      cfg.ThrashThreshold,
+		ExecutorModel:        cfg.ExecutorModel,
+		RunnerCommand:        cfg.RunnerCommand,
+		RunnerArgs:           cfg.RunnerArgs,
+		CommandName:          cfg.CommandName,
+		CommandArgs:          cfg.CommandArgs,
+		LogDir:               cfg.LogDir,
+		EvidenceDir:          cfg.EvidenceDir,
+		EvidenceBucket:       cfg.EvidenceBucket,
+		EvidenceRegion:       cfg.EvidenceRegion,
+		EvidenceEndpoint:     cfg.EvidenceEndpoint,
+		EvidencePrefix:       cfg.EvidencePrefix,
+		ExecMode:             cfg.ExecMode,
+	})
+	return NewWithFactory(cfg, factory)
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
 func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Event) {
-    // Apply defaults. Pipeline takes precedence over Phases/Order.
-    if cfg.Pipeline != nil {
-        cfg.Order = cfg.Pipeline.PhaseOrder()
-        cfg.Phases = cfg.Pipeline.PhaseConfigs()
-    }
-    if cfg.Order == nil {
-        cfg.Order = DefaultPhaseOrder()
-    }
-    if cfg.Phases == nil {
-        cfg.Phases = DefaultPhaseConfigs()
-    }
-    // Collapse Study tasks to TD -> FL only
-    if cfg.IsStudy {
-        cfg.Order = []Phase{PhaseTD, PhaseFL}
-        // Ensure phases exist for TD and FL
-        ph := DefaultPhaseConfigs()
-        cfg.Phases = map[Phase]PhaseConfig{
-            PhaseTD: ph[PhaseTD],
-            PhaseFL: ph[PhaseFL],
-        }
-    }
+	// Apply defaults. Pipeline takes precedence over Phases/Order.
+	if cfg.Pipeline != nil {
+		cfg.Order = cfg.Pipeline.PhaseOrder()
+		cfg.Phases = cfg.Pipeline.PhaseConfigs()
+	}
+	if cfg.Order == nil {
+		cfg.Order = DefaultPhaseOrder()
+	}
+	if cfg.Phases == nil {
+		cfg.Phases = DefaultPhaseConfigs()
+	}
+	// Collapse Study tasks to TD -> FL only
+	if cfg.IsStudy {
+		cfg.Order = []Phase{PhaseTD, PhaseFL}
+		// Ensure phases exist for TD and FL
+		ph := DefaultPhaseConfigs()
+		cfg.Phases = map[Phase]PhaseConfig{
+			PhaseTD: ph[PhaseTD],
+			PhaseFL: ph[PhaseFL],
+		}
+	}
 	if cfg.MaxReviewCycles == 0 {
 		cfg.MaxReviewCycles = config.DefaultMaxReviewCycles
 	}
@@ -150,6 +153,12 @@ func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Ev
 // Run executes the pipeline until all phases complete, a phase is paused/blocked,
 // or the context is cancelled. It closes the event channel when it returns.
 func (p *Pipeline) Run(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "Pipeline.Run", trace.WithAttributes(
+		attribute.String("fwu_id", p.cfg.FWUID),
+		attribute.String("project_path", p.cfg.WorkDir),
+	))
+	defer span.End()
+
 	defer close(p.events)
 
 	// Build MCP config once, shared across all phases.
@@ -166,29 +175,29 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 
 	// Build factory.
-    p.factory = NewLoopFactory(LoopFactoryConfig{
-        FWUID:                p.cfg.FWUID,
-        WorkDir:              p.cfg.WorkDir,
-        TractStore:           p.cfg.TractStore,
-        AgentsFS:             p.cfg.AgentsFS,
-        MCPConfigPath:        mcpPath,
-        DefaultMaxIterations: p.cfg.DefaultMaxIterations,
-        MaxRetries:           p.cfg.MaxRetries,
-        RetryBackoff:         p.cfg.RetryBackoff,
-        ThrashThreshold:      p.cfg.ThrashThreshold,
-        ExecutorModel:        p.cfg.ExecutorModel,
-        RunnerCommand:        p.cfg.RunnerCommand,
-        RunnerArgs:           p.cfg.RunnerArgs,
-        CommandName:          p.cfg.CommandName,
-        CommandArgs:          p.cfg.CommandArgs,
-        LogDir:               p.cfg.LogDir,
-        EvidenceDir:          p.cfg.EvidenceDir,
-        EvidenceBucket:       p.cfg.EvidenceBucket,
-        EvidenceRegion:       p.cfg.EvidenceRegion,
-        EvidenceEndpoint:     p.cfg.EvidenceEndpoint,
-        EvidencePrefix:       p.cfg.EvidencePrefix,
-        ExecMode:             p.cfg.ExecMode,
-    })
+	p.factory = NewLoopFactory(LoopFactoryConfig{
+		FWUID:                p.cfg.FWUID,
+		WorkDir:              p.cfg.WorkDir,
+		TractStore:           p.cfg.TractStore,
+		AgentsFS:             p.cfg.AgentsFS,
+		MCPConfigPath:        mcpPath,
+		DefaultMaxIterations: p.cfg.DefaultMaxIterations,
+		MaxRetries:           p.cfg.MaxRetries,
+		RetryBackoff:         p.cfg.RetryBackoff,
+		ThrashThreshold:      p.cfg.ThrashThreshold,
+		ExecutorModel:        p.cfg.ExecutorModel,
+		RunnerCommand:        p.cfg.RunnerCommand,
+		RunnerArgs:           p.cfg.RunnerArgs,
+		CommandName:          p.cfg.CommandName,
+		CommandArgs:          p.cfg.CommandArgs,
+		LogDir:               p.cfg.LogDir,
+		EvidenceDir:          p.cfg.EvidenceDir,
+		EvidenceBucket:       p.cfg.EvidenceBucket,
+		EvidenceRegion:       p.cfg.EvidenceRegion,
+		EvidenceEndpoint:     p.cfg.EvidenceEndpoint,
+		EvidencePrefix:       p.cfg.EvidencePrefix,
+		ExecMode:             p.cfg.ExecMode,
+	})
 
 	// Phase loop.
 	for p.sm.Current() != PhaseDone {
@@ -209,13 +218,13 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		}
 
 		// Emit phase_start.
-        p.emit(loop.Event{
-            Type:        loop.EventPhaseStart,
-            Phase:       string(phase),
-            FWUID:       p.cfg.FWUID,
-            Agent:       phaseCfg.Agent,
-            ReviewCycle: p.sm.ReviewCycles(),
-        })
+		p.emit(loop.Event{
+			Type:        loop.EventPhaseStart,
+			Phase:       string(phase),
+			FWUID:       p.cfg.FWUID,
+			Agent:       phaseCfg.Agent,
+			ReviewCycle: p.sm.ReviewCycles(),
+		})
 
 		// Fetch fresh briefing once per phase.
 		briefing, err := briefingFn(ctx, p.cfg.FWUID)
@@ -226,11 +235,11 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		// Doc-only fast-path: if this is a Study/Mapping task and we just finished TD,
 		// jump straight to Feedback Loop (FL) to finalize.
 		isStudy := p.cfg.IsStudy
-		
+
 		// Run Loop, consume events (with retries for transient orchestrator errors)
 		var phaseCompleted, routed, blocked bool
 		var runErr error
-		
+
 		for retry := 0; retry <= p.cfg.MaxRetries; retry++ {
 			if retry > 0 {
 				p.emit(loop.Event{
@@ -238,7 +247,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 					Text: fmt.Sprintf("phase %s failed (attempt %d/%d), retrying in %v...", phase, retry, p.cfg.MaxRetries+1, p.cfg.RetryBackoff[retry-1]),
 				})
 				time.Sleep(p.cfg.RetryBackoff[retry-1])
-				
+
 				// Re-fetch on retry if requested by user for extra "active healing"
 				if b, err := briefingFn(ctx, p.cfg.FWUID); err == nil {
 					briefing = b
@@ -256,13 +265,33 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			p.currentLoop = l
 			p.mu.Unlock()
 
-            phaseCompleted, routed, blocked, runErr = p.runPhase(ctx, l, loopCh, phase, phaseCfg)
-            if runErr == nil {
-                break
-            }
-			
+			var stepResult *loop.StepResult
+			phaseCompleted, routed, blocked, stepResult, runErr = p.runPhase(ctx, l, loopCh, phase, phaseCfg)
+			if runErr == nil {
+				// V5 Determinism check: verify we have a structured result for completion
+				if !blocked && stepResult == nil {
+					runErr = fmt.Errorf("phase %s finished without constrained StepResult", phase)
+					continue
+				}
+
+				// Handle explicit jumps from StepResult
+				if stepResult != nil && stepResult.NextPhase != "" {
+					p.emit(loop.Event{
+						Type: loop.EventProgress,
+						Text: fmt.Sprintf("Agent requested jump to phase: %s (reason: %s)", stepResult.NextPhase, stepResult.Reason),
+					})
+					if err := p.sm.JumpTo(Phase(stepResult.NextPhase)); err != nil {
+						runErr = fmt.Errorf("invalid jump requested: %w", err)
+						continue
+					}
+					routed = true // Mark as routed so we don't advance linearly
+				}
+
+				break
+			}
+
 			// If we reached here, it's a phase execution error.
-			// Only retry transient-looking errors. 
+			// Only retry transient-looking errors.
 			// (Future: improve classification)
 		}
 
@@ -288,14 +317,19 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		}
 
 		// Emit phase_complete.
-        p.emit(loop.Event{
-            Type:        loop.EventPhaseComplete,
-            Phase:       string(phase),
-            FWUID:       p.cfg.FWUID,
-            Agent:       phaseCfg.Agent,
-            ReviewCycle: p.sm.ReviewCycles(),
-            PromptHash:  func() string { if p.currentLoop != nil { return p.currentLoop.PromptHash() }; return "" }(),
-        })
+		p.emit(loop.Event{
+			Type:        loop.EventPhaseComplete,
+			Phase:       string(phase),
+			FWUID:       p.cfg.FWUID,
+			Agent:       phaseCfg.Agent,
+			ReviewCycle: p.sm.ReviewCycles(),
+			PromptHash: func() string {
+				if p.currentLoop != nil {
+					return p.currentLoop.PromptHash()
+				}
+				return ""
+			}(),
+		})
 
 		// Advance state machine.
 		if routed {
@@ -355,24 +389,32 @@ func (p *Pipeline) Stop() {
 }
 
 // runPhase runs the Loop for one phase, consuming and forwarding events.
-// Returns (phaseCompleted, routed, blocked, error).
-func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loop.Event, phase Phase, phaseCfg PhaseConfig) (bool, bool, bool, error) {
-	var phaseCompleted, routed, blocked bool
+// Returns (phaseCompleted, routed, blocked, result, error).
+func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loop.Event, phase Phase, phaseCfg PhaseConfig) (bool, bool, bool, *loop.StepResult, error) {
+	ctx, span := telemetry.StartPhaseSpan(ctx, p.cfg.FWUID, string(phase), phaseCfg.Agent)
+	span.SetAttributes(attribute.Int("phase.iteration", l.GetHealth().Iteration))
+	defer span.End()
 
-	// Consume events in the main goroutine, run Loop in a goroutine.
+	var phaseCompleted, routed, blocked bool
+	var stepResult *loop.StepResult
+
+	// Run the loop in background while we consume events here
 	loopDone := make(chan error, 1)
-	go func() {
-		loopDone <- l.Run(ctx)
-	}()
+	go func() { loopDone <- l.Run(ctx) }()
 
 	for event := range loopCh {
-		// Enrich with pipeline context.
+		// Enrich with pipeline context for downstream consumers
 		event.Phase = string(phase)
 		event.FWUID = p.cfg.FWUID
 		event.Agent = phaseCfg.Agent
 		event.ReviewCycle = p.sm.ReviewCycles()
 
-		// Handle signals.
+		// Capture constrained StepResult when provided
+		if event.Type == loop.EventComplete && event.Result != nil {
+			stepResult = event.Result
+		}
+
+		// Interpret signals into deterministic pipeline actions
 		sr := HandleSignal(event)
 		switch sr.Action {
 		case ActionPhaseComplete:
@@ -380,10 +422,10 @@ func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loo
 
 		case ActionRoute:
 			routed = true
-			// Apply route to state machine.
+			// Apply route to the state machine and emit a decision event
 			next, err := p.sm.Route(sr.RouteTarget)
 			if err != nil {
-				// Route error (e.g., max review cycles exceeded).
+				// Route error (e.g., invalid target or max review cycles)
 				p.emit(loop.Event{
 					Type:        loop.EventOperatorAttention,
 					Phase:       string(phase),
@@ -394,7 +436,6 @@ func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loo
 				})
 				blocked = true
 			} else {
-				// Emit route decision.
 				p.emit(loop.Event{
 					Type:        loop.EventRouteDecision,
 					Phase:       string(phase),
@@ -431,13 +472,13 @@ func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loo
 			})
 		}
 
-		// Forward event to pipeline channel.
+		// Forward enriched event
 		p.emit(event)
 	}
 
-	// Wait for Loop.Run() to return.
+	// Loop completed — return termination details
 	err := <-loopDone
-	return phaseCompleted, routed, blocked, err
+	return phaseCompleted, routed, blocked, stepResult, err
 }
 
 func (p *Pipeline) emit(e loop.Event) {

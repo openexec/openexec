@@ -35,6 +35,30 @@ The system follows three core principles:
 2. **Tool-First Execution**: All agent capabilities route through MCP tools with approval gates
 3. **Signal-Driven Communication**: Agents communicate state changes via the `openexec_signal` protocol
 
+### Relationship to Deterministic Runs
+
+**Important:** Conversational sessions and deterministic runs are complementary:
+
+| Concept | Purpose | Endpoint |
+|---------|---------|----------|
+| **Session** | Interactive chat, exploration, prototyping | `/api/sessions` |
+| **Run** | Deterministic task execution with artifacts | `/api/v1/runs` |
+
+**Current Architecture:**
+- Sessions provide conversational context (messages, tool approvals, history)
+- Runs provide deterministic execution (idempotent, resumable, audited)
+- A session can be linked to a run via `session_id` field
+- The daemon owns all orchestration; CLI/UI are thin clients
+
+**Workflow Example:**
+```
+1. User starts session → /api/sessions
+2. Chat explores requirements
+3. User triggers run → /api/v1/runs:execute
+4. Run executes tasks with session context
+5. Session stores conversation history
+```
+
 ---
 
 ## Architecture

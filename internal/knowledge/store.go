@@ -3,10 +3,9 @@ package knowledge
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // SymbolRecord represents detailed function/struct metadata (OpenCode)
@@ -68,21 +67,22 @@ type Store struct {
 }
 
 func NewStore(projectDir string) (*Store, error) {
-	dbPath := filepath.Join(projectDir, ".openexec", "knowledge.db")
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0750); err != nil {
-		return nil, err
-	}
-
-	db, err := sql.Open("sqlite", dbPath)
+	// For standalone usage, default to the unified db path
+	dbPath := filepath.Join(projectDir, ".openexec", "openexec.db")
+	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open knowledge db: %w", err)
 	}
 
+	return NewStoreWithDB(db)
+}
+
+// NewStoreWithDB creates a new Store using an existing database connection.
+func NewStoreWithDB(db *sql.DB) (*Store, error) {
 	s := &Store{db: db}
 	if err := s.migrate(); err != nil {
 		return nil, err
 	}
-
 	return s, nil
 }
 

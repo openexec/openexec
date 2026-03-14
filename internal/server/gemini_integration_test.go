@@ -86,14 +86,8 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 		t.Fatalf("Failed to create server: %v", err)
 	}
 
-	// Create a dummy task
-	taskID := "T-GEMINI-001"
-	task := struct {
-		TaskID  string `json:"task_id"`
-		Prompt  string `json:"prompt"`
-		WorkDir string `json:"work_dir"`
-	}{TaskID: taskID, Prompt: "Test Gemini Task", WorkDir: tmpDir}
-	taskData, _ := json.Marshal(task)
+	// Create a task ID for testing
+	taskID := "T-001"
 
 	// Start a loop via API
 	ts := httptest.NewServer(s.Mux)

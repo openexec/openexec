@@ -106,12 +106,23 @@ OpenExec v0.1.6 includes **Automated PID Tracking**:
 - `openexec run` and `openexec stop` automatically use this file to manage the background engine.
 
 ### Executing Tasks
-You can run tasks individually or let the daemon handle them:
+
+**Architecture Note:** The daemon owns all orchestration. The CLI is a thin client that triggers execution via HTTP endpoints.
 
 ```bash
-# Execute the next pending task (automatically connects to background engine)
-./openexec run
+# Trigger task execution (daemon handles planning, retries, state management)
+./openexec start
+
+# Or start daemon and execute in one command
+./openexec start --daemon && ./openexec run
 ```
+
+The daemon exposes `/api/v1/runs` endpoints for deterministic execution:
+- `POST /api/v1/runs:plan` - Generate a plan from INTENT.md
+- `POST /api/v1/runs:execute` - Execute all pending tasks
+- `GET /api/v1/runs/{id}` - Check run status
+
+Legacy FWU endpoints (`/api/fwu/*`) are deprecated and will be removed in a future release.
 
 ## 6. Development Mode (Advanced)
 

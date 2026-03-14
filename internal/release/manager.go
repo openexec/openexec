@@ -73,6 +73,21 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 		cfg = DefaultConfig()
 	}
 
+	dbPath := filepath.Join(baseDir, ".openexec", "openexec.db")
+	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open state database: %w", err)
+	}
+
+	return NewManagerWithDB(baseDir, cfg, db)
+}
+
+// NewManagerWithDB creates a Manager using an existing database connection.
+func NewManagerWithDB(baseDir string, cfg *Config, db *sql.DB) (*Manager, error) {
+	if cfg == nil {
+		cfg = DefaultConfig()
+	}
+
 	m := &Manager{
 		baseDir: baseDir,
 		config:  cfg,
@@ -81,21 +96,8 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 		tasks:   make(map[string]*Task),
 	}
 
-	// Initialize SQLite store
-	dataDir := filepath.Join(baseDir, ".openexec", "data")
-	if err := os.MkdirAll(dataDir, 0o750); err != nil {
-		return nil, fmt.Errorf("failed to create data directory: %w", err)
-	}
-
-	dbPath := filepath.Join(dataDir, "state.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open state database: %w", err)
-	}
-
 	store, err := NewSQLiteStore(db)
 	if err != nil {
-		db.Close()
 		return nil, fmt.Errorf("failed to create state store: %w", err)
 	}
 	m.store = store
@@ -111,7 +113,6 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 		trackerPath := filepath.Join(baseDir, ".openexec", "git-tracker.json")
 		tracker, err := git.NewTracker(m.gitClient, trackerPath)
 		if err != nil {
-			m.store.Close()
 			return nil, fmt.Errorf("failed to create git tracker: %w", err)
 		}
 		m.gitTracker = tracker
@@ -121,7 +122,6 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 
 	// Load existing data
 	if err := m.Load(); err != nil {
-		m.store.Close()
 		return nil, err
 	}
 

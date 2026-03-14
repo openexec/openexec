@@ -2,7 +2,6 @@ package api
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -24,14 +23,8 @@ func TestHandleCreateLoop(t *testing.T) {
 	mgr := testManager(t, bin)
 	srv := New(mgr, nil, nil, "", ":0")
 
-	payload := map[string]interface{}{
-		"task_id":  "T-001",
-		"prompt":   "Do it",
-		"work_dir": ".",
-	}
-	body, _ := json.Marshal(payload)
-
-    req := httptest.NewRequest("POST", "/api/v1/runs", bytes.NewReader(body))
+	// Use the FWU start endpoint which accepts a specific ID
+	req := httptest.NewRequest("POST", "/api/fwu/T-001/start", strings.NewReader("{}"))
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -41,8 +34,8 @@ func TestHandleCreateLoop(t *testing.T) {
 
 	var resp map[string]interface{}
 	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp["id"] != "T-001" {
-		t.Errorf("id = %v, want T-001", resp["id"])
+	if resp["fwu_id"] != "T-001" {
+		t.Errorf("fwu_id = %v, want T-001", resp["fwu_id"])
 	}
 
 	waitForTerminal(t, mgr, "T-001")
@@ -56,7 +49,8 @@ func TestHandleGetLoop(t *testing.T) {
 	mgr.Start(context.Background(), "T-001")
 	time.Sleep(50 * time.Millisecond)
 
-    req := httptest.NewRequest("GET", "/api/v1/runs/T-001", nil)
+	// Use the FWU status endpoint
+	req := httptest.NewRequest("GET", "/api/fwu/T-001/status", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -66,8 +60,8 @@ func TestHandleGetLoop(t *testing.T) {
 
 	var resp map[string]interface{}
 	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp["id"] != "T-001" {
-		t.Errorf("id = %v, want T-001", resp["id"])
+	if resp["fwu_id"] != "T-001" {
+		t.Errorf("fwu_id = %v, want T-001", resp["fwu_id"])
 	}
 
 	waitForTerminal(t, mgr, "T-001")
