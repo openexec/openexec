@@ -67,6 +67,33 @@ type Pipeline struct {
 // New creates a Pipeline and returns it along with a read-only event channel.
 // The channel is closed when Run returns.
 func New(cfg Config) (*Pipeline, <-chan loop.Event) {
+	factory := NewLoopFactory(LoopFactoryConfig{
+		FWUID:                cfg.FWUID,
+		WorkDir:              cfg.WorkDir,
+		TractStore:           cfg.TractStore,
+		AgentsFS:             cfg.AgentsFS,
+		DefaultMaxIterations: cfg.DefaultMaxIterations,
+		MaxRetries:           cfg.MaxRetries,
+		MaxReviewCycles:      cfg.MaxReviewCycles,
+		RetryBackoff:         cfg.RetryBackoff,
+		ThrashThreshold:      cfg.ThrashThreshold,
+		ExecutorModel:        cfg.ExecutorModel,
+		RunnerCommand:        cfg.RunnerCommand,
+		RunnerArgs:           cfg.RunnerArgs,
+		CommandName:          cfg.CommandName,
+		CommandArgs:          cfg.CommandArgs,
+		LogDir:               cfg.LogDir,
+		EvidenceDir:          cfg.EvidenceDir,
+		EvidenceBucket:       cfg.EvidenceBucket,
+		EvidenceRegion:       cfg.EvidenceRegion,
+		EvidenceEndpoint:     cfg.EvidenceEndpoint,
+		EvidencePrefix:       cfg.EvidencePrefix,
+	})
+	return NewWithFactory(cfg, factory)
+}
+
+// NewWithFactory creates a Pipeline using a pre-configured factory.
+func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Event) {
 	// Apply defaults. Pipeline takes precedence over Phases/Order.
 	if cfg.Pipeline != nil {
 		cfg.Order = cfg.Pipeline.PhaseOrder()
@@ -97,9 +124,10 @@ func New(cfg Config) (*Pipeline, <-chan loop.Event) {
 	ch := make(chan loop.Event, 64)
 
 	p := &Pipeline{
-		cfg:    cfg,
-		sm:     NewStateMachine(cfg.Order, cfg.Phases, cfg.MaxReviewCycles),
-		events: ch,
+		cfg:     cfg,
+		sm:      NewStateMachine(cfg.Order, cfg.Phases, cfg.MaxReviewCycles),
+		factory: factory,
+		events:  ch,
 	}
 
 	return p, ch
@@ -120,7 +148,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	// Resolve briefing function.
 	briefingFn := p.cfg.BriefingFunc
 	if briefingFn == nil {
-		briefingFn = TractBriefingFunc(p.cfg.TractStore)
+		briefingFn = TractBriefingFunc(p.factory.cfg.ReleaseManager)
 	}
 
 	// Build factory.

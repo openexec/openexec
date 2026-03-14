@@ -153,6 +153,11 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		return fmt.Errorf("pipeline %s already active (status: %s)", fwuID, e.info.Status)
 	}
 
+	rel, err := m.getInternalReleaseManager()
+	if err != nil {
+		return fmt.Errorf("load release manager: %w", err)
+	}
+
 	pCfg := pipeline.Config{
 		FWUID:                fwuID,
 		WorkDir:              m.cfg.WorkDir,
@@ -175,11 +180,36 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		BriefingFunc:         m.cfg.BriefingFunc,
 	}
 
+	// Default to built-in Tract briefing if not overridden
+	if pCfg.BriefingFunc == nil {
+		pCfg.BriefingFunc = pipeline.TractBriefingFunc(rel)
+	}
+
 	for _, opt := range opts {
 		opt(&pCfg)
 	}
 
-	p, events := pipeline.New(pCfg)
+	// Create factory using the same manager
+	factory := pipeline.NewLoopFactory(pipeline.LoopFactoryConfig{
+		FWUID:                pCfg.FWUID,
+		WorkDir:              pCfg.WorkDir,
+		TractStore:           pCfg.TractStore,
+		AgentsFS:             pCfg.AgentsFS,
+		ReleaseManager:       rel,
+		DefaultMaxIterations: pCfg.DefaultMaxIterations,
+		MaxRetries:           pCfg.MaxRetries,
+		MaxReviewCycles:      pCfg.MaxReviewCycles,
+		RetryBackoff:         pCfg.RetryBackoff,
+		ThrashThreshold:      pCfg.ThrashThreshold,
+		ExecutorModel:        pCfg.ExecutorModel,
+		RunnerCommand:        pCfg.RunnerCommand,
+		RunnerArgs:           pCfg.RunnerArgs,
+		CommandName:          pCfg.CommandName,
+		CommandArgs:          pCfg.CommandArgs,
+		LogDir:               pCfg.LogDir,
+	})
+
+	p, events := pipeline.NewWithFactory(pCfg, factory)
 
 	pipeCtx, cancel := context.WithCancel(ctx)
 

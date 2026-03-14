@@ -10,7 +10,7 @@ import (
 
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/prompt"
-	"github.com/openexec/openexec/internal/tract"
+	"github.com/openexec/openexec/internal/release"
 )
 
 // LoopFactoryConfig holds shared settings for creating Loops across pipeline phases.
@@ -19,9 +19,11 @@ type LoopFactoryConfig struct {
 	WorkDir              string
 	TractStore           string
 	AgentsFS             fs.FS
+	ReleaseManager       *release.Manager
 	MCPConfigPath        string
 	DefaultMaxIterations int
 	MaxRetries           int
+	MaxReviewCycles      int
 	RetryBackoff         []time.Duration
 	ThrashThreshold      int
 	ExecutorModel        string   // used for runner resolution
@@ -55,34 +57,24 @@ func NewLoopFactory(cfg LoopFactoryConfig) *LoopFactory {
 // BriefingFunc fetches briefing text for an FWU. Abstracted for testing.
 type BriefingFunc func(ctx context.Context, fwuID string) (string, error)
 
-// TractBriefingFunc returns a BriefingFunc that uses the real TractClient.
-// Falls back to a minimal briefing if tract is unavailable or the FWU is not found.
-func TractBriefingFunc(tractStore string) BriefingFunc {
+// TractBriefingFunc returns a BriefingFunc that uses the built-in release manager.
+func TractBriefingFunc(mgr *release.Manager) BriefingFunc {
 	return func(ctx context.Context, fwuID string) (string, error) {
-		client, err := tract.StartSubprocess(ctx, tractStore)
+		if mgr == nil {
+			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
+		}
+
+		brief, err := mgr.Brief(fwuID)
 		if err != nil {
 			msg := fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID)
 			
 			// Detect if this is likely a doc-only task from the ID or context
-			// (Future: pass more metadata to briefingFn)
 			if strings.Contains(strings.ToLower(fwuID), "study") || strings.Contains(strings.ToLower(fwuID), "mapping") {
 				msg += "\n**MANDATE:** This is a documentation/analysis task. DO NOT attempt to compile code or run tests. Focus on mapping and documenting boundaries.\n"
 			}
 
-			if strings.Contains(err.Error(), "executable file not found") {
-				log.Printf("[Briefing] tract binary not in path, using minimal briefing for %s", fwuID)
-			} else {
-				log.Printf("[Briefing] tract unavailable for %s, using minimal briefing: %v", fwuID, err)
-			}
+			log.Printf("[Briefing] built-in tract briefing failed for %s, using minimal briefing: %v", fwuID, err)
 			return msg, nil
-		}
-		defer func() { _ = client.Close() }()
-
-		brief, err := client.Brief(fwuID)
-		if err != nil {
-			// Catch read response errors (like unexpected EOF) and other protocol failures
-			log.Printf("[Briefing] tract briefing failed for %s, using minimal briefing: %v", fwuID, err)
-			return fmt.Sprintf("## FWU Briefing: %s\n\n**Status:** in_progress\n", fwuID), nil
 		}
 
 		return prompt.FormatBriefing(brief), nil

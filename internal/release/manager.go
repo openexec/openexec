@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/openexec/openexec/internal/git"
+	"github.com/openexec/openexec/internal/tract"
 )
 
 // Manager handles release, story, and task management with git integration.
@@ -359,6 +361,75 @@ func (m *Manager) GetTasks() []*Task {
 		tasks = append(tasks, t)
 	}
 	return tasks
+}
+
+// Brief returns a Tract-compatible BriefResponse for the given FWU (Task) ID.
+// This implements the "built-in" Tract logic directly in the release manager.
+func (m *Manager) Brief(fwuID string) (*tract.BriefResponse, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	task, ok := m.tasks[fwuID]
+	if !ok {
+		return nil, fmt.Errorf("task %s not found", fwuID)
+	}
+
+	story, ok := m.stories[task.StoryID]
+	if !ok {
+		return nil, fmt.Errorf("story %s not found for task %s", task.StoryID, fwuID)
+	}
+
+	brief := &tract.BriefResponse{
+		FWU: tract.FWU{
+			ID:        task.ID,
+			Name:      task.Title,
+			Status:    string(task.Status),
+			Intent:    task.Description,
+			FeatureID: story.ID, // StoryID as fallback for FeatureID
+		},
+		ReasoningChain: &tract.ReasoningChain{},
+	}
+
+	// Map goals to reasoning chain
+	if goal, ok := m.goals[story.GoalID]; ok {
+		brief.ReasoningChain.Goals = []tract.ChainEntity{
+			{ID: goal.ID, Name: goal.Title, Description: goal.Description},
+		}
+	}
+
+	// Add boundaries from task description
+	brief.Boundaries = append(brief.Boundaries, tract.Boundary{
+		ID:          "scope",
+		Scope:       "in_scope",
+		Description: task.Description,
+	})
+
+	// Add dependencies
+	for _, depID := range task.DependsOn {
+		depText := "Prerequisite task"
+		if dep, ok := m.tasks[depID]; ok {
+			depText = dep.Title
+		}
+		brief.Dependencies = append(brief.Dependencies, tract.Dependency{
+			ID:             depID,
+			DependencyType: "prerequisite",
+			TargetFWUID:    depID,
+			Description:    depText,
+		})
+	}
+
+	// If it's a Chassis task, add acceptance criteria from story
+	if strings.Contains(strings.ToLower(task.Title), "chassis") {
+		for i, ac := range story.AcceptanceCriteria {
+			brief.DesignDecisions = append(brief.DesignDecisions, tract.DesignDecision{
+				ID:         fmt.Sprintf("AC-%d", i+1),
+				Decision:   "Acceptance Criteria",
+				Resolution: ac,
+			})
+		}
+	}
+
+	return brief, nil
 }
 
 // GetTasksForStory returns all tasks for a story.
