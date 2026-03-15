@@ -76,3 +76,9 @@ export { default as SessionForkDialog } from './session/SessionForkDialog'
 export type { ForkOptions, ForkResult, SessionForkDialogProps } from './session/SessionForkDialog'
 export { default as ForkAncestryTree } from './session/ForkAncestryTree'
 export type { AncestorSession, ForkAncestryTreeProps } from './session/ForkAncestryTree'
+
+// Blueprint components
+export { default as StageTimeline } from './blueprint/StageTimeline'
+export type { StageTimelineProps } from './blueprint/StageTimeline'
+export { default as ApprovalsPanel } from './blueprint/ApprovalsPanel'
+export type { ApprovalsPanelProps } from './blueprint/ApprovalsPanel'

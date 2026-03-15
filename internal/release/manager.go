@@ -12,18 +12,28 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/git"
-	"github.com/openexec/openexec/internal/tract"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 // Manager handles release, story, and task management with git integration.
+//
+// STATE ARCHITECTURE:
+// SQLite (.openexec/openexec.db) is the CANONICAL source of truth for all state.
+// JSON files (stories.json, tasks.json, release.json) are EXPORT-ONLY artifacts.
+//
+// JSON files should ONLY be used for:
+//   - Export (backup/migration out) via ExportJSON()
+//   - One-time bootstrap (migration in) via bootstrapFromJSONUnlocked()
+//   - NOT as runtime source of truth
+//
+// All runtime reads go through the SQLite-backed Store interface.
 type Manager struct {
 	baseDir    string
 	gitClient  *git.Client
 	gitTracker *git.Tracker
 	config     *Config
-	store      Store // SQLite-backed state store
+	store      Store // SQLite-backed state store (CANONICAL)
 	mu         sync.RWMutex
 
 	// Cached data (populated from SQLite, not JSON)
@@ -186,14 +196,25 @@ func (m *Manager) Load() error {
 	return m.refreshCacheUnlocked(ctx)
 }
 
-// bootstrapFromJSONUnlocked imports data from JSON files into SQLite (one-time migration).
+// bootstrapFromJSONUnlocked imports data from JSON files into SQLite (ONE-TIME MIGRATION ONLY).
 // Caller must hold the lock.
+//
+// JSON IMPORT GUARD:
+// This method is ONLY called when SQLite is empty (storyCount == 0).
+// It performs a one-time bootstrap from legacy JSON files to migrate existing projects.
+// After bootstrap, JSON files are NEVER read again - SQLite is the canonical source.
+//
+// This is NOT a runtime data source - it's a migration path for legacy projects.
 func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 	openexecDir := filepath.Join(m.baseDir, ".openexec")
+
+	// Log migration event for drift tracking
+	fmt.Fprintf(os.Stderr, "[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)\n")
 
 	// Load and migrate release
 	releasePath := filepath.Join(openexecDir, "release.json")
 	if data, err := os.ReadFile(releasePath); err == nil {
+		fmt.Fprintf(os.Stderr, "[MIGRATION] Importing release from %s\n", releasePath)
 		var release Release
 		if err := json.Unmarshal(data, &release); err == nil {
 			if err := m.store.CreateRelease(ctx, &release); err != nil && err != ErrReleaseAlreadyExist {
@@ -205,6 +226,7 @@ func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 	// Load and migrate stories and goals
 	storiesPath := filepath.Join(openexecDir, "stories.json")
 	if data, err := os.ReadFile(storiesPath); err == nil {
+		fmt.Fprintf(os.Stderr, "[MIGRATION] Importing stories/goals from %s\n", storiesPath)
 		var sf struct {
 			SchemaVersion string  `json:"schema_version"`
 			Goals         []Goal  `json:"goals"`
@@ -220,6 +242,7 @@ func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 			if err := m.store.BulkCreateGoals(ctx, goals); err != nil {
 				return fmt.Errorf("failed to bootstrap goals: %w", err)
 			}
+			fmt.Fprintf(os.Stderr, "[MIGRATION] Imported %d goals\n", len(goals))
 
 			// Bulk create stories
 			stories := make([]*Story, len(sf.Stories))
@@ -229,12 +252,14 @@ func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 			if err := m.store.BulkCreateStories(ctx, stories); err != nil {
 				return fmt.Errorf("failed to bootstrap stories: %w", err)
 			}
+			fmt.Fprintf(os.Stderr, "[MIGRATION] Imported %d stories\n", len(stories))
 		}
 	}
 
 	// Load and migrate tasks
 	tasksPath := filepath.Join(openexecDir, "tasks.json")
 	if data, err := os.ReadFile(tasksPath); err == nil {
+		fmt.Fprintf(os.Stderr, "[MIGRATION] Importing tasks from %s\n", tasksPath)
 		var tasksData struct {
 			Tasks []Task `json:"tasks"`
 		}
@@ -246,9 +271,11 @@ func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 			if err := m.store.BulkCreateTasks(ctx, tasks); err != nil {
 				return fmt.Errorf("failed to bootstrap tasks: %w", err)
 			}
+			fmt.Fprintf(os.Stderr, "[MIGRATION] Imported %d tasks\n", len(tasks))
 		}
 	}
 
+	fmt.Fprintf(os.Stderr, "[MIGRATION] Bootstrap complete. SQLite is now the canonical source.\n")
 	return nil
 }
 
@@ -475,9 +502,9 @@ func (m *Manager) GetTasks() []*Task {
 	return tasks
 }
 
-// Brief returns a Tract-compatible BriefResponse for the given FWU (Task) ID.
-// This implements the "built-in" Tract logic directly in the release manager.
-func (m *Manager) Brief(fwuID string) (*tract.BriefResponse, error) {
+// Brief returns a BriefResponse for the given FWU (Task) ID.
+// This provides structured briefing data for task context assembly.
+func (m *Manager) Brief(fwuID string) (*BriefResponse, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -491,26 +518,26 @@ func (m *Manager) Brief(fwuID string) (*tract.BriefResponse, error) {
 		return nil, fmt.Errorf("story %s not found for task %s", task.StoryID, fwuID)
 	}
 
-	brief := &tract.BriefResponse{
-		FWU: tract.FWU{
+	brief := &BriefResponse{
+		FWU: FWU{
 			ID:        task.ID,
 			Name:      task.Title,
 			Status:    string(task.Status),
 			Intent:    task.Description,
 			FeatureID: story.ID, // StoryID as fallback for FeatureID
 		},
-		ReasoningChain: &tract.ReasoningChain{},
+		ReasoningChain: &ReasoningChain{},
 	}
 
 	// Map goals to reasoning chain
 	if goal, ok := m.goals[story.GoalID]; ok {
-		brief.ReasoningChain.Goals = []tract.ChainEntity{
+		brief.ReasoningChain.Goals = []ChainEntity{
 			{ID: goal.ID, Name: goal.Title, Description: goal.Description},
 		}
 	}
 
 	// Add boundaries from task description
-	brief.Boundaries = append(brief.Boundaries, tract.Boundary{
+	brief.Boundaries = append(brief.Boundaries, Boundary{
 		ID:          "scope",
 		Scope:       "in_scope",
 		Description: task.Description,
@@ -522,7 +549,7 @@ func (m *Manager) Brief(fwuID string) (*tract.BriefResponse, error) {
 		if dep, ok := m.tasks[depID]; ok {
 			depText = dep.Title
 		}
-		brief.Dependencies = append(brief.Dependencies, tract.Dependency{
+		brief.Dependencies = append(brief.Dependencies, Dependency{
 			ID:             depID,
 			DependencyType: "prerequisite",
 			TargetFWUID:    depID,
@@ -533,7 +560,7 @@ func (m *Manager) Brief(fwuID string) (*tract.BriefResponse, error) {
 	// If it's a Chassis task, add acceptance criteria from story
 	if strings.Contains(strings.ToLower(task.Title), "chassis") {
 		for i, ac := range story.AcceptanceCriteria {
-			brief.DesignDecisions = append(brief.DesignDecisions, tract.DesignDecision{
+			brief.DesignDecisions = append(brief.DesignDecisions, DesignDecision{
 				ID:         fmt.Sprintf("AC-%d", i+1),
 				Decision:   "Acceptance Criteria",
 				Resolution: ac,
@@ -1020,7 +1047,15 @@ func (m *Manager) saveUnlocked() error {
 }
 
 // ExportJSON exports the current state to JSON files in the specified directory.
-// This is for read-only artifact generation only - SQLite remains the canonical state.
+//
+// JSON EXPORT-ONLY GUARD:
+// This method is for EXPORT ONLY - generating JSON artifacts for:
+//   - Backup/archival
+//   - Migration to other systems
+//   - Human-readable snapshots
+//
+// These JSON files should NEVER be used as runtime source of truth.
+// SQLite (.openexec/openexec.db) is the CANONICAL state store.
 func (m *Manager) ExportJSON(exportDir string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -1029,9 +1064,12 @@ func (m *Manager) ExportJSON(exportDir string) error {
 		return err
 	}
 
+	fmt.Fprintf(os.Stderr, "[EXPORT] Exporting state to JSON (export-only, not source of truth)\n")
+
 	// Export release
 	if m.release != nil {
 		releasePath := filepath.Join(exportDir, "release.json")
+		fmt.Fprintf(os.Stderr, "[EXPORT] Writing %s (SQLite is canonical)\n", releasePath)
 		data, err := json.MarshalIndent(m.release, "", "  ")
 		if err != nil {
 			return err
@@ -1044,6 +1082,7 @@ func (m *Manager) ExportJSON(exportDir string) error {
 	// Export stories and goals
 	if len(m.stories) > 0 || len(m.goals) > 0 {
 		storiesPath := filepath.Join(exportDir, "stories.json")
+		fmt.Fprintf(os.Stderr, "[EXPORT] Writing %s (SQLite is canonical)\n", storiesPath)
 		storiesList := make([]Story, 0, len(m.stories))
 		for _, s := range m.stories {
 			storiesList = append(storiesList, *s)
@@ -1074,6 +1113,7 @@ func (m *Manager) ExportJSON(exportDir string) error {
 
 	// Export tasks
 	tasksPath := filepath.Join(exportDir, "tasks.json")
+	fmt.Fprintf(os.Stderr, "[EXPORT] Writing %s (SQLite is canonical)\n", tasksPath)
 	tasksList := make([]Task, 0, len(m.tasks))
 	for _, t := range m.tasks {
 		tasksList = append(tasksList, *t)
@@ -1090,6 +1130,50 @@ func (m *Manager) ExportJSON(exportDir string) error {
 	}
 
 	return nil
+}
+
+// Checkpoint operations (delegate to store)
+
+// CreateCheckpoint stores a new checkpoint for blueprint resumability.
+func (m *Manager) CreateCheckpoint(cp *Checkpoint) error {
+	return m.store.CreateCheckpoint(context.Background(), cp)
+}
+
+// GetCheckpoint retrieves a checkpoint by ID.
+func (m *Manager) GetCheckpoint(id string) *Checkpoint {
+	cp, err := m.store.GetCheckpoint(context.Background(), id)
+	if err != nil {
+		return nil
+	}
+	return cp
+}
+
+// ListCheckpointsForRun returns all checkpoints for a specific run.
+func (m *Manager) ListCheckpointsForRun(runID string) []*Checkpoint {
+	checkpoints, err := m.store.ListCheckpointsForRun(context.Background(), runID)
+	if err != nil {
+		return []*Checkpoint{}
+	}
+	return checkpoints
+}
+
+// GetLatestCheckpoint returns the most recent checkpoint for a run.
+func (m *Manager) GetLatestCheckpoint(runID string) *Checkpoint {
+	cp, err := m.store.GetLatestCheckpoint(context.Background(), runID)
+	if err != nil {
+		return nil
+	}
+	return cp
+}
+
+// DeleteCheckpoint removes a checkpoint by ID.
+func (m *Manager) DeleteCheckpoint(id string) error {
+	return m.store.DeleteCheckpoint(context.Background(), id)
+}
+
+// DeleteCheckpointsForRun removes all checkpoints for a specific run.
+func (m *Manager) DeleteCheckpointsForRun(runID string) error {
+	return m.store.DeleteCheckpointsForRun(context.Background(), runID)
 }
 
 // LoadConfig loads the release configuration from a project directory.

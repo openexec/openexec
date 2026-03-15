@@ -109,7 +109,6 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 		// Fallback for tests or uninitialized projects
 		config = &project.ProjectConfig{
 			ProjectDir: projectDir,
-			TractStore: filepath.Join(projectDir, ".openexec"),
 			Execution: project.ExecutionConfig{
 				PlannerModel: "sonnet",
 			},
@@ -221,7 +220,13 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 	cmd.Println("  ✓ Planning Gate passed.")
 
 	// 7. Validate and Save to stories.json
-	storiesPath := filepath.Join(config.TractStore, "stories.json")
+	//
+	// JSON EXPORT-ONLY:
+	// This writes to stories.json for backward compatibility only.
+	// The JSON file is NOT the source of truth - it's an export artifact.
+	// After this step, 'openexec story import' or 'openexec run' will
+	// import the data into SQLite, which is the canonical store.
+	storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
 	data, err := json.MarshalIndent(plan, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal plan: %w", err)
@@ -232,11 +237,15 @@ func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) e
 		return fmt.Errorf("ABORTING: Generated plan is structurally invalid: %w", err)
 	}
 
+	// Log export operation for drift tracking
+	fmt.Fprintf(os.Stderr, "[EXPORT] Writing plan to %s (export-only, not source of truth)\n", storiesPath)
+	cmd.Println(color.YellowString("Note: Writing to %s for import. SQLite is the canonical store.", storiesPath))
 	if err := os.WriteFile(storiesPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to save stories: %w", err)
 	}
 
 	cmd.Printf("✓ Stories generated: %s (%d stories)\n", storiesPath, len(plan.Stories))
+	cmd.Println(color.CyanString("Run 'openexec story import' or 'openexec run' to load into SQLite."))
 	return nil
 }
 

@@ -44,7 +44,7 @@ OpenExec uses a strict separation of concerns:
 
 - **The daemon owns all orchestration.** The CLI is a thin client that triggers server-side execution via the API. No local orchestration occurs in CLI commands.
 
-- **Deterministic state machine.** Runs progress through phases (TD → IM → RV → RF → FL → Done) governed by a versioned state machine. See [STATE_MACHINE.md](./STATE_MACHINE.md) for details.
+- **Deterministic state machine.** Runs progress through blueprint stages (gather_context -> implement -> lint -> test -> review) governed by a versioned state machine. See [STATE_MACHINE.md](./STATE_MACHINE.md) for details.
 
 - **DCP is suggest-only.** The Deterministic Control Plane provides intent routing suggestions but does not execute tools directly. All execution requests are forwarded to MCP.
 

@@ -6,60 +6,71 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/openexec/openexec/internal/release"
 )
 
 func TestLoadPendingTasks(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Create .openexec directory for SQLite
+	openexecDir := filepath.Join(tmpDir, ".openexec")
+	os.MkdirAll(openexecDir, 0755)
 
-	t.Run("From root tasks.json", func(t *testing.T) {
-		tasks := TasksFile{
-			Tasks: []Task{
-				{ID: "T-001", Title: "Task 1", Status: "pending"},
-				{ID: "T-002", Title: "Task 2", Status: "completed"},
-			},
+	// Create release manager backed by SQLite
+	mgr, err := release.NewManager(tmpDir, nil)
+	if err != nil {
+		t.Fatalf("failed to create release manager: %v", err)
+	}
+
+	t.Run("From SQLite database", func(t *testing.T) {
+		// Create a story first
+		story := &release.Story{
+			ID:     "US-001",
+			Title:  "Test Story",
+			Status: "pending",
 		}
-		data, _ := json.Marshal(tasks)
-		os.WriteFile(filepath.Join(tmpDir, "tasks.json"), data, 0644)
+		if err := mgr.CreateStory(story); err != nil {
+			t.Fatalf("failed to create story: %v", err)
+		}
 
-		got, err := loadPendingTasks(tmpDir, nil, true)
+		// Create tasks in SQLite
+		task1 := &release.Task{
+			ID:      "T-001",
+			Title:   "Task 1",
+			StoryID: "US-001",
+			Status:  "pending",
+		}
+		task2 := &release.Task{
+			ID:      "T-002",
+			Title:   "Task 2",
+			StoryID: "US-001",
+			Status:  "completed",
+		}
+		if err := mgr.CreateTask(task1); err != nil {
+			t.Fatalf("failed to create task1: %v", err)
+		}
+		if err := mgr.CreateTask(task2); err != nil {
+			t.Fatalf("failed to create task2: %v", err)
+		}
+
+		got, err := loadPendingTasks(tmpDir, mgr, true)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(got) != 2 {
-			t.Errorf("got %d tasks, want 2", len(got))
+		// Only pending tasks should be returned
+		if len(got) != 1 {
+			t.Errorf("got %d tasks, want 1 (pending only)", len(got))
 		}
-		if got[0].ID != "T-001" {
+		if len(got) > 0 && got[0].ID != "T-001" {
 			t.Errorf("got task ID %q, want %q", got[0].ID, "T-001")
 		}
 	})
 
-	t.Run("From stories.json", func(t *testing.T) {
-		os.Remove(filepath.Join(tmpDir, "tasks.json"))
-		os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-
-		storiesContent := `{
-			"stories": [
-				{
-					"id": "S-001",
-					"title": "Story 1",
-					"status": "pending",
-					"tasks": [
-						{"id": "T-003", "title": "Task 3", "description": "Desc 3"}
-					]
-				}
-			]
-		}`
-		os.WriteFile(filepath.Join(tmpDir, ".openexec", "stories.json"), []byte(storiesContent), 0644)
-
-		got, err := loadPendingTasks(tmpDir, nil, true)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(got) != 1 {
-			t.Errorf("got %d tasks, want 1", len(got))
-		}
-		if got[0].ID != "T-003" {
-			t.Errorf("got task ID %q, want %q", got[0].ID, "T-003")
+	t.Run("Requires release manager", func(t *testing.T) {
+		// Calling with nil manager should return error
+		_, err := loadPendingTasks(tmpDir, nil, true)
+		if err == nil {
+			t.Error("expected error when manager is nil")
 		}
 	})
 }

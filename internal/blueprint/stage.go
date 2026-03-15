@@ -1,6 +1,3 @@
-// Package blueprint provides stage-based execution orchestration.
-// Blueprints define sequences of deterministic and agentic stages that
-// execute to complete a task (e.g., gather_context → implement → lint → test → review).
 package blueprint
 
 import (
@@ -215,4 +212,27 @@ func (i *StageInput) HasFailedStage() bool {
 		}
 	}
 	return false
+}
+
+// SetContextFromPack populates the ContextPack map from context items.
+// This is used to inject gathered context into the stage input.
+func (i *StageInput) SetContextFromPack(items []ContextPackItem) {
+	if i.ContextPack == nil {
+		i.ContextPack = make(map[string]string)
+	}
+	for _, item := range items {
+		key := item.Source
+		if key == "" {
+			key = item.Type
+		}
+		i.ContextPack[key] = item.Content
+	}
+}
+
+// ContextPackItem represents a single context item for stage input.
+// This is a simplified representation used by the pipeline to pass context.
+type ContextPackItem struct {
+	Type    string
+	Source  string
+	Content string
 }

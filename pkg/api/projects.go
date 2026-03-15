@@ -22,7 +22,6 @@ type ProjectInfo struct {
 type InitProjectRequest struct {
 	Name        string `json:"name"`
 	Path        string `json:"path"`
-	TractStore  string `json:"tractStore"`
 	EngramStore string `json:"engramStore"`
 }
 

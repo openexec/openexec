@@ -1,31 +1,29 @@
 package manager
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/pkg/db/state"
 )
 
-func TestUpdateInfoPhaseStart(t *testing.T) {
+func TestUpdateInfoStageStart(t *testing.T) {
 	info := &PipelineInfo{Status: StatusStarting}
 	updateInfo(info, loop.Event{
-		Type:        loop.EventPhaseStart,
-		Phase:       "TD",
-		Agent:       "clario",
-		ReviewCycle: 0,
+		Type:      loop.EventStageStart,
+		StageName: "implement",
+		Iteration: 1,
 	})
 	if info.Status != StatusRunning {
 		t.Errorf("status = %s, want running", info.Status)
 	}
-	if info.Phase != "TD" {
-		t.Errorf("phase = %s, want TD", info.Phase)
+	if info.Stage != "implement" {
+		t.Errorf("stage = %s, want implement", info.Stage)
 	}
-	if info.Agent != "clario" {
-		t.Errorf("agent = %s, want clario", info.Agent)
-	}
-	if info.ReviewCycles != 0 {
-		t.Errorf("review_cycles = %d, want 0", info.ReviewCycles)
+	if info.Iteration != 1 {
+		t.Errorf("iteration = %d, want 1", info.Iteration)
 	}
 }
 
@@ -95,7 +93,15 @@ func TestUpdateInfoErrorFallbackText(t *testing.T) {
 }
 
 func TestConsumeEventsFanOut(t *testing.T) {
-	m := New(Config{WorkDir: t.TempDir()})
+	tmpDir := t.TempDir()
+	stateStore, err := state.NewStore(filepath.Join(tmpDir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(Config{WorkDir: tmpDir, StateStore: stateStore})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ch := make(chan loop.Event, 16)
 	e := &entry{
@@ -120,13 +126,13 @@ func TestConsumeEventsFanOut(t *testing.T) {
 	go m.consumeEvents("FWU-01", ch)
 
 	// Send event.
-	ch <- loop.Event{Type: loop.EventPhaseStart, Phase: "TD", Agent: "clario"}
+	ch <- loop.Event{Type: loop.EventStageStart, StageName: "implement"}
 
 	// Both subscribers should receive it.
 	select {
 	case ev := <-sub1:
-		if ev.Type != loop.EventPhaseStart {
-			t.Errorf("sub1 type = %s, want phase_start", ev.Type)
+		if ev.Type != loop.EventStageStart {
+			t.Errorf("sub1 type = %s, want stage_start", ev.Type)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("sub1 timeout")
@@ -134,8 +140,8 @@ func TestConsumeEventsFanOut(t *testing.T) {
 
 	select {
 	case ev := <-sub2:
-		if ev.Type != loop.EventPhaseStart {
-			t.Errorf("sub2 type = %s, want phase_start", ev.Type)
+		if ev.Type != loop.EventStageStart {
+			t.Errorf("sub2 type = %s, want stage_start", ev.Type)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("sub2 timeout")
@@ -145,7 +151,15 @@ func TestConsumeEventsFanOut(t *testing.T) {
 }
 
 func TestConsumeEventsClosesSubs(t *testing.T) {
-	m := New(Config{WorkDir: t.TempDir()})
+	tmpDir := t.TempDir()
+	stateStore, err := state.NewStore(filepath.Join(tmpDir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(Config{WorkDir: tmpDir, StateStore: stateStore})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ch := make(chan loop.Event, 16)
 	e := &entry{
@@ -180,7 +194,15 @@ func TestConsumeEventsClosesSubs(t *testing.T) {
 }
 
 func TestConsumeEventsSlowSubscriber(t *testing.T) {
-	m := New(Config{WorkDir: t.TempDir()})
+	tmpDir := t.TempDir()
+	stateStore, err := state.NewStore(filepath.Join(tmpDir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(Config{WorkDir: tmpDir, StateStore: stateStore})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ch := make(chan loop.Event, 128)
 	e := &entry{
@@ -189,7 +211,7 @@ func TestConsumeEventsSlowSubscriber(t *testing.T) {
 	m.pipelines["FWU-01"] = e
 
 	// Subscribe but never read from the channel.
-	_, _, err := m.Subscribe("FWU-01")
+	_, _, err = m.Subscribe("FWU-01")
 	if err != nil {
 		t.Fatal(err)
 	}

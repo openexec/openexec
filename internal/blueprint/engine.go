@@ -1,3 +1,18 @@
+// Package blueprint provides stage-based execution orchestration for AI-driven tasks.
+//
+// Blueprints define sequences of deterministic and agentic stages that execute
+// to complete a task. The standard flow is:
+//
+//	gather_context -> implement -> lint -> test -> review
+//
+// Key types:
+//   - Blueprint: Defines the complete execution plan with stages and transitions
+//   - Engine: Executes blueprints, managing state and callbacks
+//   - Stage: A single step that is either deterministic (shell commands) or agentic (LLM)
+//   - Run: Tracks the state of a single blueprint execution
+//
+// Stages support retry logic, checkpointing, and can route to different stages
+// based on success or failure.
 package blueprint
 
 import (

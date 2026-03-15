@@ -11,6 +11,7 @@ import (
     "sync"
     "time"
 
+    "github.com/openexec/openexec/internal/approval"
     "github.com/openexec/openexec/pkg/audit"
     "github.com/openexec/openexec/pkg/db/session"
     "github.com/openexec/openexec/pkg/db/state"
@@ -300,7 +301,7 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
         WriteJSON(w, http.StatusOK, map[string]interface{}{
             "run_id":       info.FWUID,
             "status":       info.Status,
-            "phase":        info.Phase,
+            "stage":        info.Stage,
             "agent":        info.Agent,
             "iteration":    info.Iteration,
             "elapsed":      info.Elapsed,
@@ -664,7 +665,7 @@ func (s *Server) handleGetRunTimeline(w http.ResponseWriter, r *http.Request) {
 	timeline := map[string]interface{}{
 		"run_id":          id,
 		"status":          info.Status,
-		"phase":           info.Phase,
+		"stage":           info.Stage,
 		"iteration":       info.Iteration,
 		"elapsed":         info.Elapsed,
 		"stages":          []map[string]interface{}{},
@@ -947,4 +948,235 @@ func truncateString(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// handleListApprovals returns pending approval requests.
+// GET /api/v1/approvals?run_id=optional&status=pending
+func (s *Server) handleListApprovals(w http.ResponseWriter, r *http.Request) {
+	if s.ApprovalGate == nil {
+		WriteError(w, http.StatusServiceUnavailable, "approval gate not configured")
+		return
+	}
+
+	// Get optional filters from query params
+	runIDFilter := r.URL.Query().Get("run_id")
+	statusFilter := r.URL.Query().Get("status")
+
+	// Get approvals from gate using the interface methods
+	var pending []*approval.GateRequest
+	if runIDFilter != "" {
+		pending = s.ApprovalGate.GetPendingApprovals(runIDFilter)
+	} else {
+		pending = s.ApprovalGate.GetAllPendingApprovals()
+	}
+
+	// Convert to response format with filtering
+	var approvals []*approvalResponse
+	for _, req := range pending {
+		// Apply status filter (pending is the only status for pending approvals)
+		if statusFilter != "" && statusFilter != "pending" && string(req.Status) != statusFilter {
+			continue
+		}
+		approvals = append(approvals, gateRequestToResponse(req))
+	}
+
+	// Return empty array instead of null
+	if approvals == nil {
+		approvals = []*approvalResponse{}
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"approvals": approvals,
+	})
+}
+
+// handleGetApproval returns a single approval request by ID.
+// GET /api/v1/approvals/{id}
+func (s *Server) handleGetApproval(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "approval id required")
+		return
+	}
+
+	if s.ApprovalGate == nil {
+		WriteError(w, http.StatusServiceUnavailable, "approval gate not configured")
+		return
+	}
+
+	// Try to get the request from the gate using InMemoryGate's GetRequest method
+	gate, ok := s.ApprovalGate.(*approval.InMemoryGate)
+	if !ok {
+		WriteError(w, http.StatusNotImplemented, "approval gate does not support GetRequest")
+		return
+	}
+
+	req, found := gate.GetRequest(id)
+	if !found {
+		WriteError(w, http.StatusNotFound, fmt.Sprintf("approval request %q not found", id))
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, gateRequestToResponse(req))
+}
+
+// handleApproveRequest approves a pending approval request.
+// POST /api/v1/approvals/{id}/approve
+func (s *Server) handleApproveRequest(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "approval id required")
+		return
+	}
+
+	if s.ApprovalGate == nil {
+		WriteError(w, http.StatusServiceUnavailable, "approval gate not configured")
+		return
+	}
+
+	var body struct {
+		DecidedBy string `json:"decided_by"`
+		Reason    string `json:"reason"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	// Default to "api" if not specified
+	decidedBy := body.DecidedBy
+	if decidedBy == "" {
+		decidedBy = "api"
+	}
+
+	// Approve the request
+	err := s.ApprovalGate.Approve(id, decidedBy)
+	if err != nil {
+		if err == approval.ErrApprovalRequestNotFound {
+			WriteError(w, http.StatusNotFound, fmt.Sprintf("approval request %q not found", id))
+			return
+		}
+		if err == approval.ErrRequestAlreadyResolved {
+			WriteError(w, http.StatusConflict, fmt.Sprintf("approval request %q already resolved", id))
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Return the updated request if possible
+	if gate, ok := s.ApprovalGate.(*approval.InMemoryGate); ok {
+		if req, found := gate.GetRequest(id); found {
+			WriteJSON(w, http.StatusOK, gateRequestToResponse(req))
+			return
+		}
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"id":      id,
+		"status":  "approved",
+		"message": "approval request approved",
+	})
+}
+
+// handleRejectRequest rejects a pending approval request.
+// POST /api/v1/approvals/{id}/reject
+func (s *Server) handleRejectRequest(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "approval id required")
+		return
+	}
+
+	if s.ApprovalGate == nil {
+		WriteError(w, http.StatusServiceUnavailable, "approval gate not configured")
+		return
+	}
+
+	var body struct {
+		DecidedBy string `json:"decided_by"`
+		Reason    string `json:"reason"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	// Default to "api" if not specified
+	decidedBy := body.DecidedBy
+	if decidedBy == "" {
+		decidedBy = "api"
+	}
+
+	reason := body.Reason
+	if reason == "" {
+		reason = "Rejected via API"
+	}
+
+	// Reject the request
+	err := s.ApprovalGate.Reject(id, decidedBy, reason)
+	if err != nil {
+		if err == approval.ErrApprovalRequestNotFound {
+			WriteError(w, http.StatusNotFound, fmt.Sprintf("approval request %q not found", id))
+			return
+		}
+		if err == approval.ErrRequestAlreadyResolved {
+			WriteError(w, http.StatusConflict, fmt.Sprintf("approval request %q already resolved", id))
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Return the updated request if possible
+	if gate, ok := s.ApprovalGate.(*approval.InMemoryGate); ok {
+		if req, found := gate.GetRequest(id); found {
+			WriteJSON(w, http.StatusOK, gateRequestToResponse(req))
+			return
+		}
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"id":      id,
+		"status":  "rejected",
+		"reason":  reason,
+		"message": "approval request rejected",
+	})
+}
+
+// approvalResponse is the JSON response format for approval requests.
+type approvalResponse struct {
+	ID           string         `json:"id"`
+	RunID        string         `json:"run_id"`
+	ToolName     string         `json:"tool_name"`
+	ToolArgs     map[string]any `json:"tool_args,omitempty"`
+	Description  string         `json:"description"`
+	RiskLevel    string         `json:"risk_level"`
+	Status       string         `json:"status"`
+	CreatedAt    string         `json:"created_at,omitempty"`
+	ResolvedAt   string         `json:"resolved_at,omitempty"`
+	ResolvedBy   string         `json:"resolved_by,omitempty"`
+	RejectReason string         `json:"reject_reason,omitempty"`
+}
+
+// gateRequestToResponse converts an approval.GateRequest to an approvalResponse.
+func gateRequestToResponse(req *approval.GateRequest) *approvalResponse {
+	if req == nil {
+		return nil
+	}
+
+	resp := &approvalResponse{
+		ID:           req.ID,
+		RunID:        req.RunID,
+		ToolName:     req.ToolName,
+		ToolArgs:     req.ToolArgs,
+		Description:  req.Description,
+		RiskLevel:    req.RiskLevel,
+		Status:       string(req.Status),
+		ResolvedBy:   req.ResolvedBy,
+		RejectReason: req.RejectReason,
+	}
+
+	if !req.CreatedAt.IsZero() {
+		resp.CreatedAt = req.CreatedAt.Format(time.RFC3339)
+	}
+	if req.ResolvedAt != nil && !req.ResolvedAt.IsZero() {
+		resp.ResolvedAt = req.ResolvedAt.Format(time.RFC3339)
+	}
+
+	return resp
 }

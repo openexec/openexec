@@ -229,6 +229,7 @@ Examples:
 		if !runNoAutoPlan {
 			planReq := map[string]any{
 				"intent_file": "INTENT.md",
+				"auto_import": true,
 			}
 			body, _ := json.Marshal(planReq)
 			_, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs:plan", startPort), "application/json", bytes.NewReader(body))
@@ -238,8 +239,16 @@ Examples:
 		}
 
 		// Execute all pending tasks
+		// Set mode to "run" for run command execution (full automation)
+		execMode := runMode
+		if execMode == "" || execMode == "workspace-write" || execMode == "read-only" || execMode == "danger-full-access" {
+			// These are execution permission modes, not operational modes
+			// Default to "run" operational mode
+			execMode = "run"
+		}
 		runOpts := map[string]any{
 			"worker_count": config.Execution.WorkerCount,
+			"mode":         execMode,
 		}
 		if len(args) > 0 {
 			runOpts["task_ids"] = []string{args[0]}
@@ -378,10 +387,17 @@ Examples:
 		}
 
 		// Trigger blueprint run via API
+		// Blueprint runs use "run" mode for full automation
+		blueprintRunMode := runMode
+		if blueprintRunMode == "" || blueprintRunMode == "workspace-write" {
+			// Map execution permission mode to operational mode
+			// Default to "run" mode for blueprint execution
+			blueprintRunMode = "run"
+		}
 		payload := map[string]any{
 			"blueprint_id":     blueprintID,
 			"task_description": taskDescription,
-			"mode":             runMode,
+			"mode":             blueprintRunMode,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -543,12 +559,17 @@ func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string,
 func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
 	isStudy := isStudyTask(task.Title)
 
-	payload := map[string]any{}
+	// Determine operational mode - default to "run" for task execution
+	execMode := runMode
+	if execMode == "" {
+		execMode = "run"
+	}
+
+	payload := map[string]any{
+		"mode": execMode,
+	}
 	if isStudy {
 		payload["is_study"] = true
-	}
-	if runMode != "" {
-		payload["mode"] = runMode
 	}
 	body, _ := json.Marshal(payload)
 
@@ -872,11 +893,21 @@ func runMiniInterview(cmd *cobra.Command, initialIntent string, config *project.
 }
 
 // tryAutoImportStories attempts to import stories from .openexec/stories.json into the DB
+//
+// JSON IMPORT GUARD:
+// This function performs a ONE-TIME IMPORT from JSON to SQLite.
+// It is ONLY called when SQLite has no stories (legacy project migration).
+// After import, JSON is NEVER read again - SQLite is the canonical source.
+//
+// This is NOT a runtime data source - it's a migration path for legacy projects.
 // Returns true if an import was performed (regardless of success), false otherwise.
 func tryAutoImportStories(projectDir string, mgr *release.Manager, cmd *cobra.Command) bool {
     storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
     data, err := os.ReadFile(storiesPath)
     if err != nil { return false }
+
+    // Log import operation for drift tracking
+    fmt.Fprintf(os.Stderr, "[IMPORT] Loading from JSON (%s) for one-time migration. SQLite is the canonical store.\n", storiesPath)
     var sf struct {
         Stories []GeneratedStory `json:"stories"`
     }

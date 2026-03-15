@@ -1,4 +1,3 @@
-// Package blueprint provides stage-based execution orchestration.
 package blueprint
 
 import (

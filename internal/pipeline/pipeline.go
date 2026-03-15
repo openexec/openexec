@@ -11,6 +11,7 @@ import (
 
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/config"
+	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,24 +22,18 @@ import (
 type Config struct {
 	FWUID                string
 	WorkDir              string
-	TractStore           string
 	AgentsFS             fs.FS
-	ExecutorModel        string                // model for runner resolution
-	RunnerCommand        string                // CLI override
-	RunnerArgs           []string              // CLI args override
-	Pipeline             *PipelineDef          // if set, overrides Phases/Order
-	Phases               map[Phase]PhaseConfig // defaults to DefaultPhaseConfigs()
-	Order                []Phase               // defaults to DefaultPhaseOrder()
-	MaxReviewCycles      int                   // default 3
-	DefaultMaxIterations int                   // default 10
-	MaxRetries           int                   // default 3
+	ExecutorModel        string   // model for runner resolution
+	RunnerCommand        string   // CLI override
+	RunnerArgs           []string // CLI args override
+	DefaultMaxIterations int      // default 10
+	MaxRetries           int      // default 3
 	RetryBackoff         []time.Duration
-	ThrashThreshold      int          // default 3
-	BriefingFunc         BriefingFunc // nil = TractBriefingFunc(TractStore)
-	CommandName          string       // test override
-	CommandArgs          []string     // test override
+	ThrashThreshold      int      // default 3
+	CommandName          string   // test override
+	CommandArgs          []string // test override
 
-	// IsStudy flags the task as documentation/analysis only (collapses phases).
+	// IsStudy flags the task as documentation/analysis only.
 	IsStudy bool
 
 	// Log configuration
@@ -63,6 +58,19 @@ type Config struct {
 
 	// TaskDescription is the user's task description for blueprint runs.
 	TaskDescription string
+
+	// ContextTokenBudget is the token budget for context assembly.
+	// If > 0, context is gathered using two-stage assembly.
+	ContextTokenBudget int
+
+	// RepoZones filters context to specific directories.
+	RepoZones []string
+
+	// KnowledgeSources ranks context items by source relevance.
+	KnowledgeSources []string
+
+	// Sensitivity determines redaction level ("low", "medium", "high").
+	Sensitivity string
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
@@ -74,14 +82,13 @@ type ResumeConfig struct {
 	AppliedToolCalls []string // Idempotency keys of already-applied tool calls
 }
 
-// Pipeline drives an FWU through TD → IM → RV → RF → FL phases.
+// Pipeline drives an FWU through blueprint-based stage execution.
+// It coordinates with the blueprint engine to execute stages like
+// gather_context → implement → lint → test → review.
 type Pipeline struct {
 	cfg     Config
-	sm      *StateMachine
 	factory *LoopFactory
 	events  chan loop.Event
-
-	briefingCache string
 
 	currentLoop *loop.Loop
 	mu          sync.Mutex
@@ -96,11 +103,9 @@ func New(cfg Config) (*Pipeline, <-chan loop.Event) {
 	factory := NewLoopFactory(LoopFactoryConfig{
 		FWUID:                cfg.FWUID,
 		WorkDir:              cfg.WorkDir,
-		TractStore:           cfg.TractStore,
 		AgentsFS:             cfg.AgentsFS,
 		DefaultMaxIterations: cfg.DefaultMaxIterations,
 		MaxRetries:           cfg.MaxRetries,
-		MaxReviewCycles:      cfg.MaxReviewCycles,
 		RetryBackoff:         cfg.RetryBackoff,
 		ThrashThreshold:      cfg.ThrashThreshold,
 		ExecutorModel:        cfg.ExecutorModel,
@@ -121,30 +126,7 @@ func New(cfg Config) (*Pipeline, <-chan loop.Event) {
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
 func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Event) {
-	// Apply defaults. Pipeline takes precedence over Phases/Order.
-	if cfg.Pipeline != nil {
-		cfg.Order = cfg.Pipeline.PhaseOrder()
-		cfg.Phases = cfg.Pipeline.PhaseConfigs()
-	}
-	if cfg.Order == nil {
-		cfg.Order = DefaultPhaseOrder()
-	}
-	if cfg.Phases == nil {
-		cfg.Phases = DefaultPhaseConfigs()
-	}
-	// Collapse Study tasks to TD -> FL only
-	if cfg.IsStudy {
-		cfg.Order = []Phase{PhaseTD, PhaseFL}
-		// Ensure phases exist for TD and FL
-		ph := DefaultPhaseConfigs()
-		cfg.Phases = map[Phase]PhaseConfig{
-			PhaseTD: ph[PhaseTD],
-			PhaseFL: ph[PhaseFL],
-		}
-	}
-	if cfg.MaxReviewCycles == 0 {
-		cfg.MaxReviewCycles = config.DefaultMaxReviewCycles
-	}
+	// Apply defaults for blueprint-based execution.
 	if cfg.DefaultMaxIterations == 0 {
 		cfg.DefaultMaxIterations = config.DefaultMaxIterations
 	}
@@ -162,7 +144,6 @@ func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Ev
 
 	p := &Pipeline{
 		cfg:     cfg,
-		sm:      NewStateMachine(cfg.Order, cfg.Phases, cfg.MaxReviewCycles),
 		factory: factory,
 		events:  ch,
 	}
@@ -170,8 +151,11 @@ func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Ev
 	return p, ch
 }
 
-// Run executes the pipeline until all phases complete, a phase is paused/blocked,
-// or the context is cancelled. It closes the event channel when it returns.
+// Run executes the pipeline using blueprint-based stage orchestration.
+// It closes the event channel when it returns.
+//
+// Note: Legacy phase-based execution has been removed. All pipeline execution
+// now uses blueprint mode. If BlueprintID is not set, "standard_task" is used.
 func (p *Pipeline) Run(ctx context.Context) error {
 	ctx, span := telemetry.StartSpan(ctx, "Pipeline.Run", trace.WithAttributes(
 		attribute.String("fwu_id", p.cfg.FWUID),
@@ -181,216 +165,8 @@ func (p *Pipeline) Run(ctx context.Context) error {
 
 	defer close(p.events)
 
-	// Blueprint mode: if BlueprintID is set, use blueprint-based execution
-	if p.cfg.BlueprintID != "" {
-		return p.runBlueprintMode(ctx)
-	}
-
-	// Build MCP config once, shared across all phases.
-	mcpPath, cleanup, err := p.buildMCPConfig()
-	if err != nil {
-		return fmt.Errorf("build MCP config: %w", err)
-	}
-	defer cleanup()
-
-	// Resolve briefing function.
-	briefingFn := p.cfg.BriefingFunc
-	if briefingFn == nil {
-		briefingFn = TractBriefingFunc(p.factory.cfg.ReleaseManager)
-	}
-
-	// Build factory.
-	p.factory = NewLoopFactory(LoopFactoryConfig{
-		FWUID:                p.cfg.FWUID,
-		WorkDir:              p.cfg.WorkDir,
-		TractStore:           p.cfg.TractStore,
-		AgentsFS:             p.cfg.AgentsFS,
-		MCPConfigPath:        mcpPath,
-		DefaultMaxIterations: p.cfg.DefaultMaxIterations,
-		MaxRetries:           p.cfg.MaxRetries,
-		RetryBackoff:         p.cfg.RetryBackoff,
-		ThrashThreshold:      p.cfg.ThrashThreshold,
-		ExecutorModel:        p.cfg.ExecutorModel,
-		RunnerCommand:        p.cfg.RunnerCommand,
-		RunnerArgs:           p.cfg.RunnerArgs,
-		CommandName:          p.cfg.CommandName,
-		CommandArgs:          p.cfg.CommandArgs,
-		LogDir:               p.cfg.LogDir,
-		EvidenceDir:          p.cfg.EvidenceDir,
-		EvidenceBucket:       p.cfg.EvidenceBucket,
-		EvidenceRegion:       p.cfg.EvidenceRegion,
-		EvidenceEndpoint:     p.cfg.EvidenceEndpoint,
-		EvidencePrefix:       p.cfg.EvidencePrefix,
-		ExecMode:             p.cfg.ExecMode,
-	})
-
-	// Phase loop.
-	for p.sm.Current() != PhaseDone {
-		if p.stopped.Load() {
-			return nil
-		}
-		if p.paused.Load() {
-			return nil
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		phase := p.sm.Current()
-		phaseCfg, ok := p.sm.CurrentConfig()
-		if !ok {
-			return fmt.Errorf("no config for phase %s", phase)
-		}
-
-		// Emit phase_start.
-		p.emit(loop.Event{
-			Type:        loop.EventPhaseStart,
-			Phase:       string(phase),
-			FWUID:       p.cfg.FWUID,
-			Agent:       phaseCfg.Agent,
-			ReviewCycle: p.sm.ReviewCycles(),
-		})
-
-		// Fetch fresh briefing once per phase.
-		briefing, err := briefingFn(ctx, p.cfg.FWUID)
-		if err != nil {
-			return fmt.Errorf("briefing for phase %s: %w", phase, err)
-		}
-
-		// Doc-only fast-path: if this is a Study/Mapping task and we just finished TD,
-		// jump straight to Feedback Loop (FL) to finalize.
-		isStudy := p.cfg.IsStudy
-
-		// Run Loop, consume events (with retries for transient orchestrator errors)
-		var phaseCompleted, routed, blocked bool
-		var runErr error
-
-		for retry := 0; retry <= p.cfg.MaxRetries; retry++ {
-			if retry > 0 {
-				p.emit(loop.Event{
-					Type: loop.EventError,
-					Text: fmt.Sprintf("phase %s failed (attempt %d/%d), retrying in %v...", phase, retry, p.cfg.MaxRetries+1, p.cfg.RetryBackoff[retry-1]),
-				})
-				time.Sleep(p.cfg.RetryBackoff[retry-1])
-
-				// Re-fetch on retry if requested by user for extra "active healing"
-				if b, err := briefingFn(ctx, p.cfg.FWUID); err == nil {
-					briefing = b
-				}
-			}
-
-			// Create Loop for this phase.
-			l, loopCh, err := p.factory.Create(briefing, phaseCfg)
-			if err != nil {
-				runErr = fmt.Errorf("create loop for phase %s: %w", phase, err)
-				continue
-			}
-
-			p.mu.Lock()
-			p.currentLoop = l
-			p.mu.Unlock()
-
-			var stepResult *loop.StepResult
-			phaseCompleted, routed, blocked, stepResult, runErr = p.runPhase(ctx, l, loopCh, phase, phaseCfg)
-			if runErr == nil {
-				// V5 Determinism check: verify we have a structured result for completion
-				if !blocked && stepResult == nil {
-					runErr = fmt.Errorf("phase %s finished without constrained StepResult", phase)
-					continue
-				}
-
-				// Handle explicit jumps from StepResult
-				if stepResult != nil && stepResult.NextPhase != "" {
-					p.emit(loop.Event{
-						Type: loop.EventProgress,
-						Text: fmt.Sprintf("Agent requested jump to phase: %s (reason: %s)", stepResult.NextPhase, stepResult.Reason),
-					})
-					if err := p.sm.JumpTo(Phase(stepResult.NextPhase)); err != nil {
-						runErr = fmt.Errorf("invalid jump requested: %w", err)
-						continue
-					}
-					routed = true // Mark as routed so we don't advance linearly
-				}
-
-				break
-			}
-
-			// If we reached here, it's a phase execution error.
-			// Only retry transient-looking errors.
-			// (Future: improve classification)
-		}
-
-		if runErr != nil {
-			return runErr
-		}
-
-		p.mu.Lock()
-		p.currentLoop = nil
-		p.mu.Unlock()
-
-		// Check if we were stopped or paused during the phase.
-		if p.stopped.Load() {
-			return nil
-		}
-		if p.paused.Load() {
-			return nil
-		}
-
-		if blocked {
-			// Pipeline pauses for operator attention.
-			return nil
-		}
-
-		// Emit phase_complete.
-		p.emit(loop.Event{
-			Type:        loop.EventPhaseComplete,
-			Phase:       string(phase),
-			FWUID:       p.cfg.FWUID,
-			Agent:       phaseCfg.Agent,
-			ReviewCycle: p.sm.ReviewCycles(),
-			PromptHash: func() string {
-				if p.currentLoop != nil {
-					return p.currentLoop.PromptHash()
-				}
-				return ""
-			}(),
-		})
-
-		// Advance state machine.
-		if routed {
-			// Already handled by Route() during runPhase.
-		} else if len(phaseCfg.Routes) > 0 {
-			// Routing phase completed without explicit route signal.
-			if !phaseCompleted {
-				return fmt.Errorf("phase %s ended without route or phase-complete signal", phase)
-			}
-			// phase-complete without route is abnormal, but not fatal.
-			// Advance linearly (skip routing).
-			if _, err := p.sm.advanceLinear(); err != nil {
-				return fmt.Errorf("advance from %s: %w", phase, err)
-			}
-		} else {
-			// Linear advancement.
-			if isStudy && phase == PhaseTD {
-				// Fast-track: Study tasks are done after Technical Design.
-				// No need for IM (Implement), RV (Review), RF (Refactor), or FL (Feedback Loop).
-				if err := p.sm.JumpTo(PhaseDone); err != nil {
-					return fmt.Errorf("complete study task: %w", err)
-				}
-			} else {
-				if _, err := p.sm.Advance(); err != nil {
-					return fmt.Errorf("advance from %s: %w", phase, err)
-				}
-			}
-		}
-	}
-
-	p.emit(loop.Event{
-		Type:  loop.EventPipelineComplete,
-		FWUID: p.cfg.FWUID,
-	})
-
-	return nil
+	// Always use blueprint mode - default to standard_task if not specified
+	return p.runBlueprintMode(ctx)
 }
 
 // Pause signals the pipeline to exit after the current loop iteration.
@@ -413,99 +189,6 @@ func (p *Pipeline) Stop() {
 	p.mu.Unlock()
 }
 
-// runPhase runs the Loop for one phase, consuming and forwarding events.
-// Returns (phaseCompleted, routed, blocked, result, error).
-func (p *Pipeline) runPhase(ctx context.Context, l *loop.Loop, loopCh <-chan loop.Event, phase Phase, phaseCfg PhaseConfig) (bool, bool, bool, *loop.StepResult, error) {
-	ctx, span := telemetry.StartPhaseSpan(ctx, p.cfg.FWUID, string(phase), phaseCfg.Agent)
-	span.SetAttributes(attribute.Int("phase.iteration", l.GetHealth().Iteration))
-	defer span.End()
-
-	var phaseCompleted, routed, blocked bool
-	var stepResult *loop.StepResult
-
-	// Run the loop in background while we consume events here
-	loopDone := make(chan error, 1)
-	go func() { loopDone <- l.Run(ctx) }()
-
-	for event := range loopCh {
-		// Enrich with pipeline context for downstream consumers
-		event.Phase = string(phase)
-		event.FWUID = p.cfg.FWUID
-		event.Agent = phaseCfg.Agent
-		event.ReviewCycle = p.sm.ReviewCycles()
-
-		// Capture constrained StepResult when provided
-		if event.Type == loop.EventComplete && event.Result != nil {
-			stepResult = event.Result
-		}
-
-		// Interpret signals into deterministic pipeline actions
-		sr := HandleSignal(event)
-		switch sr.Action {
-		case ActionPhaseComplete:
-			phaseCompleted = true
-
-		case ActionRoute:
-			routed = true
-			// Apply route to the state machine and emit a decision event
-			next, err := p.sm.Route(sr.RouteTarget)
-			if err != nil {
-				// Route error (e.g., invalid target or max review cycles)
-				p.emit(loop.Event{
-					Type:        loop.EventOperatorAttention,
-					Phase:       string(phase),
-					FWUID:       p.cfg.FWUID,
-					Agent:       phaseCfg.Agent,
-					ReviewCycle: p.sm.ReviewCycles(),
-					Text:        fmt.Sprintf("route error: %v", err),
-				})
-				blocked = true
-			} else {
-				p.emit(loop.Event{
-					Type:        loop.EventRouteDecision,
-					Phase:       string(phase),
-					FWUID:       p.cfg.FWUID,
-					Agent:       phaseCfg.Agent,
-					RouteTarget: sr.RouteTarget,
-					ReviewCycle: p.sm.ReviewCycles(),
-					Text:        fmt.Sprintf("routed to %s (next phase: %s)", sr.RouteTarget, next),
-				})
-			}
-
-		case ActionPause:
-			blocked = true
-			l.Pause()
-			p.emit(loop.Event{
-				Type:        loop.EventOperatorAttention,
-				Phase:       string(phase),
-				FWUID:       p.cfg.FWUID,
-				Agent:       phaseCfg.Agent,
-				ReviewCycle: p.sm.ReviewCycles(),
-				Text:        sr.Reason,
-			})
-
-		case ActionReplan:
-			blocked = true
-			l.Pause()
-			p.emit(loop.Event{
-				Type:        loop.EventPlanningMismatch,
-				Phase:       string(phase),
-				FWUID:       p.cfg.FWUID,
-				Agent:       phaseCfg.Agent,
-				ReviewCycle: p.sm.ReviewCycles(),
-				Text:        sr.Reason,
-			})
-		}
-
-		// Forward enriched event
-		p.emit(event)
-	}
-
-	// Loop completed — return termination details
-	err := <-loopDone
-	return phaseCompleted, routed, blocked, stepResult, err
-}
-
 func (p *Pipeline) emit(e loop.Event) {
 	p.events <- e
 }
@@ -517,7 +200,7 @@ func (p *Pipeline) buildMCPConfig() (string, func(), error) {
 	}
 
 	axonBin, _ := os.Executable()
-	servers := loop.BuildMCPServers(axonBin, p.cfg.TractStore)
+	servers := loop.BuildMCPServers(axonBin, "")
 	path, err := loop.WriteMCPConfig(servers)
 	if err != nil {
 		return "", nil, err
@@ -536,8 +219,32 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 }
 
 // runBlueprintMode executes the pipeline using blueprint-based stage orchestration.
-// This is an alternative to the phase-based execution when BlueprintID is set.
+// This is the sole execution path - all pipeline runs use blueprint mode.
+// If BlueprintID is empty, it defaults to "standard_task".
 func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
+	// Build context using two-stage assembly
+	var contextPack *ocontext.ContextPack
+	if p.cfg.ContextTokenBudget > 0 {
+		pack, err := ocontext.BuildContextWithRouting(
+			ctx,
+			p.cfg.WorkDir,
+			p.cfg.ContextTokenBudget,
+			p.cfg.RepoZones,
+			p.cfg.KnowledgeSources,
+			p.cfg.Sensitivity,
+		)
+		if err != nil {
+			// Log warning but continue - context is optional
+			p.emit(loop.Event{
+				Type:    loop.EventError,
+				FWUID:   p.cfg.FWUID,
+				ErrText: fmt.Sprintf("context assembly warning: %v", err),
+			})
+		} else {
+			contextPack = pack
+		}
+	}
+
 	// Lookup blueprint by ID
 	var bp *blueprint.Blueprint
 	switch p.cfg.BlueprintID {
@@ -629,6 +336,19 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	input := blueprint.NewStageInput(p.cfg.FWUID, p.cfg.TaskDescription, p.cfg.WorkDir)
+
+	// Inject gathered context into stage input
+	if contextPack != nil {
+		items := make([]blueprint.ContextPackItem, 0, len(contextPack.Items))
+		for _, item := range contextPack.Items {
+			items = append(items, blueprint.ContextPackItem{
+				Type:    string(item.Type),
+				Source:  item.Source,
+				Content: item.Content,
+			})
+		}
+		input.SetContextFromPack(items)
+	}
 
 	// Execute blueprint
 	if err := engine.Execute(ctx, run, input); err != nil {

@@ -11,7 +11,6 @@ import (
 type ProjectConfig struct {
 	Name        string `json:"name"`
 	ProjectDir  string `json:"project_dir,omitempty"`
-	TractStore  string `json:"tract_store"`
 	EngramStore string `json:"engram_store"`
 	GitEnabled         bool   `json:"git_enabled,omitempty"`
 	GitCommitEnabled   bool   `json:"git_commit_enabled,omitempty"` // Allow autonomous local commits
@@ -103,7 +102,6 @@ func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 	config := &ProjectConfig{
 		Name:        projectName,
 		ProjectDir:  projectDir,
-		TractStore:  ".openexec",
 		EngramStore: ".openexec/engram",
 		GitEnabled:  true,
 		BaseBranch:  "main",

@@ -33,14 +33,10 @@ const (
 // Config holds server-level configuration set once at startup.
 type Config struct {
 	WorkDir              string
-	TractStore           string
 	AgentsFS             fs.FS
 	ExecutorModel        string   // model for runner resolution
 	RunnerCommand        string   // CLI override
 	RunnerArgs           []string // CLI args override
-	Pipeline             *pipeline.PipelineDef                   // pipeline config (nil = default)
-	Phases               map[pipeline.Phase]pipeline.PhaseConfig // test override (nil = DefaultPhaseConfigs)
-	Order                []pipeline.Phase                        // test override (nil = DefaultPhaseOrder)
 	DefaultMaxIterations int
 	MaxRetries           int
 	MaxReviewCycles      int
@@ -49,27 +45,29 @@ type Config struct {
 	CommandName          string   // test override
 	CommandArgs          []string // test override
 	LogDir               string
-    BriefingFunc         pipeline.BriefingFunc // test override (nil = TractBriefingFunc)
-    // ExecMode: read-only | workspace-write | danger-full-access
-    ExecMode             string
-    StateStore           *state.Store
-    AuditLogger          audit.Logger // optional audit logger for run-step events
+	// ExecMode: read-only | workspace-write | danger-full-access
+	ExecMode    string
+	StateStore  *state.Store
+	AuditLogger audit.Logger // optional audit logger for run-step events
+	// PIIScrubLevel controls PII scrubbing sensitivity for audit logs
+	// Valid values: "low", "medium", "high", "" (disabled)
+	PIIScrubLevel string
 }
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
 type PipelineInfo struct {
-	FWUID        string         `json:"fwu_id"`
-	Status       PipelineStatus `json:"status"`
-	Phase        string         `json:"phase,omitempty"`
-	Agent        string         `json:"agent,omitempty"`
-	Iteration    int            `json:"iteration,omitempty"`
-	ReviewCycles int            `json:"review_cycles,omitempty"`
-	StartedAt    time.Time      `json:"started_at"`
-	Elapsed      string         `json:"elapsed"`
-	Error        string         `json:"error,omitempty"`
-	LastActivity time.Time      `json:"last_activity"`
-    CurrentPID   int            `json:"current_pid,omitempty"`
-    DroppedEvents int           `json:"dropped_events,omitempty"`
+	FWUID         string         `json:"fwu_id"`
+	Status        PipelineStatus `json:"status"`
+	Stage         string         `json:"stage,omitempty"` // current blueprint stage
+	Agent         string         `json:"agent,omitempty"`
+	Iteration     int            `json:"iteration,omitempty"`
+	ReviewCycles  int            `json:"review_cycles,omitempty"`
+	StartedAt     time.Time      `json:"started_at"`
+	Elapsed       string         `json:"elapsed"`
+	Error         string         `json:"error,omitempty"`
+	LastActivity  time.Time      `json:"last_activity"`
+	CurrentPID    int            `json:"current_pid,omitempty"`
+	DroppedEvents int            `json:"dropped_events,omitempty"`
 }
 
 type entry struct {
@@ -220,30 +218,19 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
     pCfg := pipeline.Config{
         FWUID:                fwuID,
         WorkDir:              m.cfg.WorkDir,
-        TractStore:           m.cfg.TractStore,
         AgentsFS:             m.cfg.AgentsFS,
         ExecutorModel:        m.cfg.ExecutorModel,
         RunnerCommand:        m.cfg.RunnerCommand,
         RunnerArgs:           m.cfg.RunnerArgs,
-        Pipeline:             m.cfg.Pipeline,
-        Phases:               m.cfg.Phases,
-        Order:                m.cfg.Order,
         DefaultMaxIterations: m.cfg.DefaultMaxIterations,
         MaxRetries:           m.cfg.MaxRetries,
-        MaxReviewCycles:      m.cfg.MaxReviewCycles,
         ThrashThreshold:      m.cfg.ThrashThreshold,
         RetryBackoff:         m.cfg.RetryBackoff,
         CommandName:          m.cfg.CommandName,
         CommandArgs:          m.cfg.CommandArgs,
         LogDir:               m.cfg.LogDir,
-        BriefingFunc:         m.cfg.BriefingFunc,
         ExecMode:             m.cfg.ExecMode,
     }
-
-	// Default to built-in Tract briefing if not overridden
-	if pCfg.BriefingFunc == nil {
-		pCfg.BriefingFunc = pipeline.TractBriefingFunc(rel)
-	}
 
 	for _, opt := range opts {
 		opt(&pCfg)
@@ -253,12 +240,10 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
     factory := pipeline.NewLoopFactory(pipeline.LoopFactoryConfig{
         FWUID:                pCfg.FWUID,
         WorkDir:              pCfg.WorkDir,
-        TractStore:           pCfg.TractStore,
         AgentsFS:             pCfg.AgentsFS,
         ReleaseManager:       rel,
         DefaultMaxIterations: pCfg.DefaultMaxIterations,
         MaxRetries:           pCfg.MaxRetries,
-        MaxReviewCycles:      pCfg.MaxReviewCycles,
         RetryBackoff:         pCfg.RetryBackoff,
         ThrashThreshold:      pCfg.ThrashThreshold,
         ExecutorModel:        pCfg.ExecutorModel,
@@ -420,6 +405,9 @@ func (m *Manager) GetConfig() Config {
 }
 
 func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
+	if m.state == nil {
+		return nil, fmt.Errorf("state store not configured")
+	}
 	rel, err := release.NewManagerWithDB(m.cfg.WorkDir, release.DefaultConfig(), m.state.GetDB())
 	if err != nil {
 		return nil, err

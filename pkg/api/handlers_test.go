@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/pkg/manager"
 )
 
@@ -33,39 +32,17 @@ func buildMockClaude(t *testing.T) string {
 	return bin
 }
 
-func mockBriefing() pipeline.BriefingFunc {
-	return func(ctx context.Context, fwuID string) (string, error) {
-		return "## FWU Briefing: " + fwuID + "\n\n**Status:** in_progress\n**Intent:** Test intent", nil
-	}
-}
-
-func allPhasesConfig(scenario string) ([]pipeline.Phase, map[pipeline.Phase]pipeline.PhaseConfig) {
-	order := pipeline.DefaultPhaseOrder()
-	phases := map[pipeline.Phase]pipeline.PhaseConfig{
-		pipeline.PhaseTD: {Agent: "test-agent", Workflow: "technical-design", CommandArgs: []string{scenario}},
-		pipeline.PhaseIM: {Agent: "test-agent", Workflow: "implement", CommandArgs: []string{scenario}},
-		pipeline.PhaseRV: {Agent: "test-agent", Workflow: "review", CommandArgs: []string{scenario}, Routes: map[string]pipeline.Phase{"spark": pipeline.PhaseIM, "hon": pipeline.PhaseRF}},
-		pipeline.PhaseRF: {Agent: "test-agent", Workflow: "refactor", CommandArgs: []string{scenario}},
-		pipeline.PhaseFL: {Agent: "test-agent", Workflow: "feedback-loop", CommandArgs: []string{scenario}},
-	}
-	return order, phases
-}
 
 func testManager(t *testing.T, bin string) *manager.Manager {
 	t.Helper()
-	order, phases := allPhasesConfig("signal-complete")
 	mgr, err := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
-		Order:                order,
-		Phases:               phases,
 		DefaultMaxIterations: 10,
 		MaxRetries:           1,
-		MaxReviewCycles:      3,
 		ThrashThreshold:      0,
 		RetryBackoff:         []time.Duration{0},
 		CommandName:          bin,
-		BriefingFunc:         mockBriefing(),
 	})
 	if err != nil {
 		t.Fatalf("manager.New: %v", err)
@@ -99,19 +76,14 @@ func TestHandleStartRunSuccess(t *testing.T) {
 
 func TestHandleStartRunDuplicate(t *testing.T) {
 	bin := buildMockClaude(t)
-	order, phases := allPhasesConfig("slow")
 	mgr, err := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
-		Order:                order,
-		Phases:               phases,
 		DefaultMaxIterations: 10,
 		MaxRetries:           1,
-		MaxReviewCycles:      3,
 		ThrashThreshold:      0,
 		RetryBackoff:         []time.Duration{0},
 		CommandName:          bin,
-		BriefingFunc:         mockBriefing(),
 	})
 	if err != nil {
 		t.Fatalf("manager.New: %v", err)

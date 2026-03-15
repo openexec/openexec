@@ -209,7 +209,7 @@ The context builder (`internal/context/`) automatically gathers and injects proj
 | Source | Description | Default Budget |
 |--------|-------------|----------------|
 | `INTENT.md` | Project vision and requirements | 500 tokens |
-| `tasks.json` | Current task state summary | 300 tokens |
+| SQLite state | Current task state from database | 300 tokens |
 | Git status | Modified files, branch info | 200 tokens |
 | Recent logs | Last 50 lines of execution.log | 500 tokens |
 | Directory tree | Project structure (respecting .gitignore) | 500 tokens |

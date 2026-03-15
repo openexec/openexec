@@ -89,33 +89,3 @@ func (d *PipelineDef) Validate() error {
 
 	return nil
 }
-
-// PhaseOrder returns the ordered list of phase IDs.
-func (d *PipelineDef) PhaseOrder() []Phase {
-	order := make([]Phase, len(d.Phases))
-	for i, p := range d.Phases {
-		order[i] = Phase(p.ID)
-	}
-	return order
-}
-
-// PhaseConfigs converts the pipeline definition to a map of PhaseConfigs.
-func (d *PipelineDef) PhaseConfigs() map[Phase]PhaseConfig {
-	configs := make(map[Phase]PhaseConfig, len(d.Phases))
-	for _, p := range d.Phases {
-		cfg := PhaseConfig{
-			Agent:         p.Agent,
-			Workflow:      p.Workflow,
-			MaxIterations: p.MaxIterations,
-		}
-		if len(p.Routes) > 0 {
-			routes := make(map[string]Phase, len(p.Routes))
-			for target, destID := range p.Routes {
-				routes[target] = Phase(destID)
-			}
-			cfg.Routes = routes
-		}
-		configs[Phase(p.ID)] = cfg
-	}
-	return configs
-}

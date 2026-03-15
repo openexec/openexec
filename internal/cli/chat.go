@@ -93,11 +93,13 @@ func runChatREPL(cmd *cobra.Command, projectName string) error {
 	fmt.Println()
 
 	// Create session via daemon API (daemon-owned orchestration)
+	// Sessions start in chat mode by default
 	sessionReq := map[string]any{
 		"projectPath": projectName,
 		"provider":    os.Getenv("OPENEXEC_PROVIDER"),
 		"model":       os.Getenv("OPENEXEC_MODEL"),
 		"title":       fmt.Sprintf("Chat %s", time.Now().Format("2006-01-02 15:04")),
+		"mode":        "chat",
 	}
 	sessionBody, _ := json.Marshal(sessionReq)
 	sessionResp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/sessions", startPort), "application/json", strings.NewReader(string(sessionBody)))
@@ -136,10 +138,15 @@ func runChatREPL(cmd *cobra.Command, projectName string) error {
 		}
 
         // Conversational V5: Create a run for the message
+        // When chat escalates to task execution, use task mode
+        chatMode := os.Getenv("OPENEXEC_MODE")
+        if chatMode == "" {
+            chatMode = "task" // Default to task mode for chat-initiated runs
+        }
         runReq := map[string]any{
             "session_id":     sessionID,
             "quickfix_title": line,
-            "mode":           os.Getenv("OPENEXEC_MODE"),
+            "mode":           chatMode,
         }
         body, _ := json.Marshal(runReq)
         resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs", startPort), "application/json", strings.NewReader(string(body)))

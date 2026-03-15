@@ -30,7 +30,10 @@ func StartProcess(ctx context.Context, cfg Config, stdoutW, stderrW io.Writer, m
     cmd.Dir = cfg.WorkDir
     // Propagate execution mode and workspace root to the child process
     env := os.Environ()
-    if cfg.ExecMode != "" {
+    // Prefer typed Mode over legacy ExecMode string
+    if cfg.Mode != "" {
+        env = append(env, "OPENEXEC_MODE="+string(cfg.Mode))
+    } else if cfg.ExecMode != "" {
         env = append(env, "OPENEXEC_MODE="+cfg.ExecMode)
     }
     if cfg.WorkDir != "" {

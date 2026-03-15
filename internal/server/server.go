@@ -130,7 +130,6 @@ func New(cfg Config) (*Server, error) {
 
     mgr, err := manager.New(manager.Config{
         WorkDir:       projectsAbs,
-        TractStore:    cfg.DataDir,
         AgentsFS:      agentsFS,
         LogDir:        logDir,
         ExecutorModel: modelUsed,

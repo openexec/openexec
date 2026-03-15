@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/blueprint"
+	"github.com/openexec/openexec/internal/mode"
 	"github.com/openexec/openexec/internal/summarize"
 	"github.com/openexec/openexec/pkg/agent"
 )
@@ -133,7 +134,13 @@ type Config struct {
     // ExecMode controls write permissions for the spawned process.
     // Accepted: "read-only", "workspace-write", "danger-full-access".
     // Propagated via environment variables to the runner.
+    // DEPRECATED: Use Mode instead for typed mode handling.
     ExecMode string
+
+    // Mode is the typed operational mode (chat/task/run).
+    // When set, this takes precedence over ExecMode for MCP server configuration.
+    // The mode is propagated to child processes via OPENEXEC_MODE env var.
+    Mode mode.Mode
 
     // PromptHash is the SHA-256 (hex) of the composed prompt for observability.
     PromptHash string
@@ -175,6 +182,11 @@ type Config struct {
 
     // BlueprintCallbacks contains callbacks for blueprint events.
     BlueprintCallbacks *BlueprintCallbacks `json:"-"`
+
+    // PIIScrubLevel controls PII scrubbing before sending to LLM providers.
+    // Valid values: "low", "medium", "high", "" (disabled)
+    // When enabled, all message content is scrubbed before being sent to the provider.
+    PIIScrubLevel string
 }
 
 // BlueprintCallbacks contains callbacks for blueprint stage events.

@@ -10,11 +10,13 @@
 
 import React from 'react'
 import type { Session, Message, ToolCall, AgentLoopState, CostInfo } from '../../../types/chat'
+import type { Stage, BlueprintState } from '../../../types/blueprint'
 import type { ForkInfo } from '../../../hooks/useFork'
 import type { AncestorSession } from '../session/ForkAncestryTree'
 import ChatHeader from '../header/ChatHeader'
 import MessageList from '../messages/MessageList'
 import ChatInput from '../input/ChatInput'
+import StageTimeline from '../blueprint/StageTimeline'
 
 export interface ChatMainProps {
   /** Current session */
@@ -59,6 +61,12 @@ export interface ChatMainProps {
   onNavigateToSession?: (sessionId: string) => void
   /** Callback when fork is requested from header */
   onForkSession?: () => void
+  /** Blueprint stages for run detail view */
+  stages?: Stage[]
+  /** Blueprint execution state */
+  blueprintState?: BlueprintState
+  /** Whether blueprint is running */
+  isBlueprintRunning?: boolean
 }
 
 const ChatMain: React.FC<ChatMainProps> = ({
@@ -83,6 +91,9 @@ const ChatMain: React.FC<ChatMainProps> = ({
   onForkAtMessage,
   onNavigateToSession,
   onForkSession,
+  stages,
+  blueprintState,
+  isBlueprintRunning = false,
 }) => {
   // Build a map of tool calls by message ID for easy lookup
   const toolCallsByMessageId = React.useMemo(() => {
@@ -128,6 +139,18 @@ const ChatMain: React.FC<ChatMainProps> = ({
         onNavigateToSession={onNavigateToSession}
         onForkSession={onForkSession}
       />
+
+      {/* Stage Timeline - shown for blueprint runs */}
+      {stages && stages.some((s) => s.status !== 'pending') && (
+        <div className="chat-main__stages" style={mainStyles.stages}>
+          <StageTimeline
+            stages={stages}
+            blueprintState={blueprintState}
+            isRunning={isBlueprintRunning}
+            compact
+          />
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="chat-main__messages" style={mainStyles.messages}>
@@ -208,6 +231,12 @@ const mainStyles: Record<string, React.CSSProperties> = {
     borderTop: '1px solid #30363d',
     padding: '16px',
     backgroundColor: '#0d1117',
+  },
+  stages: {
+    padding: '12px 16px',
+    borderBottom: '1px solid #30363d',
+    backgroundColor: '#161b22',
+    flexShrink: 0,
   },
   emptyState: {
     flex: 1,

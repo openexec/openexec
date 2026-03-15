@@ -1,6 +1,7 @@
-package tract
+package release
 
-// BriefResponse is the response from tract_brief.
+// BriefResponse is the structured briefing data for a task (FWU).
+// This was previously part of the legacy tract package.
 type BriefResponse struct {
 	FWU                FWU                 `json:"fwu"`
 	Boundaries         []Boundary          `json:"boundaries"`
@@ -15,6 +16,7 @@ type BriefResponse struct {
 	PriorICCount       int                 `json:"prior_ic_count"`
 }
 
+// FWU represents a Feature Work Unit (task) in the briefing.
 type FWU struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -23,12 +25,14 @@ type FWU struct {
 	FeatureID string `json:"feature_id"`
 }
 
+// Boundary defines what is in or out of scope for a task.
 type Boundary struct {
 	ID          string `json:"id"`
 	Scope       string `json:"scope"` // "in_scope" or "out_of_scope"
 	Description string `json:"description"`
 }
 
+// Dependency represents a dependency on another task.
 type Dependency struct {
 	ID             string `json:"id"`
 	DependencyType string `json:"dependency_type"`
@@ -36,6 +40,7 @@ type Dependency struct {
 	Description    string `json:"description"`
 }
 
+// DesignDecision captures a design decision with rationale.
 type DesignDecision struct {
 	ID         string `json:"id"`
 	Decision   string `json:"decision"`
@@ -43,6 +48,7 @@ type DesignDecision struct {
 	Rationale  string `json:"rationale"`
 }
 
+// InterfaceContract defines an interface contract with another task.
 type InterfaceContract struct {
 	ID               string `json:"id"`
 	Direction        string `json:"direction"` // "consumes" or "produces"
@@ -50,12 +56,14 @@ type InterfaceContract struct {
 	Description      string `json:"description"`
 }
 
+// VerificationGate defines a verification requirement.
 type VerificationGate struct {
 	ID          string `json:"id"`
 	Gate        string `json:"gate"` // "tests", "docs", "quality", "ops", "security"
 	Expectation string `json:"expectation"`
 }
 
+// ReasoningChain traces the task back to strategic objectives.
 type ReasoningChain struct {
 	Feature    *ChainEntity  `json:"feature"`
 	Epic       *ChainEntity  `json:"epic"`
@@ -66,12 +74,14 @@ type ReasoningChain struct {
 	Goals      []ChainEntity `json:"goals"`
 }
 
+// ChainEntity is a node in the reasoning chain.
 type ChainEntity struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
+// DependencyStatus tracks the status of a dependency.
 type DependencyStatus struct {
 	DependencyID  string `json:"dependency_id"`
 	TargetFWUID   string `json:"target_fwu_id"`
@@ -80,6 +90,7 @@ type DependencyStatus struct {
 	Description   string `json:"description"`
 }
 
+// PredecessorSpec captures specifications from predecessor tasks.
 type PredecessorSpec struct {
 	SourceFWUID string `json:"source_fwu_id"`
 	SourceICID  string `json:"source_ic_id"`
@@ -89,6 +100,7 @@ type PredecessorSpec struct {
 	CodeBlock   string `json:"code_block"`
 }
 
+// PriorIC represents a prior implementation context attempt.
 type PriorIC struct {
 	ICID            string `json:"ic_id"`
 	Attempt         int    `json:"attempt"`

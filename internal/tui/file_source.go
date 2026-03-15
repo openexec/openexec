@@ -1,13 +1,17 @@
 package tui
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // FileSource reads project data from .openexec/ directories
@@ -186,19 +190,33 @@ func (fs *FileSource) readProjectState(name, openexecDir string) ProjectInfo {
 		}
 	}
 
-	// Try to read tasks.json for progress
-	tasksFile := filepath.Join(openexecDir, "tasks.json")
-	if data, err := os.ReadFile(tasksFile); err == nil {
-		var tasks taskList
-		if json.Unmarshal(data, &tasks) == nil {
-			if len(tasks.Tasks) > 0 {
-				completed := 0
-				for _, t := range tasks.Tasks {
-					if t.Status == "completed" || t.Status == "done" {
-						completed++
+	// Try to read tasks from SQLite first (CANONICAL source)
+	//
+	// JSON READ GUARD:
+	// SQLite is the canonical source of truth. JSON fallback is ONLY used when:
+	//   - SQLite database doesn't exist (legacy project not yet migrated)
+	//   - SQLite query fails (database corruption)
+	// The JSON fallback should be considered a migration path, not a runtime source.
+	dbPath := filepath.Join(openexecDir, "openexec.db")
+	if progress, ok := fs.readProgressFromSQLite(dbPath); ok {
+		proj.Progress = progress
+	} else {
+		// FALLBACK ONLY: Read from tasks.json if SQLite is unavailable
+		// This is a migration path for legacy projects, not a runtime source.
+		tasksFile := filepath.Join(openexecDir, "tasks.json")
+		if data, err := os.ReadFile(tasksFile); err == nil {
+			fmt.Fprintf(os.Stderr, "[FALLBACK] Loading from JSON (%s) because SQLite unavailable. Run 'openexec run' to migrate.\n", tasksFile)
+			var tasks taskList
+			if json.Unmarshal(data, &tasks) == nil {
+				if len(tasks.Tasks) > 0 {
+					completed := 0
+					for _, t := range tasks.Tasks {
+						if t.Status == "completed" || t.Status == "done" {
+							completed++
+						}
 					}
+					proj.Progress = (completed * 100) / len(tasks.Tasks)
 				}
-				proj.Progress = (completed * 100) / len(tasks.Tasks)
 			}
 		}
 	}
@@ -234,6 +252,35 @@ type taskList struct {
 type task struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
+}
+
+// readProgressFromSQLite reads task progress from the SQLite database.
+// Returns (progress percentage, true) if successful, (0, false) otherwise.
+func (fs *FileSource) readProgressFromSQLite(dbPath string) (int, bool) {
+	// Check if DB file exists
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return 0, false
+	}
+
+	db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
+	if err != nil {
+		return 0, false
+	}
+	defer db.Close()
+
+	// Query task counts from SQLite
+	var total, completed int
+	err = db.QueryRow(`SELECT COUNT(*) FROM tasks`).Scan(&total)
+	if err != nil || total == 0 {
+		return 0, false
+	}
+
+	err = db.QueryRow(`SELECT COUNT(*) FROM tasks WHERE status IN ('completed', 'done')`).Scan(&completed)
+	if err != nil {
+		return 0, false
+	}
+
+	return (completed * 100) / total, true
 }
 
 // inferStatus tries to determine project status from files

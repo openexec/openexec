@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openexec/openexec/internal/approval"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/session"
 	"github.com/openexec/openexec/pkg/db/state"
@@ -18,6 +19,7 @@ type Server struct {
 	SessionRepo     session.Repository
 	AuditLogger     audit.Logger
 	StateStore      *state.Store // Unified state store for runs/steps/artifacts
+	ApprovalGate    approval.ApprovalGate // Approval gate for tool execution
 	UseUnifiedReads bool         // Default ON; set OPENEXEC_USE_UNIFIED_READS=0 to disable
 	ProjectsDir     string
 	Server          *http.Server
@@ -32,6 +34,13 @@ type ServerOption func(*Server)
 func WithStateStore(store *state.Store) ServerOption {
 	return func(s *Server) {
 		s.StateStore = store
+	}
+}
+
+// WithApprovalGate sets the approval gate for tool execution approval.
+func WithApprovalGate(gate approval.ApprovalGate) ServerOption {
+	return func(s *Server) {
+		s.ApprovalGate = gate
 	}
 }
 
@@ -141,6 +150,12 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	if s.AuditLogger != nil && s.SessionRepo != nil {
 		RegisterUsageRoutes(mux, s.AuditLogger, s.SessionRepo)
 	}
+
+	// Approval routes (v1 API)
+	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)
+	mux.HandleFunc("GET /api/v1/approvals/{id}", s.handleGetApproval)
+	mux.HandleFunc("POST /api/v1/approvals/{id}/approve", s.handleApproveRequest)
+	mux.HandleFunc("POST /api/v1/approvals/{id}/reject", s.handleRejectRequest)
 }
 
 // Handler returns the HTTP handler for testing without a listener.

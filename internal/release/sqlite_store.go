@@ -1370,5 +1370,193 @@ func parseApproval(status, approvedBy, approvedAt, comments, rejectionReason sql
 	}
 }
 
+// Checkpoint operations
+
+// CreateCheckpoint stores a new checkpoint.
+func (s *SQLiteStore) CreateCheckpoint(ctx context.Context, cp *Checkpoint) error {
+	if cp.ID == "" {
+		return ErrInvalidData
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	toolCallLogJSON, err := json.Marshal(cp.ToolCallLog)
+	if err != nil {
+		toolCallLogJSON = []byte("[]")
+	}
+
+	artifactsJSON, err := json.Marshal(cp.Artifacts)
+	if err != nil {
+		artifactsJSON = []byte("{}")
+	}
+
+	query := `
+		INSERT INTO checkpoints (id, run_id, stage, message_history, tool_call_log, artifacts, context_hash, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err = s.db.ExecContext(ctx, query,
+		cp.ID, cp.RunID, cp.Stage, cp.MessageHistory, toolCallLogJSON, artifactsJSON, cp.ContextHash,
+		cp.CreatedAt.UTC().Format(time.RFC3339Nano),
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return ErrCheckpointAlreadyExist
+		}
+		return fmt.Errorf("failed to create checkpoint: %w", err)
+	}
+
+	return nil
+}
+
+// GetCheckpoint retrieves a checkpoint by ID.
+func (s *SQLiteStore) GetCheckpoint(ctx context.Context, id string) (*Checkpoint, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	query := `SELECT id, run_id, stage, message_history, tool_call_log, artifacts, context_hash, created_at FROM checkpoints WHERE id = ?`
+
+	var cp Checkpoint
+	var toolCallLogJSON, artifactsJSON string
+	var createdAt string
+
+	err := s.db.QueryRowContext(ctx, query, id).Scan(
+		&cp.ID, &cp.RunID, &cp.Stage, &cp.MessageHistory, &toolCallLogJSON, &artifactsJSON, &cp.ContextHash, &createdAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrCheckpointNotFound
+		}
+		return nil, fmt.Errorf("failed to get checkpoint: %w", err)
+	}
+
+	// Parse JSON fields
+	if err := json.Unmarshal([]byte(toolCallLogJSON), &cp.ToolCallLog); err != nil {
+		cp.ToolCallLog = []string{}
+	}
+	if err := json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts); err != nil {
+		cp.Artifacts = map[string]string{}
+	}
+
+	// Parse timestamp
+	cp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+
+	return &cp, nil
+}
+
+// ListCheckpointsForRun returns all checkpoints for a specific run.
+func (s *SQLiteStore) ListCheckpointsForRun(ctx context.Context, runID string) ([]*Checkpoint, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	query := `SELECT id, run_id, stage, message_history, tool_call_log, artifacts, context_hash, created_at FROM checkpoints WHERE run_id = ? ORDER BY created_at ASC`
+
+	rows, err := s.db.QueryContext(ctx, query, runID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list checkpoints: %w", err)
+	}
+	defer rows.Close()
+
+	var checkpoints []*Checkpoint
+	for rows.Next() {
+		var cp Checkpoint
+		var toolCallLogJSON, artifactsJSON string
+		var createdAt string
+
+		if err := rows.Scan(&cp.ID, &cp.RunID, &cp.Stage, &cp.MessageHistory, &toolCallLogJSON, &artifactsJSON, &cp.ContextHash, &createdAt); err != nil {
+			return nil, fmt.Errorf("failed to scan checkpoint: %w", err)
+		}
+
+		// Parse JSON fields
+		if err := json.Unmarshal([]byte(toolCallLogJSON), &cp.ToolCallLog); err != nil {
+			cp.ToolCallLog = []string{}
+		}
+		if err := json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts); err != nil {
+			cp.Artifacts = map[string]string{}
+		}
+
+		// Parse timestamp
+		cp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+
+		checkpoints = append(checkpoints, &cp)
+	}
+
+	if checkpoints == nil {
+		checkpoints = []*Checkpoint{}
+	}
+
+	return checkpoints, rows.Err()
+}
+
+// GetLatestCheckpoint returns the most recent checkpoint for a run.
+func (s *SQLiteStore) GetLatestCheckpoint(ctx context.Context, runID string) (*Checkpoint, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	query := `SELECT id, run_id, stage, message_history, tool_call_log, artifacts, context_hash, created_at FROM checkpoints WHERE run_id = ? ORDER BY created_at DESC LIMIT 1`
+
+	var cp Checkpoint
+	var toolCallLogJSON, artifactsJSON string
+	var createdAt string
+
+	err := s.db.QueryRowContext(ctx, query, runID).Scan(
+		&cp.ID, &cp.RunID, &cp.Stage, &cp.MessageHistory, &toolCallLogJSON, &artifactsJSON, &cp.ContextHash, &createdAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrCheckpointNotFound
+		}
+		return nil, fmt.Errorf("failed to get latest checkpoint: %w", err)
+	}
+
+	// Parse JSON fields
+	if err := json.Unmarshal([]byte(toolCallLogJSON), &cp.ToolCallLog); err != nil {
+		cp.ToolCallLog = []string{}
+	}
+	if err := json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts); err != nil {
+		cp.Artifacts = map[string]string{}
+	}
+
+	// Parse timestamp
+	cp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+
+	return &cp, nil
+}
+
+// DeleteCheckpoint removes a checkpoint by ID.
+func (s *SQLiteStore) DeleteCheckpoint(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result, err := s.db.ExecContext(ctx, `DELETE FROM checkpoints WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete checkpoint: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return ErrCheckpointNotFound
+	}
+
+	return nil
+}
+
+// DeleteCheckpointsForRun removes all checkpoints for a specific run.
+func (s *SQLiteStore) DeleteCheckpointsForRun(ctx context.Context, runID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.ExecContext(ctx, `DELETE FROM checkpoints WHERE run_id = ?`, runID)
+	if err != nil {
+		return fmt.Errorf("failed to delete checkpoints for run: %w", err)
+	}
+
+	return nil
+}
+
 // Ensure SQLiteStore implements Store interface.
 var _ Store = (*SQLiteStore)(nil)

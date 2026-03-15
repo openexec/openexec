@@ -51,14 +51,6 @@ Tasks in blueprint mode progress through: **gather_context → implement → lin
 - **test** (deterministic): Run tests
 - **review** (agentic): Review changes and generate summary
 
-### Legacy Pipeline Phases (5-phase state machine, deprecated)
-Each task progresses through: **TD → IM → RV → RF → FL**
-- **TD** (clario): Technical Design - research and strategy
-- **IM** (spark): Implementation - code changes
-- **RV** (blade): Review - quality assurance with routing back to IM if needed
-- **RF** (hon): Refinement - post-review optimization
-- **FL** (clario): Finalize - verification and state sync
-
 ### Key Packages
 
 | Package | Purpose |
@@ -71,7 +63,7 @@ Each task progresses through: **TD → IM → RV → RF → FL**
 | `internal/toolset/` | Toolset definitions and registry |
 | `internal/dcp/` | Deterministic Control Plane - thin tool-routing layer |
 | `internal/context/` | Two-stage context assembly (deterministic + LLM ranking) |
-| `internal/pipeline/` | Phase orchestration and state machine (legacy) |
+| `internal/pipeline/` | Blueprint wrapper and loop factory |
 | `internal/mcp/` | Model Context Protocol server (JSON-RPC stdio) |
 | `internal/prompt/` | Prompt assembly from personas/workflows/manifests |
 | `internal/release/` | SQLite-backed task/story state management |

@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS stories (
 	description TEXT DEFAULT '',
 	acceptance_criteria TEXT DEFAULT '[]',
 	depends_on TEXT DEFAULT '[]',
+	priority INTEGER DEFAULT 0,
 	status TEXT NOT NULL DEFAULT 'pending',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE SET NULL
@@ -192,6 +193,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	description TEXT DEFAULT '',
 	verification_script TEXT DEFAULT '',
 	depends_on TEXT DEFAULT '[]',
+	priority INTEGER DEFAULT 0,
 	status TEXT NOT NULL DEFAULT 'pending',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE

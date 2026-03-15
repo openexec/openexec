@@ -122,4 +122,20 @@ CREATE INDEX IF NOT EXISTS idx_tasks_story_id ON tasks(story_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_agent ON tasks(assigned_agent);
+
+-- Checkpoints table stores run state snapshots for resumable execution.
+-- Each checkpoint captures message history, tool calls, and artifacts at a stage.
+CREATE TABLE IF NOT EXISTS checkpoints (
+	id TEXT PRIMARY KEY,
+	run_id TEXT NOT NULL,
+	stage TEXT NOT NULL,
+	message_history BLOB,
+	tool_call_log TEXT DEFAULT '[]',
+	artifacts TEXT DEFAULT '{}',
+	context_hash TEXT DEFAULT '',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_checkpoints_run_id ON checkpoints(run_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_stage ON checkpoints(stage);
 `

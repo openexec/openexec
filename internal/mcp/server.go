@@ -350,6 +350,18 @@ func (s *Server) handleToolsCall(req Request) {
 	var argsMap map[string]interface{}
 	_ = json.Unmarshal(params.Arguments, &argsMap)
 
+	// Approval gate: Check if tool requires approval in current mode
+	if RequiresApprovalForTool(s, params.Name) {
+		ctx := s.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		if err := RequestToolApproval(s, ctx, params.Name, argsMap); err != nil {
+			s.writeToolError(req.ID, err.Error())
+			return
+		}
+	}
+
 	// Resume support: Check if this tool call was already applied
     var idempotencyKey string
     // Determine idempotency eligibility (tool-specific)

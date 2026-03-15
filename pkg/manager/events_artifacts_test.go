@@ -9,13 +9,17 @@ import (
 
     "github.com/openexec/openexec/internal/loop"
     "github.com/openexec/openexec/pkg/audit"
+    "github.com/openexec/openexec/pkg/db/state"
 )
 
 func TestAuditIncludesArtifactsAndCheckpointWritten(t *testing.T) {
     tmp := t.TempDir()
     logger, err := audit.NewLogger(filepath.Join(tmp, "audit.db"))
     if err != nil { t.Fatal(err) }
-    m := New(Config{WorkDir: tmp, AuditLogger: logger})
+    stateStore, err := state.NewStore(filepath.Join(tmp, "state.db"))
+    if err != nil { t.Fatal(err) }
+    m, err := New(Config{WorkDir: tmp, AuditLogger: logger, StateStore: stateStore})
+    if err != nil { t.Fatal(err) }
 
     // seed pipelines map entry
     m.mu.Lock()

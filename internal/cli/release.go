@@ -24,9 +24,26 @@ Git integration and approval workflows can be enabled via configuration.`,
 }
 
 // story export: write the current DB stories/tasks to .openexec/stories.json (export-only)
+//
+// JSON EXPORT-ONLY:
+// This command exports data FROM SQLite TO JSON for:
+//   - Backup/archival
+//   - Migration to other systems
+//   - Human-readable snapshots
+//
+// The exported JSON is NOT the source of truth - SQLite is canonical.
 var storyExportCmd = &cobra.Command{
     Use:   "export",
     Short: "Export stories and tasks from DB to .openexec/stories.json (read-only export)",
+    Long: `Export stories and tasks from SQLite to JSON format.
+
+This is an EXPORT-ONLY operation. The JSON file is generated for:
+  - Backup/archival
+  - Migration to other systems
+  - Human-readable snapshots
+
+SQLite (.openexec/openexec.db) remains the canonical source of truth.
+The exported JSON should NOT be used as runtime state.`,
     RunE: func(cmd *cobra.Command, args []string) error {
         mgr, err := getReleaseManager(cmd)
         if err != nil { return err }
@@ -69,10 +86,13 @@ var storyExportCmd = &cobra.Command{
         outPath := filepath.Join(".openexec", "stories.json")
         _ = os.MkdirAll(filepath.Dir(outPath), 0750)
         data, _ := json.MarshalIndent(export, "", "  ")
+        // Log export for drift tracking
+        fmt.Fprintf(os.Stderr, "[EXPORT] Writing to %s (export-only, not source of truth)\n", outPath)
+        cmd.Println(color.YellowString("Note: Exporting to %s. SQLite is the canonical store.", outPath))
         if err := os.WriteFile(outPath, data, 0644); err != nil {
             return fmt.Errorf("failed to write %s: %w", outPath, err)
         }
-        cmd.Printf("✓ Exported stories to %s\n", outPath)
+        cmd.Printf("✓ Exported %d stories to %s\n", len(stories), outPath)
         return nil
     },
 }
@@ -812,19 +832,43 @@ type GeneratedStory struct {
 	Tasks              []any    `json:"tasks"`
 }
 
+// storyImportCmd imports stories from JSON into SQLite.
+//
+// JSON IMPORT GUARD:
+// This command performs an EXPLICIT IMPORT from JSON to SQLite.
+// It is intended for:
+//   - Migrating legacy projects to SQLite
+//   - Importing externally-generated plans
+//   - One-time data loading
+//
+// After import, SQLite is the canonical source - JSON is NOT re-read at runtime.
 var storyImportCmd = &cobra.Command{
 	Use:   "import [file]",
-	Short: "Advanced: Import stories manually (Deprecated: use 'openexec run' instead)",
-	Long: `Import stories and tasks from a generated stories.json file.
-Note: 'openexec run' now performs this step automatically via deep-healing.`,
+	Short: "Advanced: Import stories from JSON into SQLite (explicit migration)",
+	Long: `Import stories and tasks from a JSON file into SQLite.
+
+JSON IMPORT:
+This is an EXPLICIT IMPORT operation for:
+  - Migrating legacy projects to SQLite
+  - Importing externally-generated plans
+  - One-time data loading
+
+After import, SQLite (.openexec/openexec.db) becomes the canonical source.
+The JSON file is NOT used as runtime state - it's a one-time import.
+
+Note: 'openexec run' handles auto-import automatically. This command is
+for explicit manual imports when needed.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.Println(color.New(color.FgYellow).Sprint("💡 Note: 'openexec story import' is now an advanced command. 'openexec run' handles auto-import by default."))
+		cmd.Println(color.New(color.FgYellow).Sprint("Note: This performs a one-time import. SQLite will be the canonical store after import."))
 		// Determine input file
 		inputFile := ".openexec/stories.json"
 		if len(args) > 0 {
 			inputFile = args[0]
 		}
+
+		// Log import operation for drift tracking
+		fmt.Fprintf(os.Stderr, "[IMPORT] Loading from JSON (%s) for explicit import. SQLite will be canonical after import.\n", inputFile)
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		reassign, _ := cmd.Flags().GetBool("reassign")

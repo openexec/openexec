@@ -114,15 +114,6 @@ When running in **Blueprint mode** (default for `openexec run`), tasks progress 
 | **fix_tests** | Agentic | Fix failing tests (if needed) |
 | **review** | Agentic | Review changes and generate summary |
 
-### Legacy Pipeline Phases (Deprecated)
-The original 5-phase pipeline is still supported but deprecated:
-
-- **TD (Technical Design / clario):** Research, codebase mapping, and strategy formulation.
-- **IM (Implementation / spark):** Actual code modification and task execution.
-- **RV (Review / blade):** Independent quality assurance and architectural validation.
-- **RF (Refinement / hon):** Post-review adjustments and optimization.
-- **FL (Finalize / clario):** Verification of all goals and state synchronization.
-
 ---
 
 ## Architecture
@@ -226,7 +217,6 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - Use `docs/VISUALIZATION_GUIDE.md` to generate diagrams (swimlanes, nodes/edges, Mermaid starter, runner/health callouts).
 
 Key references:
-- Artifacts: INTENT.md (PRD), goals[], .openexec/stories.json, .openexec/tasks.json, .openexec/stories/*.md, .openexec/fwu/*.md
-- Ordering: story.depends_on injects ALL tasks from prerequisite stories; tasks in each story run in listed order
-- Runner: server resolves model→CLI once at startup; `GET /api/health` returns `{ runner: { command, args, model } }`
-- Runs: create via `POST /api/v1/runs` then `POST /api/v1/runs/{id}/start`; or start a task via `POST /api/fwu/{task_id}/start`. Poll status with `GET /api/fwu/{task_id}/status`.
+- Artifacts: INTENT.md (PRD), `.openexec/openexec.db` (SQLite state), `.openexec/artifacts/` (patches, summaries)
+- Runner: server resolves model at startup; `GET /api/health` returns `{ runner: { command, args, model } }`
+- Runs: create via `POST /api/v1/runs` then `POST /api/v1/runs/{id}/start`. Poll status with `GET /api/v1/runs/{id}`.

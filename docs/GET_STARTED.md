@@ -91,7 +91,7 @@ Now, turn that intent into concrete tasks:
 ./openexec plan INTENT.md
 ```
 
-OpenExec will generate a `stories.json` file in `.openexec/` containing the execution DAG (Directed Acyclic Graph) of tasks.
+OpenExec will generate a plan stored in the SQLite database (`.openexec/openexec.db`) containing the execution DAG (Directed Acyclic Graph) of tasks.
 
 ## 5. Running the System
 

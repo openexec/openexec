@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openexec/openexec/internal/tract"
+	"github.com/openexec/openexec/internal/release"
 )
 
-// FormatBriefing transforms a Tract BriefResponse into structured prompt text
+// FormatBriefing transforms a BriefResponse into structured prompt text
 // suitable for injection into an agent's system prompt.
-func FormatBriefing(brief *tract.BriefResponse) string {
+func FormatBriefing(brief *release.BriefResponse) string {
 	var b strings.Builder
 
 	// Header
@@ -44,12 +44,12 @@ func FormatBriefing(brief *tract.BriefResponse) string {
 	return b.String()
 }
 
-func writeBoundaries(b *strings.Builder, boundaries []tract.Boundary) {
+func writeBoundaries(b *strings.Builder, boundaries []release.Boundary) {
 	if len(boundaries) == 0 {
 		return
 	}
 
-	var inScope, outOfScope []tract.Boundary
+	var inScope, outOfScope []release.Boundary
 	for _, bn := range boundaries {
 		switch bn.Scope {
 		case "in_scope":
@@ -76,12 +76,12 @@ func writeBoundaries(b *strings.Builder, boundaries []tract.Boundary) {
 	}
 }
 
-func writeDependencies(b *strings.Builder, deps []tract.Dependency, statuses []tract.DependencyStatus) {
+func writeDependencies(b *strings.Builder, deps []release.Dependency, statuses []release.DependencyStatus) {
 	if len(deps) == 0 {
 		return
 	}
 
-	statusMap := make(map[string]tract.DependencyStatus, len(statuses))
+	statusMap := make(map[string]release.DependencyStatus, len(statuses))
 	for _, ds := range statuses {
 		statusMap[ds.DependencyID] = ds
 	}
@@ -95,7 +95,7 @@ func writeDependencies(b *strings.Builder, deps []tract.Dependency, statuses []t
 	}
 }
 
-func writeDesignDecisions(b *strings.Builder, decisions []tract.DesignDecision) {
+func writeDesignDecisions(b *strings.Builder, decisions []release.DesignDecision) {
 	if len(decisions) == 0 {
 		return
 	}
@@ -109,7 +109,7 @@ func writeDesignDecisions(b *strings.Builder, decisions []tract.DesignDecision) 
 	}
 }
 
-func writeInterfaceContracts(b *strings.Builder, contracts []tract.InterfaceContract) {
+func writeInterfaceContracts(b *strings.Builder, contracts []release.InterfaceContract) {
 	if len(contracts) == 0 {
 		return
 	}
@@ -120,7 +120,7 @@ func writeInterfaceContracts(b *strings.Builder, contracts []tract.InterfaceCont
 	}
 }
 
-func writeVerificationGates(b *strings.Builder, gates []tract.VerificationGate) {
+func writeVerificationGates(b *strings.Builder, gates []release.VerificationGate) {
 	if len(gates) == 0 {
 		return
 	}
@@ -131,7 +131,7 @@ func writeVerificationGates(b *strings.Builder, gates []tract.VerificationGate) 
 	}
 }
 
-func writeReasoningChain(b *strings.Builder, chain *tract.ReasoningChain) {
+func writeReasoningChain(b *strings.Builder, chain *release.ReasoningChain) {
 	if chain == nil {
 		return
 	}
@@ -168,7 +168,7 @@ func writeReasoningChain(b *strings.Builder, chain *tract.ReasoningChain) {
 	}
 }
 
-func writePredecessorSpecs(b *strings.Builder, specs []tract.PredecessorSpec) {
+func writePredecessorSpecs(b *strings.Builder, specs []release.PredecessorSpec) {
 	if len(specs) == 0 {
 		return
 	}
@@ -187,7 +187,7 @@ func writePredecessorSpecs(b *strings.Builder, specs []tract.PredecessorSpec) {
 	}
 }
 
-func writePriorICs(b *strings.Builder, priorICs []tract.PriorIC, count int) {
+func writePriorICs(b *strings.Builder, priorICs []release.PriorIC, count int) {
 	if len(priorICs) == 0 {
 		return
 	}

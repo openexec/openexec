@@ -7,15 +7,17 @@ import (
 
 // Common errors for store operations.
 var (
-	ErrReleaseNotFound     = errors.New("release not found")
-	ErrReleaseAlreadyExist = errors.New("release already exists")
-	ErrGoalNotFound        = errors.New("goal not found")
-	ErrGoalAlreadyExist    = errors.New("goal already exists")
-	ErrStoryNotFound       = errors.New("story not found")
-	ErrStoryAlreadyExist   = errors.New("story already exists")
-	ErrTaskNotFound        = errors.New("task not found")
-	ErrTaskAlreadyExist    = errors.New("task already exists")
-	ErrInvalidData         = errors.New("invalid data")
+	ErrReleaseNotFound        = errors.New("release not found")
+	ErrReleaseAlreadyExist    = errors.New("release already exists")
+	ErrGoalNotFound           = errors.New("goal not found")
+	ErrGoalAlreadyExist       = errors.New("goal already exists")
+	ErrStoryNotFound          = errors.New("story not found")
+	ErrStoryAlreadyExist      = errors.New("story already exists")
+	ErrTaskNotFound           = errors.New("task not found")
+	ErrTaskAlreadyExist       = errors.New("task already exists")
+	ErrCheckpointNotFound     = errors.New("checkpoint not found")
+	ErrCheckpointAlreadyExist = errors.New("checkpoint already exists")
+	ErrInvalidData            = errors.New("invalid data")
 )
 
 // Store defines the interface for release state persistence.
@@ -61,6 +63,14 @@ type Store interface {
 	CountStories(ctx context.Context) (int, error)
 	CountGoals(ctx context.Context) (int, error)
 	CountTasks(ctx context.Context) (int, error)
+
+	// Checkpoint operations (for blueprint resumability)
+	CreateCheckpoint(ctx context.Context, cp *Checkpoint) error
+	GetCheckpoint(ctx context.Context, id string) (*Checkpoint, error)
+	ListCheckpointsForRun(ctx context.Context, runID string) ([]*Checkpoint, error)
+	GetLatestCheckpoint(ctx context.Context, runID string) (*Checkpoint, error)
+	DeleteCheckpoint(ctx context.Context, id string) error
+	DeleteCheckpointsForRun(ctx context.Context, runID string) error
 
 	// Lifecycle
 	Close() error

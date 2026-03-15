@@ -61,13 +61,62 @@ func NewStore(dbPath string) (*Store, error) {
 
 // Init initializes the database schema.
 func (s *Store) Init() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+    s.mu.Lock()
+    defer s.mu.Unlock()
 
-	if _, err := s.db.Exec(UnifiedSchema); err != nil {
-		return fmt.Errorf("failed to initialize unified schema: %w", err)
-	}
-	return nil
+    if _, err := s.db.Exec(UnifiedSchema); err != nil {
+        return fmt.Errorf("failed to initialize unified schema: %w", err)
+    }
+    // Apply forward-safe migrations for columns that may be missing on older DBs.
+    // These are idempotent: we check the table schema before attempting ALTERs.
+    if err := s.ensureColumn("stories", "priority", "INTEGER DEFAULT 0"); err != nil {
+        return fmt.Errorf("failed to migrate stories.priority: %w", err)
+    }
+    if err := s.ensureColumn("tasks", "priority", "INTEGER DEFAULT 0"); err != nil {
+        return fmt.Errorf("failed to migrate tasks.priority: %w", err)
+    }
+    return nil
+}
+
+// ensureColumn checks for a column and adds it if missing.
+func (s *Store) ensureColumn(table, column, definition string) error {
+    // Probe table info for existing column
+    query := fmt.Sprintf("PRAGMA table_info(%s)", table)
+    rows, err := s.db.Query(query)
+    if err != nil {
+        return err
+    }
+    defer rows.Close()
+
+    type colInfo struct {
+        cid        int
+        name       string
+        colType    string
+        notnull    int
+        dflt_value any
+        pk         int
+    }
+    for rows.Next() {
+        var info colInfo
+        // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+        // Use Scan into placeholders matching types above
+        if scanErr := rows.Scan(&info.cid, &info.name, &info.colType, &info.notnull, &info.dflt_value, &info.pk); scanErr != nil {
+            return scanErr
+        }
+        if info.name == column {
+            return nil // already exists
+        }
+    }
+    if err := rows.Err(); err != nil {
+        return err
+    }
+
+    // Add the missing column
+    alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)
+    if _, err := s.db.Exec(alter); err != nil {
+        return err
+    }
+    return nil
 }
 
 // GetDB returns the underlying database handle.

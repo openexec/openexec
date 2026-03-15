@@ -65,28 +65,51 @@ func TestPipeline_BlueprintMode_RunsBlueprint(t *testing.T) {
 	}
 }
 
-func TestPipeline_BlueprintMode_NotUsedWhenIDEmpty(t *testing.T) {
-	// This test verifies that empty BlueprintID means phase-based execution.
-	// We can't fully test phase mode without proper fixtures, so we verify
-	// the code path selection logic indirectly.
+func TestPipeline_BlueprintMode_DefaultsToStandardTask(t *testing.T) {
+	// This test verifies that empty BlueprintID defaults to standard_task blueprint.
+	// Legacy phase-based execution has been removed.
 
 	cfg := Config{
-		FWUID:       "test-phase-001",
+		FWUID:       "test-default-bp",
 		WorkDir:     t.TempDir(),
-		BlueprintID: "", // Empty = phase mode
+		BlueprintID: "", // Empty = defaults to standard_task
 	}
 
-	// Create pipeline
-	p, _ := New(cfg)
+	p, events := New(cfg)
 
-	// Verify the config is set correctly
-	if p.cfg.BlueprintID != "" {
-		t.Error("BlueprintID should be empty for phase mode")
+	// Drain events
+	var receivedEvents []loop.Event
+	done := make(chan struct{})
+	go func() {
+		for e := range events {
+			receivedEvents = append(receivedEvents, e)
+		}
+		close(done)
+	}()
+
+	// Run with short timeout - we just want to verify blueprint mode is used
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	_ = p.Run(ctx)
+	<-done
+
+	// Verify blueprint_start event was emitted (proves blueprint mode was used)
+	var sawBlueprintStart bool
+	for _, e := range receivedEvents {
+		if e.Type == loop.EventBlueprintStart {
+			sawBlueprintStart = true
+			// Empty BlueprintID should default to standard_task which has ID "standard_task"
+			if e.BlueprintID != "standard_task" {
+				t.Errorf("Expected blueprint_id 'standard_task', got %q", e.BlueprintID)
+			}
+			break
+		}
 	}
 
-	// The actual phase-based execution requires proper AgentsFS setup,
-	// which is tested in other integration tests.
-	t.Log("Phase mode selected when BlueprintID is empty (verified by config)")
+	if !sawBlueprintStart {
+		t.Error("Expected blueprint_start event - empty BlueprintID should default to standard_task")
+	}
 }
 
 func TestPipeline_BlueprintMode_UnknownBlueprint(t *testing.T) {

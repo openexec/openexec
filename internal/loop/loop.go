@@ -19,6 +19,7 @@ import (
     "github.com/openexec/openexec/internal/prompt"
     "github.com/openexec/openexec/internal/summarize"
     "github.com/openexec/openexec/pkg/agent"
+    "github.com/openexec/openexec/pkg/security"
     "github.com/openexec/openexec/pkg/telemetry"
     "go.opentelemetry.io/otel/attribute"
     "go.opentelemetry.io/otel/trace"
@@ -255,6 +256,13 @@ func (l *Loop) Run(ctx context.Context) error {
                 Metadata: map[string]interface{}{
                     "prompt_cache_key": l.cfg.StablePromptHash,
                 },
+            }
+
+            // Scrub PII from messages before sending to provider
+            if l.cfg.PIIScrubLevel != "" {
+                scrubber := security.NewPIIScrubber(l.cfg.PIIScrubLevel)
+                req.Messages = scrubber.ScrubMessages(req.Messages)
+                req.System = scrubber.ScrubText(req.System)
             }
 
             resp, err := agent.DefaultRegistry.Complete(ctx, req)

@@ -13,6 +13,7 @@ import (
     "github.com/openexec/openexec/internal/prompt"
     "github.com/openexec/openexec/pkg/audit"
     "github.com/openexec/openexec/pkg/db/state"
+    "github.com/openexec/openexec/pkg/security"
 )
 
 const subscriberBufSize = 64
@@ -36,8 +37,8 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
         switch event.Type {
 		case loop.EventError:
 			log.Printf("[Manager] Event %s [%s]: ERROR: %s", fwuID, event.Type, event.ErrText)
-		case loop.EventPhaseStart, loop.EventPhaseComplete, loop.EventPipelineComplete:
-			log.Printf("[Manager] Event %s [%s]: phase=%s agent=%s", fwuID, event.Type, event.Phase, event.Agent)
+		case loop.EventStageStart, loop.EventStageComplete, loop.EventPipelineComplete:
+			log.Printf("[Manager] Event %s [%s]: stage=%s", fwuID, event.Type, event.StageName)
 		case loop.EventRetrying:
 			log.Printf("[Manager] Event %s [%s]: retrying - %s", fwuID, event.Type, event.Text)
 		case loop.EventComplete:
@@ -69,7 +70,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     "step_id":         event.StepID,
                     "trace_id":        event.TraceID,
                     "type":            event.Type,
-                    "phase":           event.Phase,
+                    "stage":           event.StageName,
                     "agent":           event.Agent,
                     "iteration":       event.Iteration,
                     "review_cycles":   event.ReviewCycle,
@@ -97,6 +98,11 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     if len(hashes) > 0 {
                         md["artifact_hashes"] = hashes
                     }
+                }
+                // Scrub PII from metadata before audit write
+                if m.cfg.PIIScrubLevel != "" {
+                    scrubber := security.NewPIIScrubber(m.cfg.PIIScrubLevel)
+                    md = scrubber.ScrubMapInterface(md)
                 }
                 e, _ := builder.WithProject(m.cfg.WorkDir).
                     WithSeverity(severity).
@@ -138,12 +144,6 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 // updateInfo applies a single event to PipelineInfo.
 func updateInfo(info *PipelineInfo, event loop.Event) {
 	switch event.Type {
-	case loop.EventPhaseStart:
-		info.Phase = event.Phase
-		info.Agent = event.Agent
-		info.Status = StatusRunning
-		info.ReviewCycles = event.ReviewCycle
-
 	case loop.EventIterationStart:
 		info.Iteration = event.Iteration
 
@@ -173,7 +173,7 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 	// Blueprint events
 	case loop.EventBlueprintStart:
 		info.Status = StatusRunning
-		info.Phase = "blueprint:" + event.BlueprintID
+		info.Stage = "blueprint:" + event.BlueprintID
 
 	case loop.EventBlueprintComplete:
 		info.Status = StatusComplete
@@ -183,25 +183,25 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 		info.Error = event.ErrText
 
 	case loop.EventStageStart:
-		info.Phase = event.StageName
+		info.Stage = event.StageName
 		info.Status = StatusRunning
 		info.Iteration = event.Iteration
 
 	case loop.EventStageComplete:
 		// Keep status running until blueprint completes
-		info.Phase = event.StageName + ":complete"
+		info.Stage = event.StageName + ":complete"
 
 	case loop.EventStageFailed:
 		// Don't set error status - stage failure may lead to retry
-		info.Phase = event.StageName + ":failed"
+		info.Stage = event.StageName + ":failed"
 
 	case loop.EventStageRetry:
-		info.Phase = event.StageName + ":retry"
+		info.Stage = event.StageName + ":retry"
 		info.Iteration = event.Attempt
 
 	case loop.EventCheckpointCreated:
 		// Checkpoint created - no status change
-		info.Phase = event.StageName + ":checkpoint"
+		info.Stage = event.StageName + ":checkpoint"
 	}
 }
 
@@ -275,8 +275,8 @@ func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
 
     // Use WriteAsync for non-blocking parallel writes
     m.state.WriteAsync(context.Background(), func(ctx context.Context) error {
-        // Write run step for phase events
-        if event.Type == loop.EventPhaseStart || event.Type == loop.EventPhaseComplete ||
+        // Write run step for stage events
+        if event.Type == loop.EventStageStart || event.Type == loop.EventStageComplete ||
            event.Type == loop.EventIterationStart || event.Type == loop.EventComplete {
             stepID := fmt.Sprintf("%s-%d", runID, event.StepID)
 
@@ -290,13 +290,13 @@ func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
             mdJSON, _ := json.Marshal(md)
 
             status := "running"
-            if event.Type == loop.EventPhaseComplete || event.Type == loop.EventComplete {
+            if event.Type == loop.EventStageComplete || event.Type == loop.EventComplete {
                 status = "completed"
             }
 
             err := m.state.AddRunStepFull(ctx,
                 stepID, runID, event.TraceID,
-                event.Phase, event.Agent, event.Iteration,
+                event.StageName, event.Agent, event.Iteration,
                 status, event.PromptHash, string(mdJSON))
             if err != nil {
                 log.Printf("[Manager] Parallel DB write (run_step) failed: %v", err)
@@ -311,10 +311,8 @@ func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
                 }
                 // Determine artifact type from path or default
                 artifactType := "patch"
-                if len(path) > 0 {
-                    if path[len(path)-4:] == ".log" {
-                        artifactType = "test_log"
-                    }
+                if len(path) >= 4 && path[len(path)-4:] == ".log" {
+                    artifactType = "test_log"
                 }
                 // Record artifact (size 0 as placeholder - actual size computed on write)
                 err := m.state.RecordArtifact(ctx, hash, artifactType, path, 0)
@@ -324,10 +322,11 @@ func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
             }
 
             // Write checkpoint for resume support
+            // Note: CheckpointData.Phase stores the current stage name for blueprint mode
             cp := state.CheckpointData{
                 ID:        uuid.New().String(),
                 RunID:     runID,
-                Phase:     event.Phase,
+                Phase:     event.StageName, // Stage name stored in Phase field for DB compatibility
                 Iteration: event.Iteration,
                 Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
                 Artifacts: event.Artifacts,

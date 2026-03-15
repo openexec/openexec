@@ -1,14 +1,24 @@
 package manager
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/openexec/openexec/internal/pipeline"
+	"github.com/openexec/openexec/pkg/db/state"
 )
 
 func TestWatchdogDetection(t *testing.T) {
-	m := New(Config{WorkDir: t.TempDir()})
+	tmpDir := t.TempDir()
+	stateStore, err := state.NewStore(filepath.Join(tmpDir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(Config{WorkDir: tmpDir, StateStore: stateStore})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Set very short stall threshold for testing
 	m.watchdog.StallThreshold = 100 * time.Millisecond

@@ -15,11 +15,13 @@ import {
   EventPanel,
   CostPanel,
   SessionForkDialog,
+  StageTimeline,
+  ApprovalsPanel,
 } from '../components/chat'
 import ProjectInitModal from '../components/chat/session/ProjectInitModal'
 import ProjectWizard from '../components/chat/session/ProjectWizard'
 import type { AncestorSession } from '../components/chat/session/ForkAncestryTree'
-import { useChat, useFork, useProviderAvailability, type ChatConfig } from '../hooks'
+import { useChat, useFork, useProviderAvailability, useBlueprint, type ChatConfig } from '../hooks'
 import type { CreateSessionParams, SessionFilters, ToolCallApproval, Session, Message } from '../types'
 import type { ForkOptions, ForkResult } from '../components/chat/session/SessionForkDialog'
 
@@ -62,6 +64,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
     baseUrl: config.apiUrl,
     authToken: config.authToken,
   })
+
+  // Initialize the blueprint hook for stage timeline and approvals
+  const blueprint = useBlueprint({
+    apiUrl: config.apiUrl,
+    authToken: config.authToken,
+    autoFetchApprovals: true,
+    approvalPollInterval: 5000,
+  })
+
+  // Process loop events through blueprint hook
+  useEffect(() => {
+    // Subscribe to events and process them for blueprint state
+    if (chat.events.length > 0) {
+      const latestEvent = chat.events[chat.events.length - 1]
+      // Only process blueprint-related events
+      if (latestEvent.type.includes('stage') || latestEvent.type.includes('blueprint')) {
+        blueprint.processEvent(latestEvent)
+      }
+    }
+  }, [chat.events, blueprint])
 
   // Fetch sessions and projects on mount
   useEffect(() => {
@@ -352,9 +374,42 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
     />
   )
 
-  // Right panel with events and cost
+  // Right panel with stage timeline, approvals, events and cost
   const rightPanel = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Stage Timeline - show when blueprint is running or has stages */}
+      {(blueprint.isRunning || blueprint.stages.some((s) => s.status !== 'pending')) && (
+        <div style={{ flexShrink: 0, padding: '8px', borderBottom: '1px solid #30363d' }}>
+          <StageTimeline
+            stages={blueprint.stages}
+            blueprintState={blueprint.blueprintState}
+            isRunning={blueprint.isRunning}
+            compact
+          />
+        </div>
+      )}
+
+      {/* Approvals Panel - show when there are pending approvals */}
+      {blueprint.approvals.filter((a) => a.status === 'pending').length > 0 && (
+        <div style={{ flexShrink: 0, padding: '8px', borderBottom: '1px solid #30363d' }}>
+          <ApprovalsPanel
+            apiUrl={config.apiUrl}
+            authToken={config.authToken}
+            approvals={blueprint.approvals}
+            isLoading={blueprint.approvalsLoading}
+            error={blueprint.approvalsError}
+            onApprovalAction={(id, approved) => {
+              if (approved) {
+                blueprint.approveRequest(id)
+              } else {
+                blueprint.rejectRequest(id)
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Events Panel */}
       <div style={{ flex: 1, overflow: 'auto', borderBottom: '1px solid #30363d' }}>
         <EventPanel
           events={chat.events}
@@ -364,6 +419,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
           onClear={chat.clearEvents}
         />
       </div>
+
+      {/* Cost Panel */}
       <div style={{ flexShrink: 0 }}>
         <CostPanel
           cost={chat.sessionCost}

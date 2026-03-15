@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/prompt"
+	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/runner"
 )
 
@@ -24,6 +26,7 @@ import (
 type PlanRequest struct {
 	IntentFile string `json:"intent_file"`
 	NoValidate bool   `json:"no_validate"`
+	AutoImport bool   `json:"auto_import"` // Automatically load stories into DB
 }
 
 // PlanResult contains the generated plan and validation status.
@@ -121,6 +124,14 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 	// Write plan artifact to .openexec/artifacts/plans/<hash>.json
 	planID, artifactHash, artifactPath := m.writePlanArtifact(plan)
 
+	// Auto-import if requested
+	if req.AutoImport {
+		if err := m.importPlan(plan); err != nil {
+			log.Printf("[Manager] Auto-import failed: %v", err)
+			// Non-fatal for the plan generation itself
+		}
+	}
+
 	return &PlanResult{
 		Plan:          plan,
 		Valid:         true,
@@ -163,6 +174,52 @@ func (m *Manager) writePlanArtifact(plan *planner.ProjectPlan) (planID, artifact
 	}
 
 	return planID, artifactHash, artifactPath
+}
+
+func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
+	rel, err := m.getInternalReleaseManager()
+	if err != nil {
+		return err
+	}
+
+	for _, s := range plan.Stories {
+		if rel.GetStory(s.ID) == nil {
+			st := &release.Story{
+				ID:                 s.ID,
+				GoalID:             s.GoalID,
+				Title:              s.Title,
+				Description:        s.Description,
+				AcceptanceCriteria: s.AcceptanceCriteria,
+				VerificationScript: s.VerificationScript,
+				DependsOn:          s.DependsOn,
+				Status:             "pending",
+				CreatedAt:          time.Now(),
+			}
+			_ = rel.CreateStory(st)
+		}
+
+		var prevTaskID string
+		for _, t := range s.Tasks {
+			if rel.GetTask(t.ID) == nil {
+				deps := t.DependsOn
+				if prevTaskID != "" {
+					deps = append(deps, prevTaskID)
+				}
+				task := &release.Task{
+					ID:          t.ID,
+					Title:       t.Title,
+					Description: t.Description,
+					StoryID:     s.ID,
+					DependsOn:   deps,
+					Status:      "pending",
+					CreatedAt:   time.Now(),
+				}
+				_ = rel.CreateTask(task)
+				prevTaskID = t.ID
+			}
+		}
+	}
+	return nil
 }
 
 // getLLMProvider returns a provider for the given model.

@@ -10,5 +10,5 @@ package prompt
 const PromptVersion = "1.0.0"
 
 // RunStateMachineVersion is the version of the run state machine logic.
-// Increment when the phase transitions or completion conditions change.
+// Increment when the stage transitions or completion conditions change.
 const RunStateMachineVersion = "1.0.0"

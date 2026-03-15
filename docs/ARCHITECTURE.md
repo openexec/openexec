@@ -45,7 +45,7 @@ This document explains how OpenExec turns an idea into executable work. OpenExec
 
 ## Execution Model: The Blueprint Engine
 
-OpenExec has evolved from a fixed 5-phase pipeline to a flexible **Blueprint Engine**. A blueprint defines a graph of stages that can be deterministic (code-based) or agentic (AI-based).
+OpenExec uses a flexible **Blueprint Engine** for task execution. A blueprint defines a graph of stages that can be deterministic (code-based) or agentic (AI-based).
 
 ### Standard Task Blueprint
 The default blueprint for task execution follows this flow:
@@ -61,13 +61,32 @@ The default blueprint for task execution follows this flow:
 | `fix_tests` | Agentic | coding_backend | AI fixes failing tests |
 | `review` | Agentic | repo_readonly | Final verification and summary |
 
-### Legacy 5-Phase Pipeline (Deprecated)
-The original state machine phases are still supported for backward compatibility:
-- **TD (Technical Design)**, **IM (Implement)**, **RV (Review)**, **RF (Refactor)**, **FL (Finalize)**.
-
 ---
 
 ## Three Execution Modes
+
+OpenExec supports three operational modes that control permissions and workflow:
+
+| Mode | Description | Side Effects | Approval |
+|------|-------------|--------------|----------|
+| **Chat** | Conversational exploration | None (read-only) | Not required |
+| **Task** | Scoped action producing artifacts | Creates files/patches | Required per action |
+| **Run** | Blueprint execution | Full automation | Pre-approved blueprint |
+
+Mode transitions follow strict rules:
+- Chat can escalate to Task or Run (requires user approval)
+- Task can return to Chat or escalate to Run
+- Run returns to Chat/Task on checkpoint, completion, or failure
+
+## State Management
+
+**SQLite is the canonical state store** for all task and run state.
+
+| Store | Location | Purpose |
+|-------|----------|---------|
+| SQLite | `.openexec/openexec.db` | Task state, run history, audit trail |
+| Artifacts | `.openexec/artifacts/` | Patches, summaries, context bundles |
+| Config | `.openexec/config.json` | Project settings |
 
 ## Toolsets
 
@@ -99,101 +118,87 @@ Toolsets group related tools by function and risk level:
 - Workflow control logic
 - Permission decisions alone
 
-## Big Picture (Legacy View)
+## Execution Flow
 
-- Wizard (Conversational): guides a short Q&A to draft a PRD (INTENT.md).
-- Planner: decomposes the PRD into goals, stories, and tasks (stories.json).
-- Planning Gate: validates structure (schema version, goal coverage, verification scripts).
-- Import & Reconciliation: materializes stories and tasks, fixes linkages, and enforces ordering.
-- Execution: Blueprint engine runs stages with toolset-based permissions.
-- Built-in State (Tract): Context briefings are generated directly from the release manager state without external service dependencies.
-- Auto‑Healing: repairs known mismatches (e.g., already implemented) and persists state.
-- Observability: /api/health exposes the resolved runner; logs and per‑loop stderr tails aid debugging.
-
-## Key Artifacts
-- INTENT.md (PRD): the product brief created by Wizard or by hand.
-- goals[]: optional goals block tied to stories via story.goal_id.
-- .openexec/stories.json: stories with depends_on and tasks (T‑… IDs), plus verification_script.
-- .openexec/tasks.json: materialized task list (imported or healed).
-- .openexec/stories/US-*.md: story files (Status: pending/done).
-- .openexec/fwu/T-*.md: task context (FWU) files used during execution.
-
-## Ordering & Barriers
-- Cross‑story barriers: story.depends_on injects ALL tasks from prerequisite stories as dependencies.
-- Intra‑story sequence: tasks are executed in listed order (each depends on the previous task).
-- Cycle guard: scheduler fails fast when a dependency cycle is detected.
+1. **CLI/API**: User triggers execution via CLI (`openexec blueprint "task"`) or API
+2. **Mode Selection**: Session starts in chat mode, escalates to task/run with approval
+3. **Blueprint Engine**: Executes stages (gather_context → implement → lint → test → review)
+4. **Tool Routing**: DCP routes tool calls to appropriate toolset based on mode
+5. **Approval Gates**: Task mode pauses for approval on write operations
+6. **State Persistence**: All progress persisted to SQLite audit database
 
 ## Runner Resolution
-- The server resolves the runner once at startup from execution.executor_model (or overrides runner_command/runner_args) and passes it to loops.
-- /api/health returns: `{ runner: { command, args, model } }` for quick verification.
+
+The server resolves the runner at startup from `execution.executor_model` (or override via `runner_command`/`runner_args`) and passes it to loops.
+
+`GET /api/health` returns: `{ runner: { command, args, model } }` for verification.
 
 ## Recovery
-- Auto‑heal: when Manager update fails, completion is upserted into tasks.json to persist state.
-- Planning mismatch: if the code is already implemented, the task is completed and persisted; true scope conflicts provide exact file paths to repair.
 
-## Mermaid Diagram (Starter)
+- **Auto-heal**: When execution detects code is already implemented, task is marked complete
+- **Checkpoint Resume**: Blueprint runs can resume from checkpoints after failure
+- **Idempotent Tool Calls**: Write operations track idempotency keys to prevent duplicates on resume
+
+## Mermaid Diagram
+
 ```mermaid
 flowchart LR
-  %% Roles / Stages as subgraphs
   subgraph U[User]
-    A[Idea / Problem]
+    A[Task Description]
   end
 
-  subgraph W[Wizard]
-    B[Conversational Q&A → PRD]
+  subgraph M[Mode System]
+    M1[Chat Mode]
+    M2[Task Mode]
+    M3[Run Mode]
   end
 
-  subgraph P[Planner]
-    C[Decompose → Stories & Tasks]
+  subgraph B[Blueprint Engine]
+    B1[gather_context]
+    B2[implement]
+    B3[lint]
+    B4[test]
+    B5[review]
   end
 
-  subgraph G[Planning Gate]
-    D[Schema & Goal Coverage]
+  subgraph T[Toolsets]
+    T1[repo_readonly]
+    T2[coding_backend]
   end
 
-  subgraph I[Import & Reconcile]
-    E[Create/Update Stories & Tasks\nBarriers + Sequencing\nSync Status]
-  end
-
-  subgraph DCT[Doctor / Preflight]
-    F[Resolve Runner (model→CLI)\nPATH/Auth Checks]
-  end
-
-  subgraph X[Execution Pipeline]
-    G1[TD]
-    G2[IM]
-    G3[RV]
-    G4[RF]
-    G5[FL]
-  end
-
-  subgraph H[Auto‑Heal]
-    H1[Complete & Persist\n(or Print Repair Hints)]
+  subgraph S[State]
+    S1[(SQLite DB)]
+    S2[Artifacts]
   end
 
   subgraph O[Observability]
-    O1[/GET /api/health → runner {command,args,model}/]
+    O1[/api/health]
+    O2[/api/v1/runs]
   end
 
-  %% Artifacts
-  P1((INTENT.md))
-  P2[(.openexec/stories.json)]
-  P3[(.openexec/tasks.json)]
-  SMD[(.openexec/stories/US-*.md)]
-  FWU[(.openexec/fwu/T-*.md)]
-
   %% Flow
-  A --> B --> P1
-  P1 --> C --> P2
-  P2 --> D
-  D -- pass --> E
-  E --> SMD
-  E --> P3
-  E --> F
-  F --> G1
-  G1 --> G2 --> G3 --> G4 --> G5
-  G1 --> FWU
-  G5 --> H1
-  H1 -- persist --> P3
-  F -. exposes .-> O1
+  A --> M1
+  M1 -- approval --> M2
+  M2 -- inputs ready --> M3
+  M3 --> B1
+  B1 --> B2 --> B3 --> B4 --> B5
+  B1 --> T1
+  B2 --> T2
+  B3 --> T2
+  B4 --> T2
+  B5 --> T1
+  B5 --> S1
+  B5 --> S2
+  M3 -. status .-> O1
+  M3 -. progress .-> O2
 ```
+
+---
+
+## Migration Notes
+
+Historical documentation about legacy systems has been archived:
+- **[LEGACY_5PHASE_PIPELINE.md](./archive/LEGACY_5PHASE_PIPELINE.md)**: The original 5-phase pipeline (TD/IM/RV/RF/FL)
+- **[LEGACY_JSON_STORAGE.md](./archive/LEGACY_JSON_STORAGE.md)**: JSON-based state management (stories.json, tasks.json)
+
+These systems have been superseded by the Blueprint Engine and SQLite state management described in this document.

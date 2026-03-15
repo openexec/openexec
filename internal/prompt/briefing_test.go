@@ -4,52 +4,52 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openexec/openexec/internal/tract"
+	"github.com/openexec/openexec/internal/release"
 )
 
-func fullBriefResponse() *tract.BriefResponse {
-	return &tract.BriefResponse{
-		FWU: tract.FWU{
+func fullBriefResponse() *release.BriefResponse {
+	return &release.BriefResponse{
+		FWU: release.FWU{
 			ID:        "FWU-01.1.01",
 			Name:      "Database infrastructure",
 			Status:    "pending",
 			Intent:    "Establish the SQLite database layer with GORM, WAL mode, and migration framework.",
 			FeatureID: "F-01.1",
 		},
-		Boundaries: []tract.Boundary{
+		Boundaries: []release.Boundary{
 			{ID: "BN:1", Scope: "in_scope", Description: "Pure Go SQLite driver setup and GORM integration"},
 			{ID: "BN:2", Scope: "in_scope", Description: "Migration framework with versioned SQL files"},
 			{ID: "BN:4", Scope: "out_of_scope", Description: "Table definitions for domain entities (owned by FWU-01.1.02)"},
 		},
-		Dependencies: []tract.Dependency{
+		Dependencies: []release.Dependency{
 			{ID: "DP:1", DependencyType: "fwu", TargetFWUID: "FWU-01.1.02", Description: "Depends on database layer being available"},
 		},
-		DependencyStatus: []tract.DependencyStatus{
+		DependencyStatus: []release.DependencyStatus{
 			{DependencyID: "DP:1", TargetFWUID: "FWU-01.1.02", TargetFWUName: "Domain models", TargetStatus: "pending", Description: "Depends on database layer being available"},
 		},
-		DesignDecisions: []tract.DesignDecision{
+		DesignDecisions: []release.DesignDecision{
 			{ID: "PD:1", Decision: "Which SQLite driver?", Resolution: "modernc.org/sqlite — pure Go, no CGO requirement", Rationale: "NFR14 mandates no CGO for deployment simplicity"},
 		},
-		InterfaceContracts: []tract.InterfaceContract{
+		InterfaceContracts: []release.InterfaceContract{
 			{ID: "CT:1", Direction: "produces", CounterpartFWUID: "FWU-01.1.02", Description: "Database connection handle and migration runner"},
 		},
-		VerificationGates: []tract.VerificationGate{
+		VerificationGates: []release.VerificationGate{
 			{ID: "VG:1", Gate: "tests", Expectation: "Database opens with WAL mode and FK enforcement verified by test"},
 			{ID: "VG:2", Gate: "quality", Expectation: "No CGO required — verified by build constraint"},
 		},
-		ReasoningChain: &tract.ReasoningChain{
-			Goals:      []tract.ChainEntity{{ID: "G-01", Name: "Deliver MVP", Description: "Ship minimum viable product"}},
-			CSFs:       []tract.ChainEntity{{ID: "CSF-01", Name: "Data persistence", Description: "Reliable data storage"}},
-			NCs:        []tract.ChainEntity{{ID: "NC-01", Name: "SQLite support", Description: "Embedded database"}},
-			SO:         &tract.ChainEntity{ID: "SO-01", Name: "Storage layer", Description: "Database abstraction"},
-			Capability: &tract.ChainEntity{ID: "CAP-01", Name: "Persistence", Description: "Data persistence capability"},
-			Epic:       &tract.ChainEntity{ID: "E-01", Name: "Database setup", Description: "Database infrastructure epic"},
-			Feature:    &tract.ChainEntity{ID: "F-01.1", Name: "SQLite integration", Description: "SQLite database feature"},
+		ReasoningChain: &release.ReasoningChain{
+			Goals:      []release.ChainEntity{{ID: "G-01", Name: "Deliver MVP", Description: "Ship minimum viable product"}},
+			CSFs:       []release.ChainEntity{{ID: "CSF-01", Name: "Data persistence", Description: "Reliable data storage"}},
+			NCs:        []release.ChainEntity{{ID: "NC-01", Name: "SQLite support", Description: "Embedded database"}},
+			SO:         &release.ChainEntity{ID: "SO-01", Name: "Storage layer", Description: "Database abstraction"},
+			Capability: &release.ChainEntity{ID: "CAP-01", Name: "Persistence", Description: "Data persistence capability"},
+			Epic:       &release.ChainEntity{ID: "E-01", Name: "Database setup", Description: "Database infrastructure epic"},
+			Feature:    &release.ChainEntity{ID: "F-01.1", Name: "SQLite integration", Description: "SQLite database feature"},
 		},
-		PredecessorSpecs: []tract.PredecessorSpec{
+		PredecessorSpecs: []release.PredecessorSpec{
 			{SourceFWUID: "FWU-01.1.01", SourceICID: "IC:1", EntityName: "SomeModel", EntityType: "model", ParentClass: "", CodeBlock: "type SomeModel struct { ... }"},
 		},
-		PriorICs: []tract.PriorIC{
+		PriorICs: []release.PriorIC{
 			{ICID: "IC:1", Attempt: 1, Status: "abandoned", PlanningVersion: 1},
 		},
 		PriorICCount: 1,
@@ -128,9 +128,9 @@ func TestFormatBriefing_NilReasoningChain(t *testing.T) {
 }
 
 func TestFormatBriefing_PredecessorSpecsWithCodeBlock(t *testing.T) {
-	brief := &tract.BriefResponse{
-		FWU: tract.FWU{ID: "FWU-01", Name: "Test", Status: "pending", Intent: "Test intent"},
-		PredecessorSpecs: []tract.PredecessorSpec{
+	brief := &release.BriefResponse{
+		FWU: release.FWU{ID: "FWU-01", Name: "Test", Status: "pending", Intent: "Test intent"},
+		PredecessorSpecs: []release.PredecessorSpec{
 			{
 				SourceFWUID: "FWU-01.1.01",
 				SourceICID:  "IC:1",
@@ -159,9 +159,9 @@ func TestFormatBriefing_PredecessorSpecsWithCodeBlock(t *testing.T) {
 }
 
 func TestFormatBriefing_PriorICsAttemptHistory(t *testing.T) {
-	brief := &tract.BriefResponse{
-		FWU: tract.FWU{ID: "FWU-01", Name: "Test", Status: "pending", Intent: "Test intent"},
-		PriorICs: []tract.PriorIC{
+	brief := &release.BriefResponse{
+		FWU: release.FWU{ID: "FWU-01", Name: "Test", Status: "pending", Intent: "Test intent"},
+		PriorICs: []release.PriorIC{
 			{ICID: "IC:1", Attempt: 1, Status: "abandoned", PlanningVersion: 1},
 			{ICID: "IC:2", Attempt: 2, Status: "rejected", PlanningVersion: 2},
 		},
@@ -177,8 +177,8 @@ func TestFormatBriefing_PriorICsAttemptHistory(t *testing.T) {
 }
 
 func TestFormatBriefing_EmptyOptionalSections(t *testing.T) {
-	brief := &tract.BriefResponse{
-		FWU: tract.FWU{ID: "FWU-01", Name: "Minimal", Status: "active", Intent: "Minimal test"},
+	brief := &release.BriefResponse{
+		FWU: release.FWU{ID: "FWU-01", Name: "Minimal", Status: "active", Intent: "Minimal test"},
 	}
 
 	result := FormatBriefing(brief)
