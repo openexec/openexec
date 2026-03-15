@@ -288,11 +288,12 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	}
 	m.pipelines[fwuID] = e
 
-	// Write run to unified DB (parallel, non-blocking)
+	// Write run to unified DB synchronously so it exists before any
+	// run_step or checkpoint writes (which have FK constraints on run_id).
 	if m.state != nil {
-		m.state.WriteAsync(ctx, func(ctx context.Context) error {
-			return m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode)
-		})
+		if err := m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode); err != nil {
+			log.Printf("[Manager] Warning: failed to persist run %s: %v", fwuID, err)
+		}
 	}
 
 	// Start event consumer before pipeline run.

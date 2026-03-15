@@ -126,8 +126,16 @@ func (s *Store) asyncWorker() {
 
 // CreateRun persists a new execution run.
 func (s *Store) CreateRun(ctx context.Context, runID, sessionID, taskID, projectPath, mode string) error {
+    // Use NULL for empty FK references to satisfy FOREIGN KEY constraints.
+    var sessID, tskID interface{}
+    if sessionID != "" {
+        sessID = sessionID
+    }
+    if taskID != "" {
+        tskID = taskID
+    }
     query := `INSERT INTO runs (id, session_id, task_id, project_path, mode, status) VALUES (?, ?, ?, ?, ?, 'starting')`
-    _, err := s.db.ExecContext(ctx, query, runID, sessionID, taskID, projectPath, mode)
+    _, err := s.db.ExecContext(ctx, query, runID, sessID, tskID, projectPath, mode)
     return err
 }
 
