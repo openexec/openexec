@@ -142,18 +142,18 @@ self.addEventListener('message', (event) => {
 });
 
 // Background sync for offline message sending (future)
-self.addEventListener('sync', (event) => {
+self.addEventListener('sync', (event: any) => {
   if (event.tag === 'send-message') {
     // event.waitUntil(sendPendingMessages());
   }
 });
 
 // Push notifications (future)
-self.addEventListener('push', (event) => {
+self.addEventListener('push', (event: any) => {
   if (!event.data) return;
 
   const data = event.data.json();
-  const options: NotificationOptions = {
+  const options: any = {
     body: data.body,
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',
