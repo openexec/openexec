@@ -100,8 +100,22 @@ Follow these steps to transform an idea into a verified project:
 5.  **Run (`openexec run`)**
     The agents begin implementing your tasks through a specialized **Autonomous Pipeline**.
 
-### Task Lifecycle Phases
-Every task in OpenExec automatically progresses through five distinct phases, each handled by a specialized agent persona:
+### Task Lifecycle: Blueprint Stages
+
+When running in **Blueprint mode** (default for `openexec run`), tasks progress through deterministic and agentic stages:
+
+| Stage | Type | Description |
+|-------|------|-------------|
+| **gather_context** | Deterministic | Gather relevant files and context for the task |
+| **implement** | Agentic | Implement the requested changes |
+| **lint** | Deterministic | Run linting checks |
+| **fix_lint** | Agentic | Fix linting errors (if needed) |
+| **test** | Deterministic | Run tests |
+| **fix_tests** | Agentic | Fix failing tests (if needed) |
+| **review** | Agentic | Review changes and generate summary |
+
+### Legacy Pipeline Phases (Deprecated)
+The original 5-phase pipeline is still supported but deprecated:
 
 - **TD (Technical Design / clario):** Research, codebase mapping, and strategy formulation.
 - **IM (Implementation / spark):** Actual code modification and task execution.
@@ -113,27 +127,58 @@ Every task in OpenExec automatically progresses through five distinct phases, ea
 
 ## Architecture
 
-OpenExec is a **Self-Contained Monolith** designed for atomic deployment and maximum reliability.
+OpenExec is a **Self-Contained Monolith** designed for atomic deployment and maximum reliability. It follows the converged architecture pattern used by modern AI coding tools: **deterministic local runtime** with **small local LLM as gatekeeper** and **frontier model for hard reasoning**.
 
 ```mermaid
 graph TD
-    User([CLI / UI]) --> Orchestrator[Deterministic Orchestrator]
+    User([CLI / UI]) --> Session[Session/Runtime Layer]
+    Session --> Context[Context Assembly Layer]
+    Context --> Tools[Tool Layer - Toolsets]
+    Tools --> Policy[Policy/Sandbox Layer]
+    Policy --> Blueprint[Blueprint Engine]
+    Blueprint --> Models[Model Layer]
 
-    subgraph "Execution Layer"
-        Orchestrator --> Loop[Phase State Machine]
-        Loop --> Tools[Tool Harness (read/write/patch/run/git)]
-        Tools --> Gates[Quality Gates]
-        Gates --> Commit[Safe Commit]
+    subgraph "Tool Layer"
+        Tools --> T1[repo_readonly]
+        Tools --> T2[coding_backend]
+        Tools --> T3[coding_frontend]
+        Tools --> T4[debug_ci]
+    end
+
+    subgraph "Model Layer"
+        Models --> Local[Local LLM: routing, classification]
+        Models --> Frontier[Frontier LLM: implementation]
     end
 
     subgraph "Persistence"
-        Orchestrator --> DB[(SQLite: sessions, runs, events)]
+        Blueprint --> DB[(SQLite: sessions, runs, events)]
     end
 
     style User fill:#238636,color:#fff
-    style Orchestrator fill:#1f6feb,color:#fff
+    style Session fill:#1f6feb,color:#fff
+    style Blueprint fill:#8957e5,color:#fff
     style DB fill:#161b22,color:#c9d1d9
 ```
+
+### Three Execution Modes
+
+| Mode | Description | Side Effects |
+|------|-------------|--------------|
+| **Chat** | Conversational, no side effects | None |
+| **Task** | Scoped action, produces artifacts | Creates files/patches |
+| **Run** | Blueprint execution over task | Full automation |
+
+### Seven Architecture Layers
+
+| Layer | Purpose |
+|-------|---------|
+| **Interaction** | CLI, Web UI, triggers |
+| **Session/Runtime** | Session state, approvals, mode transitions |
+| **Context Assembly** | Files, diffs, rules, docs, repo metadata |
+| **Tool Layer** | Toolsets (repo_readonly, coding_backend, etc.) |
+| **Policy/Sandbox** | Permissions, approvals, resource limits |
+| **Orchestration** | Blueprints (gather_context → implement → lint → test → review) |
+| **Model Layer** | Local LLM (routing) + Frontier LLM (implementation) |
 
 | Component | Role | Implementation |
 | :--- | :--- | :--- |
@@ -141,6 +186,8 @@ graph TD
 | **Planner** | Story & Goal Generation | Chat with AI Agent |
 | **Wizard** | Requirement Gathering | Chat with AI Agent |
 | **Orchestrator** | Durable Task Execution | Go + SQLite |
+| **Blueprint Engine** | Stage-based execution | Go (internal/blueprint) |
+| **DCP** | Deterministic routing | Go (internal/dcp) |
 | **Dashboard** | Visual Hub | React (Embedded in binary) |
 
 ---

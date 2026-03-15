@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -13,59 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/pkg/manager"
 )
 
-func TestHandleCreateLoop(t *testing.T) {
-	bin := buildMockClaude(t)
-	mgr := testManager(t, bin)
-	srv := New(mgr, nil, nil, "", ":0")
-
-	// Use the FWU start endpoint which accepts a specific ID
-	req := httptest.NewRequest("POST", "/api/fwu/T-001/start", strings.NewReader("{}"))
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusCreated {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusCreated)
-	}
-
-	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp["fwu_id"] != "T-001" {
-		t.Errorf("fwu_id = %v, want T-001", resp["fwu_id"])
-	}
-
-	waitForTerminal(t, mgr, "T-001")
-}
-
-func TestHandleGetLoop(t *testing.T) {
-	bin := buildMockClaude(t)
-	mgr := testManager(t, bin)
-	srv := New(mgr, nil, nil, "", ":0")
-
-	mgr.Start(context.Background(), "T-001")
-	time.Sleep(50 * time.Millisecond)
-
-	// Use the FWU status endpoint
-	req := httptest.NewRequest("GET", "/api/fwu/T-001/status", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-
-	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp["fwu_id"] != "T-001" {
-		t.Errorf("fwu_id = %v, want T-001", resp["fwu_id"])
-	}
-
-	waitForTerminal(t, mgr, "T-001")
-}
+// Legacy FWU endpoint tests removed in Phase Four.
+// Tests below use /api/v1/runs endpoints.
 
 func buildMockClaude(t *testing.T) string {
 	t.Helper()
@@ -102,7 +54,7 @@ func allPhasesConfig(scenario string) ([]pipeline.Phase, map[pipeline.Phase]pipe
 func testManager(t *testing.T, bin string) *manager.Manager {
 	t.Helper()
 	order, phases := allPhasesConfig("signal-complete")
-	return manager.New(manager.Config{
+	mgr, err := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
@@ -115,14 +67,19 @@ func testManager(t *testing.T, bin string) *manager.Manager {
 		CommandName:          bin,
 		BriefingFunc:         mockBriefing(),
 	})
+	if err != nil {
+		t.Fatalf("manager.New: %v", err)
+	}
+	return mgr
 }
 
-func TestHandleStartSuccess(t *testing.T) {
+func TestHandleStartRunSuccess(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
 	srv := New(mgr, nil, nil, "", ":0")
 
-	req := httptest.NewRequest("POST", "/api/fwu/FWU-01/start", nil)
+	// Use v1 runs endpoint
+	req := httptest.NewRequest("POST", "/api/v1/runs/RUN-01/start", strings.NewReader("{}"))
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -130,20 +87,20 @@ func TestHandleStartSuccess(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusCreated)
 	}
 
-	var body map[string]string
+	var body map[string]interface{}
 	json.NewDecoder(rec.Body).Decode(&body)
-	if body["fwu_id"] != "FWU-01" {
-		t.Errorf("fwu_id = %s, want FWU-01", body["fwu_id"])
+	if body["run_id"] != "RUN-01" {
+		t.Errorf("run_id = %v, want RUN-01", body["run_id"])
 	}
 
 	// Clean up: wait for completion.
-	waitForTerminal(t, mgr, "FWU-01")
+	waitForTerminal(t, mgr, "RUN-01")
 }
 
-func TestHandleStartDuplicate(t *testing.T) {
+func TestHandleStartRunDuplicate(t *testing.T) {
 	bin := buildMockClaude(t)
 	order, phases := allPhasesConfig("slow")
-	mgr := manager.New(manager.Config{
+	mgr, err := manager.New(manager.Config{
 		WorkDir:              t.TempDir(),
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		Order:                order,
@@ -156,13 +113,16 @@ func TestHandleStartDuplicate(t *testing.T) {
 		CommandName:          bin,
 		BriefingFunc:         mockBriefing(),
 	})
+	if err != nil {
+		t.Fatalf("manager.New: %v", err)
+	}
 	srv := New(mgr, nil, nil, "", ":0")
 
 	// Start pipeline with slow scenario to keep it running.
-	mgr.Start(context.Background(), "FWU-01")
+	mgr.Start(context.Background(), "RUN-01")
 	time.Sleep(100 * time.Millisecond)
 
-	req := httptest.NewRequest("POST", "/api/fwu/FWU-01/start", nil)
+	req := httptest.NewRequest("POST", "/api/v1/runs/RUN-01/start", strings.NewReader("{}"))
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -170,18 +130,18 @@ func TestHandleStartDuplicate(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusConflict)
 	}
 
-	mgr.Stop("FWU-01")
+	mgr.Stop("RUN-01")
 }
 
-func TestHandleStatusFound(t *testing.T) {
+func TestHandleGetRunFound(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
 	srv := New(mgr, nil, nil, "", ":0")
 
-	mgr.Start(context.Background(), "FWU-01")
+	mgr.Start(context.Background(), "RUN-01")
 	time.Sleep(50 * time.Millisecond)
 
-	req := httptest.NewRequest("GET", "/api/fwu/FWU-01/status", nil)
+	req := httptest.NewRequest("GET", "/api/v1/runs/RUN-01", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -189,20 +149,20 @@ func TestHandleStatusFound(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var info manager.PipelineInfo
+	var info map[string]interface{}
 	json.NewDecoder(rec.Body).Decode(&info)
-	if info.FWUID != "FWU-01" {
-		t.Errorf("fwu_id = %s, want FWU-01", info.FWUID)
+	if info["run_id"] != "RUN-01" {
+		t.Errorf("run_id = %v, want RUN-01", info["run_id"])
 	}
 
-	waitForTerminal(t, mgr, "FWU-01")
+	waitForTerminal(t, mgr, "RUN-01")
 }
 
-func TestHandleStatusNotFound(t *testing.T) {
-	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
+func TestHandleGetRunNotFound(t *testing.T) {
+	mgr, _ := manager.New(manager.Config{WorkDir: "/tmp"})
 	srv := New(mgr, nil, nil, "", ":0")
 
-	req := httptest.NewRequest("GET", "/api/fwu/nonexistent/status", nil)
+	req := httptest.NewRequest("GET", "/api/v1/runs/nonexistent", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -211,11 +171,11 @@ func TestHandleStatusNotFound(t *testing.T) {
 	}
 }
 
-func TestHandleListEmpty(t *testing.T) {
-	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
+func TestHandleListRunsEmpty(t *testing.T) {
+	mgr, _ := manager.New(manager.Config{WorkDir: "/tmp"})
 	srv := New(mgr, nil, nil, "", ":0")
 
-	req := httptest.NewRequest("GET", "/api/fwus", nil)
+	req := httptest.NewRequest("GET", "/api/v1/runs", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -223,25 +183,30 @@ func TestHandleListEmpty(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var list []manager.PipelineInfo
-	json.NewDecoder(rec.Body).Decode(&list)
-	if len(list) != 0 {
-		t.Errorf("list length = %d, want 0", len(list))
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	runs, ok := resp["runs"].([]interface{})
+	if !ok {
+		t.Errorf("expected runs array")
+		return
+	}
+	if len(runs) != 0 {
+		t.Errorf("list length = %d, want 0", len(runs))
 	}
 }
 
-func TestHandleListWithPipelines(t *testing.T) {
+func TestHandleListRunsWithPipelines(t *testing.T) {
 	bin := buildMockClaude(t)
 	mgr := testManager(t, bin)
 	srv := New(mgr, nil, nil, "", ":0")
 
-	mgr.Start(context.Background(), "FWU-01")
-	mgr.Start(context.Background(), "FWU-02")
+	mgr.Start(context.Background(), "RUN-01")
+	mgr.Start(context.Background(), "RUN-02")
 
-	waitForTerminal(t, mgr, "FWU-01")
-	waitForTerminal(t, mgr, "FWU-02")
+	waitForTerminal(t, mgr, "RUN-01")
+	waitForTerminal(t, mgr, "RUN-02")
 
-	req := httptest.NewRequest("GET", "/api/fwus", nil)
+	req := httptest.NewRequest("GET", "/api/v1/runs", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 
@@ -249,186 +214,26 @@ func TestHandleListWithPipelines(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var list []manager.PipelineInfo
-	json.NewDecoder(rec.Body).Decode(&list)
-	if len(list) != 2 {
-		t.Errorf("list length = %d, want 2", len(list))
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	runs, ok := resp["runs"].([]interface{})
+	if !ok {
+		t.Errorf("expected runs array")
+		return
 	}
-}
-
-func TestHandlePauseFound(t *testing.T) {
-	bin := buildMockClaude(t)
-	order, phases := allPhasesConfig("slow")
-	mgr := manager.New(manager.Config{
-		WorkDir:              t.TempDir(),
-		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
-		Order:                order,
-		Phases:               phases,
-		DefaultMaxIterations: 10,
-		MaxRetries:           1,
-		MaxReviewCycles:      3,
-		ThrashThreshold:      0,
-		RetryBackoff:         []time.Duration{0},
-		CommandName:          bin,
-		BriefingFunc:         mockBriefing(),
-	})
-	srv := New(mgr, nil, nil, "", ":0")
-
-	mgr.Start(context.Background(), "FWU-01")
-	time.Sleep(100 * time.Millisecond)
-
-	req := httptest.NewRequest("POST", "/api/fwu/FWU-01/pause", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-
-	// Stop to clean up.
-	time.Sleep(100 * time.Millisecond)
-	mgr.Stop("FWU-01")
-}
-
-func TestHandlePauseNotFound(t *testing.T) {
-	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, nil, nil, "", ":0")
-
-	req := httptest.NewRequest("POST", "/api/fwu/nonexistent/pause", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
-	}
-}
-
-func TestHandleStopFound(t *testing.T) {
-	bin := buildMockClaude(t)
-	order, phases := allPhasesConfig("slow")
-	mgr := manager.New(manager.Config{
-		WorkDir:              t.TempDir(),
-		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
-		Order:                order,
-		Phases:               phases,
-		DefaultMaxIterations: 10,
-		MaxRetries:           1,
-		MaxReviewCycles:      3,
-		ThrashThreshold:      0,
-		RetryBackoff:         []time.Duration{0},
-		CommandName:          bin,
-		BriefingFunc:         mockBriefing(),
-	})
-	srv := New(mgr, nil, nil, "", ":0")
-
-	mgr.Start(context.Background(), "FWU-01")
-	time.Sleep(100 * time.Millisecond)
-
-	req := httptest.NewRequest("POST", "/api/fwu/FWU-01/stop", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
-}
-
-func TestHandleStopNotFound(t *testing.T) {
-	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, nil, nil, "", ":0")
-
-	req := httptest.NewRequest("POST", "/api/fwu/nonexistent/stop", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotFound {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
-	}
-}
-
-func TestHandleEventsSSE(t *testing.T) {
-	bin := buildMockClaude(t)
-	mgr := testManager(t, bin)
-	srv := New(mgr, nil, nil, "", ":0")
-
-	// Use a real HTTP server for SSE (needs flusher).
-	ts := httptest.NewServer(srv.Handler())
-	defer ts.Close()
-
-	// Start a pipeline.
-	mgr.Start(context.Background(), "FWU-01")
-
-	// Connect SSE.
-	resp, err := http.Get(ts.URL + "/api/fwu/FWU-01/events")
-	if err != nil {
-		t.Fatalf("GET events: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
-	}
-	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
-		t.Errorf("Content-Type = %s, want text/event-stream", ct)
-	}
-
-	// Read at least one SSE event.
-	scanner := bufio.NewScanner(resp.Body)
-	got := false
-	deadline := time.After(30 * time.Second)
-	done := make(chan struct{})
-
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, "data: ") {
-				data := strings.TrimPrefix(line, "data: ")
-				var event loop.Event
-				if json.Unmarshal([]byte(data), &event) == nil && event.Type != "" {
-					got = true
-					close(done)
-					return
-				}
-			}
-		}
-	}()
-
-	select {
-	case <-done:
-		if !got {
-			t.Error("expected at least one SSE event")
-		}
-	case <-deadline:
-		t.Fatal("timeout waiting for SSE event")
-	}
-}
-
-func TestHandleEventsNotFound(t *testing.T) {
-	mgr := manager.New(manager.Config{WorkDir: "/tmp"})
-	srv := New(mgr, nil, nil, "", ":0")
-
-	ts := httptest.NewServer(srv.Handler())
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/api/fwu/nonexistent/events")
-	if err != nil {
-		t.Fatalf("GET events: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusNotFound)
+	if len(runs) != 2 {
+		t.Errorf("list length = %d, want 2", len(runs))
 	}
 }
 
 // waitForTerminal polls until the pipeline reaches a terminal state.
-func waitForTerminal(t *testing.T, mgr *manager.Manager, fwuID string) {
+func waitForTerminal(t *testing.T, mgr *manager.Manager, runID string) {
 	t.Helper()
 	deadline := time.After(30 * time.Second)
 	for {
-		info, err := mgr.Status(fwuID)
+		info, err := mgr.Status(runID)
 		if err != nil {
-			t.Fatalf("Status(%s): %v", fwuID, err)
+			t.Fatalf("Status(%s): %v", runID, err)
 		}
 		switch info.Status {
 		case manager.StatusComplete, manager.StatusError, manager.StatusStopped:
@@ -436,7 +241,7 @@ func waitForTerminal(t *testing.T, mgr *manager.Manager, fwuID string) {
 		}
 		select {
 		case <-deadline:
-			t.Fatalf("timeout waiting for %s to reach terminal state (current: %s)", fwuID, info.Status)
+			t.Fatalf("timeout waiting for %s to reach terminal state (current: %s)", runID, info.Status)
 		case <-time.After(50 * time.Millisecond):
 		}
 	}

@@ -27,16 +27,31 @@ cd ui && npm install && npm run dev -- --port 3001  # Dev server with HMR
 
 ## Architecture Overview
 
-OpenExec is a **single-binary AI orchestration framework** that transforms high-level intent into production code through a deterministic pipeline.
+OpenExec is a **single-binary AI orchestration framework** that transforms high-level intent into production code through a deterministic pipeline. It follows the **converged architecture** pattern: deterministic local runtime with small local LLM as gatekeeper and frontier model for hard reasoning.
 
-### Core Execution Flow
+### Three Execution Modes
+| Mode | Description | Side Effects |
+|------|-------------|--------------|
+| **Chat** | Conversational, no side effects | None |
+| **Task** | Scoped action, produces artifacts | Creates files/patches |
+| **Run** | Blueprint execution over task | Full automation |
+
+### Core Execution Flow (Blueprint Mode)
 ```
-CLI Command → Manager → Pipeline → Loop → AI Provider (Claude/OpenAI/Gemini)
-                ↓
-         SQLite State Store
+CLI Command → Manager → Loop → Blueprint Engine → Stages → AI Provider
+                ↓                    ↓
+         SQLite State        DCP (routing)
 ```
 
-### Pipeline Phases (5-phase state machine)
+### Blueprint Stages
+Tasks in blueprint mode progress through: **gather_context → implement → lint → test → review**
+- **gather_context** (deterministic): Gather relevant files and context
+- **implement** (agentic): Implement the requested changes
+- **lint** (deterministic): Run linting checks
+- **test** (deterministic): Run tests
+- **review** (agentic): Review changes and generate summary
+
+### Legacy Pipeline Phases (5-phase state machine, deprecated)
 Each task progresses through: **TD → IM → RV → RF → FL**
 - **TD** (clario): Technical Design - research and strategy
 - **IM** (spark): Implementation - code changes
@@ -50,15 +65,33 @@ Each task progresses through: **TD → IM → RV → RF → FL**
 |---------|---------|
 | `cmd/openexec/` | Entry point, calls `cli.Execute()` |
 | `internal/cli/` | Cobra commands (init, plan, start, run, chat, doctor) |
-| `internal/loop/` | Core iteration engine - spawns AI, parses events |
-| `internal/pipeline/` | Phase orchestration and state machine |
+| `internal/loop/` | Core iteration engine - spawns AI, parses events, blueprint execution |
+| `internal/blueprint/` | Stage-based execution engine with checkpoints and retries |
+| `internal/mode/` | Mode types (chat/task/run) and transitions |
+| `internal/toolset/` | Toolset definitions and registry |
+| `internal/dcp/` | Deterministic Control Plane - thin tool-routing layer |
+| `internal/context/` | Two-stage context assembly (deterministic + LLM ranking) |
+| `internal/pipeline/` | Phase orchestration and state machine (legacy) |
 | `internal/mcp/` | Model Context Protocol server (JSON-RPC stdio) |
 | `internal/prompt/` | Prompt assembly from personas/workflows/manifests |
 | `internal/release/` | SQLite-backed task/story state management |
+| `internal/router/` | Intent routing and classification |
 | `pkg/agent/` | AI provider adapters (anthropic, openai, gemini) |
 | `pkg/manager/` | Multi-pipeline orchestrator |
 | `pkg/api/` | HTTP handlers and WebSocket |
 | `ui/` | React 18 + TypeScript + Vite (embedded in binary) |
+
+### Toolsets
+Tools are grouped into toolsets by function and risk level:
+
+| Toolset | Risk | Description |
+|---------|------|-------------|
+| `repo_readonly` | Low | Read operations only |
+| `coding_backend` | Medium | Backend implementation |
+| `coding_frontend` | Medium | Frontend implementation |
+| `debug_ci` | Medium | CI/CD debugging |
+| `docs_research` | Low | Documentation and research |
+| `release_ops` | High | Release operations |
 
 ### Agent Definitions
 Agent personas, workflows, and manifests live in `agents/`:

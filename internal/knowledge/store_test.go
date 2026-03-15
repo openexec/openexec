@@ -1,13 +1,22 @@
 package knowledge
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestKnowledgeStore_Specialized(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
-	store, _ := NewStore(tmpDir)
+	// Create .openexec directory for the store
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755); err != nil {
+		t.Fatalf("failed to create .openexec dir: %v", err)
+	}
+	store, err := NewStore(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
 	defer store.Close()
 
 	t.Run("Symbol CRUD", func(t *testing.T) {

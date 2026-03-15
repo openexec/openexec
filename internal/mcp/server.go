@@ -17,6 +17,8 @@ import (
     "crypto/sha256"
     "encoding/hex"
 
+    "github.com/openexec/openexec/internal/mode"
+    "github.com/openexec/openexec/internal/toolset"
     "github.com/openexec/openexec/pkg/telemetry"
 )
 
@@ -66,6 +68,9 @@ type Server struct {
 	runID               string              // Current run ID for tracing
 	idempotencyChecker  IdempotencyChecker  // Resume support
 	resumeMode          bool                // True when resuming a prior run
+	toolsetRegistry     *toolset.Registry   // Toolset-based tool filtering
+	currentMode         mode.Mode           // Current operational mode (chat/task/run)
+	activeToolset       string              // Currently active toolset name
 }
 
 // SetContext sets the tracing context and run ID for the server.
@@ -86,17 +91,56 @@ func (s *Server) SetResumeMode(enabled bool) {
 	s.resumeMode = enabled
 }
 
+// SetMode sets the current operational mode (chat, task, run).
+// This affects which tools are available and whether writes are allowed.
+func (s *Server) SetMode(m mode.Mode) {
+	s.currentMode = m
+	// Auto-select toolset based on mode
+	switch m {
+	case mode.ModeChat:
+		s.activeToolset = "repo_readonly"
+	case mode.ModeTask, mode.ModeRun:
+		s.activeToolset = "coding_backend"
+	}
+}
+
+// GetMode returns the current operational mode.
+func (s *Server) GetMode() mode.Mode {
+	return s.currentMode
+}
+
+// SetToolset sets the active toolset for filtering available tools.
+func (s *Server) SetToolset(name string) error {
+	if _, ok := s.toolsetRegistry.Get(name); !ok {
+		return fmt.Errorf("toolset %q not found", name)
+	}
+	s.activeToolset = name
+	return nil
+}
+
+// GetToolset returns the currently active toolset.
+func (s *Server) GetToolset() string {
+	return s.activeToolset
+}
+
+// GetToolsetRegistry returns the toolset registry for external configuration.
+func (s *Server) GetToolsetRegistry() *toolset.Registry {
+	return s.toolsetRegistry
+}
+
 // ErrNoWorkspaceRoot is returned when no valid workspace root can be determined.
 var ErrNoWorkspaceRoot = fmt.Errorf("no valid workspace root: set WORKSPACE_ROOT or provide WorkDir in config")
 
 // NewServer creates a new MCP server reading from in and writing to out.
-func NewServer(in io.Reader, out io.Writer) *Server {
+// Returns error if no workspace root can be determined (fail-fast).
+func NewServer(in io.Reader, out io.Writer) (*Server, error) {
 	return NewServerWithConfig(in, out, ServerConfig{})
 }
 
 // NewServerWithConfig creates a new MCP server with explicit configuration.
-// Returns a server instance. Use ValidateConfig() to check workspace roots before Serve().
-func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) *Server {
+// Returns error if no workspace root can be determined (fail-fast).
+// CRITICAL: Workspace root is mandatory for path scoping security.
+func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) (*Server, error) {
 	// Determine workspace roots with fallback chain
 	var roots []string
 	if envRoot := os.Getenv("WORKSPACE_ROOT"); envRoot != "" {
@@ -107,25 +151,32 @@ func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) *Server 
 		roots = []string{cwd}
 	}
 
+	// FAIL FAST: No workspace root means no path scoping security
+	if len(roots) == 0 || roots[0] == "" {
+		return nil, ErrNoWorkspaceRoot
+	}
+
 	return &Server{
-		in:             in,
-		out:            out,
-		broker:         NewToolBroker(cfg.Mode),
-		workspaceRoots: roots,
+		in:              in,
+		out:             out,
+		broker:          NewToolBroker(cfg.Mode),
+		workspaceRoots:  roots,
+		toolsetRegistry: toolset.NewRegistry(),
+		currentMode:     mode.ModeChat, // Start in chat mode
+		activeToolset:   "repo_readonly", // Default to read-only toolset
 		pythonValidator: NewPythonValidatorWithConfig(&PythonValidatorConfig{
 			PythonPath:     "python3",
 			Timeout:        5 * time.Second,
 			SkipIfNoPython: true, // Don't fail writes if Python is unavailable
 		}),
-	}
+	}, nil
 }
 
 // ValidateConfig checks that the server has valid workspace configuration.
-// Call this before Serve() to ensure path scoping can be enforced.
+// DEPRECATED: NewServerWithConfig now fails fast if workspace root is missing.
+// This method is kept for backward compatibility but always returns nil.
 func (s *Server) ValidateConfig() error {
-	if len(s.workspaceRoots) == 0 || s.workspaceRoots[0] == "" {
-		return ErrNoWorkspaceRoot
-	}
+	// Validation now happens in constructor (fail-fast)
 	return nil
 }
 
@@ -196,11 +247,13 @@ func (s *Server) handleInitialize(req Request) {
 }
 
 func (s *Server) handleToolsList(req Request) {
-    // Core tools available in all modes
+    // Core tools always available in all modes
     tools := []interface{}{
-        axonSignalToolDef(),
-        ReadFileToolDef(),
-        GitApplyPatchToolDef(),
+        axonSignalToolDef(),        // Always available (control plane)
+        ReadFileToolDef(),          // Read is always allowed
+        GitApplyPatchToolDef(),     // Patch tool available (with mode restrictions in Authorize)
+        OpenExecResultToolDef(),    // Typed step results
+        OpenExecActionToolDef(),    // Unified action envelope
     }
 
     // Dangerous tools only advertised in danger-full-access mode
@@ -221,9 +274,24 @@ func (s *Server) handleToolsList(req Request) {
         )
     }
 
-    s.writeResult(req.ID, map[string]interface{}{
+    // Include toolset info in response for clients that support it
+    result := map[string]interface{}{
         "tools": tools,
-    })
+    }
+
+    // Add toolset metadata if configured
+    if s.toolsetRegistry != nil && s.activeToolset != "" {
+        result["active_toolset"] = s.activeToolset
+        result["mode"] = string(s.currentMode)
+
+        // Include list of tools in active toolset for client filtering
+        if ts, ok := s.toolsetRegistry.Get(s.activeToolset); ok {
+            result["toolset_tools"] = ts.Tools
+            result["toolset_risk"] = string(ts.RiskLevel)
+        }
+    }
+
+    s.writeResult(req.ID, result)
 }
 
 func axonSignalToolDef() map[string]interface{} {
@@ -367,6 +435,12 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "list_session_forks":
 		s.handleListSessionForks(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "openexec_result":
+		s.handleOpenExecResult(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "openexec_action":
+		s.handleOpenExecAction(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))
@@ -1126,4 +1200,180 @@ func (s *Server) handleListSessionForks(req Request, params toolsCallParams) {
 		"fork_count":        len(forks),
 		"forks":             forksList,
 	})
+}
+
+// handleOpenExecResult processes typed step result submissions from agents.
+// This replaces the legacy text-based "STEP_RESULT: {JSON}" pattern with
+// schema-validated structured output.
+func (s *Server) handleOpenExecResult(req Request, params toolsCallParams) {
+	var resultReq OpenExecResultRequest
+	if err := json.Unmarshal(params.Arguments, &resultReq); err != nil {
+		s.writeError(req.ID, -32602, fmt.Sprintf("invalid openexec_result arguments: %v", err))
+		return
+	}
+
+	// Validate the result against schema constraints
+	if err := ValidateOpenExecResultRequest(&resultReq); err != nil {
+		s.writeToolError(req.ID, fmt.Sprintf("validation error: %v", err))
+		return
+	}
+
+	// The result is returned to the agent; the orchestrator's parser will
+	// extract typed signals from tool_result messages.
+	s.writeResult(req.ID, map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "text",
+				"text": fmt.Sprintf("STEP_RESULT: %s", mustMarshalJSON(map[string]interface{}{
+					"status":      resultReq.Status,
+					"reason":      resultReq.Reason,
+					"next_phase":  resultReq.NextPhase,
+					"artifacts":   resultReq.Artifacts,
+					"confidence":  resultReq.Confidence,
+					"diagnostics": resultReq.Diagnostics,
+				})),
+			},
+		},
+		"result": map[string]interface{}{
+			"status":      resultReq.Status,
+			"reason":      resultReq.Reason,
+			"next_phase":  resultReq.NextPhase,
+			"artifacts":   resultReq.Artifacts,
+			"confidence":  resultReq.Confidence,
+			"diagnostics": resultReq.Diagnostics,
+		},
+		"typed": true,
+	})
+}
+
+// handleOpenExecAction processes unified typed agent actions.
+// Supports step results, tool calls, plan updates, and progress reports.
+func (s *Server) handleOpenExecAction(req Request, params toolsCallParams) {
+	var actionReq map[string]interface{}
+	if err := json.Unmarshal(params.Arguments, &actionReq); err != nil {
+		s.writeError(req.ID, -32602, fmt.Sprintf("invalid openexec_action arguments: %v", err))
+		return
+	}
+
+	actionType, _ := actionReq["type"].(string)
+	if actionType == "" {
+		s.writeToolError(req.ID, "action type is required")
+		return
+	}
+
+	// Process based on action type
+	switch actionType {
+	case "complete", "error", "pivot", "retry":
+		// Extract step_result and validate
+		stepResult, ok := actionReq["step_result"].(map[string]interface{})
+		if !ok {
+			s.writeToolError(req.ID, fmt.Sprintf("step_result is required for action type %q", actionType))
+			return
+		}
+
+		// Convert to typed struct and validate
+		resultReq := OpenExecResultRequest{
+			Status:    getString(stepResult, "status"),
+			Reason:    getString(stepResult, "reason"),
+			NextPhase: getString(stepResult, "next_phase"),
+		}
+		if artifacts, ok := stepResult["artifacts"].(map[string]interface{}); ok {
+			resultReq.Artifacts = make(map[string]string)
+			for k, v := range artifacts {
+				if str, ok := v.(string); ok {
+					resultReq.Artifacts[k] = str
+				}
+			}
+		}
+		if conf, ok := stepResult["confidence"].(float64); ok {
+			resultReq.Confidence = conf
+		}
+		resultReq.Diagnostics = getString(stepResult, "diagnostics")
+
+		if err := ValidateOpenExecResultRequest(&resultReq); err != nil {
+			s.writeToolError(req.ID, fmt.Sprintf("validation error: %v", err))
+			return
+		}
+
+		// Return the result in a format the parser can extract
+		s.writeResult(req.ID, map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "text",
+					"text": fmt.Sprintf("STEP_RESULT: %s", mustMarshalJSON(stepResult)),
+				},
+			},
+			"action_type": actionType,
+			"result":      stepResult,
+			"typed":       true,
+		})
+
+	case "progress":
+		text, _ := actionReq["text"].(string)
+		s.writeResult(req.ID, map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "text",
+					"text": fmt.Sprintf("Progress: %s", text),
+				},
+			},
+			"action_type": actionType,
+			"typed":       true,
+		})
+
+	case "tool_call":
+		// Tool calls through this action type are informational only.
+		// Actual tool execution must go through tools/call.
+		toolCall, _ := actionReq["tool_call"].(map[string]interface{})
+		toolName := getString(toolCall, "tool")
+
+		s.writeResult(req.ID, map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "text",
+					"text": fmt.Sprintf("Tool call intent recorded: %s (use tools/call for execution)", toolName),
+				},
+			},
+			"action_type": actionType,
+			"tool_call":   toolCall,
+			"typed":       true,
+		})
+
+	case "plan_update":
+		planUpdate, _ := actionReq["plan_update"].(map[string]interface{})
+		updateAction := getString(planUpdate, "action")
+		reason := getString(planUpdate, "reason")
+
+		s.writeResult(req.ID, map[string]interface{}{
+			"content": []interface{}{
+				map[string]interface{}{
+					"type": "text",
+					"text": fmt.Sprintf("Plan update: action=%s, reason=%s", updateAction, reason),
+				},
+			},
+			"action_type": actionType,
+			"plan_update": planUpdate,
+			"typed":       true,
+		})
+
+	default:
+		s.writeToolError(req.ID, fmt.Sprintf("unknown action type: %s", actionType))
+	}
+}
+
+// getString safely extracts a string value from a map.
+func getString(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// mustMarshalJSON marshals a value to JSON, returning "{}" on error.
+func mustMarshalJSON(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }

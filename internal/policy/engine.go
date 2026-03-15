@@ -12,15 +12,139 @@ import (
 
 // Engine enforces deterministic rules stored in the knowledge base.
 type Engine struct {
-	store *knowledge.Store
+	store       *knowledge.Store
+	rulesEngine *RulesEngine
+	projectDir  string
 }
 
+// NewEngine creates a new policy engine with the knowledge store.
 func NewEngine(store *knowledge.Store) *Engine {
-	return &Engine{store: store}
+	return NewEngineWithProject(store, ".")
+}
+
+// NewEngineWithProject creates a policy engine with project-specific rules.
+func NewEngineWithProject(store *knowledge.Store, projectDir string) *Engine {
+	// Load rules from project or use defaults
+	ruleSet, err := LoadRulesFromProject(projectDir)
+	if err != nil {
+		// Fall back to defaults on error
+		ruleSet = DefaultSecurityRules()
+	}
+
+	return &Engine{
+		store:       store,
+		rulesEngine: NewRulesEngine(ruleSet),
+		projectDir:  projectDir,
+	}
 }
 
 // ValidateAction checks if a tool execution is allowed by policy.
+// Uses the rules engine for structured evaluation.
 func (e *Engine) ValidateAction(ctx context.Context, toolName string, action string) (bool, string) {
+	return e.ValidateActionWithContext(ctx, &EvaluationContext{
+		Tool:   toolName,
+		Action: action,
+		Tier:   os.Getenv("OPENEXEC_MODE"),
+	})
+}
+
+// ValidateActionWithContext performs full policy evaluation with rich context.
+func (e *Engine) ValidateActionWithContext(ctx context.Context, evalCtx *EvaluationContext) (bool, string) {
+	result := e.rulesEngine.Evaluate(evalCtx)
+
+	switch result.Decision {
+	case DecisionAllow:
+		return true, ""
+	case DecisionDeny:
+		reason := result.Reason
+		if result.MatchedRule != nil && result.MatchedRule.Description != "" {
+			reason = result.MatchedRule.Description
+		}
+		return false, fmt.Sprintf("Policy violation: %s", reason)
+	case DecisionAsk:
+		// For "ask" decisions, we return true but include the reason
+		// The caller is responsible for prompting the user
+		reason := "User confirmation required"
+		if result.MatchedRule != nil && result.MatchedRule.Description != "" {
+			reason = result.MatchedRule.Description
+		}
+		return true, fmt.Sprintf("CONFIRM: %s", reason)
+	default:
+		return true, ""
+	}
+}
+
+// ValidateTool validates a tool call with full context.
+func (e *Engine) ValidateTool(ctx context.Context, toolName string, path string, args map[string]interface{}, tier string) *EvaluationResult {
+	// Build action string from args for pattern matching
+	action := toolName
+	if cmd, ok := args["command"].(string); ok {
+		action = cmd
+	}
+
+	evalCtx := &EvaluationContext{
+		Tool:   toolName,
+		Path:   path,
+		Action: action,
+		Tier:   tier,
+		Args:   args,
+		Env:    getEnvMap(),
+	}
+
+	return e.rulesEngine.Evaluate(evalCtx)
+}
+
+// RequiresConfirmation checks if the action requires user confirmation.
+func (e *Engine) RequiresConfirmation(ctx context.Context, toolName string, action string) (bool, string) {
+	result := e.rulesEngine.Evaluate(&EvaluationContext{
+		Tool:   toolName,
+		Action: action,
+		Tier:   os.Getenv("OPENEXEC_MODE"),
+	})
+
+	if result.Decision == DecisionAsk {
+		reason := result.Reason
+		if result.MatchedRule != nil {
+			reason = result.MatchedRule.Name
+		}
+		return true, reason
+	}
+	return false, ""
+}
+
+// ReloadRules reloads the rules from the project directory.
+func (e *Engine) ReloadRules() error {
+	ruleSet, err := LoadRulesFromProject(e.projectDir)
+	if err != nil {
+		return err
+	}
+	e.rulesEngine = NewRulesEngine(ruleSet)
+	return nil
+}
+
+// getEnvMap returns relevant environment variables as a map.
+func getEnvMap() map[string]string {
+	env := make(map[string]string)
+	relevantVars := []string{
+		"OPENEXEC_MODE",
+		"OPENEXEC_WORKSPACE_ROOT",
+		"USER",
+		"HOME",
+	}
+	for _, key := range relevantVars {
+		if v := os.Getenv(key); v != "" {
+			env[key] = v
+		}
+	}
+	return env
+}
+
+// Legacy keyword-based validation (kept for backward compatibility)
+func (e *Engine) validateLegacy(ctx context.Context, toolName string, action string) (bool, string) {
+	if e.store == nil {
+		return true, ""
+	}
+
 	policyKey := fmt.Sprintf("tool_%s", toolName)
 	record, err := e.store.GetPolicy(policyKey)
 	if err != nil {
@@ -28,11 +152,9 @@ func (e *Engine) ValidateAction(ctx context.Context, toolName string, action str
 	}
 
 	if record == nil {
-		// Default: allow if no specific policy exists
 		return true, ""
 	}
 
-	// Simple keyword matching for this scaffold.
 	if strings.Contains(record.Value, "deny") && strings.Contains(action, "force") {
 		return false, "Policy violation: 'force' operations are denied for this tool."
 	}

@@ -5,12 +5,14 @@ import (
     "encoding/json"
     "log"
     "net/http"
+    "os"
+    "strings"
     "sync"
 
     "github.com/gorilla/websocket"
     "github.com/openexec/openexec/internal/loop"
-    "os"
-    "strings"
+    "github.com/openexec/openexec/internal/mcp"
+    "github.com/openexec/openexec/internal/prompt"
 )
 
 var upgrader = websocket.Upgrader{
@@ -168,9 +170,12 @@ func (c *Client) readPump(s *Server) {
 			go func(sessionId string, ch <-chan loop.Event) {
 				for event := range ch {
 					msg := map[string]interface{}{
-						"type":      "event",
-						"sessionId": sessionId,
-						"payload":   event,
+						"type":                       "event",
+						"sessionId":                  sessionId,
+						"payload":                    event,
+						"prompt_version":             prompt.PromptVersion,
+						"tool_registry_version":      mcp.ToolRegistryVersion,
+						"run_state_machine_version": prompt.RunStateMachineVersion,
 					}
 					data, _ := json.Marshal(msg)
 					select {
@@ -207,9 +212,12 @@ func (c *Client) readPump(s *Server) {
 			go func(runID string, ch <-chan loop.Event) {
 				for event := range ch {
 					msg := map[string]interface{}{
-						"type":    "step",
-						"runId":   runID,
-						"payload": event,
+						"type":                       "step",
+						"runId":                      runID,
+						"payload":                    event,
+						"prompt_version":             prompt.PromptVersion,
+						"tool_registry_version":      mcp.ToolRegistryVersion,
+						"run_state_machine_version": prompt.RunStateMachineVersion,
 					}
 					data, _ := json.Marshal(msg)
 					select {

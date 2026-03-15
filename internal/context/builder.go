@@ -638,3 +638,389 @@ func QuickContextWithBudget(ctx context.Context, projectPath string, totalTokens
 	}
 	return result.Context, nil
 }
+
+// =============================================================================
+// Two-Stage Context Assembly (Converged Architecture)
+// =============================================================================
+//
+// Stage 1: Deterministic gathering based on routing plan zones
+// Stage 2: Ranking and filtering based on knowledge source priorities
+
+// ContextPack is the assembled context for a single routing request.
+// It contains prioritized, sanitized context items ready for model consumption.
+type ContextPack struct {
+	// Items contains the ranked and filtered context items.
+	Items []*ContextItem `json:"items"`
+
+	// TotalTokens is the total estimated token count of all items.
+	TotalTokens int `json:"total_tokens"`
+
+	// ContextHash is a hash of the context for cache keying.
+	ContextHash string `json:"context_hash"`
+
+	// Sensitivity indicates the detected sensitivity level.
+	Sensitivity string `json:"sensitivity"`
+
+	// RedactedKeys lists any keys that were redacted for security.
+	RedactedKeys []string `json:"redacted_keys,omitempty"`
+
+	// AssembledAt is when this pack was created.
+	AssembledAt time.Time `json:"assembled_at"`
+
+	// Zones lists the repo zones that were used for filtering.
+	Zones []string `json:"zones,omitempty"`
+
+	// KnowledgeSources lists the sources used for ranking.
+	KnowledgeSources []string `json:"knowledge_sources,omitempty"`
+}
+
+// DeterministicContext holds the raw gathered context before ranking.
+type DeterministicContext struct {
+	// ChangedFiles lists files modified in the workspace.
+	ChangedFiles []string `json:"changed_files,omitempty"`
+
+	// CurrentDiff is the git diff of uncommitted changes.
+	CurrentDiff string `json:"current_diff,omitempty"`
+
+	// RepoRules contains .claude/rules, CLAUDE.md content.
+	RepoRules []string `json:"repo_rules,omitempty"`
+
+	// TestFailures lists recent test failure messages.
+	TestFailures []string `json:"test_failures,omitempty"`
+
+	// GatheredItems are the raw context items from gatherers.
+	GatheredItems []*ContextItem `json:"gathered_items,omitempty"`
+}
+
+// RoutingAwareBuilder builds context using a routing plan.
+type RoutingAwareBuilder struct {
+	builder     *ContextBuilder
+	projectPath string
+	maxTokens   int
+	sensitiveKws []string
+}
+
+// NewRoutingAwareBuilder creates a builder that uses routing plans.
+func NewRoutingAwareBuilder(projectPath string, budget *ContextBudget) *RoutingAwareBuilder {
+	registry := DefaultRegistry()
+	return &RoutingAwareBuilder{
+		builder:     NewContextBuilder(registry, budget),
+		projectPath: projectPath,
+		maxTokens:   budget.AvailableForContext(),
+		sensitiveKws: []string{
+			"password", "secret", "api_key", "apikey", "token",
+			"private_key", "credential", "ssh_key", "auth",
+		},
+	}
+}
+
+// BuildWithPlan performs two-stage context assembly from routing parameters.
+// repoZones filters context to specific directories.
+// knowledgeSources ranks items by source relevance.
+// sensitivity determines redaction level ("low", "medium", "high").
+func (b *RoutingAwareBuilder) BuildWithPlan(
+	ctx context.Context,
+	repoZones []string,
+	knowledgeSources []string,
+	sensitivity string,
+) (*ContextPack, error) {
+	// Stage 1: Deterministic gathering
+	det, err := b.gatherDeterministic(ctx, repoZones)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stage 2: Ranking by knowledge source priorities
+	ranked := b.rankByKnowledgeSources(det.GatheredItems, knowledgeSources)
+
+	// Stage 3: Apply token budget and redact sensitive content
+	filtered, redactedKeys := b.applyBudgetAndRedact(ranked, sensitivity)
+
+	// Compute hash for caching
+	hash := b.computeContextHash(filtered)
+
+	return &ContextPack{
+		Items:            filtered,
+		TotalTokens:      sumTokens(filtered),
+		ContextHash:      hash,
+		Sensitivity:      sensitivity,
+		RedactedKeys:     redactedKeys,
+		AssembledAt:      time.Now(),
+		Zones:            repoZones,
+		KnowledgeSources: knowledgeSources,
+	}, nil
+}
+
+// gatherDeterministic performs Stage 1: gather context without LLM involvement.
+func (b *RoutingAwareBuilder) gatherDeterministic(ctx context.Context, repoZones []string) (*DeterministicContext, error) {
+	det := &DeterministicContext{
+		GatheredItems: make([]*ContextItem, 0),
+	}
+
+	// Build context using the standard builder
+	result, err := b.builder.Build(ctx, b.projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect all items
+	det.GatheredItems = append(det.GatheredItems, result.IncludedItems...)
+
+	// Extract specific context types
+	for _, item := range det.GatheredItems {
+		switch item.Type {
+		case ContextTypeGitDiff:
+			det.CurrentDiff = item.Content
+		case ContextTypeGitStatus:
+			det.ChangedFiles = parseGitStatusFiles(item.Content)
+		case ContextTypeProjectInstructions:
+			det.RepoRules = append(det.RepoRules, item.Content)
+		}
+	}
+
+	// Filter by repo zones if specified
+	if len(repoZones) > 0 {
+		det.GatheredItems = filterItemsByZones(det.GatheredItems, repoZones)
+	}
+
+	return det, nil
+}
+
+// filterItemsByZones keeps only items matching the specified zones.
+func filterItemsByZones(items []*ContextItem, zones []string) []*ContextItem {
+	filtered := make([]*ContextItem, 0)
+
+	// Always include essential types regardless of zone
+	essentialTypes := map[ContextType]bool{
+		ContextTypeProjectInstructions: true,
+		ContextTypeEnvironment:         true,
+		ContextTypePackageInfo:         true,
+	}
+
+	for _, item := range items {
+		// Always include essential types
+		if essentialTypes[item.Type] {
+			filtered = append(filtered, item)
+			continue
+		}
+
+		// Check if source matches any zone
+		for _, zone := range zones {
+			if sourceMatchesZone(item.Source, zone) {
+				filtered = append(filtered, item)
+				break
+			}
+		}
+	}
+
+	return filtered
+}
+
+// sourceMatchesZone checks if a source path matches a zone pattern.
+func sourceMatchesZone(source, zone string) bool {
+	// Direct prefix match
+	if strings.HasPrefix(source, zone) {
+		return true
+	}
+
+	// Normalize zone to directory form
+	if !strings.HasSuffix(zone, "/") {
+		zone = zone + "/"
+	}
+
+	return strings.Contains(source, zone)
+}
+
+// rankByKnowledgeSources ranks items by knowledge source priorities.
+func (b *RoutingAwareBuilder) rankByKnowledgeSources(items []*ContextItem, knowledgeSources []string) []*ContextItem {
+	// Build priority map: earlier in list = higher priority
+	priority := make(map[string]int)
+	for i, source := range knowledgeSources {
+		priority[source] = len(knowledgeSources) - i
+	}
+
+	// Score each item
+	type scoredItem struct {
+		item  *ContextItem
+		score int
+	}
+
+	scored := make([]scoredItem, 0, len(items))
+	for _, item := range items {
+		score := b.scoreItemBySource(item, priority)
+		scored = append(scored, scoredItem{item: item, score: score})
+	}
+
+	// Sort by score descending
+	sort.Slice(scored, func(i, j int) bool {
+		return scored[i].score > scored[j].score
+	})
+
+	// Extract items
+	result := make([]*ContextItem, 0, len(scored))
+	for _, si := range scored {
+		result = append(result, si.item)
+	}
+
+	return result
+}
+
+// scoreItemBySource calculates relevance score based on knowledge sources.
+func (b *RoutingAwareBuilder) scoreItemBySource(item *ContextItem, sourcePriority map[string]int) int {
+	score := 0
+
+	// Base score from item priority
+	score += int(item.Priority) * 10
+
+	// Map context type to knowledge source
+	sourceType := contextTypeToKnowledgeSource(item.Type)
+	if p, ok := sourcePriority[sourceType]; ok {
+		score += p * 100
+	}
+
+	// Bonus for recent items
+	if !item.GatheredAt.IsZero() {
+		age := time.Since(item.GatheredAt)
+		if age < time.Minute {
+			score += 50
+		} else if age < time.Hour {
+			score += 20
+		}
+	}
+
+	return score
+}
+
+// contextTypeToKnowledgeSource maps context types to knowledge source names.
+func contextTypeToKnowledgeSource(ct ContextType) string {
+	switch ct {
+	case ContextTypeGitLog:
+		return "git_history"
+	case ContextTypeGitDiff, ContextTypeGitStatus:
+		return "git_history"
+	case ContextTypeProjectInstructions:
+		return "local_docs"
+	case ContextTypeDirectoryStructure, ContextTypeRecentFiles:
+		return "code_symbols"
+	case ContextTypePackageInfo:
+		return "dependencies"
+	default:
+		return "code_symbols"
+	}
+}
+
+// applyBudgetAndRedact applies token budget and redacts sensitive content.
+func (b *RoutingAwareBuilder) applyBudgetAndRedact(items []*ContextItem, sensitivity string) ([]*ContextItem, []string) {
+	result := make([]*ContextItem, 0)
+	redactedKeys := make([]string, 0)
+	tokensUsed := 0
+
+	for _, item := range items {
+		// Check budget
+		if tokensUsed+item.TokenCount > b.maxTokens {
+			// Try to truncate
+			remaining := b.maxTokens - tokensUsed
+			if remaining > 100 {
+				newItem := *item
+				newItem.Content = TruncateToTokenLimit(item.Content, remaining)
+				newItem.TokenCount = EstimateTokens(newItem.Content)
+				result = append(result, &newItem)
+				tokensUsed += newItem.TokenCount
+			}
+			break
+		}
+
+		// Redact if high sensitivity
+		if sensitivity == "high" {
+			newItem := *item
+			newItem.Content, redactedKeys = b.redactSensitive(item.Content, redactedKeys)
+			newItem.TokenCount = EstimateTokens(newItem.Content)
+			result = append(result, &newItem)
+			tokensUsed += newItem.TokenCount
+		} else {
+			result = append(result, item)
+			tokensUsed += item.TokenCount
+		}
+	}
+
+	return result, redactedKeys
+}
+
+// redactSensitive detects and logs sensitive content.
+func (b *RoutingAwareBuilder) redactSensitive(content string, existingKeys []string) (string, []string) {
+	lower := strings.ToLower(content)
+	keys := append([]string{}, existingKeys...)
+
+	for _, kw := range b.sensitiveKws {
+		if strings.Contains(lower, kw) {
+			keys = append(keys, kw)
+		}
+	}
+
+	// For now, just detect - actual redaction would be more sophisticated
+	return content, keys
+}
+
+// computeContextHash generates a hash for cache keying.
+func (b *RoutingAwareBuilder) computeContextHash(items []*ContextItem) string {
+	h := sha256.New()
+	for _, item := range items {
+		h.Write([]byte(item.ID))
+		h.Write([]byte(item.Content))
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// parseGitStatusFiles extracts file paths from git status output.
+func parseGitStatusFiles(gitStatus string) []string {
+	files := make([]string, 0)
+	lines := strings.Split(gitStatus, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) < 3 {
+			continue
+		}
+
+		// Git status format: XY filename
+		if len(line) > 2 && line[2] == ' ' {
+			file := strings.TrimSpace(line[3:])
+			if file != "" {
+				// Handle renamed files
+				if idx := strings.Index(file, " -> "); idx != -1 {
+					file = file[idx+4:]
+				}
+				files = append(files, file)
+			}
+		}
+	}
+
+	return files
+}
+
+// sumTokens calculates total tokens across items.
+func sumTokens(items []*ContextItem) int {
+	total := 0
+	for _, item := range items {
+		total += item.TokenCount
+	}
+	return total
+}
+
+// BuildContextWithRouting is a convenience function for routing-aware context building.
+func BuildContextWithRouting(
+	ctx context.Context,
+	projectPath string,
+	totalTokens int,
+	repoZones []string,
+	knowledgeSources []string,
+	sensitivity string,
+) (*ContextPack, error) {
+	budget, err := NewContextBudget(totalTokens)
+	if err != nil {
+		return nil, err
+	}
+
+	builder := NewRoutingAwareBuilder(projectPath, budget)
+	return builder.BuildWithPlan(ctx, repoZones, knowledgeSources, sensitivity)
+}

@@ -76,6 +76,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     "text":            event.Text,
                     "error":           event.ErrText,
                     "prompt_hash":     event.PromptHash,
+                    "cache_key":       event.CacheKey, // Stable hash for deterministic replay
                     "artifact_hashes": []string{},
                     "artifacts":       event.Artifacts,
                     "timestamp":       time.Now().UTC().Format(time.RFC3339Nano),
@@ -84,10 +85,17 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     "tool_registry_version":     mcp.ToolRegistryVersion,
                     "run_state_machine_version": prompt.RunStateMachineVersion,
                 }
-                // Back-compat: if patch artifact present, populate artifact_hashes
+                // Collect all artifact hashes for observability
                 if event.Artifacts != nil {
-                    if h, ok := event.Artifacts["patch_hash"]; ok && h != "" {
-                        md["artifact_hashes"] = []string{h}
+                    var hashes []string
+                    for key, hash := range event.Artifacts {
+                        // Only include keys that are actually content hashes (suffix "_hash")
+                        if hash != "" && len(key) > 5 && key[len(key)-5:] == "_hash" {
+                            hashes = append(hashes, hash)
+                        }
+                    }
+                    if len(hashes) > 0 {
+                        md["artifact_hashes"] = hashes
                     }
                 }
                 e, _ := builder.WithProject(m.cfg.WorkDir).
@@ -98,7 +106,8 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
         }
 
         // Write JSONL checkpoint when artifacts are present (e.g., patch applied)
-        if len(event.Artifacts) > 0 {
+        // or when a checkpoint event is explicitly emitted
+        if len(event.Artifacts) > 0 || event.Type == loop.EventCheckpointCreated {
             writeCheckpointJSONL(m.cfg.WorkDir, fwuID, event)
             // Also write to SQLite for resume/replay
             if m.state != nil {
@@ -160,6 +169,39 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 		if info.Error == "" {
 			info.Error = event.Text
 		}
+
+	// Blueprint events
+	case loop.EventBlueprintStart:
+		info.Status = StatusRunning
+		info.Phase = "blueprint:" + event.BlueprintID
+
+	case loop.EventBlueprintComplete:
+		info.Status = StatusComplete
+
+	case loop.EventBlueprintFailed:
+		info.Status = StatusError
+		info.Error = event.ErrText
+
+	case loop.EventStageStart:
+		info.Phase = event.StageName
+		info.Status = StatusRunning
+		info.Iteration = event.Iteration
+
+	case loop.EventStageComplete:
+		// Keep status running until blueprint completes
+		info.Phase = event.StageName + ":complete"
+
+	case loop.EventStageFailed:
+		// Don't set error status - stage failure may lead to retry
+		info.Phase = event.StageName + ":failed"
+
+	case loop.EventStageRetry:
+		info.Phase = event.StageName + ":retry"
+		info.Iteration = event.Attempt
+
+	case loop.EventCheckpointCreated:
+		// Checkpoint created - no status change
+		info.Phase = event.StageName + ":checkpoint"
 	}
 }
 

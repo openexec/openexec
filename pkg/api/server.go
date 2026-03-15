@@ -18,7 +18,7 @@ type Server struct {
 	SessionRepo     session.Repository
 	AuditLogger     audit.Logger
 	StateStore      *state.Store // Unified state store for runs/steps/artifacts
-	UseUnifiedReads bool         // Feature flag: OPENEXEC_USE_UNIFIED_READS=1
+	UseUnifiedReads bool         // Default ON; set OPENEXEC_USE_UNIFIED_READS=0 to disable
 	ProjectsDir     string
 	Server          *http.Server
 	Mux             *http.ServeMux
@@ -39,11 +39,14 @@ func WithStateStore(store *state.Store) ServerOption {
 func New(mgr *manager.Manager, sessionRepo session.Repository, auditLogger audit.Logger, projectsDir string, addr string, opts ...ServerOption) *Server {
 	mux := http.NewServeMux()
 
-	// Check feature flag for unified DB reads
-	useUnifiedReads := false
+	// Unified DB reads are ON by default.
+	// Set OPENEXEC_USE_UNIFIED_READS=0 to disable for troubleshooting.
+	useUnifiedReads := true
 	if v := os.Getenv("OPENEXEC_USE_UNIFIED_READS"); v != "" {
 		lower := strings.ToLower(v)
-		useUnifiedReads = (lower == "1" || lower == "true" || lower == "yes")
+		if lower == "0" || lower == "false" || lower == "no" {
+			useUnifiedReads = false
+		}
 	}
 
 	s := &Server{
@@ -82,26 +85,37 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	// WebSocket route
 	mux.HandleFunc("GET /ws", s.handleWS)
 
-	// Task Execution (FWU) routes
-	mux.HandleFunc("POST /api/fwu/{id}/start", s.handleStart)
-	mux.HandleFunc("GET /api/fwu/{id}/status", s.handleStatus)
-	mux.HandleFunc("GET /api/fwus", s.handleList)
-	mux.HandleFunc("POST /api/fwu/{id}/pause", s.handlePause)
-	mux.HandleFunc("POST /api/fwu/{id}/stop", s.handleStop)
-	mux.HandleFunc("GET /api/fwu/{id}/events", s.handleEvents)
-
-    // v1 Loops compatibility routes removed; use /api/fwu/* or /api/v1/runs
+	// Legacy FWU routes REMOVED in Phase Four.
+	// Use /api/v1/runs endpoints for all orchestration.
 
     // v1 Runs (deterministic run creation)
     mux.HandleFunc("GET /api/v1/runs", s.handleListRuns)
     mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
     mux.HandleFunc("POST /api/v1/runs:plan", s.handlePlan)
     mux.HandleFunc("POST /api/v1/runs:execute", s.handleExecuteRuns)
+    mux.HandleFunc("POST /api/v1/runs:blueprint", s.handleStartBlueprintRun)
     mux.HandleFunc("POST /api/v1/runs/{id}/start", s.handleStartRun)
+    mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResumeRun)
     mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
     mux.HandleFunc("GET /api/v1/runs/{id}/steps", s.handleGetRunSteps)
+    mux.HandleFunc("GET /api/v1/runs/{id}/checkpoints", s.handleGetRunCheckpoints)
+    mux.HandleFunc("GET /api/v1/runs/{id}/timeline", s.handleGetRunTimeline)
+    mux.HandleFunc("POST /api/v1/runs/parallel", s.handleStartParallelRuns)
 
-	// Session routes
+	// Session routes (v1 API - daemon-owned orchestration)
+	mux.HandleFunc("GET /api/v1/sessions", s.handleListSessions)
+	mux.HandleFunc("POST /api/v1/sessions", s.handleCreateSession)
+	mux.HandleFunc("GET /api/v1/sessions/{id}", s.handleGetSession)
+	mux.HandleFunc("PATCH /api/v1/sessions/{id}", s.handleUpdateSession)
+	mux.HandleFunc("DELETE /api/v1/sessions/{id}", s.handleDeleteSession)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/fork", s.handleForkSession)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/archive", s.handleArchiveSession)
+	mux.HandleFunc("POST /api/v1/sessions/{id}/run", s.handleStartRunFromSession)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/fork-info", s.handleGetForkInfo)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/forks", s.handleListSessionForks)
+	mux.HandleFunc("GET /api/v1/sessions/{id}/messages", s.handleListMessages)
+
+	// Legacy session routes (aliases to v1, kept for backward compatibility)
 	mux.HandleFunc("GET /api/sessions", s.handleListSessions)
 	mux.HandleFunc("POST /api/sessions", s.handleCreateSession)
 	mux.HandleFunc("GET /api/sessions/{id}", s.handleGetSession)

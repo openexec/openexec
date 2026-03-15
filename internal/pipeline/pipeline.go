@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -52,6 +53,25 @@ type Config struct {
 
 	// ExecMode: read-only | workspace-write | danger-full-access
 	ExecMode string
+
+	// ResumeFrom enables resuming from a checkpoint.
+	ResumeFrom *ResumeConfig
+
+	// BlueprintID enables blueprint mode with the specified blueprint.
+	// When set, the pipeline uses blueprint-based execution instead of phases.
+	BlueprintID string
+
+	// TaskDescription is the user's task description for blueprint runs.
+	TaskDescription string
+}
+
+// ResumeConfig holds configuration for resuming from a checkpoint.
+type ResumeConfig struct {
+	CheckpointID     string   // ID of the checkpoint to resume from
+	Phase            string   // Phase to resume from
+	Iteration        int      // Iteration to resume from
+	MessageHistory   []byte   // JSON-encoded message history
+	AppliedToolCalls []string // Idempotency keys of already-applied tool calls
 }
 
 // Pipeline drives an FWU through TD → IM → RV → RF → FL phases.
@@ -160,6 +180,11 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	defer span.End()
 
 	defer close(p.events)
+
+	// Blueprint mode: if BlueprintID is set, use blueprint-based execution
+	if p.cfg.BlueprintID != "" {
+		return p.runBlueprintMode(ctx)
+	}
 
 	// Build MCP config once, shared across all phases.
 	mcpPath, cleanup, err := p.buildMCPConfig()
@@ -508,4 +533,204 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 		return loop.LoopHealth{}, false
 	}
 	return p.currentLoop.GetHealth(), true
+}
+
+// runBlueprintMode executes the pipeline using blueprint-based stage orchestration.
+// This is an alternative to the phase-based execution when BlueprintID is set.
+func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
+	// Lookup blueprint by ID
+	var bp *blueprint.Blueprint
+	switch p.cfg.BlueprintID {
+	case "standard_task", "":
+		bp = blueprint.DefaultBlueprint
+	case "quick_fix":
+		bp = blueprint.QuickFixBlueprint
+	default:
+		return fmt.Errorf("unknown blueprint: %s", p.cfg.BlueprintID)
+	}
+
+	// Create executor with agentic runner
+	executor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
+
+	// Set up agentic runner that wraps a bounded loop
+	executor.AgenticRunner = &blueprint.LoopAgenticRunner{
+		MaxIterations: p.cfg.DefaultMaxIterations,
+		LoopFactory: func(prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+			return p.createAgenticLoop(ctx, prompt, workDir, maxIterations)
+		},
+	}
+
+	// Create engine with callbacks that emit events
+	engineConfig := blueprint.DefaultEngineConfig()
+	engineConfig.OnStageComplete = func(run *blueprint.Run, result *blueprint.StageResult) {
+		eventType := loop.EventStageComplete
+		if result.Status == blueprint.StageStatusFailed {
+			eventType = loop.EventStageFailed
+		}
+		p.emit(loop.Event{
+			Type:      eventType,
+			FWUID:     p.cfg.FWUID,
+			StageName: result.StageName,
+			StageType: string(result.Status),
+			Attempt:   result.Attempt,
+			Text:      result.Output,
+			ErrText:   result.Error,
+			Artifacts: result.Artifacts,
+		})
+	}
+	engineConfig.OnCheckpoint = func(run *blueprint.Run, stageName string) {
+		p.emit(loop.Event{
+			Type:      loop.EventCheckpointCreated,
+			FWUID:     p.cfg.FWUID,
+			StageName: stageName,
+			Artifacts: map[string]string{
+				"checkpoint_stage": stageName,
+				"run_id":           run.ID,
+			},
+		})
+	}
+	engineConfig.OnRunComplete = func(run *blueprint.Run) {
+		// Collect all artifacts from stage results
+		allArtifacts := make(map[string]string)
+		for _, result := range run.Results {
+			for k, v := range result.Artifacts {
+				allArtifacts[k] = v
+			}
+		}
+		p.emit(loop.Event{
+			Type:  loop.EventBlueprintComplete,
+			FWUID: p.cfg.FWUID,
+			Result: &loop.StepResult{
+				Status:     "complete",
+				Reason:     "blueprint_complete",
+				NextPhase:  "done",
+				Artifacts:  allArtifacts,
+				Confidence: 1.0,
+			},
+		})
+	}
+
+	engine, err := blueprint.NewEngine(bp, executor, engineConfig)
+	if err != nil {
+		return fmt.Errorf("create blueprint engine: %w", err)
+	}
+
+	// Emit blueprint start event
+	p.emit(loop.Event{
+		Type:        loop.EventBlueprintStart,
+		FWUID:       p.cfg.FWUID,
+		BlueprintID: bp.ID,
+	})
+
+	// Create run and input
+	run, err := engine.StartRun(ctx, p.cfg.FWUID, nil)
+	if err != nil {
+		return fmt.Errorf("start blueprint run: %w", err)
+	}
+
+	input := blueprint.NewStageInput(p.cfg.FWUID, p.cfg.TaskDescription, p.cfg.WorkDir)
+
+	// Execute blueprint
+	if err := engine.Execute(ctx, run, input); err != nil {
+		p.emit(loop.Event{
+			Type:        loop.EventBlueprintFailed,
+			FWUID:       p.cfg.FWUID,
+			BlueprintID: bp.ID,
+			ErrText:     err.Error(),
+		})
+		return err
+	}
+
+	// Emit pipeline complete for compatibility
+	p.emit(loop.Event{
+		Type:  loop.EventPipelineComplete,
+		FWUID: p.cfg.FWUID,
+	})
+
+	return nil
+}
+
+// createAgenticLoop creates a bounded loop for agentic stage execution.
+// Returns an AgenticLoop that wraps the internal loop infrastructure.
+func (p *Pipeline) createAgenticLoop(ctx context.Context, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+	// Build MCP config
+	mcpPath, cleanup, err := p.buildMCPConfig()
+	if err != nil {
+		return nil, fmt.Errorf("build MCP config: %w", err)
+	}
+
+	cfg := loop.Config{
+		Prompt:        prompt,
+		WorkDir:       workDir,
+		MaxIterations: maxIterations,
+		MaxRetries:    p.cfg.MaxRetries,
+		RetryBackoff:  p.cfg.RetryBackoff,
+		MCPConfigPath: mcpPath,
+		FwuID:         p.cfg.FWUID,
+		ExecMode:      p.cfg.ExecMode,
+		RunnerCommand: p.cfg.RunnerCommand,
+		RunnerArgs:    p.cfg.RunnerArgs,
+		CommandName:   p.cfg.CommandName,
+		CommandArgs:   p.cfg.CommandArgs,
+	}
+
+	l, ch := loop.New(cfg)
+
+	return &agenticLoopAdapter{
+		loop:    l,
+		events:  ch,
+		cleanup: cleanup,
+		emit:    p.emit,
+	}, nil
+}
+
+// agenticLoopAdapter wraps a loop.Loop to implement blueprint.AgenticLoop.
+type agenticLoopAdapter struct {
+	loop       *loop.Loop
+	events     <-chan loop.Event
+	cleanup    func()
+	emit       func(loop.Event)
+	lastOutput string
+	artifacts  map[string]string
+}
+
+// Run executes the loop and captures results.
+func (a *agenticLoopAdapter) Run(ctx context.Context) error {
+	defer a.cleanup()
+
+	a.artifacts = make(map[string]string)
+
+	// Run loop in background
+	loopDone := make(chan error, 1)
+	go func() { loopDone <- a.loop.Run(ctx) }()
+
+	// Consume events and capture output/artifacts
+	for event := range a.events {
+		// Forward event to pipeline
+		a.emit(event)
+
+		// Capture text output
+		if event.Text != "" {
+			a.lastOutput = event.Text
+		}
+
+		// Capture artifacts
+		if event.Result != nil && event.Result.Artifacts != nil {
+			for k, v := range event.Result.Artifacts {
+				a.artifacts[k] = v
+			}
+		}
+		if event.Artifacts != nil {
+			for k, v := range event.Artifacts {
+				a.artifacts[k] = v
+			}
+		}
+	}
+
+	return <-loopDone
+}
+
+// GetResult returns the captured output and artifacts.
+func (a *agenticLoopAdapter) GetResult() (string, map[string]string, error) {
+	return a.lastOutput, a.artifacts, nil
 }

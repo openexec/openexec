@@ -39,6 +39,16 @@ const (
 	// Heartbeat and progress events.
 	EventHeartbeat EventType = "heartbeat"
 	EventProgress  EventType = "progress"
+
+	// Blueprint execution events.
+	EventBlueprintStart     EventType = "blueprint_start"
+	EventBlueprintComplete  EventType = "blueprint_complete"
+	EventBlueprintFailed    EventType = "blueprint_failed"
+	EventStageStart         EventType = "stage_start"
+	EventStageComplete      EventType = "stage_complete"
+	EventStageFailed        EventType = "stage_failed"
+	EventStageRetry         EventType = "stage_retry"
+	EventCheckpointCreated  EventType = "checkpoint_created"
 )
 
 // EventKind identifies the high-level category of an event.
@@ -102,10 +112,21 @@ type Event struct {
     // Observability fields
     PromptHash string `json:"prompt_hash,omitempty"`
 
+    // CacheKey is a stable hash of context inputs for deterministic replay.
+    // Unlike PromptHash (which may vary with formatting), CacheKey is computed
+    // from the semantic content: intent, context files, and model parameters.
+    CacheKey string `json:"cache_key,omitempty"`
+
     // Artifacts extracted from tool results (e.g., patch hash/path)
     Artifacts map[string]string `json:"artifacts,omitempty"`
 
     // Trace context for replay/observability
     TraceID string `json:"trace_id,omitempty"`
     StepID  int    `json:"step_id,omitempty"`
+
+    // Blueprint execution context
+    BlueprintID string `json:"blueprint_id,omitempty"`
+    StageName   string `json:"stage_name,omitempty"`
+    StageType   string `json:"stage_type,omitempty"` // "deterministic" or "agentic"
+    Attempt     int    `json:"attempt,omitempty"`
 }

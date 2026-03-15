@@ -24,18 +24,25 @@ func writeCheckpointJSONL(workDir, runID string, event loop.Event) {
     if workDir == "" || runID == "" {
         return
     }
-    if len(event.Artifacts) == 0 {
-        return
-    }
     dir := filepath.Join(workDir, ".openexec", "checkpoints")
     _ = os.MkdirAll(dir, 0o755)
     path := filepath.Join(dir, runID+".jsonl")
+
+    // Build artifacts map, including stage name for blueprint checkpoints
+    artifacts := event.Artifacts
+    if artifacts == nil {
+        artifacts = make(map[string]string)
+    }
+    if event.StageName != "" {
+        artifacts["stage_name"] = event.StageName
+    }
+
     rec := checkpointRecord{
         RunID:     runID,
         Phase:     event.Phase,
         Iteration: event.Iteration,
         Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
-        Artifacts: event.Artifacts,
+        Artifacts: artifacts,
     }
     b, err := json.Marshal(rec)
     if err != nil {
@@ -51,15 +58,31 @@ func writeCheckpointJSONL(workDir, runID string, event loop.Event) {
 
 // writeCheckpointSQLite inserts a checkpoint row into the audit database if available.
 func writeCheckpointSQLite(db *sql.DB, runID string, event loop.Event) {
-    if db == nil || runID == "" || len(event.Artifacts) == 0 {
+    if db == nil || runID == "" {
         return
     }
-    b, err := json.Marshal(event.Artifacts)
+
+    // Build artifacts map, including stage name for blueprint checkpoints
+    artifacts := event.Artifacts
+    if artifacts == nil {
+        artifacts = make(map[string]string)
+    }
+    if event.StageName != "" {
+        artifacts["stage_name"] = event.StageName
+    }
+
+    b, err := json.Marshal(artifacts)
     if err != nil { return }
+
+    // Use StageName as phase if available (for blueprint mode)
+    phase := event.Phase
+    if phase == "" && event.StageName != "" {
+        phase = event.StageName
+    }
 
     _, _ = db.Exec(
         `INSERT INTO run_checkpoints (id, run_id, phase, iteration, timestamp, artifacts)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        uuid.New().String(), runID, event.Phase, event.Iteration, time.Now().UTC().Format(time.RFC3339Nano), string(b),
+        uuid.New().String(), runID, phase, event.Iteration, time.Now().UTC().Format(time.RFC3339Nano), string(b),
     )
 }

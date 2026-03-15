@@ -246,6 +246,18 @@ type GathererResult struct {
 // GathererRunner executes gatherers and tracks their execution.
 type GathererRunner struct {
 	gatherers []Gatherer
+	cache     *Cache
+}
+
+// GathererRunnerOption configures a GathererRunner.
+type GathererRunnerOption func(*GathererRunner)
+
+// WithCache enables context caching for the runner.
+// Cached context bundles are stored by content hash for deduplication.
+func WithCache(cache *Cache) GathererRunnerOption {
+	return func(r *GathererRunner) {
+		r.cache = cache
+	}
 }
 
 // NewGathererRunner creates a new GathererRunner.
@@ -253,6 +265,15 @@ func NewGathererRunner(gatherers ...Gatherer) *GathererRunner {
 	return &GathererRunner{
 		gatherers: gatherers,
 	}
+}
+
+// NewGathererRunnerWithOptions creates a GathererRunner with options.
+func NewGathererRunnerWithOptions(opts ...GathererRunnerOption) *GathererRunner {
+	r := &GathererRunner{}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // AddGatherer adds a gatherer to the runner.

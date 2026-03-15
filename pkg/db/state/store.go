@@ -195,12 +195,14 @@ func (s *Store) CheckIdempotencyKey(ctx context.Context, idempotencyKey string) 
 
 // CheckpointData represents a run checkpoint for replay.
 type CheckpointData struct {
-    ID        string
-    RunID     string
-    Phase     string
-    Iteration int
-    Timestamp string
-    Artifacts map[string]string
+    ID             string
+    RunID          string
+    Phase          string
+    Iteration      int
+    Timestamp      string
+    Artifacts      map[string]string
+    MessageHistory []byte // JSON array of messages for resume
+    ToolCallLog    []byte // JSON array of completed tool call IDs
 }
 
 // RecordCheckpoint persists a checkpoint for a run.
@@ -211,21 +213,38 @@ func (s *Store) RecordCheckpoint(ctx context.Context, cp CheckpointData) error {
             artifactsJSON = string(data)
         }
     }
-    query := `INSERT INTO run_checkpoints (id, run_id, phase, iteration, timestamp, artifacts)
-              VALUES (?, ?, ?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, cp.ID, cp.RunID, cp.Phase, cp.Iteration, cp.Timestamp, artifactsJSON)
+    messageHistory := "[]"
+    if len(cp.MessageHistory) > 0 {
+        messageHistory = string(cp.MessageHistory)
+    }
+    toolCallLog := "[]"
+    if len(cp.ToolCallLog) > 0 {
+        toolCallLog = string(cp.ToolCallLog)
+    }
+    query := `INSERT INTO run_checkpoints (id, run_id, phase, iteration, timestamp, artifacts, message_history, tool_call_log)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    _, err := s.db.ExecContext(ctx, query, cp.ID, cp.RunID, cp.Phase, cp.Iteration, cp.Timestamp, artifactsJSON, messageHistory, toolCallLog)
     return err
+}
+
+// RecordCheckpointWithHistory persists a checkpoint with full message history for resume.
+func (s *Store) RecordCheckpointWithHistory(ctx context.Context, cp CheckpointData, messages []byte, toolCalls []byte) error {
+    cp.MessageHistory = messages
+    cp.ToolCallLog = toolCalls
+    return s.RecordCheckpoint(ctx, cp)
 }
 
 // GetLatestCheckpoint returns the most recent checkpoint for a run.
 func (s *Store) GetLatestCheckpoint(ctx context.Context, runID string) (*CheckpointData, error) {
-    query := `SELECT id, run_id, phase, iteration, timestamp, artifacts
+    query := `SELECT id, run_id, phase, iteration, timestamp, artifacts,
+              COALESCE(message_history, '[]'), COALESCE(tool_call_log, '[]')
               FROM run_checkpoints WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1`
     row := s.db.QueryRowContext(ctx, query, runID)
 
     var cp CheckpointData
-    var artifactsJSON string
-    err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp, &artifactsJSON)
+    var artifactsJSON, messageHistory, toolCallLog string
+    err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp,
+                    &artifactsJSON, &messageHistory, &toolCallLog)
     if err != nil {
         if err == sql.ErrNoRows {
             return nil, nil
@@ -236,7 +255,77 @@ func (s *Store) GetLatestCheckpoint(ctx context.Context, runID string) (*Checkpo
     if artifactsJSON != "" {
         _ = json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts)
     }
+    cp.MessageHistory = []byte(messageHistory)
+    cp.ToolCallLog = []byte(toolCallLog)
     return &cp, nil
+}
+
+// GetCheckpointByID retrieves a specific checkpoint by ID.
+func (s *Store) GetCheckpointByID(ctx context.Context, checkpointID string) (*CheckpointData, error) {
+    query := `SELECT id, run_id, phase, iteration, timestamp, artifacts,
+              COALESCE(message_history, '[]'), COALESCE(tool_call_log, '[]')
+              FROM run_checkpoints WHERE id = ?`
+    row := s.db.QueryRowContext(ctx, query, checkpointID)
+
+    var cp CheckpointData
+    var artifactsJSON, messageHistory, toolCallLog string
+    err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp,
+                    &artifactsJSON, &messageHistory, &toolCallLog)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, nil
+        }
+        return nil, err
+    }
+
+    if artifactsJSON != "" {
+        _ = json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts)
+    }
+    cp.MessageHistory = []byte(messageHistory)
+    cp.ToolCallLog = []byte(toolCallLog)
+    return &cp, nil
+}
+
+// ListAppliedToolCalls returns the idempotency keys of tool calls that have been completed.
+// This is used during resume to skip already-applied tool calls.
+func (s *Store) ListAppliedToolCalls(ctx context.Context, runID string) ([]string, error) {
+    query := `SELECT DISTINCT tc.idempotency_key
+              FROM tool_calls tc
+              JOIN messages m ON tc.message_id = m.id
+              JOIN sessions s ON m.session_id = s.id
+              JOIN runs r ON r.session_id = s.id
+              WHERE r.id = ? AND tc.status = 'completed' AND tc.idempotency_key IS NOT NULL`
+    rows, err := s.db.QueryContext(ctx, query, runID)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var keys []string
+    for rows.Next() {
+        var key string
+        if err := rows.Scan(&key); err != nil {
+            return nil, err
+        }
+        keys = append(keys, key)
+    }
+    return keys, rows.Err()
+}
+
+// GetToolCallByIdempotencyKey retrieves the result of a previously completed tool call.
+// Returns nil if not found or not completed.
+func (s *Store) GetToolCallByIdempotencyKey(ctx context.Context, idempotencyKey string) (string, error) {
+    query := `SELECT tool_output FROM tool_calls
+              WHERE idempotency_key = ? AND status = 'completed' LIMIT 1`
+    var output sql.NullString
+    err := s.db.QueryRowContext(ctx, query, idempotencyKey).Scan(&output)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return "", nil
+        }
+        return "", err
+    }
+    return output.String, nil
 }
 
 // --- SESSION OPERATIONS ---

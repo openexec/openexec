@@ -26,7 +26,10 @@ func TestGitApplyPatch_PersistsArtifactAndReports(t *testing.T) {
     }
     b, _ := json.Marshal(args)
     params := toolsCallParams{Name: "git_apply_patch", Arguments: b}
-    s := NewServer(strings.NewReader(""), os.Stdout)
+    s, err := NewServerWithConfig(strings.NewReader(""), os.Stdout, ServerConfig{WorkDir: tmp})
+    if err != nil {
+        t.Fatalf("NewServerWithConfig: %v", err)
+    }
     s.handleGitApplyPatch(req, params)
 
     // Expect artifact file exists

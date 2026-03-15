@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/openexec/openexec/internal/toolset"
 	"github.com/openexec/openexec/pkg/telemetry"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -22,13 +23,25 @@ const (
 
 // ToolBroker enforces tiered permissions across all MCP tools.
 type ToolBroker struct {
-	mode  PermissionMode
-	runID string // Current run ID for tracing
+	mode            PermissionMode
+	runID           string              // Current run ID for tracing
+	toolsetRegistry *toolset.Registry   // Optional toolset-based filtering
+	activeToolset   string              // Currently active toolset
 }
 
 // SetRunID sets the current run ID for tracing context.
 func (b *ToolBroker) SetRunID(runID string) {
 	b.runID = runID
+}
+
+// SetToolsetRegistry configures toolset-based authorization.
+func (b *ToolBroker) SetToolsetRegistry(registry *toolset.Registry) {
+	b.toolsetRegistry = registry
+}
+
+// SetActiveToolset sets the currently active toolset for authorization.
+func (b *ToolBroker) SetActiveToolset(name string) {
+	b.activeToolset = name
 }
 
 // StartToolSpan creates a traced span for a tool invocation.
@@ -61,10 +74,23 @@ func NewToolBroker(modeOverride string) *ToolBroker {
 	return &ToolBroker{mode: mode}
 }
 
-// Authorize checks if a tool call is permitted in the current mode.
+// Authorize checks if a tool call is permitted in the current mode and toolset.
 func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string) {
+	// Check toolset-based authorization first (if configured)
+	if b.toolsetRegistry != nil && b.activeToolset != "" {
+		ts, ok := b.toolsetRegistry.Get(b.activeToolset)
+		if ok && b.toolsetRegistry.IsEnabled(b.activeToolset) {
+			// Control plane tools are always allowed
+			if !isControlPlaneTool(toolName) && !ts.HasTool(toolName) {
+				return false, fmt.Sprintf("[Toolset %s] tool '%s' is not available in the current toolset", b.activeToolset, toolName)
+			}
+		}
+	}
+
+	// Mode-based authorization (existing logic)
 	switch toolName {
-	case "read_file", "axon_signal", "openexec_signal", "get_fork_info", "list_session_forks", "fork_session":
+	case "read_file", "axon_signal", "openexec_signal", "get_fork_info", "list_session_forks", "fork_session",
+		"openexec_result", "openexec_action":
 		return true, "" // Always allowed (Read-only or control plane)
 
 	case "git_apply_patch":
@@ -98,6 +124,20 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 		}
 		return true, ""
 	}
+}
+
+// isControlPlaneTool returns true for tools that are always allowed regardless of toolset.
+func isControlPlaneTool(toolName string) bool {
+	controlPlaneTools := map[string]bool{
+		"axon_signal":        true,
+		"openexec_signal":    true,
+		"openexec_result":    true,
+		"openexec_action":    true,
+		"get_fork_info":      true,
+		"list_session_forks": true,
+		"fork_session":       true,
+	}
+	return controlPlaneTools[toolName]
 }
 
 func (b *ToolBroker) validateShellCommand(arguments string) (bool, string) {

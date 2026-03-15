@@ -92,9 +92,28 @@ func runChatREPL(cmd *cobra.Command, projectName string) error {
 	fmt.Println("Type your intent or 'exit' to quit.")
 	fmt.Println()
 
-    // V5: Create a conversational session on start
-    sessionID := fmt.Sprintf("session-%d", time.Now().Unix())
-    fmt.Printf("   ℹ️ Session: %s\n\n", sessionID)
+	// Create session via daemon API (daemon-owned orchestration)
+	sessionReq := map[string]any{
+		"projectPath": projectName,
+		"provider":    os.Getenv("OPENEXEC_PROVIDER"),
+		"model":       os.Getenv("OPENEXEC_MODEL"),
+		"title":       fmt.Sprintf("Chat %s", time.Now().Format("2006-01-02 15:04")),
+	}
+	sessionBody, _ := json.Marshal(sessionReq)
+	sessionResp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/sessions", startPort), "application/json", strings.NewReader(string(sessionBody)))
+	var sessionID string
+	if err == nil && sessionResp.StatusCode == http.StatusCreated {
+		var resp struct {
+			ID string `json:"id"`
+		}
+		_ = json.NewDecoder(sessionResp.Body).Decode(&resp)
+		sessionResp.Body.Close()
+		sessionID = resp.ID
+	} else {
+		// Fallback to local ID if daemon session creation fails
+		sessionID = fmt.Sprintf("session-%d", time.Now().Unix())
+	}
+	fmt.Printf("   ℹ️ Session: %s\n\n", sessionID)
 
     for {
         line, err := l.Readline()

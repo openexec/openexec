@@ -2,6 +2,8 @@ package loop
 
 import (
     "context"
+    "crypto/sha256"
+    "encoding/hex"
     "encoding/json"
     "fmt"
     "io"
@@ -13,6 +15,8 @@ import (
     "sync/atomic"
     "time"
 
+    "github.com/openexec/openexec/internal/blueprint"
+    "github.com/openexec/openexec/internal/prompt"
     "github.com/openexec/openexec/internal/summarize"
     "github.com/openexec/openexec/pkg/agent"
     "github.com/openexec/openexec/pkg/telemetry"
@@ -50,6 +54,15 @@ type Loop struct {
 
 	// history tracks the message conversation for provider-backed loops.
 	history []agent.Message
+
+	// blueprintEngine is the engine for blueprint execution mode.
+	blueprintEngine *blueprint.Engine
+
+	// blueprintRun is the current blueprint run.
+	blueprintRun *blueprint.Run
+
+	// blueprintInput is the input for the current blueprint run.
+	blueprintInput *blueprint.StageInput
 }
 
 // New creates a Loop with the given config and returns it along with a
@@ -76,6 +89,31 @@ func New(cfg Config) (*Loop, <-chan Event) {
 	}
 	now := time.Now()
 	l.lastActivity.Store(&now)
+
+	// Initialize blueprint engine if enabled
+	if cfg.BlueprintEnabled {
+		bp := cfg.Blueprint
+		if bp == nil {
+			bp = blueprint.DefaultBlueprint
+		}
+
+		// Configure blueprint engine callbacks
+		engineCfg := blueprint.DefaultEngineConfig()
+		if cfg.BlueprintCallbacks != nil {
+			engineCfg.OnStageComplete = cfg.BlueprintCallbacks.OnStageComplete
+			engineCfg.OnCheckpoint = cfg.BlueprintCallbacks.OnCheckpoint
+			engineCfg.OnRunComplete = cfg.BlueprintCallbacks.OnRunComplete
+		}
+
+		// Create engine (if executor is provided)
+		if cfg.BlueprintExecutor != nil {
+			engine, err := blueprint.NewEngine(bp, cfg.BlueprintExecutor, engineCfg)
+			if err == nil {
+				l.blueprintEngine = engine
+			}
+		}
+	}
+
 	return l, ch
 }
 
@@ -108,6 +146,11 @@ func (l *Loop) Run(ctx context.Context) error {
 			})
 			return fmt.Errorf("preflight checks failed: %s", preflightReport.Summary)
 		}
+	}
+
+	// Blueprint execution path
+	if l.cfg.BlueprintEnabled && l.blueprintEngine != nil {
+		return l.runBlueprint(ctx)
 	}
 
 	recorder := NewSessionRecorder(l.cfg.EvidenceDir, l.cfg.FwuID)
@@ -179,14 +222,22 @@ func (l *Loop) Run(ctx context.Context) error {
                 // Check if we need to summarize (using a standard 128k limit as heuristic if unknown)
                 limit := 128000
                 check := l.cfg.Summarizer.ShouldSummarize(l.history, limit)
-                
+
                 if check.ShouldSummarize {
                     l.emit(Event{
-                        Type: EventProgress, 
+                        Type: EventProgress,
                         Text: fmt.Sprintf("Summarizing session history to save tokens (saving ~%d tokens)", check.EstimatedSavings),
                     })
-                    
-                    if _, err := l.cfg.Summarizer.Summarize(ctx, l.cfg.FwuID, l.history, summarize.TriggerReasonTokenThreshold); err == nil {
+
+                    if summaryResult, err := l.cfg.Summarizer.Summarize(ctx, l.cfg.FwuID, l.history, summarize.TriggerReasonTokenThreshold); err == nil {
+                        // Persist summary as content-addressed artifact
+                        if summaryHash := l.writeSummaryArtifact(summaryResult); summaryHash != "" {
+                            l.emit(Event{
+                                Type:      EventProgress,
+                                Text:      "Session summary persisted as artifact",
+                                Artifacts: map[string]string{"summary_hash": summaryHash},
+                            })
+                        }
                         // Build context with the new summary
                         if summarized, err := l.cfg.Summarizer.BuildContextWithSummary(ctx, l.cfg.FwuID, l.history); err == nil {
                             messages = summarized
@@ -559,6 +610,55 @@ func getExitCode(err error) int {
 	return 1
 }
 
+// SummaryArtifact represents a persisted session summary for replay/audit.
+type SummaryArtifact struct {
+	SessionID     string `json:"session_id"`
+	SummaryText   string `json:"summary_text"`
+	MessageCount  int    `json:"message_count"`
+	TokensSaved   int    `json:"tokens_saved"`
+	PromptVersion string `json:"prompt_version"`
+	CreatedAt     string `json:"created_at"`
+}
+
+// writeSummaryArtifact persists a summary to .openexec/artifacts/summaries/<hash>.json
+// and returns the content-addressed hash for observability.
+func (l *Loop) writeSummaryArtifact(result *summarize.SummaryResult) string {
+	if result == nil || result.Text == "" {
+		return ""
+	}
+
+	artifact := SummaryArtifact{
+		SessionID:     result.SessionID,
+		SummaryText:   result.Text,
+		MessageCount:  result.MessagesSummarized,
+		TokensSaved:   result.TokensSaved,
+		PromptVersion: prompt.PromptVersion,
+		CreatedAt:     result.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}
+
+	data, err := json.MarshalIndent(artifact, "", "  ")
+	if err != nil {
+		return ""
+	}
+
+	// Compute content hash
+	hash := sha256.Sum256(data)
+	hashStr := hex.EncodeToString(hash[:])
+
+	// Write to artifacts directory
+	dir := filepath.Join(l.cfg.WorkDir, ".openexec", "artifacts", "summaries")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return ""
+	}
+
+	artifactPath := filepath.Join(dir, hashStr+".json")
+	if err := os.WriteFile(artifactPath, data, 0644); err != nil {
+		return ""
+	}
+
+	return hashStr
+}
+
 // GetConfig returns a copy of the loop configuration.
 func (l *Loop) GetConfig() Config {
 	return l.cfg
@@ -588,4 +688,220 @@ func (l *Loop) GetHealth() LoopHealth {
 		LastActivity: lastAct,
 		CurrentPID:   os.Getpid(),
 	}
+}
+
+// runBlueprint executes the loop in blueprint mode.
+// This replaces linear iteration with stage-based execution.
+func (l *Loop) runBlueprint(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "Loop.runBlueprint", trace.WithAttributes(
+		attribute.String("blueprint_id", l.blueprintEngine.GetBlueprint().ID),
+		attribute.String("fwu_id", l.cfg.FwuID),
+	))
+	defer span.End()
+
+	bp := l.blueprintEngine.GetBlueprint()
+
+	// Generate run ID
+	runID := fmt.Sprintf("run-%s-%d", l.cfg.FwuID, time.Now().UnixNano())
+
+	// Create stage input
+	l.blueprintInput = blueprint.NewStageInput(runID, l.cfg.Prompt, l.cfg.WorkDir)
+
+	// Start the run
+	run, err := l.blueprintEngine.StartRun(ctx, runID, l.blueprintInput)
+	if err != nil {
+		l.emit(Event{
+			Type:        EventBlueprintFailed,
+			BlueprintID: bp.ID,
+			ErrText:     fmt.Sprintf("failed to start blueprint run: %v", err),
+			Err:         err,
+		})
+		return err
+	}
+	l.blueprintRun = run
+
+	// Emit blueprint start event
+	l.emit(Event{
+		Type:        EventBlueprintStart,
+		BlueprintID: bp.ID,
+		Text:        fmt.Sprintf("Starting blueprint %q with initial stage %q", bp.Name, bp.InitialStage),
+	})
+
+	// Execute stages with event emission
+	for run.CurrentStage != "complete" && run.CurrentStage != "" {
+		// Check lifecycle
+		if l.stopped.Load() {
+			l.blueprintEngine.Cancel(runID)
+			return nil
+		}
+		if l.paused.Load() {
+			l.blueprintEngine.Pause(runID)
+			l.emit(Event{Type: EventPaused, BlueprintID: bp.ID, StageName: run.CurrentStage})
+			return nil
+		}
+
+		// Check context
+		select {
+		case <-ctx.Done():
+			l.blueprintEngine.Cancel(runID)
+			return ctx.Err()
+		default:
+		}
+
+		// Get current stage
+		stage, ok := bp.GetStage(run.CurrentStage)
+		if !ok {
+			err := fmt.Errorf("stage %q not found", run.CurrentStage)
+			l.emit(Event{
+				Type:        EventBlueprintFailed,
+				BlueprintID: bp.ID,
+				StageName:   run.CurrentStage,
+				ErrText:     err.Error(),
+				Err:         err,
+			})
+			return err
+		}
+
+		l.iteration++
+		attempt := run.GetRetries(stage.Name) + 1
+
+		// Emit stage start event
+		l.emit(Event{
+			Type:        EventStageStart,
+			Iteration:   l.iteration,
+			BlueprintID: bp.ID,
+			StageName:   stage.Name,
+			StageType:   string(stage.Type),
+			Attempt:     attempt,
+			Text:        fmt.Sprintf("Starting stage %q (attempt %d)", stage.Name, attempt),
+		})
+
+		// Call stage start callback
+		if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnStageStart != nil {
+			l.cfg.BlueprintCallbacks.OnStageStart(run, stage)
+		}
+
+		// Execute stage
+		result, err := l.blueprintEngine.ExecuteStage(ctx, run, stage.Name, l.blueprintInput)
+		if err != nil {
+			result = blueprint.NewStageResult(stage.Name, attempt)
+			result.Fail(err.Error())
+		}
+		l.blueprintInput.AddPreviousResult(result)
+
+		// Call stage complete callback
+		if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnStageComplete != nil {
+			l.cfg.BlueprintCallbacks.OnStageComplete(run, result)
+		}
+
+		// Handle result
+		if result.Status == blueprint.StageStatusCompleted {
+			l.emit(Event{
+				Type:        EventStageComplete,
+				Iteration:   l.iteration,
+				BlueprintID: bp.ID,
+				StageName:   stage.Name,
+				StageType:   string(stage.Type),
+				Attempt:     attempt,
+				Text:        fmt.Sprintf("Stage %q completed successfully", stage.Name),
+				Artifacts:   result.Artifacts,
+			})
+
+			// Create checkpoint if configured
+			if stage.CreateCheckpoint {
+				run.AddCheckpoint()
+				l.emit(Event{
+					Type:        EventCheckpointCreated,
+					BlueprintID: bp.ID,
+					StageName:   stage.Name,
+					Text:        fmt.Sprintf("Checkpoint created at stage %q", stage.Name),
+				})
+				if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnCheckpoint != nil {
+					l.cfg.BlueprintCallbacks.OnCheckpoint(run, stage.Name)
+				}
+			}
+
+			// Move to next stage
+			run.CurrentStage = stage.OnSuccess
+		} else if result.Status == blueprint.StageStatusFailed {
+			l.emit(Event{
+				Type:        EventStageFailed,
+				Iteration:   l.iteration,
+				BlueprintID: bp.ID,
+				StageName:   stage.Name,
+				StageType:   string(stage.Type),
+				Attempt:     attempt,
+				ErrText:     result.Error,
+				Text:        fmt.Sprintf("Stage %q failed: %s", stage.Name, result.Error),
+			})
+
+			// Check if we can retry
+			if stage.OnFailure != "" && run.GetRetries(stage.Name) < stage.MaxRetries {
+				run.IncrementRetries(stage.Name)
+				l.emit(Event{
+					Type:        EventStageRetry,
+					BlueprintID: bp.ID,
+					StageName:   stage.Name,
+					Attempt:     run.GetRetries(stage.Name) + 1,
+					Text:        fmt.Sprintf("Retrying stage %q (attempt %d/%d)", stage.Name, run.GetRetries(stage.Name)+1, stage.MaxRetries),
+				})
+				run.CurrentStage = stage.OnFailure
+			} else {
+				run.Fail(result.Error)
+				l.emit(Event{
+					Type:        EventBlueprintFailed,
+					BlueprintID: bp.ID,
+					StageName:   stage.Name,
+					ErrText:     fmt.Sprintf("Stage %q failed after max retries: %s", stage.Name, result.Error),
+				})
+				return fmt.Errorf("stage %q failed: %s", stage.Name, result.Error)
+			}
+		}
+	}
+
+	// Blueprint completed successfully
+	run.Complete()
+	if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnRunComplete != nil {
+		l.cfg.BlueprintCallbacks.OnRunComplete(run)
+	}
+
+	l.emit(Event{
+		Type:        EventBlueprintComplete,
+		Iteration:   l.iteration,
+		BlueprintID: bp.ID,
+		Text:        fmt.Sprintf("Blueprint %q completed successfully", bp.Name),
+	})
+
+	// Build artifacts from all stage results
+	artifacts := make(map[string]string)
+	for _, result := range run.Results {
+		for k, v := range result.Artifacts {
+			artifacts[fmt.Sprintf("%s:%s", result.StageName, k)] = v
+		}
+	}
+
+	// Emit EventComplete with Result for determinism
+	l.emit(Event{
+		Type:        EventComplete,
+		Iteration:   l.iteration,
+		BlueprintID: bp.ID,
+		Result: &StepResult{
+			Status:     "complete",
+			Reason:     "blueprint_complete",
+			NextPhase:  "done",
+			Artifacts:  artifacts,
+			Confidence: 1.0,
+		},
+	})
+	return nil
+}
+
+// GetBlueprintRun returns the current blueprint run (if any).
+func (l *Loop) GetBlueprintRun() *blueprint.Run {
+	return l.blueprintRun
+}
+
+// GetBlueprintEngine returns the blueprint engine (if any).
+func (l *Loop) GetBlueprintEngine() *blueprint.Engine {
+	return l.blueprintEngine
 }

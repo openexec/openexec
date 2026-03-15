@@ -93,8 +93,17 @@ type Manager struct {
 	state     *state.Store
 }
 
+// ErrNoWorkDir is returned when Manager is created without a WorkDir.
+var ErrNoWorkDir = fmt.Errorf("CRITICAL: WorkDir not configured; set WorkDir in manager.Config")
+
 // New creates a Manager with the given server-level config.
-func New(cfg Config) *Manager {
+// Returns error if WorkDir is empty (fail-fast for workspace scoping).
+func New(cfg Config) (*Manager, error) {
+	// FAIL FAST: WorkDir is mandatory for workspace-scoped execution
+	if cfg.WorkDir == "" {
+		return nil, ErrNoWorkDir
+	}
+
 	if cfg.DefaultMaxIterations == 0 {
 		cfg.DefaultMaxIterations = config.DefaultMaxIterations
 	}
@@ -119,27 +128,25 @@ func New(cfg Config) *Manager {
 	// SELF-HEALING: Ghost State Cleanup
 	// If the server crashed while tasks were running, they are stuck in the DB
 	// as 'running' or 'starting'. We must reset them to 'pending' on startup.
-	if cfg.WorkDir != "" {
-		relMgr, err := m.getInternalReleaseManager()
-		if err == nil {
-			tasks := relMgr.GetTasks()
-			resetCount := 0
-			for _, t := range tasks {
-				if t.Status == "running" || t.Status == "starting" {
-					t.Status = "pending"
-					_ = relMgr.UpdateTask(t)
-					resetCount++
-				}
+	relMgr, err := m.getInternalReleaseManager()
+	if err == nil {
+		tasks := relMgr.GetTasks()
+		resetCount := 0
+		for _, t := range tasks {
+			if t.Status == "running" || t.Status == "starting" {
+				t.Status = "pending"
+				_ = relMgr.UpdateTask(t)
+				resetCount++
 			}
-			if resetCount > 0 {
-				log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
-			}
+		}
+		if resetCount > 0 {
+			log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
 		}
 	}
 
 	m.watchdog = NewWatchdog(m)
 	go m.watchdog.Run(context.Background())
-	return m
+	return m, nil
 }
 
 // isTerminal returns true if the status represents a finished pipeline.
@@ -161,6 +168,36 @@ func WithIsStudy(isStudy bool) StartOption {
 func WithExecMode(mode string) StartOption {
     return func(cfg *pipeline.Config) {
         cfg.ExecMode = mode
+    }
+}
+
+// WithResumeCheckpoint enables resuming from a checkpoint.
+func WithResumeCheckpoint(checkpoint *state.CheckpointData, appliedToolCalls []string) StartOption {
+    return func(cfg *pipeline.Config) {
+        if checkpoint == nil {
+            return
+        }
+        cfg.ResumeFrom = &pipeline.ResumeConfig{
+            CheckpointID:     checkpoint.ID,
+            Phase:            checkpoint.Phase,
+            Iteration:        checkpoint.Iteration,
+            MessageHistory:   checkpoint.MessageHistory,
+            AppliedToolCalls: appliedToolCalls,
+        }
+    }
+}
+
+// WithBlueprint enables blueprint mode with the specified blueprint ID.
+func WithBlueprint(blueprintID string) StartOption {
+    return func(cfg *pipeline.Config) {
+        cfg.BlueprintID = blueprintID
+    }
+}
+
+// WithTaskDescription sets the task description for blueprint runs.
+func WithTaskDescription(description string) StartOption {
+    return func(cfg *pipeline.Config) {
+        cfg.TaskDescription = description
     }
 }
 

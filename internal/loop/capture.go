@@ -32,6 +32,7 @@ type MetaData struct {
 	Error      string    `json:"error,omitempty"`
 	Config     Config    `json:"config"`
 	PromptHash string    `json:"prompt_hash"`
+	CacheKey   string    `json:"cache_key"` // Stable hash for deterministic replay
 }
 
 // NewSessionRecorder creates a recorder that stores evidence in baseDir/fwuID/timestamp/.
@@ -67,15 +68,27 @@ func (r *SessionRecorder) Start(cfg Config) error {
 		return fmt.Errorf("failed to create stderr file: %w", err)
 	}
 
-	// Calculate prompt hash
+	// Calculate prompt hash (may vary with formatting)
 	hash := sha256.Sum256([]byte(cfg.Prompt))
 	promptHash := hex.EncodeToString(hash[:])
+
+	// Calculate cache key (stable hash of semantic content for deterministic replay)
+	// Includes: FWUID, ExecutorModel, MaxIterations, StablePromptHash (if available) or Prompt
+	var cacheInput string
+	if cfg.StablePromptHash != "" {
+		cacheInput = fmt.Sprintf("%s|%s|%d|%s", r.fwuID, cfg.ExecutorModel, cfg.MaxIterations, cfg.StablePromptHash)
+	} else {
+		cacheInput = fmt.Sprintf("%s|%s|%d|%s", r.fwuID, cfg.ExecutorModel, cfg.MaxIterations, cfg.Prompt)
+	}
+	cacheHash := sha256.Sum256([]byte(cacheInput))
+	cacheKey := hex.EncodeToString(cacheHash[:16]) // Use first 16 bytes (32 hex chars)
 
 	r.meta = MetaData{
 		FwuID:      r.fwuID,
 		StartTime:  time.Now(),
 		Config:     cfg,
 		PromptHash: promptHash,
+		CacheKey:   cacheKey,
 	}
 
 	return r.writeMeta()

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/openexec/openexec/internal/mode"
 )
 
 // Common errors returned by session operations.
@@ -173,6 +174,10 @@ type Session struct {
 	Model string `json:"model"`
 	// Title is a user-friendly title for the session.
 	Title string `json:"title,omitempty"`
+	// Mode is the current operational mode (chat, task, run).
+	Mode mode.Mode `json:"mode"`
+	// ModeState tracks mode transitions and history.
+	ModeState *mode.State `json:"mode_state,omitempty"`
 	// ParentSessionID is the ID of the parent session if this is a fork.
 	ParentSessionID sql.NullString `json:"parent_session_id,omitempty"`
 	// ForkPointMessageID is the message ID where this session forked from parent.
@@ -186,6 +191,7 @@ type Session struct {
 }
 
 // NewSession creates a new Session with a generated UUID.
+// Sessions start in chat mode by default.
 func NewSession(projectPath, provider, model string) (*Session, error) {
 	if projectPath == "" {
 		return nil, fmt.Errorf("%w: project_path is required", ErrInvalidSession)
@@ -203,6 +209,8 @@ func NewSession(projectPath, provider, model string) (*Session, error) {
 		ProjectPath: projectPath,
 		Provider:    provider,
 		Model:       model,
+		Mode:        mode.ModeChat,
+		ModeState:   mode.NewState(),
 		Status:      StatusActive,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -267,6 +275,34 @@ func (s *Session) GetForkPointMessageID() string {
 		return s.ForkPointMessageID.String
 	}
 	return ""
+}
+
+// TransitionMode transitions the session to a new operational mode.
+func (s *Session) TransitionMode(to mode.Mode, condition mode.TransitionCondition, reason string) error {
+	if s.ModeState == nil {
+		s.ModeState = mode.NewState()
+	}
+	if err := s.ModeState.TransitionTo(to, condition, reason); err != nil {
+		return err
+	}
+	s.Mode = to
+	s.UpdatedAt = time.Now().UTC()
+	return nil
+}
+
+// CanWrite returns true if the current mode allows write operations.
+func (s *Session) CanWrite() bool {
+	return s.Mode.AllowsWrites()
+}
+
+// CanExec returns true if the current mode allows command execution.
+func (s *Session) CanExec() bool {
+	return s.Mode.AllowsExec()
+}
+
+// RequiresApproval returns true if operations require user approval in current mode.
+func (s *Session) RequiresApproval() bool {
+	return s.Mode.RequiresApproval()
 }
 
 // ForkOptions configures session forking behavior.
@@ -364,6 +400,8 @@ func (s *Session) ForkSession(opts *ForkOptions) (*Session, error) {
 		Provider:           provider,
 		Model:              model,
 		Title:              title,
+		Mode:               mode.ModeChat, // Forks start in chat mode
+		ModeState:          mode.NewState(),
 		ParentSessionID:    sql.NullString{String: s.ID, Valid: true},
 		ForkPointMessageID: sql.NullString{String: opts.ForkPointMessageID, Valid: true},
 		Status:             StatusActive,

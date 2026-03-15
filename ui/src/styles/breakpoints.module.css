@@ -1,0 +1,201 @@
+/* Breakpoint-based responsive utility classes */
+/* Import this module in components that need responsive behavior */
+
+/* ================================================
+   BREAKPOINT VALUES
+   - Mobile: < 768px
+   - Tablet: 768px - 1024px
+   - Desktop: > 1024px
+   ================================================ */
+
+/* ================================================
+   DISPLAY UTILITIES
+   ================================================ */
+
+/* Mobile only (< 768px) */
+@media (min-width: 768px) {
+  .mobileOnly {
+    display: none !important;
+  }
+}
+
+/* Tablet and up (>= 768px) */
+@media (max-width: 767px) {
+  .tabletUp {
+    display: none !important;
+  }
+}
+
+/* Desktop only (>= 1024px) */
+@media (max-width: 1023px) {
+  .desktopOnly {
+    display: none !important;
+  }
+}
+
+/* Hide on desktop (< 1024px) */
+@media (min-width: 1024px) {
+  .mobileTablet {
+    display: none !important;
+  }
+}
+
+/* ================================================
+   LAYOUT UTILITIES
+   ================================================ */
+
+/* Stack on mobile, row on tablet+ */
+.stackMobile {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .stackMobile {
+    flex-direction: row;
+  }
+}
+
+/* Stack on mobile/tablet, row on desktop */
+.stackTablet {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 1024px) {
+  .stackTablet {
+    flex-direction: row;
+  }
+}
+
+/* ================================================
+   SPACING UTILITIES
+   ================================================ */
+
+/* Responsive padding */
+.paddingResponsive {
+  padding: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .paddingResponsive {
+    padding: var(--space-4);
+  }
+}
+
+@media (min-width: 1024px) {
+  .paddingResponsive {
+    padding: var(--space-6);
+  }
+}
+
+/* Responsive gap */
+.gapResponsive {
+  gap: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .gapResponsive {
+    gap: var(--space-3);
+  }
+}
+
+@media (min-width: 1024px) {
+  .gapResponsive {
+    gap: var(--space-4);
+  }
+}
+
+/* ================================================
+   TEXT UTILITIES
+   ================================================ */
+
+/* Responsive text size */
+.textResponsive {
+  font-size: var(--font-size-sm);
+}
+
+@media (min-width: 768px) {
+  .textResponsive {
+    font-size: var(--font-size-md);
+  }
+}
+
+/* Hide text on mobile, show icon only */
+.textHideMobile {
+  display: inline;
+}
+
+@media (max-width: 767px) {
+  .textHideMobile {
+    display: none;
+  }
+}
+
+/* ================================================
+   CONTAINER UTILITIES
+   ================================================ */
+
+/* Full width on mobile, constrained on larger screens */
+.containerResponsive {
+  width: 100%;
+  max-width: 100%;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .containerResponsive {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+}
+
+@media (min-width: 1024px) {
+  .containerResponsive {
+    max-width: var(--container-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+}
+
+/* ================================================
+   SIDEBAR BEHAVIOR
+   ================================================ */
+
+/* Sidebar that collapses on mobile */
+.sidebarCollapsible {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  transform: translateX(-100%);
+  transition: transform var(--transition-normal);
+  z-index: var(--z-fixed);
+}
+
+.sidebarCollapsible.open {
+  transform: translateX(0);
+}
+
+@media (min-width: 1024px) {
+  .sidebarCollapsible {
+    position: relative;
+    transform: translateX(0);
+  }
+}
+
+/* Main content that shifts when sidebar opens */
+.mainWithSidebar {
+  margin-left: 0;
+  transition: margin-left var(--transition-normal);
+}
+
+@media (min-width: 1024px) {
+  .mainWithSidebar {
+    margin-left: var(--sidebar-width);
+  }
+}

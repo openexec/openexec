@@ -21,20 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// legacyFWUEnabled returns true if legacy FWU CLI flows are enabled.
-// Set OPENEXEC_ENABLE_LEGACY_FWU=1 to enable (deprecated).
-func legacyFWUEnabled() bool {
-	v := os.Getenv("OPENEXEC_ENABLE_LEGACY_FWU")
-	return v == "1" || strings.ToLower(v) == "true" || strings.ToLower(v) == "yes"
-}
-
-// printDeprecationBanner prints a deprecation warning for CLI orchestration.
-func printDeprecationBanner(cmd *cobra.Command, feature string) {
-	cmd.Printf("\n⚠️  DEPRECATION WARNING: %s\n", feature)
-	cmd.Println("   CLI orchestration is deprecated. The daemon now owns all orchestration.")
-	cmd.Println("   Use 'openexec start' to trigger server-side execution via /api/v1/runs endpoints.")
-	cmd.Println("   Set OPENEXEC_ENABLE_LEGACY_FWU=1 to enable legacy flows (temporary).\n")
-}
+// Legacy FWU flow removed in Phase Four. All orchestration is daemon-owned.
 
 var (
 	startPort        int
@@ -53,6 +40,9 @@ var (
 	runQuickfix      string
 	runVerify        string
 	runMode          string
+
+	// Blueprint command flags
+	blueprintID string
 )
 
 // Task represents a task to execute
@@ -77,6 +67,16 @@ type TasksFile struct {
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start execution daemon for concurrent task processing",
+	Long: `Start the execution daemon that handles all orchestration.
+
+The daemon exposes /api/v1/runs endpoints for run management:
+  POST /api/v1/runs        Create a new run
+  POST /api/v1/runs:plan   Generate a plan from INTENT.md
+  POST /api/v1/runs:execute Execute pending tasks
+  GET  /api/v1/runs        List runs (supports ?limit=&offset= paging)
+  GET  /api/v1/runs/{id}   Get run status
+
+WebSocket events are available at /ws for real-time monitoring.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
@@ -176,7 +176,16 @@ var startCmd = &cobra.Command{
 
 var runCmd = &cobra.Command{
 	Use:   "run [task-id]",
-	Short: "Execute tasks using the execution engine",
+	Short: "Execute tasks using the execution engine (daemon-orchestrated)",
+	Long: `Execute tasks using the execution engine.
+
+All orchestration is handled by the daemon via /api/v1/runs endpoints.
+The CLI is a thin client that triggers and monitors server-side execution.
+
+Examples:
+  openexec run             # Execute all pending tasks
+  openexec run T-001       # Execute specific task
+  openexec run --quickfix "Fix typo" --verify "make test"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
@@ -274,6 +283,98 @@ var restartCmd = &cobra.Command{
 			_ = err
 		}
 		return startCmd.RunE(cmd, args)
+	},
+}
+
+var blueprintCmd = &cobra.Command{
+	Use:   "blueprint <task-description>",
+	Short: "Execute a task using blueprint-based orchestration",
+	Long: `Execute a task using blueprint-based stage orchestration.
+
+Blueprints define sequences of deterministic and agentic stages:
+  gather_context → implement → lint → test → review
+
+Available blueprints:
+  - standard_task: Full workflow with lint/test validation (default)
+  - quick_fix:     Simplified workflow for small fixes
+
+Examples:
+  openexec blueprint "Add user authentication"
+  openexec blueprint --blueprint-id quick_fix "Fix typo in README"`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		taskDescription := strings.Join(args, " ")
+
+		config, err := project.LoadProjectConfig(".")
+		if err != nil {
+			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
+		// Auto-start engine if not running
+		if !isServerRunning(config.ProjectDir, 0) {
+			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
+			startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
+			execPath, _ := os.Executable()
+			startExec := exec.Command(execPath, startArgs...)
+			startExec.Dir = config.ProjectDir
+			if err := startExec.Run(); err != nil {
+				return fmt.Errorf("failed to auto-start execution engine: %w", err)
+			}
+			time.Sleep(1 * time.Second)
+		}
+
+		// Sync port from PID file
+		if _, effectivePort, err := readPID(config.ProjectDir); err == nil {
+			if effectivePort != startPort {
+				cmd.Printf("   ℹ️ Syncing with engine on port %d\n", effectivePort)
+				startPort = effectivePort
+			}
+		}
+
+		if err := waitForServer(startPort, 15*time.Second); err != nil {
+			return fmt.Errorf("engine failed to become ready: %w", err)
+		}
+
+		// Trigger blueprint run via API
+		payload := map[string]any{
+			"blueprint_id":     blueprintID,
+			"task_description": taskDescription,
+			"mode":             runMode,
+		}
+		body, _ := json.Marshal(payload)
+
+		resp, err := http.Post(
+			fmt.Sprintf("http://localhost:%d/api/v1/runs:blueprint", startPort),
+			"application/json",
+			bytes.NewReader(body),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to start blueprint run: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusCreated {
+			respBody, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("server rejected blueprint run: %s", string(respBody))
+		}
+
+		var result map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
+
+		runID, _ := result["run_id"].(string)
+		bpID, _ := result["blueprint_id"].(string)
+
+		cmd.Printf("🎯 Blueprint run started\n")
+		cmd.Printf("   Run ID:    %s\n", runID)
+		cmd.Printf("   Blueprint: %s\n", bpID)
+		cmd.Printf("   Task:      %s\n", taskDescription)
+		cmd.Println()
+		cmd.Printf("Monitor progress with: openexec status %s\n", runID)
+		cmd.Printf("Or view timeline:      curl http://localhost:%d/api/v1/runs/%s/timeline\n", startPort, runID)
+
+		return nil
 	},
 }
 
@@ -396,32 +497,32 @@ func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string,
 	_ = exec.Command("git", "checkout", baseBranch).Run()
 }
 
-// createExecutionLoopWithRetry triggers a task execution via daemon.
-// DEPRECATED: Uses legacy /api/fwu endpoint. Use /api/v1/runs endpoints instead.
+// createExecutionLoopWithRetry triggers a task execution via daemon using /api/v1/runs endpoints.
 func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
-    // prompt and MCP config are handled server-side for FWU start
-
 	isStudy := isStudyTask(task.Title)
 
-    payload := map[string]any{}
-    if isStudy { payload["is_study"] = true }
-    if runMode != "" { payload["mode"] = runMode }
-    body, _ := json.Marshal(payload)
+	payload := map[string]any{}
+	if isStudy {
+		payload["is_study"] = true
+	}
+	if runMode != "" {
+		payload["mode"] = runMode
+	}
+	body, _ := json.Marshal(payload)
 
-    // Use v1 runs endpoint (preferred) with fallback to legacy FWU
-    endpoint := fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", startPort, task.ID)
-    resp, err := http.Post(endpoint, "application/json", bytes.NewReader(body))
+	endpoint := fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", startPort, task.ID)
+	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-    if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-        respBody, _ := io.ReadAll(resp.Body)
-        return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
-    }
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
+	}
 
-    return task.ID, nil
+	return task.ID, nil
 }
 
 func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string) string {
@@ -441,8 +542,8 @@ func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string)
 	return sb.String()
 }
 
-// waitForLoop monitors a run/loop until completion or timeout.
-// DEPRECATED: Client-side monitoring is being phased out. Use server-side callbacks or WS events.
+// waitForLoop monitors a run via /api/v1/runs/{id} until completion or timeout.
+// Uses WebSocket events for real-time updates with HTTP polling fallback.
 func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.Duration, isChassis bool) error {
 	deadline := time.Now().Add(timeout)
 	lastIteration := -1
@@ -517,9 +618,9 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		}
 	}
 
-	// Main monitoring loop - uses v1 runs endpoint (with FWU fallback for compatibility)
+	// Main monitoring loop - uses v1 runs endpoint
 	for time.Now().Before(deadline) {
-        resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s", startPort, loopID))
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s", startPort, loopID))
 		if err != nil {
 			time.Sleep(2 * time.Second)
 			continue
@@ -652,9 +753,14 @@ func init() {
     runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
     runCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
 
+	blueprintCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
+	blueprintCmd.Flags().StringVar(&blueprintID, "blueprint-id", "standard_task", "Blueprint to execute (standard_task, quick_fix)")
+	blueprintCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
+
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
+	rootCmd.AddCommand(blueprintCmd)
 }
 
 // tryAutoImportStories attempts to import stories from .openexec/stories.json into the DB

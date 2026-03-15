@@ -636,3 +636,140 @@ func joinPath(root, relPath string) string {
 }
 
 // filepath import is needed - but it should already be in the package via path.go
+
+// OpenExecResultToolDef returns the MCP tool definition for the openexec_result tool.
+// This tool allows agents to emit typed, schema-validated step results.
+// Replaces the legacy text-based "STEP_RESULT: {JSON}" pattern.
+func OpenExecResultToolDef() map[string]interface{} {
+	return map[string]interface{}{
+		"name":        "openexec_result",
+		"description": "Emit a structured step result to signal completion, error, pivot, or retry. This is the preferred method for agents to communicate step outcomes to the orchestrator. Results are schema-validated before processing.",
+		"inputSchema": map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"status": map[string]interface{}{
+					"type":        "string",
+					"description": "The outcome status of the step.",
+					"enum":        []string{"complete", "error", "pivot", "retry"},
+				},
+				"reason": map[string]interface{}{
+					"type":        "string",
+					"description": "Explanation for the status. Required for all status types.",
+					"minLength":   1,
+				},
+				"next_phase": map[string]interface{}{
+					"type":        "string",
+					"description": "Requested phase transition (for pivot status).",
+				},
+				"artifacts": map[string]interface{}{
+					"type":        "object",
+					"description": "Hash-addressed results (e.g., {'patch_hash': 'abc123', 'test_output': 'def456'}).",
+					"additionalProperties": map[string]interface{}{
+						"type": "string",
+					},
+				},
+				"confidence": map[string]interface{}{
+					"type":        "number",
+					"description": "Confidence level in the result (0.0 to 1.0). Used for uncertainty-aware orchestration.",
+					"minimum":     0.0,
+					"maximum":     1.0,
+				},
+				"diagnostics": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional internal reasoning or debugging information.",
+				},
+			},
+			"required": []string{"status", "reason"},
+		},
+	}
+}
+
+// OpenExecResultRequest represents the parsed arguments for an openexec_result tool call.
+type OpenExecResultRequest struct {
+	Status      string            `json:"status"`
+	Reason      string            `json:"reason"`
+	NextPhase   string            `json:"next_phase,omitempty"`
+	Artifacts   map[string]string `json:"artifacts,omitempty"`
+	Confidence  float64           `json:"confidence,omitempty"`
+	Diagnostics string            `json:"diagnostics,omitempty"`
+}
+
+// ValidateOpenExecResultRequest validates an OpenExecResultRequest.
+func ValidateOpenExecResultRequest(req *OpenExecResultRequest) error {
+	validStatuses := map[string]bool{
+		"complete": true,
+		"error":    true,
+		"pivot":    true,
+		"retry":    true,
+	}
+	if !validStatuses[req.Status] {
+		return &ValidationError{Field: "status", Message: "must be one of: complete, error, pivot, retry"}
+	}
+	if req.Reason == "" {
+		return &ValidationError{Field: "reason", Message: "reason is required"}
+	}
+	if req.Confidence < 0 || req.Confidence > 1 {
+		return &ValidationError{Field: "confidence", Message: "must be between 0.0 and 1.0"}
+	}
+	return nil
+}
+
+// OpenExecActionToolDef returns the MCP tool definition for the openexec_action tool.
+// This is the unified envelope for all typed agent actions.
+func OpenExecActionToolDef() map[string]interface{} {
+	return map[string]interface{}{
+		"name":        "openexec_action",
+		"description": "Emit a typed agent action. This is the canonical way for agents to communicate decisions to the orchestrator. Supports step results, tool calls, plan updates, and progress reports.",
+		"inputSchema": map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"type": map[string]interface{}{
+					"type":        "string",
+					"description": "The type of action being performed.",
+					"enum":        []string{"complete", "pivot", "retry", "error", "progress", "tool_call", "plan_update"},
+				},
+				"step_result": map[string]interface{}{
+					"type":        "object",
+					"description": "For complete/error/pivot/retry actions. Contains status, reason, artifacts, etc.",
+					"properties": map[string]interface{}{
+						"status":      map[string]interface{}{"type": "string", "enum": []string{"complete", "error", "pivot", "retry"}},
+						"reason":      map[string]interface{}{"type": "string", "minLength": 1},
+						"next_phase":  map[string]interface{}{"type": "string"},
+						"artifacts":   map[string]interface{}{"type": "object", "additionalProperties": map[string]interface{}{"type": "string"}},
+						"confidence":  map[string]interface{}{"type": "number", "minimum": 0, "maximum": 1},
+						"diagnostics": map[string]interface{}{"type": "string"},
+					},
+					"required": []string{"status", "reason"},
+				},
+				"tool_call": map[string]interface{}{
+					"type":        "object",
+					"description": "For tool_call actions. Specifies which tool to invoke and with what input.",
+					"properties": map[string]interface{}{
+						"tool":       map[string]interface{}{"type": "string", "minLength": 1},
+						"input":      map[string]interface{}{"type": "object"},
+						"idempotent": map[string]interface{}{"type": "boolean"},
+						"priority":   map[string]interface{}{"type": "string", "enum": []string{"low", "normal", "high"}},
+						"timeout_ms": map[string]interface{}{"type": "integer", "minimum": 0},
+					},
+					"required": []string{"tool", "input"},
+				},
+				"plan_update": map[string]interface{}{
+					"type":        "object",
+					"description": "For plan_update actions. Specifies plan modifications.",
+					"properties": map[string]interface{}{
+						"action":       map[string]interface{}{"type": "string", "enum": []string{"add", "remove", "reorder", "complete"}},
+						"task_ids":     map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+						"reason":       map[string]interface{}{"type": "string", "minLength": 1},
+						"new_priority": map[string]interface{}{"type": "integer"},
+					},
+					"required": []string{"action", "reason"},
+				},
+				"text": map[string]interface{}{
+					"type":        "string",
+					"description": "For progress actions. Human-readable status message.",
+				},
+			},
+			"required": []string{"type"},
+		},
+	}
+}

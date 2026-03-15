@@ -13,8 +13,9 @@ func TestManager(t *testing.T) {
 
 	p1 := filepath.Join(tmpDir, "project1")
 	p2 := filepath.Join(tmpDir, "project2")
-	os.MkdirAll(p1, 0755)
-	os.MkdirAll(p2, 0755)
+	// Create project dirs with .openexec subdirs for the store
+	os.MkdirAll(filepath.Join(p1, ".openexec"), 0755)
+	os.MkdirAll(filepath.Join(p2, ".openexec"), 0755)
 
 	t.Run("Isolate Projects", func(t *testing.T) {
 		// Act

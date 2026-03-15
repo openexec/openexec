@@ -1,14 +1,111 @@
 # OpenExec Architecture Overview
 
-This document explains how OpenExec turns an idea into executable work by moving through Wizard → PRD → Stories → Tasks → Execution, with built‑in validation and recovery. Use it as a primer and as a source for visualizations.
+This document explains how OpenExec turns an idea into executable work. OpenExec follows the **converged architecture** pattern used by modern AI coding tools: deterministic local runtime with small local LLM as gatekeeper and frontier model for hard reasoning.
 
-## Big Picture
+## Converged Architecture: The 7-Layer Model
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. INTERACTION LAYER                                                │
+│    CLI, Web UI, Slack/Ticket triggers                               │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────┐
+│ 2. SESSION/RUNTIME LAYER                                            │
+│    Session state, approvals, mode (chat/task/run), event stream     │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────┐
+│ 3. CONTEXT ASSEMBLY LAYER                                           │
+│    Files, diffs, rules, docs, tickets, repo metadata                │
+│    Two-stage: deterministic gather → local LLM ranking              │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────┐
+│ 4. TOOL LAYER (Toolsets, not flat tools)                            │
+│    repo_readonly, coding_backend, coding_frontend, debug_ci, etc.   │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────┐
+│ 5. POLICY/SANDBOX LAYER                                             │
+│    Permissions, approvals, resource limits, audit trail             │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────┐
+│ 6. ORCHESTRATION LAYER (Blueprints)                                 │
+│    gather_context → implement → lint → test → review                │
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+┌─────────────────────────────────────────────────────────────────────┐
+│ 7. MODEL LAYER (Plural)                                             │
+│    Local LLM: routing, classification, redaction                    │
+│    Frontier LLM: implementation, reasoning, synthesis               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Execution Model: The Blueprint Engine
+
+OpenExec has evolved from a fixed 5-phase pipeline to a flexible **Blueprint Engine**. A blueprint defines a graph of stages that can be deterministic (code-based) or agentic (AI-based).
+
+### Standard Task Blueprint
+The default blueprint for task execution follows this flow:
+`gather_context` → `implement` → `lint` → `test` → `review`
+
+| Stage | Type | Toolset | Description |
+|-------|------|---------|-------------|
+| `gather_context` | Deterministic | repo_readonly | Gather relevant files and project map |
+| `implement` | Agentic | coding_backend | Frontier model makes code changes |
+| `lint` | Deterministic | coding_backend | Run configured linters (e.g., go vet, ruff) |
+| `fix_lint` | Agentic | coding_backend | AI fixes linting errors if they occur |
+| `test` | Deterministic | coding_backend | Run project test suite |
+| `fix_tests` | Agentic | coding_backend | AI fixes failing tests |
+| `review` | Agentic | repo_readonly | Final verification and summary |
+
+### Legacy 5-Phase Pipeline (Deprecated)
+The original state machine phases are still supported for backward compatibility:
+- **TD (Technical Design)**, **IM (Implement)**, **RV (Review)**, **RF (Refactor)**, **FL (Finalize)**.
+
+---
+
+## Three Execution Modes
+
+## Toolsets
+
+Toolsets group related tools by function and risk level:
+
+| Toolset | Tools | Risk Level | Phases |
+|---------|-------|------------|--------|
+| `repo_readonly` | read_file, glob, grep, git_status | Low | gather_context, review |
+| `coding_backend` | read_file, write_file, git_apply_patch, run_shell_command | Medium | implement, lint, test |
+| `coding_frontend` | read_file, write_file, git_apply_patch, npm_run | Medium | implement, lint, test |
+| `debug_ci` | read_file, run_shell_command, git_log, ci_status | Medium | fix_ci |
+| `docs_research` | read_file, glob, web_fetch | Low | gather_context |
+| `release_ops` | git_tag, git_push, changelog_update | High | finalize |
+
+## Local LLM Role: Gatekeeper, Not Boss
+
+**Local LLM SHOULD do:**
+- Intent classification (chat vs task vs run)
+- Toolset selection
+- Knowledge-source selection
+- Context pack ranking
+- Redaction/risk scoring
+- Summarization of local text
+
+**Local LLM should NOT do:**
+- Core coding generation
+- Long bugfix loops
+- Final code synthesis
+- Workflow control logic
+- Permission decisions alone
+
+## Big Picture (Legacy View)
+
 - Wizard (Conversational): guides a short Q&A to draft a PRD (INTENT.md).
 - Planner: decomposes the PRD into goals, stories, and tasks (stories.json).
 - Planning Gate: validates structure (schema version, goal coverage, verification scripts).
 - Import & Reconciliation: materializes stories and tasks, fixes linkages, and enforces ordering.
-- Execution Pipeline: runs TD → IM → RV → RF → FL with the resolved CLI runner (claude/codex/gemini).
-  - **Fast-Track:** Study/Mapping tasks jump directly from TD → FL to save time on documentation work.
+- Execution: Blueprint engine runs stages with toolset-based permissions.
 - Built-in State (Tract): Context briefings are generated directly from the release manager state without external service dependencies.
 - Auto‑Healing: repairs known mismatches (e.g., already implemented) and persists state.
 - Observability: /api/health exposes the resolved runner; logs and per‑loop stderr tails aid debugging.

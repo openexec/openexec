@@ -265,6 +265,8 @@ func TestDCP_AllowedDependencies(t *testing.T) {
 		"github.com/openexec/openexec/internal/router":    "BitNet intent routing",
 		"github.com/openexec/openexec/internal/tools":     "tool interface and implementations",
 		"github.com/openexec/openexec/internal/logging":   "structured logging",
+		"github.com/openexec/openexec/internal/mode":      "mode classification (chat/task/run)",
+		"github.com/openexec/openexec/internal/toolset":   "toolset registry and selection",
 		"github.com/openexec/openexec/pkg/util":           "utility functions (PII scrubbing, etc.)",
 	}
 

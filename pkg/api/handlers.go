@@ -8,9 +8,11 @@ import (
     "net/http"
     "strconv"
     "strings"
+    "sync"
     "time"
 
     "github.com/openexec/openexec/pkg/audit"
+    "github.com/openexec/openexec/pkg/db/session"
     "github.com/openexec/openexec/pkg/db/state"
     "github.com/openexec/openexec/pkg/manager"
 )
@@ -25,9 +27,7 @@ func parseIntParam(r *http.Request, key string, defaultVal int) int {
     return defaultVal
 }
 
-// Legacy loops endpoint removed; use /api/fwu/{id}/start or /api/v1/runs
-
-// Legacy loops endpoint removed; use /api/fwu/{id}/status
+// Legacy loops and FWU endpoints removed in Phase Four. Use /api/v1/runs endpoints.
 
 // handlePlan executes the planning workflow on the server and returns a plan artifact.
 func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
@@ -74,12 +74,18 @@ func (s *Server) handleExecuteRuns(w http.ResponseWriter, r *http.Request) {
 
 // handleCreateRun creates a new run from an explicit request and returns a run_id.
 // This improves determinism by persisting the inputs up front.
+// When StateStore is available, creates a RunSpec for deterministic replay.
 func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
     var req struct {
         WorkDir       string `json:"work_dir"`
+        SessionID     string `json:"session_id,omitempty"`
+        Intent        string `json:"intent,omitempty"`
         QuickfixTitle string `json:"quickfix_title,omitempty"`
         VerifyScript  string `json:"verify_script,omitempty"`
         Mode          string `json:"mode,omitempty"`
+        Model         string `json:"model,omitempty"`
+        ContextHash   string `json:"context_hash,omitempty"`
+        PromptHash    string `json:"prompt_hash,omitempty"`
     }
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
         WriteError(w, http.StatusBadRequest, "invalid request body")
@@ -93,28 +99,54 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
         runID = "T-QF-" + now
     }
 
+    // Create RunSpec for deterministic replay if StateStore is available
+    var specID string
+    if s.StateStore != nil && req.Intent != "" {
+        spec := &state.RunSpec{
+            SessionID:   req.SessionID,
+            Intent:      req.Intent,
+            ContextHash: req.ContextHash,
+            PromptHash:  req.PromptHash,
+            Model:       req.Model,
+            Mode:        req.Mode,
+        }
+        if err := s.StateStore.CreateRunSpec(r.Context(), spec); err != nil {
+            log.Printf("[API] CreateRunSpec failed: %v", err)
+            // Continue without spec - non-fatal
+        } else {
+            specID = spec.ID
+        }
+    }
+
     // Persist the run request to audit for replay determinism
     if s.AuditLogger != nil {
         builder, err := audit.NewEntry(audit.EventRunCreated, "openexec", "system")
         if err == nil {
-            e, _ := builder.WithProject(s.ProjectsDir).
-                WithMetadata(map[string]interface{}{
-                    "event":          "run.created",
-                    "run_id":         runID,
-                    "work_dir":       req.WorkDir,
-                    "quickfix_title": req.QuickfixTitle,
-                    "verify_script":  req.VerifyScript,
-                    "mode":           req.Mode,
-                }).Build()
+            md := map[string]interface{}{
+                "event":          "run.created",
+                "run_id":         runID,
+                "work_dir":       req.WorkDir,
+                "quickfix_title": req.QuickfixTitle,
+                "verify_script":  req.VerifyScript,
+                "mode":           req.Mode,
+            }
+            if specID != "" {
+                md["spec_id"] = specID
+            }
+            e, _ := builder.WithProject(s.ProjectsDir).WithMetadata(md).Build()
             _ = s.AuditLogger.Log(r.Context(), e)
         }
     }
 
     // Return the run_id; clients can use /api/v1/runs/{id}/start to begin execution.
-    WriteJSON(w, http.StatusCreated, map[string]interface{}{
+    resp := map[string]interface{}{
         "run_id": runID,
         "status": "created",
-    })
+    }
+    if specID != "" {
+        resp["spec_id"] = specID
+    }
+    WriteJSON(w, http.StatusCreated, resp)
 }
 
 // handleStartRun starts a run by id using the manager and optional options.
@@ -147,6 +179,109 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
     WriteJSON(w, http.StatusCreated, map[string]interface{}{
         "run_id": id,
         "status": "starting",
+    })
+}
+
+// handleResumeRun resumes a run from a checkpoint.
+func (s *Server) handleResumeRun(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    if id == "" {
+        WriteError(w, http.StatusBadRequest, "missing run id")
+        return
+    }
+
+    var body struct {
+        CheckpointID string `json:"checkpoint_id,omitempty"`
+    }
+    _ = json.NewDecoder(r.Body).Decode(&body)
+
+    // Get checkpoint (latest if not specified)
+    var checkpoint *state.CheckpointData
+    var err error
+    if s.StateStore == nil {
+        WriteError(w, http.StatusServiceUnavailable, "state store not available")
+        return
+    }
+
+    if body.CheckpointID != "" {
+        checkpoint, err = s.StateStore.GetCheckpointByID(r.Context(), body.CheckpointID)
+    } else {
+        checkpoint, err = s.StateStore.GetLatestCheckpoint(r.Context(), id)
+    }
+    if err != nil {
+        WriteError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get checkpoint: %v", err))
+        return
+    }
+    if checkpoint == nil {
+        WriteError(w, http.StatusNotFound, fmt.Sprintf("no checkpoint found for run %s", id))
+        return
+    }
+
+    // Get list of applied tool calls for idempotency
+    appliedCalls, err := s.StateStore.ListAppliedToolCalls(r.Context(), id)
+    if err != nil {
+        log.Printf("[API] ListAppliedToolCalls error: %v", err)
+        // Non-fatal, continue with empty list
+        appliedCalls = []string{}
+    }
+
+    // Start with resume options
+    opts := []manager.StartOption{
+        manager.WithResumeCheckpoint(checkpoint, appliedCalls),
+    }
+
+    if err := s.Mgr.Start(context.Background(), id, opts...); err != nil {
+        if strings.Contains(err.Error(), "already active") {
+            WriteError(w, http.StatusConflict, err.Error())
+            return
+        }
+        WriteError(w, http.StatusInternalServerError, err.Error())
+        return
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]interface{}{
+        "run_id":        id,
+        "checkpoint_id": checkpoint.ID,
+        "phase":         checkpoint.Phase,
+        "iteration":     checkpoint.Iteration,
+        "status":        "resuming",
+    })
+}
+
+// handleGetRunCheckpoints returns checkpoints for a run.
+func (s *Server) handleGetRunCheckpoints(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    if id == "" {
+        WriteError(w, http.StatusBadRequest, "missing run id")
+        return
+    }
+
+    if s.StateStore == nil {
+        WriteError(w, http.StatusServiceUnavailable, "state store not available")
+        return
+    }
+
+    checkpoints, err := s.StateStore.ListCheckpoints(r.Context(), id)
+    if err != nil {
+        WriteError(w, http.StatusInternalServerError, fmt.Sprintf("failed to list checkpoints: %v", err))
+        return
+    }
+
+    result := make([]map[string]interface{}, 0, len(checkpoints))
+    for _, cp := range checkpoints {
+        result = append(result, map[string]interface{}{
+            "id":        cp.ID,
+            "run_id":    cp.RunID,
+            "phase":     cp.Phase,
+            "iteration": cp.Iteration,
+            "timestamp": cp.Timestamp,
+            "artifacts": cp.Artifacts,
+        })
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]interface{}{
+        "run_id":      id,
+        "checkpoints": result,
     })
 }
 
@@ -338,138 +473,69 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
     WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": list})
 }
 
-func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		WriteError(w, http.StatusBadRequest, "missing fwu id")
-		return
-	}
+// Legacy FWU handlers (handleStart, handleStatus, handleList, handlePause, handleStop, handleEvents)
+// REMOVED in Phase Four. Use /api/v1/runs endpoints for all orchestration.
 
-	err := s.Mgr.Start(context.Background(), id)
-	if err != nil {
-		if strings.Contains(err.Error(), "already active") {
-			WriteError(w, http.StatusConflict, err.Error())
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
+// handleStartParallelRuns starts multiple runs in parallel using git worktrees.
+func (s *Server) handleStartParallelRuns(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        RunIDs []string `json:"run_ids"`
+        Mode   string   `json:"mode,omitempty"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        WriteError(w, http.StatusBadRequest, "invalid request body")
+        return
+    }
 
-	WriteJSON(w, http.StatusCreated, map[string]string{
-		"fwu_id": id,
-		"status": "starting",
-	})
-}
+    if len(req.RunIDs) == 0 {
+        WriteError(w, http.StatusBadRequest, "at least one run_id is required")
+        return
+    }
 
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		WriteError(w, http.StatusBadRequest, "missing fwu id")
-		return
-	}
+    if len(req.RunIDs) > 10 {
+        WriteError(w, http.StatusBadRequest, "maximum 10 parallel runs allowed")
+        return
+    }
 
-	info, err := s.Mgr.Status(id)
-	if err != nil {
-		WriteError(w, http.StatusNotFound, err.Error())
-		return
-	}
+    // Start runs in parallel
+    results := make([]map[string]interface{}, 0, len(req.RunIDs))
+    var mu sync.Mutex
+    var wg sync.WaitGroup
 
-	WriteJSON(w, http.StatusOK, info)
-}
+    for _, runID := range req.RunIDs {
+        wg.Add(1)
+        go func(id string) {
+            defer wg.Done()
 
-func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
-	list := s.Mgr.List()
-	WriteJSON(w, http.StatusOK, list)
-}
+            var opts []manager.StartOption
+            if req.Mode != "" {
+                opts = append(opts, manager.WithExecMode(req.Mode))
+            }
 
-func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		WriteError(w, http.StatusBadRequest, "missing fwu id")
-		return
-	}
+            err := s.Mgr.Start(context.Background(), id, opts...)
 
-	err := s.Mgr.Pause(id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			WriteError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+            mu.Lock()
+            defer mu.Unlock()
 
-	WriteJSON(w, http.StatusOK, map[string]string{"status": "pausing"})
-}
+            result := map[string]interface{}{
+                "run_id": id,
+            }
+            if err != nil {
+                result["status"] = "error"
+                result["error"] = err.Error()
+            } else {
+                result["status"] = "starting"
+            }
+            results = append(results, result)
+        }(runID)
+    }
 
-func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		WriteError(w, http.StatusBadRequest, "missing fwu id")
-		return
-	}
+    wg.Wait()
 
-	err := s.Mgr.Stop(id)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			WriteError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		WriteError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	WriteJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
-}
-
-func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		WriteError(w, http.StatusBadRequest, "missing fwu id")
-		return
-	}
-
-	sub, unsub, err := s.Mgr.Subscribe(id)
-	if err != nil {
-		if _, ok := err.(*manager.NotFoundError); ok {
-			WriteError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		WriteError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	defer unsub()
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		WriteError(w, http.StatusInternalServerError, "streaming not supported")
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	ctx := r.Context()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case event, ok := <-sub:
-			if !ok {
-				// Pipeline finished, channel closed.
-				return
-			}
-			data, err := json.Marshal(event)
-			if err != nil {
-				continue
-			}
-			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
-			flusher.Flush()
-		}
-	}
+    WriteJSON(w, http.StatusAccepted, map[string]interface{}{
+        "runs":  results,
+        "count": len(req.RunIDs),
+    })
 }
 
 func WriteJSON(w http.ResponseWriter, status int, v interface{}) {
@@ -487,4 +553,398 @@ func WriteErrorWithSuggestion(w http.ResponseWriter, status int, msg string, sug
 		"error":      msg,
 		"suggestion": suggestion,
 	})
+}
+
+// handleStartBlueprintRun starts a blueprint-based run.
+// POST /api/v1/runs:blueprint
+func (s *Server) handleStartBlueprintRun(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		BlueprintID     string `json:"blueprint_id"`
+		TaskDescription string `json:"task_description"`
+		Mode            string `json:"mode,omitempty"`
+		SessionID       string `json:"session_id,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Validate required fields
+	if req.TaskDescription == "" {
+		WriteError(w, http.StatusBadRequest, "task_description is required")
+		return
+	}
+
+	// Use default blueprint if not specified
+	blueprintID := req.BlueprintID
+	if blueprintID == "" {
+		blueprintID = "standard_task"
+	}
+
+	// Generate run ID
+	now := time.Now().UTC().Format("20060102-150405")
+	runID := fmt.Sprintf("BP-%s-%s", blueprintID[:min(8, len(blueprintID))], now)
+
+	// Build start options
+	opts := []manager.StartOption{
+		manager.WithBlueprint(blueprintID),
+		manager.WithTaskDescription(req.TaskDescription),
+	}
+	if req.Mode != "" {
+		opts = append(opts, manager.WithExecMode(req.Mode))
+	}
+
+	// Log blueprint run creation to audit
+	if s.AuditLogger != nil {
+		builder, err := audit.NewEntry(audit.EventRunCreated, "openexec", "system")
+		if err == nil {
+			md := map[string]interface{}{
+				"event":            "run.blueprint_created",
+				"run_id":           runID,
+				"blueprint_id":     blueprintID,
+				"task_description": req.TaskDescription,
+				"mode":             req.Mode,
+				"session_id":       req.SessionID,
+			}
+			e, _ := builder.WithProject(s.ProjectsDir).WithMetadata(md).Build()
+			_ = s.AuditLogger.Log(r.Context(), e)
+		}
+	}
+
+	// Start the run asynchronously
+	if err := s.Mgr.Start(context.Background(), runID, opts...); err != nil {
+		if strings.Contains(err.Error(), "already active") {
+			WriteError(w, http.StatusConflict, err.Error())
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"run_id":           runID,
+		"blueprint_id":     blueprintID,
+		"task_description": req.TaskDescription,
+		"status":           "starting",
+	})
+}
+
+// handleGetRunTimeline returns the timeline for a blueprint run.
+// GET /api/v1/runs/{id}/timeline
+func (s *Server) handleGetRunTimeline(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "missing run id")
+		return
+	}
+
+	// Get run status from manager
+	info, err := s.Mgr.Status(id)
+	if err != nil {
+		// Try unified DB
+		if s.UseUnifiedReads && s.StateStore != nil {
+			run, dbErr := s.StateStore.GetRun(r.Context(), id)
+			if dbErr != nil || run == nil {
+				WriteError(w, http.StatusNotFound, fmt.Sprintf("run %q not found", id))
+				return
+			}
+			// Return basic timeline for completed runs
+			WriteJSON(w, http.StatusOK, map[string]interface{}{
+				"run_id": id,
+				"status": run.Status,
+				"stages": []map[string]interface{}{},
+			})
+			return
+		}
+		WriteError(w, http.StatusNotFound, fmt.Sprintf("run %q not found", id))
+		return
+	}
+
+	// Build timeline from run steps
+	timeline := map[string]interface{}{
+		"run_id":          id,
+		"status":          info.Status,
+		"phase":           info.Phase,
+		"iteration":       info.Iteration,
+		"elapsed":         info.Elapsed,
+		"stages":          []map[string]interface{}{},
+		"checkpoints":     []string{},
+		"can_resume_from": []string{},
+	}
+
+	// Get stage history from run steps
+	if s.StateStore != nil {
+		steps, err := s.StateStore.ListRunSteps(r.Context(), id, 100, 0)
+		if err == nil {
+			stageMap := make(map[string]map[string]interface{})
+			for _, step := range steps {
+				stageName := step.Phase
+				if stageName == "" {
+					continue
+				}
+
+				// Initialize or update stage entry
+				if _, exists := stageMap[stageName]; !exists {
+					stageMap[stageName] = map[string]interface{}{
+						"name":       stageName,
+						"status":     step.Status,
+						"started_at": step.StartedAt,
+						"attempt":    1,
+					}
+				}
+
+				// Update with latest status
+				existing := stageMap[stageName]
+				existing["status"] = step.Status
+				if step.CompletedAt.Valid {
+					existing["completed_at"] = step.CompletedAt.String
+				}
+				if step.Agent.Valid {
+					existing["agent"] = step.Agent.String
+				}
+			}
+
+			// Convert map to slice
+			stages := make([]map[string]interface{}, 0, len(stageMap))
+			for _, stage := range stageMap {
+				stages = append(stages, stage)
+			}
+			timeline["stages"] = stages
+		}
+
+		// Get checkpoints
+		checkpoints, err := s.StateStore.ListCheckpoints(r.Context(), id)
+		if err == nil {
+			cpNames := make([]string, 0, len(checkpoints))
+			resumeFrom := make([]string, 0, len(checkpoints))
+			for _, cp := range checkpoints {
+				phase := cp.Phase
+				if phase == "" {
+					// Try to get stage name from artifacts
+					if sn, ok := cp.Artifacts["stage_name"]; ok {
+						phase = sn
+					}
+				}
+				if phase != "" {
+					cpNames = append(cpNames, fmt.Sprintf("stage:%s", phase))
+					resumeFrom = append(resumeFrom, fmt.Sprintf("stage:%s", phase))
+				}
+			}
+			timeline["checkpoints"] = cpNames
+			timeline["can_resume_from"] = resumeFrom
+		}
+	}
+
+	WriteJSON(w, http.StatusOK, timeline)
+}
+
+// min returns the smaller of two integers.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// handleStartRunFromSession converts a chat session into a blueprint-driven run.
+// POST /api/v1/sessions/{id}/run
+func (s *Server) handleStartRunFromSession(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		WriteError(w, http.StatusBadRequest, "session id required")
+		return
+	}
+
+	var req struct {
+		BlueprintID     string `json:"blueprint_id"`
+		Mode            string `json:"mode"`
+		TaskDescription string `json:"task_description"`
+		UseSummary      bool   `json:"use_summary"`
+		Messages        int    `json:"messages"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
+		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Validate session exists
+	if s.SessionRepo == nil {
+		WriteError(w, http.StatusServiceUnavailable, "session repository not available")
+		return
+	}
+
+	sess, err := s.SessionRepo.GetSession(r.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			WriteError(w, http.StatusNotFound, fmt.Sprintf("session %q not found", id))
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Derive task description from session if not provided
+	taskDescription := req.TaskDescription
+	if taskDescription == "" {
+		taskDescription = deriveTaskFromSession(r.Context(), s.SessionRepo, sess.ID, req.Messages)
+	}
+
+	if taskDescription == "" {
+		WriteError(w, http.StatusBadRequest, "could not derive task description from session; provide task_description")
+		return
+	}
+
+	// Default blueprint
+	blueprintID := req.BlueprintID
+	if blueprintID == "" {
+		blueprintID = "standard_task"
+	}
+
+	// Validate blueprint ID (known blueprints)
+	switch blueprintID {
+	case "standard_task", "quick_fix":
+		// valid
+	default:
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("unknown blueprint_id: %s (valid: standard_task, quick_fix)", blueprintID))
+		return
+	}
+
+	// Default mode
+	mode := req.Mode
+	if mode == "" {
+		mode = "workspace-write"
+	}
+
+	// Validate mode
+	switch mode {
+	case "read-only", "workspace-write", "danger-full-access":
+		// valid
+	default:
+		WriteError(w, http.StatusBadRequest, fmt.Sprintf("invalid mode: %s (valid: read-only, workspace-write, danger-full-access)", mode))
+		return
+	}
+
+	// Generate run ID
+	now := time.Now().UTC().Format("20060102-150405")
+	bpPrefix := blueprintID
+	if len(bpPrefix) > 8 {
+		bpPrefix = bpPrefix[:8]
+	}
+	runID := fmt.Sprintf("BP-%s-%s", bpPrefix, now)
+
+	// Build start options
+	opts := []manager.StartOption{
+		manager.WithBlueprint(blueprintID),
+		manager.WithTaskDescription(taskDescription),
+		manager.WithExecMode(mode),
+	}
+
+	// Check manager is available
+	if s.Mgr == nil {
+		WriteError(w, http.StatusServiceUnavailable, "manager not available")
+		return
+	}
+
+	// Log run creation to audit
+	if s.AuditLogger != nil {
+		builder, err := audit.NewEntry(audit.EventRunCreated, "openexec", "system")
+		if err == nil {
+			md := map[string]interface{}{
+				"event":            "run.session_to_blueprint",
+				"run_id":           runID,
+				"session_id":       id,
+				"blueprint_id":     blueprintID,
+				"task_description": truncateString(taskDescription, 500),
+				"mode":             mode,
+			}
+			e, _ := builder.WithProject(s.ProjectsDir).WithMetadata(md).Build()
+			_ = s.AuditLogger.Log(r.Context(), e)
+		}
+	}
+
+	// Start the run
+	if err := s.Mgr.Start(context.Background(), runID, opts...); err != nil {
+		if strings.Contains(err.Error(), "already active") {
+			WriteError(w, http.StatusConflict, err.Error())
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusCreated, map[string]interface{}{
+		"run_id":       runID,
+		"blueprint_id": blueprintID,
+		"session_id":   id,
+		"status":       "starting",
+	})
+}
+
+// deriveTaskFromSession extracts a task description from session messages.
+// If messagesCount > 0, considers that many recent messages for context.
+func deriveTaskFromSession(ctx context.Context, repo interface {
+	GetFullConversationHistory(ctx context.Context, sessionID string) ([]*session.Message, error)
+}, sessionID string, messagesCount int) string {
+	messages, err := repo.GetFullConversationHistory(ctx, sessionID)
+	if err != nil || len(messages) == 0 {
+		return ""
+	}
+
+	// Find the last user message
+	var lastUserMsg *session.Message
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == session.RoleUser {
+			lastUserMsg = messages[i]
+			break
+		}
+	}
+
+	if lastUserMsg == nil {
+		return ""
+	}
+
+	// If only one message requested or found, return it directly
+	if messagesCount <= 1 {
+		return lastUserMsg.Content
+	}
+
+	// Build context from recent N messages
+	startIdx := len(messages) - messagesCount
+	if startIdx < 0 {
+		startIdx = 0
+	}
+
+	var contextParts []string
+	for i := startIdx; i < len(messages); i++ {
+		msg := messages[i]
+		if i == len(messages)-1 && msg.Role == session.RoleUser {
+			continue // Skip last user msg, we'll add it as Task
+		}
+		role := "User"
+		if msg.Role == session.RoleAssistant {
+			role = "Assistant"
+		}
+		// Truncate long messages in context
+		content := truncateString(msg.Content, 200)
+		contextParts = append(contextParts, fmt.Sprintf("%s: %s", role, content))
+	}
+
+	if len(contextParts) > 0 {
+		return fmt.Sprintf("Context:\n%s\n\nTask: %s",
+			strings.Join(contextParts, "\n"),
+			lastUserMsg.Content)
+	}
+
+	return lastUserMsg.Content
+}
+
+// truncateString truncates a string to maxLen characters, adding "..." if truncated.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return s[:maxLen]
+	}
+	return s[:maxLen-3] + "..."
 }

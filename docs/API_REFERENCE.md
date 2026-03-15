@@ -28,11 +28,25 @@ OpenExec exposes a unified API served by the single-binary OpenExec server (`ope
 | API Type | Protocol | Base Path | Purpose |
 |----------|----------|-----------|---------|
 | Runs API (v1) | HTTP/JSON | `/api/v1/runs` | Planning and execution (recommended) |
+| Blueprint API | HTTP/JSON | `/api/v1/blueprints` | Blueprint management and execution |
+| Toolset API | HTTP/JSON | `/api/v1/toolsets` | Toolset listing and configuration |
 | FWU API | HTTP/JSON | `/api/fwu` | Task-based execution control (**deprecated**) |
 | Session API| HTTP/JSON | `/api/sessions`| Chat history and state management |
 | Project API| HTTP/JSON | `/api/projects`| Multi-project discovery and init |
 | Model API  | HTTP/JSON | `/api` | Provider and model metadata |
 | WebSocket | WS/JSON | `/ws` | Real-time conversation streaming |
+
+### Execution Architecture
+
+OpenExec uses a strict separation of concerns:
+
+- **MCP is the sole execution plane.** All file operations, command execution, and tool invocations flow through the MCP (Model Context Protocol) server with mandatory workspace scoping, permission gating, and audit logging.
+
+- **The daemon owns all orchestration.** The CLI is a thin client that triggers server-side execution via the API. No local orchestration occurs in CLI commands.
+
+- **Deterministic state machine.** Runs progress through phases (TD → IM → RV → RF → FL → Done) governed by a versioned state machine. See [STATE_MACHINE.md](./STATE_MACHINE.md) for details.
+
+- **DCP is suggest-only.** The Deterministic Control Plane provides intent routing suggestions but does not execute tools directly. All execution requests are forwarded to MCP.
 
 ---
 
@@ -111,6 +125,80 @@ Retrieves paginated conversation history.
   }
 }
 ```
+
+---
+
+#### Start Run from Session
+`POST /api/v1/sessions/{id}/run`
+
+Converts an existing chat session into a deterministic, blueprint-driven run. This endpoint allows users to escalate a conversation into an automated execution flow with streaming progress and resumability.
+
+**Request Body:**
+```json
+{
+  "blueprint_id": "standard_task",
+  "mode": "workspace-write",
+  "task_description": "Implement user authentication",
+  "use_summary": false,
+  "messages": 5
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `blueprint_id` | string | `standard_task` | Blueprint to execute (`standard_task`, `quick_fix`) |
+| `mode` | string | `workspace-write` | Execution mode (`read-only`, `workspace-write`, `danger-full-access`) |
+| `task_description` | string | (derived) | Explicit task description; if omitted, derived from session messages |
+| `use_summary` | bool | `false` | Use session summary instead of full messages |
+| `messages` | int | `0` | Number of recent messages to include for context (0 = last user message only) |
+
+**Task Derivation:**
+
+When `task_description` is not provided, the endpoint derives the task from the session's conversation:
+- If `messages=0` or `messages=1`: Uses the content of the last user message
+- If `messages>1`: Includes recent conversation context with the last user message
+
+**Response (201 Created):**
+```json
+{
+  "run_id": "BP-standard-20240315-120000",
+  "blueprint_id": "standard_task",
+  "session_id": "sess_abc123",
+  "status": "starting"
+}
+```
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| `400 Bad Request` | Invalid `blueprint_id`, `mode`, or missing session ID |
+| `400 Bad Request` | Could not derive task description (no user messages in session) |
+| `404 Not Found` | Session does not exist |
+| `503 Service Unavailable` | Manager not available |
+
+**Example Usage:**
+
+```bash
+# Start a run with explicit task description
+curl -X POST "http://localhost:8080/api/v1/sessions/sess_abc123/run" \
+  -H "Content-Type: application/json" \
+  -d '{"task_description": "Add user authentication", "blueprint_id": "standard_task"}'
+
+# Start a run with derived task from session
+curl -X POST "http://localhost:8080/api/v1/sessions/sess_abc123/run" \
+  -H "Content-Type: application/json" \
+  -d '{"blueprint_id": "quick_fix"}'
+```
+
+**Monitoring Progress:**
+
+After starting a run, monitor progress via:
+- **WebSocket**: Connect to `/ws` and subscribe to the run ID to receive real-time events
+- **Timeline API**: `GET /api/v1/runs/{run_id}/timeline` for stage history and checkpoints
+- **Run Status**: `GET /api/v1/runs/{run_id}` for current status and output
 
 ---
 
@@ -272,6 +360,162 @@ Mapped to UI `Session` interface. Uses **camelCase** tags.
 
 ---
 
+### Blueprint API
+
+Base path: `/api/v1/blueprints`
+
+#### List Blueprints
+`GET /api/v1/blueprints`
+
+Returns all available blueprints.
+
+**Response:**
+```json
+[
+  {
+    "id": "standard_task",
+    "name": "Standard Task",
+    "description": "Default blueprint for implementing tasks with lint/test validation",
+    "version": "1.0",
+    "initial_stage": "gather_context",
+    "stages": ["gather_context", "implement", "lint", "test", "review"]
+  },
+  {
+    "id": "quick_fix",
+    "name": "Quick Fix",
+    "description": "Simplified blueprint for small, targeted fixes",
+    "version": "1.0",
+    "initial_stage": "implement",
+    "stages": ["implement", "verify"]
+  }
+]
+```
+
+---
+
+#### Get Blueprint
+`GET /api/v1/blueprints/{id}`
+
+Returns a specific blueprint with full stage definitions.
+
+**Response:**
+```json
+{
+  "id": "standard_task",
+  "name": "Standard Task",
+  "stages": {
+    "gather_context": {
+      "name": "gather_context",
+      "type": "deterministic",
+      "toolset": "repo_readonly",
+      "on_success": "implement",
+      "create_checkpoint": true
+    },
+    "implement": {
+      "name": "implement",
+      "type": "agentic",
+      "toolset": "coding_backend",
+      "max_retries": 3,
+      "timeout": "10m",
+      "on_success": "lint",
+      "on_failure": "implement"
+    }
+  }
+}
+```
+
+---
+
+### Toolset API
+
+Base path: `/api/v1/toolsets`
+
+#### List Toolsets
+`GET /api/v1/toolsets`
+
+Returns all available toolsets.
+
+**Response:**
+```json
+[
+  {
+    "name": "repo_readonly",
+    "description": "Read-only repository operations",
+    "tools": ["read_file", "glob", "grep", "git_status"],
+    "risk_level": "low",
+    "phases": ["gather_context", "review"]
+  },
+  {
+    "name": "coding_backend",
+    "description": "Backend implementation tools",
+    "tools": ["read_file", "write_file", "git_apply_patch", "run_shell_command"],
+    "risk_level": "medium",
+    "phases": ["implement", "fix_lint", "fix_tests"]
+  }
+]
+```
+
+---
+
+#### Get Toolset Tools
+`GET /api/v1/toolsets/{name}/tools`
+
+Returns tools available in a specific toolset.
+
+**Response:**
+```json
+{
+  "name": "coding_backend",
+  "tools": [
+    {
+      "name": "read_file",
+      "description": "Read file contents"
+    },
+    {
+      "name": "write_file",
+      "description": "Write file contents"
+    }
+  ]
+}
+```
+
+---
+
+### Mode Transitions
+
+Sessions support mode transitions via the Session API:
+
+#### Transition Mode
+`POST /api/sessions/{id}/mode`
+
+Transitions a session to a new execution mode.
+
+**Request Body:**
+```json
+{
+  "mode": "task",
+  "reason": "user_approved"
+}
+```
+
+**Valid Transitions:**
+| From | To | Condition |
+|------|-----|-----------|
+| chat | task | `user_approved` |
+| task | run | `inputs_ready` |
+| run | chat | `checkpoint` |
+
+**Response (200 OK):**
+```json
+{
+  "previous_mode": "chat",
+  "current_mode": "task",
+  "transitioned_at": "2024-03-15T12:00:00Z"
+}
+```
+
+---
+
 ### FWU API (Deprecated)
 
 Base path: `/api/fwu`
@@ -401,6 +645,36 @@ This prevents duplicate writes and enables efficient lookup during resume.
 
 ---
 
+### Blueprint Event Types
+
+When running in blueprint mode, the following events are emitted:
+
+| Event Type | Description | Fields |
+|------------|-------------|--------|
+| `blueprint_start` | Blueprint execution started | `blueprint_id` |
+| `blueprint_complete` | Blueprint completed successfully | `blueprint_id`, `iteration` |
+| `blueprint_failed` | Blueprint failed | `blueprint_id`, `stage_name`, `error` |
+| `stage_start` | Stage execution started | `blueprint_id`, `stage_name`, `stage_type`, `attempt` |
+| `stage_complete` | Stage completed successfully | `blueprint_id`, `stage_name`, `artifacts` |
+| `stage_failed` | Stage failed | `blueprint_id`, `stage_name`, `error` |
+| `stage_retry` | Stage retrying | `blueprint_id`, `stage_name`, `attempt` |
+| `checkpoint_created` | Checkpoint created | `blueprint_id`, `stage_name` |
+
+**Example WebSocket Event:**
+```json
+{
+  "type": "stage_start",
+  "blueprint_id": "standard_task",
+  "stage_name": "implement",
+  "stage_type": "agentic",
+  "attempt": 1,
+  "iteration": 2,
+  "text": "Starting stage \"implement\" (attempt 1)"
+}
+```
+
+---
+
 ### Run-Step Event Metadata
 
 Events emitted during run execution include version metadata for debugging and reproducibility:
@@ -451,17 +725,17 @@ When enabled:
 
 #### Unified Database Reads
 
-Set `OPENEXEC_USE_UNIFIED_READS=true` to enable reading run state from the unified database.
+Unified database reads are **enabled by default**. Set `OPENEXEC_USE_UNIFIED_READS=0` to disable.
 
-When disabled (default):
-- Handlers read from in-memory Manager state (active runs only)
-- Historical runs not accessible after restart
-
-When enabled:
+With unified reads enabled (default):
 - `GET /api/v1/runs` queries unified DB with filtering support
 - `GET /api/v1/runs/{id}` falls back to DB if not found in memory
 - `GET /api/v1/runs/{id}/steps` reads from `run_steps` table instead of audit logger
 - Supports historical run data persisted across restarts
+
+When disabled:
+- Handlers read from in-memory Manager state (active runs only)
+- Historical runs not accessible after restart
 
 **Bake-in Phase**: Enable this flag in staging/development to verify data consistency before production rollout.
 
@@ -486,7 +760,7 @@ When enabled:
 | Flag | Default | Purpose |
 |------|---------|---------|
 | `OPENEXEC_ENABLE_DCP` | `false` | Enable Deterministic Control Plane (BitNet routing) |
-| `OPENEXEC_USE_UNIFIED_READS` | `false` | Enable reading run state from unified DB |
+| `OPENEXEC_USE_UNIFIED_READS` | `true` | Read run state from unified DB (set to `0` to disable) |
 | `OPENEXEC_ENABLE_LEGACY_FWU` | `false` | Enable deprecated FWU CLI flows |
 
 **Future Flags (Reserved):**

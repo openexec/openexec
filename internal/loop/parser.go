@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/openexec/openexec/internal/schema"
 	"github.com/openexec/openexec/pkg/util"
 )
 
@@ -110,40 +111,36 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				Text:      item.Text,
 			})
 
-			// Constrained Output Detection (V5): Check for STEP_RESULT: {JSON}
-			if strings.Contains(item.Text, "STEP_RESULT:") {
-				parts := strings.SplitN(item.Text, "STEP_RESULT:", 2)
-				if len(parts) > 1 {
-					var res StepResult
-					if err := json.Unmarshal([]byte(strings.TrimSpace(parts[1])), &res); err == nil {
-						p.emit(Event{
-							Type:      EventComplete,
-							Iteration: p.iteration,
-							Result:    &res,
-						})
-					}
-				}
-			}
-
-			// SELF-HEALING: Detect if agent claims task is already done or scope is misaligned
-			txtLower := strings.ToLower(item.Text)
-			isComplete := strings.Contains(txtLower, "already completed") || 
-						 strings.Contains(txtLower, "already done") ||
-						 strings.Contains(txtLower, "implementation is complete") ||
-						 strings.Contains(txtLower, "criteria appear to be met")
-			
-			if isComplete {
-				p.emitSignal(map[string]interface{}{
-					"type":   "complete",
-					"reason": "Agent verified implementation already exists",
+			// Typed Schema Detection: Check for STEP_RESULT: {JSON} with validation
+			if result, err := schema.DetectLegacyStepResult(item.Text); err == nil && result != nil {
+				p.emit(Event{
+					Type:      EventComplete,
+					Iteration: p.iteration,
+					Result: &StepResult{
+						Status:      result.Status,
+						Reason:      result.Reason,
+						NextPhase:   result.NextPhase,
+						Artifacts:   result.Artifacts,
+						Confidence:  result.Confidence,
+						Diagnostics: result.Diagnostics,
+					},
 				})
 			}
 
-			// If agent finds a semantic mismatch (scope), allow it to fix it if it's clear
+			// Legacy completion signal detection (deprecated, use typed StepResult)
+			if reason := schema.DetectCompletionSignal(item.Text); reason != "" {
+				p.emitSignal(map[string]interface{}{
+					"type":   "complete",
+					"reason": reason,
+				})
+			}
+
+			// Scope reconciliation detection
+			txtLower := strings.ToLower(item.Text)
 			if strings.Contains(txtLower, "planning mismatch") && strings.Contains(txtLower, "analysis reveals") {
 				p.emitSignal(map[string]interface{}{
-					"type":   "progress",
-					"text":   "Reconciling task metadata based on agent analysis",
+					"type": "progress",
+					"text": "Reconciling task metadata based on agent analysis",
 				})
 			}
 		case "tool_use":

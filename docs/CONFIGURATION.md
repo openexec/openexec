@@ -1,6 +1,6 @@
 # OpenExec Configuration Guide
 
-This guide covers all configuration options for OpenExec, including agent selection, execution settings, quality gates, and more.
+This guide covers all configuration options for OpenExec, including agent selection, execution settings, quality gates, toolsets, blueprints, and more.
 
 ## Configuration File
 
@@ -147,6 +147,60 @@ daemon:
   health_host: "0.0.0.0"
 
   resume_on_restart: true               # Resume from last project on restart
+
+# ============================================================================
+# TOOLSET CONFIGURATION
+# ============================================================================
+toolsets:
+  # Which toolsets are enabled for this project
+  enabled:
+    - repo_readonly
+    - coding_backend
+    - debug_ci
+
+  # Custom toolset definitions
+  custom:
+    my_toolset:
+      tools:
+        - read_file
+        - write_file
+        - custom_tool
+      risk_level: medium                # low, medium, high
+      phases:
+        - implement
+        - fix_lint
+
+# ============================================================================
+# BLUEPRINT CONFIGURATION
+# ============================================================================
+blueprints:
+  # Enable blueprint-driven execution (default: true)
+  enabled: true
+
+  # Default blueprint to use
+  default: standard_task                # standard_task, quick_fix, or custom
+
+  # Custom blueprint definitions
+  custom:
+    fast_fix:
+      stages:
+        - implement
+        - lint
+        - test
+      max_total_retries: 5
+
+# ============================================================================
+# MODE CONFIGURATION
+# ============================================================================
+mode:
+  # Default mode for new sessions
+  default: chat                         # chat, task, run
+
+  # Auto-escalation settings
+  auto_escalate:
+    enabled: true
+    chat_to_task_confidence: 0.8        # Min confidence to suggest escalation
+    task_to_run_confidence: 0.9         # Min confidence to suggest escalation
 
 # ============================================================================
 # CONTEXT CONFIGURATION (code indexing for prompts)
@@ -343,6 +397,61 @@ safety:
   enabled: true
   file_locking: true
   git_add_all_allowed: false      # No bulk adds
+```
+
+### Scenario 6: Blueprint-driven execution with custom stages
+
+```yaml
+blueprints:
+  enabled: true
+  default: standard_task
+
+toolsets:
+  enabled:
+    - repo_readonly
+    - coding_backend
+    - debug_ci
+
+agents:
+  default: claude
+  claude:
+    model: sonnet
+    timeout: 600
+```
+
+### Scenario 7: Quick fixes without full test cycle
+
+```yaml
+blueprints:
+  enabled: true
+  default: quick_fix
+  custom:
+    quick_fix:
+      stages:
+        - implement
+        - verify                  # Just build, no full test suite
+
+toolsets:
+  enabled:
+    - coding_backend
+
+execution:
+  auto_fix: true
+  max_fix_iterations: 2
+```
+
+### Scenario 8: Read-only exploration mode
+
+```yaml
+mode:
+  default: chat                   # Never auto-escalate
+
+toolsets:
+  enabled:
+    - repo_readonly               # Only read operations
+
+blueprints:
+  enabled: false                  # No automated execution
 ```
 
 ## Environment Variables

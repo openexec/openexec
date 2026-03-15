@@ -34,7 +34,10 @@ func sendAndReceive(t *testing.T, lines ...string) []Response {
 	in := strings.NewReader(input)
 	out := new(bytes.Buffer)
 
-	srv := NewServer(in, out)
+	srv, err := NewServer(in, out)
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
 	if err := srv.Serve(); err != nil {
 		t.Fatalf("Serve: %v", err)
 	}
@@ -98,8 +101,10 @@ func TestToolsList(t *testing.T) {
 
 	result, _ := resps[0].Result.(map[string]interface{})
 	tools, _ := result["tools"].([]interface{})
-	if len(tools) != 5 {
-		t.Fatalf("expected 5 tools, got %d", len(tools))
+	// In danger-full-access mode (set in TestMain), we expect 7 tools:
+	// 5 core tools + write_file + run_shell_command
+	if len(tools) != 7 {
+		t.Fatalf("expected 7 tools in danger-full-access mode, got %d", len(tools))
 	}
 
 	// Check openexec_signal tool
@@ -138,30 +143,42 @@ func TestToolsList(t *testing.T) {
 		t.Error("missing 'patch' in git_apply_patch input schema properties")
 	}
 
-	// Check write_file tool (index 3, only in full-auto mode)
+	// Check openexec_result tool (index 3)
 	tool4, _ := tools[3].(map[string]interface{})
-	if tool4["name"] != "write_file" {
-		t.Errorf("tool[3] name = %v, want write_file", tool4["name"])
+	if tool4["name"] != "openexec_result" {
+		t.Errorf("tool[3] name = %v, want openexec_result", tool4["name"])
 	}
 
-	schema4, _ := tool4["inputSchema"].(map[string]interface{})
-	props4, _ := schema4["properties"].(map[string]interface{})
-	if props4["path"] == nil {
+	// Check openexec_action tool (index 4)
+	tool5, _ := tools[4].(map[string]interface{})
+	if tool5["name"] != "openexec_action" {
+		t.Errorf("tool[4] name = %v, want openexec_action", tool5["name"])
+	}
+
+	// Check write_file tool (index 5, only in full-auto mode)
+	tool6, _ := tools[5].(map[string]interface{})
+	if tool6["name"] != "write_file" {
+		t.Errorf("tool[5] name = %v, want write_file", tool6["name"])
+	}
+
+	schema6, _ := tool6["inputSchema"].(map[string]interface{})
+	props6, _ := schema6["properties"].(map[string]interface{})
+	if props6["path"] == nil {
 		t.Error("missing 'path' in write_file input schema properties")
 	}
-	if props4["content"] == nil {
+	if props6["content"] == nil {
 		t.Error("missing 'content' in write_file input schema properties")
 	}
 
-	// Check run_shell_command tool (index 4, only in full-auto mode)
-	tool5, _ := tools[4].(map[string]interface{})
-	if tool5["name"] != "run_shell_command" {
-		t.Errorf("tool[4] name = %v, want run_shell_command", tool5["name"])
+	// Check run_shell_command tool (index 6, only in full-auto mode)
+	tool7, _ := tools[6].(map[string]interface{})
+	if tool7["name"] != "run_shell_command" {
+		t.Errorf("tool[6] name = %v, want run_shell_command", tool7["name"])
 	}
 
-	schema5, _ := tool5["inputSchema"].(map[string]interface{})
-	props5, _ := schema5["properties"].(map[string]interface{})
-	if props5["command"] == nil {
+	schema7, _ := tool7["inputSchema"].(map[string]interface{})
+	props7, _ := schema7["properties"].(map[string]interface{})
+	if props7["command"] == nil {
 		t.Error("missing 'command' in run_shell_command input schema properties")
 	}
 }
@@ -228,7 +245,10 @@ func TestNotificationNoResponse(t *testing.T) {
 	in := strings.NewReader(input)
 	out := new(bytes.Buffer)
 
-	srv := NewServer(in, out)
+	srv, err := NewServer(in, out)
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
 	srv.Serve()
 
 	if out.Len() != 0 {
@@ -262,8 +282,11 @@ func TestEOFCleanExit(t *testing.T) {
 	in := strings.NewReader("")
 	out := new(bytes.Buffer)
 
-	srv := NewServer(in, out)
-	err := srv.Serve()
+	srv, err := NewServer(in, out)
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	err = srv.Serve()
 
 	if err != nil {
 		t.Fatalf("Serve on empty input: %v", err)

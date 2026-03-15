@@ -54,13 +54,28 @@ CREATE TABLE IF NOT EXISTS tool_calls (
 	FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
 );
 
--- 4. RUNS (Deterministic Execution Instances)
+-- 4a. RUN SPECS (Immutable Execution Specifications)
+-- RunSpecs capture the deterministic inputs for a run, enabling replay and caching.
+CREATE TABLE IF NOT EXISTS run_specs (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    intent TEXT NOT NULL,
+    context_hash TEXT NOT NULL, -- Hash of context files used
+    prompt_hash TEXT NOT NULL, -- Hash of the composed prompt
+    model TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+-- 4b. RUNS (Deterministic Execution Instances)
 -- A Run represents one execution of a task or a conversational intent.
 -- It can be linked to a Session for context and history.
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY,
     session_id TEXT,
     task_id TEXT, -- Optional link to a specific task in the release graph
+    spec_id TEXT, -- Link to immutable RunSpec for deterministic replay
     project_path TEXT NOT NULL,
     mode TEXT NOT NULL DEFAULT 'workspace-write', -- suggest, workspace-write, danger-full-access
     status TEXT NOT NULL DEFAULT 'starting', -- starting, running, paused, complete, error, stopped
@@ -70,8 +85,10 @@ CREATE TABLE IF NOT EXISTS runs (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     started_at DATETIME DEFAULT NULL,
     completed_at DATETIME DEFAULT NULL,
+    worktree_path TEXT DEFAULT NULL, -- Path to git worktree for parallel runs
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+    FOREIGN KEY (spec_id) REFERENCES run_specs(id) ON DELETE SET NULL
 );
 
 -- 5. RUN STEPS (Individual iterations of a Run)
@@ -85,6 +102,7 @@ CREATE TABLE IF NOT EXISTS run_steps (
     status TEXT NOT NULL,
     inputs_hash TEXT, -- Content-hash of inputs (briefing + context)
     outputs_hash TEXT, -- Content-hash of outputs (patches + logs)
+    cache_key TEXT, -- Stable hash for deterministic replay (computed from semantic content)
     started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME DEFAULT NULL,
     metadata TEXT DEFAULT '{}',
@@ -109,6 +127,8 @@ CREATE TABLE IF NOT EXISTS run_checkpoints (
     iteration INTEGER NOT NULL,
     timestamp TEXT NOT NULL,
     artifacts TEXT DEFAULT '{}', -- JSON map of hash -> path
+    message_history TEXT DEFAULT '[]', -- JSON array of messages for resume
+    tool_call_log TEXT DEFAULT '[]', -- JSON array of completed tool calls
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
 );

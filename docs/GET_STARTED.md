@@ -2,6 +2,18 @@
 
 Welcome to OpenExec! This guide will take you from zero to running your first AI-orchestrated project.
 
+## Understanding Execution Modes
+
+OpenExec operates in three modes:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Chat** | Conversational, no side effects | Exploring codebase, asking questions |
+| **Task** | Scoped action, produces artifacts | Single focused change |
+| **Run** | Blueprint execution over task | Automated implementation with tests |
+
+By default, `openexec chat` starts in Chat mode, while `openexec run` uses Run mode with the blueprint engine.
+
 ## 1. Local Setup
 
 ### Prerequisites
@@ -83,6 +95,31 @@ OpenExec will generate a `stories.json` file in `.openexec/` containing the exec
 
 ## 5. Running the System
 
+### Blueprint Execution
+
+OpenExec uses **blueprints** to orchestrate task execution. A blueprint defines a sequence of stages:
+
+```
+gather_context → implement → lint → test → review
+```
+
+Each stage is either:
+- **Deterministic**: Fixed commands (lint, test)
+- **Agentic**: Requires AI reasoning (implement, review)
+
+### Toolsets
+
+Tools are grouped into **toolsets** by risk level:
+
+| Toolset | Risk | Tools |
+|---------|------|-------|
+| `repo_readonly` | Low | read_file, glob, grep |
+| `coding_backend` | Medium | read_file, write_file, patch, shell |
+| `coding_frontend` | Medium | read_file, write_file, patch, npm |
+| `release_ops` | High | git_tag, git_push |
+
+The blueprint engine automatically selects the appropriate toolset for each stage.
+
 ### The Integrated Server (CLI + UI)
 To start the orchestration engine and host the web console:
 
@@ -123,6 +160,27 @@ The daemon exposes `/api/v1/runs` endpoints for deterministic execution:
 - `GET /api/v1/runs/{id}` - Check run status
 
 Legacy FWU endpoints (`/api/fwu/*`) are deprecated and will be removed in a future release.
+
+### Escalating Chat to Run
+
+You can convert a chat session into a blueprint-driven run:
+
+```bash
+# Via curl (replace sess_abc123 with your session ID)
+curl -X POST "http://localhost:8080/api/v1/sessions/sess_abc123/run" \
+  -H "Content-Type: application/json" \
+  -d '{"blueprint_id": "standard_task"}'
+```
+
+The task description is derived from the session's last user message. You can also provide an explicit task:
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/sessions/sess_abc123/run" \
+  -H "Content-Type: application/json" \
+  -d '{"task_description": "Add user authentication", "blueprint_id": "quick_fix"}'
+```
+
+Monitor progress via WebSocket (`/ws`) or the timeline API (`GET /api/v1/runs/{run_id}/timeline`).
 
 ## 6. Development Mode (Advanced)
 

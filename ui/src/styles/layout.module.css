@@ -1,0 +1,315 @@
+/* Layout CSS Module - Core layout patterns for OpenExec UI */
+
+/* ================================================
+   GRID LAYOUTS
+   ================================================ */
+
+/* Main app grid (sidebar + main content) */
+.appGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  background-color: var(--color-bg-primary);
+}
+
+/* Mobile: full width, sidebar hidden by default */
+@media (max-width: 767px) {
+  .appGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tablet: collapsible sidebar icon rail */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .appGrid {
+    grid-template-columns: var(--sidebar-collapsed-width) 1fr;
+  }
+
+  .appGridSidebarOpen {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+}
+
+/* Desktop: fixed sidebar */
+@media (min-width: 1024px) {
+  .appGrid {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+}
+
+/* ================================================
+   SIDEBAR
+   ================================================ */
+
+.sidebar {
+  background-color: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border-primary);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Mobile: overlay sidebar */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    z-index: var(--z-fixed);
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+}
+
+/* Tablet: collapsed by default */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sidebar {
+    width: var(--sidebar-collapsed-width);
+    transition: width var(--transition-normal);
+  }
+
+  .sidebarExpanded {
+    width: var(--sidebar-width);
+  }
+}
+
+/* ================================================
+   OVERLAY
+   ================================================ */
+
+.overlay {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background-color: var(--color-bg-overlay);
+    z-index: calc(var(--z-fixed) - 1);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+  }
+
+  .overlayVisible {
+    display: block;
+    opacity: 1;
+  }
+}
+
+/* ================================================
+   MAIN CONTENT
+   ================================================ */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ================================================
+   HEADER
+   ================================================ */
+
+.header {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  background-color: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-primary);
+  gap: var(--space-3);
+}
+
+@media (max-width: 767px) {
+  .header {
+    height: var(--mobile-header-height);
+    min-height: var(--mobile-header-height);
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+}
+
+/* ================================================
+   CONTENT AREA
+   ================================================ */
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scrollContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ================================================
+   CHAT LAYOUT
+   ================================================ */
+
+.chatContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.messageArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 767px) {
+  .messageArea {
+    padding: var(--space-3);
+  }
+}
+
+.inputArea {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-primary);
+}
+
+@media (max-width: 767px) {
+  .inputArea {
+    padding: var(--space-2) var(--space-3);
+    /* Account for mobile keyboard */
+    padding-bottom: env(safe-area-inset-bottom, var(--space-2));
+  }
+}
+
+/* ================================================
+   PANEL LAYOUTS
+   ================================================ */
+
+/* Split panel (side-by-side on desktop, stacked on mobile) */
+.splitPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (min-width: 1024px) {
+  .splitPanel {
+    flex-direction: row;
+  }
+
+  .splitPanelMain {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .splitPanelSide {
+    width: 320px;
+    flex-shrink: 0;
+  }
+}
+
+/* ================================================
+   BOTTOM NAVIGATION (Mobile)
+   ================================================ */
+
+.bottomNav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .bottomNav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background-color: var(--color-bg-secondary);
+    border-top: 1px solid var(--color-border-primary);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: var(--z-sticky);
+  }
+
+  .bottomNavItem {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    gap: var(--space-1);
+    font-size: var(--font-size-xs);
+    min-height: var(--touch-target-min);
+  }
+
+  .bottomNavItemActive {
+    color: var(--color-primary);
+  }
+
+  /* Add padding to content for bottom nav */
+  .contentWithBottomNav {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ================================================
+   CENTERED CONTENT
+   ================================================ */
+
+.centeredContent {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
+  padding: var(--space-4);
+}
+
+@media (max-width: 767px) {
+  .centeredContent {
+    padding: var(--space-3);
+  }
+}
+
+/* ================================================
+   CARD LAYOUT
+   ================================================ */
+
+.card {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.cardHeader {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.cardBody {
+  padding: var(--space-4);
+}
+
+@media (max-width: 767px) {
+  .cardHeader,
+  .cardBody {
+    padding: var(--space-3);
+  }
+}

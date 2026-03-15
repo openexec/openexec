@@ -9,7 +9,14 @@ import (
 func TestIndexer(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
-	store, _ := NewStore(tmpDir)
+	// Create .openexec directory for the store
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755); err != nil {
+		t.Fatalf("failed to create .openexec dir: %v", err)
+	}
+	store, err := NewStore(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
 	defer store.Close()
 
 	idx := NewIndexer(store)
@@ -25,7 +32,7 @@ func CalculateSum(a, b int) int {
 	os.WriteFile(filepath.Join(tmpDir, "logic.go"), []byte(goCode), 0644)
 
 	// Act
-	err := idx.IndexProject(tmpDir)
+	err = idx.IndexProject(tmpDir)
 	if err != nil {
 		t.Fatalf("IndexProject failed: %v", err)
 	}

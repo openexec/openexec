@@ -128,7 +128,7 @@ func New(cfg Config) (*Server, error) {
 		loopArgs = nil
 	}
 
-    mgr := manager.New(manager.Config{
+    mgr, err := manager.New(manager.Config{
         WorkDir:       projectsAbs,
         TractStore:    cfg.DataDir,
         AgentsFS:      agentsFS,
@@ -150,6 +150,9 @@ func New(cfg Config) (*Server, error) {
         CommandArgs: loopArgs,
         StateStore:  stateStore,
     })
+    if err != nil {
+        return nil, fmt.Errorf("manager initialization failed: %w", err)
+    }
     // 3. Initialize Deterministic Control Plane (DCP) — optional
     // Controlled via Config.EnableDCP or OPENEXEC_ENABLE_DCP env var.
     enableDCP := cfg.EnableDCP
@@ -187,7 +190,7 @@ func New(cfg Config) (*Server, error) {
         Checker:     health.NewChecker(),
         ProjectsDir: cfg.ProjectsDir,
         Mux:         mux,
-        axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, ""),
+        axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, "", api.WithStateStore(stateStore)),
         HttpServer: &http.Server{
             Addr:    fmt.Sprintf(":%d", cfg.Port),
             Handler: mux,
@@ -220,7 +223,7 @@ func logFeatureFlags() {
         enabled bool
     }{
         {"DCP", "OPENEXEC_ENABLE_DCP", isEnvTrue("OPENEXEC_ENABLE_DCP")},
-        {"UnifiedReads", "OPENEXEC_USE_UNIFIED_READS", isEnvTrue("OPENEXEC_USE_UNIFIED_READS")},
+        {"UnifiedReads", "OPENEXEC_USE_UNIFIED_READS", !isEnvFalse("OPENEXEC_USE_UNIFIED_READS")}, // default true
         {"LegacyFWU", "OPENEXEC_ENABLE_LEGACY_FWU", isEnvTrue("OPENEXEC_ENABLE_LEGACY_FWU")},
     }
 
@@ -245,6 +248,12 @@ func logFeatureFlags() {
 func isEnvTrue(key string) bool {
     v := strings.ToLower(os.Getenv(key))
     return v == "1" || v == "true" || v == "yes"
+}
+
+// isEnvFalse returns true if the environment variable is explicitly set to a falsy value.
+func isEnvFalse(key string) bool {
+    v := strings.ToLower(os.Getenv(key))
+    return v == "0" || v == "false" || v == "no"
 }
 
 func (s *Server) registerRoutes() {
@@ -279,10 +288,30 @@ func (s *Server) registerRoutes() {
 
 func (s *Server) handleDCPQuery(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Query string `json:"query"`
+		Query   string `json:"query"`
+		Execute bool   `json:"execute,omitempty"` // Defense in depth: always rejected
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Defense in depth: DCP is suggest-only. Execution must go through MCP.
+	if req.Execute {
+		log.Printf("[DCP] BLOCKED: execute=true rejected (DCP is suggest-only)")
+		s.respondJSON(w, http.StatusForbidden, map[string]interface{}{
+			"error":      "DCP is suggest-only; execution must go through MCP",
+			"suggestion": "Use MCP tools directly or pass the suggestion to the MCP execution layer",
+		})
+		return
+	}
+
+	// Extra guard: ensure coordinator is in suggest-only mode
+	if s.Coordinator.AllowExecution {
+		log.Printf("[DCP] BLOCKED: coordinator has AllowExecution=true (should never happen in production)")
+		s.respondJSON(w, http.StatusForbidden, map[string]interface{}{
+			"error": "DCP is misconfigured; execution is disabled at the HTTP layer",
+		})
 		return
 	}
 

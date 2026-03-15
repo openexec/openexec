@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/summarize"
 	"github.com/openexec/openexec/pkg/agent"
 )
@@ -139,6 +140,65 @@ type Config struct {
 
     // StablePromptHash is the SHA-256 (hex) of the stable prefix for cache keying.
     StablePromptHash string
+
+    // RunSpecID links to the immutable RunSpec for deterministic replay.
+    // When set, this run can be resumed or replayed using the same inputs.
+    RunSpecID string
+
+    // ContextCachePath is the directory for caching gathered context bundles.
+    // If empty, context caching is disabled.
+    // Typically set to .openexec/cache/context.
+    ContextCachePath string
+
+    // ResumeFromCheckpoint enables resuming from a specific checkpoint.
+    // When set, the loop will:
+    // 1. Restore message history from the checkpoint
+    // 2. Skip tool calls with existing idempotency keys
+    // 3. Continue from the checkpoint's phase and iteration
+    ResumeFromCheckpoint *ResumeConfig
+
+    // StallDetection configures stall detection with provider timeouts and backoff.
+    // If nil, default stall detection settings are used.
+    StallDetection *StallConfig
+
+    // BlueprintEnabled enables blueprint-driven execution mode.
+    // When enabled, the loop uses blueprint stages instead of linear iteration.
+    BlueprintEnabled bool
+
+    // Blueprint is the blueprint to execute.
+    // If BlueprintEnabled is true and this is nil, DefaultBlueprint is used.
+    Blueprint *blueprint.Blueprint
+
+    // BlueprintExecutor is the stage executor for blueprint execution.
+    // Required when BlueprintEnabled is true.
+    BlueprintExecutor blueprint.StageExecutor `json:"-"`
+
+    // BlueprintCallbacks contains callbacks for blueprint events.
+    BlueprintCallbacks *BlueprintCallbacks `json:"-"`
+}
+
+// BlueprintCallbacks contains callbacks for blueprint stage events.
+type BlueprintCallbacks struct {
+    // OnStageStart is called when a stage begins.
+    OnStageStart func(run *blueprint.Run, stage *blueprint.Stage)
+
+    // OnStageComplete is called when a stage completes.
+    OnStageComplete func(run *blueprint.Run, result *blueprint.StageResult)
+
+    // OnCheckpoint is called when a checkpoint is created.
+    OnCheckpoint func(run *blueprint.Run, stageName string)
+
+    // OnRunComplete is called when the run completes.
+    OnRunComplete func(run *blueprint.Run)
+}
+
+// ResumeConfig holds configuration for resuming from a checkpoint.
+type ResumeConfig struct {
+    CheckpointID     string   // ID of the checkpoint to resume from
+    MessageHistory   []byte   // JSON-encoded message history
+    AppliedToolCalls []string // Idempotency keys of already-applied tool calls
+    Phase            string   // Phase to resume from
+    Iteration        int      // Iteration to resume from
 }
 
 // Summarizer defines the interface for session history summarization.
@@ -153,6 +213,7 @@ type Summarizer interface {
 
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {
+	stallConfig := DefaultStallConfig()
 	return Config{
 		MaxIterations:   10,
 		MaxRetries:      3,
@@ -163,5 +224,6 @@ func DefaultConfig() Config {
 		GateTimeout:     5 * time.Minute,
 		MaxGateRetries:  3,
 		PreflightChecks: true,
+		StallDetection:  &stallConfig,
 	}
 }
