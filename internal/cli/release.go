@@ -1634,7 +1634,6 @@ func init() {
 
     releaseCmd.AddCommand(releaseChangelogCmd)
     // story subcommands
-    storyCmd := &cobra.Command{Use: "story", Short: "Manage stories and tasks (import/export)"}
     storyCmd.AddCommand(storyExportCmd)
     rootCmd.AddCommand(storyCmd)
 	releaseChangelogCmd.Flags().Bool("json", false, "Output as JSON")

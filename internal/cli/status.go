@@ -14,9 +14,12 @@ import (
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
+	Use:   "status [run-id]",
 	Short: "Show execution engine and run status",
 	Long: `Display the current status of the OpenExec execution engine.
+
+If [run-id] is provided, shows detailed status for that specific run.
+Otherwise, shows general engine status and active runs.
 
 Shows:
   - Daemon status (running/stopped, PID, port)
@@ -25,11 +28,19 @@ Shows:
 
 Examples:
   openexec status           # Show full status
+  openexec status run_123   # Show status for specific run
+  openexec status --watch   # Watch status in real-time
   openexec status --json    # Output as JSON`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
+		// Watch mode
+		watch, _ := cmd.Flags().GetBool("watch")
+		if watch {
+			return runStatusWatch(cmd, config)
 		}
 
 		// Check daemon status
@@ -44,6 +55,15 @@ Examples:
 			}
 		}
 
+		// Handle specific run ID if provided
+		if len(args) > 0 {
+			runID := args[0]
+			if !daemonRunning {
+				return fmt.Errorf("engine not running: cannot fetch details for run %s", runID)
+			}
+			return showRunDetail(cmd, port, runID)
+		}
+
 		// Output format
 		jsonOutput, _ := cmd.Flags().GetBool("json")
 
@@ -53,6 +73,59 @@ Examples:
 
 		return outputStatusText(cmd, daemonRunning, pid, port, config)
 	},
+}
+
+func showRunDetail(cmd *cobra.Command, port int, runID string) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s", port, runID))
+	if err != nil {
+		return fmt.Errorf("failed to fetch run details: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("run %s not found", runID)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+	if jsonOutput {
+		cmd.Println(string(body))
+		return nil
+	}
+
+	var run struct {
+		ID        string `json:"id"`
+		Status    string `json:"status"`
+		Phase     string `json:"phase"`
+		Blueprint string `json:"blueprint_id"`
+		Task      string `json:"task_description"`
+		Iteration int    `json:"iteration"`
+		Error     string `json:"error,omitempty"`
+	}
+	if err := json.Unmarshal(body, &run); err != nil {
+		return fmt.Errorf("failed to parse run details: %w", err)
+	}
+
+	cmd.Printf("Run Details: %s\n", run.ID)
+	cmd.Println("========================================")
+	cmd.Printf("Status:    %s\n", run.Status)
+	cmd.Printf("Phase:     %s\n", run.Phase)
+	cmd.Printf("Blueprint: %s\n", run.Blueprint)
+	cmd.Printf("Iteration: %d\n", run.Iteration)
+	cmd.Printf("Task:      %s\n", run.Task)
+	if run.Error != "" {
+		cmd.Printf("Error:     %s\n", run.Error)
+	}
+
+	return nil
 }
 
 func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, config *project.ProjectConfig) error {
@@ -196,7 +269,30 @@ func fetchRuns(port int) ([]runInfo, error) {
 	return runs, nil
 }
 
+func runStatusWatch(cmd *cobra.Command, config *project.ProjectConfig) error {
+	for {
+		// Clear screen
+		cmd.Print("\033[H\033[2J")
+		
+		pid, port, pidErr := readPID(config.ProjectDir)
+		daemonRunning := false
+		if pidErr == nil {
+			process, err := os.FindProcess(pid)
+			if err == nil && process.Signal(syscall.Signal(0)) == nil {
+				daemonRunning = true
+			}
+		}
+
+		_ = outputStatusText(cmd, daemonRunning, pid, port, config)
+		
+		cmd.Println("\n(Press Ctrl+C to stop watching)")
+		
+		time.Sleep(2 * time.Second)
+	}
+}
+
 func init() {
 	statusCmd.Flags().Bool("json", false, "Output as JSON")
+	statusCmd.Flags().BoolP("watch", "w", false, "Watch status in real-time")
 	rootCmd.AddCommand(statusCmd)
 }

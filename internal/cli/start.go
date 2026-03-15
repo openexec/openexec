@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/server"
@@ -41,7 +44,8 @@ var (
 	runMode          string
 
 	// Blueprint command flags
-	blueprintID string
+	blueprintID      string
+	blueprintClarify bool
 )
 
 // Task represents a task to execute
@@ -329,6 +333,18 @@ Examples:
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
+		// Handle interactive clarification if requested
+		if blueprintClarify {
+			clarified, err := runMiniInterview(cmd, taskDescription, config)
+			if err != nil {
+				return err
+			}
+			if clarified == "" {
+				return nil // User cancelled
+			}
+			taskDescription = clarified
 		}
 
 		// Use config port if not explicitly set via flag
@@ -781,12 +797,78 @@ func init() {
 
 	blueprintCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	blueprintCmd.Flags().StringVar(&blueprintID, "blueprint-id", "standard_task", "Blueprint to execute (standard_task, quick_fix)")
+	blueprintCmd.Flags().BoolVar(&blueprintClarify, "clarify", false, "Start interactive clarification interview before execution")
 	blueprintCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
 	rootCmd.AddCommand(blueprintCmd)
+}
+
+func runMiniInterview(cmd *cobra.Command, initialIntent string, config *project.ProjectConfig) (string, error) {
+	model := config.Execution.PlannerModel
+	if model == "" {
+		model = config.Execution.ExecutorModel
+	}
+	if model == "" {
+		model = "sonnet"
+	}
+
+	cmd.Println(color.CyanString("\n=== Task Clarification Interview ==="))
+	cmd.Printf("   Model: %s\n", model)
+	cmd.Println("   (Type 'done' to start execution, or 'exit' to cancel)")
+	cmd.Println()
+
+	reader := bufio.NewReader(os.Stdin)
+	p := planner.New(&cliLLMProvider{model: model, cmd: cmd})
+	stateJSON := "{}"
+
+	// Initial message
+	message := initialIntent
+	
+	for {
+		if message != "" {
+			cmd.Print(color.CyanString("Thinking... "))
+			resp, err := p.ProcessWizardMessage(cmd.Context(), message, stateJSON)
+			cmd.Print("\r") // Clear Thinking line
+			if err != nil {
+				return "", err
+			}
+
+			// Update state
+			stateBytes, _ := json.Marshal(resp.UpdatedState)
+			stateJSON = string(stateBytes)
+
+			if resp.Acknowledgement != "" {
+				cmd.Println(color.BlueString("🤖 %s", resp.Acknowledgement))
+			}
+
+			if resp.IsComplete {
+				cmd.Println(color.GreenString("\n✔ Intent clarified."))
+				return initialIntent + "\n\nContext:\n" + resp.Acknowledgement, nil
+			}
+
+			cmd.Println(color.GreenString("\n? %s", resp.NextQuestion))
+		}
+
+		cmd.Print(color.GreenString("> "))
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+
+		message = strings.TrimSpace(input)
+		if message == "exit" || message == "quit" {
+			return "", nil
+		}
+		if message == "done" {
+			return initialIntent, nil
+		}
+		if message == "" {
+			continue
+		}
+	}
 }
 
 // tryAutoImportStories attempts to import stories from .openexec/stories.json into the DB
