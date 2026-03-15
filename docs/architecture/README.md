@@ -38,7 +38,10 @@ The tactical plan for simplifying and stabilizing the codebase.
 *   [**V1 Cut List & Migration Board**](/architecture/V1-CUT-LIST-MIGRATION-BOARD) — Status tracking for component removal, migration, and stabilization.
 
 ## 5. Research & Future
-*   [**Elixir/BEAM Orchestrator**](/architecture/ELIXIR_BEAM_ORCHESTRATOR) — Research on high-scale orchestration using the BEAM virtual machine.
+*   [**Self-Healing & Self-Upgrade**](./SELF-HEALING-UPGRADE.md) — Future architecture for autonomous runtime diagnosis and repair.
+*   [**Runtime Evolution Interface (REI)**](./RUNTIME-EVOLUTION-INTERFACE.md) — Boundary between the active runtime and evolution workflows.
+*   [**Elixir/BEAM Orchestrator**](./ELIXIR_BEAM_ORCHESTRATOR.md) — Research on high-scale orchestration using the BEAM virtual machine.
+
 
 ---
 *Last Updated: March 14, 2026*
