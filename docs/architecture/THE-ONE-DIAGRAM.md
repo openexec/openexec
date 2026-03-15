@@ -5,46 +5,46 @@ To understand OpenExec, you must first understand the fundamental shift in how i
 ## 1. How most AI coding tools work
 In traditional tools, the LLM **is** the runtime. The system behavior depends on prompts, probabilistic retrieval, and hidden orchestration. Developers try to control it using `CLAUDE.md` or system prompts, but these are mere suggestions, not deterministic logic.
 
-```text
-User
-  │
-  ▼
-AI Coding Tool (Claude Code / Cursor / etc.)
-  │
-  ▼
-LLM Runtime
-  │
-  ├─ Prompt Rules (CLAUDE.md)
-  ├─ Tool Calls
-  ├─ RAG / Vector DB
-  └─ Hidden Orchestration
-  │
-  ▼
-Repository + Terminal
+```mermaid
+graph TD
+    User((User)) --> Tool[AI Coding Tool<br/>Claude Code / Cursor / etc.]
+    Tool --> LLMRuntime[LLM Runtime]
+    
+    subgraph LLMRuntime [LLM Runtime]
+        Rules[Prompt Rules<br/>CLAUDE.md]
+        Tools[Tool Calls]
+        RAG[RAG / Vector DB]
+        Orch[Hidden Orchestration]
+    end
+    
+    LLMRuntime --> Repo[Repository + Terminal]
+    
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style LLMRuntime fill:#fff3f3,stroke:#ff0000,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 ## 2. OpenExec Architecture
 OpenExec flips the control plane. The runtime is deterministic and governed by code, while the LLM is treated as a **reasoning component** that helps inside strict boundaries.
 
-```text
-User
-  │
-  ▼
-OpenExec Runtime (Deterministic)
-  │
-  ├─ Blueprint Engine (Workflow logic)
-  ├─ Policy Engine (Security + Permissions)
-  ├─ Operational Memory (Pointer records)
-  └─ Context Builder (Safe hydration)
-  │
-  ▼
-LLM (Claude / GPT / Gemini / Local)
-  │
-  ▼
-Typed Tool Actions
-  │
-  ▼
-Workspace / Systems
+```mermaid
+graph TD
+    User((User)) --> Runtime[OpenExec Runtime<br/>Deterministic]
+    
+    subgraph Runtime [Deterministic Runtime]
+        direction TB
+        BE[Blueprint Engine<br/>Workflow Logic]
+        PE[Policy Engine<br/>Security + Permissions]
+        OM[Operational Memory<br/>Pointer Records]
+        CB[Context Builder<br/>Safe Hydration]
+    end
+    
+    Runtime --> LLM[LLM<br/>Claude / GPT / Gemini / Local]
+    LLM --> Actions[Typed Tool Actions]
+    Actions --> Systems[Workspace / Systems]
+    
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style Runtime fill:#f0fff0,stroke:#00aa00,stroke-width:3px
+    style Actions fill:#fff,stroke:#333,stroke-width:2px
 ```
 
 ## 3. The Difference in One Sentence
