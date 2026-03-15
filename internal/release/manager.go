@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -177,8 +178,7 @@ func (m *Manager) Load() error {
 	// If SQLite is empty, bootstrap from JSON files (one-time migration)
 	if storyCount == 0 {
 		if err := m.bootstrapFromJSONUnlocked(ctx); err != nil {
-			// Bootstrap is best-effort; log and continue
-			// The system can still work with an empty store
+			log.Printf("[ReleaseManager] bootstrap from JSON failed: %v", err)
 		}
 	}
 
@@ -202,37 +202,78 @@ func (m *Manager) bootstrapFromJSONUnlocked(ctx context.Context) error {
 		}
 	}
 
-	// Load and migrate stories and goals
+	// Load and migrate stories, goals, and embedded tasks from stories.json.
 	storiesPath := filepath.Join(openexecDir, "stories.json")
 	if data, err := os.ReadFile(storiesPath); err == nil {
-		var sf struct {
-			SchemaVersion string  `json:"schema_version"`
-			Goals         []Goal  `json:"goals"`
-			Stories       []Story `json:"stories"`
+		var rawFile struct {
+			SchemaVersion string `json:"schema_version"`
+			Goals         []Goal `json:"goals"`
+			Stories       []struct {
+				Story
+				RawTasks json.RawMessage `json:"tasks"`
+			} `json:"stories"`
 		}
 
-		if err := json.Unmarshal(data, &sf); err == nil {
-			// Bulk create goals first
-			goals := make([]*Goal, len(sf.Goals))
-			for i := range sf.Goals {
-				goals[i] = &sf.Goals[i]
+		if err := json.Unmarshal(data, &rawFile); err != nil {
+			log.Printf("[Bootstrap] failed to unmarshal stories.json: %v", err)
+		} else {
+			log.Printf("[Bootstrap] parsed stories.json: %d goals, %d stories", len(rawFile.Goals), len(rawFile.Stories))
+
+			goals := make([]*Goal, len(rawFile.Goals))
+			for i := range rawFile.Goals {
+				goals[i] = &rawFile.Goals[i]
 			}
 			if err := m.store.BulkCreateGoals(ctx, goals); err != nil {
 				return fmt.Errorf("failed to bootstrap goals: %w", err)
 			}
 
-			// Bulk create stories
-			stories := make([]*Story, len(sf.Stories))
-			for i := range sf.Stories {
-				stories[i] = &sf.Stories[i]
+			var allTasks []*Task
+			stories := make([]*Story, len(rawFile.Stories))
+			for i := range rawFile.Stories {
+				s := &rawFile.Stories[i].Story
+				if s.Status == "" {
+					s.Status = "pending"
+				}
+
+				var embeddedTasks []Task
+				if err := json.Unmarshal(rawFile.Stories[i].RawTasks, &embeddedTasks); err == nil && len(embeddedTasks) > 0 && embeddedTasks[0].ID != "" {
+					taskIDs := make([]string, len(embeddedTasks))
+					for j := range embeddedTasks {
+						taskIDs[j] = embeddedTasks[j].ID
+						if embeddedTasks[j].StoryID == "" {
+							embeddedTasks[j].StoryID = s.ID
+						}
+						if embeddedTasks[j].Status == "" {
+							embeddedTasks[j].Status = "pending"
+						}
+						if embeddedTasks[j].MaxAttempts == 0 {
+							embeddedTasks[j].MaxAttempts = 3
+						}
+						allTasks = append(allTasks, &embeddedTasks[j])
+					}
+					s.Tasks = taskIDs
+				} else {
+					var taskIDs []string
+					_ = json.Unmarshal(rawFile.Stories[i].RawTasks, &taskIDs)
+					s.Tasks = taskIDs
+				}
+
+				stories[i] = s
 			}
+
+			log.Printf("[Bootstrap] creating %d stories and %d tasks", len(stories), len(allTasks))
 			if err := m.store.BulkCreateStories(ctx, stories); err != nil {
 				return fmt.Errorf("failed to bootstrap stories: %w", err)
+			}
+			if len(allTasks) > 0 {
+				if err := m.store.BulkCreateTasks(ctx, allTasks); err != nil {
+					return fmt.Errorf("failed to bootstrap embedded tasks: %w", err)
+				}
 			}
 		}
 	}
 
-	// Load and migrate tasks
+	// Load tasks from separate tasks.json (if exists)
 	tasksPath := filepath.Join(openexecDir, "tasks.json")
 	if data, err := os.ReadFile(tasksPath); err == nil {
 		var tasksData struct {

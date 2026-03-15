@@ -121,6 +121,12 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 	// Write plan artifact to .openexec/artifacts/plans/<hash>.json
 	planID, artifactHash, artifactPath := m.writePlanArtifact(plan)
 
+	// Write stories.json so the release manager bootstrap can import it into the DB.
+	storiesPath := filepath.Join(m.cfg.WorkDir, ".openexec", "stories.json")
+	if planData, err := json.MarshalIndent(plan, "", "  "); err == nil {
+		_ = os.WriteFile(storiesPath, planData, 0644)
+	}
+
 	return &PlanResult{
 		Plan:          plan,
 		Valid:         true,
