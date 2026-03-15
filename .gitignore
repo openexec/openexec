@@ -28,6 +28,14 @@ Thumbs.db
 *.log
 logs/
 
+# Test and Coverage
+*.out
+*.test
+coverage_gap.html
+report.json
+test_output.txt
+tasks.json
+
 # Playwright
 ui/playwright-report/
 ui/test-results/
