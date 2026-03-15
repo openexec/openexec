@@ -28,7 +28,6 @@ var (
 	startWorkers     int
 	startTimeout     int
 	startExecutor    string
-	startReviewer    string
 	startDaemon      bool
 	startUI          bool
 	executionBinary  string
@@ -89,9 +88,6 @@ WebSocket events are available at /ws for real-time monitoring.`,
 		if !cmd.Flags().Changed("timeout") && config.Execution.TimeoutSeconds > 0 {
 			startTimeout = config.Execution.TimeoutSeconds
 		}
-		if !cmd.Flags().Changed("reviewer") && config.Execution.ReviewEnabled {
-			startReviewer = config.Execution.ReviewerModel
-		}
 
 		dataDir := filepath.Join(config.ProjectDir, ".openexec", "data")
 		auditDB := filepath.Join(config.ProjectDir, ".openexec", "openexec.db")
@@ -106,9 +102,6 @@ WebSocket events are available at /ws for real-time monitoring.`,
 		}
 
 		serverArgs := []string{"start", "--port", fmt.Sprintf("%d", startPort)}
-		if startReviewer != "" {
-			serverArgs = append(serverArgs, "--reviewer", startReviewer)
-		}
 
 		if startDaemon {
 			if isServerRunning(config.ProjectDir, startPort) {
@@ -192,6 +185,11 @@ Examples:
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
+		// Use config port if not explicitly set via flag
+		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
+			startPort = config.Execution.Port
+		}
+
 		// 1. AUTO-START ENGINE
 		if !isServerRunning(config.ProjectDir, 0) { // Check if ANY engine is running for this project
 			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
@@ -254,7 +252,8 @@ Examples:
 			return fmt.Errorf("server rejected execution request: %d", resp.StatusCode)
 		}
 
-		cmd.Println("📋 Execution orchestrated by daemon. Use 'openexec status' or the web UI to monitor progress.")
+		cmd.Println("📋 Execution orchestrated by daemon.")
+		cmd.Println("   Monitor: openexec status | openexec tui | http://localhost:" + fmt.Sprintf("%d", startPort))
 		return nil
 	},
 }
@@ -267,9 +266,31 @@ var stopCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if pid, _, err := readPID(config.ProjectDir); err == nil {
-			return KillDaemon(pid)
+		pid, port, err := readPID(config.ProjectDir)
+		if err != nil {
+			cmd.Println("Daemon is not running (no PID file found)")
+			return nil
 		}
+
+		// Check if process is actually running
+		process, err := os.FindProcess(pid)
+		if err != nil || process.Signal(syscall.Signal(0)) != nil {
+			cmd.Println("Daemon is not running (stale PID file)")
+			_ = removePIDFile(config.ProjectDir)
+			return nil
+		}
+
+		cmd.Printf("Stopping daemon (PID %d, port %d)...\n", pid, port)
+		if err := KillDaemon(pid); err != nil {
+			return fmt.Errorf("failed to stop daemon: %w", err)
+		}
+
+		// Wait briefly for process to exit
+		time.Sleep(500 * time.Millisecond)
+
+		// Clean up PID file
+		_ = removePIDFile(config.ProjectDir)
+		cmd.Println("Daemon stopped")
 		return nil
 	},
 }
@@ -308,6 +329,11 @@ Examples:
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
+		// Use config port if not explicitly set via flag
+		if !cmd.Flags().Changed("port") && config.Execution.Port > 0 {
+			startPort = config.Execution.Port
 		}
 
 		// Auto-start engine if not running

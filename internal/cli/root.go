@@ -50,6 +50,9 @@ func Execute() {
 }
 
 func init() {
+	// Disable Cobra's default help command (we have our own extended helpCmd)
+	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
+
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.openexec/config.yaml)")
 	rootCmd.PersistentFlags().String("log-level", "info", "log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().String("data-dir", "", "data directory for local stores (default is $HOME/.openexec)")

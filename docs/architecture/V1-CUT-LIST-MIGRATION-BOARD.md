@@ -51,6 +51,23 @@ Interesting ideas that are explicitly out of scope for v1.
 
 ## Implementation Roadmap
 
+```mermaid
+gantt
+    title OpenExec v1.0 Roadmap
+    dateFormat  YYYY-MM-DD
+    section Phase 1: Stabilization
+    SQLite State Model       :a1, 2026-03-15, 7d
+    Blueprint Engine         :after a1, 7d
+    Policy Engine            :after a1, 7d
+    section Phase 2: Execution
+    Toolsets & Context       :a2, after a1, 10d
+    Timeline & Replay        :after a2, 7d
+    section Phase 3: Intelligence
+    Local Router Model       :a3, after a2, 7d
+    section Phase 4: Polish
+    CLI Experience           :a4, after a3, 7d
+```
+
 ### Phase 1: Runtime Stabilization (1-2 Weeks)
 *   Finalize SQLite state model and remove authoritative JSON state.
 *   Stabilize the Blueprint Engine and Policy Engine.

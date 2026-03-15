@@ -21,6 +21,23 @@ Records form a deterministic knowledge graph designed for operational systems:
 
 ## 4. Retrieval & Hydration
 Operational memory is retrieved **before** model reasoning:
+
+```mermaid
+flowchart LR
+    Request[User Request] --> Router[Local Router]
+    Router --> Lookup[Memory Lookup]
+    
+    subgraph Memory [Operational Memory]
+        Service[Service Record]
+        Runbook[Runbook Record]
+        Env[Environment Record]
+    end
+    
+    Lookup --> Service & Runbook & Env
+    Service & Runbook & Env --> Pack[Context Pack Builder]
+    Pack --> LLM[LLM Reasoning]
+```
+
 1.  Identify target service/system.
 2.  Fetch relevant records (Service, Runbook, Environment).
 3.  Assemble a **Structured Context Pack** (metadata, constraints, recent history).

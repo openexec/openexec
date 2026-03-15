@@ -15,6 +15,29 @@ The runtime loop is the "kernel" of OpenExec. It only does five things:
 ## 2. High-Level Flow
 `Load Run` → `Load Blueprint` → `For each Stage: (Policy Eval → Execute → Log → Persist)` → `Finish`.
 
+```mermaid
+flowchart TD
+    Start([Start]) --> LoadRun[Load Run State]
+    LoadRun --> LoadBP[Load Blueprint DSL]
+    LoadBP --> PrepWS[Prepare Workspace]
+    PrepWS --> EachStage{For each Stage}
+    
+    EachStage -- Next --> Policy[Evaluate Policy]
+    Policy -- Blocked --> Error([Halt with Error])
+    Policy -- Allowed --> Exec[Execute Stage]
+    
+    Exec --> Log[Emit Timeline Event]
+    Log --> Persist[Persist State]
+    Persist --> Result{Success?}
+    
+    Result -- Yes --> EachStage
+    Result -- No --> Retry{Retry < Limit?}
+    Retry -- Yes --> Exec
+    Retry -- No --> EachStage
+    
+    EachStage -- All Done --> Finish([Mark Run Complete])
+```
+
 ## 3. Reference Implementation (Go)
 
 ```go

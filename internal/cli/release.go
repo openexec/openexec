@@ -1662,9 +1662,6 @@ func init() {
 	releaseCmd.AddCommand(releaseApprovalsCmd)
 	releaseApprovalsCmd.Flags().Bool("json", false, "Output as JSON")
 
-	// Story subcommands
-	rootCmd.AddCommand(storyCmd)
-
 	storyCmd.AddCommand(storyCreateCmd)
 	storyCreateCmd.Flags().String("description", "", "Story description")
 	storyCreateCmd.Flags().String("type", "feature", "Story type (feature, bugfix, enhancement, chore)")

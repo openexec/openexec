@@ -14,6 +14,22 @@ The runtime:
 ## 2. High-Level Architecture
 OpenExec follows a converged architecture pattern: a **deterministic local runtime** managing a **small local LLM** for routing/filtering and a **frontier model** for complex reasoning and implementation.
 
+```mermaid
+graph TD
+    Layer1[1. Interaction Layer<br/>CLI / IDE / Web]
+    Layer2[2. Session/Runtime Layer<br/>State / Approvals / Mode]
+    Layer3[3. Context Assembly Layer<br/>Deterministic Gather / Local LLM Ranking]
+    Layer4[4. Tool Layer<br/>Curated Toolsets]
+    Layer5[5. Policy/Sandbox Layer<br/>Permissions / Resource Limits]
+    Layer6[6. Orchestration Layer<br/>Blueprints]
+    Layer7[7. Model Layer<br/>Local Gatekeeper / Frontier Reasoning]
+
+    Layer1 --- Layer2 --- Layer3 --- Layer4 --- Layer5 --- Layer6 --- Layer7
+
+    style Layer6 fill:#f0fff0,stroke:#00aa00,stroke-width:2px
+    style Layer7 fill:#fff3f3,stroke:#ff0000,stroke-width:2px
+```
+
 ## 3. Core Components
 
 ### 3.1 Interaction Layer
@@ -32,8 +48,25 @@ A single daemon or embedded service responsible for:
 ## 4. Canonical Runtime State Model
 All runtime activity is stored in **SQLite**.
 
+```mermaid
+graph LR
+    Session --> Task
+    Task --> Run
+    Run --> Step
+    Step --> ToolCall
+    ToolCall --> Artifact
+
+    style Session fill:#e1f5fe,stroke:#01579b
+    style Task fill:#e1f5fe,stroke:#01579b
+    style Run fill:#e8f5e9,stroke:#2e7d32
+    style Step fill:#e8f5e9,stroke:#2e7d32
+    style ToolCall fill:#fff3e0,stroke:#e65100
+    style Artifact fill:#f3e5f5,stroke:#4a148c
+```
+
 **Hierarchy:**
 `Session` → `Task` → `Run` → `Step` → `ToolCall` → `Artifact`
+
 
 ### 4.1 Sessions
 Represents a user interaction context.

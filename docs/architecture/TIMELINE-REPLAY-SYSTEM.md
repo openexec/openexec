@@ -4,6 +4,19 @@ Every run in OpenExec produces a complete deterministic timeline of decisions, t
 
 ## 1. The Timeline Concept
 Every run produces a chronological event log:
+
+```mermaid
+graph TD
+    Run[Run #1842] --> Step1[Step 1: build_context]
+    Run --> Step2[Step 2: implement]
+    Run --> Step3[...]
+    
+    Step2 --> Model[ModelInvocation]
+    Step2 --> Tool[ToolCall: apply_patch]
+    Step2 --> Policy[PolicyCheck]
+    Step2 --> Artifact[ArtifactCreated: patch.diff]
+```
+
 **Run** → **Step** → **Events** (ToolCall, PolicyCheck, ModelInvocation, ArtifactCreated).
 
 ### Event Types
