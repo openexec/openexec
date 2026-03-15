@@ -424,7 +424,12 @@ func (s *Server) handleGetRunSteps(w http.ResponseWriter, r *http.Request) {
 // When OPENEXEC_USE_UNIFIED_READS=1, uses state store; otherwise uses manager's in-memory list.
 // Query params: ?project_path=...&status=...&limit=100&offset=0
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
-    // Use unified DB if enabled
+    // Always include in-memory pipelines for real-time visibility.
+    // DB runs may lag behind due to async writes; in-memory state is authoritative.
+    inMemory := s.Mgr.List()
+
+    // Also query DB for completed/historical runs not in memory
+    var dbRuns []map[string]interface{}
     if s.UseUnifiedReads && s.StateStore != nil {
         projectPath := r.URL.Query().Get("project_path")
         status := r.URL.Query().Get("status")
@@ -439,38 +444,44 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
         })
         if err != nil {
             log.Printf("[API] ListRuns DB error: %v", err)
-            WriteError(w, http.StatusInternalServerError, "database error")
-            return
+        } else {
+            for _, run := range runs {
+                runMap := map[string]interface{}{
+                    "run_id":       run.ID,
+                    "project_path": run.ProjectPath,
+                    "mode":         run.Mode,
+                    "status":       run.Status,
+                    "created_at":   run.CreatedAt,
+                    "updated_at":   run.UpdatedAt,
+                }
+                if run.SessionID.Valid {
+                    runMap["session_id"] = run.SessionID.String
+                }
+                if run.TaskID.Valid {
+                    runMap["task_id"] = run.TaskID.String
+                }
+                if run.ErrorMessage.Valid {
+                    runMap["error"] = run.ErrorMessage.String
+                }
+                dbRuns = append(dbRuns, runMap)
+            }
         }
-
-        result := make([]map[string]interface{}, 0, len(runs))
-        for _, run := range runs {
-            runMap := map[string]interface{}{
-                "run_id":       run.ID,
-                "project_path": run.ProjectPath,
-                "mode":         run.Mode,
-                "status":       run.Status,
-                "created_at":   run.CreatedAt,
-                "updated_at":   run.UpdatedAt,
-            }
-            if run.SessionID.Valid {
-                runMap["session_id"] = run.SessionID.String
-            }
-            if run.TaskID.Valid {
-                runMap["task_id"] = run.TaskID.String
-            }
-            if run.ErrorMessage.Valid {
-                runMap["error"] = run.ErrorMessage.String
-            }
-            result = append(result, runMap)
-        }
-        WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": result})
-        return
     }
 
-    // Fallback to in-memory list
-    list := s.Mgr.List()
-    WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": list})
+    // Merge: in-memory pipelines take priority, add DB runs not already present
+    inMemoryIDs := make(map[string]bool)
+    result := make([]interface{}, 0, len(inMemory)+len(dbRuns))
+    for _, p := range inMemory {
+        inMemoryIDs[p.FWUID] = true
+        result = append(result, p)
+    }
+    for _, r := range dbRuns {
+        if id, ok := r["run_id"].(string); ok && !inMemoryIDs[id] {
+            result = append(result, r)
+        }
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": result})
 }
 
 // Legacy FWU handlers (handleStart, handleStatus, handleList, handlePause, handleStop, handleEvents)
