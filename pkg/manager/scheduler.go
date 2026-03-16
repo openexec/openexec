@@ -149,6 +149,7 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 							return
 						}
 						if isTerminal(info.Status) {
+							log.Printf("[Scheduler] Task %s finished: status=%s elapsed=%s error=%q", node.Task.ID, info.Status, info.Elapsed, info.Error)
 							if info.Status == StatusError {
 								errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, info.Error)
 							}
