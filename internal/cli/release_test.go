@@ -13,6 +13,7 @@ import (
 
 func TestReleaseCmd(t *testing.T) {
 	tmpDir := t.TempDir()
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 	oldCwd, _ := os.Getwd()
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldCwd)
@@ -185,6 +186,7 @@ func TestLoadReleaseConfig(t *testing.T) {
 
 func TestGetReleaseManager(t *testing.T) {
 	tmpDir := t.TempDir()
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 	cmd := &cobra.Command{}
 	cmd.Flags().String("project-dir", tmpDir, "")
 	cmd.Flags().Set("project-dir", tmpDir)

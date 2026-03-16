@@ -213,10 +213,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		return fmt.Errorf("pipeline %s already active (status: %s)", fwuID, e.info.Status)
 	}
 
-	rel, err := m.getInternalReleaseManager()
-	if err != nil {
-		return fmt.Errorf("load release manager: %w", err)
-	}
+	// Release manager is optional — needed for briefing but not required for basic runs
+	rel, _ := m.getInternalReleaseManager()
 
     pCfg := pipeline.Config{
         FWUID:                fwuID,
