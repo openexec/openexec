@@ -2,8 +2,13 @@ package blueprint
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Registry stores and retrieves blueprints by ID.
@@ -89,4 +94,28 @@ func DefaultRegistry() *Registry {
 		defaultRegistry.MustRegister(QuickFixBlueprint)
 	})
 	return defaultRegistry
+}
+
+// LoadFromFile loads a blueprint from a YAML file and registers it.
+func (r *Registry) LoadFromFile(path string) (*Blueprint, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read blueprint file: %w", err)
+	}
+
+	var bp Blueprint
+	if err := yaml.Unmarshal(data, &bp); err != nil {
+		return nil, fmt.Errorf("failed to parse blueprint YAML: %w", err)
+	}
+
+	// Default ID from filename if missing
+	if bp.ID == "" {
+		bp.ID = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+
+	if err := r.Register(&bp); err != nil {
+		return nil, err
+	}
+
+	return &bp, nil
 }

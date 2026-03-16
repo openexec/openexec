@@ -166,7 +166,7 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 
 	cmd.Printf("Active:  %d run(s)\n", len(activeRuns))
 	for _, r := range activeRuns {
-		cmd.Printf("  - %s: %s (%s)\n", r.ID, r.Status, r.Phase)
+		cmd.Printf("  - %s: %s (%s)\n", r.GetID(), r.Status, r.GetStage())
 	}
 
 	cmd.Println()
@@ -191,7 +191,7 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 			case "cancelled":
 				statusIcon = "○"
 			}
-			cmd.Printf("  %s %s: %s\n", statusIcon, r.ID, r.Status)
+			cmd.Printf("  %s %s: %s\n", statusIcon, r.GetID(), r.Status)
 		}
 	}
 
@@ -231,9 +231,29 @@ func outputStatusJSON(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 
 type runInfo struct {
 	ID        string `json:"id"`
+	RunID     string `json:"run_id"`
+	FWUID     string `json:"fwu_id"`
 	Status    string `json:"status"`
 	Phase     string `json:"phase,omitempty"`
+	Stage     string `json:"stage,omitempty"`
 	CreatedAt string `json:"created_at,omitempty"`
+}
+
+func (r runInfo) GetID() string {
+	if r.RunID != "" {
+		return r.RunID
+	}
+	if r.FWUID != "" {
+		return r.FWUID
+	}
+	return r.ID
+}
+
+func (r runInfo) GetStage() string {
+	if r.Stage != "" {
+		return r.Stage
+	}
+	return r.Phase
 }
 
 func fetchRuns(port int) ([]runInfo, error) {

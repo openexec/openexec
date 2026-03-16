@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -18,7 +20,14 @@ import (
 func TestDCPCoordinator(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
-	store, _ := knowledge.NewStore(tmpDir)
+	// Knowledge store expects .openexec dir
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755); err != nil {
+		t.Fatalf("failed to create .openexec: %v", err)
+	}
+	store, err := knowledge.NewStore(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
 	defer store.Close()
 
 	// Use a mock BitNet router (BitNetRouter with skipAvailabilityCheck)
@@ -26,6 +35,7 @@ func TestDCPCoordinator(t *testing.T) {
 	r.SetSkipAvailabilityCheck(true)
 
 	coord := NewCoordinator(r, store)
+	coord.AllowExecution = true // Enable execution for unit tests
 	coord.RegisterTool(tools.NewDeployTool(store))
 	coord.RegisterTool(tools.NewSymbolReaderTool(store))
 
@@ -56,8 +66,15 @@ func TestDCPCoordinator(t *testing.T) {
 			t.Fatalf("ProcessQuery failed: %v", err)
 		}
 
-		if !strings.Contains(res.(string), "Successfully deployed") {
-			t.Errorf("unexpected result: %v", res)
+		if sugg, ok := res.(*IntentSuggestion); ok {
+			if !strings.Contains(sugg.Description, "Successfully deployed") {
+				t.Errorf("unexpected result: %v", sugg.Description)
+			}
+		} else {
+			// Fallback for cases where it might return a string directly
+			if !strings.Contains(res.(string), "Successfully deployed") {
+				t.Errorf("unexpected result: %v", res)
+			}
 		}
 	})
 
@@ -80,7 +97,13 @@ func TestDCPCoordinator(t *testing.T) {
 			t.Fatalf("ProcessQuery failed: %v", err)
 		}
 
-		output := res.(string)
+		var output string
+		if sugg, ok := res.(*IntentSuggestion); ok {
+			output = sugg.Description
+		} else {
+			output = res.(string)
+		}
+
 		if strings.Contains(output, "test@example.com") {
 			t.Error("PII (email) was not scrubbed")
 		}
@@ -136,6 +159,7 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// Track execution count
 		executionCount := 0
@@ -174,6 +198,7 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 		// Don't register any tools - no general_chat fallback available
 
 		// Act
@@ -204,6 +229,7 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		executionCount := 0
 		chatTool := &mockCountingTool{
@@ -243,6 +269,7 @@ func TestCoordinator_NoDoubleFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		someToolExecuted := false
 		chatToolExecuted := false
@@ -290,6 +317,7 @@ func TestCoordinator_RouterErrorFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		executionCount := 0
 		chatTool := &mockCountingTool{
@@ -326,6 +354,7 @@ func TestCoordinator_RouterErrorFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 		// Don't register general_chat
 
 		// Act
@@ -360,6 +389,7 @@ func TestCoordinator_MissingToolFallback(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		executionCount := 0
 		chatTool := &mockCountingTool{
@@ -405,6 +435,7 @@ func TestCoordinator_FallbackExecutionError(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// general_chat is registered but it returns an error
 		chatTool := &mockCountingTool{
@@ -436,6 +467,7 @@ func TestCoordinator_FallbackExecutionError(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// general_chat is registered but it returns an error
 		chatTool := &mockCountingTool{
@@ -471,6 +503,7 @@ func TestCoordinator_FallbackExecutionError(t *testing.T) {
 		}
 
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// general_chat is registered but it returns an error
 		chatTool := &mockCountingTool{
@@ -560,6 +593,7 @@ func newTestCoordinator(r router.Router, s *knowledge.Store) (*Coordinator, *byt
 		Output: buf,
 	})
 	coord := NewCoordinator(r, s, WithLogger(logger))
+	coord.AllowExecution = true
 	return coord, buf
 }
 
@@ -582,6 +616,7 @@ func TestCoordinator_LoggerInjection(t *testing.T) {
 
 		// Act: Create coordinator without WithLogger option
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 		coord.RegisterTool(&mockCountingTool{name: "general_chat"})
 
 		// Assert: Coordinator should have a non-nil logger
@@ -830,6 +865,10 @@ func TestCoordinator_QueryHash(t *testing.T) {
 func newTestStore(t *testing.T) (*knowledge.Store, func()) {
 	t.Helper()
 	tmpDir := t.TempDir()
+	// Knowledge store expects .openexec dir
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755); err != nil {
+		t.Fatalf("Failed to create .openexec: %v", err)
+	}
 	store, err := knowledge.NewStore(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create test store: %v", err)
@@ -1009,6 +1048,7 @@ func TestCoordinator_ToolRegistrationPropagation(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// WHEN a tool is registered
 		executed := false
@@ -1085,6 +1125,7 @@ func TestCoordinator_ThinLayer(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 		coord.RegisterTool(&mockCountingTool{name: "test_tool"})
 
 		// THEN Coordinator has no phase-related fields or methods
@@ -1123,6 +1164,7 @@ func TestCoordinator_ThinLayer(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 		coord.RegisterTool(&mockCountingTool{
 			name: "test_tool",
 			onExecute: func() {
@@ -1161,6 +1203,7 @@ func TestCoordinator_ThinLayer(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		for _, name := range []string{"tool_a", "tool_b", "tool_c"} {
 			n := name
@@ -1204,6 +1247,7 @@ func TestCoordinator_ThinLayer(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 		coord.RegisterTool(&mockCountingTool{name: "test_tool"})
 
 		// THEN Coordinator has no signal-related methods

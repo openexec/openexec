@@ -1,0 +1,7 @@
+🎯 Blueprint run started
+   Run ID:    BP-gate-wir-20260316-195611
+   Blueprint: gate-wiring-self-test
+   Task:      self test
+
+Monitor progress with: openexec status BP-gate-wir-20260316-195611
+Or view timeline:      curl http://localhost:8083/api/v1/runs/BP-gate-wir-20260316-195611/timeline

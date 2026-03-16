@@ -128,7 +128,7 @@ func (b *ContextBuilder) Build(ctx context.Context, projectPath string) (*Builde
 		if result.Error != nil {
 			// Find the gatherer to get its info
 			for _, g := range b.registry.GetAll() {
-				if g.Type() == result.Item.Type || (result.Item != nil && g.Type() == result.Item.Type) {
+				if result.Item != nil && g.Type() == result.Item.Type {
 					errors = append(errors, GatherError{
 						Type:  g.Type(),
 						Name:  g.Name(),

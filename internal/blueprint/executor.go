@@ -8,6 +8,9 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/openexec/openexec/internal/actions"
+	"github.com/openexec/openexec/internal/types"
 )
 
 // DefaultExecutor executes blueprint stages.
@@ -18,6 +21,9 @@ type DefaultExecutor struct {
 
 	// Timeout is the default timeout for commands. If zero, 5 minutes is used.
 	Timeout time.Duration
+
+	// ActionRegistry contains deterministic Go-native actions.
+	ActionRegistry *actions.Registry
 
 	// AgenticRunner runs agentic stages. If nil, agentic stages fail.
 	AgenticRunner AgenticRunner
@@ -48,9 +54,9 @@ func (e *DefaultExecutor) Execute(ctx context.Context, stage *Stage, input *Stag
 	result := NewStageResult(stage.Name, 1)
 
 	switch stage.Type {
-	case StageTypeDeterministic:
+	case types.StageTypeDeterministic:
 		return e.executeDeterministic(ctx, stage, input, result)
-	case StageTypeAgentic:
+	case types.StageTypeAgentic:
 		return e.executeAgentic(ctx, stage, input, result)
 	default:
 		result.Fail(fmt.Sprintf("unknown stage type: %s", stage.Type))
@@ -58,8 +64,29 @@ func (e *DefaultExecutor) Execute(ctx context.Context, stage *Stage, input *Stag
 	}
 }
 
-// executeDeterministic runs shell commands for deterministic stages.
+// executeDeterministic runs Go-native actions or shell commands for deterministic stages.
 func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage, input *StageInput, result *StageResult) (*StageResult, error) {
+	// 1. Try Action Registry first (Go-native logic)
+	if stage.Action != "" && e.ActionRegistry != nil {
+		if action, ok := e.ActionRegistry.Get(stage.Action); ok {
+			resp, err := action.Execute(ctx, actions.ActionRequest{
+				RunID:        input.RunID,
+				WorkspaceDir: e.WorkDir,
+				Inputs:       map[string]any{"task_description": input.TaskDescription},
+			})
+			if err != nil {
+				result.Fail(err.Error())
+				return result, nil
+			}
+			result.Status = resp.Status
+			result.Output = resp.Output
+			result.Error = resp.Error
+			result.Artifacts = resp.Artifacts
+			return result, nil
+		}
+	}
+
+	// 2. Fallback to shell commands
 	if len(stage.Commands) == 0 {
 		// No commands = automatic success
 		result.Complete("no commands to execute")

@@ -138,6 +138,7 @@ func TestDCP_ProcessQueryIsStateless(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// Register a deterministic tool that always returns the same value
 		coord.RegisterTool(&mockCountingTool{name: "deterministic_tool"})
@@ -174,6 +175,7 @@ func TestDCP_ProcessQueryIsStateless(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// Register a tool that tracks external call count (not internal state)
 		coord.RegisterTool(&mockCountingTool{
@@ -212,6 +214,7 @@ func TestDCP_ProcessQueryIsStateless(t *testing.T) {
 			},
 		}
 		coord := NewCoordinator(mockRouter, store)
+		coord.AllowExecution = true
 
 		// Tool alternates between success and error
 		coord.RegisterTool(&mockAlternatingTool{

@@ -96,32 +96,32 @@ func TestCoordinator_Route_ToolsetSelection(t *testing.T) {
 	}{
 		{
 			name:            "read operations use repo_readonly",
-			query:           "read the main.go file",
+			query:           "search code for authentication patterns",
 			expectedToolset: "repo_readonly",
 		},
 		{
 			name:            "implementation tasks use coding_backend",
-			query:           "implement a new feature for the backend",
+			query:           "implement api for user profiles",
 			expectedToolset: "coding_backend",
 		},
 		{
 			name:            "frontend tasks use coding_frontend",
-			query:           "style the React UI component",
+			query:           "style the react ui component",
 			expectedToolset: "coding_frontend",
 		},
 		{
 			name:            "CI tasks use debug_ci",
-			query:           "fix the CI pipeline failure",
+			query:           "fix the ci pipeline test failure",
 			expectedToolset: "debug_ci",
 		},
 		{
 			name:            "research tasks use docs_research",
-			query:           "research best practices for authentication",
+			query:           "research topic: best practices for security",
 			expectedToolset: "docs_research",
 		},
 		{
 			name:            "release tasks use release_ops",
-			query:           "release version 2.0",
+			query:           "tag release version 2.0",
 			expectedToolset: "release_ops",
 		},
 	}

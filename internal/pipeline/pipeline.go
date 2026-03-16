@@ -4,17 +4,22 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/openexec/openexec/internal/actions"
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/types"
 	"github.com/openexec/openexec/pkg/telemetry"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -95,6 +100,8 @@ type Pipeline struct {
 	factory *LoopFactory
 	events  chan loop.Event
 
+	gateRunner types.GateRunner
+
 	currentLoop *loop.Loop
 	mu          sync.Mutex
 
@@ -104,7 +111,7 @@ type Pipeline struct {
 
 // New creates a Pipeline and returns it along with a read-only event channel.
 // The channel is closed when Run returns.
-func New(cfg Config) (*Pipeline, <-chan loop.Event) {
+func New(cfg Config, opts ...Option) (*Pipeline, <-chan loop.Event) {
 	factory := NewLoopFactory(LoopFactoryConfig{
 		FWUID:                cfg.FWUID,
 		WorkDir:              cfg.WorkDir,
@@ -126,11 +133,21 @@ func New(cfg Config) (*Pipeline, <-chan loop.Event) {
 		EvidencePrefix:       cfg.EvidencePrefix,
 		ExecMode:             cfg.ExecMode,
 	})
-	return NewWithFactory(cfg, factory)
+	return NewWithFactory(cfg, factory, opts...)
+}
+
+// Option defines a functional option for Pipeline.
+type Option func(*Pipeline)
+
+// WithGateRunner sets the quality gate runner for the pipeline.
+func WithGateRunner(runner types.GateRunner) Option {
+	return func(p *Pipeline) {
+		p.gateRunner = runner
+	}
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
-func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Event) {
+func NewWithFactory(cfg Config, factory *LoopFactory, opts ...Option) (*Pipeline, <-chan loop.Event) {
 	// Apply defaults for blueprint-based execution.
 	if cfg.DefaultMaxIterations == 0 {
 		cfg.DefaultMaxIterations = config.DefaultMaxIterations
@@ -151,6 +168,10 @@ func NewWithFactory(cfg Config, factory *LoopFactory) (*Pipeline, <-chan loop.Ev
 		cfg:     cfg,
 		factory: factory,
 		events:  ch,
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	return p, ch
@@ -258,7 +279,20 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	case "quick_fix":
 		bp = blueprint.QuickFixBlueprint
 	default:
-		return fmt.Errorf("unknown blueprint: %s", p.cfg.BlueprintID)
+		// Try to load from external file in .openexec/blueprints/
+		absWorkDir, _ := filepath.Abs(p.cfg.WorkDir)
+		bpPath := filepath.Join(absWorkDir, ".openexec", "blueprints", p.cfg.BlueprintID+".yaml")
+		log.Printf("[Pipeline] Loading external blueprint from: %s", bpPath)
+		if _, err := os.Stat(bpPath); err == nil {
+			reg := blueprint.NewRegistry()
+			if externalBP, err := reg.LoadFromFile(bpPath); err == nil {
+				bp = externalBP
+			} else {
+				return fmt.Errorf("failed to load blueprint from %s: %w", bpPath, err)
+			}
+		} else {
+			return fmt.Errorf("unknown blueprint: %s", p.cfg.BlueprintID)
+		}
 	}
 
 	// Override implement stage timeout if configured
@@ -280,6 +314,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	// Create executor with agentic runner
 	executor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
+	executor.ActionRegistry = actions.DefaultRegistry(p.cfg.WorkDir)
 
 	// Set up agentic runner that wraps a bounded loop
 	executor.AgenticRunner = &blueprint.LoopAgenticRunner{
@@ -300,7 +335,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 	engineConfig.OnStageComplete = func(run *blueprint.Run, result *blueprint.StageResult) {
 		eventType := loop.EventStageComplete
-		if result.Status == blueprint.StageStatusFailed {
+		if result.Status == types.StageStatusFailed {
 			eventType = loop.EventStageFailed
 		}
 		p.emit(loop.Event{

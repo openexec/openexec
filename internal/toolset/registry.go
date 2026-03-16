@@ -368,12 +368,12 @@ func (s *Selector) SelectForPhase(phase string) *Toolset {
 // Uses simple keyword matching; can be enhanced with local LLM.
 func (s *Selector) SelectForTask(task string) []*Toolset {
 	keywords := map[string][]string{
-		"repo_readonly":   {"read", "search", "find", "understand", "explore", "analyze"},
-		"coding_backend":  {"implement", "fix", "write", "create", "update", "backend", "api", "server"},
-		"coding_frontend": {"frontend", "ui", "component", "react", "vue", "css", "html"},
-		"debug_ci":        {"ci", "pipeline", "build", "test failure", "debug"},
-		"docs_research":   {"document", "research", "explain", "summarize"},
-		"release_ops":     {"release", "deploy", "tag", "push", "publish"},
+		"repo_readonly":   {"search code", "find in repo", "explore repository", "analyze structure"},
+		"coding_backend":  {"implement api", "backend logic", "server-side", "database schema"},
+		"coding_frontend": {"frontend component", "react ui", "css style", "html template"},
+		"debug_ci":        {"ci pipeline", "build failure", "test failure", "debug ci"},
+		"docs_research":   {"summarize documentation", "research topic", "explain architecture"},
+		"release_ops":     {"tag release", "deploy to", "push to origin", "publish package"},
 	}
 
 	var result []*Toolset

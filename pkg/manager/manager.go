@@ -1,22 +1,27 @@
 package manager
 
 import (
-    "context"
-    "fmt"
-    "io/fs"
-    "log"
-    "sync"
-    "time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io/fs"
+	"log"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
 
-    "github.com/openexec/openexec/internal/config"
-    "github.com/openexec/openexec/internal/loop"
-    "github.com/openexec/openexec/internal/pipeline"
-    "github.com/openexec/openexec/internal/release"
-    "github.com/openexec/openexec/pkg/audit"
-    "github.com/openexec/openexec/pkg/db/state"
-    "github.com/openexec/openexec/pkg/telemetry"
-    "go.opentelemetry.io/otel/attribute"
-    "go.opentelemetry.io/otel/trace"
+	"github.com/openexec/openexec/internal/config"
+	"github.com/openexec/openexec/internal/execution/gates"
+	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/pipeline"
+	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/audit"
+	"github.com/openexec/openexec/pkg/db/state"
+	"github.com/openexec/openexec/pkg/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 // PipelineStatus represents the lifecycle state of a managed pipeline.
 type PipelineStatus string
@@ -278,6 +283,11 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
+	// Initialize quality gate runner and inject into pipeline
+	if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
+		pipeline.WithGateRunner(&gateRunnerAdapter{runner: runner})(p)
+	}
+
 	// Create OTel span for the entire run lifecycle
 	runCtx, runSpan := telemetry.StartRunSpan(ctx, fwuID, m.cfg.WorkDir, pCfg.ExecMode)
 	pipeCtx, cancel := context.WithCancel(runCtx)
@@ -435,4 +445,79 @@ func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
 		return nil, err
 	}
 	return rel, nil
+}
+
+// ExportJSON exports the current release state to JSON files for backward compatibility.
+func (m *Manager) ExportJSON(dir string) error {
+	rel, err := m.getInternalReleaseManager()
+	if err != nil {
+		return err
+	}
+
+	// Fetch and map goals
+	relGoals := rel.GetGoals()
+	plannerGoals := make([]planner.Goal, len(relGoals))
+	for i, g := range relGoals {
+		plannerGoals[i] = planner.Goal{
+			ID:                 g.ID,
+			Title:              g.Title,
+			Description:        g.Description,
+			SuccessCriteria:    g.SuccessCriteria,
+			VerificationMethod: g.VerificationMethod,
+		}
+	}
+
+	// Fetch and map stories
+	relStories := rel.GetStories()
+	plannerStories := make([]planner.Story, len(relStories))
+	for i, s := range relStories {
+		// Map tasks for this story
+		relTasks := rel.GetTasksForStory(s.ID)
+		plannerTasks := make([]planner.Task, len(relTasks))
+		for j, t := range relTasks {
+			plannerTasks[j] = planner.Task{
+				ID:                 t.ID,
+				Title:              t.Title,
+				Description:        t.Description,
+				VerificationScript: t.VerificationScript,
+				DependsOn:          t.DependsOn,
+			}
+		}
+
+		plannerStories[i] = planner.Story{
+			ID:                 s.ID,
+			GoalID:             s.GoalID,
+			Title:              s.Title,
+			Description:        s.Description,
+			AcceptanceCriteria: s.AcceptanceCriteria,
+			VerificationScript: s.VerificationScript,
+			DependsOn:          s.DependsOn,
+			Tasks:              plannerTasks,
+		}
+	}
+
+	plan := &planner.ProjectPlan{
+		Goals:   plannerGoals,
+		Stories: plannerStories,
+	}
+
+	data, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(dir, "stories.json"), data, 0644)
+}
+
+// gateRunnerAdapter adapts gates.Runner to the blueprint.GateRunner interface.
+type gateRunnerAdapter struct {
+	runner *gates.Runner
+}
+
+func (a *gateRunnerAdapter) RunAll(ctx context.Context) error {
+	report := a.runner.RunAll(ctx)
+	if !report.Passed {
+		return fmt.Errorf("%s", report.Summary)
+	}
+	return nil
 }

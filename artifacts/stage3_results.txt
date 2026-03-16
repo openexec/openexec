@@ -1,0 +1,175 @@
+=== Build ===
+=== Integration test ===
+?   	github.com/openexec/openexec	[no test files]
+?   	github.com/openexec/openexec/cmd/openexec	[no test files]
+?   	github.com/openexec/openexec/internal	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/approval	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/blueprint	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/budget	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/cli	0.303s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/config	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/context	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/conversation	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/dcp	(cached) [no tests to run]
+?   	github.com/openexec/openexec/internal/execution/audit	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/execution/gates	(cached) [no tests to run]
+?   	github.com/openexec/openexec/internal/execution/health	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/git	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/health	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/intent	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/knowledge	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/logging	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/loop	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/mcp	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/mode	(cached) [no tests to run]
+?   	github.com/openexec/openexec/internal/patch	[no test files]
+=== RUN   TestBlueprintExecutor_InvokesQualityGates
+--- PASS: TestBlueprintExecutor_InvokesQualityGates (0.03s)
+PASS
+ok  	github.com/openexec/openexec/internal/pipeline	(cached)
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/planner	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/policy	(cached) [no tests to run]
+?   	github.com/openexec/openexec/internal/project	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/manifest	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/persona	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/render	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/workflow	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/protocol	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/release	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/router	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/runner	(cached) [no tests to run]
+?   	github.com/openexec/openexec/internal/runtime	[no test files]
+?   	github.com/openexec/openexec/internal/schema	[no test files]
+?   	github.com/openexec/openexec/internal/security	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/server	0.489s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/summarize	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/telegram	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/tools	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/toolset	(cached) [no tests to run]
+?   	github.com/openexec/openexec/internal/tui	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/twilio	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/uploader	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/user	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/validation	0.684s [no tests to run]
+?   	github.com/openexec/openexec/internal/worktree	[no test files]
+?   	github.com/openexec/openexec/pkg/actions	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/agent	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/api	0.871s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/audit	(cached) [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/db/session	(cached) [no tests to run]
+?   	github.com/openexec/openexec/pkg/db/state	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/manager	1.065s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/security	(cached) [no tests to run]
+?   	github.com/openexec/openexec/pkg/telemetry	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/util	(cached) [no tests to run]
+?   	github.com/openexec/openexec/pkg/version	[no test files]
+?   	github.com/openexec/openexec/ui/node_modules/flatted/golang/pkg/flatted	[no test files]
+=== All tests ===
+?   	github.com/openexec/openexec	[no test files]
+?   	github.com/openexec/openexec/cmd/openexec	[no test files]
+?   	github.com/openexec/openexec/internal	[no test files]
+ok  	github.com/openexec/openexec/internal/approval	(cached)
+ok  	github.com/openexec/openexec/internal/blueprint	(cached)
+ok  	github.com/openexec/openexec/internal/budget	(cached)
+ok  	github.com/openexec/openexec/internal/cli	1.934s
+ok  	github.com/openexec/openexec/internal/config	(cached)
+ok  	github.com/openexec/openexec/internal/context	(cached)
+ok  	github.com/openexec/openexec/internal/conversation	(cached)
+ok  	github.com/openexec/openexec/internal/dcp	(cached)
+?   	github.com/openexec/openexec/internal/execution/audit	[no test files]
+ok  	github.com/openexec/openexec/internal/execution/gates	(cached)
+?   	github.com/openexec/openexec/internal/execution/health	[no test files]
+ok  	github.com/openexec/openexec/internal/git	(cached)
+ok  	github.com/openexec/openexec/internal/health	(cached)
+ok  	github.com/openexec/openexec/internal/intent	(cached)
+ok  	github.com/openexec/openexec/internal/knowledge	(cached)
+ok  	github.com/openexec/openexec/internal/logging	(cached)

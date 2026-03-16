@@ -6,12 +6,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/runner"
+	"github.com/openexec/openexec/pkg/db/state"
+	"github.com/openexec/openexec/pkg/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -33,8 +36,45 @@ var doctorIntentCmd = &cobra.Command{
 	Use:   "intent",
 	Short: "Validate and optionally fix INTENT.md",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Initialize Manager
+		config, err := project.LoadProjectConfig(".")
+		if err != nil {
+			return fmt.Errorf("project not initialized: run 'openexec init' first")
+		}
+
+		sStore, err := state.NewStore(filepath.Join(config.ProjectDir, ".openexec", "openexec.db"))
+		if err != nil {
+			return err
+		}
+		defer sStore.Close()
+
+		mgr, err := manager.New(manager.Config{
+			WorkDir:    config.ProjectDir,
+			StateStore: sStore,
+		})
+		if err != nil {
+			return err
+		}
+
 		// Just call plan validation logic
-		return GenerateAndSave(cmd, "INTENT.md", ".")
+		res, err := mgr.Plan(cmd.Context(), manager.PlanRequest{
+			IntentFile: "INTENT.md",
+			AutoImport: false, // Just validate
+		})
+		if err != nil {
+			return err
+		}
+
+		if !res.Valid {
+			cmd.Println(color.RedString("\nINTENT VALIDATION FAILED:"))
+			for _, issue := range res.Issues {
+				cmd.Printf("  - %s\n", issue)
+			}
+			return fmt.Errorf("intent document is invalid")
+		}
+
+		cmd.Println(color.GreenString("✓ INTENT.md is valid."))
+		return nil
 	},
 }
 

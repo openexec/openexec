@@ -95,7 +95,7 @@ func InitOTel(ctx context.Context, serviceName string, w io.Writer) (func(contex
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
-			semconv.SchemaURL,
+			resource.Default().SchemaURL(),
 			semconv.ServiceName(cfg.ServiceName),
 		),
 	)

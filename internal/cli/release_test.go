@@ -24,6 +24,9 @@ project:
 `
 	os.WriteFile(filepath.Join(tmpDir, "openexec.yaml"), []byte(yamlContent), 0644)
 
+	// Create .openexec dir
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
+
 	t.Run("Create Release", func(t *testing.T) {
 		b := bytes.NewBufferString("")
 		rootCmd.SetOut(b)
@@ -185,6 +188,9 @@ func TestLoadReleaseConfig(t *testing.T) {
 
 func TestGetReleaseManager(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Release manager expects .openexec dir
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
+	
 	cmd := &cobra.Command{}
 	cmd.Flags().String("project-dir", tmpDir, "")
 	cmd.Flags().Set("project-dir", tmpDir)

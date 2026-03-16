@@ -136,10 +136,14 @@ func NewCoordinator(r router.Router, s *knowledge.Store, opts ...CoordinatorOpti
 		store:   s,
 		indexer: knowledge.NewIndexer(s),
 		tools:   make(map[string]tools.Tool),
-		log:     logging.Default().WithComponent("dcp"),
 	}
 	for _, opt := range opts {
 		opt(c)
+	}
+
+	// Initialize default logger if not provided via options
+	if c.log == nil {
+		c.log = logging.Default().WithComponent("dcp")
 	}
 
 	// Initialize default toolset registry if not provided
