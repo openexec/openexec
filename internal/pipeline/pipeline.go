@@ -13,6 +13,7 @@ import (
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -264,6 +265,16 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	if p.cfg.TaskTimeout > 0 {
 		if impl, ok := bp.Stages["implement"]; ok {
 			impl.Timeout = p.cfg.TaskTimeout
+		}
+	}
+
+	// Override lint/test commands from project config
+	if projCfg, err := project.LoadProjectConfig(p.cfg.WorkDir); err == nil {
+		if lint, ok := bp.Stages["lint"]; ok && len(projCfg.Execution.LintCommands) > 0 {
+			lint.Commands = projCfg.Execution.LintCommands
+		}
+		if test, ok := bp.Stages["test"]; ok && len(projCfg.Execution.TestCommands) > 0 {
+			test.Commands = projCfg.Execution.TestCommands
 		}
 	}
 
