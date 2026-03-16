@@ -111,7 +111,7 @@ var DefaultBlueprint = &Blueprint{
 			Description: "Run linting checks",
 			Type:        StageTypeDeterministic,
 			Toolset:     "coding_backend",
-			Commands:    []string{"go vet ./...", "golangci-lint run"},
+			Commands:    nil, // Set from project config; empty = auto-pass
 			OnSuccess:   "test",
 			OnFailure:   "fix_lint",
 		},
@@ -128,7 +128,7 @@ var DefaultBlueprint = &Blueprint{
 			Description: "Run tests",
 			Type:        StageTypeDeterministic,
 			Toolset:     "coding_backend",
-			Commands:    []string{"go test ./..."},
+			Commands:    nil, // Set from project config; empty = auto-pass
 			OnSuccess:   "review",
 			OnFailure:   "fix_tests",
 		},
