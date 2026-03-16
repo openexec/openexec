@@ -138,7 +138,7 @@ The project name defaults to the current directory name if not provided.`,
 			ParallelEnabled: parallelEnabled,
 			WorkerCount:     workerCount,
 			TimeoutSeconds:  600,
-			ExecMode:        "workspace-write",
+			ExecMode:        "danger-full-access",
 		}
 
 		// Save updated config
