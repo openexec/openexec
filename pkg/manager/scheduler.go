@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openexec/openexec/internal/prompt"
 	"github.com/openexec/openexec/internal/release"
 )
 
@@ -122,7 +123,19 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 				isStudy := strings.Contains(strings.ToLower(node.Task.Title), "study") || 
 						  strings.Contains(strings.ToLower(node.Task.Title), "map")
 				
+				// Build rich task briefing from release manager
+				taskDesc := node.Task.Title
+				if node.Task.Description != "" {
+					taskDesc += "\n\n" + node.Task.Description
+				}
+				// Try to get full briefing with acceptance criteria, dependencies, etc.
+				if brief, err := rel.Brief(node.Task.ID); err == nil {
+					taskDesc = prompt.FormatBriefing(brief)
+				}
+
 				var opts []StartOption
+				opts = append(opts, WithTaskDescription(taskDesc))
+				opts = append(opts, WithBlueprint("standard_task"))
 				if isStudy {
 					opts = append(opts, WithIsStudy(true))
 				}
