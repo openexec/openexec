@@ -246,7 +246,7 @@ func (s *Store) UpdateRunStatus(ctx context.Context, runID, status, errorMessage
 
 // AddRunStep records a single iteration step of a run.
 func (s *Store) AddRunStep(ctx context.Context, stepID, runID, traceID, phase string, iteration int, status string) error {
-    query := `INSERT INTO run_steps (id, run_id, trace_id, phase, iteration, status) VALUES (?, ?, ?, ?, ?, ?)`
+    query := `INSERT OR IGNORE INTO run_steps (id, run_id, trace_id, phase, iteration, status) VALUES (?, ?, ?, ?, ?, ?)`
     _, err := s.db.ExecContext(ctx, query, stepID, runID, traceID, phase, iteration, status)
     return err
 }
@@ -459,7 +459,7 @@ func (s *Store) UpdateRunStepCompleted(ctx context.Context, stepID, outputsHash 
 
 // AddRunStepFull records a run step with all fields.
 func (s *Store) AddRunStepFull(ctx context.Context, stepID, runID, traceID, phase, agent string, iteration int, status, inputsHash, metadata string) error {
-    query := `INSERT INTO run_steps (id, run_id, trace_id, phase, agent, iteration, status, inputs_hash, metadata)
+    query := `INSERT OR IGNORE INTO run_steps (id, run_id, trace_id, phase, agent, iteration, status, inputs_hash, metadata)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     _, err := s.db.ExecContext(ctx, query, stepID, runID, traceID, phase, agent, iteration, status, inputsHash, metadata)
     return err
