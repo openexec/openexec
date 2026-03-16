@@ -243,6 +243,12 @@ func buildAgenticPrompt(stage *Stage, input *StageInput) string {
 	sb.WriteString(input.TaskDescription)
 	sb.WriteString("\n\n")
 
+	if input.Briefing != "" {
+		sb.WriteString("## Project Context & Briefing\n")
+		sb.WriteString(input.Briefing)
+		sb.WriteString("\n\n")
+	}
+
 	// Add context from previous stages
 	if len(input.PreviousStages) > 0 {
 		sb.WriteString("## Previous Stage Results\n")

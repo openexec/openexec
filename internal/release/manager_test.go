@@ -8,11 +8,21 @@ import (
 	"time"
 )
 
+// testDir creates a temp directory with the .openexec subdirectory that NewManager expects.
+func testDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".openexec"), 0755); err != nil {
+		t.Fatalf("failed to create .openexec dir: %v", err)
+	}
+	return dir
+}
+
 // TestManager_SQLiteCanonicalState verifies that state is persisted to SQLite only,
 // and JSON files are not written during normal operations (AC-1, AC-2).
 func TestManager_SQLiteCanonicalState(t *testing.T) {
 	t.Run("saves state to SQLite without writing JSON files", func(t *testing.T) {
-		tmpDir := t.TempDir()
+		tmpDir := testDir(t)
 
 		cfg := DefaultConfig()
 		cfg.GitEnabled = false
@@ -83,9 +93,9 @@ func TestManager_SQLiteCanonicalState(t *testing.T) {
 		}
 
 		// Verify: SQLite database should exist and contain the data
-		dbPath := filepath.Join(openexecDir, "data", "state.db")
+		dbPath := filepath.Join(openexecDir, "openexec.db")
 		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-			t.Fatalf("state.db should exist: %v", err)
+			t.Fatalf("openexec.db should exist: %v", err)
 		}
 
 		// Verify data is in SQLite by reading back
@@ -120,7 +130,7 @@ func TestManager_SQLiteCanonicalState(t *testing.T) {
 	})
 
 	t.Run("loads state from SQLite on restart", func(t *testing.T) {
-		tmpDir := t.TempDir()
+		tmpDir := testDir(t)
 
 		cfg := DefaultConfig()
 		cfg.GitEnabled = false
@@ -204,7 +214,7 @@ func TestManager_SQLiteCanonicalState(t *testing.T) {
 	})
 
 	t.Run("updates state in SQLite correctly", func(t *testing.T) {
-		tmpDir := t.TempDir()
+		tmpDir := testDir(t)
 
 		cfg := DefaultConfig()
 		cfg.GitEnabled = false
@@ -268,7 +278,7 @@ func TestManager_SQLiteCanonicalState(t *testing.T) {
 // that Session and Audit components depend on.
 func TestManager_SessionAuditCompatibility(t *testing.T) {
 	t.Run("manager store interface is compatible with session/audit patterns", func(t *testing.T) {
-		tmpDir := t.TempDir()
+		tmpDir := testDir(t)
 
 		cfg := DefaultConfig()
 		cfg.GitEnabled = false
@@ -363,7 +373,7 @@ func TestManager_SessionAuditCompatibility(t *testing.T) {
 // for read-only artifact generation (AC-2 allows read-only exports).
 func TestManager_ExportJSON(t *testing.T) {
 	t.Run("exports state to JSON files on demand", func(t *testing.T) {
-		tmpDir := t.TempDir()
+		tmpDir := testDir(t)
 
 		cfg := DefaultConfig()
 		cfg.GitEnabled = false

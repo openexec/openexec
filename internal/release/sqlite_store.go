@@ -33,33 +33,18 @@ func NewSQLiteStore(db *sql.DB) (*SQLiteStore, error) {
 	return store, nil
 }
 
-// initSchema creates the state tables if they don't exist and migrates existing tables.
+// initSchema creates the state tables if they don't exist and applies migrations.
 func (s *SQLiteStore) initSchema(ctx context.Context) error {
 	// Enable foreign keys
 	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = ON;"); err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
-	// Migrate existing tables first so that the full schema (including indexes
-	// on newer columns like "priority") can be applied without errors.
-	if err := s.migrateSchema(ctx); err != nil {
-		return err
-	}
-
-	_, err := s.db.ExecContext(ctx, StateSchema)
-	return err
-}
-
-// migrateSchema ensures all expected columns exist on each table, adding any that are missing.
-func (s *SQLiteStore) migrateSchema(ctx context.Context) error {
-	type migration struct {
-		table      string
-		column     string
-		definition string
-	}
-
-	migrations := []migration{
-		// stories columns (covers both state schema and release schema gaps)
+	// Apply column migrations for existing tables before running the full schema.
+	// CREATE TABLE IF NOT EXISTS won't add new columns to existing tables,
+	// so we must ALTER TABLE first if the unified schema created simplified tables.
+	migrations := [][3]string{
+		// stories columns
 		{"stories", "epic_id", "TEXT DEFAULT NULL"},
 		{"stories", "goal_id", "TEXT DEFAULT NULL"},
 		{"stories", "role", "TEXT DEFAULT ''"},
@@ -102,10 +87,10 @@ func (s *SQLiteStore) migrateSchema(ctx context.Context) error {
 		{"tasks", "approval_review_cycle", "INTEGER DEFAULT 0"},
 		{"tasks", "needs_review", "INTEGER DEFAULT 0"},
 		{"tasks", "review_notes", "TEXT DEFAULT ''"},
-		{"tasks", "error_message", "TEXT DEFAULT ''"},
-		{"tasks", "metadata", "TEXT DEFAULT '{}'"},
 		{"tasks", "started_at", "DATETIME DEFAULT NULL"},
 		{"tasks", "completed_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "error_message", "TEXT DEFAULT ''"},
+		{"tasks", "metadata", "TEXT DEFAULT '{}'"},
 		// releases columns
 		{"releases", "git_branch", "TEXT DEFAULT ''"},
 		{"releases", "git_base_branch", "TEXT DEFAULT ''"},
@@ -122,72 +107,47 @@ func (s *SQLiteStore) migrateSchema(ctx context.Context) error {
 		{"releases", "changelog", "TEXT DEFAULT ''"},
 		{"releases", "deployed_at", "DATETIME DEFAULT NULL"},
 	}
-
-	tableExistsCache := make(map[string]bool)
-
 	for _, m := range migrations {
-		if exists, cached := tableExistsCache[m.table]; cached && !exists {
-			continue
-		}
-		if _, cached := tableExistsCache[m.table]; !cached {
-			te, err := s.tableExists(ctx, m.table)
-			if err != nil {
-				return fmt.Errorf("checking table %s: %w", m.table, err)
-			}
-			tableExistsCache[m.table] = te
-			if !te {
-				continue
-			}
-		}
-
-		colExists, err := s.columnExists(ctx, m.table, m.column)
-		if err != nil {
-			return fmt.Errorf("checking column %s.%s: %w", m.table, m.column, err)
-		}
-		if !colExists {
-			alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", m.table, m.column, m.definition)
-			if _, err := s.db.ExecContext(ctx, alter); err != nil {
-				return fmt.Errorf("adding column %s.%s: %w", m.table, m.column, err)
+		if s.tableExists(ctx, m[0]) && !s.columnExists(ctx, m[0], m[1]) {
+			ddl := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", m[0], m[1], m[2])
+			if _, err := s.db.ExecContext(ctx, ddl); err != nil {
+				return fmt.Errorf("failed to migrate %s.%s: %w", m[0], m[1], err)
 			}
 		}
 	}
 
-	return nil
+	_, err := s.db.ExecContext(ctx, StateSchema)
+	return err
 }
 
 // tableExists checks whether a table exists in the database.
-func (s *SQLiteStore) tableExists(ctx context.Context, table string) (bool, error) {
-	var count int
-	err := s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
+func (s *SQLiteStore) tableExists(ctx context.Context, table string) bool {
+	var name string
+	err := s.db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
+	return err == nil
 }
 
-// columnExists checks whether a column exists on a table using PRAGMA table_info.
-func (s *SQLiteStore) columnExists(ctx context.Context, table, column string) (bool, error) {
+// columnExists checks whether a column exists in a table.
+func (s *SQLiteStore) columnExists(ctx context.Context, table, column string) bool {
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
-		return false, err
+		return false
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		var cid int
-		var name, colType string
-		var notNull int
-		var dfltValue *string
+		var name, typ string
+		var notnull int
+		var dfltValue sql.NullString
 		var pk int
-		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
-			return false, err
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dfltValue, &pk); err != nil {
+			return false
 		}
 		if name == column {
-			return true, nil
+			return true
 		}
 	}
-	return false, rows.Err()
+	return false
 }
 
 // Close closes the database connection.
@@ -1093,7 +1053,7 @@ func (s *SQLiteStore) listTasksWithFilter(ctx context.Context, where string, arg
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed to scan task id: %w", err)
+			return nil, fmt.Errorf("failed to scan task id: %w", id)
 		}
 		ids = append(ids, id)
 	}

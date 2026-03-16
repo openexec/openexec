@@ -172,6 +172,9 @@ type StageInput struct {
 	// ContextPack contains gathered context files.
 	ContextPack map[string]string `json:"context_pack,omitempty"`
 
+	// Briefing is the rich context briefing (e.g. PRD, acceptance criteria).
+	Briefing string `json:"briefing,omitempty"`
+
 	// WorkingDirectory is the directory for execution.
 	WorkingDirectory string `json:"working_directory"`
 
