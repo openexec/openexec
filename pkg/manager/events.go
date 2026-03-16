@@ -40,7 +40,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 		case loop.EventStageStart, loop.EventStageComplete, loop.EventPipelineComplete:
 			log.Printf("[Manager] Event %s [%s]: stage=%s", fwuID, event.Type, event.StageName)
 		case loop.EventRetrying:
-			log.Printf("[Manager] Event %s [%s]: retrying - %s", fwuID, event.Type, event.Text)
+			log.Printf("[Manager] Event %s [%s]: retrying - %s | error: %s", fwuID, event.Type, event.Text, event.ErrText)
 		case loop.EventComplete:
 			log.Printf("[Manager] Event %s [%s]: loop complete", fwuID, event.Type)
 		}
