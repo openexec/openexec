@@ -34,6 +34,12 @@ type LoopFactoryConfig struct {
 
 	// ExecMode propagates execution mode to the loop.
 	ExecMode string
+
+	// BlueprintID enables blueprint mode with the specified blueprint.
+	BlueprintID string
+
+	// TaskDescription is the user's task description for blueprint runs.
+	TaskDescription string
 }
 
 // LoopFactory creates configured Loops for blueprint stage execution.
