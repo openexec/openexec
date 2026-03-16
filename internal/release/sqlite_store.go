@@ -33,15 +33,104 @@ func NewSQLiteStore(db *sql.DB) (*SQLiteStore, error) {
 	return store, nil
 }
 
-// initSchema creates the state tables if they don't exist.
+// initSchema creates the state tables if they don't exist and applies migrations.
 func (s *SQLiteStore) initSchema(ctx context.Context) error {
 	// Enable foreign keys
 	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = ON;"); err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
+	// Apply column migrations for existing tables before running the full schema.
+	// CREATE TABLE IF NOT EXISTS won't add new columns to existing tables,
+	// so we must ALTER TABLE first if the unified schema created simplified tables.
+	migrations := [][3]string{
+		// stories columns
+		{"stories", "role", "TEXT DEFAULT ''"},
+		{"stories", "want", "TEXT DEFAULT ''"},
+		{"stories", "benefit", "TEXT DEFAULT ''"},
+		{"stories", "verification_script", "TEXT DEFAULT ''"},
+		{"stories", "contract", "TEXT DEFAULT ''"},
+		{"stories", "tasks", "TEXT DEFAULT '[]'"},
+		{"stories", "story_type", "TEXT DEFAULT 'feature'"},
+		{"stories", "priority", "INTEGER DEFAULT 0"},
+		{"stories", "git_branch", "TEXT DEFAULT ''"},
+		{"stories", "git_base_branch", "TEXT DEFAULT ''"},
+		{"stories", "git_merged_to", "TEXT DEFAULT ''"},
+		{"stories", "git_merge_commit", "TEXT DEFAULT ''"},
+		{"stories", "git_merged_at", "DATETIME DEFAULT NULL"},
+		{"stories", "git_commit_count", "INTEGER DEFAULT 0"},
+		{"stories", "approval_status", "TEXT DEFAULT ''"},
+		{"stories", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"stories", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"stories", "approval_comments", "TEXT DEFAULT ''"},
+		{"stories", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"stories", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"stories", "started_at", "DATETIME DEFAULT NULL"},
+		{"stories", "completed_at", "DATETIME DEFAULT NULL"},
+		// tasks columns
+		{"tasks", "task_type", "TEXT DEFAULT ''"},
+		{"tasks", "priority", "INTEGER DEFAULT 0"},
+		{"tasks", "assigned_agent", "TEXT DEFAULT ''"},
+		{"tasks", "attempt_count", "INTEGER DEFAULT 0"},
+		{"tasks", "max_attempts", "INTEGER DEFAULT 3"},
+		{"tasks", "git_commits", "TEXT DEFAULT '[]'"},
+		{"tasks", "git_branch", "TEXT DEFAULT ''"},
+		{"tasks", "git_pr_number", "INTEGER DEFAULT NULL"},
+		{"tasks", "git_pr_url", "TEXT DEFAULT ''"},
+		{"tasks", "approval_status", "TEXT DEFAULT ''"},
+		{"tasks", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"tasks", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "approval_comments", "TEXT DEFAULT ''"},
+		{"tasks", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"tasks", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"tasks", "needs_review", "INTEGER DEFAULT 0"},
+		{"tasks", "review_notes", "TEXT DEFAULT ''"},
+		{"tasks", "started_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "completed_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "error_message", "TEXT DEFAULT ''"},
+		{"tasks", "metadata", "TEXT DEFAULT '{}'"},
+	}
+	for _, m := range migrations {
+		if s.tableExists(ctx, m[0]) && !s.columnExists(ctx, m[0], m[1]) {
+			ddl := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", m[0], m[1], m[2])
+			if _, err := s.db.ExecContext(ctx, ddl); err != nil {
+				return fmt.Errorf("failed to migrate %s.%s: %w", m[0], m[1], err)
+			}
+		}
+	}
+
 	_, err := s.db.ExecContext(ctx, StateSchema)
 	return err
+}
+
+// tableExists checks whether a table exists in the database.
+func (s *SQLiteStore) tableExists(ctx context.Context, table string) bool {
+	var name string
+	err := s.db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
+	return err == nil
+}
+
+// columnExists checks whether a column exists in a table.
+func (s *SQLiteStore) columnExists(ctx context.Context, table, column string) bool {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull int
+		var dfltValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dfltValue, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
 }
 
 // Close closes the database connection.
