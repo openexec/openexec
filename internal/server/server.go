@@ -148,6 +148,18 @@ func New(cfg Config) (*Server, error) {
         CommandName: loopCmd,
         CommandArgs: loopArgs,
         StateStore:  stateStore,
+        TaskTimeout: func() time.Duration {
+            if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.TimeoutSeconds > 0 {
+                return time.Duration(pc.Execution.TimeoutSeconds) * time.Second
+            }
+            return 0
+        }(),
+        ExecMode: func() string {
+            if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ExecMode != "" {
+                return pc.Execution.ExecMode
+            }
+            return "workspace-write"
+        }(),
     })
     if err != nil {
         return nil, fmt.Errorf("manager initialization failed: %w", err)

@@ -52,6 +52,9 @@ type Config struct {
 	// PIIScrubLevel controls PII scrubbing sensitivity for audit logs
 	// Valid values: "low", "medium", "high", "" (disabled)
 	PIIScrubLevel string
+	// TaskTimeout overrides the default implement stage timeout.
+	// Read from config.json execution.timeout_seconds.
+	TaskTimeout time.Duration
 }
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
@@ -230,6 +233,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         CommandArgs:          m.cfg.CommandArgs,
         LogDir:               m.cfg.LogDir,
         ExecMode:             m.cfg.ExecMode,
+        TaskTimeout:          m.cfg.TaskTimeout,
     }
 
 	for _, opt := range opts {
@@ -277,7 +281,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	// run_step or checkpoint writes (which have FK constraints on run_id).
 	if m.state != nil {
 		if err := m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode); err != nil {
-			log.Printf("[Manager] Warning: failed to persist run %s: %v", fwuID, err)
+			log.Printf("[Manager] Failed to create run record for %s: %v", fwuID, err)
 		}
 	}
 

@@ -8,13 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openexec/openexec/internal/prompt"
 	"github.com/openexec/openexec/internal/release"
 )
 
 // RunOptions defines settings for executing multiple tasks.
 type RunOptions struct {
-	WorkerCount int
-	TaskIDs     []string // Optional: restrict to specific tasks
+	WorkerCount int      `json:"worker_count"`
+	TaskIDs     []string `json:"task_ids,omitempty"`
 }
 
 type taskNode struct {
@@ -119,10 +120,22 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 				log.Printf("[Scheduler] Worker %d starting task %s", id, node.Task.ID)
 				
 				// Determine if it's a study task
-				isStudy := strings.Contains(strings.ToLower(node.Task.Title), "study") || 
+				isStudy := strings.Contains(strings.ToLower(node.Task.Title), "study") ||
 						  strings.Contains(strings.ToLower(node.Task.Title), "map")
-				
+
+				// Build rich task briefing from release manager
+				taskDesc := node.Task.Title
+				if node.Task.Description != "" {
+					taskDesc += "\n\n" + node.Task.Description
+				}
+				// Try to get full briefing with acceptance criteria, dependencies, etc.
+				if brief, err := rel.Brief(node.Task.ID); err == nil {
+					taskDesc = prompt.FormatBriefing(brief)
+				}
+
 				var opts []StartOption
+				opts = append(opts, WithTaskDescription(taskDesc))
+				opts = append(opts, WithBlueprint("standard_task"))
 				if isStudy {
 					opts = append(opts, WithIsStudy(true))
 				}
@@ -149,6 +162,7 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 							return
 						}
 						if isTerminal(info.Status) {
+							log.Printf("[Scheduler] Task %s finished: status=%s elapsed=%s error=%q", node.Task.ID, info.Status, info.Elapsed, info.Error)
 							if info.Status == StatusError {
 								errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, info.Error)
 							}
