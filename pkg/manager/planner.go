@@ -115,7 +115,7 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 		return nil, err
 	}
 
-	p := planner.New(m.getLLMProvider(plannerModel))
+	p := planner.New(&cliLLMProvider{model: plannerModel})
 	plan, err := p.GeneratePlan(ctx, string(intentContent), nil)
 	if err != nil {
 		return nil, fmt.Errorf("planner failed: %w", err)
@@ -185,6 +185,7 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 	var importedGoals, importedStories, importedTasks int
 
 	// 1. Create goals first (stories reference them via FK)
+	importedGoalIDs := make(map[string]bool)
 	for _, g := range plan.Goals {
 		if rel.GetGoal(g.ID) == nil {
 			goal := &release.Goal{
@@ -199,6 +200,7 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 			}
 			importedGoals++
 		}
+		importedGoalIDs[g.ID] = true
 	}
 
 	// 2. Create stories and tasks
@@ -208,9 +210,17 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 			for j, t := range s.Tasks {
 				taskIDs[j] = t.ID
 			}
+
+			// Validate GoalID exists
+			goalID := s.GoalID
+			if goalID != "" && !importedGoalIDs[goalID] && rel.GetGoal(goalID) == nil {
+				log.Printf("[Planner] Warning: Story %s references unknown Goal %s. Clearing GoalID.", s.ID, goalID)
+				goalID = ""
+			}
+
 			st := &release.Story{
 				ID:                 s.ID,
-				GoalID:             s.GoalID,
+				GoalID:             goalID,
 				Title:              s.Title,
 				Description:        s.Description,
 				AcceptanceCriteria: s.AcceptanceCriteria,
@@ -221,16 +231,16 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 				Priority:           i,
 				Status:             release.StoryStatusPending,
 				CreatedAt:          now,
-			}
-			if err := rel.CreateStory(st); err != nil {
+				}
+				if err := rel.CreateStory(st); err != nil {
 				return fmt.Errorf("import story %s: %w", s.ID, err)
-			}
-			importedStories++
-		}
+				}
+				importedStories++
+				}
 
-		var prevTaskID string
-		for j, t := range s.Tasks {
-			if rel.GetTask(t.ID) == nil {
+				var prevTaskID string
+				for j, t := range s.Tasks {
+				if rel.GetTask(t.ID) == nil {
 				deps := t.DependsOn
 				if prevTaskID != "" {
 					deps = append(deps, prevTaskID)
@@ -247,6 +257,7 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 					Status:             release.TaskStatusPending,
 					CreatedAt:          now,
 				}
+
 				if err := rel.CreateTask(task); err != nil {
 					return fmt.Errorf("import task %s: %w", t.ID, err)
 				}

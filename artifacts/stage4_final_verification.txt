@@ -1,0 +1,11 @@
+=== Final build ===
+=== Integration tests ===
+=== RUN   TestBlueprintExecutor_InvokesQualityGates
+--- PASS: TestBlueprintExecutor_InvokesQualityGates (0.02s)
+=== RUN   TestBlueprintExecutor_EmptyStage_StillRunsGates
+--- PASS: TestBlueprintExecutor_EmptyStage_StillRunsGates (0.02s)
+PASS
+ok  	github.com/openexec/openexec/internal/pipeline	(cached)
+=== No silenced gate errors ===
+CLEAN
+=== Test count delta ===

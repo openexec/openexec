@@ -3,75 +3,47 @@ package blueprint
 import (
 	"context"
 	"time"
-)
 
-// StageType indicates whether a stage is deterministic or agentic.
-type StageType string
-
-const (
-	// StageTypeDeterministic indicates a stage with fixed, predictable behavior.
-	// Deterministic stages run predefined commands (lint, test, etc.).
-	StageTypeDeterministic StageType = "deterministic"
-
-	// StageTypeAgentic indicates a stage requiring LLM reasoning.
-	// Agentic stages involve code generation, debugging, or analysis.
-	StageTypeAgentic StageType = "agentic"
-)
-
-// StageStatus represents the current status of a stage.
-type StageStatus string
-
-const (
-	// StageStatusPending indicates the stage has not started.
-	StageStatusPending StageStatus = "pending"
-
-	// StageStatusRunning indicates the stage is currently executing.
-	StageStatusRunning StageStatus = "running"
-
-	// StageStatusCompleted indicates the stage completed successfully.
-	StageStatusCompleted StageStatus = "completed"
-
-	// StageStatusFailed indicates the stage failed.
-	StageStatusFailed StageStatus = "failed"
-
-	// StageStatusSkipped indicates the stage was skipped.
-	StageStatusSkipped StageStatus = "skipped"
+	"github.com/openexec/openexec/internal/types"
 )
 
 // Stage defines a single step in a blueprint.
 type Stage struct {
 	// Name is the unique identifier for this stage.
-	Name string `json:"name"`
+	Name string `json:"name" yaml:"name"`
 
 	// Description explains what this stage does.
-	Description string `json:"description,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	// Type indicates whether this is deterministic or agentic.
-	Type StageType `json:"type"`
+	Type types.StageType `json:"type" yaml:"type"`
 
 	// Toolset specifies which toolset to use for this stage.
-	Toolset string `json:"toolset"`
+	Toolset string `json:"toolset" yaml:"toolset"`
+
+	// Action is the Go-native action name to execute (for deterministic stages).
+	Action string `json:"action,omitempty" yaml:"action,omitempty"`
 
 	// MaxRetries is the maximum number of retry attempts.
-	MaxRetries int `json:"max_retries,omitempty"`
+	MaxRetries int `json:"max_retries,omitempty" yaml:"max_retries,omitempty"`
 
 	// Timeout is the maximum duration for this stage.
-	Timeout time.Duration `json:"timeout,omitempty"`
+	Timeout time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 
 	// OnSuccess is the next stage to execute on success.
-	OnSuccess string `json:"on_success,omitempty"`
+	OnSuccess string `json:"on_success,omitempty" yaml:"on_success,omitempty"`
 
 	// OnFailure is the stage to execute on failure (for retry or fallback).
-	OnFailure string `json:"on_failure,omitempty"`
+	OnFailure string `json:"on_failure,omitempty" yaml:"on_failure,omitempty"`
 
-	// Commands lists shell commands for deterministic stages.
-	Commands []string `json:"commands,omitempty"`
+	// Commands lists shell commands for deterministic stages (fallback).
+	Commands []string `json:"commands,omitempty" yaml:"commands,omitempty"`
 
 	// Prompt is the LLM prompt for agentic stages.
-	Prompt string `json:"prompt,omitempty"`
+	Prompt string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
 
 	// CreateCheckpoint indicates whether to create a checkpoint after this stage.
-	CreateCheckpoint bool `json:"create_checkpoint,omitempty"`
+	CreateCheckpoint bool `json:"create_checkpoint,omitempty" yaml:"create_checkpoint,omitempty"`
 }
 
 // IsTerminal returns true if this stage has no successor.
@@ -85,7 +57,7 @@ type StageResult struct {
 	StageName string `json:"stage_name"`
 
 	// Status is the outcome status.
-	Status StageStatus `json:"status"`
+	Status types.StageStatus `json:"status"`
 
 	// StartedAt is when the stage started.
 	StartedAt time.Time `json:"started_at"`
@@ -116,7 +88,7 @@ type StageResult struct {
 func NewStageResult(stageName string, attempt int) *StageResult {
 	return &StageResult{
 		StageName: stageName,
-		Status:    StageStatusRunning,
+		Status:    types.StageStatusRunning,
 		StartedAt: time.Now().UTC(),
 		Attempt:   attempt,
 		Artifacts: make(map[string]string),
@@ -125,7 +97,7 @@ func NewStageResult(stageName string, attempt int) *StageResult {
 
 // Complete marks the stage as completed successfully.
 func (r *StageResult) Complete(output string) {
-	r.Status = StageStatusCompleted
+	r.Status = types.StageStatusCompleted
 	r.Output = output
 	r.CompletedAt = time.Now().UTC()
 	r.Duration = r.CompletedAt.Sub(r.StartedAt)
@@ -133,7 +105,7 @@ func (r *StageResult) Complete(output string) {
 
 // Fail marks the stage as failed.
 func (r *StageResult) Fail(err string) {
-	r.Status = StageStatusFailed
+	r.Status = types.StageStatusFailed
 	r.Error = err
 	r.CompletedAt = time.Now().UTC()
 	r.Duration = r.CompletedAt.Sub(r.StartedAt)
@@ -141,7 +113,7 @@ func (r *StageResult) Fail(err string) {
 
 // Skip marks the stage as skipped.
 func (r *StageResult) Skip(reason string) {
-	r.Status = StageStatusSkipped
+	r.Status = types.StageStatusSkipped
 	r.Output = reason
 	r.CompletedAt = time.Now().UTC()
 	r.Duration = r.CompletedAt.Sub(r.StartedAt)
@@ -149,6 +121,9 @@ func (r *StageResult) Skip(reason string) {
 
 // AddArtifact adds an artifact to the result.
 func (r *StageResult) AddArtifact(name, value string) {
+	if r.Artifacts == nil {
+		r.Artifacts = make(map[string]string)
+	}
 	r.Artifacts[name] = value
 }
 
@@ -210,15 +185,21 @@ func (i *StageInput) GetLastResult() *StageResult {
 // HasFailedStage returns true if any previous stage failed.
 func (i *StageInput) HasFailedStage() bool {
 	for _, r := range i.PreviousStages {
-		if r.Status == StageStatusFailed {
+		if r.Status == types.StageStatusFailed {
 			return true
 		}
 	}
 	return false
 }
 
+// ContextPackItem represents a single context item for stage input.
+type ContextPackItem struct {
+	Type    string
+	Source  string
+	Content string
+}
+
 // SetContextFromPack populates the ContextPack map from context items.
-// This is used to inject gathered context into the stage input.
 func (i *StageInput) SetContextFromPack(items []ContextPackItem) {
 	if i.ContextPack == nil {
 		i.ContextPack = make(map[string]string)
@@ -230,12 +211,4 @@ func (i *StageInput) SetContextFromPack(items []ContextPackItem) {
 		}
 		i.ContextPack[key] = item.Content
 	}
-}
-
-// ContextPackItem represents a single context item for stage input.
-// This is a simplified representation used by the pipeline to pass context.
-type ContextPackItem struct {
-	Type    string
-	Source  string
-	Content string
 }

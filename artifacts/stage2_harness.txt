@@ -1,0 +1,157 @@
+?   	github.com/openexec/openexec	[no test files]
+?   	github.com/openexec/openexec/cmd/openexec	[no test files]
+?   	github.com/openexec/openexec/internal	[no test files]
+# github.com/openexec/openexec/internal/pipeline [github.com/openexec/openexec/internal/pipeline.test]
+internal/pipeline/blueprint_integration_test.go:7:2: "github.com/openexec/openexec/internal/blueprint" imported and not used
+internal/pipeline/blueprint_integration_test.go:8:2: "github.com/openexec/openexec/internal/loop" imported and not used
+internal/pipeline/blueprint_integration_test.go:54:24: too many arguments in call to New
+	have (Config, func(*Pipeline))
+	want (Config)
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/approval	0.268s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/blueprint	0.324s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/budget	0.233s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/cli	1.069s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/config	0.502s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/context	0.671s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/conversation	0.341s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/dcp	0.185s [no tests to run]
+?   	github.com/openexec/openexec/internal/execution/audit	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/execution/gates	1.193s [no tests to run]
+?   	github.com/openexec/openexec/internal/execution/health	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/git	0.833s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/health	1.265s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/intent	1.365s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/knowledge	1.486s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/logging	1.618s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/loop	1.830s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/mcp	1.969s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/mode	1.986s [no tests to run]
+?   	github.com/openexec/openexec/internal/patch	[no test files]
+FAIL	github.com/openexec/openexec/internal/pipeline [build failed]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/planner	1.976s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/policy	1.957s [no tests to run]
+?   	github.com/openexec/openexec/internal/project	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt	1.939s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/manifest	1.850s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/persona	1.870s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/render	1.842s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/prompt/workflow	1.828s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/protocol	1.828s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/release	1.813s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/router	1.738s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/runner	1.687s [no tests to run]
+?   	github.com/openexec/openexec/internal/runtime	[no test files]
+?   	github.com/openexec/openexec/internal/schema	[no test files]
+?   	github.com/openexec/openexec/internal/security	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/server	1.763s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/summarize	1.783s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/telegram	1.855s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/tools	1.844s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/toolset	1.858s [no tests to run]
+?   	github.com/openexec/openexec/internal/tui	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/twilio	1.885s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/uploader	1.902s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/user	1.935s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/internal/validation	2.002s [no tests to run]
+?   	github.com/openexec/openexec/internal/worktree	[no test files]
+?   	github.com/openexec/openexec/pkg/actions	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/agent	2.027s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/api	2.096s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/audit	2.125s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/db/session	2.076s [no tests to run]
+?   	github.com/openexec/openexec/pkg/db/state	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/manager	2.066s [no tests to run]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/security	2.025s [no tests to run]
+?   	github.com/openexec/openexec/pkg/telemetry	[no test files]
+testing: warning: no tests to run
+PASS
+ok  	github.com/openexec/openexec/pkg/util	2.018s [no tests to run]
+?   	github.com/openexec/openexec/pkg/version	[no test files]
+?   	github.com/openexec/openexec/ui/node_modules/flatted/golang/pkg/flatted	[no test files]
+FAIL

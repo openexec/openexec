@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,11 +9,10 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/openexec/openexec/internal/intent"
-	"github.com/openexec/openexec/internal/knowledge"
-	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/runner"
+	"github.com/openexec/openexec/pkg/db/state"
+	"github.com/openexec/openexec/pkg/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +20,7 @@ var (
 	planValidateOnly bool
 	planNoValidate   bool
 	planFix          bool
+	planExport       bool
 )
 
 var planCmd = &cobra.Command{
@@ -39,214 +38,60 @@ Note: 'openexec run' now performs this step automatically if your plan is missin
 		// Show deprecation notice
 		cmd.Println(color.New(color.FgYellow).Sprint("💡 Note: 'openexec plan' is now an advanced command. 'openexec run' handles auto-planning by default."))
 
-		return GenerateAndSave(cmd, intentFile, ".")
-	},
-}
-
-// GenerateAndSave performs the full planning cycle: validation, LLM generation, post-processing, and saving.
-func GenerateAndSave(cmd *cobra.Command, intentFile string, projectDir string) error {
-	// 1. Resolve intent file path with fallbacks
-	if _, err := os.Stat(intentFile); os.IsNotExist(err) {
-		fallbacks := []string{"intent.md", "docs/INTENT.md", "docs/intent.md"}
-		found := false
-		for _, f := range fallbacks {
-			if _, err := os.Stat(filepath.Join(projectDir, f)); err == nil {
-				intentFile = filepath.Join(projectDir, f)
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("no intent file found. Create INTENT.md or run 'openexec wizard'")
-		}
-	}
-
-	// 1.5 Validation
-	if !planNoValidate {
-		validator := intent.NewValidator(intentFile)
-		result, err := validator.Validate()
+		// 1. Initialize Manager
+		config, err := project.LoadProjectConfig(".")
 		if err != nil {
-			return fmt.Errorf("validation error: %w", err)
+			return fmt.Errorf("project not initialized: run 'openexec init' first")
 		}
 
-		shouldFix := planFix || doctorIntentFix
+		sStore, err := state.NewStore(filepath.Join(config.ProjectDir, ".openexec", "openexec.db"))
+		if err != nil {
+			return err
+		}
+		defer sStore.Close()
 
-		if shouldFix && (planValidateOnly || doctorIntentFix) {
-			fixer := intent.NewFixer(result)
-			cmd.Println(fixer.Preview())
-			if !result.Valid {
-				return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
+		mgr, err := manager.New(manager.Config{
+			WorkDir:    config.ProjectDir,
+			StateStore: sStore,
+		})
+		if err != nil {
+			return err
+		}
+
+		// 2. Execute Plan
+		cmd.Printf("Generating plan from: %s\n", intentFile)
+		cmd.Println("  Planning...")
+		
+		res, err := mgr.Plan(cmd.Context(), manager.PlanRequest{
+			IntentFile: intentFile,
+			NoValidate: planNoValidate,
+			AutoImport: true, // Always import to SQLite
+		})
+		if err != nil {
+			return err
+		}
+
+		if !res.Valid {
+			cmd.Println(color.RedString("\nPLANNING GATE FAILED:"))
+			for _, issue := range res.Issues {
+				cmd.Printf("  - %s\n", issue)
 			}
-			return nil
+			return fmt.Errorf("intent validation failed")
 		}
 
-		if planValidateOnly || !result.Valid {
-			reporter := intent.NewReporter(result)
-			cmd.Println(reporter.Generate())
-		}
+		cmd.Printf("✓ Stories generated and imported to SQLite (%d stories)\n", len(res.Plan.Stories))
 
-		if planValidateOnly {
-			if !result.Valid {
-				return fmt.Errorf("validation failed with %d critical issue(s)", len(result.Critical))
+		// 3. Optional Export
+		if planExport {
+			storiesPath := filepath.Join(config.ProjectDir, ".openexec", "stories.json")
+			if err := mgr.ExportJSON(filepath.Dir(storiesPath)); err != nil {
+				return fmt.Errorf("export failed: %w", err)
 			}
-			cmd.Println("Validation passed. Run 'openexec plan' to generate stories.")
-			return nil
+			cmd.Printf("✓ Exported to %s\n", storiesPath)
 		}
 
-		if !result.Valid {
-			cmd.Println("\nHint: Fix the issues above or run 'openexec wizard' to re-align your intent.")
-			return fmt.Errorf("cannot plan: intent document has %d critical issue(s)", len(result.Critical))
-		}
-
-		if result.Valid && len(result.Warnings) > 0 {
-			cmd.Printf("Validation passed with %d warning(s)\n\n", len(result.Warnings))
-		}
-	}
-
-	// 2. Load project configuration
-	config, err := project.LoadProjectConfig(projectDir)
-	if err != nil {
-		// Fallback for tests or uninitialized projects
-		config = &project.ProjectConfig{
-			ProjectDir: projectDir,
-			Execution: project.ExecutionConfig{
-				PlannerModel: "sonnet",
-			},
-		}
-	}
-
-	plannerModel := config.Execution.PlannerModel
-	if plannerModel == "" {
-		plannerModel = config.Execution.ExecutorModel
-	}
-	if plannerModel == "" {
-		plannerModel = "sonnet" // default
-	}
-
-	cmd.Printf("Generating plan from: %s\n", intentFile)
-	cmd.Printf("  Engine:         Native Go Orchestrator\n")
-	cmd.Printf("  Planner model:  %s\n", plannerModel)
-
-	// 3. Context building
-	intentContent, err := os.ReadFile(intentFile)
-	if err != nil {
-		return err
-	}
-
-	var prdContext map[string][]*knowledge.PRDRecord
-	kStore, err := knowledge.NewStore(projectDir)
-	if err == nil {
-		defer kStore.Close()
-		sections := []string{"personas", "user_journeys", "functional", "non_functional"}
-		prdContext = make(map[string][]*knowledge.PRDRecord)
-		for _, sec := range sections {
-			records, _ := kStore.ListPRDRecords(sec)
-			if len(records) > 0 {
-				prdContext[sec] = records
-			}
-		}
-	}
-
-	// 4. Initialize Native Planner
-	p := planner.New(&cliLLMProvider{
-		model: plannerModel,
-		cmd:   cmd,
-	})
-
-	cmd.Println("  Planning...")
-	plan, err := p.GeneratePlan(cmd.Context(), string(intentContent), prdContext)
-	if err != nil {
-		return err
-	}
-
-	if plan == nil || len(plan.Stories) == 0 {
-		return fmt.Errorf("planner returned an empty plan. Check your intent file or try a more capable model")
-	}
-
-	// 5. DETERMINISTIC POST-PROCESSING (Fast-Track)
-	flow := "greenfield"
-	scope := "epic"
-	intentLower := strings.ToLower(string(intentContent))
-	if strings.Contains(intentLower, "flow: existing") || strings.Contains(intentLower, "refactor") {
-		flow = "existing"
-	}
-	if strings.Contains(intentLower, "scope: surgical") {
-		scope = "surgical"
-	}
-
-	cmd.Printf("  Hardening plan (Flow: %s, Scope: %s)...\n", flow, scope)
-	planner.EnforceFastTrack(plan, scope, flow)
-
-	// 6. PRAGMATIC PLANNING GATE
-	cmd.Println("  Running Planning Gate checks...")
-
-	// Rule A: Goal Coverage
-	goalCoverage := make(map[string]bool)
-	for _, s := range plan.Stories {
-		if s.GoalID != "" && s.VerificationScript != "" {
-			goalCoverage[s.GoalID] = true
-		}
-	}
-	for _, g := range plan.Goals {
-		if !goalCoverage[g.ID] {
-			return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script. Improve your intent and re-plan", g.ID, g.Title)
-		}
-	}
-
-	// Rule B: Discovery First (if refactoring/fixing)
-	if flow == "existing" {
-		hasDiscovery := false
-		for _, s := range plan.Stories {
-			title := strings.ToLower(s.Title)
-			if strings.Contains(title, "discovery") || strings.Contains(title, "analyze") || strings.Contains(title, "study") {
-				hasDiscovery = true
-				break
-			}
-		}
-		if !hasDiscovery {
-			return fmt.Errorf("PLANNING GATE FAILED: Refactor/Fix project requires a 'Study' story to analyze existing state.")
-		}
-	}
-
-	// Rule C: Surgical Compaction
-	if scope == "surgical" {
-		for _, s := range plan.Stories {
-			if !strings.Contains(strings.ToLower(s.Title), "study") && len(s.Tasks) > 1 {
-				return fmt.Errorf("PLANNING GATE FAILED: Surgical fix stories must be compacted into exactly ONE Chassis task. Got %d tasks for %s", len(s.Tasks), s.ID)
-			}
-		}
-	}
-
-	cmd.Println("  ✓ Planning Gate passed.")
-
-	// 7. Validate and Save to stories.json
-	//
-	// JSON EXPORT-ONLY:
-	// This writes to stories.json for backward compatibility only.
-	// The JSON file is NOT the source of truth - it's an export artifact.
-	// After this step, 'openexec story import' or 'openexec run' will
-	// import the data into SQLite, which is the canonical store.
-	storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
-	data, err := json.MarshalIndent(plan, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal plan: %w", err)
-	}
-
-	var dummy planner.ProjectPlan
-	if err := json.Unmarshal(data, &dummy); err != nil {
-		return fmt.Errorf("ABORTING: Generated plan is structurally invalid: %w", err)
-	}
-
-	// Log export operation for drift tracking
-	fmt.Fprintf(os.Stderr, "[EXPORT] Writing plan to %s (export-only, not source of truth)\n", storiesPath)
-	cmd.Println(color.YellowString("Note: Writing to %s for import. SQLite is the canonical store.", storiesPath))
-	if err := os.WriteFile(storiesPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to save stories: %w", err)
-	}
-
-	cmd.Printf("✓ Stories generated: %s (%d stories)\n", storiesPath, len(plan.Stories))
-	cmd.Println(color.CyanString("Run 'openexec story import' or 'openexec run' to load into SQLite."))
-	return nil
+		return nil
+	},
 }
 
 type cliLLMProvider struct {
@@ -287,5 +132,6 @@ func init() {
 	planCmd.Flags().BoolVar(&planValidateOnly, "validate-only", false, "Validate and exit without planning")
 	planCmd.Flags().BoolVar(&planNoValidate, "no-validate", false, "Skip validation entirely")
 	planCmd.Flags().BoolVar(&planFix, "fix", false, "Show stubs for missing sections")
+	planCmd.Flags().BoolVar(&planExport, "export", false, "Export generated plan to .openexec/stories.json")
 	rootCmd.AddCommand(planCmd)
 }

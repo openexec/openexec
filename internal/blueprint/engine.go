@@ -20,27 +20,29 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/openexec/openexec/internal/types"
 )
 
 // Blueprint defines a complete execution plan with stages.
 type Blueprint struct {
 	// ID is the unique identifier for this blueprint.
-	ID string `json:"id"`
+	ID string `json:"id" yaml:"id"`
 
 	// Name is the human-readable name.
-	Name string `json:"name"`
+	Name string `json:"name" yaml:"name"`
 
 	// Description explains what this blueprint does.
-	Description string `json:"description,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	// Stages is the map of stage name to stage definition.
-	Stages map[string]*Stage `json:"stages"`
+	Stages map[string]*Stage `json:"stages" yaml:"stages"`
 
 	// InitialStage is the first stage to execute.
-	InitialStage string `json:"initial_stage"`
+	InitialStage string `json:"initial_stage" yaml:"initial_stage"`
 
 	// Version is the blueprint version.
-	Version string `json:"version,omitempty"`
+	Version string `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 // GetStage retrieves a stage by name.
@@ -91,15 +93,16 @@ var DefaultBlueprint = &Blueprint{
 		"gather_context": {
 			Name:             "gather_context",
 			Description:      "Gather relevant files and context for the task",
-			Type:             StageTypeDeterministic,
+			Type:             types.StageTypeDeterministic,
 			Toolset:          "repo_readonly",
+			Action:           "build_context",
 			OnSuccess:        "implement",
 			CreateCheckpoint: true,
 		},
 		"implement": {
 			Name:        "implement",
 			Description: "Implement the requested changes",
-			Type:        StageTypeAgentic,
+			Type:        types.StageTypeAgentic,
 			Toolset:     "coding_backend",
 			MaxRetries:  3,
 			Timeout:     10 * time.Minute,
@@ -109,7 +112,7 @@ var DefaultBlueprint = &Blueprint{
 		"lint": {
 			Name:        "lint",
 			Description: "Run linting checks",
-			Type:        StageTypeDeterministic,
+			Type:        types.StageTypeDeterministic,
 			Toolset:     "coding_backend",
 			Commands:    nil, // Set from project config; empty = auto-pass
 			OnSuccess:   "test",
@@ -118,7 +121,7 @@ var DefaultBlueprint = &Blueprint{
 		"fix_lint": {
 			Name:        "fix_lint",
 			Description: "Fix linting errors",
-			Type:        StageTypeAgentic,
+			Type:        types.StageTypeAgentic,
 			Toolset:     "coding_backend",
 			MaxRetries:  2,
 			OnSuccess:   "lint",
@@ -126,7 +129,7 @@ var DefaultBlueprint = &Blueprint{
 		"test": {
 			Name:        "test",
 			Description: "Run tests",
-			Type:        StageTypeDeterministic,
+			Type:        types.StageTypeDeterministic,
 			Toolset:     "coding_backend",
 			Commands:    nil, // Set from project config; empty = auto-pass
 			OnSuccess:   "review",
@@ -135,7 +138,7 @@ var DefaultBlueprint = &Blueprint{
 		"fix_tests": {
 			Name:        "fix_tests",
 			Description: "Fix failing tests",
-			Type:        StageTypeAgentic,
+			Type:        types.StageTypeAgentic,
 			Toolset:     "coding_backend",
 			MaxRetries:  2,
 			OnSuccess:   "test",
@@ -143,7 +146,7 @@ var DefaultBlueprint = &Blueprint{
 		"review": {
 			Name:             "review",
 			Description:      "Review changes and generate summary",
-			Type:             StageTypeAgentic,
+			Type:             types.StageTypeAgentic,
 			Toolset:          "repo_readonly",
 			OnSuccess:        "complete",
 			CreateCheckpoint: true,
@@ -161,18 +164,19 @@ var QuickFixBlueprint = &Blueprint{
 	Stages: map[string]*Stage{
 		"implement": {
 			Name:       "implement",
-			Type:       StageTypeAgentic,
+			Type:       types.StageTypeAgentic,
 			Toolset:    "coding_backend",
 			MaxRetries: 2,
 			OnSuccess:  "verify",
 		},
 		"verify": {
 			Name:      "verify",
-			Type:      StageTypeDeterministic,
+			Type:      types.StageTypeDeterministic,
 			Toolset:   "coding_backend",
-			Commands:  []string{"go build ./..."},
+			Action:    "run_gates",
 			OnSuccess: "complete",
 		},
+
 	},
 	InitialStage: "implement",
 }
@@ -419,7 +423,7 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 		}
 
 		// Handle result
-		if result.Status == StageStatusCompleted {
+		if result.Status == types.StageStatusCompleted {
 			// Create checkpoint if configured
 			if stage.CreateCheckpoint {
 				run.AddCheckpoint()
@@ -430,7 +434,7 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 
 			// Move to next stage
 			run.CurrentStage = stage.OnSuccess
-		} else if result.Status == StageStatusFailed {
+		} else if result.Status == types.StageStatusFailed {
 			// Check if we can retry
 			if stage.OnFailure != "" && run.GetRetries(stage.Name) < stage.MaxRetries {
 				run.IncrementRetries(stage.Name)
