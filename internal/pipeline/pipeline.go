@@ -71,6 +71,10 @@ type Config struct {
 
 	// Sensitivity determines redaction level ("low", "medium", "high").
 	Sensitivity string
+
+	// TaskTimeout overrides the default implement stage timeout.
+	// If zero, the blueprint default (10 minutes) is used.
+	TaskTimeout time.Duration
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
@@ -254,6 +258,13 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		bp = blueprint.QuickFixBlueprint
 	default:
 		return fmt.Errorf("unknown blueprint: %s", p.cfg.BlueprintID)
+	}
+
+	// Override implement stage timeout if configured
+	if p.cfg.TaskTimeout > 0 {
+		if impl, ok := bp.Stages["implement"]; ok {
+			impl.Timeout = p.cfg.TaskTimeout
+		}
 	}
 
 	// Create executor with agentic runner

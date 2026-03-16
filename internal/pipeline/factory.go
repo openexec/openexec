@@ -34,6 +34,10 @@ type LoopFactoryConfig struct {
 
 	// ExecMode propagates execution mode to the loop.
 	ExecMode string
+
+	// TaskTimeout overrides the default implement stage timeout.
+	// If zero, the blueprint default (10 minutes) is used.
+	TaskTimeout time.Duration
 }
 
 // LoopFactory creates configured Loops for blueprint stage execution.

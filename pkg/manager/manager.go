@@ -52,6 +52,9 @@ type Config struct {
 	// PIIScrubLevel controls PII scrubbing sensitivity for audit logs
 	// Valid values: "low", "medium", "high", "" (disabled)
 	PIIScrubLevel string
+	// TaskTimeout overrides the default implement stage timeout.
+	// Read from config.json execution.timeout_seconds.
+	TaskTimeout time.Duration
 }
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
@@ -230,6 +233,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         CommandArgs:          m.cfg.CommandArgs,
         LogDir:               m.cfg.LogDir,
         ExecMode:             m.cfg.ExecMode,
+        TaskTimeout:          m.cfg.TaskTimeout,
     }
 
 	for _, opt := range opts {
