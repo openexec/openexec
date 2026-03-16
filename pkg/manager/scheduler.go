@@ -8,102 +8,79 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openexec/openexec/internal/prompt"
 	"github.com/openexec/openexec/internal/release"
 )
 
 // RunOptions defines settings for executing multiple tasks.
 type RunOptions struct {
-	WorkerCount int      `json:"worker_count"`
-	TaskIDs     []string `json:"task_ids,omitempty"`
+	MaxParallel int    `json:"max_parallel"`
+	IsStudy     bool   `json:"is_study"`
+	Mode        string `json:"mode"`
 }
 
-type taskNode struct {
-	Task      *release.Task
-	DependsOn map[string]bool
-	Status    string // pending, running, completed, failed
-}
-
-// ExecuteTasks orchestrates the parallel execution of multiple tasks with dependency tracking.
-// This moves the core loop from the CLI to the Daemon.
+// ExecuteTasks runs all pending tasks in the dependency graph.
 func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	rel, err := m.getInternalReleaseManager()
 	if err != nil {
-		return fmt.Errorf("failed to load release manager: %w", err)
+		return err
 	}
 
-	allTasks := rel.GetTasks()
-	if len(allTasks) == 0 {
-		return fmt.Errorf("no tasks found in database")
-	}
-
-	// 1. Build and filter nodes
-	nodes := make(map[string]*taskNode)
-	var tasksToRun []*taskNode
-	
-	idMap := make(map[string]bool)
-	for _, id := range opts.TaskIDs { idMap[id] = true }
-
-	for _, t := range allTasks {
-		if len(opts.TaskIDs) > 0 && !idMap[t.ID] {
-			continue
-		}
-		
-		node := &taskNode{
-			Task:      t,
-			DependsOn: make(map[string]bool),
-			Status:    t.Status,
-		}
-		for _, dep := range t.DependsOn {
-			node.DependsOn[dep] = true
-		}
-		nodes[t.ID] = node
-		if t.Status != string(release.TaskStatusDone) && t.Status != "completed" {
-			tasksToRun = append(tasksToRun, node)
-		}
-	}
-
-	if len(tasksToRun) == 0 {
+	tasks := rel.GetTasks()
+	if len(tasks) == 0 {
 		return nil
 	}
 
-	workerCount := opts.WorkerCount
-	if workerCount <= 0 { workerCount = 4 }
-	if workerCount > len(tasksToRun) { workerCount = len(tasksToRun) }
+	// Filter for pending tasks only
+	var pending []*release.Task
+	for _, t := range tasks {
+		if t.Status == "pending" || t.Status == "" {
+			pending = append(pending, t)
+		}
+	}
+
+	if len(pending) == 0 {
+		log.Printf("[Scheduler] All tasks already complete or in progress")
+		return nil
+	}
+
+	log.Printf("[Scheduler] Starting execution of %d pending tasks (parallel=%d)", len(pending), opts.MaxParallel)
+
+	// Simple topological sort / dependency resolver
+	type node struct {
+		Task     *release.Task
+		Deps     []string
+		Finished bool
+	}
+
+	nodes := make(map[string]*node)
+	for _, t := range pending {
+		nodes[t.ID] = &node{Task: t, Deps: t.DependsOn}
+	}
 
 	var mu sync.Mutex
-	var wg sync.WaitGroup
-	readyTasks := make(chan *taskNode, len(tasksToRun))
-	errors := make(chan error, len(tasksToRun))
-	
+	wg := sync.WaitGroup{}
+	readyTasks := make(chan *node, len(pending))
+	errors := make(chan error, len(pending))
 	finishedCount := 0
-	totalToRun := len(tasksToRun)
+	totalToRun := len(pending)
 
 	checkReady := func() {
 		mu.Lock()
 		defer mu.Unlock()
-
-		if finishedCount == totalToRun || len(errors) > 0 {
-			return
-		}
-
-		for _, node := range nodes {
-			if node.Status != string(release.TaskStatusPending) {
+		for id, n := range nodes {
+			if n.Finished {
 				continue
 			}
-
-			allDone := true
-			for depID := range node.DependsOn {
-				depNode, exists := nodes[depID]
-				if exists && depNode.Status != string(release.TaskStatusDone) && depNode.Status != "completed" {
-					allDone = false
+			allDepsDone := true
+			for _, depID := range n.Deps {
+				if d, ok := nodes[depID]; ok && !d.Finished {
+					allDepsDone = false
 					break
 				}
 			}
-
-			if allDone {
-				node.Status = "ready"
-				readyTasks <- node
+			if allDepsDone {
+				readyTasks <- n
+				delete(nodes, id)
 			}
 		}
 	}
@@ -111,73 +88,64 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	// Initial check
 	go checkReady()
 
-	// Start workers
+	workerCount := opts.MaxParallel
+	if workerCount <= 0 {
+		workerCount = 1
+	}
+
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			for node := range readyTasks {
-				log.Printf("[Scheduler] Worker %d starting task %s", id, node.Task.ID)
+				log.Printf("[Worker %d] Executing %s: %s", id, node.Task.ID, node.Task.Title)
 				
-				// Determine if it's a study task
-				isStudy := strings.Contains(strings.ToLower(node.Task.Title), "study") || 
-						  strings.Contains(strings.ToLower(node.Task.Title), "map")
+				start := time.Now()
 				
-				// Build rich task briefing from release manager
-				taskDesc := node.Task.Title
-				if node.Task.Description != "" {
-					taskDesc += "\n\n" + node.Task.Description
+				var optsList []StartOption
+				if opts.IsStudy {
+					optsList = append(optsList, WithIsStudy(true))
 				}
-				// Try to get full briefing with acceptance criteria, dependencies, etc.
-				if brief, err := rel.Brief(node.Task.ID); err == nil {
-					taskDesc = prompt.FormatBriefing(brief)
-				}
-
-				var opts []StartOption
-				opts = append(opts, WithTaskDescription(taskDesc))
-				opts = append(opts, WithBlueprint("standard_task"))
-				if isStudy {
-					opts = append(opts, WithIsStudy(true))
+				if opts.Mode != "" {
+					optsList = append(optsList, WithExecMode(opts.Mode))
 				}
 				
-				// Standard Task Blueprint is required for implementation
-				opts = append(opts, WithBlueprint("standard_task"))
-				opts = append(opts, WithTaskDescription(node.Task.Description))
+				// Ensure blueprint metadata is passed
+				optsList = append(optsList, WithBlueprint("standard_task"))
+				optsList = append(optsList, WithTaskDescription(node.Task.Description))
 
 				// Start the individual pipeline
-				if err := m.Start(ctx, node.Task.ID, opts...); err != nil {
+				if err := m.Start(ctx, node.Task.ID, optsList...); err != nil {
 					errors <- fmt.Errorf("failed to start task %s: %w", node.Task.ID, err)
 					return
 				}
 
-				// Wait for completion via polling (V1 simplicity)
-				ticker := time.NewTicker(2 * time.Second)
-				done := false
-				for !done {
-					select {
-					case <-ctx.Done():
-						ticker.Stop()
+				// Poll for completion (V1.0 simple wait)
+				// TODO: Replace with event-driven completion signal
+				for {
+					info, err := m.Status(node.Task.ID)
+					if err != nil {
+						errors <- fmt.Errorf("status check failed for %s: %w", node.Task.ID, err)
 						return
-					case <-ticker.C:
-						info, err := m.Status(node.Task.ID)
-						if err != nil {
-							errors <- err
-							ticker.Stop()
-							return
-						}
-						if isTerminal(info.Status) {
-							log.Printf("[Scheduler] Task %s finished: status=%s elapsed=%s error=%q", node.Task.ID, info.Status, info.Elapsed, info.Error)
-							if info.Status == StatusError {
-								errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, info.Error)
-							}
-							done = true
-						}
 					}
+					if info.Status == StatusComplete {
+						break
+					}
+					if info.Status == StatusError {
+						errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, info.Error)
+						return
+					}
+					if info.Status == StatusStopped {
+						errors <- fmt.Errorf("task %s stopped manually", node.Task.ID)
+						return
+					}
+					time.Sleep(2 * time.Second)
 				}
-				ticker.Stop()
+
+				log.Printf("[Worker %d] ✓ Finished %s in %v (Status: %s)", id, node.Task.ID, time.Since(start).Truncate(time.Second), StatusComplete)
 
 				mu.Lock()
-				node.Status = string(release.TaskStatusDone)
+				node.Finished = true
 				finishedCount++
 				mu.Unlock()
 
