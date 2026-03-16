@@ -124,11 +124,10 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 	// Write plan artifact to .openexec/artifacts/plans/<hash>.json
 	planID, artifactHash, artifactPath := m.writePlanArtifact(plan)
 
-	// Auto-import if requested
+	// Auto-import: persist stories/tasks to DB so runs:execute can find them
 	if req.AutoImport {
 		if err := m.importPlan(plan); err != nil {
-			log.Printf("[Manager] Auto-import failed: %v", err)
-			// Non-fatal for the plan generation itself
+			return nil, fmt.Errorf("failed to import plan to database: %w", err)
 		}
 	}
 
@@ -188,8 +187,33 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 		return err
 	}
 
-	for _, s := range plan.Stories {
+	now := time.Now()
+	var importedGoals, importedStories, importedTasks int
+
+	// 1. Create goals first (stories reference them via FK)
+	for _, g := range plan.Goals {
+		if rel.GetGoal(g.ID) == nil {
+			goal := &release.Goal{
+				ID:                 g.ID,
+				Title:              g.Title,
+				Description:        g.Description,
+				SuccessCriteria:    g.SuccessCriteria,
+				VerificationMethod: g.VerificationMethod,
+			}
+			if err := rel.CreateGoal(goal); err != nil {
+				return fmt.Errorf("import goal %s: %w", g.ID, err)
+			}
+			importedGoals++
+		}
+	}
+
+	// 2. Create stories and tasks
+	for i, s := range plan.Stories {
 		if rel.GetStory(s.ID) == nil {
+			taskIDs := make([]string, len(s.Tasks))
+			for j, t := range s.Tasks {
+				taskIDs[j] = t.ID
+			}
 			st := &release.Story{
 				ID:                 s.ID,
 				GoalID:             s.GoalID,
@@ -197,34 +221,48 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 				Description:        s.Description,
 				AcceptanceCriteria: s.AcceptanceCriteria,
 				VerificationScript: s.VerificationScript,
+				Tasks:              taskIDs,
 				DependsOn:          s.DependsOn,
-				Status:             "pending",
-				CreatedAt:          time.Now(),
+				StoryType:          release.StoryTypeFeature,
+				Priority:           i,
+				Status:             release.StoryStatusPending,
+				CreatedAt:          now,
 			}
-			_ = rel.CreateStory(st)
+			if err := rel.CreateStory(st); err != nil {
+				return fmt.Errorf("import story %s: %w", s.ID, err)
+			}
+			importedStories++
 		}
 
 		var prevTaskID string
-		for _, t := range s.Tasks {
+		for j, t := range s.Tasks {
 			if rel.GetTask(t.ID) == nil {
 				deps := t.DependsOn
 				if prevTaskID != "" {
 					deps = append(deps, prevTaskID)
 				}
 				task := &release.Task{
-					ID:          t.ID,
-					Title:       t.Title,
-					Description: t.Description,
-					StoryID:     s.ID,
-					DependsOn:   deps,
-					Status:      "pending",
-					CreatedAt:   time.Now(),
+					ID:                 t.ID,
+					Title:              t.Title,
+					Description:        t.Description,
+					VerificationScript: t.VerificationScript,
+					StoryID:            s.ID,
+					DependsOn:          deps,
+					Priority:           j,
+					MaxAttempts:        3,
+					Status:             release.TaskStatusPending,
+					CreatedAt:          now,
 				}
-				_ = rel.CreateTask(task)
+				if err := rel.CreateTask(task); err != nil {
+					return fmt.Errorf("import task %s: %w", t.ID, err)
+				}
+				importedTasks++
 				prevTaskID = t.ID
 			}
 		}
 	}
+
+	log.Printf("[Planner] Imported %d goals, %d stories, %d tasks into database", importedGoals, importedStories, importedTasks)
 	return nil
 }
 

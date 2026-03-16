@@ -13,6 +13,7 @@ import (
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/pkg/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -71,6 +72,10 @@ type Config struct {
 
 	// Sensitivity determines redaction level ("low", "medium", "high").
 	Sensitivity string
+
+	// TaskTimeout overrides the default implement stage timeout.
+	// If zero, the blueprint default (10 minutes) is used.
+	TaskTimeout time.Duration
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
@@ -256,6 +261,23 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		return fmt.Errorf("unknown blueprint: %s", p.cfg.BlueprintID)
 	}
 
+	// Override implement stage timeout if configured
+	if p.cfg.TaskTimeout > 0 {
+		if impl, ok := bp.Stages["implement"]; ok {
+			impl.Timeout = p.cfg.TaskTimeout
+		}
+	}
+
+	// Override lint/test commands from project config
+	if projCfg, err := project.LoadProjectConfig(p.cfg.WorkDir); err == nil {
+		if lint, ok := bp.Stages["lint"]; ok && len(projCfg.Execution.LintCommands) > 0 {
+			lint.Commands = projCfg.Execution.LintCommands
+		}
+		if test, ok := bp.Stages["test"]; ok && len(projCfg.Execution.TestCommands) > 0 {
+			test.Commands = projCfg.Execution.TestCommands
+		}
+	}
+
 	// Create executor with agentic runner
 	executor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
 
@@ -269,6 +291,13 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	// Create engine with callbacks that emit events
 	engineConfig := blueprint.DefaultEngineConfig()
+	engineConfig.OnStageStart = func(run *blueprint.Run, stageName string) {
+		p.emit(loop.Event{
+			Type:      loop.EventStageStart,
+			FWUID:     p.cfg.FWUID,
+			StageName: stageName,
+		})
+	}
 	engineConfig.OnStageComplete = func(run *blueprint.Run, result *blueprint.StageResult) {
 		eventType := loop.EventStageComplete
 		if result.Status == blueprint.StageStatusFailed {
@@ -336,6 +365,14 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	input := blueprint.NewStageInput(p.cfg.FWUID, p.cfg.TaskDescription, p.cfg.WorkDir)
+
+	// Inject rich context from ReleaseManager briefing if available
+	if p.factory != nil && p.factory.cfg.ReleaseManager != nil {
+		if brief, err := p.factory.cfg.ReleaseManager.Brief(p.cfg.FWUID); err == nil && brief != nil {
+			// Format using prompt assembler style
+			input.Briefing = p.factory.assembler.FormatBriefing(brief)
+		}
+	}
 
 	// Inject gathered context into stage input
 	if contextPack != nil {

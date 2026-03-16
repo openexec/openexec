@@ -40,6 +40,10 @@ type LoopFactoryConfig struct {
 
 	// TaskDescription is the user's task description for blueprint runs.
 	TaskDescription string
+
+	// TaskTimeout overrides the default implement stage timeout.
+	// If zero, the blueprint default (10 minutes) is used.
+	TaskTimeout time.Duration
 }
 
 // LoopFactory creates configured Loops for blueprint stage execution.

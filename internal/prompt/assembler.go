@@ -8,6 +8,7 @@ import (
 	"github.com/openexec/openexec/internal/prompt/manifest"
 	"github.com/openexec/openexec/internal/prompt/persona"
 	"github.com/openexec/openexec/internal/prompt/workflow"
+	"github.com/openexec/openexec/internal/release"
 )
 
 // Assembler composes system prompts for agent phases using decomposed definitions.
@@ -137,4 +138,51 @@ func (a *Assembler) ComposeParts(agent, workflowID, briefing string) (string, st
 
     full := stable.String() + volatile.String()
     return stable.String(), volatile.String(), full, nil
+}
+
+// FormatBriefing converts a ReleaseManager briefing into a formatted markdown string.
+func (a *Assembler) FormatBriefing(b *release.BriefResponse) string {
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "## Task: %s (%s)\n\n", b.FWU.Name, b.FWU.ID)
+	
+	if b.FWU.Intent != "" {
+		sb.WriteString("### Intent\n")
+		sb.WriteString(b.FWU.Intent)
+		sb.WriteString("\n\n")
+	}
+
+	if len(b.ReasoningChain.Goals) > 0 {
+		sb.WriteString("### Project Goals\n")
+		for _, g := range b.ReasoningChain.Goals {
+			fmt.Fprintf(&sb, "- **%s**: %s\n", g.Name, g.Description)
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(b.DesignDecisions) > 0 {
+		sb.WriteString("### Design Decisions & Acceptance Criteria\n")
+		for _, d := range b.DesignDecisions {
+			fmt.Fprintf(&sb, "- [%s] **%s**: %s\n", d.ID, d.Decision, d.Resolution)
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(b.Boundaries) > 0 {
+		sb.WriteString("### Boundaries & Constraints\n")
+		for _, bnd := range b.Boundaries {
+			fmt.Fprintf(&sb, "- **%s**: %s\n", bnd.Scope, bnd.Description)
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(b.Dependencies) > 0 {
+		sb.WriteString("### Dependencies\n")
+		for _, dep := range b.Dependencies {
+			fmt.Fprintf(&sb, "- %s (ID: %s)\n", dep.Description, dep.ID)
+		}
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
 }

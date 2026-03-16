@@ -236,7 +236,9 @@ func buildClaudeArgs(cfg Config) []string {
     // In -p mode, there is no user to approve tool calls, so the agent
     // would block forever on Write/Edit/Bash permission prompts.
     // Safety is enforced by the MCP toolset and execution mode constraints.
-    if cfg.ExecMode == "workspace-write" || cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access" {
+    danger := cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access"
+    workspace := cfg.ExecMode == "workspace-write" || os.Getenv("OPENEXEC_MODE") == "workspace-write"
+    if danger || workspace {
         args = append([]string{"--dangerously-skip-permissions"}, args...)
     }
 	if cfg.MCPConfigPath != "" {
