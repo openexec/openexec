@@ -388,17 +388,15 @@ Examples:
 		}
 
 		// Trigger blueprint run via API
-		// Blueprint runs use "run" mode for full automation
-		blueprintRunMode := runMode
-		if blueprintRunMode == "" || blueprintRunMode == "workspace-write" {
-			// Map execution permission mode to operational mode
-			// Default to "run" mode for blueprint execution
-			blueprintRunMode = "run"
+		// Use exec_mode from project config for permission level
+		execMode := config.Execution.ExecMode
+		if execMode == "" {
+			execMode = "danger-full-access"
 		}
 		payload := map[string]any{
 			"blueprint_id":     blueprintID,
 			"task_description": taskDescription,
-			"mode":             blueprintRunMode,
+			"mode":             execMode,
 		}
 		body, _ := json.Marshal(payload)
 
