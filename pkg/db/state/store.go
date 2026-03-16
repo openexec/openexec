@@ -69,11 +69,58 @@ func (s *Store) Init() error {
     }
     // Apply forward-safe migrations for columns that may be missing on older DBs.
     // These are idempotent: we check the table schema before attempting ALTERs.
-    if err := s.ensureColumn("stories", "priority", "INTEGER DEFAULT 0"); err != nil {
-        return fmt.Errorf("failed to migrate stories.priority: %w", err)
+    // Covers drift between this unified schema and internal/release/schema.go.
+    migrations := [][3]string{
+        // stories columns
+        {"stories", "role", "TEXT DEFAULT ''"},
+        {"stories", "want", "TEXT DEFAULT ''"},
+        {"stories", "benefit", "TEXT DEFAULT ''"},
+        {"stories", "verification_script", "TEXT DEFAULT ''"},
+        {"stories", "contract", "TEXT DEFAULT ''"},
+        {"stories", "tasks", "TEXT DEFAULT '[]'"},
+        {"stories", "story_type", "TEXT DEFAULT 'feature'"},
+        {"stories", "priority", "INTEGER DEFAULT 0"},
+        {"stories", "git_branch", "TEXT DEFAULT ''"},
+        {"stories", "git_base_branch", "TEXT DEFAULT ''"},
+        {"stories", "git_merged_to", "TEXT DEFAULT ''"},
+        {"stories", "git_merge_commit", "TEXT DEFAULT ''"},
+        {"stories", "git_merged_at", "DATETIME DEFAULT NULL"},
+        {"stories", "git_commit_count", "INTEGER DEFAULT 0"},
+        {"stories", "approval_status", "TEXT DEFAULT ''"},
+        {"stories", "approval_approved_by", "TEXT DEFAULT ''"},
+        {"stories", "approval_approved_at", "DATETIME DEFAULT NULL"},
+        {"stories", "approval_comments", "TEXT DEFAULT ''"},
+        {"stories", "approval_rejection_reason", "TEXT DEFAULT ''"},
+        {"stories", "approval_review_cycle", "INTEGER DEFAULT 0"},
+        {"stories", "started_at", "DATETIME DEFAULT NULL"},
+        {"stories", "completed_at", "DATETIME DEFAULT NULL"},
+        // tasks columns
+        {"tasks", "task_type", "TEXT DEFAULT ''"},
+        {"tasks", "priority", "INTEGER DEFAULT 0"},
+        {"tasks", "assigned_agent", "TEXT DEFAULT ''"},
+        {"tasks", "attempt_count", "INTEGER DEFAULT 0"},
+        {"tasks", "max_attempts", "INTEGER DEFAULT 3"},
+        {"tasks", "git_commits", "TEXT DEFAULT '[]'"},
+        {"tasks", "git_branch", "TEXT DEFAULT ''"},
+        {"tasks", "git_pr_number", "INTEGER DEFAULT NULL"},
+        {"tasks", "git_pr_url", "TEXT DEFAULT ''"},
+        {"tasks", "approval_status", "TEXT DEFAULT ''"},
+        {"tasks", "approval_approved_by", "TEXT DEFAULT ''"},
+        {"tasks", "approval_approved_at", "DATETIME DEFAULT NULL"},
+        {"tasks", "approval_comments", "TEXT DEFAULT ''"},
+        {"tasks", "approval_rejection_reason", "TEXT DEFAULT ''"},
+        {"tasks", "approval_review_cycle", "INTEGER DEFAULT 0"},
+        {"tasks", "needs_review", "INTEGER DEFAULT 0"},
+        {"tasks", "review_notes", "TEXT DEFAULT ''"},
+        {"tasks", "started_at", "DATETIME DEFAULT NULL"},
+        {"tasks", "completed_at", "DATETIME DEFAULT NULL"},
+        {"tasks", "error_message", "TEXT DEFAULT ''"},
+        {"tasks", "metadata", "TEXT DEFAULT '{}'"},
     }
-    if err := s.ensureColumn("tasks", "priority", "INTEGER DEFAULT 0"); err != nil {
-        return fmt.Errorf("failed to migrate tasks.priority: %w", err)
+    for _, m := range migrations {
+        if err := s.ensureColumn(m[0], m[1], m[2]); err != nil {
+            return fmt.Errorf("failed to migrate %s.%s: %w", m[0], m[1], err)
+        }
     }
     return nil
 }
@@ -174,9 +221,17 @@ func (s *Store) asyncWorker() {
 // --- RUN OPERATIONS ---
 
 // CreateRun persists a new execution run.
+// Empty sessionID or taskID are stored as NULL to satisfy foreign key constraints.
 func (s *Store) CreateRun(ctx context.Context, runID, sessionID, taskID, projectPath, mode string) error {
-    query := `INSERT INTO runs (id, session_id, task_id, project_path, mode, status) VALUES (?, ?, ?, ?, ?, 'starting')`
-    _, err := s.db.ExecContext(ctx, query, runID, sessionID, taskID, projectPath, mode)
+    query := `INSERT OR IGNORE INTO runs (id, session_id, task_id, project_path, mode, status) VALUES (?, ?, ?, ?, ?, 'starting')`
+    var sessVal, taskVal interface{}
+    if sessionID != "" {
+        sessVal = sessionID
+    }
+    if taskID != "" {
+        taskVal = taskID
+    }
+    _, err := s.db.ExecContext(ctx, query, runID, sessVal, taskVal, projectPath, mode)
     return err
 }
 
