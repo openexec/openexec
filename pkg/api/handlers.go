@@ -159,14 +159,18 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
     }
 
     var body struct {
-        IsStudy bool   `json:"is_study,omitempty"`
-        Mode    string `json:"mode,omitempty"`
+        IsStudy         bool   `json:"is_study,omitempty"`
+        Mode            string `json:"mode,omitempty"`
+        BlueprintID     string `json:"blueprint_id,omitempty"`
+        TaskDescription string `json:"task_description,omitempty"`
     }
     _ = json.NewDecoder(r.Body).Decode(&body)
 
     var opts []manager.StartOption
     if body.IsStudy { opts = append(opts, manager.WithIsStudy(true)) }
     if body.Mode != "" { opts = append(opts, manager.WithExecMode(body.Mode)) }
+    if body.BlueprintID != "" { opts = append(opts, manager.WithBlueprint(body.BlueprintID)) }
+    if body.TaskDescription != "" { opts = append(opts, manager.WithTaskDescription(body.TaskDescription)) }
 
     if err := s.Mgr.Start(context.Background(), id, opts...); err != nil {
         if strings.Contains(err.Error(), "already active") {

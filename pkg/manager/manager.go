@@ -47,6 +47,7 @@ type Config struct {
 	LogDir               string
 	// ExecMode: read-only | workspace-write | danger-full-access
 	ExecMode    string
+	BlueprintID string
 	StateStore  *state.Store
 	AuditLogger audit.Logger // optional audit logger for run-step events
 	// PIIScrubLevel controls PII scrubbing sensitivity for audit logs
@@ -230,10 +231,24 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         CommandArgs:          m.cfg.CommandArgs,
         LogDir:               m.cfg.LogDir,
         ExecMode:             m.cfg.ExecMode,
+        BlueprintID:          m.cfg.BlueprintID, // Use global default if available
+        TaskDescription:      "",
     }
 
 	for _, opt := range opts {
 		opt(&pCfg)
+	}
+
+	// Auto-populate from ReleaseManager if not explicitly set via options
+	if pCfg.TaskDescription == "" || pCfg.BlueprintID == "" {
+		if task := rel.GetTask(fwuID); task != nil {
+			if pCfg.TaskDescription == "" {
+				pCfg.TaskDescription = task.Description
+			}
+			if pCfg.BlueprintID == "" {
+				pCfg.BlueprintID = "standard_task" // Default for all tasks
+			}
+		}
 	}
 
 	// Create factory using the same manager
@@ -253,6 +268,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         CommandArgs:          pCfg.CommandArgs,
         LogDir:               pCfg.LogDir,
         ExecMode:             pCfg.ExecMode,
+        BlueprintID:          pCfg.BlueprintID,
+        TaskDescription:      pCfg.TaskDescription,
     })
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)

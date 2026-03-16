@@ -126,6 +126,10 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 				if isStudy {
 					opts = append(opts, WithIsStudy(true))
 				}
+				
+				// Standard Task Blueprint is required for implementation
+				opts = append(opts, WithBlueprint("standard_task"))
+				opts = append(opts, WithTaskDescription(node.Task.Description))
 
 				// Start the individual pipeline
 				if err := m.Start(ctx, node.Task.ID, opts...); err != nil {
