@@ -11,8 +11,10 @@ This directory contains the foundational specifications and architectural decisi
 ## 1. Vision & Strategy
 High-level conceptual models and the strategic differentiation of OpenExec.
 
-*   [**The One Diagram**](/architecture/THE-ONE-DIAGRAM) — The fundamental mental model: Runtime governs LLM, not the other way around.
-*   [**Strategic Advantages**](/architecture/STRATEGIC-ADVANTAGES) — Why OpenExec's deterministic approach is superior for regulated and enterprise environments.
+*   [**The One Diagram**](./THE-ONE-DIAGRAM.md) — The fundamental mental model: Runtime governs LLM, not the other way around.
+*   [**The 80% Trap**](./THE-80-PERCENT-TRAP.md) — Instruction set for bridging the gap from intent to execution.
+*   [**Strategic Advantages**](./STRATEGIC-ADVANTAGES.md) — Why OpenExec's deterministic approach is superior for regulated and enterprise environments.
+
 *   [**Architecture Decision Memo (ADR-001)**](/architecture/ADR-001-CORE-RUNTIME) — The official mandate for core runtime consolidation and SQLite migration.
 
 ## 2. Core Architecture v1.0
