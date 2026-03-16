@@ -280,6 +280,13 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	// Create engine with callbacks that emit events
 	engineConfig := blueprint.DefaultEngineConfig()
+	engineConfig.OnStageStart = func(run *blueprint.Run, stageName string) {
+		p.emit(loop.Event{
+			Type:      loop.EventStageStart,
+			FWUID:     p.cfg.FWUID,
+			StageName: stageName,
+		})
+	}
 	engineConfig.OnStageComplete = func(run *blueprint.Run, result *blueprint.StageResult) {
 		eventType := loop.EventStageComplete
 		if result.Status == blueprint.StageStatusFailed {
