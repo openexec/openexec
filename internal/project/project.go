@@ -47,6 +47,15 @@ type ExecutionConfig struct {
     WorkerCount int `json:"worker_count,omitempty"`
     // TimeoutSeconds sets the default per-task timeout used by run/start when flags are not provided.
     TimeoutSeconds int `json:"timeout_seconds,omitempty"`
+    // ExecMode controls the permission level for the AI runner.
+    // Values: "suggest" (read-only), "workspace-write" (default), "danger-full-access" (skip all permissions)
+    ExecMode string `json:"exec_mode,omitempty"`
+    // LintCommands overrides the default lint commands in the blueprint.
+    // If empty, the lint stage is skipped (auto-pass).
+    LintCommands []string `json:"lint_commands,omitempty"`
+    // TestCommands overrides the default test commands in the blueprint.
+    // If empty, the test stage is skipped (auto-pass).
+    TestCommands []string `json:"test_commands,omitempty"`
 }
 
 // Initialize initializes a new OpenExec project

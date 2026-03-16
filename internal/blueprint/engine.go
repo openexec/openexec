@@ -102,7 +102,7 @@ var DefaultBlueprint = &Blueprint{
 			Type:        StageTypeAgentic,
 			Toolset:     "coding_backend",
 			MaxRetries:  3,
-			Timeout:     30 * time.Minute,
+			Timeout:     10 * time.Minute,
 			OnSuccess:   "lint",
 			OnFailure:   "implement",
 		},
@@ -111,7 +111,7 @@ var DefaultBlueprint = &Blueprint{
 			Description: "Run linting checks",
 			Type:        StageTypeDeterministic,
 			Toolset:     "coding_backend",
-			Commands:    []string{},
+			Commands:    nil, // Set from project config; empty = auto-pass
 			OnSuccess:   "test",
 			OnFailure:   "fix_lint",
 		},
@@ -128,7 +128,7 @@ var DefaultBlueprint = &Blueprint{
 			Description: "Run tests",
 			Type:        StageTypeDeterministic,
 			Toolset:     "coding_backend",
-			Commands:    []string{},
+			Commands:    nil, // Set from project config; empty = auto-pass
 			OnSuccess:   "review",
 			OnFailure:   "fix_tests",
 		},
@@ -170,7 +170,7 @@ var QuickFixBlueprint = &Blueprint{
 			Name:      "verify",
 			Type:      StageTypeDeterministic,
 			Toolset:   "coding_backend",
-			Commands:  []string{},
+			Commands:  []string{"go build ./..."},
 			OnSuccess: "complete",
 		},
 	},
@@ -306,6 +306,9 @@ type EngineConfig struct {
 	// DefaultTimeout is the default stage timeout.
 	DefaultTimeout time.Duration
 
+	// OnStageStart is called when a stage begins execution.
+	OnStageStart func(run *Run, stageName string)
+
 	// OnStageComplete is called when a stage completes.
 	OnStageComplete func(run *Run, result *StageResult)
 
@@ -392,6 +395,11 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 		if !ok {
 			run.Fail(fmt.Sprintf("stage %q not found", run.CurrentStage))
 			return fmt.Errorf("stage %q not found", run.CurrentStage)
+		}
+
+		// Notify stage start
+		if e.config.OnStageStart != nil {
+			e.config.OnStageStart(run, stage.Name)
 		}
 
 		// Execute stage
