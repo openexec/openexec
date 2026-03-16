@@ -804,6 +804,7 @@ func init() {
 	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
 	startCmd.Flags().BoolVarP(&startDaemon, "daemon", "d", false, "Run as background daemon")
 	startCmd.Flags().BoolVar(&startUI, "ui", false, "Open web console")
+	startCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Model for code review")
 	startCmd.AddCommand(stopCmd)
 	startCmd.AddCommand(restartCmd)
 

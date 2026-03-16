@@ -266,11 +266,11 @@ func buildAgenticPrompt(stage *Stage, input *StageInput) string {
 	// Stage-specific instructions
 	switch stage.Name {
 	case "implement":
-		sb.WriteString("Implement the requested changes. Use git_apply_patch for code modifications.\n")
+		sb.WriteString("Implement the requested changes. Create new files with your Write tool, and use git_apply_patch or Edit for modifying existing files.\n")
 	case "fix_lint":
-		sb.WriteString("Fix the linting errors from the previous stage. Use git_apply_patch for code modifications.\n")
+		sb.WriteString("Fix the linting errors from the previous stage. Use git_apply_patch or Edit for code modifications.\n")
 	case "fix_tests":
-		sb.WriteString("Fix the failing tests from the previous stage. Use git_apply_patch for code modifications.\n")
+		sb.WriteString("Fix the failing tests from the previous stage. Use git_apply_patch or Edit for code modifications.\n")
 	case "review":
 		sb.WriteString("Review the changes made in previous stages. Provide a summary of what was done and any concerns.\n")
 	}

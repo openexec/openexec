@@ -166,7 +166,7 @@ func (b *stderrTailBuffer) String() string {
 const autonomousPreamble = `IMPORTANT: You are running autonomously in a non-interactive pipeline. ` +
     `There is no human operator present. Do NOT plan — proceed directly with implementation. ` +
     `Work independently and make reasonable decisions. ` +
-    `All code edits MUST be applied as unified diffs using the git_apply_patch MCP tool. Do NOT use write_file for source changes. ` +
+    `For code edits, prefer the git_apply_patch MCP tool for unified diffs, but you may use your built-in Write and Edit tools when creating new files or when patches are impractical. ` +
     `If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
 
 ` + `If the project does not yet have a .gitignore file, create an appropriate one for the tech stack before writing other code.
@@ -232,8 +232,11 @@ func buildClaudeArgs(cfg Config) []string {
         "--max-turns", "50",
         "--disallowedTools", strings.Join(disabledTools, ","),
     }
-    // Only add bypass flag when explicitly in danger mode
-    if cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access" {
+    // Skip permission prompts for non-interactive execution.
+    // In -p mode, there is no user to approve tool calls, so the agent
+    // would block forever on Write/Edit/Bash permission prompts.
+    // Safety is enforced by the MCP toolset and execution mode constraints.
+    if cfg.ExecMode == "workspace-write" || cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access" {
         args = append([]string{"--dangerously-skip-permissions"}, args...)
     }
 	if cfg.MCPConfigPath != "" {

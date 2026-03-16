@@ -33,15 +33,161 @@ func NewSQLiteStore(db *sql.DB) (*SQLiteStore, error) {
 	return store, nil
 }
 
-// initSchema creates the state tables if they don't exist.
+// initSchema creates the state tables if they don't exist and migrates existing tables.
 func (s *SQLiteStore) initSchema(ctx context.Context) error {
 	// Enable foreign keys
 	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = ON;"); err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
+	// Migrate existing tables first so that the full schema (including indexes
+	// on newer columns like "priority") can be applied without errors.
+	if err := s.migrateSchema(ctx); err != nil {
+		return err
+	}
+
 	_, err := s.db.ExecContext(ctx, StateSchema)
 	return err
+}
+
+// migrateSchema ensures all expected columns exist on each table, adding any that are missing.
+func (s *SQLiteStore) migrateSchema(ctx context.Context) error {
+	type migration struct {
+		table      string
+		column     string
+		definition string
+	}
+
+	migrations := []migration{
+		// stories columns (covers both state schema and release schema gaps)
+		{"stories", "epic_id", "TEXT DEFAULT NULL"},
+		{"stories", "goal_id", "TEXT DEFAULT NULL"},
+		{"stories", "role", "TEXT DEFAULT ''"},
+		{"stories", "want", "TEXT DEFAULT ''"},
+		{"stories", "benefit", "TEXT DEFAULT ''"},
+		{"stories", "verification_script", "TEXT DEFAULT ''"},
+		{"stories", "contract", "TEXT DEFAULT ''"},
+		{"stories", "tasks", "TEXT DEFAULT '[]'"},
+		{"stories", "story_type", "TEXT DEFAULT 'feature'"},
+		{"stories", "priority", "INTEGER DEFAULT 0"},
+		{"stories", "git_branch", "TEXT DEFAULT ''"},
+		{"stories", "git_base_branch", "TEXT DEFAULT ''"},
+		{"stories", "git_merged_to", "TEXT DEFAULT ''"},
+		{"stories", "git_merge_commit", "TEXT DEFAULT ''"},
+		{"stories", "git_merged_at", "DATETIME DEFAULT NULL"},
+		{"stories", "git_commit_count", "INTEGER DEFAULT 0"},
+		{"stories", "approval_status", "TEXT DEFAULT ''"},
+		{"stories", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"stories", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"stories", "approval_comments", "TEXT DEFAULT ''"},
+		{"stories", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"stories", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"stories", "started_at", "DATETIME DEFAULT NULL"},
+		{"stories", "completed_at", "DATETIME DEFAULT NULL"},
+		// tasks columns
+		{"tasks", "task_type", "TEXT DEFAULT ''"},
+		{"tasks", "priority", "INTEGER DEFAULT 0"},
+		{"tasks", "assigned_agent", "TEXT DEFAULT ''"},
+		{"tasks", "attempt_count", "INTEGER DEFAULT 0"},
+		{"tasks", "max_attempts", "INTEGER DEFAULT 3"},
+		{"tasks", "git_commits", "TEXT DEFAULT '[]'"},
+		{"tasks", "git_branch", "TEXT DEFAULT ''"},
+		{"tasks", "git_pr_number", "INTEGER DEFAULT NULL"},
+		{"tasks", "git_pr_url", "TEXT DEFAULT ''"},
+		{"tasks", "approval_status", "TEXT DEFAULT ''"},
+		{"tasks", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"tasks", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "approval_comments", "TEXT DEFAULT ''"},
+		{"tasks", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"tasks", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"tasks", "needs_review", "INTEGER DEFAULT 0"},
+		{"tasks", "review_notes", "TEXT DEFAULT ''"},
+		{"tasks", "error_message", "TEXT DEFAULT ''"},
+		{"tasks", "metadata", "TEXT DEFAULT '{}'"},
+		{"tasks", "started_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "completed_at", "DATETIME DEFAULT NULL"},
+		// releases columns
+		{"releases", "git_branch", "TEXT DEFAULT ''"},
+		{"releases", "git_base_branch", "TEXT DEFAULT ''"},
+		{"releases", "git_tag", "TEXT DEFAULT ''"},
+		{"releases", "git_merge_commit", "TEXT DEFAULT ''"},
+		{"releases", "git_head_commit", "TEXT DEFAULT ''"},
+		{"releases", "approval_status", "TEXT DEFAULT ''"},
+		{"releases", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"releases", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"releases", "approval_comments", "TEXT DEFAULT ''"},
+		{"releases", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"releases", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"releases", "deployed_to", "TEXT DEFAULT '[]'"},
+		{"releases", "changelog", "TEXT DEFAULT ''"},
+		{"releases", "deployed_at", "DATETIME DEFAULT NULL"},
+	}
+
+	tableExistsCache := make(map[string]bool)
+
+	for _, m := range migrations {
+		if exists, cached := tableExistsCache[m.table]; cached && !exists {
+			continue
+		}
+		if _, cached := tableExistsCache[m.table]; !cached {
+			te, err := s.tableExists(ctx, m.table)
+			if err != nil {
+				return fmt.Errorf("checking table %s: %w", m.table, err)
+			}
+			tableExistsCache[m.table] = te
+			if !te {
+				continue
+			}
+		}
+
+		colExists, err := s.columnExists(ctx, m.table, m.column)
+		if err != nil {
+			return fmt.Errorf("checking column %s.%s: %w", m.table, m.column, err)
+		}
+		if !colExists {
+			alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", m.table, m.column, m.definition)
+			if _, err := s.db.ExecContext(ctx, alter); err != nil {
+				return fmt.Errorf("adding column %s.%s: %w", m.table, m.column, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// tableExists checks whether a table exists in the database.
+func (s *SQLiteStore) tableExists(ctx context.Context, table string) (bool, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// columnExists checks whether a column exists on a table using PRAGMA table_info.
+func (s *SQLiteStore) columnExists(ctx context.Context, table, column string) (bool, error) {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull int
+		var dfltValue *string
+		var pk int
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			return false, err
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // Close closes the database connection.
