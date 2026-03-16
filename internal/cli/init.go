@@ -137,6 +137,7 @@ The project name defaults to the current directory name if not provided.`,
 			Port:            8080,
 			ParallelEnabled: parallelEnabled,
 			WorkerCount:     workerCount,
+			TimeoutSeconds:  600,
 		}
 
 		// Save updated config
