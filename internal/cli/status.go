@@ -166,7 +166,7 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 
 	cmd.Printf("Active:  %d run(s)\n", len(activeRuns))
 	for _, r := range activeRuns {
-		cmd.Printf("  - %s: %s (%s)\n", r.ID, r.Status, r.Phase)
+		cmd.Printf("  - %s: %s (%s)\n", r.effectiveID(), r.Status, r.effectiveStage())
 	}
 
 	cmd.Println()
@@ -184,14 +184,14 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 			r := completedRuns[i]
 			statusIcon := "?"
 			switch r.Status {
-			case "completed", "done":
+			case "completed", "complete", "done":
 				statusIcon = "✓"
 			case "failed", "error":
 				statusIcon = "✗"
-			case "cancelled":
+			case "cancelled", "stopped":
 				statusIcon = "○"
 			}
-			cmd.Printf("  %s %s: %s\n", statusIcon, r.ID, r.Status)
+			cmd.Printf("  %s %s: %s\n", statusIcon, r.effectiveID(), r.Status)
 		}
 	}
 
@@ -231,9 +231,31 @@ func outputStatusJSON(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 
 type runInfo struct {
 	ID        string `json:"id"`
+	FWUID     string `json:"fwu_id"`
+	RunID     string `json:"run_id"`
 	Status    string `json:"status"`
 	Phase     string `json:"phase,omitempty"`
+	Stage     string `json:"stage,omitempty"`
 	CreatedAt string `json:"created_at,omitempty"`
+}
+
+// effectiveID returns the best available ID for display.
+func (r runInfo) effectiveID() string {
+	if r.FWUID != "" {
+		return r.FWUID
+	}
+	if r.RunID != "" {
+		return r.RunID
+	}
+	return r.ID
+}
+
+// effectiveStage returns the best available stage/phase for display.
+func (r runInfo) effectiveStage() string {
+	if r.Stage != "" {
+		return r.Stage
+	}
+	return r.Phase
 }
 
 func fetchRuns(port int) ([]runInfo, error) {
