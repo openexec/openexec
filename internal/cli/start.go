@@ -31,6 +31,7 @@ var (
 	startWorkers     int
 	startTimeout     int
 	startExecutor    string
+	startReviewer    string
 	startDaemon      bool
 	startUI          bool
 	executionBinary  string
