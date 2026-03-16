@@ -13,8 +13,8 @@ import (
 
 // RunOptions defines settings for executing multiple tasks.
 type RunOptions struct {
-	WorkerCount int
-	TaskIDs     []string // Optional: restrict to specific tasks
+	WorkerCount int      `json:"worker_count"`
+	TaskIDs     []string `json:"task_ids,omitempty"`
 }
 
 type taskNode struct {
