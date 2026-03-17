@@ -53,7 +53,11 @@ type Config struct {
 	// ExecMode: read-only | workspace-write | danger-full-access
 	ExecMode    string
 	BlueprintID string
-	StateStore  *state.Store
+	// ReviewEnabled enables code review after task execution
+	ReviewEnabled bool
+	// ReviewerModel is the model to use for code review
+	ReviewerModel string
+	StateStore    *state.Store
 	AuditLogger audit.Logger // optional audit logger for run-step events
 	// PIIScrubLevel controls PII scrubbing sensitivity for audit logs
 	// Valid values: "low", "medium", "high", "" (disabled)
@@ -240,6 +244,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         LogDir:               m.cfg.LogDir,
         ExecMode:             m.cfg.ExecMode,
         BlueprintID:          m.cfg.BlueprintID, // Use global default if available
+        ReviewEnabled:        m.cfg.ReviewEnabled,
+        ReviewerModel:        m.cfg.ReviewerModel,
         TaskDescription:      "",
         TaskTimeout:          m.cfg.TaskTimeout,
     }

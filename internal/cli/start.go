@@ -240,16 +240,9 @@ Examples:
 		}
 
 		// Execute all pending tasks
-		// Set mode to "run" for run command execution (full automation)
-		execMode := runMode
-		if execMode == "" || execMode == "workspace-write" || execMode == "read-only" || execMode == "danger-full-access" {
-			// These are execution permission modes, not operational modes
-			// Default to "run" operational mode
-			execMode = "run"
-		}
 		runOpts := map[string]any{
 			"worker_count": config.Execution.WorkerCount,
-			"mode":         execMode,
+			"mode":         runMode,
 		}
 		if len(args) > 0 {
 			runOpts["task_ids"] = []string{args[0]}
@@ -815,12 +808,12 @@ func init() {
     runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
     runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Execute a single deterministic quickfix without planning (task title)")
     runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
-    runCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
+    runCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	blueprintCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	blueprintCmd.Flags().StringVar(&blueprintID, "blueprint-id", "standard_task", "Blueprint to execute (standard_task, quick_fix)")
 	blueprintCmd.Flags().BoolVar(&blueprintClarify, "clarify", false, "Start interactive clarification interview before execution")
-	blueprintCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
+	blueprintCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)

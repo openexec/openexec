@@ -11,10 +11,8 @@ import (
 type ProjectConfig struct {
 	Name        string `json:"name"`
 	ProjectDir  string `json:"project_dir,omitempty"`
-	EngramStore string `json:"engram_store"`
 	GitEnabled         bool   `json:"git_enabled,omitempty"`
 	GitCommitEnabled   bool   `json:"git_commit_enabled,omitempty"` // Allow autonomous local commits
-	GitPushEnabled     bool   `json:"git_push_enabled,omitempty"`   // Allow autonomous remote push on release completion
 	BaseBranch         string `json:"base_branch,omitempty"`
 	ReleaseBranchPrefix string `json:"release_branch_prefix,omitempty"` // e.g. "release/"
 	FeatureBranchPrefix string `json:"feature_branch_prefix,omitempty"` // e.g. "feature/"
@@ -33,16 +31,12 @@ type ExecutionConfig struct {
 	RunnerCommand string `json:"runner_command,omitempty"`
 	// RunnerArgs optionally provides arguments for the runner when RunnerCommand is set.
 	RunnerArgs []string `json:"runner_args,omitempty"`
+	// Port is the execution engine port
+	Port int `json:"port,omitempty"`
 	// ReviewEnabled enables code review after task execution
 	ReviewEnabled bool `json:"review_enabled"`
 	// ReviewerModel is the model to use for code review
 	ReviewerModel string `json:"reviewer_model,omitempty"`
-	// MaxIterations is the maximum iterations per task
-	MaxIterations int `json:"max_iterations,omitempty"`
-	// Port is the execution engine port
-	Port int `json:"port,omitempty"`
-	// ParallelEnabled enables parallel task execution
-	ParallelEnabled bool `json:"parallel_enabled"`
     // WorkerCount is the number of concurrent workers for parallel execution
     WorkerCount int `json:"worker_count,omitempty"`
     // TimeoutSeconds sets the default per-task timeout used by run/start when flags are not provided.
@@ -111,7 +105,6 @@ func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 	config := &ProjectConfig{
 		Name:        projectName,
 		ProjectDir:  projectDir,
-		EngramStore: ".openexec/engram",
 		GitEnabled:  true,
 		BaseBranch:  "main",
 	}

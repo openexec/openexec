@@ -248,7 +248,8 @@ func (r *SimpleAgenticRunner) RunAgentic(ctx context.Context, stage *Stage, inpu
 // LoopAgenticRunner runs agentic stages using a bounded loop with the Loop infrastructure.
 type LoopAgenticRunner struct {
 	// LoopFactory creates a new loop for each agentic stage.
-	LoopFactory func(prompt string, workDir string, maxIterations int) (AgenticLoop, error)
+	// stageName is passed to allow model tiering (e.g. using Opus for 'review' stage).
+	LoopFactory func(stageName string, prompt string, workDir string, maxIterations int) (AgenticLoop, error)
 
 	// MaxIterations is the maximum iterations for the bounded subloop. Default 10.
 	MaxIterations int
@@ -274,7 +275,7 @@ func (r *LoopAgenticRunner) RunAgentic(ctx context.Context, stage *Stage, input 
 	// Build prompt from stage and input
 	prompt := buildAgenticPrompt(stage, input)
 
-	loop, err := r.LoopFactory(prompt, input.WorkingDirectory, maxIter)
+	loop, err := r.LoopFactory(stage.Name, prompt, input.WorkingDirectory, maxIter)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create loop: %w", err)
 	}

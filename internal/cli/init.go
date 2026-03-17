@@ -82,7 +82,7 @@ The project name defaults to the current directory name if not provided.`,
 
 		// Interactive mode if not explicitly set via flags
 		var plannerModel, executorModel, reviewerModel string
-		var reviewEnabled, parallelEnabled, gitCommitEnabled, gitPushEnabled bool
+		var reviewEnabled, parallelEnabled, gitCommitEnabled bool
 		var workerCount int
 
 		if !initNonInteractive {
@@ -98,7 +98,7 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			// 2. Execution Config prompt
-			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled = promptExecutionConfig(cmd)
+			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, _ = promptExecutionConfig(cmd)
 		} else {
 			if projectName == "" {
 				projectName = defaultProjectName
@@ -116,7 +116,6 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			gitCommitEnabled = false
-			gitPushEnabled = false
 		}
 
 		// Initialize the project structure
@@ -127,15 +126,12 @@ The project name defaults to the current directory name if not provided.`,
 
 		// Set execution config
 		cfg.GitCommitEnabled = gitCommitEnabled
-		cfg.GitPushEnabled = gitPushEnabled
 		cfg.Execution = project.ExecutionConfig{
 			PlannerModel:    plannerModel,
 			ExecutorModel:   executorModel,
 			ReviewEnabled:   reviewEnabled,
 			ReviewerModel:   reviewerModel,
-			MaxIterations:   10,
 			Port:            8080,
-			ParallelEnabled: parallelEnabled,
 			WorkerCount:     workerCount,
 			TimeoutSeconds:  600,
 			ExecMode:        "danger-full-access",
