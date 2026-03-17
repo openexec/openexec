@@ -55,6 +55,11 @@ type Config struct {
 	// ExecMode: read-only | workspace-write | danger-full-access
 	ExecMode string
 
+	// ReviewEnabled controls whether the review stage runs.
+	ReviewEnabled bool
+	// ReviewerModel overrides the executor model for the review stage.
+	ReviewerModel string
+
 	// ResumeFrom enables resuming from a checkpoint.
 	ResumeFrom *ResumeConfig
 
@@ -132,6 +137,8 @@ func New(cfg Config, opts ...Option) (*Pipeline, <-chan loop.Event) {
 		EvidenceEndpoint:     cfg.EvidenceEndpoint,
 		EvidencePrefix:       cfg.EvidencePrefix,
 		ExecMode:             cfg.ExecMode,
+		ReviewEnabled:        cfg.ReviewEnabled,
+		ReviewerModel:        cfg.ReviewerModel,
 	})
 	return NewWithFactory(cfg, factory, opts...)
 }
@@ -302,6 +309,15 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	}
 
+	// Skip review stage if review is disabled
+	if !p.cfg.ReviewEnabled {
+		// Rewire test stage (or its predecessor) to skip directly to complete
+		if test, ok := bp.Stages["test"]; ok && test.OnSuccess == "review" {
+			test.OnSuccess = "complete"
+		}
+		delete(bp.Stages, "review")
+	}
+
 	// Override lint/test commands from project config
 	if projCfg, err := project.LoadProjectConfig(p.cfg.WorkDir); err == nil {
 		if lint, ok := bp.Stages["lint"]; ok && len(projCfg.Execution.LintCommands) > 0 {
@@ -319,8 +335,8 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Set up agentic runner that wraps a bounded loop
 	executor.AgenticRunner = &blueprint.LoopAgenticRunner{
 		MaxIterations: p.cfg.DefaultMaxIterations,
-		LoopFactory: func(prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
-			return p.createAgenticLoop(ctx, prompt, workDir, maxIterations)
+		LoopFactory: func(stageName string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+			return p.createAgenticLoop(ctx, stageName, prompt, workDir, maxIterations)
 		},
 	}
 
@@ -444,11 +460,22 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 // createAgenticLoop creates a bounded loop for agentic stage execution.
 // Returns an AgenticLoop that wraps the internal loop infrastructure.
-func (p *Pipeline) createAgenticLoop(ctx context.Context, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+func (p *Pipeline) createAgenticLoop(ctx context.Context, stageName string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
 	// Build MCP config
 	mcpPath, cleanup, err := p.buildMCPConfig()
 	if err != nil {
 		return nil, fmt.Errorf("build MCP config: %w", err)
+	}
+
+	// Use reviewer model for the review stage if configured
+	executorModel := p.cfg.ExecutorModel
+	runnerCmd := p.cfg.RunnerCommand
+	runnerArgs := p.cfg.RunnerArgs
+	if stageName == "review" && p.cfg.ReviewerModel != "" {
+		executorModel = p.cfg.ReviewerModel
+		// Reset runner overrides so runner.Resolve picks the right binary for the reviewer model
+		runnerCmd = ""
+		runnerArgs = nil
 	}
 
 	cfg := loop.Config{
@@ -460,8 +487,9 @@ func (p *Pipeline) createAgenticLoop(ctx context.Context, prompt string, workDir
 		MCPConfigPath: mcpPath,
 		FwuID:         p.cfg.FWUID,
 		ExecMode:      p.cfg.ExecMode,
-		RunnerCommand: p.cfg.RunnerCommand,
-		RunnerArgs:    p.cfg.RunnerArgs,
+		ExecutorModel: executorModel,
+		RunnerCommand: runnerCmd,
+		RunnerArgs:    runnerArgs,
 		CommandName:   p.cfg.CommandName,
 		CommandArgs:   p.cfg.CommandArgs,
 	}

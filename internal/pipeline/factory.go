@@ -35,6 +35,11 @@ type LoopFactoryConfig struct {
 	// ExecMode propagates execution mode to the loop.
 	ExecMode string
 
+	// ReviewEnabled controls whether the review stage runs.
+	ReviewEnabled bool
+	// ReviewerModel overrides the executor model for the review stage.
+	ReviewerModel string
+
 	// BlueprintID enables blueprint mode with the specified blueprint.
 	BlueprintID string
 

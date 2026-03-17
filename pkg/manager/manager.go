@@ -51,7 +51,9 @@ type Config struct {
 	CommandArgs          []string // test override
 	LogDir               string
 	// ExecMode: read-only | workspace-write | danger-full-access
-	ExecMode    string
+	ExecMode      string
+	ReviewEnabled bool
+	ReviewerModel string
 	BlueprintID string
 	StateStore  *state.Store
 	AuditLogger audit.Logger // optional audit logger for run-step events
@@ -239,6 +241,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         CommandArgs:          m.cfg.CommandArgs,
         LogDir:               m.cfg.LogDir,
         ExecMode:             m.cfg.ExecMode,
+        ReviewEnabled:        m.cfg.ReviewEnabled,
+        ReviewerModel:        m.cfg.ReviewerModel,
         BlueprintID:          m.cfg.BlueprintID, // Use global default if available
         TaskDescription:      "",
         TaskTimeout:          m.cfg.TaskTimeout,
@@ -277,6 +281,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         CommandArgs:          pCfg.CommandArgs,
         LogDir:               pCfg.LogDir,
         ExecMode:             pCfg.ExecMode,
+        ReviewEnabled:        pCfg.ReviewEnabled,
+        ReviewerModel:        pCfg.ReviewerModel,
         BlueprintID:          pCfg.BlueprintID,
         TaskDescription:      pCfg.TaskDescription,
     })

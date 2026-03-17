@@ -154,6 +154,18 @@ func New(cfg Config) (*Server, error) {
             }
             return 0
         }(),
+        ReviewEnabled: func() bool {
+            if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
+                return pc.Execution.ReviewEnabled
+            }
+            return false
+        }(),
+        ReviewerModel: func() string {
+            if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ReviewerModel != "" {
+                return pc.Execution.ReviewerModel
+            }
+            return ""
+        }(),
         ExecMode: func() string {
             if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ExecMode != "" {
                 return pc.Execution.ExecMode

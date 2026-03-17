@@ -15,6 +15,8 @@ import (
 var (
 	initPlannerModel   string
 	initExecutorModel  string
+	initReviewEnabled  bool
+	initReviewerModel  string
 	initNonInteractive bool
 	initWorkerCount    int
 	initForce          bool
@@ -78,8 +80,8 @@ The project name defaults to the current directory name if not provided.`,
 		}
 
 		// Interactive mode if not explicitly set via flags
-		var plannerModel, executorModel string
-		var gitCommitEnabled bool
+		var plannerModel, executorModel, reviewerModel string
+		var reviewEnabled, gitCommitEnabled bool
 		var workerCount int
 
 		if !initNonInteractive {
@@ -95,13 +97,15 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			// 2. Execution Config prompt
-			plannerModel, executorModel, workerCount, gitCommitEnabled = promptExecutionConfig(cmd)
+			plannerModel, executorModel, reviewEnabled, reviewerModel, workerCount, gitCommitEnabled = promptExecutionConfig(cmd)
 		} else {
 			if projectName == "" {
 				projectName = defaultProjectName
 			}
 			plannerModel = initPlannerModel
 			executorModel = initExecutorModel
+			reviewEnabled = initReviewEnabled
+			reviewerModel = initReviewerModel
 			workerCount = initWorkerCount
 			gitCommitEnabled = false
 		}
@@ -117,6 +121,8 @@ The project name defaults to the current directory name if not provided.`,
 		cfg.Execution = project.ExecutionConfig{
 			PlannerModel:   plannerModel,
 			ExecutorModel:  executorModel,
+			ReviewEnabled:  reviewEnabled,
+			ReviewerModel:  reviewerModel,
 			Port:           8080,
 			WorkerCount:    workerCount,
 			TimeoutSeconds: 600,
@@ -147,6 +153,8 @@ The project name defaults to the current directory name if not provided.`,
 func init() {
 	initCmd.Flags().StringVar(&initPlannerModel, "planner", "sonnet", "Model to use for planning phase")
 	initCmd.Flags().StringVar(&initExecutorModel, "executor", "sonnet", "Model to use for task execution")
+	initCmd.Flags().BoolVar(&initReviewEnabled, "review", false, "Enable code review after task execution")
+	initCmd.Flags().StringVar(&initReviewerModel, "reviewer", "opus", "Model to use for code review")
 	initCmd.Flags().BoolVarP(&initNonInteractive, "yes", "y", false, "Non-interactive mode (use defaults)")
 	initCmd.Flags().IntVar(&initWorkerCount, "worker-count", 4, "Number of concurrent workers (1 = sequential)")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Force re-initialization of an existing project")
@@ -155,7 +163,7 @@ func init() {
 }
 
 // promptExecutionConfig interactively prompts for execution configuration
-func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, workerCount int, gitCommitEnabled bool) {
+func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, workerCount int, gitCommitEnabled bool) {
 	reader := bufio.NewReader(cmd.InOrStdin())
 
 	fmt.Println("\n=== Execution Settings ===")
@@ -172,6 +180,15 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		executorModel = selectModelInteractively(reader, "executor", plannerModel)
 	} else {
 		executorModel = plannerModel
+	}
+
+	// Review configuration
+	fmt.Printf("\nEnable code review after task execution? [y/N]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	if answer == "y" || answer == "yes" {
+		reviewEnabled = true
+		reviewerModel = selectModelInteractively(reader, "reviewer", initReviewerModel)
 	}
 
 	// Git configuration
@@ -195,7 +212,7 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		workerCount = 1
 	}
 
-	return plannerModel, executorModel, workerCount, gitCommitEnabled
+	return plannerModel, executorModel, reviewEnabled, reviewerModel, workerCount, gitCommitEnabled
 }
 
 // ensureGitignore ensures .gitignore exists and contains .openexec entries.

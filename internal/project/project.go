@@ -31,6 +31,10 @@ type ExecutionConfig struct {
 	RunnerCommand string `json:"runner_command,omitempty"`
 	// RunnerArgs optionally provides arguments for the runner when RunnerCommand is set.
 	RunnerArgs []string `json:"runner_args,omitempty"`
+	// ReviewEnabled enables code review after task execution
+	ReviewEnabled bool `json:"review_enabled"`
+	// ReviewerModel is the model to use for code review (e.g. "opus")
+	ReviewerModel string `json:"reviewer_model,omitempty"`
 	// Port is the execution engine port
 	Port int `json:"port,omitempty"`
     // WorkerCount is the number of concurrent workers for parallel execution.
