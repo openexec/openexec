@@ -309,7 +309,6 @@ func (s *AlertNotificationSender) HandleCallbackQuery(ctx context.Context, query
 
 	switch data.Action {
 	case AlertCallbackCancel:
-		responseText = "Cancelling task..."
 		s.mu.RLock()
 		handler := s.cancelHandler
 		s.mu.RUnlock()
@@ -325,7 +324,6 @@ func (s *AlertNotificationSender) HandleCallbackQuery(ctx context.Context, query
 		}
 
 	case AlertCallbackLogs:
-		responseText = "Fetching logs..."
 		s.mu.RLock()
 		handler := s.logsHandler
 		s.mu.RUnlock()

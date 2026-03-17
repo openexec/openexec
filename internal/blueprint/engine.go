@@ -423,7 +423,8 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 		}
 
 		// Handle result
-		if result.Status == types.StageStatusCompleted {
+		switch result.Status {
+		case types.StageStatusCompleted:
 			// Create checkpoint if configured
 			if stage.CreateCheckpoint {
 				run.AddCheckpoint()
@@ -434,7 +435,7 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 
 			// Move to next stage
 			run.CurrentStage = stage.OnSuccess
-		} else if result.Status == types.StageStatusFailed {
+		case types.StageStatusFailed:
 			// Check if we can retry
 			if stage.OnFailure != "" && run.GetRetries(stage.Name) < stage.MaxRetries {
 				run.IncrementRetries(stage.Name)

@@ -644,7 +644,6 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 		}
 		if err := conn.WriteJSON(subscribeMsg); err != nil {
 			// Fallback to polling if subscription fails
-			err = nil
 		} else {
 			// Listen for events via WebSocket
 			type wsMessage struct {

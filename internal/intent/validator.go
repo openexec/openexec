@@ -128,7 +128,7 @@ func (v *Validator) loadFile() error {
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", v.filePath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

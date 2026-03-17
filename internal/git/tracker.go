@@ -243,7 +243,7 @@ func (t *Tracker) CreateStoryBranch(storyID, baseBranch string) (string, error) 
 	if err := t.client.Lock(); err != nil {
 		return "", fmt.Errorf("failed to acquire git lock: %w", err)
 	}
-	defer t.client.Unlock()
+	defer func() { _ = t.client.Unlock() }()
 
 	branch := fmt.Sprintf("feature/%s", storyID)
 
@@ -271,7 +271,7 @@ func (t *Tracker) CreateReleaseBranch(version, baseBranch string) (string, error
 	if err := t.client.Lock(); err != nil {
 		return "", fmt.Errorf("failed to acquire git lock: %w", err)
 	}
-	defer t.client.Unlock()
+	defer func() { _ = t.client.Unlock() }()
 
 	branch := fmt.Sprintf("release/%s", version)
 
@@ -299,7 +299,7 @@ func (t *Tracker) MergeStoryToRelease(storyID, releaseVersion string) (*MergeInf
 	if err := t.client.Lock(); err != nil {
 		return nil, fmt.Errorf("failed to acquire git lock: %w", err)
 	}
-	defer t.client.Unlock()
+	defer func() { _ = t.client.Unlock() }()
 
 	storyBranch := t.GetStoryBranch(storyID)
 	if storyBranch == "" {
@@ -390,7 +390,7 @@ func (t *Tracker) TagRelease(version, message string) error {
 	if err := t.client.Lock(); err != nil {
 		return fmt.Errorf("failed to acquire git lock: %w", err)
 	}
-	defer t.client.Unlock()
+	defer func() { _ = t.client.Unlock() }()
 
 	tag := fmt.Sprintf("v%s", version)
 

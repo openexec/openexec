@@ -200,7 +200,8 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 		}
 
 		// Handle result
-		if result.Status == types.StageStatusCompleted {
+		switch result.Status {
+		case types.StageStatusCompleted:
 			l.emit(Event{
 				Type:        EventStageComplete,
 				Iteration:   l.iteration,
@@ -225,7 +226,7 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 
 			// Move to next stage
 			run.CurrentStage = stage.OnSuccess
-		} else if result.Status == types.StageStatusFailed {
+		case types.StageStatusFailed:
 			l.emit(Event{
 				Type:        EventStageFailed,
 				Iteration:   l.iteration,

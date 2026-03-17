@@ -82,49 +82,87 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			result.Output = resp.Output
 			result.Error = resp.Error
 			result.Artifacts = resp.Artifacts
+
+			// If action succeeded, still run quality gates if it wasn't the gates action itself
+			if result.Status == types.StageStatusCompleted && stage.Action != "run_gates" {
+				e.runQualityGates(ctx, input, result)
+			}
 			return result, nil
 		}
 	}
 
 	// 2. Fallback to shell commands
-	if len(stage.Commands) == 0 {
+	if len(stage.Commands) > 0 {
+		timeout := e.Timeout
+		if stage.Timeout > 0 {
+			timeout = stage.Timeout
+		}
+
+		var outputs []string
+		for _, cmdStr := range stage.Commands {
+			cmdCtx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+
+			if e.OnCommandStart != nil {
+				e.OnCommandStart(stage, cmdStr)
+			}
+
+			output, err := e.runCommand(cmdCtx, cmdStr)
+			outputs = append(outputs, output)
+
+			if e.OnCommandComplete != nil {
+				e.OnCommandComplete(stage, cmdStr, output, err)
+			}
+
+			if err != nil {
+				result.Output = strings.Join(outputs, "\n---\n")
+				result.Fail(fmt.Sprintf("command failed: %s: %v", cmdStr, err))
+				return result, nil
+			}
+		}
+		result.Output = strings.Join(outputs, "\n---\n")
+		result.Complete("all commands succeeded")
+	} else {
 		// No commands = automatic success
 		result.Complete("no commands to execute")
-		return result, nil
 	}
 
-	timeout := e.Timeout
-	if stage.Timeout > 0 {
-		timeout = stage.Timeout
-	}
+	// 3. Run Quality Gates (if configured and Action Registry available)
+	e.runQualityGates(ctx, input, result)
 
-	var outputs []string
-
-	for _, cmdStr := range stage.Commands {
-		cmdCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-
-		if e.OnCommandStart != nil {
-			e.OnCommandStart(stage, cmdStr)
-		}
-
-		output, err := e.runCommand(cmdCtx, cmdStr)
-		outputs = append(outputs, output)
-
-		if e.OnCommandComplete != nil {
-			e.OnCommandComplete(stage, cmdStr, output, err)
-		}
-
-		if err != nil {
-			result.Output = strings.Join(outputs, "\n---\n")
-			result.Fail(fmt.Sprintf("command failed: %s: %v", cmdStr, err))
-			return result, nil // Return result, not error - the stage failed but execution succeeded
-		}
-	}
-
-	result.Output = strings.Join(outputs, "\n---\n")
-	result.Complete("all commands succeeded")
 	return result, nil
+}
+
+// runQualityGates executes configured quality gates and merges results into the stage result.
+func (e *DefaultExecutor) runQualityGates(ctx context.Context, input *StageInput, result *StageResult) {
+	if e.ActionRegistry == nil {
+		return
+	}
+
+	runGates, ok := e.ActionRegistry.Get("run_gates")
+	if !ok {
+		return
+	}
+
+	gateResp, err := runGates.Execute(ctx, actions.ActionRequest{
+		RunID:        input.RunID,
+		WorkspaceDir: e.WorkDir,
+		Inputs:       map[string]any{"task_description": input.TaskDescription},
+	})
+	if err != nil {
+		// Internal error running gates, don't fail the stage but log it
+		result.Output += fmt.Sprintf("\n\n⚠ Warning: failed to run quality gates: %v", err)
+		return
+	}
+
+	// Merge gate results
+	if gateResp.Status == types.StageStatusFailed {
+		result.Status = types.StageStatusFailed
+		result.Error = fmt.Sprintf("Quality gates failed: %s", gateResp.Error)
+		result.Output += "\n\n=== QUALITY GATE FAILURE ===\n" + gateResp.Output
+	} else if gateResp.Output != "" {
+		result.Output += "\n\n=== QUALITY GATES PASSED ===\n" + gateResp.Output
+	}
 }
 
 // runCommand executes a shell command and returns its output.

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -84,10 +83,6 @@ type StallDetector struct {
 	onStall     func(count int, duration time.Duration)
 	onRecovery  func(count int)
 	onFatalStall func(count int)
-
-	// Tracking
-	operationStart time.Time
-	operationCount atomic.Int64
 }
 
 // NewStallDetector creates a new stall detector with the given config.
@@ -131,19 +126,6 @@ func (d *StallDetector) RecordActivity() {
 			d.onRecovery(d.stallCount)
 		}
 	}
-}
-
-// StartOperation marks the beginning of a timed operation.
-func (d *StallDetector) StartOperation() context.Context {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	d.operationStart = time.Now()
-	d.operationCount.Add(1)
-
-	// Create a context with the provider timeout
-	ctx, _ := context.WithTimeout(context.Background(), d.config.ProviderTimeout)
-	return ctx
 }
 
 // Check evaluates the current stall state and triggers callbacks.

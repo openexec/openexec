@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/blueprint"
+	"github.com/openexec/openexec/internal/types"
 )
 
 // mockStageExecutor is a simple stage executor for testing.
@@ -30,7 +31,7 @@ func TestLoop_BlueprintMode_Initialization(t *testing.T) {
 		Stages: map[string]*blueprint.Stage{
 			"start": {
 				Name:      "start",
-				Type:      blueprint.StageTypeAgentic,
+				Type:      types.StageTypeAgentic,
 				OnSuccess: "complete",
 			},
 		},
@@ -101,12 +102,12 @@ func TestLoop_BlueprintMode_SimpleExecution(t *testing.T) {
 		Stages: map[string]*blueprint.Stage{
 			"stage1": {
 				Name:      "stage1",
-				Type:      blueprint.StageTypeDeterministic,
+				Type:      types.StageTypeDeterministic,
 				OnSuccess: "stage2",
 			},
 			"stage2": {
 				Name:      "stage2",
-				Type:      blueprint.StageTypeAgentic,
+				Type:      types.StageTypeAgentic,
 				OnSuccess: "complete",
 			},
 		},
@@ -210,7 +211,7 @@ func TestLoop_BlueprintMode_Callbacks(t *testing.T) {
 		Stages: map[string]*blueprint.Stage{
 			"stage1": {
 				Name:             "stage1",
-				Type:             blueprint.StageTypeDeterministic,
+				Type:             types.StageTypeDeterministic,
 				OnSuccess:        "complete",
 				CreateCheckpoint: true,
 			},
@@ -290,7 +291,7 @@ func TestLoop_BlueprintMode_StageFailureWithRetry(t *testing.T) {
 		Stages: map[string]*blueprint.Stage{
 			"stage1": {
 				Name:       "stage1",
-				Type:       blueprint.StageTypeAgentic,
+				Type:       types.StageTypeAgentic,
 				MaxRetries: 2,
 				OnSuccess:  "complete",
 				OnFailure:  "stage1", // Retry same stage
