@@ -62,6 +62,12 @@ type Config struct {
 	// When set, the pipeline uses blueprint-based execution instead of phases.
 	BlueprintID string
 
+	// ReviewEnabled enables the code review stage after testing.
+	ReviewEnabled bool
+
+	// ReviewerModel optionally overrides the model used for the review stage.
+	ReviewerModel string
+
 	// TaskDescription is the user's task description for blueprint runs.
 	TaskDescription string
 
@@ -319,8 +325,13 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Set up agentic runner that wraps a bounded loop
 	executor.AgenticRunner = &blueprint.LoopAgenticRunner{
 		MaxIterations: p.cfg.DefaultMaxIterations,
-		LoopFactory: func(prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
-			return p.createAgenticLoop(ctx, prompt, workDir, maxIterations)
+		LoopFactory: func(stageName string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+			// Model tiering: Use ReviewerModel for review stage if configured
+			model := p.cfg.ExecutorModel
+			if stageName == "review" && p.cfg.ReviewerModel != "" {
+				model = p.cfg.ReviewerModel
+			}
+			return p.createAgenticLoop(ctx, model, prompt, workDir, maxIterations)
 		},
 	}
 
@@ -422,7 +433,19 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		input.SetContextFromPack(items)
 	}
 
-	// Execute blueprint
+	// Handle conditional review stage
+	if !p.cfg.ReviewEnabled {
+		if test, ok := bp.Stages["test"]; ok {
+			test.OnSuccess = "complete"
+		}
+	} else if p.cfg.ReviewerModel != "" {
+		// Use specialized model for review if configured
+		if review, ok := bp.Stages["review"]; ok {
+			// We can't easily override model per-stage in the current executor
+			// without passing it through AgenticRunner factory.
+			// This part of model tiering is handled in the LoopAgenticRunner setup.
+		}
+	}
 	if err := engine.Execute(ctx, run, input); err != nil {
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
@@ -444,7 +467,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 // createAgenticLoop creates a bounded loop for agentic stage execution.
 // Returns an AgenticLoop that wraps the internal loop infrastructure.
-func (p *Pipeline) createAgenticLoop(ctx context.Context, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+func (p *Pipeline) createAgenticLoop(ctx context.Context, model string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
 	// Build MCP config
 	mcpPath, cleanup, err := p.buildMCPConfig()
 	if err != nil {
@@ -452,6 +475,7 @@ func (p *Pipeline) createAgenticLoop(ctx context.Context, prompt string, workDir
 	}
 
 	cfg := loop.Config{
+		Model:         model,
 		Prompt:        prompt,
 		WorkDir:       workDir,
 		MaxIterations: maxIterations,

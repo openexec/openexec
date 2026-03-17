@@ -12,7 +12,7 @@ import (
 
 // RunOptions defines settings for executing multiple tasks.
 type RunOptions struct {
-	MaxParallel int    `json:"max_parallel"`
+	MaxParallel int    `json:"worker_count"` // Fix mismatch: CLI sends worker_count
 	IsStudy     bool   `json:"is_study"`
 	Mode        string `json:"mode"`
 }
@@ -27,6 +27,12 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	tasks := rel.GetTasks()
 	if len(tasks) == 0 {
 		return nil
+	}
+
+	stories := rel.GetStories()
+	storyMap := make(map[string]*release.Story)
+	for _, s := range stories {
+		storyMap[s.ID] = s
 	}
 
 	// Filter for pending tasks only
@@ -46,14 +52,23 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 
 	// Simple topological sort / dependency resolver
 	type node struct {
-		Task     *release.Task
-		Deps     []string
-		Finished bool
+		Task      *release.Task
+		Deps      []string // Task-level dependencies
+		StoryDeps []string // Story-level dependencies
+		Finished  bool
 	}
 
 	nodes := make(map[string]*node)
 	for _, t := range pending {
-		nodes[t.ID] = &node{Task: t, Deps: t.DependsOn}
+		storyDeps := []string{}
+		if story, ok := storyMap[t.StoryID]; ok {
+			storyDeps = story.DependsOn
+		}
+		nodes[t.ID] = &node{
+			Task:      t,
+			Deps:      t.DependsOn,
+			StoryDeps: storyDeps,
+		}
 	}
 
 	var mu sync.Mutex
@@ -63,6 +78,17 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	finishedCount := 0
 	totalToRun := len(pending)
 
+	// Helper to check if all tasks of a story are finished
+	isStoryFinished := func(storyID string) bool {
+		storyTasks := rel.GetTasksForStory(storyID)
+		for _, st := range storyTasks {
+			if st.Status != "done" && st.Status != "approved" {
+				return false
+			}
+		}
+		return true
+	}
+
 	checkReady := func() {
 		mu.Lock()
 		defer mu.Unlock()
@@ -70,14 +96,39 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 			if n.Finished {
 				continue
 			}
-			allDepsDone := true
+
+			// 1. Check Task-level dependencies
+			allTaskDepsDone := true
 			for _, depID := range n.Deps {
+				// Check if the dependency is in the current pending set and not finished
 				if d, ok := nodes[depID]; ok && !d.Finished {
-					allDepsDone = false
+					allTaskDepsDone = false
+					break
+				}
+				// If not in pending set, check actual task status in DB
+				if _, ok := nodes[depID]; !ok {
+					t := rel.GetTask(depID)
+					if t == nil || (t.Status != "done" && t.Status != "approved") {
+						allTaskDepsDone = false
+						break
+					}
+				}
+			}
+			if !allTaskDepsDone {
+				continue
+			}
+
+			// 2. Check Story-level dependencies (only for "root" tasks of a story or all if strict)
+			// PR #8: Root tasks of a story are blocked until ALL tasks from its dependency stories are complete.
+			allStoryDepsDone := true
+			for _, storyDepID := range n.StoryDeps {
+				if !isStoryFinished(storyDepID) {
+					allStoryDepsDone = false
 					break
 				}
 			}
-			if allDepsDone {
+
+			if allStoryDepsDone {
 				readyTasks <- n
 				delete(nodes, id)
 			}

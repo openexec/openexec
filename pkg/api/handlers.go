@@ -103,13 +103,17 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
     // Create RunSpec for deterministic replay if StateStore is available
     var specID string
     if s.StateStore != nil && req.Intent != "" {
+        mode := req.Mode
+        if mode == "" {
+            mode = "danger-full-access"
+        }
         spec := &state.RunSpec{
             SessionID:   req.SessionID,
             Intent:      req.Intent,
             ContextHash: req.ContextHash,
             PromptHash:  req.PromptHash,
             Model:       req.Model,
-            Mode:        req.Mode,
+            Mode:        mode,
         }
         if err := s.StateStore.CreateRunSpec(r.Context(), spec); err != nil {
             log.Printf("[API] CreateRunSpec failed: %v", err)
@@ -168,7 +172,11 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 
     var opts []manager.StartOption
     if body.IsStudy { opts = append(opts, manager.WithIsStudy(true)) }
-    if body.Mode != "" { opts = append(opts, manager.WithExecMode(body.Mode)) }
+    mode := body.Mode
+    if mode == "" {
+        mode = "danger-full-access"
+    }
+    opts = append(opts, manager.WithExecMode(mode))
     if body.BlueprintID != "" { opts = append(opts, manager.WithBlueprint(body.BlueprintID)) }
     if body.TaskDescription != "" { opts = append(opts, manager.WithTaskDescription(body.TaskDescription)) }
 
@@ -524,9 +532,11 @@ func (s *Server) handleStartParallelRuns(w http.ResponseWriter, r *http.Request)
             defer wg.Done()
 
             var opts []manager.StartOption
-            if req.Mode != "" {
-                opts = append(opts, manager.WithExecMode(req.Mode))
+            mode := req.Mode
+            if mode == "" {
+                mode = "danger-full-access"
             }
+            opts = append(opts, manager.WithExecMode(mode))
 
             err := s.Mgr.Start(context.Background(), id, opts...)
 
@@ -606,9 +616,11 @@ func (s *Server) handleStartBlueprintRun(w http.ResponseWriter, r *http.Request)
 		manager.WithBlueprint(blueprintID),
 		manager.WithTaskDescription(req.TaskDescription),
 	}
-	if req.Mode != "" {
-		opts = append(opts, manager.WithExecMode(req.Mode))
+	mode := req.Mode
+	if mode == "" {
+		mode = "danger-full-access"
 	}
+	opts = append(opts, manager.WithExecMode(mode))
 
 	// Log blueprint run creation to audit
 	if s.AuditLogger != nil {
@@ -828,7 +840,7 @@ func (s *Server) handleStartRunFromSession(w http.ResponseWriter, r *http.Reques
 	// Default mode
 	mode := req.Mode
 	if mode == "" {
-		mode = "workspace-write"
+		mode = "danger-full-access"
 	}
 
 	// Validate mode
