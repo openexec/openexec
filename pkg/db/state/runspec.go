@@ -84,7 +84,7 @@ func (s *Store) ListRunSpecsBySession(ctx context.Context, sessionID string, lim
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var specs []*RunSpec
 	for rows.Next() {

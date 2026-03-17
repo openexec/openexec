@@ -47,7 +47,7 @@ func NewStore(dbPath string) (*Store, error) {
 	}
 
 	if err := s.Init(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
@@ -133,7 +133,7 @@ func (s *Store) ensureColumn(table, column, definition string) error {
     if err != nil {
         return err
     }
-    defer rows.Close()
+    defer func() { _ = rows.Close() }()
 
     type colInfo struct {
         cid        int
@@ -403,7 +403,7 @@ func (s *Store) ListAppliedToolCalls(ctx context.Context, runID string) ([]strin
     if err != nil {
         return nil, err
     }
-    defer rows.Close()
+    defer func() { _ = rows.Close() }()
 
     var keys []string
     for rows.Next() {
@@ -497,7 +497,7 @@ func (s *Store) WriteRunStepWithArtifacts(ctx context.Context, step RunStepData,
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Write run step
 	_, err = tx.ExecContext(ctx,
@@ -644,7 +644,7 @@ func (s *Store) ListRuns(ctx context.Context, filter RunFilter) ([]RunRecord, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var runs []RunRecord
 	for rows.Next() {
@@ -697,7 +697,7 @@ func (s *Store) ListRunSteps(ctx context.Context, runID string, limit, offset in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var steps []RunStepRecord
 	for rows.Next() {
@@ -783,7 +783,7 @@ func (s *Store) ListArtifacts(ctx context.Context, artifactType string, limit in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var artifacts []ArtifactRecord
 	for rows.Next() {
@@ -807,7 +807,7 @@ func (s *Store) ListCheckpoints(ctx context.Context, runID string) ([]Checkpoint
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var checkpoints []CheckpointData
 	for rows.Next() {
@@ -885,7 +885,7 @@ func (s *Store) ListSessions(ctx context.Context, projectPath string, limit int)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var sessions []SessionRecord
 	for rows.Next() {

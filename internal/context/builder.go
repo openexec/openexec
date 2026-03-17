@@ -925,7 +925,6 @@ func (b *RoutingAwareBuilder) applyBudgetAndRedact(items []*ContextItem, sensiti
 				newItem.Content = TruncateToTokenLimit(item.Content, remaining)
 				newItem.TokenCount = EstimateTokens(newItem.Content)
 				result = append(result, &newItem)
-				tokensUsed += newItem.TokenCount
 			}
 			break
 		}

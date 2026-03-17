@@ -43,7 +43,7 @@ func (m *Manager) CloseAll() {
 	defer m.mu.Unlock()
 
 	for path, s := range m.stores {
-		s.Close()
+		_ = s.Close()
 		delete(m.stores, path)
 	}
 }

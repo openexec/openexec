@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/openexec/openexec/internal/types"
 )
 
 func TestDefaultExecutor_DeterministicStage_Success(t *testing.T) {
@@ -15,7 +17,7 @@ func TestDefaultExecutor_DeterministicStage_Success(t *testing.T) {
 
 	stage := &Stage{
 		Name:     "test_stage",
-		Type:     StageTypeDeterministic,
+		Type:     types.StageTypeDeterministic,
 		Commands: []string{"echo hello", "echo world"},
 	}
 
@@ -26,8 +28,8 @@ func TestDefaultExecutor_DeterministicStage_Success(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if result.Status != StageStatusCompleted {
-		t.Errorf("Expected status %s, got %s", StageStatusCompleted, result.Status)
+	if result.Status != types.StageStatusCompleted {
+		t.Errorf("Expected status %s, got %s", types.StageStatusCompleted, result.Status)
 	}
 
 	if result.Output == "" {
@@ -42,7 +44,7 @@ func TestDefaultExecutor_DeterministicStage_CommandFailure(t *testing.T) {
 
 	stage := &Stage{
 		Name:     "failing_stage",
-		Type:     StageTypeDeterministic,
+		Type:     types.StageTypeDeterministic,
 		Commands: []string{"exit 1"},
 	}
 
@@ -53,8 +55,8 @@ func TestDefaultExecutor_DeterministicStage_CommandFailure(t *testing.T) {
 		t.Fatalf("Execute returned error (should return result with failed status): %v", err)
 	}
 
-	if result.Status != StageStatusFailed {
-		t.Errorf("Expected status %s, got %s", StageStatusFailed, result.Status)
+	if result.Status != types.StageStatusFailed {
+		t.Errorf("Expected status %s, got %s", types.StageStatusFailed, result.Status)
 	}
 
 	if result.Error == "" {
@@ -70,7 +72,7 @@ func TestDefaultExecutor_DeterministicStage_Timeout(t *testing.T) {
 
 	stage := &Stage{
 		Name:     "slow_stage",
-		Type:     StageTypeDeterministic,
+		Type:     types.StageTypeDeterministic,
 		Commands: []string{"sleep 10"},
 	}
 
@@ -84,8 +86,8 @@ func TestDefaultExecutor_DeterministicStage_Timeout(t *testing.T) {
 		t.Fatalf("Execute returned error: %v", err)
 	}
 
-	if result.Status != StageStatusFailed {
-		t.Errorf("Expected status %s, got %s", StageStatusFailed, result.Status)
+	if result.Status != types.StageStatusFailed {
+		t.Errorf("Expected status %s, got %s", types.StageStatusFailed, result.Status)
 	}
 }
 
@@ -96,7 +98,7 @@ func TestDefaultExecutor_DeterministicStage_NoCommands(t *testing.T) {
 
 	stage := &Stage{
 		Name:     "empty_stage",
-		Type:     StageTypeDeterministic,
+		Type:     types.StageTypeDeterministic,
 		Commands: []string{},
 	}
 
@@ -107,8 +109,8 @@ func TestDefaultExecutor_DeterministicStage_NoCommands(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if result.Status != StageStatusCompleted {
-		t.Errorf("Expected status %s, got %s", StageStatusCompleted, result.Status)
+	if result.Status != types.StageStatusCompleted {
+		t.Errorf("Expected status %s, got %s", types.StageStatusCompleted, result.Status)
 	}
 }
 
@@ -122,7 +124,7 @@ func TestDefaultExecutor_DeterministicStage_MultipleCommands_StopsOnFailure(t *t
 
 	stage := &Stage{
 		Name: "multi_stage",
-		Type: StageTypeDeterministic,
+		Type: types.StageTypeDeterministic,
 		Commands: []string{
 			"echo marker > marker.txt",
 			"exit 1",          // This should fail
@@ -137,8 +139,8 @@ func TestDefaultExecutor_DeterministicStage_MultipleCommands_StopsOnFailure(t *t
 		t.Fatalf("Execute returned error: %v", err)
 	}
 
-	if result.Status != StageStatusFailed {
-		t.Errorf("Expected status %s, got %s", StageStatusFailed, result.Status)
+	if result.Status != types.StageStatusFailed {
+		t.Errorf("Expected status %s, got %s", types.StageStatusFailed, result.Status)
 	}
 
 	// First command should have run
@@ -161,7 +163,7 @@ func TestDefaultExecutor_AgenticStage_NoRunner(t *testing.T) {
 
 	stage := &Stage{
 		Name: "agentic_stage",
-		Type: StageTypeAgentic,
+		Type: types.StageTypeAgentic,
 	}
 
 	input := NewStageInput("run-1", "test task", tmpDir)
@@ -171,8 +173,8 @@ func TestDefaultExecutor_AgenticStage_NoRunner(t *testing.T) {
 		t.Error("Expected error when AgenticRunner is not configured")
 	}
 
-	if result.Status != StageStatusFailed {
-		t.Errorf("Expected status %s, got %s", StageStatusFailed, result.Status)
+	if result.Status != types.StageStatusFailed {
+		t.Errorf("Expected status %s, got %s", types.StageStatusFailed, result.Status)
 	}
 }
 
@@ -188,7 +190,7 @@ func TestDefaultExecutor_AgenticStage_WithSimpleRunner(t *testing.T) {
 
 	stage := &Stage{
 		Name: "agentic_stage",
-		Type: StageTypeAgentic,
+		Type: types.StageTypeAgentic,
 	}
 
 	input := NewStageInput("run-1", "implement feature X", tmpDir)
@@ -198,8 +200,8 @@ func TestDefaultExecutor_AgenticStage_WithSimpleRunner(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if result.Status != StageStatusCompleted {
-		t.Errorf("Expected status %s, got %s", StageStatusCompleted, result.Status)
+	if result.Status != types.StageStatusCompleted {
+		t.Errorf("Expected status %s, got %s", types.StageStatusCompleted, result.Status)
 	}
 
 	if result.Output != "agentic output" {
@@ -227,7 +229,7 @@ func TestDefaultExecutor_Callbacks(t *testing.T) {
 
 	stage := &Stage{
 		Name:     "callback_stage",
-		Type:     StageTypeDeterministic,
+		Type:     types.StageTypeDeterministic,
 		Commands: []string{"echo one", "echo two"},
 	}
 
@@ -256,7 +258,7 @@ func TestBuildAgenticPrompt(t *testing.T) {
 
 	input := NewStageInput("run-1", "Add user authentication", "/project")
 	input.PreviousStages = []*StageResult{
-		{StageName: "gather_context", Status: StageStatusCompleted, Output: "Found 5 relevant files"},
+		{StageName: "gather_context", Status: types.StageStatusCompleted, Output: "Found 5 relevant files"},
 	}
 	input.ContextPack["src/auth.go"] = "contents..."
 

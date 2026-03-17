@@ -73,12 +73,12 @@ func (m *Manager) Create(ctx context.Context, runID string) (*Worktree, error) {
 	// Create the worktree with a new branch
 	cmd := exec.CommandContext(ctx, "git", "worktree", "add", "-b", branchName, worktreePath)
 	cmd.Dir = m.repoDir
-	output, err := cmd.CombinedOutput()
+	_, err := cmd.CombinedOutput()
 	if err != nil {
 		// Try without creating a new branch (branch might already exist)
 		cmd = exec.CommandContext(ctx, "git", "worktree", "add", worktreePath, branchName)
 		cmd.Dir = m.repoDir
-		output, err = cmd.CombinedOutput()
+		output, err := cmd.CombinedOutput()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create worktree: %s: %w", string(output), err)
 		}

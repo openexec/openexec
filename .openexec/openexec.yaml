@@ -6,4 +6,6 @@ quality:
   # Enable default quality gates
   gates:
     - lint
-  custom: []
+  custom:
+    - name: lint
+      command: "go vet ./..."

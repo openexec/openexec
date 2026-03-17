@@ -43,8 +43,8 @@ func (r *Registry) Get(name string) (Action, bool) {
 // DefaultRegistry returns a registry populated with built-in actions.
 func DefaultRegistry(projectDir string) *Registry {
 	r := NewRegistry()
-	r.Register(NewRunGatesAction(projectDir))
-	r.Register(NewBuildContextAction(projectDir))
-	r.Register(NewApplyPatchAction(projectDir))
+	_ = r.Register(NewRunGatesAction(projectDir))
+	_ = r.Register(NewBuildContextAction(projectDir))
+	_ = r.Register(NewApplyPatchAction(projectDir))
 	return r
 }

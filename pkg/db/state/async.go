@@ -52,7 +52,9 @@ func (w *AsyncWriter) Close(ctx context.Context) {
     if !ok {
         // default 3s
         t := time.Now().Add(3 * time.Second)
-        ctx, _ = context.WithDeadline(ctx, t)
+        var cancel context.CancelFunc
+        ctx, cancel = context.WithDeadline(ctx, t)
+        defer cancel()
     } else {
         _ = deadline
     }

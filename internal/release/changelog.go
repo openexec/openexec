@@ -358,10 +358,6 @@ func statusEmoji(status string) string {
 
 // GenerateReleaseNotes generates release notes suitable for GitHub/GitLab releases.
 func (g *ChangelogGenerator) GenerateReleaseNotes(opts *ChangelogOptions) (string, error) {
-	if opts == nil {
-		opts = DefaultChangelogOptions()
-	}
-
 	release := g.manager.GetRelease()
 	if release == nil {
 		return "", fmt.Errorf("no release defined")

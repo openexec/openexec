@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/openexec/openexec/internal/types"
 )
 
 // MockExecutor is a test executor that can be configured to return specific results.
@@ -123,8 +125,8 @@ func TestEngine_Execute_SimpleFlow(t *testing.T) {
 		Name:         "Test",
 		InitialStage: "stage1",
 		Stages: map[string]*Stage{
-			"stage1": {Name: "stage1", Type: StageTypeDeterministic, OnSuccess: "stage2"},
-			"stage2": {Name: "stage2", Type: StageTypeDeterministic, OnSuccess: "complete"},
+			"stage1": {Name: "stage1", Type: types.StageTypeDeterministic, OnSuccess: "stage2"},
+			"stage2": {Name: "stage2", Type: types.StageTypeDeterministic, OnSuccess: "complete"},
 		},
 	}
 
@@ -171,7 +173,7 @@ func TestEngine_Execute_WithRetry(t *testing.T) {
 		Stages: map[string]*Stage{
 			"stage1": {
 				Name:       "stage1",
-				Type:       StageTypeAgentic,
+				Type:       types.StageTypeAgentic,
 				MaxRetries: 2,
 				OnSuccess:  "complete",
 				OnFailure:  "stage1", // Retry same stage
@@ -227,7 +229,7 @@ func TestEngine_Execute_MaxRetriesExceeded(t *testing.T) {
 		Stages: map[string]*Stage{
 			"stage1": {
 				Name:       "stage1",
-				Type:       StageTypeAgentic,
+				Type:       types.StageTypeAgentic,
 				MaxRetries: 2,
 				OnSuccess:  "complete",
 				OnFailure:  "stage1",
@@ -388,7 +390,7 @@ func TestStageResult_Complete(t *testing.T) {
 	result := NewStageResult("test", 1)
 	result.Complete("output data")
 
-	if result.Status != StageStatusCompleted {
+	if result.Status != types.StageStatusCompleted {
 		t.Errorf("status = %s, want completed", result.Status)
 	}
 	if result.Output != "output data" {
@@ -407,7 +409,7 @@ func TestStageResult_Fail(t *testing.T) {
 	result := NewStageResult("test", 1)
 	result.Fail("error message")
 
-	if result.Status != StageStatusFailed {
+	if result.Status != types.StageStatusFailed {
 		t.Errorf("status = %s, want failed", result.Status)
 	}
 	if result.Error != "error message" {
