@@ -1,26 +1,28 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/openexec/openexec/main/docs/assets/logo.svg" alt="OpenExec Logo" width="200"/>
+  <img src="docs/assets/logo.svg" alt="OpenExec Logo" width="160"/>
 </p>
 
 <h1 align="center">OpenExec</h1>
 
 <p align="center">
-  <strong>The Deterministic AI Operating System: From Intent to Production</strong>
+  <strong>Autonomous AI Operating System for Validated Code Orchestration</strong><br>
+  <em>Closing the gap between human intent and production-ready implementation.</em>
 </p>
 
 <p align="center">
-  <a href="#what-is-openexec">Overview</a> •
-  <a href="#conversational-orchestration">Conversational Mode</a> •
-  <a href="#how-to-start">Quick Start</a> •
-  <a href="docs/GET_STARTED.md">Getting Started Guide</a> •
+  <img src="https://img.shields.io/github/v/release/openexec/openexec?style=flat-square&color=orange" alt="Version"/>
+  <img src="https://img.shields.io/github/actions/workflow/status/openexec/openexec/go.yml?style=flat-square" alt="Build Status"/>
+  <img src="https://img.shields.io/badge/go-%2300ADD8.svg?style=flat-square&logo=go&logoColor=white" alt="Go"/>
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/GDPR-Compliant-green.svg?style=flat-square" alt="GDPR"/>
+</p>
+
+<p align="center">
+  <a href="https://openexec.io">Website</a> •
+  <a href="docs/GET_STARTED.md">Get Started</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#contributing">Contributing</a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"/>
-  <img src="https://img.shields.io/badge/status-active-success.svg" alt="Status"/>
-  <img src="https://img.shields.io/badge/platform-cross--platform-informational.svg" alt="Platform"/>
+  <a href="#blueprints">Blueprints</a> •
+  <a href="https://github.com/openexec/openexec/issues">Report Bug</a>
 </p>
 
 ---
@@ -30,6 +32,12 @@
 **OpenExec** is a single-binary task orchestration framework designed to close the gap between human high-level intent and verified, production-ready code.
 
 Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in a structured pipeline. It doesn't just write code; it **plans, reviews, executes, and validates** every change through a recursive autonomous loop.
+
+## ⚡ Core Capabilities
+
+| 🛡️ **Safety Gates** | 🧠 **Local Context** | 🔐 **PII Shield** |
+| :--- | :--- | :--- |
+| YAML-based guardrails block unsafe code before it hits your disk. | Local indexing ensures LLMs only see what they need—reducing bloat and cost. | Automatic local scrubbing of emails, IP addresses, and sensitive metadata. |
 
 ## Core Pillars: Turning Policy into Reality
 
