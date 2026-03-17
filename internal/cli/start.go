@@ -816,12 +816,12 @@ func init() {
     runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
     runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Execute a single deterministic quickfix without planning (task title)")
     runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
-    runCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
+    runCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	blueprintCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	blueprintCmd.Flags().StringVar(&blueprintID, "blueprint-id", "standard_task", "Blueprint to execute (standard_task, quick_fix)")
 	blueprintCmd.Flags().BoolVar(&blueprintClarify, "clarify", false, "Start interactive clarification interview before execution")
-	blueprintCmd.Flags().StringVar(&runMode, "mode", "workspace-write", "Execution mode: read-only | workspace-write | danger-full-access")
+	blueprintCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(runCmd)

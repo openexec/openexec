@@ -828,7 +828,7 @@ func (s *Server) handleStartRunFromSession(w http.ResponseWriter, r *http.Reques
 	// Default mode
 	mode := req.Mode
 	if mode == "" {
-		mode = "workspace-write"
+		mode = "danger-full-access"
 	}
 
 	// Validate mode

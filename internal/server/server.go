@@ -158,7 +158,7 @@ func New(cfg Config) (*Server, error) {
             if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ExecMode != "" {
                 return pc.Execution.ExecMode
             }
-            return "workspace-write"
+            return "danger-full-access"
         }(),
     })
     if err != nil {
