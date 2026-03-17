@@ -44,6 +44,11 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 
 	log.Printf("[Scheduler] Starting execution of %d pending tasks (parallel=%d)", len(pending), opts.MaxParallel)
 
+	// Resolve story-level dependencies into task-level dependencies.
+	// If story US-002 depends on US-001, then the first task of US-002
+	// must wait for all tasks of US-001 to finish.
+	storyDeps := resolveStoryDeps(rel)
+
 	// Simple topological sort / dependency resolver
 	type node struct {
 		Task     *release.Task
@@ -53,7 +58,12 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 
 	nodes := make(map[string]*node)
 	for _, t := range pending {
-		nodes[t.ID] = &node{Task: t, Deps: t.DependsOn}
+		deps := append([]string{}, t.DependsOn...)
+		// Add story-level deps for this task
+		if extra, ok := storyDeps[t.ID]; ok {
+			deps = append(deps, extra...)
+		}
+		nodes[t.ID] = &node{Task: t, Deps: deps}
 	}
 
 	var mu sync.Mutex
@@ -166,4 +176,66 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	}
 
 	return nil
+}
+
+// resolveStoryDeps builds a map of taskID → extra dependency taskIDs derived
+// from story-level dependencies. For each task whose parent story depends on
+// other stories, the task gains dependencies on all tasks in those stories.
+// This ensures no task in US-002 starts before all tasks in US-001 finish
+// when US-002.DependsOn includes US-001.
+func resolveStoryDeps(rel *release.Manager) map[string][]string {
+	stories := rel.GetStories()
+	if len(stories) == 0 {
+		return nil
+	}
+
+	// Build story ID → task IDs map
+	storyTasks := make(map[string][]string)
+	for _, t := range rel.GetTasks() {
+		if t.StoryID != "" {
+			storyTasks[t.StoryID] = append(storyTasks[t.StoryID], t.ID)
+		}
+	}
+
+	// For each story with dependencies, find the first task in that story
+	// (the one with no intra-story deps) and make it depend on all tasks
+	// from the dependency stories.
+	extra := make(map[string][]string)
+	for _, s := range stories {
+		if len(s.DependsOn) == 0 {
+			continue
+		}
+		// Collect all task IDs from dependency stories
+		var depTaskIDs []string
+		for _, depStoryID := range s.DependsOn {
+			depTaskIDs = append(depTaskIDs, storyTasks[depStoryID]...)
+		}
+		if len(depTaskIDs) == 0 {
+			continue
+		}
+		// Find root tasks of this story (tasks with no intra-story deps)
+		myTasks := storyTasks[s.ID]
+		myTaskSet := make(map[string]bool, len(myTasks))
+		for _, id := range myTasks {
+			myTaskSet[id] = true
+		}
+		for _, t := range myTasks {
+			task := rel.GetTask(t)
+			if task == nil {
+				continue
+			}
+			hasIntraDep := false
+			for _, dep := range task.DependsOn {
+				if myTaskSet[dep] {
+					hasIntraDep = true
+					break
+				}
+			}
+			if !hasIntraDep {
+				// This is a root task of the story — block it on dep story tasks
+				extra[t] = append(extra[t], depTaskIDs...)
+			}
+		}
+	}
+	return extra
 }
