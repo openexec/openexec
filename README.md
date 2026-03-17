@@ -5,8 +5,8 @@
 <h1 align="center">OpenExec</h1>
 
 <p align="center">
-  <strong>Autonomous AI Operating System for Validated Code Orchestration</strong><br>
-  <em>Closing the gap between human intent and production-ready implementation.</em>
+  <strong>The Deterministic AI Operating System: From Intent to Production</strong><br>
+  <em>Treating AI systems as operational software, not just prototypes.</em>
 </p>
 
 <p align="center">
@@ -29,40 +29,26 @@
 
 ## What is OpenExec?
 
-**OpenExec** is a single-binary task orchestration framework designed to close the gap between human high-level intent and verified, production-ready code.
+**OpenExec** is a single-binary task orchestration framework designed to treat AI agents as managed workers in a structured, production-grade pipeline. Built by a platform engineer with 20+ years of high-scale experience, it bridges the machine speed of AI with the institutional trust required for real-world business flows.
 
-Unlike "chat-and-hope" AI tools, OpenExec treats AI agents as managed workers in a structured pipeline. It doesn't just write code; it **plans, reviews, executes, and validates** every change through a recursive autonomous loop.
+Unlike experimental "chat-and-hope" AI tools, OpenExec treats AI orchestration as **operational software**: observable, deterministic where required, and fully auditable. It plans, reviews, executes, and validates every change through a recursive autonomous loop.
 
 ## ⚡ Core Capabilities
 
 | 🛡️ **Safety Gates** | 🧠 **Local Context** | 🔐 **PII Shield** |
 | :--- | :--- | :--- |
-| YAML-based guardrails block unsafe code before it hits your disk. | Local indexing ensures LLMs only see what they need—reducing bloat and cost. | Automatic local scrubbing of emails, IP addresses, and sensitive metadata. |
+| YAML-based guardrails block unsafe code before it hits your disk. | Local indexing ensures LLMs only see what they need—reducing cost and risk. | Automatic local scrubbing of emails, IP addresses, and sensitive metadata. |
 
-## Core Pillars: Turning Policy into Reality
+## Core Pillars: Turning Intent into Reliable Execution
 
-OpenExec bridges the gap between machine speed and institutional trust by embedding governance directly into the architecture.
+OpenExec embeds governance and observability directly into the orchestration architecture.
 
-1.  **Safety by Design (Rule-Based Logic):** Translate laws and regulations into local YAML guardrails. Rules act as physical gates—if an action breaks your policy, the system blocks it locally before it happens.
-2.  **Institutional Memory (Owned Logic):** You own the "Library" of logic the AI builds. Your organizational patterns stay local, ensuring you can swap AI providers without losing your intelligence.
-3.  **Information Limiting (Privacy-First):** Control exactly what external APIs see. Sensitive metadata—like API keys, server IPs, and full network maps—stay local. Cloud models only receive the specific context required for the task.
-4.  **GDPR Compliance (PII Shield):** Detect and scrub Personally Identifiable Information (PII) locally. Automatically masks emails, Finnish personal identity codes (HETU), IP addresses, and API keys before they reach any external cloud model.
-5.  **Digital Flight Recorder:** Records not just *what* changed, but *why*. Captures the complete reasoning chain in a tamper-proof vault for public sector accountability.
-6.  **Multi-Platform Resilience:** Native support for macOS, Linux, and Windows. Includes **Automatic Port Probing** to resolve conflicts and handles OS security (like Gatekeeper) out-of-the-box.
-
-**Governance isn't a speed limit; it's the brakes that allow you to move at machine speed safely.**
-
-
----
-
-## Local Knowledge Map
-
-OpenExec maintains local project context to improve precision and reduce prompt bloat. Indexers and gatherers assemble deterministic context packs for execution steps.
-
-- Precision: focus execution on the smallest necessary code slices.
-- Privacy: keep source local; only minimal context is sent to providers when required.
-
-Context indexing is optional and used internally by the orchestrator; no special CLI is required to get started.
+1.  **Operational AI:** AI systems are treated as software dependencies with strict SLAs, not black-box experiments.
+2.  **Safety by Design (Rule-Based Logic):** Translate organizational policies into local YAML guardrails. Rules act as physical gates—if an action breaks policy, the system blocks it locally before it happens.
+3.  **Production-Grade Observability:** Built-in instrumentation for every decision and tool call. Records not just *what* changed, but *why*, providing a complete reasoning chain for accountability.
+4.  **Institutional Memory (Owned Logic):** You own the library of logic the AI builds. Organizational patterns stay local, enabling you to swap AI providers without losing operational intelligence.
+5.  **Information Limiting (Privacy-First):** Precise context assembly ensures cloud models only receive the specific context required for the task. Sensitive metadata stays behind your firewall.
+6.  **Digital Flight Recorder:** Every autonomous loop is recorded in a tamper-proof SQLite vault, ensuring full auditability for compliance and debugging.
 
 ---
 
@@ -76,57 +62,22 @@ Download the latest binary for your platform, or use the automated script:
 ```bash
 # Default (installs to /usr/local/bin or ~/.local/bin)
 curl -sSfL https://openexec.io/install.sh | sh
-
-# Non-sudo / Custom path
-curl -sSfL https://openexec.io/install.sh | INSTALL_DIR=$HOME/bin sh
 ```
 
-The script automatically falls back to `~/.local/bin` if it doesn't have permission to write to system directories.
-
-Alternatively, build from source:
-```bash
-go build -o openexec ./cmd/openexec
-```
-
-### 2. Updating
-To update to the latest version at any time:
-```bash
-openexec update
-```
-
-## The Execution Flow
+### 2. The Execution Flow
 Follow these steps to transform an idea into a verified project:
 
-1.  **Initialize (`git init && openexec init`)**
-    Set up Git if necessary, then run the OpenExec initialization to select your preferred AI models.
-2.  **Guided Interview (`openexec wizard`)**
-    Chat with the AI Architect to define your project shape, platform, and contracts. It generates a verified `INTENT.md`.
-3.  **Plan (`openexec plan INTENT.md`)**
-    OpenExec decomposes your intent into a structured set of technical stories and tasks by chatting with the AI agent.
-4.  **Start Server (`openexec start --ui`)**
-    Launch the integrated server and open the web dashboard. Use `--daemon` for background mode with **Automated PID Tracking**.
-5.  **Run (`openexec run`)**
-    The agents begin implementing your tasks through a specialized **Autonomous Pipeline**.
-
-### Task Lifecycle: Blueprint Stages
-
-When running in **Blueprint mode** (default for `openexec run`), tasks progress through deterministic and agentic stages:
-
-| Stage | Type | Description |
-|-------|------|-------------|
-| **gather_context** | Deterministic | Gather relevant files and context for the task |
-| **implement** | Agentic | Implement the requested changes |
-| **lint** | Deterministic | Run linting checks |
-| **fix_lint** | Agentic | Fix linting errors (if needed) |
-| **test** | Deterministic | Run tests |
-| **fix_tests** | Agentic | Fix failing tests (if needed) |
-| **review** | Agentic | Review changes and generate summary |
+1.  **Initialize (`git init && openexec init`)**: Set up the project and select your preferred AI models.
+2.  **Guided Interview (`openexec wizard`)**: Chat with the AI Architect to generate a verified `INTENT.md`.
+3.  **Plan (`openexec plan INTENT.md`)**: Decompose intent into a structured set of technical stories and tasks.
+4.  **Start Server (`openexec start --ui`)**: Launch the visual dashboard and background daemon.
+5.  **Run (`openexec run`)**: Execute tasks through the specialized **Autonomous Pipeline**.
 
 ---
 
 ## Architecture
 
-OpenExec is a **Self-Contained Monolith** designed for atomic deployment and maximum reliability. It follows the converged architecture pattern used by modern AI coding tools: **deterministic local runtime** with **small local LLM as gatekeeper** and **frontier model for hard reasoning**.
+OpenExec follows a **Self-Contained Monolith** pattern for maximum reliability. It combines a deterministic local runtime with frontier models for high-level reasoning.
 
 ```mermaid
 graph TD
@@ -136,13 +87,6 @@ graph TD
     Tools --> Policy[Policy/Sandbox Layer]
     Policy --> Blueprint[Blueprint Engine]
     Blueprint --> Models[Model Layer]
-
-    subgraph "Tool Layer"
-        Tools --> T1[repo_readonly]
-        Tools --> T2[coding_backend]
-        Tools --> T3[coding_frontend]
-        Tools --> T4[debug_ci]
-    end
 
     subgraph "Model Layer"
         Models --> Local[Local LLM: routing, classification]
@@ -159,72 +103,15 @@ graph TD
     style DB fill:#161b22,color:#c9d1d9
 ```
 
-### Three Execution Modes
-
-| Mode | Description | Side Effects |
-|------|-------------|--------------|
-| **Chat** | Conversational, no side effects | None |
-| **Task** | Scoped action, produces artifacts | Creates files/patches |
-| **Run** | Blueprint execution over task | Full automation |
-
-### Seven Architecture Layers
-
-| Layer | Purpose |
-|-------|---------|
-| **Interaction** | CLI, Web UI, triggers |
-| **Session/Runtime** | Session state, approvals, mode transitions |
-| **Context Assembly** | Files, diffs, rules, docs, repo metadata |
-| **Tool Layer** | Toolsets (repo_readonly, coding_backend, etc.) |
-| **Policy/Sandbox** | Permissions, approvals, resource limits |
-| **Orchestration** | Blueprints (gather_context → implement → lint → test → review) |
-| **Model Layer** | Local LLM (routing) + Frontier LLM (implementation) |
-
-| Component | Role | Implementation |
-| :--- | :--- | :--- |
-| **CLI** | Unified Interface | Go (Cobra) |
-| **Planner** | Story & Goal Generation | Chat with AI Agent |
-| **Wizard** | Requirement Gathering | Chat with AI Agent |
-| **Orchestrator** | Durable Task Execution | Go + SQLite |
-| **Blueprint Engine** | Stage-based execution | Go (internal/blueprint) |
-| **DCP** | Deterministic routing | Go (internal/dcp) |
-| **Dashboard** | Visual Hub | React (Embedded in binary) |
-
----
-
-## Local UI Development
-
-The CLI and orchestration engine are delivered as a single binary with the UI embedded. For development of the React dashboard:
-
-```bash
-cd ui
-npm install
-npm run dev -- --port 3001
-```
-
-Open the dashboard at http://localhost:3001. The dev server proxies requests to the backend started via `openexec start`.
-
-
 ---
 
 ## Contributing
 
-We welcome engineers, architects, and AI enthusiasts to help evolve the orchestration plane.
+We welcome engineers and AI enthusiasts to help evolve the orchestration plane.
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
 <p align="center">
-  Built with AI, for AI-assisted development.
+  Built with AI, for production-grade AI orchestration.
 </p>
-
-
-
-## Architecture & Visualization
-
-- Read the high‑level architecture at `docs/ARCHITECTURE.md`.
-- Use `docs/VISUALIZATION_GUIDE.md` to generate diagrams (swimlanes, nodes/edges, Mermaid starter, runner/health callouts).
-
-Key references:
-- Artifacts: INTENT.md (PRD), `.openexec/openexec.db` (SQLite state), `.openexec/artifacts/` (patches, summaries)
-- Runner: server resolves model at startup; `GET /api/health` returns `{ runner: { command, args, model } }`
-- Runs: create via `POST /api/v1/runs` then `POST /api/v1/runs/{id}/start`. Poll status with `GET /api/v1/runs/{id}`.
