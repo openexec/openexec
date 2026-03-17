@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/openexec/openexec-docs/main/static/img/logo.svg" alt="OpenExec Logo" width="160"/>
+  <img src="https://raw.githubusercontent.com/openexec/.github/main/profile/logo.svg" alt="OpenExec Logo" width="160"/>
 </p>
 
 <h1 align="center">OpenExec</h1>
