@@ -61,7 +61,7 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 		"name": "gemini-test",
 		"execution": {
 			"executor_model": "gemini-3.1-pro-preview",
-			"parallel_enabled": false
+			"worker_count": 1
 		}
 	}`
 	_ = os.WriteFile(filepath.Join(tmpDir, "openexec.yaml"), []byte("project:\n  name: gemini-test\n"), 0644)

@@ -240,16 +240,11 @@ Examples:
 		}
 
 		// Execute all pending tasks
-		// Set mode to "run" for run command execution (full automation)
-		execMode := runMode
-		if execMode == "" || execMode == "workspace-write" || execMode == "read-only" || execMode == "danger-full-access" {
-			// These are execution permission modes, not operational modes
-			// Default to "run" operational mode
-			execMode = "run"
-		}
+		// Pass the exec permission mode (not the operational mode) to the scheduler.
+		// The --mode flag controls permission level (danger-full-access, workspace-write, etc).
 		runOpts := map[string]any{
-			"worker_count": config.Execution.WorkerCount,
-			"mode":         execMode,
+			"max_parallel": config.Execution.WorkerCount,
+			"mode":         runMode,
 		}
 		if len(args) > 0 {
 			runOpts["task_ids"] = []string{args[0]}
@@ -388,17 +383,11 @@ Examples:
 		}
 
 		// Trigger blueprint run via API
-		// Blueprint runs use "run" mode for full automation
-		blueprintRunMode := runMode
-		if blueprintRunMode == "" || blueprintRunMode == "workspace-write" {
-			// Map execution permission mode to operational mode
-			// Default to "run" mode for blueprint execution
-			blueprintRunMode = "run"
-		}
+		// Pass exec permission mode directly — don't conflate with operational mode.
 		payload := map[string]any{
 			"blueprint_id":     blueprintID,
 			"task_description": taskDescription,
-			"mode":             blueprintRunMode,
+			"mode":             runMode,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -560,14 +549,9 @@ func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string,
 func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
 	isStudy := isStudyTask(task.Title)
 
-	// Determine operational mode - default to "run" for task execution
-	execMode := runMode
-	if execMode == "" {
-		execMode = "run"
-	}
-
+	// Pass exec permission mode directly — don't conflate with operational mode.
 	payload := map[string]any{
-		"mode": execMode,
+		"mode": runMode,
 	}
 	if isStudy {
 		payload["is_study"] = true

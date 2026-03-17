@@ -15,10 +15,7 @@ import (
 var (
 	initPlannerModel   string
 	initExecutorModel  string
-	initReviewEnabled  bool
-	initReviewerModel  string
 	initNonInteractive bool
-	initParallel       bool
 	initWorkerCount    int
 	initForce          bool
 )
@@ -81,8 +78,8 @@ The project name defaults to the current directory name if not provided.`,
 		}
 
 		// Interactive mode if not explicitly set via flags
-		var plannerModel, executorModel, reviewerModel string
-		var reviewEnabled, parallelEnabled, gitCommitEnabled, gitPushEnabled bool
+		var plannerModel, executorModel string
+		var gitCommitEnabled bool
 		var workerCount int
 
 		if !initNonInteractive {
@@ -98,25 +95,15 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			// 2. Execution Config prompt
-			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled = promptExecutionConfig(cmd)
+			plannerModel, executorModel, workerCount, gitCommitEnabled = promptExecutionConfig(cmd)
 		} else {
 			if projectName == "" {
 				projectName = defaultProjectName
 			}
 			plannerModel = initPlannerModel
 			executorModel = initExecutorModel
-			reviewEnabled = initReviewEnabled
-			reviewerModel = initReviewerModel
-
-			// Respect flag if provided in non-interactive mode
-			parallelEnabled = initParallel
 			workerCount = initWorkerCount
-			if !parallelEnabled {
-				workerCount = 1
-			}
-
 			gitCommitEnabled = false
-			gitPushEnabled = false
 		}
 
 		// Initialize the project structure
@@ -127,18 +114,13 @@ The project name defaults to the current directory name if not provided.`,
 
 		// Set execution config
 		cfg.GitCommitEnabled = gitCommitEnabled
-		cfg.GitPushEnabled = gitPushEnabled
 		cfg.Execution = project.ExecutionConfig{
-			PlannerModel:    plannerModel,
-			ExecutorModel:   executorModel,
-			ReviewEnabled:   reviewEnabled,
-			ReviewerModel:   reviewerModel,
-			MaxIterations:   10,
-			Port:            8080,
-			ParallelEnabled: parallelEnabled,
-			WorkerCount:     workerCount,
-			TimeoutSeconds:  600,
-			ExecMode:        "danger-full-access",
+			PlannerModel:   plannerModel,
+			ExecutorModel:  executorModel,
+			Port:           8080,
+			WorkerCount:    workerCount,
+			TimeoutSeconds: 600,
+			ExecMode:       "danger-full-access",
 		}
 
 		// Save updated config
@@ -165,19 +147,15 @@ The project name defaults to the current directory name if not provided.`,
 func init() {
 	initCmd.Flags().StringVar(&initPlannerModel, "planner", "sonnet", "Model to use for planning phase")
 	initCmd.Flags().StringVar(&initExecutorModel, "executor", "sonnet", "Model to use for task execution")
-	initCmd.Flags().BoolVar(&initReviewEnabled, "review", false, "Enable code review after task execution")
-	initCmd.Flags().BoolVar(&initNonInteractive, "no-review", false, "Disable code review (non-interactive)")
-	initCmd.Flags().StringVar(&initReviewerModel, "reviewer", "opus", "Model to use for code review")
 	initCmd.Flags().BoolVarP(&initNonInteractive, "yes", "y", false, "Non-interactive mode (use defaults)")
-	initCmd.Flags().BoolVar(&initParallel, "parallel", true, "Enable parallel task execution (non-interactive)")
-	initCmd.Flags().IntVar(&initWorkerCount, "worker-count", 4, "Number of concurrent workers (non-interactive)")
+	initCmd.Flags().IntVar(&initWorkerCount, "worker-count", 4, "Number of concurrent workers (1 = sequential)")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Force re-initialization of an existing project")
 
 	rootCmd.AddCommand(initCmd)
 }
 
 // promptExecutionConfig interactively prompts for execution configuration
-func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int, gitCommitEnabled bool, gitPushEnabled bool) {
+func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, workerCount int, gitCommitEnabled bool) {
 	reader := bufio.NewReader(cmd.InOrStdin())
 
 	fmt.Println("\n=== Execution Settings ===")
@@ -196,20 +174,6 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		executorModel = plannerModel
 	}
 
-	// Review configuration
-	fmt.Printf("\nEnable code review after task execution? [Y/n]: ")
-	answer, _ = reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-
-	reviewEnabled = true
-	if answer == "n" || answer == "no" {
-		reviewEnabled = false
-	}
-
-	if reviewEnabled {
-		reviewerModel = selectModelInteractively(reader, "reviewer", initReviewerModel)
-	}
-
 	// Git configuration
 	fmt.Printf("\nEnable autonomous local commits? [y/N]: ")
 	answer, _ = reader.ReadString('\n')
@@ -219,38 +183,19 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		gitCommitEnabled = true
 	}
 
-	gitPushEnabled = false
-	if gitCommitEnabled {
-		fmt.Printf("Enable autonomous remote push on release completion? [y/N]: ")
-		answer, _ = reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer == "y" || answer == "yes" {
-			gitPushEnabled = true
-		}
+	// Worker count (1 = sequential, >1 = parallel)
+	workerCount = 4
+	fmt.Printf("\nNumber of concurrent workers (1 = sequential) [%d]: ", workerCount)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimSpace(line)
+	if line != "" {
+		fmt.Sscanf(line, "%d", &workerCount)
 	}
-
-	// Parallel configuration
-	fmt.Printf("\nEnable parallel task execution? [Y/n]: ")
-	answer, _ = reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-
-	parallelEnabled = true
-	if answer == "n" || answer == "no" {
-		parallelEnabled = false
+	if workerCount < 1 {
 		workerCount = 1
 	}
 
-	if parallelEnabled {
-		workerCount = 4
-		fmt.Printf("Number of concurrent workers [%d]: ", workerCount)
-		line, _ := reader.ReadString('\n')
-		line = strings.TrimSpace(line)
-		if line != "" {
-			fmt.Sscanf(line, "%d", &workerCount)
-		}
-	}
-
-	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled
+	return plannerModel, executorModel, workerCount, gitCommitEnabled
 }
 
 // ensureGitignore ensures .gitignore exists and contains .openexec entries.

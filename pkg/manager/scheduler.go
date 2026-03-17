@@ -105,7 +105,10 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 				if opts.IsStudy {
 					optsList = append(optsList, WithIsStudy(true))
 				}
-				if opts.Mode != "" {
+				// Only override ExecMode for valid permission modes.
+				// Operational modes (chat/task/run) must not replace the exec permission.
+				switch opts.Mode {
+				case "read-only", "workspace-write", "danger-full-access":
 					optsList = append(optsList, WithExecMode(opts.Mode))
 				}
 				
