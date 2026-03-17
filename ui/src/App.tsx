@@ -88,7 +88,7 @@ const App: React.FC<AppProps> = ({ config }) => {
   const [view, setView] = useState<'chat' | 'knowledge' | 'usage' | 'replay'>('chat')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <nav style={navStyles.nav}>
         <button 
           style={{ ...navStyles.btn, ...(view === 'chat' ? navStyles.activeBtn : {}) }}
@@ -115,7 +115,7 @@ const App: React.FC<AppProps> = ({ config }) => {
           Replay
         </button>
       </nav>
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {view === 'chat' ? (
           <ChatPage config={mergedConfig} />
         ) : view === 'knowledge' ? (

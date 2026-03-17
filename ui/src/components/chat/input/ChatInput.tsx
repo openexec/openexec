@@ -56,9 +56,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onChange={handleChange}
           onSubmit={handleSubmit}
           placeholder={placeholder}
-          disabled={disabled || isSubmitting}
+          disabled={disabled && !isSubmitting} // Allow typing even if disabled (e.g. while waiting for response) unless it's a hard disable
           minRows={1}
           maxRows={6}
+          autoFocus
         />
 
         <SendButton
@@ -67,6 +68,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           isLoading={isSubmitting}
         />
       </div>
+...
 
       {/* Help text */}
       <div className="chat-input__help" style={styles.help}>

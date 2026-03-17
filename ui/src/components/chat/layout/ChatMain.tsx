@@ -107,7 +107,8 @@ const ChatMain: React.FC<ChatMainProps> = ({
   }, [toolCalls])
 
   // Determine if we can send messages
-  const canSendMessage = !!session && !isSubmitting && !(loopState?.isRunning && !loopState?.isPaused)
+  // We still gate the SUBMIT, but we want the input to be interactable for typing/drafting
+  const canSubmitMessage = !!session && !isSubmitting && !(loopState?.isRunning && !loopState?.isPaused)
 
   // Get placeholder text based on state
   const getPlaceholder = () => {
@@ -175,7 +176,7 @@ const ChatMain: React.FC<ChatMainProps> = ({
       <div className="chat-main__input" style={mainStyles.input}>
         <ChatInput
           onSubmit={onSendMessage}
-          disabled={!canSendMessage}
+          disabled={isSubmitting} // Only hard-disable while physically submitting
           placeholder={getPlaceholder()}
           isSubmitting={isSubmitting}
         />

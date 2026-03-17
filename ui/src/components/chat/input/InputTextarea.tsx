@@ -20,6 +20,8 @@ export interface InputTextareaProps {
   minRows?: number
   /** Maximum rows */
   maxRows?: number
+  /** Auto-focus on mount */
+  autoFocus?: boolean
 }
 
 const InputTextarea: React.FC<InputTextareaProps> = ({
@@ -30,8 +32,16 @@ const InputTextarea: React.FC<InputTextareaProps> = ({
   disabled = false,
   minRows = 1,
   maxRows = 10,
+  autoFocus = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-focus on mount
+  useEffect(() => {
+    if (autoFocus && textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }, [autoFocus])
 
   // Auto-resize textarea based on content
   const adjustHeight = useCallback(() => {
