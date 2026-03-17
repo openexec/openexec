@@ -44,9 +44,9 @@ func TestBlueprintExecutor_InvokesQualityGates(t *testing.T) {
 		WorkDir:         t.TempDir(),
 		BlueprintID:     "quick_fix",
 		TaskDescription: "Fix something",
-		// Mock a successful execution
+		// Mock a successful agentic execution using stream-JSON that Parser understands
 		CommandName: "echo",
-		CommandArgs: []string{"phase-complete"},
+		CommandArgs: []string{`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"openexec_signal","input":{"type":"phase-complete"}}]}}`},
 	}
 
 	p, events := New(cfg, WithGateRunner(spyRunner))
@@ -84,7 +84,7 @@ func TestBlueprintExecutor_EmptyStage_StillRunsGates(t *testing.T) {
 		TaskDescription: "Verify empty stage gating",
 		// Override to successfully mock execution for all stages
 		CommandName: "echo",
-		CommandArgs: []string{"phase-complete"},
+		CommandArgs: []string{`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"openexec_signal","input":{"type":"phase-complete"}}]}}`},
 	}
 
 	p, events := New(cfg, WithGateRunner(spyRunner))

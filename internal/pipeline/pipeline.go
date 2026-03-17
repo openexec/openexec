@@ -322,6 +322,11 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	executor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
 	executor.ActionRegistry = actions.DefaultRegistry(p.cfg.WorkDir)
 
+	// If a custom gate runner is provided (e.g. by tests), register it as the 'run_gates' action
+	if p.gateRunner != nil {
+		executor.ActionRegistry.Overwrite(&gateRunnerAction{runner: p.gateRunner})
+	}
+
 	// Set up agentic runner that wraps a bounded loop
 	executor.AgenticRunner = &blueprint.LoopAgenticRunner{
 		MaxIterations: p.cfg.DefaultMaxIterations,
@@ -440,12 +445,11 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	} else if p.cfg.ReviewerModel != "" {
 		// Use specialized model for review if configured
-		if review, ok := bp.Stages["review"]; ok {
-			// We can't easily override model per-stage in the current executor
-			// without passing it through AgenticRunner factory.
-			// This part of model tiering is handled in the LoopAgenticRunner setup.
+		if _, ok := bp.Stages["review"]; ok {
+			// Model tiering is handled in the LoopAgenticRunner setup
 		}
 	}
+
 	if err := engine.Execute(ctx, run, input); err != nil {
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
@@ -475,9 +479,10 @@ func (p *Pipeline) createAgenticLoop(ctx context.Context, model string, prompt s
 	}
 
 	cfg := loop.Config{
-		Model:         model,
+		ExecutorModel: model,
 		Prompt:        prompt,
 		WorkDir:       workDir,
+
 		MaxIterations: maxIterations,
 		MaxRetries:    p.cfg.MaxRetries,
 		RetryBackoff:  p.cfg.RetryBackoff,
@@ -549,4 +554,29 @@ func (a *agenticLoopAdapter) Run(ctx context.Context) error {
 // GetResult returns the captured output and artifacts.
 func (a *agenticLoopAdapter) GetResult() (string, map[string]string, error) {
 	return a.lastOutput, a.artifacts, nil
+}
+
+// gateRunnerAction adapts a types.GateRunner to the actions.Action interface.
+type gateRunnerAction struct {
+	runner types.GateRunner
+}
+
+func (a *gateRunnerAction) Name() string {
+	return "run_gates"
+}
+
+func (a *gateRunnerAction) Execute(ctx context.Context, req actions.ActionRequest) (actions.ActionResponse, error) {
+	err := a.runner.RunAll(ctx)
+	if err != nil {
+		return actions.ActionResponse{
+			Status: types.StageStatusFailed,
+			Output: "Quality gates failed",
+			Error:  err.Error(),
+		}, nil
+	}
+
+	return actions.ActionResponse{
+		Status: types.StageStatusCompleted,
+		Output: "All quality gates passed",
+	}, nil
 }

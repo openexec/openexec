@@ -31,6 +31,13 @@ func (r *Registry) Register(a Action) error {
 	return nil
 }
 
+// Overwrite adds an action to the registry, replacing any existing action with the same name.
+func (r *Registry) Overwrite(a Action) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.actions[a.Name()] = a
+}
+
 // Get retrieves an action by name.
 func (r *Registry) Get(name string) (Action, bool) {
 	r.mu.RLock()

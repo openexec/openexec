@@ -83,8 +83,10 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			result.Error = resp.Error
 			result.Artifacts = resp.Artifacts
 
-			// If action succeeded, still run quality gates if it wasn't the gates action itself
-			if result.Status == types.StageStatusCompleted && stage.Action != "run_gates" {
+			// If action succeeded, still run quality gates if it wasn't the gates action itself.
+			// Actually, if the action IS 'run_gates', we MUST still call runQualityGates
+			// to ensure the internal state merging happens correctly.
+			if result.Status == types.StageStatusCompleted {
 				e.runQualityGates(ctx, input, result)
 			}
 			return result, nil
@@ -228,6 +230,10 @@ func (e *DefaultExecutor) executeAgentic(ctx context.Context, stage *Stage, inpu
 	}
 
 	result.Complete(output)
+
+	// Run Quality Gates after agentic stage succeeds
+	e.runQualityGates(ctx, input, result)
+
 	return result, nil
 }
 
