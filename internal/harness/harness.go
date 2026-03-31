@@ -18,6 +18,7 @@ import (
 	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/parallel"
 	"github.com/openexec/openexec/internal/predictive"
+	"github.com/openexec/openexec/internal/quality"
 	oetools "github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/internal/types"
 )
@@ -53,6 +54,11 @@ type Harness struct {
 	// Checkpointing
 	checkpointManager *checkpoint.Manager
 	autoCheckpoint    bool
+
+	// Quality Gates
+	qualityManager *quality.Manager
+	qualityGates   []quality.Gate
+	autoQuality    bool
 
 	// Blueprint execution
 	blueprintEngine *blueprint.Engine
@@ -102,6 +108,13 @@ type HarnessConfig struct {
 	CheckpointManager    *checkpoint.Manager
 	AutoCheckpoint       bool // Create checkpoint after each stage
 
+	// Quality gates configuration
+	QualityGatesEnabled bool
+	QualityManager      *quality.Manager
+	QualityGates        []quality.Gate
+	AutoQuality         bool // Run quality gates before execution
+	QualityMode         quality.GateMode
+
 	// Blueprint configuration
 	Blueprint        *blueprint.Blueprint
 	BlueprintEnabled bool
@@ -130,6 +143,9 @@ func DefaultHarnessConfig(projectDir string) *HarnessConfig {
 		MaxToolConcurrency:       4,
 		CheckpointingEnabled:     true,
 		AutoCheckpoint:           true,
+		QualityGatesEnabled:      true,
+		AutoQuality:              true,
+		QualityMode:              quality.GateModeBlock,
 		Blueprint:                blueprint.DefaultBlueprint,
 		BlueprintEnabled:         true,
 	}
@@ -179,6 +195,11 @@ func NewHarness(config *HarnessConfig) (*Harness, error) {
 	// Initialize checkpoint manager
 	if err := h.initCheckpointManager(); err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %w", err)
+	}
+
+	// Initialize quality gates
+	if err := h.initQualityGates(); err != nil {
+		return nil, fmt.Errorf("failed to initialize quality gates: %w", err)
 	}
 
 	// Initialize blueprint engine
@@ -352,6 +373,38 @@ func (h *Harness) initCheckpointManager() error {
 	return nil
 }
 
+// initQualityGates initializes the quality gates subsystem.
+func (h *Harness) initQualityGates() error {
+	if !h.config.QualityGatesEnabled {
+		return nil
+	}
+
+	// Use provided manager or create new
+	if h.config.QualityManager != nil {
+		h.qualityManager = h.config.QualityManager
+	} else {
+		// Detect project type and get default gates
+		projectType := quality.DetectProjectType(h.projectDir)
+		gates := quality.DefaultGates(projectType)
+
+		// Apply quality mode to all gates
+		for i := range gates {
+			gates[i].Mode = h.config.QualityMode
+		}
+
+		// Add custom gates from config
+		gates = append(gates, h.config.QualityGates...)
+
+		manager := quality.NewManager(h.projectDir, gates)
+		h.qualityManager = manager
+	}
+
+	h.autoQuality = h.config.AutoQuality
+	h.qualityGates = h.config.QualityGates
+
+	return nil
+}
+
 // initBlueprintEngine initializes the blueprint execution engine.
 func (h *Harness) initBlueprintEngine() error {
 	if !h.config.BlueprintEnabled {
@@ -495,6 +548,22 @@ func min(a, b int) int {
 func (h *Harness) Execute(ctx context.Context, task string, files []string) (*blueprint.Run, error) {
 	if h.blueprintEngine == nil {
 		return nil, fmt.Errorf("blueprint engine not initialized")
+	}
+
+	// Run quality gates if enabled
+	if h.qualityManager != nil && h.autoQuality {
+		qualitySummary, err := h.RunQualityGates(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("quality gates failed: %w", err)
+		}
+
+		// Print quality summary
+		fmt.Println(quality.FormatSummary(qualitySummary))
+
+		// Block if any blocking gates failed
+		if qualitySummary.Blocked {
+			return nil, fmt.Errorf("execution blocked by quality gates: %d failed", qualitySummary.FailedGates)
+		}
 	}
 
 	// Predict and preload files if predictive loader is enabled
@@ -680,6 +749,44 @@ func (h *Harness) GetCheckpointManager() *checkpoint.Manager {
 	return h.checkpointManager
 }
 
+// RunQualityGates runs all configured quality gates.
+func (h *Harness) RunQualityGates(ctx context.Context) (*quality.GateSummary, error) {
+	if h.qualityManager == nil {
+		return nil, fmt.Errorf("quality manager not initialized")
+	}
+
+	return h.qualityManager.RunAll(ctx)
+}
+
+// RunQualityGate runs a single quality gate by name.
+func (h *Harness) RunQualityGate(ctx context.Context, gateName string) (*quality.GateResult, error) {
+	if h.qualityManager == nil {
+		return nil, fmt.Errorf("quality manager not initialized")
+	}
+
+	return h.qualityManager.RunGate(ctx, gateName)
+}
+
+// AddQualityGate adds a quality gate.
+func (h *Harness) AddQualityGate(gate quality.Gate) {
+	if h.qualityManager != nil {
+		h.qualityManager.AddGate(gate)
+	}
+}
+
+// RemoveQualityGate removes a quality gate by name.
+func (h *Harness) RemoveQualityGate(gateName string) bool {
+	if h.qualityManager != nil {
+		return h.qualityManager.RemoveGate(gateName)
+	}
+	return false
+}
+
+// GetQualityManager returns the quality manager.
+func (h *Harness) GetQualityManager() *quality.Manager {
+	return h.qualityManager
+}
+
 // GetBlueprintEngine returns the blueprint engine.
 func (h *Harness) GetBlueprintEngine() *blueprint.Engine {
 	return h.blueprintEngine
@@ -730,6 +837,8 @@ func (h *Harness) Close() error {
 			errs = append(errs, err)
 		}
 	}
+
+	// Note: qualityManager doesn't need closing (no resources to release)
 
 	if len(errs) > 0 {
 		return fmt.Errorf("errors closing harness: %v", errs)
