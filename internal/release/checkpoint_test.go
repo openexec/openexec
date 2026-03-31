@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func TestCheckpoint_NewCheckpoint(t *testing.T) {
@@ -73,7 +73,7 @@ func TestCheckpoint_ContextHash(t *testing.T) {
 }
 
 func TestSQLiteStore_CheckpointOperations(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestSQLiteStore_CheckpointOperations(t *testing.T) {
 }
 
 func TestSQLiteStore_ListCheckpointsForRun(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestSQLiteStore_ListCheckpointsForRun(t *testing.T) {
 }
 
 func TestSQLiteStore_GetLatestCheckpoint(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestSQLiteStore_GetLatestCheckpoint(t *testing.T) {
 }
 
 func TestSQLiteStore_DeleteCheckpoint(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestSQLiteStore_DeleteCheckpoint(t *testing.T) {
 }
 
 func TestSQLiteStore_DeleteCheckpointsForRun(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestSQLiteStore_DeleteCheckpointsForRun(t *testing.T) {
 }
 
 func TestManager_CheckpointOperations(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}

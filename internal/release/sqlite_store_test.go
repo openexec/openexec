@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // testDB creates a temporary SQLite database for testing.
@@ -21,7 +21,7 @@ func testDB(t *testing.T) (*sql.DB, func()) {
 	}
 
 	dbPath := filepath.Join(tmpDir, "state.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on")
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("failed to open database: %v", err)

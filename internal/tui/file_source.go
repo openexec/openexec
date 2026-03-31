@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // FileSource reads project data from .openexec/ directories
@@ -262,7 +262,7 @@ func (fs *FileSource) readProgressFromSQLite(dbPath string) (int, bool) {
 		return 0, false
 	}
 
-	db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
+	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
 	if err != nil {
 		return 0, false
 	}
