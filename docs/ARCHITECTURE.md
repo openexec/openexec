@@ -392,6 +392,34 @@ stages:
 
 ---
 
+### ❌ "OpenExec relies on the AI CLI's tool support"
+
+**✅ Reality:** OpenExec provides its own tools via MCP (Model Context Protocol) server!
+
+**How it works:**
+1. OpenExec starts an MCP server (`internal/mcp/server.go`)
+2. MCP server exposes 20+ tools (read_file, write_file, git_apply_patch, run_shell_command, etc.)
+3. AI CLI connects to MCP server via stdio or HTTP
+4. AI CLI requests tool calls through MCP
+5. OpenExec executes tools and returns results
+
+**This means:** Any AI client that speaks MCP can use OpenExec's tools, regardless of whether the AI has native tool support!
+
+**Tools provided by OpenExec:**
+- `read_file` - Read file contents
+- `write_file` - Write file contents  
+- `git_apply_patch` - Apply git patches
+- `run_shell_command` - Execute shell commands
+- `git_status` - Check git status
+- `git_diff` - Get git diffs
+- `git_log` - View git history
+- `glob` - File globbing
+- `grep` - Text search
+- `list_directory` - Directory listing
+- And more...
+
+---
+
 ## Integration Points
 
 ### Adding a New AI CLI
@@ -422,6 +450,323 @@ func TestResolve_MistralModels(t *testing.T) {
 
 3. **Document** (`docs/MODELS.md`):
 Add installation and usage instructions.
+
+---
+
+### Adding API-Only LLM Support (No CLI Available)
+
+For LLMs without an official CLI (e.g., Kimi, Mistral API, Cohere), you have two options:
+
+#### Option 1: Create a Thin CLI Wrapper (Recommended)
+
+Create a minimal CLI that wraps the HTTP API and speaks MCP:
+
+```go
+// cmd/kimi-cli/main.go
+package main
+
+import (
+    "bufio"
+    "encoding/json"
+    "fmt"
+    "os"
+    
+    "github.com/openexec/openexec/pkg/agent"
+)
+
+func main() {
+    // Read MCP messages from stdin
+    scanner := bufio.NewScanner(os.Stdin)
+    
+    for scanner.Scan() {
+        var req MCPRequest
+        json.Unmarshal(scanner.Bytes(), &req)
+        
+        switch req.Method {
+        case "initialize":
+            // Send capabilities including tools
+            sendResponse(MCPResponse{
+                Result: map[string]interface{}{
+                    "tools": []Tool{/* list tools */},
+                },
+            })
+            
+        case "tools/list":
+            // Advertise tools we support
+            sendResponse(MCPResponse{
+                Result: map[string]interface{}{
+                    "tools": getSupportedTools(),
+                },
+            })
+            
+        case "tools/call":
+            // Forward tool call to OpenExec MCP server
+            // or handle directly
+            result := handleToolCall(req.Params)
+            sendResponse(MCPResponse{Result: result})
+            
+        default:
+            // Pass through to Kimi API
+            response := callKimiAPI(req)
+            sendResponse(response)
+        }
+    }
+}
+```
+
+**Pros:**
+- Minimal code
+- Reuses OpenExec's tool infrastructure
+- Works with any MCP-capable client
+
+**Cons:**
+- Requires maintaining wrapper
+- Adds latency (stdio → HTTP → API)
+
+---
+
+#### Option 2: Implement Direct API Provider in OpenExec
+
+Add native API support to OpenExec by implementing the `pkg/agent/` interfaces:
+
+**Files to create/modify:**
+
+1. **Create `pkg/agent/kimi_provider.go`:**
+```go
+package agent
+
+import (
+    "context"
+    "fmt"
+    
+    kimi "github.com/moonshot/kimi-go" // hypothetical SDK
+)
+
+// KimiProvider implements Provider for Moonshot Kimi API
+type KimiProvider struct {
+    client *kimi.Client
+    model  string
+}
+
+func NewKimiProvider(apiKey string, model string) (*KimiProvider, error) {
+    client := kimi.NewClient(apiKey)
+    return &KimiProvider{
+        client: client,
+        model:  model,
+    }, nil
+}
+
+func (p *KimiProvider) GetName() string {
+    return "kimi"
+}
+
+func (p *KimiProvider) GetModels() []string {
+    return []string{"kimi-k2.5", "kimi-k1.5"}
+}
+
+func (p *KimiProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+    // Call Kimi API
+    resp, err := p.client.Chat.Completions.Create(ctx, kimi.ChatCompletionRequest{
+        Model: p.model,
+        Messages: convertMessages(req.Messages),
+        Tools: convertTools(req.Tools), // Important: pass MCP tools!
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    return &CompletionResponse{
+        Content: resp.Choices[0].Message.Content,
+        ToolCalls: convertToolCalls(resp.Choices[0].Message.ToolCalls),
+    }, nil
+}
+
+func (p *KimiProvider) Stream(ctx context.Context, req CompletionRequest) (<-chan StreamEvent, error) {
+    // Implement streaming
+}
+```
+
+2. **Modify `internal/runner/runner.go`:**
+```go
+func Resolve(model string, workDir string, env []string) (string, []string, error) {
+    // ... existing CLI resolution ...
+    
+    // Check for API-only models
+    if isAPIModel(model) {
+        // Return special marker for API mode
+        return "__api__", []string{model}, nil
+    }
+}
+
+func isAPIModel(model string) bool {
+    apiModels := []string{"kimi", "mistral", "cohere"}
+    for _, m := range apiModels {
+        if strings.Contains(model, m) {
+            return true
+        }
+    }
+    return false
+}
+```
+
+3. **Modify `internal/loop/process.go`:**
+```go
+func StartProcess(ctx context.Context, cfg Config) (*Process, error) {
+    cmd, args := buildCommand(cfg)
+    
+    // Check if API mode
+    if cmd == "__api__" {
+        return startAPIProvider(ctx, cfg, args[0]) // args[0] is model name
+    }
+    
+    // Existing CLI spawning code...
+}
+
+func startAPIProvider(ctx context.Context, cfg Config, model string) (*Process, error) {
+    // Initialize appropriate provider
+    var provider agent.Provider
+    var err error
+    
+    switch {
+    case strings.Contains(model, "kimi"):
+        provider, err = agent.NewKimiProvider(
+            os.Getenv("KIMI_API_KEY"),
+            model,
+        )
+    case strings.Contains(model, "mistral"):
+        provider, err = agent.NewMistralProvider(
+            os.Getenv("MISTRAL_API_KEY"),
+            model,
+        )
+    }
+    
+    if err != nil {
+        return nil, err
+    }
+    
+    // Start MCP server with this provider
+    mcpServer := mcp.NewServerWithProvider(provider, cfg.WorkDir)
+    
+    // Return process-like interface
+    return &Process{
+        apiProvider: provider,
+        mcpServer:   mcpServer,
+    }, nil
+}
+```
+
+4. **Add configuration** (`internal/loop/config.go`):
+```go
+type Config struct {
+    // ... existing fields ...
+    
+    // APIProviderConfig for direct API mode
+    APIProviderConfig *APIProviderConfig
+}
+
+type APIProviderConfig struct {
+    Provider string            // "kimi", "mistral", "cohere"
+    APIKey   string
+    BaseURL  string            // Optional custom endpoint
+    Model    string
+}
+```
+
+**Pros:**
+- No external CLI dependency
+- Lower latency (direct HTTP)
+- Full control over implementation
+
+**Cons:**
+- More code to maintain
+- Need to handle all API quirks
+- Must implement tool calling for each provider
+
+---
+
+#### Option 3: Use a Generic MCP Bridge
+
+Use an existing tool like `mcp-bridge` or `mcp-proxy`:
+
+```bash
+# Install generic MCP bridge
+npm install -g @modelcontextprotocol/bridge
+
+# Configure for Kimi
+export KIMI_API_KEY="your-key"
+mcp-bridge --provider kimi --model kimi-k2.5
+
+# Use with OpenExec
+openexec run --model kimi-k2.5 --mcp-server localhost:8080
+```
+
+**Pros:**
+- Zero code changes to OpenExec
+- Works immediately
+
+**Cons:**
+- External dependency
+- May not support all features
+
+---
+
+### Specific Requirements for Kimi K2.5
+
+To add Kimi K2.5 support to OpenExec:
+
+**Prerequisites:**
+1. Moonshot API key (from platform.moonshot.cn)
+2. HTTP client that supports streaming
+3. Tool calling support (if Kimi supports it)
+
+**Implementation Steps:**
+
+1. **Check Kimi's capabilities:**
+   - Does it support function calling/tools?
+   - What's the API format? (OpenAI-compatible?)
+   - Streaming support?
+
+2. **Choose approach:**
+   - If Kimi has tool support → Option 2 (direct API)
+   - If Kimi is chat-only → Option 1 (wrapper that handles tools)
+
+3. **For Option 2, implement:**
+   ```go
+   // pkg/agent/kimi_provider.go
+   type KimiProvider struct {
+       client *http.Client
+       apiKey string
+       baseURL string
+   }
+   
+   // Kimi uses OpenAI-compatible API
+   func (p *KimiProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+       httpReq, _ := http.NewRequestWithContext(ctx, "POST", 
+           p.baseURL+"/v1/chat/completions",
+           bytes.NewReader(body),
+       )
+       httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+       
+       resp, err := p.client.Do(httpReq)
+       // ... parse response ...
+   }
+   ```
+
+4. **Add tool support:**
+   If Kimi supports function calling, pass MCP tools as functions:
+   ```go
+   reqBody := map[string]interface{}{
+       "model": "kimi-k2.5",
+       "messages": messages,
+       "tools": convertMCPToolsToKimiTools(tools),
+   }
+   ```
+
+5. **Test:**
+   ```bash
+   export KIMI_API_KEY="your-key"
+   openexec run --model kimi-k2.5 --task "Refactor auth middleware"
+   ```
 
 ---
 
