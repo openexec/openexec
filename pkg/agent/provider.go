@@ -1,6 +1,13 @@
 // Package agent provides types and interfaces for AI provider adapters.
 // It defines the unified interface that all AI providers (OpenAI, Anthropic, Gemini)
 // must implement to be used by the OpenExec orchestration engine.
+//
+// IMPORTANT: This package contains ABSTRACTIONS only, not implementations.
+// OpenExec currently uses CLI subprocesses (claude, codex, gemini) rather than
+// direct API clients. See internal/runner/ for model resolution and
+// internal/loop/ for process spawning.
+//
+// Future implementations may use these interfaces for direct API integration.
 package agent
 
 import (

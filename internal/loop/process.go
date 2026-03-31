@@ -1,3 +1,11 @@
+// Package loop manages AI CLI subprocesses for OpenExec.
+//
+// This package is responsible for spawning and managing external AI CLI tools
+// (claude, codex, gemini) as subprocesses. It does NOT implement LLM clients
+// directly - it shells out to the CLI tools that users have installed.
+//
+// For model resolution (model name -> CLI command), see internal/runner/.
+// For the abstraction interfaces, see pkg/agent/.
 package loop
 
 import (
@@ -13,7 +21,7 @@ import (
 	"github.com/openexec/openexec/internal/runner"
 )
 
-// Process represents a running Claude Code instance.
+// Process represents a running AI CLI instance (claude, codex, or gemini).
 type Process struct {
 	cmd    *exec.Cmd
 	Stdout io.ReadCloser

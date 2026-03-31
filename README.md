@@ -34,6 +34,54 @@ Most AI coding tools (like Claude Code or GitHub Copilot) operate as **black box
 | **Reliability** | "Try and see" - code might break your app. | **Safety Gates:** YAML rules block unsafe code *before* it runs. |
 | **Workflow** | Linear chat interface. | **Blueprint Engine:** Structured pipelines (Plan → Code → Lint → Test). |
 | **Ownership** | Logic lives in the cloud provider. | **Institutional Memory:** Your patterns stay in your local library. |
+| **Multi-Model** | Single model only. | **Model Orchestration:** Claude codes, Codex reviews, Gemini analyzes. |
+
+---
+
+## 🏗️ Architecture Overview
+
+**Important:** OpenExec is an **orchestration layer** that wraps and enhances existing AI CLI tools. It does not implement its own LLM clients - instead, it spawns subprocesses for the CLIs you already use.
+
+### Supported AI CLIs
+
+| CLI | Provider | Purpose | Installation |
+|-----|----------|---------|--------------|
+| `claude` | Anthropic | Primary coding agent | `npm install -g @anthropic-ai/claude-code` |
+| `codex` | OpenAI | Alternative coding agent | `npm install -g @openai/codex` |
+| `gemini` | Google | Analysis and review | (Google's CLI tool) |
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    OpenExec Orchestration                    │
+│  ├─ Blueprint Engine (deterministic workflows)              │
+│  ├─ Quality Gates (lint/test/format blocking)               │
+│  ├─ Checkpointing (crash recovery)                          │
+│  ├─ Context Pruning (95% token reduction)                   │
+│  ├─ Predictive Loading (pre-load files)                     │
+│  ├─ Memory System (learned patterns)                        │
+│  └─ Multi-Agent Coordination (parallel execution)           │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ Spawns subprocess
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              External AI CLI Processes                       │
+│  ├─ claude (Claude Code CLI)                                │
+│  ├─ codex (OpenAI Codex CLI)                                │
+│  └─ gemini (Google Gemini CLI)                              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ Uses
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              LLM Provider APIs (cloud)                       │
+│  ├─ Anthropic API (Claude models)                           │
+│  ├─ OpenAI API (GPT/Codex models)                           │
+│  └─ Google API (Gemini models)                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Point:** OpenExec adds the "production-grade" infrastructure (checkpoints, gates, memory) around the "brain" (Claude/Codex/Gemini CLIs) that you already trust.
 
 ---
 
@@ -48,9 +96,32 @@ OpenExec doesn't just read files; it understands your project. It maintains a **
 ### 🚦 Move Fast, Safely
 Treat AI as a managed worker. With **Safety Gates**, you define the rules (e.g., "never modify auth logic without a test"). If the AI tries to break a rule, the system blocks the action locally and suggests a fix.
 
+### 🔄 Multi-Model Workflows
+Use the best model for each job:
+- **Claude** for complex coding tasks
+- **Codex** for quick edits and reviews  
+- **Gemini** for analysis and documentation
+
+Configure them to work in sequence or parallel.
+
 ---
 
 ## 🚀 Quick Start
+
+### Prerequisites
+
+Install at least one AI CLI:
+
+```bash
+# Install Claude Code (recommended)
+npm install -g @anthropic-ai/claude-code
+
+# Or install Codex
+npm install -g @openai/codex
+
+# Or install Gemini CLI
+# (follow Google's installation instructions)
+```
 
 ### 1. Installation
 Download the latest binary for your platform, or use the automated script:
@@ -78,6 +149,7 @@ graph TD
     subgraph Layer 1: Interaction
         UI[Web Dashboard]
         CLI[Unified CLI]
+        TUI[Terminal UI]
     end
 
     subgraph Layer 2: Runtime
@@ -98,36 +170,47 @@ graph TD
     subgraph Layer 5: Governance
         Policy[YAML Guardrails]
         PII[PII/GDPR Shield]
+        Quality[Quality Gates]
     end
 
     subgraph Layer 6: Orchestration
         Engine[Blueprint Engine]
         Flow[gather → implement → lint → test → review]
+        Checkpoint[Checkpointing]
+        Memory[Memory System]
     end
 
     subgraph Layer 7: Intelligence
-        Local[Local Routing Model]
-        Frontier[Frontier Reasoning Model]
+        Router[Model Router]
+        ClaudeCLI[Claude CLI]
+        CodexCLI[Codex CLI]
+        GeminiCLI[Gemini CLI]
     end
 
-    UI & CLI --> Session
+    UI & CLI & TUI --> Session
     Session --> Mode
     Mode --> Assembly
     Assembly --> DCP
-    DCP --> Policy
-    Policy --> Engine
-    Engine --> Local & Frontier
+    DCP --> Policy & Quality
+    Policy & Quality --> Engine
+    Engine --> Checkpoint & Memory
+    Engine --> Router
+    Router --> ClaudeCLI & CodexCLI & GeminiCLI
 
     style Layer 6: Orchestration fill:#8957e5,color:#fff
     style Layer 5: Governance fill:#238636,color:#fff
     style Layer 4: Tooling fill:#1f6feb,color:#fff
+    style Layer 7: Intelligence fill:#db61a2,color:#fff
 ```
 
 ### Blueprint Execution Flow
 
 ```mermaid
 stateDiagram-v2
-    [*] --> gather_context: Start Run
+    [*] --> quality_gates: Start Run
+    quality_gates --> gather_context: Gates Passed
+    quality_gates --> [*]: Gates Failed (Block)
+    
     gather_context --> implement: Context Ready
     
     state Implementation_Loop {
@@ -142,9 +225,87 @@ stateDiagram-v2
         fix_tests --> test: Fix Applied
     }
     
-    test --> review: All Tests Passed
+    test --> checkpoint: Tests Passed
+    checkpoint --> review: State Saved
     review --> [*]: Task Complete
 ```
+
+### Model Resolution
+
+OpenExec resolves model names to CLI commands:
+
+```go
+// From internal/runner/runner.go
+func Resolve(model string, workDir string, env []string) (string, []string, error) {
+    model = strings.ToLower(model)
+    
+    // Claude models → "claude" CLI
+    if isClaudeModel(model) {
+        return "claude", []string{"--output-format", "stream"}, nil
+    }
+    
+    // OpenAI/Codex models → "codex" CLI  
+    if isOpenAIModel(model) {
+        return "codex", []string{}, nil
+    }
+    
+    // Gemini models → "gemini" CLI
+    if isGeminiModel(model) {
+        return "gemini", []string{}, nil
+    }
+}
+```
+
+### Multi-Model Workflow Example
+
+```yaml
+# .openexec/workflow.yaml
+stages:
+  - name: implement
+    agent: claude-3-sonnet
+    task: "Implement the feature"
+    
+  - name: review  
+    agent: codex
+    task: "Review the implementation for bugs"
+    
+  - name: document
+    agent: gemini-pro
+    task: "Generate documentation"
+```
+
+---
+
+## 📁 Project Structure
+
+```
+openexec/
+├── cmd/                    # CLI entry points
+│   └── openexec/          # Main CLI
+├── internal/              # Private implementation
+│   ├── blueprint/         # Deterministic workflow engine
+│   ├── cache/             # Multi-level caching
+│   ├── checkpoint/        # Crash recovery
+│   ├── context/           # Context pruning
+│   ├── harness/           # Integrated orchestration
+│   ├── loop/              # CLI process management
+│   ├── memory/            # Pattern learning
+│   ├── parallel/          # Multi-agent coordination
+│   ├── predictive/        # File pre-loading
+│   ├── quality/           # Lint/test gates
+│   ├── runner/            # Model → CLI resolution
+│   ├── tui/               # Terminal UI (Bubble Tea)
+│   └── ...
+├── pkg/agent/             # Provider abstractions
+├── ui/                    # Web UI (React/Vite)
+└── docs/                  # Documentation
+```
+
+**Key Directories:**
+- `internal/loop/` - Spawns and manages CLI subprocesses
+- `internal/runner/` - Maps model names to CLI commands
+- `internal/harness/` - Orchestrates all subsystems
+- `pkg/agent/` - Abstract provider interface (not direct implementation)
 
 ---
 
