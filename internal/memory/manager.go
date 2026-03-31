@@ -113,8 +113,6 @@ func (m *MemoryManager) GetEntry(category, key string) (*MemoryEntry, error) {
 	defer m.mu.RUnlock()
 
 	entry := &MemoryEntry{}
-	var accessCount int
-	var lastAccessed sql.NullTime
 
 	query := `SELECT category, key, value, source, layer, extracted_at 
 	          FROM memory_entries WHERE category = ? AND key = ?`
@@ -238,6 +236,13 @@ func (m *MemoryManager) Search(query string) ([]*MemoryEntry, error) {
 func (m *MemoryManager) DeleteEntry(category, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Delete related access log entries first (foreign key constraint)
+	delLog := `DELETE FROM memory_access_log WHERE entry_id IN
+	           (SELECT id FROM memory_entries WHERE category = ? AND key = ?)`
+	if _, err := m.db.Exec(delLog, category, key); err != nil {
+		return fmt.Errorf("failed to delete access log: %w", err)
+	}
 
 	query := `DELETE FROM memory_entries WHERE category = ? AND key = ?`
 	_, err := m.db.Exec(query, category, key)

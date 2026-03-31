@@ -179,20 +179,20 @@ func TestPredictiveLoader(t *testing.T) {
 	})
 
 	t.Run("Cache File", func(t *testing.T) {
-		// Create test file
-		testFile := filepath.Join(tmpDir, "cached.go")
+		// Create test file with a name that matches the task pattern
+		testFile := filepath.Join(tmpDir, "auth_handler.go")
 		os.WriteFile(testFile, []byte("package main"), 0644)
 
-		// First load - cache miss
+		// First load - cache miss (task "Fix authentication" matches pattern "auth")
 		allFiles := []string{testFile}
-		result1, _ := loader.PredictAndLoad(context.Background(), "test", allFiles)
+		result1, _ := loader.PredictAndLoad(context.Background(), "Fix authentication handler", allFiles)
 
 		if result1.CacheMisses != 1 {
 			t.Errorf("expected 1 cache miss, got %d", result1.CacheMisses)
 		}
 
 		// Second load - cache hit
-		result2, _ := loader.PredictAndLoad(context.Background(), "test", allFiles)
+		result2, _ := loader.PredictAndLoad(context.Background(), "Fix authentication handler", allFiles)
 
 		if result2.CacheHits != 1 {
 			t.Errorf("expected 1 cache hit, got %d", result2.CacheHits)

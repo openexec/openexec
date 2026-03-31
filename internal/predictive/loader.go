@@ -362,10 +362,11 @@ func (l *Loader) extractSymbols(task string) []string {
 
 	// Common patterns for symbol names
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`\b([A-Z][a-zA-Z0-9]+)\b`),                    // CamelCase
-		regexp.MustCompile(`\b([a-z]+(?:_[a-z]+)+)\b`),                   // snake_case
-		regexp.MustCompile(`(?:function|method|class|struct|type)\s+(\w+)`), // Definitions
-		regexp.MustCompile(`(?:call|use|import)\s+(\w+)`),                // Usage
+		regexp.MustCompile(`\b([A-Z][a-zA-Z0-9]+)\b`),                         // CamelCase
+		regexp.MustCompile(`\b([a-z]+(?:_[a-z]+)+)\b`),                        // snake_case
+		regexp.MustCompile(`(?i)(?:function|method|class|struct|type)\s+(\w+)`), // Definitions
+		regexp.MustCompile(`(?i)(?:call|use|import)\s+(\w+)`),                  // Usage
+		regexp.MustCompile(`\b([a-z]{5,})\b`),                                  // Meaningful lowercase words
 	}
 
 	for _, pattern := range patterns {
@@ -410,15 +411,15 @@ func (l *Loader) matchPattern(file string, pattern string) float64 {
 	lowerFile := strings.ToLower(file)
 	lowerPattern := strings.ToLower(pattern)
 
-	// Direct match in path
-	if strings.Contains(lowerFile, lowerPattern) {
-		return 80.0
-	}
-
-	// Filename match
+	// Filename match (higher priority)
 	filename := filepath.Base(lowerFile)
 	if strings.Contains(filename, lowerPattern) {
 		return 100.0
+	}
+
+	// Direct match in path
+	if strings.Contains(lowerFile, lowerPattern) {
+		return 80.0
 	}
 
 	return 0.0
@@ -513,12 +514,12 @@ func (l *Loader) isStopWord(word string) bool {
 		"day": true, "get": true, "has": true, "him": true, "his": true,
 		"how": true, "its": true, "may": true, "new": true, "now": true,
 		"old": true, "see": true, "two": true, "who": true, "boy": true,
-		"did": true, "she": true, "use": true, "her": true, "way": true,
+		"did": true, "use": true,
 		"many": true, "oil": true, "sit": true, "set": true, "run": true,
 		"eat": true, "far": true, "sea": true, "eye": true, "ago": true,
 		"off": true, "too": true, "any": true, "say": true, "man": true,
 		"try": true, "ask": true, "end": true, "why": true, "let": true,
-		"put": true, "say": true, "she": true, "try": true, "way": true,
+		"put": true,
 	}
 	return stopWords[strings.ToLower(word)]
 }

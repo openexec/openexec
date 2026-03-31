@@ -3,7 +3,6 @@
 package agent
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,9 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/openexec/openexec/internal/blueprint"
-	"github.com/openexec/openexec/internal/types"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // AgentType indicates the role of an agent in the swarm.
@@ -79,7 +76,7 @@ type AgentRegistry struct {
 // NewAgentRegistry creates a new agent registry.
 func NewAgentRegistry(projectDir string) (*AgentRegistry, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "agents.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open agent registry db: %w", err)
 	}

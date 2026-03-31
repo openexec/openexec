@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/openexec/openexec/internal/agent"
@@ -231,7 +230,7 @@ func (pe *ParallelEngine) shouldUseParallelism(stage *ParallelStage, files []str
 }
 
 // toParallelStage converts a regular stage to a parallel stage.
-func (pe *ParallelStage) toParallelStage(stage *blueprint.Stage) *ParallelStage {
+func (pe *ParallelEngine) toParallelStage(stage *blueprint.Stage) *ParallelStage {
 	return &ParallelStage{
 		Stage:          stage,
 		EnableParallel: false, // Default to sequential

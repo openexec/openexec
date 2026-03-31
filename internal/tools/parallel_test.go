@@ -16,7 +16,7 @@ func TestParallelExecutor(t *testing.T) {
 			return "result", nil
 		})
 
-		result, err := executor.Execute(context.Background(), []Tool{tool})
+		result, err := executor.Execute(context.Background(), []ParallelTool{tool})
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
@@ -30,7 +30,7 @@ func TestParallelExecutor(t *testing.T) {
 	})
 
 	t.Run("Execute Multiple Tools", func(t *testing.T) {
-		tools := []Tool{
+		tools := []ParallelTool{
 			NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
 				return "result1", nil
 			}),
@@ -56,7 +56,7 @@ func TestParallelExecutor(t *testing.T) {
 	})
 
 	t.Run("Execute With Error", func(t *testing.T) {
-		tools := []Tool{
+		tools := []ParallelTool{
 			NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
 				return "result1", nil
 			}),
@@ -79,7 +79,7 @@ func TestParallelExecutor(t *testing.T) {
 	})
 
 	t.Run("Execute Empty", func(t *testing.T) {
-		result, err := executor.Execute(context.Background(), []Tool{})
+		result, err := executor.Execute(context.Background(), []ParallelTool{})
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
@@ -90,7 +90,7 @@ func TestParallelExecutor(t *testing.T) {
 	})
 
 	t.Run("Results By Name", func(t *testing.T) {
-		tools := []Tool{
+		tools := []ParallelTool{
 			NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
 				return "result1", nil
 			}),
@@ -114,7 +114,7 @@ func TestParallelExecutor(t *testing.T) {
 	})
 
 	t.Run("Get Result", func(t *testing.T) {
-		tools := []Tool{
+		tools := []ParallelTool{
 			NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
 				return "result1", nil
 			}),
@@ -139,19 +139,19 @@ func TestParallelExecutor(t *testing.T) {
 	t.Run("Has Errors", func(t *testing.T) {
 		tests := []struct {
 			name     string
-			tools    []Tool
+			tools    []ParallelTool
 			expected bool
 		}{
 			{
 				"no errors",
-				[]Tool{NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
+				[]ParallelTool{NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
 					return "ok", nil
 				})},
 				false,
 			},
 			{
 				"with errors",
-				[]Tool{NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
+				[]ParallelTool{NewSimpleTool("tool1", func(ctx context.Context) (interface{}, error) {
 					return nil, errors.New("fail")
 				})},
 				true,

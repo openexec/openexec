@@ -440,8 +440,8 @@ func (p *Pruner) getCachedResult(query string) (*PruneResult, error) {
 	var resultJSON string
 	var createdAt time.Time
 
-	query := `SELECT result, created_at FROM prune_cache WHERE query_hash = ?`
-	err := p.db.QueryRow(query, queryHash).Scan(&resultJSON, &createdAt)
+	sqlQuery := `SELECT result, created_at FROM prune_cache WHERE query_hash = ?`
+	err := p.db.QueryRow(sqlQuery, queryHash).Scan(&resultJSON, &createdAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

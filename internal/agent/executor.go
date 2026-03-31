@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/blueprint"
-	"github.com/openexec/openexec/internal/types"
 )
 
 // ParallelStage represents a stage that can be executed by multiple agents in parallel.
@@ -192,11 +191,11 @@ func (pe *ParallelExecutor) runAgent(
 	}
 
 	// Complete agent
-	agentResult := &AgentResult{
+	ar := &AgentResult{
 		FilesProcessed: batch.Files,
 		Summary:        result.Output,
 	}
-	if err := pe.registry.Complete(agent.ID, agentResult); err != nil {
+	if err := pe.registry.Complete(agent.ID, ar); err != nil {
 		results <- &agentResult{AgentID: agent.ID, Error: err}
 		return
 	}
@@ -254,6 +253,11 @@ func (pe *ParallelExecutor) createBatchInput(base *blueprint.StageInput, batch W
 	// Copy previous results
 	for _, result := range base.PreviousStages {
 		batchInput.AddPreviousResult(result)
+	}
+
+	// Copy original variables
+	for k, v := range base.Variables {
+		batchInput.Variables[k] = v
 	}
 
 	// Add batch-specific variables

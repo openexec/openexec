@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -597,7 +596,7 @@ func (h *Harness) GetPredictedFile(path string) (*predictive.FileEntry, bool) {
 }
 
 // ExecuteToolsParallel executes multiple tools in parallel.
-func (h *Harness) ExecuteToolsParallel(ctx context.Context, tools []oetools.Tool) (*oetools.ExecutionResult, error) {
+func (h *Harness) ExecuteToolsParallel(ctx context.Context, tools []oetools.ParallelTool) (*oetools.ExecutionResult, error) {
 	if h.parallelToolExecutor == nil {
 		return nil, fmt.Errorf("parallel tool executor not initialized")
 	}

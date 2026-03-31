@@ -169,7 +169,7 @@ func (c *KnowledgeCache) Stats() (total int, expired int, err error) {
 	}
 
 	// Expired entries
-	cutoff := time.Now().Add(-c.ttl)
+	cutoff := time.Now().Add(-c.ttl).UTC().Format("2006-01-02 15:04:05")
 	err = c.db.QueryRow(`SELECT COUNT(*) FROM knowledge_cache WHERE indexed_at < ?`, cutoff).Scan(&expired)
 	if err != nil {
 		return 0, 0, fmt.Errorf("cache stats failed: %w", err)

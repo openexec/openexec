@@ -217,6 +217,7 @@ func TestScoreCalculation(t *testing.T) {
 
 func TestTermExtraction(t *testing.T) {
 	tmpDir := t.TempDir()
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
@@ -260,6 +261,7 @@ func TestTermExtraction(t *testing.T) {
 
 func TestTokenEstimation(t *testing.T) {
 	tmpDir := t.TempDir()
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 

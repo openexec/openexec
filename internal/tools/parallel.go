@@ -48,8 +48,8 @@ func NewParallelExecutor(config *ParallelConfig) *ParallelExecutor {
 	}
 }
 
-// Tool represents a tool that can be executed.
-type Tool interface {
+// ParallelTool represents a tool that can be executed in parallel.
+type ParallelTool interface {
 	Name() string
 	Execute(ctx context.Context) (interface{}, error)
 }
@@ -73,7 +73,7 @@ type ExecutionResult struct {
 }
 
 // Execute runs multiple tools in parallel.
-func (e *ParallelExecutor) Execute(ctx context.Context, tools []Tool) (*ExecutionResult, error) {
+func (e *ParallelExecutor) Execute(ctx context.Context, tools []ParallelTool) (*ExecutionResult, error) {
 	if len(tools) == 0 {
 		return &ExecutionResult{}, nil
 	}
@@ -92,11 +92,9 @@ func (e *ParallelExecutor) Execute(ctx context.Context, tools []Tool) (*Executio
 
 	// Execute tools
 	var wg sync.WaitGroup
-	errChan := make(chan error, 1)
-
 	for _, tool := range tools {
 		wg.Add(1)
-		go func(t Tool) {
+		go func(t ParallelTool) {
 			defer wg.Done()
 
 			// Acquire semaphore
@@ -170,8 +168,8 @@ func (e *ParallelExecutor) ExecuteWithDependencies(ctx context.Context, tools []
 		return &ExecutionResult{}, nil
 	}
 
-	// Build dependency graph
-	graph := e.buildDependencyGraph(tools)
+	// Build dependency graph (validates structure)
+	_ = e.buildDependencyGraph(tools)
 
 	// Execute in waves
 	start := time.Now()
@@ -182,7 +180,7 @@ func (e *ParallelExecutor) ExecuteWithDependencies(ctx context.Context, tools []
 	completed := make(map[string]bool)
 	for len(completed) < len(tools) {
 		// Find ready tools (all dependencies completed)
-		var ready []Tool
+		var ready []ParallelTool
 		for _, tool := range tools {
 			if completed[tool.Name()] {
 				continue
@@ -224,7 +222,7 @@ func (e *ParallelExecutor) ExecuteWithDependencies(ctx context.Context, tools []
 
 // ToolWithDeps is a tool with dependencies.
 type ToolWithDeps interface {
-	Tool
+	ParallelTool
 	Dependencies() []string
 }
 
@@ -248,7 +246,7 @@ func (e *ParallelExecutor) dependenciesMet(tool ToolWithDeps, completed map[stri
 }
 
 // ExecuteBatched executes tools in batches.
-func (e *ParallelExecutor) ExecuteBatched(ctx context.Context, tools []Tool, batchSize int) (*ExecutionResult, error) {
+func (e *ParallelExecutor) ExecuteBatched(ctx context.Context, tools []ParallelTool, batchSize int) (*ExecutionResult, error) {
 	if batchSize <= 0 {
 		batchSize = e.maxConcurrency
 	}
@@ -351,19 +349,19 @@ func (t *GrepTool) Execute(ctx context.Context) (interface{}, error) {
 // ParallelToolSet executes a set of tools in parallel.
 type ParallelToolSet struct {
 	executor *ParallelExecutor
-	tools    []Tool
+	tools    []ParallelTool
 }
 
 // NewParallelToolSet creates a new parallel tool set.
 func NewParallelToolSet(config *ParallelConfig) *ParallelToolSet {
 	return &ParallelToolSet{
 		executor: NewParallelExecutor(config),
-		tools:    make([]Tool, 0),
+		tools:    make([]ParallelTool, 0),
 	}
 }
 
 // Add adds a tool to the set.
-func (s *ParallelToolSet) Add(tool Tool) {
+func (s *ParallelToolSet) Add(tool ParallelTool) {
 	s.tools = append(s.tools, tool)
 }
 
