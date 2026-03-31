@@ -455,11 +455,39 @@ Add installation and usage instructions.
 
 ### Adding API-Only LLM Support (No CLI Available)
 
-For LLMs without an official CLI (e.g., Kimi, Mistral API, Cohere), you have two options:
+**IMPORTANT:** OpenExec uses **BitNet Router** for tool selection, so the LLM does **NOT** need native tool calling capability!
 
-#### Option 1: Create a Thin CLI Wrapper (Recommended)
+```
+User Query: "Read the auth file"
+        ↓
+┌─────────────────────────────────────────┐
+│  BitNet Router (local 1-bit model)      │  ← OpenExec handles this
+│  ├─ Parses intent from query            │
+│  ├─ Selects tool: "read_file"           │
+│  └─ Extracts args: {"path": "auth.go"}  │
+└─────────────────────────────────────────┘
+        ↓
+┌─────────────────────────────────────────┐
+│  LLM (Kimi/Claude/Codex/etc.)           │  ← Your wrapper provides this
+│  ├─ Receives: "Read file auth.go"       │
+│  ├─ Generates response/content          │
+│  └─ NO tool calling needed!             │
+└─────────────────────────────────────────┘
+        ↓
+┌─────────────────────────────────────────┐
+│  OpenExec executes tool                 │  ← OpenExec handles this
+│  ├─ read_file("auth.go")                │
+│  └─ Returns content to LLM              │
+└─────────────────────────────────────────┘
+```
 
-Create a minimal CLI that wraps the HTTP API and speaks MCP:
+**This means:** You only need a **chat wrapper** for any LLM. Tool selection and execution are handled by OpenExec!
+
+---
+
+#### Option 1: Create a Thin Chat Wrapper (Recommended)
+
+Create a minimal CLI that wraps the HTTP API and provides chat capability only:
 
 ```go
 // cmd/kimi-cli/main.go
@@ -470,58 +498,63 @@ import (
     "encoding/json"
     "fmt"
     "os"
-    
-    "github.com/openexec/openexec/pkg/agent"
+    "strings"
 )
 
+// Simple chat wrapper - NO tool calling needed!
 func main() {
-    // Read MCP messages from stdin
+    apiKey := os.Getenv("KIMI_API_KEY")
+    
     scanner := bufio.NewScanner(os.Stdin)
+    var conversation []Message
     
     for scanner.Scan() {
-        var req MCPRequest
-        json.Unmarshal(scanner.Bytes(), &req)
+        line := scanner.Text()
         
-        switch req.Method {
-        case "initialize":
-            // Send capabilities including tools
-            sendResponse(MCPResponse{
-                Result: map[string]interface{}{
-                    "tools": []Tool{/* list tools */},
-                },
-            })
-            
-        case "tools/list":
-            // Advertise tools we support
-            sendResponse(MCPResponse{
-                Result: map[string]interface{}{
-                    "tools": getSupportedTools(),
-                },
-            })
-            
-        case "tools/call":
-            // Forward tool call to OpenExec MCP server
-            // or handle directly
-            result := handleToolCall(req.Params)
-            sendResponse(MCPResponse{Result: result})
-            
-        default:
-            // Pass through to Kimi API
-            response := callKimiAPI(req)
-            sendResponse(response)
+        // Parse incoming message
+        var msg map[string]interface{}
+        if err := json.Unmarshal([]byte(line), &msg); err != nil {
+            continue
         }
+        
+        // Extract user message
+        content := extractContent(msg)
+        conversation = append(conversation, Message{Role: "user", Content: content})
+        
+        // Call Kimi API (simple chat, no tools!)
+        response := callKimiChatAPI(apiKey, conversation)
+        conversation = append(conversation, Message{Role: "assistant", Content: response})
+        
+        // Return response
+        fmt.Println(response)
     }
+}
+
+func callKimiChatAPI(apiKey string, messages []Message) string {
+    // Simple HTTP call to Kimi API
+    // POST https://api.moonshot.cn/v1/chat/completions
+    // Body: {"model": "kimi-k2.5", "messages": messages}
+    
+    // Return assistant's response
+    return "..."
+}
+
+type Message struct {
+    Role    string `json:"role"`
+    Content string `json:"content"`
 }
 ```
 
-**Pros:**
-- Minimal code
-- Reuses OpenExec's tool infrastructure
-- Works with any MCP-capable client
+**That's it!** BitNet Router handles:
+- Intent parsing
+- Tool selection  
+- Argument extraction
+- Tool execution (via OpenExec MCP)
 
-**Cons:**
-- Requires maintaining wrapper
-- Adds latency (stdio → HTTP → API)
+Your wrapper just needs to:
+- Accept chat messages
+- Call LLM API
+- Return responses
 
 ---
 
@@ -566,10 +599,11 @@ func (p *KimiProvider) GetModels() []string {
 
 func (p *KimiProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
     // Call Kimi API
+    // NOTE: No Tools parameter needed! BitNet Router handles tool selection.
     resp, err := p.client.Chat.Completions.Create(ctx, kimi.ChatCompletionRequest{
         Model: p.model,
         Messages: convertMessages(req.Messages),
-        Tools: convertTools(req.Tools), // Important: pass MCP tools!
+        // Tools: NOT NEEDED - BitNet handles this!
     })
     if err != nil {
         return nil, err
@@ -577,7 +611,7 @@ func (p *KimiProvider) Complete(ctx context.Context, req CompletionRequest) (*Co
     
     return &CompletionResponse{
         Content: resp.Choices[0].Message.Content,
-        ToolCalls: convertToolCalls(resp.Choices[0].Message.ToolCalls),
+        // ToolCalls: NOT NEEDED - BitNet handles this!
     }, nil
 }
 
@@ -716,57 +750,78 @@ To add Kimi K2.5 support to OpenExec:
 
 **Prerequisites:**
 1. Moonshot API key (from platform.moonshot.cn)
-2. HTTP client that supports streaming
-3. Tool calling support (if Kimi supports it)
+2. HTTP client
+3. **NO tool calling support needed!** (BitNet Router handles this)
 
 **Implementation Steps:**
 
-1. **Check Kimi's capabilities:**
-   - Does it support function calling/tools?
-   - What's the API format? (OpenAI-compatible?)
-   - Streaming support?
-
-2. **Choose approach:**
-   - If Kimi has tool support → Option 2 (direct API)
-   - If Kimi is chat-only → Option 1 (wrapper that handles tools)
-
-3. **For Option 2, implement:**
+1. **Create simple chat wrapper** (Option 1 is easiest):
    ```go
-   // pkg/agent/kimi_provider.go
-   type KimiProvider struct {
-       client *http.Client
-       apiKey string
-       baseURL string
-   }
+   // cmd/kimi-cli/main.go
+   package main
    
-   // Kimi uses OpenAI-compatible API
-   func (p *KimiProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
-       httpReq, _ := http.NewRequestWithContext(ctx, "POST", 
-           p.baseURL+"/v1/chat/completions",
-           bytes.NewReader(body),
-       )
-       httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+   import (
+       "bufio"
+       "bytes"
+       "encoding/json"
+       "fmt"
+       "net/http"
+       "os"
+   )
+   
+   func main() {
+       apiKey := os.Getenv("KIMI_API_KEY")
+       scanner := bufio.NewScanner(os.Stdin)
        
-       resp, err := p.client.Do(httpReq)
-       // ... parse response ...
+       for scanner.Scan() {
+           // Read user message
+           var req struct {
+               Messages []struct {
+                   Role    string `json:"role"`
+                   Content string `json:"content"`
+               } `json:"messages"`
+           }
+           json.Unmarshal(scanner.Bytes(), &req)
+           
+           // Call Kimi API (simple chat, NO tools!)
+           body, _ := json.Marshal(map[string]interface{}{
+               "model":    "kimi-k2.5",
+               "messages": req.Messages,
+               // NO "tools" field - BitNet handles this!
+           })
+           
+           httpReq, _ := http.NewRequest("POST",
+               "https://api.moonshot.cn/v1/chat/completions",
+               bytes.NewReader(body),
+           )
+           httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+           httpReq.Header.Set("Content-Type", "application/json")
+           
+           resp, _ := http.DefaultClient.Do(httpReq)
+           // ... parse and print response ...
+       }
    }
    ```
 
-4. **Add tool support:**
-   If Kimi supports function calling, pass MCP tools as functions:
-   ```go
-   reqBody := map[string]interface{}{
-       "model": "kimi-k2.5",
-       "messages": messages,
-       "tools": convertMCPToolsToKimiTools(tools),
-   }
+2. **Install wrapper:**
+   ```bash
+   go build -o /usr/local/bin/kimi-cli ./cmd/kimi-cli
    ```
 
-5. **Test:**
+3. **Use with OpenExec:**
    ```bash
    export KIMI_API_KEY="your-key"
    openexec run --model kimi-k2.5 --task "Refactor auth middleware"
    ```
+
+**That's it!** BitNet Router will:
+- Parse your intent
+- Select appropriate tools
+- Call the wrapper for LLM responses
+- Execute tools via OpenExec MCP
+- Return results to the wrapper
+
+**No tool calling support needed in the LLM!**
 
 ---
 
