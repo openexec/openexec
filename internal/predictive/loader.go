@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/knowledge"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Loader predicts and pre-loads files based on task analysis.
@@ -89,7 +89,7 @@ func NewLoader(projectDir string, knowledgeStore *knowledge.Store, config *Loade
 	}
 
 	dbPath := filepath.Join(projectDir, ".openexec", "predictive.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open predictive db: %w", err)
 	}

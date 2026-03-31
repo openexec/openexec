@@ -50,6 +50,13 @@ type ExecutionConfig struct {
 	// TestCommands overrides the default test commands in the blueprint.
 	// If empty, the test stage is skipped (auto-pass).
 	TestCommands []string `json:"test_commands,omitempty"`
+
+	// Feature flags for V2 subsystems
+	QualityGatesV2    bool `json:"quality_gates_v2,omitempty"`
+	CacheEnabled      bool `json:"cache_enabled,omitempty"`
+	PredictiveLoad    bool `json:"predictive_load,omitempty"`
+	MemoryEnabled     bool `json:"memory_enabled,omitempty"`
+	CheckpointEnabled bool `json:"checkpoint_enabled,omitempty"`
 }
 
 // Initialize initializes a new OpenExec project

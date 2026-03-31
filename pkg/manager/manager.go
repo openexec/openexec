@@ -16,6 +16,8 @@ import (
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
@@ -292,6 +294,13 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	// Initialize quality gate runner and inject into pipeline
 	if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
 		pipeline.WithGateRunner(&gateRunnerAdapter{runner: runner})(p)
+	}
+
+	// Wire quality gates V2 if enabled in project config
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.QualityGatesV2 {
+		projectType := quality.DetectProjectType(m.cfg.WorkDir)
+		qm := quality.NewManager(m.cfg.WorkDir, quality.DefaultGates(projectType))
+		pipeline.WithQualityManager(qm)(p)
 	}
 
 	// Create OTel span for the entire run lifecycle

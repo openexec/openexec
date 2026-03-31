@@ -17,6 +17,7 @@ import (
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/types"
 	"github.com/openexec/openexec/pkg/telemetry"
 
@@ -106,7 +107,8 @@ type Pipeline struct {
 	factory *LoopFactory
 	events  chan loop.Event
 
-	gateRunner types.GateRunner
+	gateRunner     types.GateRunner
+	qualityManager *quality.Manager
 
 	currentLoop *loop.Loop
 	mu          sync.Mutex
@@ -149,6 +151,13 @@ type Option func(*Pipeline)
 func WithGateRunner(runner types.GateRunner) Option {
 	return func(p *Pipeline) {
 		p.gateRunner = runner
+	}
+}
+
+// WithQualityManager sets the V2 quality gate manager for the pipeline.
+func WithQualityManager(qm *quality.Manager) Option {
+	return func(p *Pipeline) {
+		p.qualityManager = qm
 	}
 }
 
@@ -364,6 +373,30 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			ErrText:   result.Error,
 			Artifacts: result.Artifacts,
 		})
+
+		// Run quality gates after successful agentic stages
+		if p.qualityManager != nil && result.Status == types.StageStatusCompleted {
+			go func() {
+				summary, err := p.qualityManager.RunAll(context.Background())
+				if err != nil {
+					p.emit(loop.Event{Type: loop.EventError, ErrText: fmt.Sprintf("quality gates error: %v", err)})
+					return
+				}
+				if summary.FailedGates > 0 {
+					p.emit(loop.Event{
+						Type:  loop.EventGatesFailed,
+						Text:  fmt.Sprintf("Quality gates: %d passed, %d failed, blocked=%v", summary.PassedGates, summary.FailedGates, summary.Blocked),
+						FWUID: p.cfg.FWUID,
+					})
+				} else {
+					p.emit(loop.Event{
+						Type:  loop.EventGatesPassed,
+						Text:  fmt.Sprintf("Quality gates: %d passed", summary.PassedGates),
+						FWUID: p.cfg.FWUID,
+					})
+				}
+			}()
+		}
 	}
 	engineConfig.OnCheckpoint = func(run *blueprint.Run, stageName string) {
 		p.emit(loop.Event{

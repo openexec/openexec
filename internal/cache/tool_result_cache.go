@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // ToolResultCache provides caching for tool execution results.
@@ -31,7 +31,7 @@ type ToolResultCacheEntry struct {
 // NewToolResultCache creates a new tool result cache with the specified TTL.
 func NewToolResultCache(projectDir string, ttl time.Duration) (*ToolResultCache, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "cache.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open tool cache db: %w", err)
 	}

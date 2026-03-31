@@ -107,7 +107,7 @@ func NewPruner(projectDir string, knowledgeStore *knowledge.Store, memoryManager
 	}
 
 	dbPath := filepath.Join(projectDir, ".openexec", "pruner.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open pruner db: %w", err)
 	}

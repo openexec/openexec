@@ -59,7 +59,7 @@ const (
 // NewManager creates a new checkpoint manager.
 func NewManager(projectDir string) (*Manager, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "checkpoints.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open checkpoint db: %w", err)
 	}
@@ -120,8 +120,12 @@ func (m *Manager) Create(run *blueprint.Run, workingDir string) (*Checkpoint, er
 		Status:       CheckpointStatusValid,
 	}
 
-	// Copy stage results
-	copy(checkpoint.StageResults, run.Results)
+	// Copy stage results (dereference pointers)
+	for i, r := range run.Results {
+		if r != nil {
+			checkpoint.StageResults[i] = *r
+		}
+	}
 
 	// Capture working state (file hashes)
 	if err := m.captureWorkingState(checkpoint, workingDir); err != nil {
@@ -166,7 +170,7 @@ func (m *Manager) Restore(checkpointID string) (*Checkpoint, error) {
 // GetLatest gets the latest checkpoint for a run.
 func (m *Manager) GetLatest(runID string) (*Checkpoint, error) {
 	var checkpointID string
-	query := `SELECT id FROM checkpoints WHERE run_id = ? AND status = 'valid' ORDER BY created_at DESC LIMIT 1`
+	query := `SELECT id FROM checkpoints WHERE run_id = ? AND status = 'valid' ORDER BY created_at DESC, rowid DESC LIMIT 1`
 	err := m.db.QueryRow(query, runID).Scan(&checkpointID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -214,7 +218,7 @@ func (m *Manager) Delete(checkpointID string) error {
 
 // Cleanup removes old checkpoints.
 func (m *Manager) Cleanup(olderThan time.Time) error {
-	_, err := m.db.Exec(`DELETE FROM checkpoints WHERE created_at < ?`, olderThan)
+	_, err := m.db.Exec(`DELETE FROM checkpoints WHERE created_at < ?`, olderThan.UTC().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return fmt.Errorf("failed to cleanup checkpoints: %w", err)
 	}
@@ -340,7 +344,7 @@ func (m *Manager) save(checkpoint *Checkpoint) error {
 		string(stageResultsJSON),
 		string(workingStateJSON),
 		string(variablesJSON),
-		checkpoint.CreatedAt,
+		checkpoint.CreatedAt.UTC().Format("2006-01-02 15:04:05"),
 		checkpoint.Checksum,
 		string(checkpoint.Status),
 	)

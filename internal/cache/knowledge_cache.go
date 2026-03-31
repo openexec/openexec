@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // KnowledgeCache provides persistent caching for knowledge index operations.
@@ -34,7 +34,7 @@ type KnowledgeCacheEntry struct {
 // The cache is stored in SQLite for persistence across sessions.
 func NewKnowledgeCache(projectDir string, ttl time.Duration) (*KnowledgeCache, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "cache.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open cache db: %w", err)
 	}

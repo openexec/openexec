@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // MemoryManager provides high-level memory management with persistence.
@@ -23,7 +23,7 @@ func NewMemoryManager(projectDir string) (*MemoryManager, error) {
 	system := NewMemorySystem(projectDir)
 
 	dbPath := filepath.Join(projectDir, ".openexec", "memory.db")
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open memory db: %w", err)
 	}
