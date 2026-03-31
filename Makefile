@@ -1,7 +1,7 @@
 VERSION ?= $(shell grep "const Version =" pkg/version/version.go | cut -d'"' -f2)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 
-.PHONY: all build build-all clean lint test type-check ui-lint ui-test ui-type-check help
+.PHONY: all build build-all clean lint test compat-test type-check ui-lint ui-test ui-type-check help
 
 # Default target
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "  make build-all    Build binaries for all platforms using Docker"
 	@echo "  make lint         Run all linters (Go + UI)"
 	@echo "  make test         Run all unit tests (Go + UI)"
+	@echo "  make compat-test  Run existing-project compatibility regression tests"
 	@echo "  make type-check   Run all type checking (Go + UI)"
 	@echo "  make ui-lint      Run ESLint for the UI"
 	@echo "  make ui-test      Run Vitest for the UI"
@@ -49,6 +50,10 @@ test:
 	@echo "🧪 Running Go tests..."
 	go test ./...
 	@$(MAKE) ui-test
+
+compat-test:
+	@echo "🧪 Running compatibility regression tests..."
+	go test ./internal/validation/... -run Compatibility -v
 
 ui-test:
 	@echo "🧪 Running UI tests (Strict Serial Mode)..."

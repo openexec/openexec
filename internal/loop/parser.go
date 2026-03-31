@@ -168,8 +168,10 @@ func (p *Parser) parseToolResult(data json.RawMessage) {
 
     // Content can be an array of items or a simple string.
     // Prefer array parsing to extract structured text and artifact markers.
+    // Use standard json.Unmarshal here — tool results are well-formed JSON from the stream,
+    // not LLM-generated text that needs sanitization.
     var items []contentItem
-    if err := util.UnmarshalRobust(string(data), &items); err == nil && len(items) > 0 {
+    if err := json.Unmarshal(data, &items); err == nil && len(items) > 0 {
         var b strings.Builder
         artifacts := map[string]string{}
         for _, it := range items {
@@ -195,7 +197,7 @@ func (p *Parser) parseToolResult(data json.RawMessage) {
 
     // Fallback to plain string
     var s string
-    if err := util.UnmarshalRobust(string(data), &s); err == nil {
+    if err := json.Unmarshal(data, &s); err == nil {
         p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: s})
         return
     }

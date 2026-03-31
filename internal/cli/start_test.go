@@ -83,6 +83,12 @@ func TestBuildTaskPromptWithRetry(t *testing.T) {
 	}
 
 	t.Run("New Task", func(t *testing.T) {
+		// Run in a clean temp dir to avoid git status leaking repo filenames
+		tmpDir := t.TempDir()
+		oldCwd, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(oldCwd)
+
 		prompt := buildTaskPromptWithRetry(task, nil, "")
 		if !strings.Contains(prompt, "TASK ID: T-001") {
 			t.Error("missing task ID in prompt")

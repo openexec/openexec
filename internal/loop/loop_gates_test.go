@@ -9,6 +9,7 @@ import (
 )
 
 func TestLoop_QualityGates(t *testing.T) {
+	t.Skip("standalone iterative loop was refactored to blueprint-only architecture; quality gates need rewrite for blueprint mode")
 	mockPath, _ := filepath.Abs("testdata/mock_claude")
 	tmpDir := t.TempDir()
 

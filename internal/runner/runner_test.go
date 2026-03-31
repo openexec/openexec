@@ -52,9 +52,6 @@ func TestResolve_ClaudeModels(t *testing.T) {
 
 			// Check for key default args
 			argsStr := strings.Join(args, " ")
-			if !strings.Contains(argsStr, "--dangerously-skip-permissions") {
-				t.Error("missing --dangerously-skip-permissions in default args")
-			}
 			if !strings.Contains(argsStr, "--output-format") {
 				t.Error("missing --output-format in default args")
 			}
@@ -127,10 +124,10 @@ func TestResolve_GeminiModels(t *testing.T) {
 				t.Errorf("expected gemini executable, got %q", cmd)
 			}
 
-			// Verify args include yolo flag
+			// Verify args include prompt flag
 			argsStr := strings.Join(args, " ")
-			if !strings.Contains(argsStr, "--yolo") {
-				t.Error("missing --yolo in gemini args")
+			if !strings.Contains(argsStr, "--prompt") {
+				t.Error("missing --prompt in gemini args")
 			}
 		})
 	}
@@ -264,7 +261,6 @@ func TestClaudeDefaultArgs(t *testing.T) {
 	}
 
 	expectedFlags := []string{
-		"--dangerously-skip-permissions",
 		"--output-format",
 		"--verbose",
 		"--max-turns",
@@ -297,7 +293,7 @@ func TestGeminiDefaultArgs(t *testing.T) {
 	}
 
 	argsStr := strings.Join(GeminiDefaultArgs, " ")
-	if !strings.Contains(argsStr, "--yolo") {
-		t.Error("missing --yolo in GeminiDefaultArgs")
+	if !strings.Contains(argsStr, "--prompt") {
+		t.Error("missing --prompt in GeminiDefaultArgs")
 	}
 }

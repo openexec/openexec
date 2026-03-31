@@ -141,7 +141,12 @@ func isControlPlaneTool(toolName string) bool {
 }
 
 func (b *ToolBroker) validateShellCommand(arguments string) (bool, string) {
-	// Implementation of allowlist logic
+	// In full-auto (danger) mode, allow all commands without restriction
+	if b.mode == ModeFullAuto {
+		return true, ""
+	}
+
+	// Implementation of allowlist logic for restricted modes
 	allowedCommands := map[string]bool{
 		"go": true, "npm": true, "ls": true, "pwd": true, "git": true,
 		"cat": true, "grep": true, "find": true, "mkdir": true, "rm": true,
@@ -151,6 +156,8 @@ func (b *ToolBroker) validateShellCommand(arguments string) (bool, string) {
 		"uv": true, "pip": true, "poetry": true, "make": true, "just": true,
 		"echo": true, "printf": true, "wc": true, "sleep": true, "head": true, "tail": true,
 		"bash": true, "sh": true, "date": true, "env": true, "exit": true,
+		"seq": true, "sort": true, "uniq": true, "tr": true, "cut": true, "awk": true, "sed": true,
+		"printenv": true, "which": true, "whoami": true, "uname": true,
 	}
 
 	// Parse JSON arguments to extract command

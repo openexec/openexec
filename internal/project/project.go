@@ -9,11 +9,11 @@ import (
 
 // ProjectConfig holds project-specific configuration
 type ProjectConfig struct {
-	Name        string `json:"name"`
-	ProjectDir  string `json:"project_dir,omitempty"`
-	GitEnabled         bool   `json:"git_enabled,omitempty"`
-	GitCommitEnabled   bool   `json:"git_commit_enabled,omitempty"` // Allow autonomous local commits
-	BaseBranch         string `json:"base_branch,omitempty"`
+	Name                string `json:"name"`
+	ProjectDir          string `json:"project_dir,omitempty"`
+	GitEnabled          bool   `json:"git_enabled,omitempty"`
+	GitCommitEnabled    bool   `json:"git_commit_enabled,omitempty"` // Allow autonomous local commits
+	BaseBranch          string `json:"base_branch,omitempty"`
 	ReleaseBranchPrefix string `json:"release_branch_prefix,omitempty"` // e.g. "release/"
 	FeatureBranchPrefix string `json:"feature_branch_prefix,omitempty"` // e.g. "feature/"
 
@@ -37,19 +37,19 @@ type ExecutionConfig struct {
 	ReviewEnabled bool `json:"review_enabled"`
 	// ReviewerModel is the model to use for code review
 	ReviewerModel string `json:"reviewer_model,omitempty"`
-    // WorkerCount is the number of concurrent workers for parallel execution
-    WorkerCount int `json:"worker_count,omitempty"`
-    // TimeoutSeconds sets the default per-task timeout used by run/start when flags are not provided.
-    TimeoutSeconds int `json:"timeout_seconds,omitempty"`
-    // ExecMode controls the permission level for the AI runner.
-    // Values: "suggest" (read-only), "workspace-write" (default), "danger-full-access" (skip all permissions)
-    ExecMode string `json:"exec_mode,omitempty"`
-    // LintCommands overrides the default lint commands in the blueprint.
-    // If empty, the lint stage is skipped (auto-pass).
-    LintCommands []string `json:"lint_commands,omitempty"`
-    // TestCommands overrides the default test commands in the blueprint.
-    // If empty, the test stage is skipped (auto-pass).
-    TestCommands []string `json:"test_commands,omitempty"`
+	// WorkerCount is the number of concurrent workers for parallel execution
+	WorkerCount int `json:"worker_count,omitempty"`
+	// TimeoutSeconds sets the default per-task timeout used by run/start when flags are not provided.
+	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
+	// ExecMode controls the permission level for the AI runner.
+	// Values: "suggest" (read-only), "workspace-write" (default), "danger-full-access" (skip all permissions)
+	ExecMode string `json:"exec_mode,omitempty"`
+	// LintCommands overrides the default lint commands in the blueprint.
+	// If empty, the lint stage is skipped (auto-pass).
+	LintCommands []string `json:"lint_commands,omitempty"`
+	// TestCommands overrides the default test commands in the blueprint.
+	// If empty, the test stage is skipped (auto-pass).
+	TestCommands []string `json:"test_commands,omitempty"`
 }
 
 // Initialize initializes a new OpenExec project
@@ -103,10 +103,10 @@ func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 
 	// Create project config
 	config := &ProjectConfig{
-		Name:        projectName,
-		ProjectDir:  projectDir,
-		GitEnabled:  true,
-		BaseBranch:  "main",
+		Name:       projectName,
+		ProjectDir: projectDir,
+		GitEnabled: true,
+		BaseBranch: "main",
 	}
 
 	// Save config.json
@@ -133,14 +133,19 @@ quality:
 
 // LoadProjectConfig loads the project configuration from .openexec directory
 func LoadProjectConfig(projectDir string) (*ProjectConfig, error) {
+	absProjectDir, err := filepath.Abs(projectDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine project directory: %w", err)
+	}
+
 	// Try .openexec first, then fall back to .uaos for backwards compatibility
-	openexecDir := filepath.Join(projectDir, ".openexec")
+	openexecDir := filepath.Join(absProjectDir, ".openexec")
 	configFile := filepath.Join(openexecDir, "config.json")
 
 	// Check .openexec/config.json
 	if _, err := os.Stat(configFile); err != nil {
 		// Try legacy .uaos/project.json
-		uaosDir := filepath.Join(projectDir, ".uaos")
+		uaosDir := filepath.Join(absProjectDir, ".uaos")
 		legacyConfig := filepath.Join(uaosDir, "project.json")
 		if _, err := os.Stat(legacyConfig); err == nil {
 			configFile = legacyConfig
@@ -155,7 +160,7 @@ func LoadProjectConfig(projectDir string) (*ProjectConfig, error) {
 		return nil, err
 	}
 
-	config.ProjectDir = projectDir
+	config.ProjectDir = absProjectDir
 	return config, nil
 }
 

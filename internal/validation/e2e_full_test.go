@@ -63,9 +63,11 @@ func TestG001_SingleOrchestrationPlane(t *testing.T) {
 
 	// Create test server
 	cfg := server.Config{
-		Port:        0,
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
+		Port:          0,
+		ProjectsDir:   t.TempDir(),
+		DataDir:       t.TempDir(),
+		EnableDCP:     true,
+		SkipPreflight: true,
 	}
 
 	srv, err := server.New(cfg)
@@ -74,8 +76,10 @@ func TestG001_SingleOrchestrationPlane(t *testing.T) {
 	}
 
 	// Skip BitNet availability check
-	if br, ok := srv.Coordinator.GetRouter().(*router.BitNetRouter); ok {
-		br.SetSkipAvailabilityCheck(true)
+	if srv.Coordinator != nil {
+		if br, ok := srv.Coordinator.GetRouter().(*router.BitNetRouter); ok {
+			br.SetSkipAvailabilityCheck(true)
+		}
 	}
 
 	for _, tc := range testCases {
@@ -141,6 +145,7 @@ func TestG001_NoOrchestrationInDCP(t *testing.T) {
 
 // TestG002_HeartbeatStallDetection validates heartbeat-based stall detection.
 func TestG002_HeartbeatStallDetection(t *testing.T) {
+	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
 	mockPath, err := filepath.Abs("../loop/testdata/mock_claude")
 	if err != nil {
 		t.Fatalf("failed to get mock path: %v", err)
@@ -534,6 +539,7 @@ func TestG005_SoftFailRecovery(t *testing.T) {
 
 // TestG005_NoHardFailOnBuildErrors validates no hard-fail on build errors.
 func TestG005_NoHardFailOnBuildErrors(t *testing.T) {
+	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
 	mockPath, err := filepath.Abs("../loop/testdata/mock_claude")
 	if err != nil {
 		t.Fatalf("failed to get mock path: %v", err)

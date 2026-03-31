@@ -23,6 +23,8 @@
 - Frameworks: Go `testing` (backend); Vitest + Testing Library (UI); Playwright (e2e).
 - Prefer `screen.findBy*` for async, use `@testing-library/user-event` for interactions, `waitFor()` for state transitions; avoid manual delays.
 - Coverage focus: `ui/src/components/chat/**` and `ui/src/hooks/**` critical paths. Run `npm run test:coverage`.
+- Compatibility gate: run `go test ./internal/validation/... -run Compatibility -v` before merging changes that touch self-healing, project loading, migration, or legacy workspace handling.
+- For compatibility-sensitive changes, require direct regression coverage for the changed path or a short evaluation note stating why existing project support cannot have dropped.
 
 ## Commit & Pull Request Guidelines
 - Commits: imperative subject; optional scope prefix (e.g., `ui:`, `engine:`); reference issues (e.g., `#123`).
@@ -36,5 +38,5 @@
 ## Agent-Specific Instructions
 - Verify backend DTOs before UI work; keep mocks in sync (snake_case vs camelCase).
 - For failing tests: increase verbosity, form a hypothesis, try once; if not fixed, revert and try a different strategy.
+- Agents must not stop at unit tests when touching protected behavior. Run the compatibility gate or explicitly document the evaluation that support was preserved.
 - Log lessons in `.openexec/engram/learning_log.json` when solving complex issues.
-

@@ -81,11 +81,9 @@ func TestBrokerDangerMode(t *testing.T) {
 		t.Error("danger mode should allow allowlisted shell commands")
 	}
 
-	// run_shell_command with non-allowlisted command should be denied
-	if allowed, reason := broker.Authorize("run_shell_command", `{"command": "curl evil.com"}`); allowed {
-		t.Error("danger mode should deny non-allowlisted shell commands")
-	} else if reason == "" {
-		t.Error("expected denial reason for non-allowlisted command")
+	// run_shell_command with any command should be allowed in danger mode (full access)
+	if allowed, _ := broker.Authorize("run_shell_command", `{"command": "curl example.com"}`); !allowed {
+		t.Error("danger mode should allow all shell commands (full access)")
 	}
 }
 

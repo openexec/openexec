@@ -46,6 +46,23 @@ The active runtime never modifies its own live process. This "immutable runtime"
 ## 4. Candidate Validation & Replay
 Before promotion, a candidate must reproduce **Golden Runs**—historical runs representing known-good behavior (e.g., `fix_ci_failure`, `scoped_code_change`). This ensures that a self-repair or upgrade never introduces regressions into core orchestration logic.
 
+### Compatibility Gate for Existing Projects
+Golden runs are not enough on their own. Self-healing must also prove that the candidate runtime still works with previously initialized workspaces.
+
+The promotion gate should include a fixture-based compatibility suite that exercises:
+
+* current `.openexec` projects
+* legacy `.uaos/project.json` projects
+* legacy `.openexec/tasks.json` progress fallback when SQLite is unavailable
+
+In this repository, that contract is covered by the validation compatibility tests:
+
+```bash
+go test ./internal/validation/... -run Compatibility -v
+```
+
+The suite builds the real `openexec` binary, runs it against copied fixture projects, and verifies that commands such as `openexec status --json` still recognize legacy workspaces. A self-fix candidate must pass this suite before restart or promotion.
+
 ## 5. Operational Memory Integration
 All incidents, repair attempts, and upgrade histories are stored in the **Operational Memory Layer** as `RuntimeMaintenanceRecords`. This data becomes institutional knowledge, allowing the system to learn from past failures and refine its self-healing blueprints.
 

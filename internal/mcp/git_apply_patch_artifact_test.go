@@ -26,6 +26,10 @@ func TestGitApplyPatch_PersistsArtifactAndReports(t *testing.T) {
     }
     b, _ := json.Marshal(args)
     params := toolsCallParams{Name: "git_apply_patch", Arguments: b}
+    oldRoot := os.Getenv("WORKSPACE_ROOT")
+    os.Setenv("WORKSPACE_ROOT", tmp)
+    defer os.Setenv("WORKSPACE_ROOT", oldRoot)
+
     s, err := NewServerWithConfig(strings.NewReader(""), os.Stdout, ServerConfig{WorkDir: tmp})
     if err != nil {
         t.Fatalf("NewServerWithConfig: %v", err)

@@ -6,11 +6,13 @@ import (
 )
 
 func TestParser_ExtractsPatchArtifact(t *testing.T) {
-    ch := make(chan Event, 1)
+    ch := make(chan Event, 2) // Buffer must hold heartbeat + tool result
     p := NewParser(ch, 1)
     // Simulate tool_result content array with a text item containing artifact marker
     payload := []byte(`[{"type":"text","text":"Patch applied successfully\nARTIFACT:patch abc123 /tmp/x.patch"}]`)
     p.parseToolResult(payload)
+    // Drain the heartbeat event emitted first
+    <-ch
     select {
     case evt := <-ch:
         if evt.Type != EventToolResult {

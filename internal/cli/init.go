@@ -16,6 +16,7 @@ var (
 	initPlannerModel   string
 	initExecutorModel  string
 	initReviewEnabled  bool
+	initNoReview       bool
 	initReviewerModel  string
 	initNonInteractive bool
 	initParallel       bool
@@ -105,7 +106,13 @@ The project name defaults to the current directory name if not provided.`,
 			}
 			plannerModel = initPlannerModel
 			executorModel = initExecutorModel
-			reviewEnabled = initReviewEnabled
+			reviewEnabled = true
+			if cmd.Flags().Changed("review") {
+				reviewEnabled = initReviewEnabled
+			}
+			if initNoReview {
+				reviewEnabled = false
+			}
 			reviewerModel = initReviewerModel
 
 			// Respect flag if provided in non-interactive mode
@@ -127,14 +134,14 @@ The project name defaults to the current directory name if not provided.`,
 		// Set execution config
 		cfg.GitCommitEnabled = gitCommitEnabled
 		cfg.Execution = project.ExecutionConfig{
-			PlannerModel:    plannerModel,
-			ExecutorModel:   executorModel,
-			ReviewEnabled:   reviewEnabled,
-			ReviewerModel:   reviewerModel,
-			Port:            8080,
-			WorkerCount:     workerCount,
-			TimeoutSeconds:  600,
-			ExecMode:        "danger-full-access",
+			PlannerModel:   plannerModel,
+			ExecutorModel:  executorModel,
+			ReviewEnabled:  reviewEnabled,
+			ReviewerModel:  reviewerModel,
+			Port:           8080,
+			WorkerCount:    workerCount,
+			TimeoutSeconds: 600,
+			ExecMode:       "danger-full-access",
 		}
 
 		// Save updated config
@@ -162,7 +169,7 @@ func init() {
 	initCmd.Flags().StringVar(&initPlannerModel, "planner", "sonnet", "Model to use for planning phase")
 	initCmd.Flags().StringVar(&initExecutorModel, "executor", "sonnet", "Model to use for task execution")
 	initCmd.Flags().BoolVar(&initReviewEnabled, "review", false, "Enable code review after task execution")
-	initCmd.Flags().BoolVar(&initNonInteractive, "no-review", false, "Disable code review (non-interactive)")
+	initCmd.Flags().BoolVar(&initNoReview, "no-review", false, "Disable code review after task execution")
 	initCmd.Flags().StringVar(&initReviewerModel, "reviewer", "opus", "Model to use for code review")
 	initCmd.Flags().BoolVarP(&initNonInteractive, "yes", "y", false, "Non-interactive mode (use defaults)")
 	initCmd.Flags().BoolVar(&initParallel, "parallel", true, "Enable parallel task execution (non-interactive)")

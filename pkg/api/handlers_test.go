@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/manager"
 )
 
@@ -35,14 +36,23 @@ func buildMockClaude(t *testing.T) string {
 
 func testManager(t *testing.T, bin string) *manager.Manager {
 	t.Helper()
+	workDir := t.TempDir()
+	dbPath := filepath.Join(workDir, "test.db")
+	stateStore, err := state.NewStore(dbPath)
+	if err != nil {
+		t.Fatalf("state.NewStore: %v", err)
+	}
+	t.Cleanup(func() { stateStore.Close() })
+
 	mgr, err := manager.New(manager.Config{
-		WorkDir:              t.TempDir(),
+		WorkDir:              workDir,
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
 		DefaultMaxIterations: 10,
 		MaxRetries:           1,
 		ThrashThreshold:      0,
 		RetryBackoff:         []time.Duration{0},
 		CommandName:          bin,
+		StateStore:           stateStore,
 	})
 	if err != nil {
 		t.Fatalf("manager.New: %v", err)
@@ -76,18 +86,7 @@ func TestHandleStartRunSuccess(t *testing.T) {
 
 func TestHandleStartRunDuplicate(t *testing.T) {
 	bin := buildMockClaude(t)
-	mgr, err := manager.New(manager.Config{
-		WorkDir:              t.TempDir(),
-		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
-		DefaultMaxIterations: 10,
-		MaxRetries:           1,
-		ThrashThreshold:      0,
-		RetryBackoff:         []time.Duration{0},
-		CommandName:          bin,
-	})
-	if err != nil {
-		t.Fatalf("manager.New: %v", err)
-	}
+	mgr := testManager(t, bin)
 	srv := New(mgr, nil, nil, "", ":0")
 
 	// Start pipeline with slow scenario to keep it running.

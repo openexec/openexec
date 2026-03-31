@@ -32,21 +32,26 @@ We welcome contributions to the OpenExec execution engine!
    ```bash
    go test ./...
    ```
-4. **Run UI tests** (if applicable):
+4. **Run compatibility regression tests** for changes that can affect existing projects, migrations, self-healing, or legacy behavior:
+   ```bash
+   make compat-test
+   ```
+5. **Run UI tests** (if applicable):
    ```bash
    cd ui && npm test
    ```
-5. **Lint your changes:**
+6. **Lint your changes:**
    ```bash
    golangci-lint run
    ```
-6. **Submit a Pull Request.**
+7. **Submit a Pull Request.**
 
 ## Standards
 
 - **Go Code:** Follow Effective Go and idiomatic patterns; format with `gofmt`.
 - **UI Code:** Use TypeScript and React best practices.
 - **Commit Messages:** Clear, concise subjects; reference issues when applicable.
+- **Anti-Regression Rule:** For compatibility-sensitive changes, add or update an automated regression test for the changed path, or include a short evaluation note explaining why existing-project support could not have dropped.
 
 ## Security
 

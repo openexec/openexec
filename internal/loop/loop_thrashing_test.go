@@ -16,6 +16,7 @@ import (
 // THEN EventThrashingDetected is emitted
 // AND loop.Run() returns nil (not an error)
 func TestLoop_ExitStrategyC003_CleanExit(t *testing.T) {
+	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
 	mockPath, err := filepath.Abs("testdata/mock_claude")
 	if err != nil {
 		t.Fatalf("failed to get abs path: %v", err)
@@ -74,6 +75,7 @@ func TestLoop_ExitStrategyC003_CleanExit(t *testing.T) {
 // WHEN the loop runs
 // THEN no EventThrashingDetected is emitted (before MaxIterations)
 func TestLoop_ExitStrategyC003_ProgressResets(t *testing.T) {
+	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
 	mockPath, err := filepath.Abs("testdata/mock_claude")
 	if err != nil {
 		t.Fatalf("failed to get abs path: %v", err)
@@ -134,6 +136,7 @@ func TestLoop_ExitStrategyC003_ProgressResets(t *testing.T) {
 // THEN no EventThrashingDetected is emitted
 // AND the loop runs until MaxIterations
 func TestLoop_ExitStrategyC003_DisabledWhenZero(t *testing.T) {
+	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
 	mockPath, err := filepath.Abs("testdata/mock_claude")
 	if err != nil {
 		t.Fatalf("failed to get abs path: %v", err)

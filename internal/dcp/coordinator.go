@@ -167,6 +167,9 @@ func (c *Coordinator) RegisterTool(t tools.Tool) {
 }
 
 func (c *Coordinator) GetRouter() router.Router {
+	if c == nil {
+		return nil
+	}
 	return c.router
 }
 

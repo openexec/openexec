@@ -189,6 +189,11 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 			Attempt:     attempt,
 		})
 
+		// Invoke stage start callback
+		if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnStageStart != nil {
+			l.cfg.BlueprintCallbacks.OnStageStart(run, stage)
+		}
+
 		// Execute stage
 		result, err := l.blueprintEngine.ExecuteStage(ctx, run, stage.Name, input)
 		if err != nil {
@@ -197,6 +202,11 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 				ErrText: fmt.Sprintf("execution error in stage %q: %v", stage.Name, err),
 			})
 			return err
+		}
+
+		// Invoke stage complete callback
+		if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnStageComplete != nil {
+			l.cfg.BlueprintCallbacks.OnStageComplete(run, result)
 		}
 
 		// Handle result
@@ -216,6 +226,9 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 			// Create checkpoint if configured
 			if stage.CreateCheckpoint {
 				run.AddCheckpoint()
+				if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnCheckpoint != nil {
+					l.cfg.BlueprintCallbacks.OnCheckpoint(run, stage.Name)
+				}
 				l.emit(Event{
 					Type:        EventCheckpointCreated,
 					BlueprintID: bp.ID,
@@ -264,6 +277,11 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 
 	// Blueprint completed successfully
 	run.Complete()
+
+	// Invoke run complete callback
+	if l.cfg.BlueprintCallbacks != nil && l.cfg.BlueprintCallbacks.OnRunComplete != nil {
+		l.cfg.BlueprintCallbacks.OnRunComplete(run)
+	}
 
 	l.emit(Event{
 		Type:        EventBlueprintComplete,

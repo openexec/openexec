@@ -62,6 +62,23 @@ func TestInitCmd(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(tmpDir, "openexec.yaml")); err != nil {
 		t.Error("openexec.yaml not created")
 	}
+
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".openexec", "config.json"))
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+
+	var cfg struct {
+		Execution struct {
+			ReviewEnabled bool `json:"review_enabled"`
+		} `json:"execution"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("failed to parse config: %v", err)
+	}
+	if !cfg.Execution.ReviewEnabled {
+		t.Fatal("non-interactive init should enable review by default")
+	}
 }
 
 func TestInitCmd_Interactive(t *testing.T) {
@@ -118,5 +135,50 @@ func TestInitCmd_Interactive(t *testing.T) {
 	// let's at least check that some config was written.
 	if cfg.Execution.PlannerModel == "" && !strings.Contains(b.String(), "successfully") {
 		t.Errorf("Interactive init failed to write config or report success. Output: %s", b.String())
+	}
+}
+
+func TestInitCmd_NoReviewFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	runGit(t, tmpDir, "init")
+	runGit(t, tmpDir, "config", "user.name", "Test User")
+	runGit(t, tmpDir, "config", "user.email", "test@example.com")
+	runGit(t, tmpDir, "config", "commit.gpgsign", "false")
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, tmpDir, "add", "README.md")
+	runGit(t, tmpDir, "commit", "-m", "Initial")
+	runGit(t, tmpDir, "branch", "-M", "main")
+
+	oldCwd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldCwd)
+
+	b := bytes.NewBufferString("")
+	rootCmd.SetOut(b)
+	rootCmd.SetArgs([]string{"init", "no-review-project", "-y", "--no-review"})
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".openexec", "config.json"))
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+
+	var cfg struct {
+		Execution struct {
+			ReviewEnabled bool `json:"review_enabled"`
+		} `json:"execution"`
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("failed to parse config: %v", err)
+	}
+	if cfg.Execution.ReviewEnabled {
+		t.Fatal("--no-review should disable review in non-interactive init")
 	}
 }

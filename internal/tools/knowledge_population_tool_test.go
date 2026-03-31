@@ -2,6 +2,8 @@ package tools
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,7 +13,11 @@ import (
 func TestKnowledgePopulationTool(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
-	store, _ := knowledge.NewStore(tmpDir)
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
+	store, err := knowledge.NewStore(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create knowledge store: %v", err)
+	}
 	defer store.Close()
 
 	tool := NewKnowledgePopulationTool(store)

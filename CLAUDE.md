@@ -16,6 +16,9 @@ go test -v ./internal/loop/... -run TestLoop  # Single test/package
 cd ui && npm test             # UI tests (watch mode)
 cd ui && npx vitest run --fileParallelism=false  # UI tests (CI mode)
 
+# Compatibility regression tests (CI gate — required before merging)
+make compat-test              # Runs: go test ./internal/validation/... -run Compatibility -v
+
 # Lint & Type Check
 make lint                     # Go vet + golangci-lint + UI ESLint
 make type-check               # Go build check + UI tsc
@@ -59,15 +62,14 @@ Tasks in blueprint mode progress through: **gather_context → implement → lin
 | `internal/cli/` | Cobra commands (init, plan, start, run, chat, doctor) |
 | `internal/loop/` | Core iteration engine - spawns AI, parses events, blueprint execution |
 | `internal/blueprint/` | Stage-based execution engine with checkpoints and retries |
-| `internal/mode/` | Mode types (chat/task/run) and transitions |
-| `internal/toolset/` | Toolset definitions and registry |
 | `internal/dcp/` | Deterministic Control Plane - thin tool-routing layer |
+| `internal/project/` | Project config loading with legacy `.uaos/` fallback |
+| `internal/validation/` | E2E and compatibility regression tests (CI gate) |
+| `internal/toolset/` | Toolset definitions and registry |
 | `internal/context/` | Two-stage context assembly (deterministic + LLM ranking) |
-| `internal/pipeline/` | Blueprint wrapper and loop factory |
 | `internal/mcp/` | Model Context Protocol server (JSON-RPC stdio) |
 | `internal/prompt/` | Prompt assembly from personas/workflows/manifests |
 | `internal/release/` | SQLite-backed task/story state management |
-| `internal/router/` | Intent routing and classification |
 | `pkg/agent/` | AI provider adapters (anthropic, openai, gemini) |
 | `pkg/manager/` | Multi-pipeline orchestrator |
 | `pkg/api/` | HTTP handlers and WebSocket |
@@ -96,9 +98,19 @@ Agent personas, workflows, and manifests live in `agents/`:
 - **Tract**: Separate JSON-RPC microservice for story/task storage
 - **Config**: `.openexec/config.json` for project settings
 
+### Backward Compatibility: `.uaos/` → `.openexec/`
+Project loading (`internal/project/`) uses dual-path reading: first tries `.openexec/config.json`, then falls back to `.uaos/project.json` (legacy format). The legacy `tasks.json` fallback for progress calculation is also preserved. This backward compatibility is enforced by `make compat-test` in CI.
+
 ---
 
 ## Engineering Mandates
+
+### Anti-Regression Policy
+Do not merge changes that modify compatibility-sensitive behavior (project loading, migration, self-healing, legacy workspace handling) without proving support was preserved. Either:
+1. Add/update automated regression coverage that directly exercises the changed path, OR
+2. Include a short compatibility evaluation explaining why existing-project support cannot have dropped.
+
+Protected behaviors: existing `.openexec` projects, legacy `.uaos` projects, and migration fallbacks like `.openexec/tasks.json`.
 
 ### Observe, then Resolve
 To prevent thrashing during task execution:
@@ -115,9 +127,14 @@ To prevent thrashing during task execution:
 - Verify API schemas in `internal/api/` or `types/` before implementing UI
 - Ensure mocks match current API response format (snake_case vs camelCase)
 
+### Commit Messages
+Follow Conventional Commit prefixes: `fix:`, `feat:`, `docs:`, `release:`, etc. Keep subjects imperative and under one line.
+
 ### Known Quirks
 - **JSDOM limitations**: Doesn't fully simulate layout events (onMouseEnter). Check if failing tests depend on layout properties
 - **Audit DB**: Source of truth for task progress is `.openexec/data/audit.db`
+- **Go version**: Requires Go 1.25+
+- **CI matrix**: Tests run on both Ubuntu 22.04 and macOS
 
 ### Learning Loop
 When solving complex bugs, persist lessons to `.openexec/engram/learning_log.json`
