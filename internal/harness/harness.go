@@ -17,6 +17,8 @@ import (
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/parallel"
+	"github.com/openexec/openexec/internal/predictive"
+	oetools "github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/internal/types"
 )
 
@@ -40,6 +42,13 @@ type Harness struct {
 
 	// Context Pruning
 	contextPruner   *oecontext.Pruner
+
+	// Predictive Loading
+	predictiveLoader *predictive.Loader
+	predictiveCache  map[string]*predictive.FileEntry
+
+	// Parallel Tools
+	parallelToolExecutor *oetools.ParallelExecutor
 
 	// Blueprint execution
 	blueprintEngine *blueprint.Engine
@@ -75,6 +84,15 @@ type HarnessConfig struct {
 	ContextPruner         *oecontext.Pruner
 	MaxContextTokens      int
 
+	// Predictive loading configuration
+	PredictiveLoadingEnabled bool
+	PredictiveLoader         *predictive.Loader
+	MaxPreloadFiles          int
+
+	// Parallel tools configuration
+	ParallelToolsEnabled bool
+	MaxToolConcurrency   int
+
 	// Blueprint configuration
 	Blueprint        *blueprint.Blueprint
 	BlueprintEnabled bool
@@ -95,10 +113,14 @@ func DefaultHarnessConfig(projectDir string) *HarnessConfig {
 		MemoryEnabled:     true,
 		MultiAgentEnabled:     true,
 		MaxAgents:             4,
-		ContextPruningEnabled: true,
-		MaxContextTokens:      100000,
-		Blueprint:             blueprint.DefaultBlueprint,
-		BlueprintEnabled:      true,
+		ContextPruningEnabled:    true,
+		MaxContextTokens:         100000,
+		PredictiveLoadingEnabled: true,
+		MaxPreloadFiles:          10,
+		ParallelToolsEnabled:     true,
+		MaxToolConcurrency:       4,
+		Blueprint:                blueprint.DefaultBlueprint,
+		BlueprintEnabled:         true,
 	}
 }
 
@@ -131,6 +153,16 @@ func NewHarness(config *HarnessConfig) (*Harness, error) {
 	// Initialize context pruner
 	if err := h.initContextPruner(); err != nil {
 		return nil, fmt.Errorf("failed to initialize context pruner: %w", err)
+	}
+
+	// Initialize predictive loader
+	if err := h.initPredictiveLoader(); err != nil {
+		return nil, fmt.Errorf("failed to initialize predictive loader: %w", err)
+	}
+
+	// Initialize parallel tool executor
+	if err := h.initParallelTools(); err != nil {
+		return nil, fmt.Errorf("failed to initialize parallel tools: %w", err)
 	}
 
 	// Initialize blueprint engine
@@ -236,6 +268,48 @@ func (h *Harness) initContextPruner() error {
 		}
 		h.contextPruner = pruner
 	}
+
+	return nil
+}
+
+// initPredictiveLoader initializes the predictive loading subsystem.
+func (h *Harness) initPredictiveLoader() error {
+	if !h.config.PredictiveLoadingEnabled {
+		return nil
+	}
+
+	// Use provided loader or create new
+	if h.config.PredictiveLoader != nil {
+		h.predictiveLoader = h.config.PredictiveLoader
+	} else {
+		loaderConfig := predictive.DefaultLoaderConfig()
+		loaderConfig.MaxPreloadFiles = h.config.MaxPreloadFiles
+
+		loader, err := predictive.NewLoader(h.projectDir, nil, loaderConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create predictive loader: %w", err)
+		}
+		h.predictiveLoader = loader
+	}
+
+	h.predictiveCache = make(map[string]*predictive.FileEntry)
+
+	return nil
+}
+
+// initParallelTools initializes the parallel tool execution subsystem.
+func (h *Harness) initParallelTools() error {
+	if !h.config.ParallelToolsEnabled {
+		return nil
+	}
+
+	toolConfig := &oetools.ParallelConfig{
+		MaxConcurrency: h.config.MaxToolConcurrency,
+		Timeout:        30 * time.Second,
+		FailFast:       false,
+	}
+
+	h.parallelToolExecutor = oetools.NewParallelExecutor(toolConfig)
 
 	return nil
 }
@@ -380,6 +454,17 @@ func (h *Harness) Execute(ctx context.Context, task string, files []string) (*bl
 		return nil, fmt.Errorf("blueprint engine not initialized")
 	}
 
+	// Predict and preload files if predictive loader is enabled
+	if h.predictiveLoader != nil && len(files) > 0 {
+		predictionResult, err := h.PredictAndLoad(ctx, task, files)
+		if err == nil && len(predictionResult.LoadedFiles) > 0 {
+			// Update predictive cache with loaded files
+			for _, file := range predictionResult.LoadedFiles {
+				h.predictiveCache[file.Path] = &file
+			}
+		}
+	}
+
 	// Prune files if context pruner is enabled
 	if h.contextPruner != nil && len(files) > 0 {
 		prunedFiles, err := h.PruneContext(task, files)
@@ -452,6 +537,30 @@ func (h *Harness) PruneContext(task string, filePaths []string) ([]string, error
 	return pruned, nil
 }
 
+// PredictAndLoad predicts and preloads files for a task.
+func (h *Harness) PredictAndLoad(ctx context.Context, task string, filePaths []string) (*predictive.PredictionResult, error) {
+	if h.predictiveLoader == nil {
+		return nil, fmt.Errorf("predictive loader not initialized")
+	}
+
+	return h.predictiveLoader.PredictAndLoad(ctx, task, filePaths)
+}
+
+// GetPredictedFile retrieves a preloaded file from the predictive cache.
+func (h *Harness) GetPredictedFile(path string) (*predictive.FileEntry, bool) {
+	entry, ok := h.predictiveCache[path]
+	return entry, ok
+}
+
+// ExecuteToolsParallel executes multiple tools in parallel.
+func (h *Harness) ExecuteToolsParallel(ctx context.Context, tools []oetools.Tool) (*oetools.ExecutionResult, error) {
+	if h.parallelToolExecutor == nil {
+		return nil, fmt.Errorf("parallel tool executor not initialized")
+	}
+
+	return h.parallelToolExecutor.Execute(ctx, tools)
+}
+
 // GetKnowledgeCache returns the knowledge cache.
 func (h *Harness) GetKnowledgeCache() *cache.KnowledgeCache {
 	return h.knowledgeCache
@@ -475,6 +584,16 @@ func (h *Harness) GetAgentRegistry() *agent.AgentRegistry {
 // GetContextPruner returns the context pruner.
 func (h *Harness) GetContextPruner() *oecontext.Pruner {
 	return h.contextPruner
+}
+
+// GetPredictiveLoader returns the predictive loader.
+func (h *Harness) GetPredictiveLoader() *predictive.Loader {
+	return h.predictiveLoader
+}
+
+// GetParallelToolExecutor returns the parallel tool executor.
+func (h *Harness) GetParallelToolExecutor() *oetools.ParallelExecutor {
+	return h.parallelToolExecutor
 }
 
 // GetBlueprintEngine returns the blueprint engine.
@@ -512,6 +631,12 @@ func (h *Harness) Close() error {
 
 	if h.contextPruner != nil {
 		if err := h.contextPruner.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if h.predictiveLoader != nil {
+		if err := h.predictiveLoader.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
