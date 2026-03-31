@@ -13,6 +13,7 @@ import (
 	"github.com/openexec/openexec/internal/agent"
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/cache"
+	"github.com/openexec/openexec/internal/checkpoint"
 	oecontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
@@ -49,6 +50,10 @@ type Harness struct {
 
 	// Parallel Tools
 	parallelToolExecutor *oetools.ParallelExecutor
+
+	// Checkpointing
+	checkpointManager *checkpoint.Manager
+	autoCheckpoint    bool
 
 	// Blueprint execution
 	blueprintEngine *blueprint.Engine
@@ -93,6 +98,11 @@ type HarnessConfig struct {
 	ParallelToolsEnabled bool
 	MaxToolConcurrency   int
 
+	// Checkpointing configuration
+	CheckpointingEnabled bool
+	CheckpointManager    *checkpoint.Manager
+	AutoCheckpoint       bool // Create checkpoint after each stage
+
 	// Blueprint configuration
 	Blueprint        *blueprint.Blueprint
 	BlueprintEnabled bool
@@ -119,6 +129,8 @@ func DefaultHarnessConfig(projectDir string) *HarnessConfig {
 		MaxPreloadFiles:          10,
 		ParallelToolsEnabled:     true,
 		MaxToolConcurrency:       4,
+		CheckpointingEnabled:     true,
+		AutoCheckpoint:           true,
 		Blueprint:                blueprint.DefaultBlueprint,
 		BlueprintEnabled:         true,
 	}
@@ -163,6 +175,11 @@ func NewHarness(config *HarnessConfig) (*Harness, error) {
 	// Initialize parallel tool executor
 	if err := h.initParallelTools(); err != nil {
 		return nil, fmt.Errorf("failed to initialize parallel tools: %w", err)
+	}
+
+	// Initialize checkpoint manager
+	if err := h.initCheckpointManager(); err != nil {
+		return nil, fmt.Errorf("failed to initialize checkpoint manager: %w", err)
 	}
 
 	// Initialize blueprint engine
@@ -314,6 +331,28 @@ func (h *Harness) initParallelTools() error {
 	return nil
 }
 
+// initCheckpointManager initializes the checkpointing subsystem.
+func (h *Harness) initCheckpointManager() error {
+	if !h.config.CheckpointingEnabled {
+		return nil
+	}
+
+	// Use provided manager or create new
+	if h.config.CheckpointManager != nil {
+		h.checkpointManager = h.config.CheckpointManager
+	} else {
+		manager, err := checkpoint.NewManager(h.projectDir)
+		if err != nil {
+			return fmt.Errorf("failed to create checkpoint manager: %w", err)
+		}
+		h.checkpointManager = manager
+	}
+
+	h.autoCheckpoint = h.config.AutoCheckpoint
+
+	return nil
+}
+
 // initBlueprintEngine initializes the blueprint execution engine.
 func (h *Harness) initBlueprintEngine() error {
 	if !h.config.BlueprintEnabled {
@@ -381,6 +420,11 @@ func (h *Harness) wrapStageStartCallback(userCallback func(*blueprint.Run, *blue
 // wrapStageCompleteCallback wraps the user's callback to add harness functionality.
 func (h *Harness) wrapStageCompleteCallback(userCallback func(*blueprint.Run, *blueprint.StageResult)) func(*blueprint.Run, *blueprint.StageResult) {
 	return func(run *blueprint.Run, result *blueprint.StageResult) {
+		// Create checkpoint after successful stage completion
+		if h.checkpointManager != nil && h.autoCheckpoint && result.Status == types.StageStatusCompleted {
+			_, _ = h.CreateCheckpoint(run)
+		}
+
 		// Extract memories from completed stage
 		if h.memoryManager != nil && result.Status == types.StageStatusCompleted {
 			h.extractAndStoreMemories(run, result)
@@ -596,6 +640,47 @@ func (h *Harness) GetParallelToolExecutor() *oetools.ParallelExecutor {
 	return h.parallelToolExecutor
 }
 
+// CreateCheckpoint creates a checkpoint for the current run state.
+func (h *Harness) CreateCheckpoint(run *blueprint.Run) (*checkpoint.Checkpoint, error) {
+	if h.checkpointManager == nil {
+		return nil, fmt.Errorf("checkpoint manager not initialized")
+	}
+
+	return h.checkpointManager.Create(run, h.projectDir)
+}
+
+// RestoreCheckpoint restores execution from a checkpoint.
+func (h *Harness) RestoreCheckpoint(checkpointID string) (*checkpoint.Checkpoint, error) {
+	if h.checkpointManager == nil {
+		return nil, fmt.Errorf("checkpoint manager not initialized")
+	}
+
+	return h.checkpointManager.Restore(checkpointID)
+}
+
+// GetLatestCheckpoint gets the latest checkpoint for a run.
+func (h *Harness) GetLatestCheckpoint(runID string) (*checkpoint.Checkpoint, error) {
+	if h.checkpointManager == nil {
+		return nil, fmt.Errorf("checkpoint manager not initialized")
+	}
+
+	return h.checkpointManager.GetLatest(runID)
+}
+
+// ListCheckpoints lists all checkpoints for a run.
+func (h *Harness) ListCheckpoints(runID string) ([]*checkpoint.Checkpoint, error) {
+	if h.checkpointManager == nil {
+		return nil, fmt.Errorf("checkpoint manager not initialized")
+	}
+
+	return h.checkpointManager.List(runID)
+}
+
+// GetCheckpointManager returns the checkpoint manager.
+func (h *Harness) GetCheckpointManager() *checkpoint.Manager {
+	return h.checkpointManager
+}
+
 // GetBlueprintEngine returns the blueprint engine.
 func (h *Harness) GetBlueprintEngine() *blueprint.Engine {
 	return h.blueprintEngine
@@ -637,6 +722,12 @@ func (h *Harness) Close() error {
 
 	if h.predictiveLoader != nil {
 		if err := h.predictiveLoader.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if h.checkpointManager != nil {
+		if err := h.checkpointManager.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
