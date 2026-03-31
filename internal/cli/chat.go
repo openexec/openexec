@@ -42,6 +42,13 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 
 		// Check if server is running, if not, start it in background
 		if !isServerRunning(projectDir, startPort) {
+			// Preflight: verify the configured runner CLI is available
+			if config != nil {
+				if err := preflightRunnerCheck(config); err != nil {
+					return err
+				}
+			}
+
 			fmt.Println(color.CyanString("🚀 Starting execution engine in background..."))
 
 			// Set daemon flag and run start command
@@ -60,7 +67,11 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 			fmt.Printf("⏳ Waiting for engine to initialize (port %d)...", startPort)
 			if err := waitForServer(startPort, 15*time.Second); err != nil {
 				fmt.Println(color.RedString(" ✗ Failed!"))
-				return fmt.Errorf("engine failed to become ready on port %d: %w", startPort, err)
+				hint := daemonDiagnostic(projectDir)
+				if hint != "" {
+					return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Daemon log (last lines):\n  %s", startPort, err, strings.ReplaceAll(hint, "\n", "\n  "))
+				}
+				return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Check .openexec/daemon.log for details", startPort, err)
 			}
 			fmt.Println(color.GreenString(" ✓ Ready"))
 			fmt.Println()

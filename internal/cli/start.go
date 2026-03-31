@@ -20,6 +20,7 @@ import (
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/internal/runner"
 	"github.com/openexec/openexec/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -197,6 +198,11 @@ Examples:
 
 		// 1. AUTO-START ENGINE
 		if !isServerRunning(config.ProjectDir, 0) { // Check if ANY engine is running for this project
+			// Preflight: verify the configured runner CLI is available
+			if err := preflightRunnerCheck(config); err != nil {
+				return err
+			}
+
 			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
 			// Start with requested port, but it might move if busy
 			startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
@@ -220,7 +226,11 @@ Examples:
 		}
 
 		if err := waitForServer(startPort, 15*time.Second); err != nil {
-			return fmt.Errorf("engine failed to become ready on port %d: %w", startPort, err)
+			hint := daemonDiagnostic(config.ProjectDir)
+			if hint != "" {
+				return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Daemon log (last lines):\n  %s", startPort, err, strings.ReplaceAll(hint, "\n", "\n  "))
+			}
+			return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Check .openexec/daemon.log for details", startPort, err)
 		}
 
 		// 2. TRIGGER SERVER-SIDE EXECUTION
@@ -357,6 +367,10 @@ Examples:
 
 		// Auto-start engine if not running
 		if !isServerRunning(config.ProjectDir, 0) {
+			if err := preflightRunnerCheck(config); err != nil {
+				return err
+			}
+
 			cmd.Println("⚙️ Execution engine not running. Starting daemon...")
 			startArgs := []string{"start", "--daemon", "--port", fmt.Sprintf("%d", startPort)}
 			execPath, _ := os.Executable()
@@ -377,7 +391,11 @@ Examples:
 		}
 
 		if err := waitForServer(startPort, 15*time.Second); err != nil {
-			return fmt.Errorf("engine failed to become ready: %w", err)
+			hint := daemonDiagnostic(config.ProjectDir)
+			if hint != "" {
+				return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Daemon log (last lines):\n  %s", startPort, err, strings.ReplaceAll(hint, "\n", "\n  "))
+			}
+			return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Check .openexec/daemon.log for details", startPort, err)
 		}
 
 		// Trigger blueprint run via API
@@ -477,6 +495,63 @@ func waitForServer(port int, timeout time.Duration) error {
 		time.Sleep(500 * time.Millisecond)
 	}
 	return fmt.Errorf("timeout")
+}
+
+// preflightRunnerCheck validates that the configured executor CLI is available
+// before attempting to start the daemon. Returns a user-friendly error with
+// install guidance if the runner is missing.
+func preflightRunnerCheck(config *project.ProjectConfig) error {
+	model := config.Execution.ExecutorModel
+	overrideCmd := config.Execution.RunnerCommand
+	overrideArgs := config.Execution.RunnerArgs
+
+	_, _, err := runner.Resolve(model, overrideCmd, overrideArgs)
+	if err != nil {
+		// Build a helpful error message
+		cliName := "claude"
+		if overrideCmd != "" {
+			cliName = overrideCmd
+		} else if model != "" {
+			m := strings.ToLower(model)
+			switch {
+			case strings.HasPrefix(m, "gpt-") || strings.Contains(m, "codex") || strings.Contains(m, "openai"):
+				cliName = "codex"
+			case strings.HasPrefix(m, "gemini"):
+				cliName = "gemini"
+			}
+		}
+
+		modelDisplay := model
+		if modelDisplay == "" {
+			modelDisplay = "default (claude)"
+		}
+
+		return fmt.Errorf("%q CLI not found on PATH (configured model: %s)\n\n"+
+			"  Supported runners:\n"+
+			"    claude  — Claude (Anthropic)    npm i -g @anthropic-ai/claude-code\n"+
+			"    codex   — Codex (OpenAI)        npm i -g @openai/codex\n"+
+			"    gemini  — Gemini (Google)        npm i -g @google/gemini-cli\n\n"+
+			"  Or reconfigure:  openexec init --force",
+			cliName, modelDisplay)
+	}
+	return nil
+}
+
+// daemonDiagnostic reads the last lines of daemon.log to surface errors
+// that caused the background engine to crash before becoming ready.
+func daemonDiagnostic(projectDir string) string {
+	logPath := filepath.Join(projectDir, ".openexec", "daemon.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	// Return last 5 lines (or fewer)
+	start := len(lines) - 5
+	if start < 0 {
+		start = 0
+	}
+	return strings.Join(lines[start:], "\n")
 }
 
 func isServerRunning(projectDir string, port int) bool {
