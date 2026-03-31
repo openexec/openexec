@@ -5,6 +5,7 @@ package harness
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/openexec/openexec/internal/agent"
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/cache"
+	oecontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/parallel"
@@ -35,6 +37,9 @@ type Harness struct {
 	// Multi-Agent
 	agentRegistry   *agent.AgentRegistry
 	parallelEngine  *parallel.ParallelEngine
+
+	// Context Pruning
+	contextPruner   *oecontext.Pruner
 
 	// Blueprint execution
 	blueprintEngine *blueprint.Engine
@@ -65,6 +70,11 @@ type HarnessConfig struct {
 	MaxAgents         int
 	AgentRegistry     *agent.AgentRegistry
 
+	// Context pruning configuration
+	ContextPruningEnabled bool
+	ContextPruner         *oecontext.Pruner
+	MaxContextTokens      int
+
 	// Blueprint configuration
 	Blueprint        *blueprint.Blueprint
 	BlueprintEnabled bool
@@ -83,10 +93,12 @@ func DefaultHarnessConfig(projectDir string) *HarnessConfig {
 		CacheEnabled:      true,
 		CacheTTL:          1 * time.Hour,
 		MemoryEnabled:     true,
-		MultiAgentEnabled: true,
-		MaxAgents:         4,
-		Blueprint:         blueprint.DefaultBlueprint,
-		BlueprintEnabled:  true,
+		MultiAgentEnabled:     true,
+		MaxAgents:             4,
+		ContextPruningEnabled: true,
+		MaxContextTokens:      100000,
+		Blueprint:             blueprint.DefaultBlueprint,
+		BlueprintEnabled:      true,
 	}
 }
 
@@ -114,6 +126,11 @@ func NewHarness(config *HarnessConfig) (*Harness, error) {
 	// Initialize multi-agent
 	if err := h.initMultiAgent(); err != nil {
 		return nil, fmt.Errorf("failed to initialize multi-agent: %w", err)
+	}
+
+	// Initialize context pruner
+	if err := h.initContextPruner(); err != nil {
+		return nil, fmt.Errorf("failed to initialize context pruner: %w", err)
 	}
 
 	// Initialize blueprint engine
@@ -195,6 +212,29 @@ func (h *Harness) initMultiAgent() error {
 			return fmt.Errorf("failed to create agent registry: %w", err)
 		}
 		h.agentRegistry = registry
+	}
+
+	return nil
+}
+
+// initContextPruner initializes the context pruning subsystem.
+func (h *Harness) initContextPruner() error {
+	if !h.config.ContextPruningEnabled {
+		return nil
+	}
+
+	// Use provided pruner or create new
+	if h.config.ContextPruner != nil {
+		h.contextPruner = h.config.ContextPruner
+	} else {
+		prunerConfig := oecontext.DefaultPrunerConfig()
+		prunerConfig.MaxTokens = h.config.MaxContextTokens
+
+		pruner, err := oecontext.NewPruner(h.projectDir, nil, h.memoryManager, prunerConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create context pruner: %w", err)
+		}
+		h.contextPruner = pruner
 	}
 
 	return nil
@@ -340,9 +380,17 @@ func (h *Harness) Execute(ctx context.Context, task string, files []string) (*bl
 		return nil, fmt.Errorf("blueprint engine not initialized")
 	}
 
+	// Prune files if context pruner is enabled
+	if h.contextPruner != nil && len(files) > 0 {
+		prunedFiles, err := h.PruneContext(task, files)
+		if err == nil && len(prunedFiles) < len(files) {
+			files = prunedFiles
+		}
+	}
+
 	// Start run
 	input := blueprint.NewStageInput("harness-run", task, h.projectDir)
-	
+
 	// Add memory context
 	if h.memoryManager != nil {
 		context, err := h.memoryManager.LoadContext()
@@ -370,6 +418,40 @@ func (h *Harness) Execute(ctx context.Context, task string, files []string) (*bl
 	return run, nil
 }
 
+// PruneContext prunes files to the most relevant for a task.
+func (h *Harness) PruneContext(task string, filePaths []string) ([]string, error) {
+	if h.contextPruner == nil {
+		return filePaths, nil
+	}
+
+	// Load file contents
+	var files []oecontext.FileInfo
+	for _, path := range filePaths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue // Skip unreadable files
+		}
+		files = append(files, oecontext.FileInfo{
+			Path:    path,
+			Content: string(content),
+		})
+	}
+
+	// Prune
+	result, err := h.contextPruner.Prune(files, task)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract paths
+	var pruned []string
+	for _, file := range result.Files {
+		pruned = append(pruned, file.Path)
+	}
+
+	return pruned, nil
+}
+
 // GetKnowledgeCache returns the knowledge cache.
 func (h *Harness) GetKnowledgeCache() *cache.KnowledgeCache {
 	return h.knowledgeCache
@@ -388,6 +470,11 @@ func (h *Harness) GetMemoryManager() *memory.MemoryManager {
 // GetAgentRegistry returns the agent registry.
 func (h *Harness) GetAgentRegistry() *agent.AgentRegistry {
 	return h.agentRegistry
+}
+
+// GetContextPruner returns the context pruner.
+func (h *Harness) GetContextPruner() *oecontext.Pruner {
+	return h.contextPruner
 }
 
 // GetBlueprintEngine returns the blueprint engine.
@@ -419,6 +506,12 @@ func (h *Harness) Close() error {
 
 	if h.agentRegistry != nil {
 		if err := h.agentRegistry.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if h.contextPruner != nil {
+		if err := h.contextPruner.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
