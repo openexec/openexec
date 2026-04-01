@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/actions"
+	"github.com/openexec/openexec/internal/agent"
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/cache"
 	"github.com/openexec/openexec/internal/checkpoint"
@@ -19,6 +20,7 @@ import (
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
+	"github.com/openexec/openexec/internal/parallel"
 	"github.com/openexec/openexec/internal/predictive"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
@@ -118,6 +120,9 @@ type Pipeline struct {
 
 	intentRouter router.Router
 
+	agentRegistry  *agent.AgentRegistry
+	parallelConfig *parallel.ParallelConfig
+
 	memoryManager    *memory.MemoryManager
 	knowledgeCache   *cache.KnowledgeCache
 	toolResultCache  *cache.ToolResultCache
@@ -204,6 +209,15 @@ func WithMemoryManager(m *memory.MemoryManager) Option {
 // WithRouter sets the intent router for deterministic task routing.
 func WithRouter(r router.Router) Option {
 	return func(p *Pipeline) { p.intentRouter = r }
+}
+
+// WithParallelExecution enables multi-agent parallel execution for agentic stages.
+// When worker_count > 1 in config, agentic stages are split across parallel agents.
+func WithParallelExecution(registry *agent.AgentRegistry, config *parallel.ParallelConfig) Option {
+	return func(p *Pipeline) {
+		p.agentRegistry = registry
+		p.parallelConfig = config
+	}
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
@@ -603,14 +617,40 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	}
 
-	if err := engine.Execute(ctx, run, input); err != nil {
+	// Execute blueprint: use parallel engine if configured, otherwise standard
+	var execErr error
+	if p.agentRegistry != nil && p.parallelConfig != nil && p.parallelConfig.EnableParallelism {
+		parallelEngine, err := parallel.NewParallelEngine(bp, executor, p.agentRegistry, p.parallelConfig)
+		if err != nil {
+			log.Printf("[Pipeline] Parallel engine init failed, falling back to sequential: %v", err)
+			execErr = engine.Execute(ctx, run, input)
+		} else {
+			// Gather workspace files for batch splitting
+			var files []string
+			_ = filepath.Walk(p.cfg.WorkDir, func(path string, info os.FileInfo, err error) error {
+				if err != nil || info.IsDir() {
+					return nil
+				}
+				rel, _ := filepath.Rel(p.cfg.WorkDir, path)
+				if rel != "" && rel[0] != '.' {
+					files = append(files, rel)
+				}
+				return nil
+			})
+			execErr = parallelEngine.ExecuteBlueprint(ctx, run, input, files)
+		}
+	} else {
+		execErr = engine.Execute(ctx, run, input)
+	}
+
+	if execErr != nil {
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
 			FWUID:       p.cfg.FWUID,
 			BlueprintID: bp.ID,
-			ErrText:     err.Error(),
+			ErrText:     execErr.Error(),
 		})
-		return err
+		return execErr
 	}
 
 	// Emit pipeline complete for compatibility

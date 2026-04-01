@@ -11,12 +11,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openexec/openexec/internal/agent"
 	"github.com/openexec/openexec/internal/cache"
 	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
+	"github.com/openexec/openexec/internal/parallel"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/predictive"
@@ -350,6 +352,16 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		br := router.NewBitNetRouter(modelPath)
 		br.SetSkipAvailabilityCheck(false)
 		pipeline.WithRouter(br)(p) // Overrides deterministic
+	}
+
+	// Multi-agent parallel execution (when worker_count > 1)
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.WorkerCount > 1 {
+		if registry, err := agent.NewAgentRegistry(m.cfg.WorkDir); err == nil {
+			parallelCfg := parallel.DefaultParallelConfig()
+			parallelCfg.MaxAgents = projCfg.Execution.WorkerCount
+			pipeline.WithParallelExecution(registry, parallelCfg)(p)
+			log.Printf("[Manager] Parallel execution enabled: %d workers", projCfg.Execution.WorkerCount)
+		}
 	}
 
 	// Create OTel span for the entire run lifecycle
