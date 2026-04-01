@@ -31,13 +31,14 @@ var availableModels = []struct {
 	Name     string
 }{
 	// Claude (Anthropic)
-	{"claude", "sonnet", "Claude 4.6 Sonnet"},
-	{"claude", "opus", "Claude 4.6 Opus"},
-	{"claude", "haiku", "Claude 4.6 Haiku"},
+	{"claude", "sonnet", "Claude Sonnet 4.6"},
+	{"claude", "opus", "Claude Opus 4.6"},
+	{"claude", "haiku", "Claude Haiku 4.5"},
 	// Codex (OpenAI)
+	{"codex", "gpt-5.4", "GPT-5.4"},
+	{"codex", "gpt-5.4-mini", "GPT-5.4 Mini"},
 	{"codex", "gpt-5.3-codex", "GPT-5.3 Codex"},
 	{"codex", "gpt-5.3-codex-spark", "GPT-5.3 Codex Spark"},
-	{"codex", "gpt-5.3", "GPT-5.3"},
 	// Gemini (Google)
 	{"gemini", "gemini-3.1-pro-preview", "Gemini 3.1 Pro"},
 	{"gemini", "gemini-3.1-flash-preview", "Gemini 3.1 Flash"},
