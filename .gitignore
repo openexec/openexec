@@ -9,39 +9,105 @@ site/
 *.swp
 *.swo
 *~
+*.iml
+.project
+.classpath
+.settings/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Local development
 .env
 .env.local
+.env.*.local
 *.local
+!.env.example
 
 # OpenExec specific
 .openexec/
+!.openexec/config.example.json
 *.db
 *.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# BitNet / Local LLM Models
+models/
+*.gguf
+*.bin
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.safetensors
 
 # Logs
 *.log
 logs/
+log/
 
 # Test and Coverage
 *.out
 *.test
-coverage_gap.html
+*.cover
+coverage*
 report.json
 test_output.txt
 tasks.json
+*.prof
+*.trace
 
 # Playwright
 ui/playwright-report/
 ui/test-results/
 ui/playwright/.cache/
 
+# Build artifacts
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+
+# Dependency directories
+node_modules/
+vendor/
+
+# Go specific
+*.exe
+*.test
+*.prof
+go.work
+go.work.sum
+
+# Python (for skills with search)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
 # OpenExec Managed Block
 .openexec/logs/
 .openexec/data/
 .openexec/engram/cache/
+.openexec/models/
