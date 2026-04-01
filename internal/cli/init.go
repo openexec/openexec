@@ -86,6 +86,7 @@ The project name defaults to the current directory name if not provided.`,
 		var reviewEnabled, parallelEnabled, gitCommitEnabled bool
 		var qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting bool
 		var workerCount int
+		var apiProvider, apiBaseURL, apiKey, apiModel string
 
 		if !initNonInteractive {
 			// 1. Project Name prompt
@@ -99,7 +100,10 @@ The project name defaults to the current directory name if not provided.`,
 				}
 			}
 
-			// 2. Execution Config prompt
+			// 2. Execution mode (CLI vs API)
+			apiProvider, apiBaseURL, apiKey, apiModel = promptAPIConfig(cmd)
+
+			// 3. Execution Config prompt
 			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, _, qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting = promptExecutionConfig(cmd)
 		} else {
 			if projectName == "" {
@@ -155,6 +159,10 @@ The project name defaults to the current directory name if not provided.`,
 			MemoryEnabled:     memoryEnabled,
 			CheckpointEnabled: checkpointEnabled,
 			BitNetRouting:     bitnetRouting,
+			APIProvider:       apiProvider,
+			APIBaseURL:        apiBaseURL,
+			APIKey:            apiKey,
+			APIModel:          apiModel,
 		}
 
 		// Save updated config
@@ -295,6 +303,39 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 	bitnetRouting = answer == "y" || answer == "yes"
 
 	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled, qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting
+}
+
+// promptAPIConfig interactively prompts for API provider configuration.
+// Returns empty strings if user selects CLI mode.
+func promptAPIConfig(cmd *cobra.Command) (apiProvider, apiBaseURL, apiKey, apiModel string) {
+	reader := bufio.NewReader(cmd.InOrStdin())
+
+	fmt.Println("\n=== Execution Mode ===")
+	fmt.Println("  [1] CLI tool (claude/codex/gemini) - default")
+	fmt.Println("  [2] API provider (OpenAI-compatible)")
+	fmt.Printf("\nSelect execution mode [1]: ")
+	answer, _ := reader.ReadString('\n')
+	answer = strings.TrimSpace(answer)
+
+	if answer != "2" {
+		return "", "", "", ""
+	}
+
+	apiProvider = "openai_compat"
+
+	fmt.Printf("API Base URL (e.g. https://api.openai.com/v1): ")
+	apiBaseURL, _ = reader.ReadString('\n')
+	apiBaseURL = strings.TrimSpace(apiBaseURL)
+
+	fmt.Printf("API Key (or $ENV_VAR): ")
+	apiKey, _ = reader.ReadString('\n')
+	apiKey = strings.TrimSpace(apiKey)
+
+	fmt.Printf("Model name (e.g. gpt-4o, moonshot-v1-128k): ")
+	apiModel, _ = reader.ReadString('\n')
+	apiModel = strings.TrimSpace(apiModel)
+
+	return apiProvider, apiBaseURL, apiKey, apiModel
 }
 
 // ensureGitignore ensures .gitignore exists and contains .openexec entries.

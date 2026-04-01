@@ -27,6 +27,7 @@ import (
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
+	"github.com/openexec/openexec/internal/skills"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -260,6 +261,16 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
         TaskTimeout:          m.cfg.TaskTimeout,
     }
 
+	// Wire API provider settings from project config
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil {
+		if projCfg.Execution.APIProvider != "" {
+			pCfg.APIProvider = projCfg.Execution.APIProvider
+			pCfg.APIBaseURL = projCfg.Execution.APIBaseURL
+			pCfg.APIKey = projCfg.Execution.APIKey
+			pCfg.APIModel = projCfg.Execution.APIModel
+		}
+	}
+
 	for _, opt := range opts {
 		opt(&pCfg)
 	}
@@ -348,6 +359,11 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	// Deterministic routing is always on
 	dr := router.NewDeterministicRouter()
 	pipeline.WithRouter(dr)(p)
+
+	// Skills registry: load and inject into pipeline
+	sr := skills.NewRegistry()
+	_ = sr.LoadAll(m.cfg.WorkDir)
+	pipeline.WithSkillRegistry(sr)(p)
 
 	// BitNet routing upgrade (optional, feature flag)
 	// When bitnet_routing is enabled and no explicit model path is set,

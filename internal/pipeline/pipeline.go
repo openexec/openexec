@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,7 +26,9 @@ import (
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/router"
+	"github.com/openexec/openexec/internal/skills"
 	"github.com/openexec/openexec/internal/types"
+	pagent "github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/telemetry"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -95,6 +98,12 @@ type Config struct {
 	// TaskTimeout overrides the default implement stage timeout.
 	// If zero, the blueprint default (10 minutes) is used.
 	TaskTimeout time.Duration
+
+	// API provider settings for OpenAI-compatible execution
+	APIProvider string // "openai_compat"
+	APIBaseURL  string // e.g. "https://api.moonshot.cn/v1"
+	APIKey      string // API key or "$ENV_VAR" reference
+	APIModel    string // e.g. "moonshot-v1-128k"
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
@@ -122,6 +131,8 @@ type Pipeline struct {
 
 	agentRegistry  *agent.AgentRegistry
 	parallelConfig *parallel.ParallelConfig
+
+	skillRegistry *skills.Registry
 
 	memoryManager    *memory.MemoryManager
 	knowledgeCache   *cache.KnowledgeCache
@@ -211,6 +222,11 @@ func WithMemoryManager(m *memory.MemoryManager) Option {
 // only the most relevant context items for a given task.
 func WithContextPruner(cp *ocontext.Pruner) Option {
 	return func(p *Pipeline) { p.contextPruner = cp }
+}
+
+// WithSkillRegistry sets the skill registry for injecting relevant skills into pipeline context.
+func WithSkillRegistry(r *skills.Registry) Option {
+	return func(p *Pipeline) { p.skillRegistry = r }
 }
 
 // WithRouter sets the intent router for deterministic task routing.
@@ -638,6 +654,14 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	}
 
+	// Inject relevant skills into briefing
+	if p.skillRegistry != nil && p.cfg.TaskDescription != "" {
+		selected := p.skillRegistry.SelectForTask(p.cfg.TaskDescription)
+		for _, skill := range selected {
+			input.Briefing += fmt.Sprintf("\n\n--- Skill: %s ---\n%s", skill.Name, skill.Content)
+		}
+	}
+
 	// Handle conditional review stage
 	if !p.cfg.ReviewEnabled {
 		if test, ok := bp.Stages["test"]; ok {
@@ -697,7 +721,14 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 // createAgenticLoop creates a bounded loop for agentic stage execution.
 // Returns an AgenticLoop that wraps the internal loop infrastructure.
+// Routes to API-based execution when API provider is configured.
 func (p *Pipeline) createAgenticLoop(ctx context.Context, model string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+	// API mode: use HTTP provider instead of CLI subprocess
+	if p.cfg.APIProvider != "" {
+		return p.createAPIAgenticLoop(ctx, prompt, workDir, maxIterations)
+	}
+
+	// CLI mode: existing subprocess path
 	// Build MCP config
 	mcpPath, cleanup, err := p.buildMCPConfig()
 	if err != nil {
@@ -729,6 +760,88 @@ func (p *Pipeline) createAgenticLoop(ctx context.Context, model string, prompt s
 		cleanup: cleanup,
 		emit:    p.emit,
 	}, nil
+}
+
+// createAPIAgenticLoop creates an API-based agentic loop using an OpenAI-compatible provider.
+func (p *Pipeline) createAPIAgenticLoop(ctx context.Context, prompt string, workDir string, maxTurns int) (blueprint.AgenticLoop, error) {
+	// Resolve API key (support $ENV_VAR references)
+	apiKey := p.cfg.APIKey
+	if strings.HasPrefix(apiKey, "$") {
+		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key is required: set api_key in config or use $ENV_VAR reference")
+	}
+
+	// Create OpenAI provider with custom base URL
+	providerCfg := pagent.OpenAIProviderConfig{
+		APIKey:  apiKey,
+		BaseURL: p.cfg.APIBaseURL,
+	}
+	provider, err := pagent.NewOpenAIProvider(providerCfg)
+	if err != nil {
+		return nil, fmt.Errorf("create API provider: %w", err)
+	}
+
+	// Build tool definitions for the API
+	tools := loop.BuildAPIToolDefinitions()
+
+	// Create event channel and runner
+	ch := make(chan loop.Event, 100)
+	runner := loop.NewAPIRunner(loop.APIRunnerConfig{
+		Provider: provider,
+		Model:    p.cfg.APIModel,
+		Prompt:   prompt,
+		WorkDir:  workDir,
+		MaxTurns: maxTurns,
+		Tools:    tools,
+	}, ch)
+
+	return &apiLoopAdapter{runner: runner, events: ch, emit: p.emit}, nil
+}
+
+// apiLoopAdapter wraps an APIRunner to implement blueprint.AgenticLoop.
+type apiLoopAdapter struct {
+	runner     *loop.APIRunner
+	events     chan loop.Event
+	emit       func(loop.Event)
+	lastOutput string
+	artifacts  map[string]string
+}
+
+// Run executes the API runner and captures results.
+func (a *apiLoopAdapter) Run(ctx context.Context) error {
+	a.artifacts = make(map[string]string)
+
+	// Run in background
+	runDone := make(chan error, 1)
+	go func() { runDone <- a.runner.Run(ctx) }()
+
+	// Consume events and capture output/artifacts
+	for event := range a.events {
+		a.emit(event)
+
+		if event.Text != "" {
+			a.lastOutput = event.Text
+		}
+		if event.Result != nil && event.Result.Artifacts != nil {
+			for k, v := range event.Result.Artifacts {
+				a.artifacts[k] = v
+			}
+		}
+		if event.Artifacts != nil {
+			for k, v := range event.Artifacts {
+				a.artifacts[k] = v
+			}
+		}
+	}
+
+	return <-runDone
+}
+
+// GetResult returns the captured output and artifacts.
+func (a *apiLoopAdapter) GetResult() (string, map[string]string, error) {
+	return a.lastOutput, a.artifacts, nil
 }
 
 // agenticLoopAdapter wraps a loop.Loop to implement blueprint.AgenticLoop.

@@ -59,6 +59,12 @@ type ExecutionConfig struct {
 	CheckpointEnabled bool `json:"checkpoint_enabled,omitempty"`
 	BitNetRouting     bool   `json:"bitnet_routing,omitempty"`
 	BitNetModel       string `json:"bitnet_model,omitempty"`
+
+	// API provider settings (OpenAI-compatible endpoints)
+	APIProvider string `json:"api_provider,omitempty"` // "openai_compat"
+	APIBaseURL  string `json:"api_base_url,omitempty"` // e.g. "https://api.moonshot.cn/v1"
+	APIKey      string `json:"api_key,omitempty"`      // API key or "$ENV_VAR" reference
+	APIModel    string `json:"api_model,omitempty"`    // e.g. "moonshot-v1-128k"
 }
 
 // Initialize initializes a new OpenExec project
