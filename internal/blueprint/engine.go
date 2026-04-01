@@ -170,11 +170,12 @@ var QuickFixBlueprint = &Blueprint{
 			OnSuccess:  "verify",
 		},
 		"verify": {
-			Name:      "verify",
-			Type:      types.StageTypeDeterministic,
-			Toolset:   "coding_backend",
-			Action:    "run_gates",
-			OnSuccess: "complete",
+			Name:            "verify",
+			Type:            types.StageTypeDeterministic,
+			Toolset:         "coding_backend",
+			Action:          "run_gates",
+			OnSuccess:       "complete",
+			RunQualityGates: true,
 		},
 
 	},

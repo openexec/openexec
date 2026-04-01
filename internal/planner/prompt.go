@@ -14,10 +14,10 @@ RULES:
 4. DYNAMIC TASK SIZING: Evaluate the complexity of the requirement:
    - For SIMPLE fixes/features (e.g., changing a YAML file, fixing a specific UI bug, updating a single component): Create exactly ONE "Chassis" task per story. A Chassis task combines Diagnose, Implement, and Verify into a single, cohesive unit to reduce orchestrator overhead.
    - For COMPLEX refactors/features (e.g., massive architectural changes, cross-cutting concerns): Use the Vertical Slice sequence: Task 1 (Diagnose), Task 2 (Implement), Task 3 (Verify).
-5. SERIALIZATION: Avoid massive parallelism. Implementation stories should form a logical sequence (Story A -> Story B -> Story C). Do not let more than 2 feature stories be "ready" at the same time unless they are truly orthogonal.
+5. PARALLELISM: Maximize parallelism where possible. Only add depends_on between stories when there is a true data or artifact dependency (e.g., Story B needs files created by Story A). Stories that are orthogonal (touching different files/modules) MUST NOT depend on each other.
 6. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
 7. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command). This script must specifically verify the GOAL it is linked to.
-8. Task IDs: T-US-XXX-YYY format. Sequential tasks within a story must depend on their predecessor.
+8. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
 9. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories.
 10. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
 
@@ -92,10 +92,11 @@ REVIEW THE STORIES AGAINST THESE CRITERIA:
    - Does every implementation story have a functional 'verification_script'?
    - If a goal has no stories, or a story has no verification script, REJECT.
 
-3. **Dependency Correctness (Pragmatic Ordering)**: 
-   - Is there a Discovery story that all others depend on?
-   - Are implementation stories serialized (forming a chain)?
-   - If stories are excessively parallel (missing depends_on), REJECT.
+3. **Dependency Correctness (Pragmatic Ordering)**:
+   - Is there a Discovery story that all others depend on (for existing projects)?
+   - Do depends_on links reflect true data/artifact dependencies?
+   - Stories that touch different files/modules should be parallel, not chained.
+   - If stories have unnecessary serialization (depends_on without true dependency), REJECT.
 
 5. **Quality & Correctness**: No parsing errors, hallucinations, or corrupted titles.
 

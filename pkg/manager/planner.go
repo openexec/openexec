@@ -238,20 +238,15 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 				importedStories++
 				}
 
-				var prevTaskID string
 				for j, t := range s.Tasks {
 				if rel.GetTask(t.ID) == nil {
-				deps := t.DependsOn
-				if prevTaskID != "" {
-					deps = append(deps, prevTaskID)
-				}
 				task := &release.Task{
 					ID:                 t.ID,
 					Title:              t.Title,
 					Description:        t.Description,
 					VerificationScript: t.VerificationScript,
 					StoryID:            s.ID,
-					DependsOn:          deps,
+					DependsOn:          t.DependsOn,
 					Priority:           j,
 					MaxAttempts:        3,
 					Status:             release.TaskStatusPending,
@@ -262,7 +257,6 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 					return fmt.Errorf("import task %s: %w", t.ID, err)
 				}
 				importedTasks++
-				prevTaskID = t.ID
 			}
 		}
 	}

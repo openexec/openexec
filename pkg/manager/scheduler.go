@@ -52,10 +52,11 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 
 	// Simple topological sort / dependency resolver
 	type node struct {
-		Task      *release.Task
-		Deps      []string // Task-level dependencies
-		StoryDeps []string // Story-level dependencies
-		Finished  bool
+		Task       *release.Task
+		Deps       []string // Task-level dependencies
+		StoryDeps  []string // Story-level dependencies
+		Dispatched bool
+		Finished   bool
 	}
 
 	nodes := make(map[string]*node)
@@ -92,26 +93,27 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	checkReady := func() {
 		mu.Lock()
 		defer mu.Unlock()
-		for id, n := range nodes {
-			if n.Finished {
+		for _, n := range nodes {
+			if n.Dispatched || n.Finished {
 				continue
 			}
 
 			// 1. Check Task-level dependencies
 			allTaskDepsDone := true
 			for _, depID := range n.Deps {
-				// Check if the dependency is in the current pending set and not finished
-				if d, ok := nodes[depID]; ok && !d.Finished {
-					allTaskDepsDone = false
-					break
-				}
-				// If not in pending set, check actual task status in DB
-				if _, ok := nodes[depID]; !ok {
-					t := rel.GetTask(depID)
-					if t == nil || (t.Status != "done" && t.Status != "approved") {
+				// Check if the dependency is in the current pending set
+				if d, ok := nodes[depID]; ok {
+					if !d.Finished {
 						allTaskDepsDone = false
 						break
 					}
+					continue
+				}
+				// If not in pending set, check actual task status in DB
+				t := rel.GetTask(depID)
+				if t == nil || (t.Status != "done" && t.Status != "approved") {
+					allTaskDepsDone = false
+					break
 				}
 			}
 			if !allTaskDepsDone {
@@ -129,8 +131,8 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 			}
 
 			if allStoryDepsDone {
+				n.Dispatched = true
 				readyTasks <- n
-				delete(nodes, id)
 			}
 		}
 	}
@@ -194,12 +196,18 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 
 				log.Printf("[Worker %d] ✓ Finished %s in %v (Status: %s)", id, node.Task.ID, time.Since(start).Truncate(time.Second), StatusComplete)
 
+				// Update task status so dependency checks can see completion
+				if err := rel.SetTaskStatus(node.Task.ID, "done"); err != nil {
+					log.Printf("[Worker %d] Warning: failed to update task status for %s: %v", id, node.Task.ID, err)
+				}
+
 				mu.Lock()
 				node.Finished = true
 				finishedCount++
+				done := finishedCount == totalToRun
 				mu.Unlock()
 
-				if finishedCount == totalToRun {
+				if done {
 					close(readyTasks)
 				} else {
 					checkReady()

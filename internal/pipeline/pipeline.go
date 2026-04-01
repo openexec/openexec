@@ -546,8 +546,9 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			Artifacts: result.Artifacts,
 		})
 
-		// Run quality gates after successful agentic stages
-		if p.qualityManager != nil && result.Status == types.StageStatusCompleted {
+		// Run quality gates after successful stages that opt in
+		stage, _ := bp.GetStage(result.StageName)
+		if p.qualityManager != nil && result.Status == types.StageStatusCompleted && stage != nil && stage.RunQualityGates {
 			go func() {
 				summary, err := p.qualityManager.RunAll(context.Background())
 				if err != nil {

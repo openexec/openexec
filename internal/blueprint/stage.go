@@ -44,6 +44,10 @@ type Stage struct {
 
 	// CreateCheckpoint indicates whether to create a checkpoint after this stage.
 	CreateCheckpoint bool `json:"create_checkpoint,omitempty" yaml:"create_checkpoint,omitempty"`
+
+	// RunQualityGates indicates whether to run quality gates after this stage completes.
+	// Only stages that produce code changes (implement, fix_lint, fix_tests) should enable this.
+	RunQualityGates bool `json:"run_quality_gates,omitempty" yaml:"run_quality_gates,omitempty"`
 }
 
 // IsTerminal returns true if this stage has no successor.
