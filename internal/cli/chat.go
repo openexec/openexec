@@ -25,6 +25,9 @@ var chatCmd = &cobra.Command{
 	Long: `Start a real-time conversational session with the OpenExec agent.
 Talk to your project, ask questions about the codebase, or trigger automated tasks.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check for updates in background
+		go checkForUpdate()
+
 		// Try to load project configuration
 		config, err := project.LoadProjectConfig(".")
 		projectName := "global"

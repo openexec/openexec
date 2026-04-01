@@ -83,6 +83,9 @@ The daemon exposes /api/v1/runs endpoints for run management:
 
 WebSocket events are available at /ws for real-time monitoring.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check for updates in background
+		go checkForUpdate()
+
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
@@ -186,6 +189,9 @@ Examples:
   openexec run T-001       # Execute specific task
   openexec run --quickfix "Fix typo" --verify "make test"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check for updates in background
+		go checkForUpdate()
+
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
