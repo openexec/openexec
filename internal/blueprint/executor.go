@@ -87,7 +87,7 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			// Actually, if the action IS 'run_gates', we MUST still call runQualityGates
 			// to ensure the internal state merging happens correctly.
 			if result.Status == types.StageStatusCompleted {
-				e.runQualityGates(ctx, input, result)
+				e.runQualityGates(ctx, stage, input, result)
 			}
 			return result, nil
 		}
@@ -130,13 +130,16 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 	}
 
 	// 3. Run Quality Gates (if configured and Action Registry available)
-	e.runQualityGates(ctx, input, result)
+	e.runQualityGates(ctx, stage, input, result)
 
 	return result, nil
 }
 
 // runQualityGates executes configured quality gates and merges results into the stage result.
-func (e *DefaultExecutor) runQualityGates(ctx context.Context, input *StageInput, result *StageResult) {
+func (e *DefaultExecutor) runQualityGates(ctx context.Context, stage *Stage, input *StageInput, result *StageResult) {
+	if stage != nil && !stage.RunQualityGates {
+		return
+	}
 	if e.ActionRegistry == nil {
 		return
 	}
@@ -232,7 +235,7 @@ func (e *DefaultExecutor) executeAgentic(ctx context.Context, stage *Stage, inpu
 	result.Complete(output)
 
 	// Run Quality Gates after agentic stage succeeds
-	e.runQualityGates(ctx, input, result)
+	e.runQualityGates(ctx, stage, input, result)
 
 	return result, nil
 }
