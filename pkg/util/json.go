@@ -18,14 +18,23 @@ func SanitizeJSON(input string) ([]byte, error) {
 	if len(matches) > 1 {
 		jsonText = matches[1]
 	} else {
-		// Strategy 2: Extract content between first { and last }
-		first := strings.Index(input, "{")
-		last := strings.LastIndex(input, "}")
+		// Strategy 2: Extract JSON from surrounding text.
+		// Check both { and [ and use whichever appears first,
+		// so arrays like [{"key":"val"}] aren't misextracted as {"key":"val"}.
+		firstBrace := strings.Index(input, "{")
+		lastBrace := strings.LastIndex(input, "}")
+		firstBracket := strings.Index(input, "[")
+		lastBracket := strings.LastIndex(input, "]")
 
-		// If no braces, check for arrays
-		if first == -1 {
-			first = strings.Index(input, "[")
-			last = strings.LastIndex(input, "]")
+		first, last := -1, -1
+		if firstBrace != -1 && lastBrace > firstBrace {
+			first, last = firstBrace, lastBrace
+		}
+		if firstBracket != -1 && lastBracket > firstBracket {
+			// Use array bounds if they appear before object bounds (or no object found)
+			if first == -1 || firstBracket < first {
+				first, last = firstBracket, lastBracket
+			}
 		}
 
 		if first != -1 && last != -1 && last > first {

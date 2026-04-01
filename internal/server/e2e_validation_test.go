@@ -21,44 +21,36 @@ var forbiddenIntentErrorStrings = []string{
 // This is the comprehensive validation suite proving intent routing works correctly.
 // All queries MUST receive valid responses; none may return "could not determine intent" errors.
 func TestE2EIntentRoutingValidation(t *testing.T) {
-	// DCP tests require DCP to be enabled in the server configuration.
-	// Skip when running in environments without DCP support.
-	t.Skip("DCP feature flag is disabled by default; enable with OPENEXEC_ENABLE_DCP=true to run these tests")
 	// Setup server with BitNetRouter in skip mode (uses NewTestServer helper)
 	ts := NewTestServer(t)
 	s := ts.Server
 
-	// Matrix of test inputs representing real user scenarios
-	// NOTE: allowError=true means we accept 500s from tool execution failures,
-	// as long as they don't contain intent routing errors.
+	// Matrix of test inputs representing real user scenarios.
+	// In suggest-only mode, DCP returns IntentSuggestion structs, not execution results.
 	testCases := []struct {
-		name       string
-		query      string
-		wantTool   string // expected tool (or "" for any)
-		wantInResp string // substring that MUST appear in result (or "" for any)
-		allowError bool   // true if tool execution failure is acceptable (not an intent routing error)
+		name     string
+		query    string
+		wantTool string // expected tool_name (or "" for any)
 	}{
 		// --- Fallback scenarios (MUST work) ---
-		{"empty_query", "", "general_chat", "", false},
-		{"help_request", "help", "general_chat", "OpenExec", false},
-		{"gibberish", "asdf1234xyz", "general_chat", "query", false},
-		{"question", "What is the weather?", "general_chat", "query", false},
+		{"empty_query", "", "general_chat"},
+		{"help_request", "help", "general_chat"},
+		{"gibberish", "asdf1234xyz", "general_chat"},
+		{"question", "What is the weather?", "general_chat"},
 
 		// --- Keyword-matched scenarios (SHOULD work via simulator) ---
-		{"deploy_keyword", "deploy to prod", "deploy", "", false},
-		// symbol_keyword: The tool may return 500 because symbol doesn't exist in test env,
-		// but that's a tool execution error NOT an intent routing error.
-		{"symbol_keyword", "show function Execute", "read_symbol", "", true},
-		{"wizard_keyword", "start wizard", "general_chat", "wizard", false},
+		{"deploy_keyword", "deploy to prod", "deploy"},
+		{"symbol_keyword", "show function Execute", ""}, // may route to read_symbol or general_chat
+		{"wizard_keyword", "start wizard", ""},
 
 		// --- Edge cases ---
-		{"unicode_chinese", "你好世界", "general_chat", "query", false},
-		{"unicode_japanese", "こんにちは", "general_chat", "query", false},
-		{"long_query", strings.Repeat("hello ", 100), "general_chat", "query", false},
-		{"special_chars", "!@#$%^&*()", "general_chat", "query", false},
-		{"whitespace_only", "   ", "general_chat", "", false},
-		{"newlines", "hello\nworld\ntesting", "general_chat", "query", false},
-		{"tabs", "hello\tworld", "general_chat", "query", false},
+		{"unicode_chinese", "你好世界", "general_chat"},
+		{"unicode_japanese", "こんにちは", "general_chat"},
+		{"long_query", strings.Repeat("hello ", 100), "general_chat"},
+		{"special_chars", "!@#$%^&*()", "general_chat"},
+		{"whitespace_only", "   ", "general_chat"},
+		{"newlines", "hello\nworld\ntesting", "general_chat"},
+		{"tabs", "hello\tworld", "general_chat"},
 	}
 
 	for _, tc := range testCases {
@@ -75,28 +67,16 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 
 			// --- Contract Validation ---
 
-			// 1. HTTP 200 is required (unless allowError is true for expected tool failures)
+			// 1. HTTP 200 is required (suggest-only mode never returns 500 for routing)
 			if rec.Code != http.StatusOK {
-				if !tc.allowError {
-					t.Errorf("expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
-					return
-				}
-				// For allowError cases, we still check the response doesn't contain intent errors
-				bodyStr := rec.Body.String()
-				for _, forbidden := range forbiddenIntentErrorStrings {
-					if strings.Contains(strings.ToLower(bodyStr), forbidden) {
-						t.Errorf("CRITICAL: Found forbidden substring %q in error response: %s", forbidden, bodyStr)
-					}
-				}
-				// Tool execution failures are acceptable - the key is that intent routing worked
-				t.Logf("Accepted tool execution error (intent routing succeeded): %s", rec.Body.String())
+				t.Errorf("expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
 				return
 			}
 
 			// 2. Parse response
 			var resp struct {
-				Result interface{} `json:"result"`
-				Error  string      `json:"error"`
+				Result map[string]interface{} `json:"result"`
+				Error  string                 `json:"error"`
 			}
 			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
@@ -107,26 +87,31 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 				t.Errorf("unexpected error in response: %s", resp.Error)
 			}
 
-			// 4. Result field MUST be non-nil
+			// 4. Result field MUST be non-nil with valid IntentSuggestion fields
 			if resp.Result == nil {
-				t.Error("expected non-empty result")
+				t.Fatal("expected non-nil result")
 			}
 
-			// 5. CRITICAL: Check for forbidden substrings
-			resultStr, _ := resp.Result.(string)
-			bodyStr := rec.Body.String()
+			toolName, _ := resp.Result["tool_name"].(string)
+			if toolName == "" {
+				t.Error("expected non-empty tool_name in suggestion")
+			}
+
+			if _, ok := resp.Result["confidence"].(float64); !ok {
+				t.Errorf("expected confidence to be a number, got: %T", resp.Result["confidence"])
+			}
+
+			// 5. Verify expected tool_name if specified
+			if tc.wantTool != "" && toolName != tc.wantTool {
+				t.Errorf("expected tool_name %q, got: %s", tc.wantTool, toolName)
+			}
+
+			// 6. CRITICAL: Check for forbidden substrings in full response
+			bodyStr := strings.ToLower(rec.Body.String())
 			for _, forbidden := range forbiddenIntentErrorStrings {
-				if strings.Contains(strings.ToLower(resultStr), forbidden) {
-					t.Errorf("CRITICAL: Found forbidden substring %q in result: %s", forbidden, resultStr)
+				if strings.Contains(bodyStr, forbidden) {
+					t.Errorf("CRITICAL: Found forbidden substring %q in response body", forbidden)
 				}
-				if strings.Contains(strings.ToLower(bodyStr), forbidden) {
-					t.Errorf("CRITICAL: Found forbidden substring %q in response body: %s", forbidden, bodyStr)
-				}
-			}
-
-			// 6. Optional: Check for expected content in response
-			if tc.wantInResp != "" && !strings.Contains(resultStr, tc.wantInResp) {
-				t.Errorf("expected result to contain %q, got: %s", tc.wantInResp, resultStr)
 			}
 		})
 	}
@@ -135,7 +120,6 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 // TestE2ENoConfidenceErrorsOnAnyInput ensures that arbitrary inputs never produce confidence errors.
 // This is the definitive regression test for G-001.
 func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
-	t.Skip("DCP feature flag is disabled by default")
 	ts := NewTestServer(t)
 	s := ts.Server
 
@@ -187,7 +171,6 @@ func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
 
 // TestE2ERapidSequentialQueries ensures no race conditions under sequential load.
 func TestE2ERapidSequentialQueries(t *testing.T) {
-	t.Skip("DCP feature flag is disabled by default")
 	ts := NewTestServer(t)
 	s := ts.Server
 

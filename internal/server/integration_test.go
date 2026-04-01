@@ -196,31 +196,28 @@ func TestE2EServerStartsAndAcceptsQueries(t *testing.T) {
 // =============================================================================
 
 func TestE2EHelpQueryReturnsGuidance(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
 	// GIVEN a running server with GeneralChatTool registered
 	ts := NewTestServer(t)
 
 	// WHEN I POST {"query": "help"} to /api/v1/dcp/query
 	resp := ts.MustQuery("help")
 
-	// THEN I receive HTTP 200
-	// AND the result contains "OpenExec"
-	resultStr := fmt.Sprintf("%v", resp.Result)
-	if !strings.Contains(resultStr, "OpenExec") {
-		t.Errorf("expected result to contain 'OpenExec', got: %s", resultStr)
+	// THEN I receive HTTP 200 with an IntentSuggestion
+	resultMap, ok := resp.Result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result to be a map, got: %T (%v)", resp.Result, resp.Result)
 	}
 
-	// AND the result contains guidance about available commands
-	guidance := []string{"deploy", "commit", "wizard"}
-	foundGuidance := false
-	for _, g := range guidance {
-		if strings.Contains(strings.ToLower(resultStr), g) {
-			foundGuidance = true
-			break
-		}
+	// AND the suggestion routes to general_chat
+	toolName, _ := resultMap["tool_name"].(string)
+	if toolName != "general_chat" {
+		t.Errorf("expected tool_name 'general_chat', got: %s", toolName)
 	}
-	if !foundGuidance {
-		t.Errorf("expected result to contain guidance about commands, got: %s", resultStr)
+
+	// AND confidence is a number > 0 or fallback
+	confidence, _ := resultMap["confidence"].(float64)
+	if confidence < 0 {
+		t.Errorf("expected non-negative confidence, got: %f", confidence)
 	}
 
 	ts.AssertNoErrorPhrases(resp, "help")
@@ -515,51 +512,27 @@ func TestE2EServerShutdownGracefully(t *testing.T) {
 }
 
 func TestDCPQueryIntegration(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
-	// Initialize a unified server in test mode
-	// We mock the dependencies minimally
-	cfg := Config{
-		Port:        0, // random
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
+	// GIVEN a test server with DCP enabled in suggest-only mode
+	ts := NewTestServer(t)
+
+	// WHEN I POST {"query": "hello"} to /api/v1/dcp/query
+	resp := ts.MustQuery("hello")
+
+	// THEN the result is an IntentSuggestion map
+	resultMap, ok := resp.Result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result to be a map, got: %T (%v)", resp.Result, resp.Result)
 	}
 
-	s, err := New(cfg)
-	if err != nil {
-		t.Fatalf("failed to create server: %v", err)
+	// AND tool_name is a non-empty string
+	toolName, ok := resultMap["tool_name"].(string)
+	if !ok || toolName == "" {
+		t.Errorf("expected non-empty tool_name string, got: %v", resultMap["tool_name"])
 	}
 
-	// Bypass availability check for bitnet during tests
-	if br, ok := s.Coordinator.GetRouter().(*router.BitNetRouter); ok {
-		br.SetSkipAvailabilityCheck(true)
-	}
-
-	// Test successful general chat fallback
-	payload := map[string]string{"query": "hello"}
-	body, _ := json.Marshal(payload)
-
-	req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
-	rec := httptest.NewRecorder()
-
-	s.Mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected status 200, got %d. Body: %s", rec.Code, rec.Body.String())
-	}
-
-	var resp struct {
-		Result string `json:"result"`
-		Error  string `json:"error"`
-	}
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	if resp.Error != "" {
-		t.Errorf("unexpected error in response: %s", resp.Error)
-	}
-	if resp.Result == "" {
-		t.Error("expected non-empty result (general_chat fallback)")
+	// AND confidence is a number
+	if _, ok := resultMap["confidence"].(float64); !ok {
+		t.Errorf("expected confidence to be a number, got: %T", resultMap["confidence"])
 	}
 }
 
@@ -580,32 +553,27 @@ func TestDCPQueryIntegration(t *testing.T) {
 // THEN the response contains guidance about available commands
 // AND no intent routing errors appear (AC3)
 func TestIntegrationCLIChatHelpQuery(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
 	// AC1: Start server
 	ts := NewTestServer(t)
 
 	// AC1: Send query
 	resp := ts.MustQuery("help")
 
-	// AC1: Validate response
-	resultStr := fmt.Sprintf("%v", resp.Result)
-
-	// AC2: Help query should mention OpenExec
-	if !strings.Contains(resultStr, "OpenExec") {
-		t.Errorf("help response should mention OpenExec, got: %s", resultStr)
+	// AC1: Validate response is an IntentSuggestion
+	resultMap, ok := resp.Result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result to be a map, got: %T (%v)", resp.Result, resp.Result)
 	}
 
-	// AC2: Help query should provide guidance
-	guidance := []string{"deploy", "commit", "wizard"}
-	foundGuidance := false
-	for _, g := range guidance {
-		if strings.Contains(strings.ToLower(resultStr), g) {
-			foundGuidance = true
-			break
-		}
+	// AC2: Help query should route to general_chat
+	toolName, _ := resultMap["tool_name"].(string)
+	if toolName != "general_chat" {
+		t.Errorf("expected tool_name 'general_chat' for help query, got: %s", toolName)
 	}
-	if !foundGuidance {
-		t.Errorf("help response should mention available commands, got: %s", resultStr)
+
+	// AC2: Confidence should be present
+	if _, ok := resultMap["confidence"].(float64); !ok {
+		t.Errorf("expected confidence to be a number, got: %T", resultMap["confidence"])
 	}
 
 	// AC3: No intent routing errors
@@ -618,19 +586,29 @@ func TestIntegrationCLIChatHelpQuery(t *testing.T) {
 // THEN the query is handled by general_chat fallback
 // AND no intent routing errors appear (AC3)
 func TestIntegrationCLIChatUnknownQuery(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
 	// AC1: Start server
 	ts := NewTestServer(t)
 
 	// AC1: Send unknown query
 	resp := ts.MustQuery("What is the capital of France?")
 
-	// AC1: Validate response
-	resultStr := fmt.Sprintf("%v", resp.Result)
+	// AC1: Validate response is an IntentSuggestion
+	resultMap, ok := resp.Result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result to be a map, got: %T (%v)", resp.Result, resp.Result)
+	}
 
-	// AC2: Unknown query should be echoed (general_chat behavior)
-	if !strings.Contains(strings.ToLower(resultStr), "france") && !strings.Contains(strings.ToLower(resultStr), "received") {
-		t.Errorf("unknown query should be handled gracefully, got: %s", resultStr)
+	// AC2: Unknown query should fall back to general_chat
+	toolName, _ := resultMap["tool_name"].(string)
+	if toolName != "general_chat" {
+		t.Errorf("expected tool_name 'general_chat' for unknown query, got: %s", toolName)
+	}
+
+	// AC2: Should be marked as fallback or have low confidence
+	isFallback, _ := resultMap["is_fallback"].(bool)
+	confidence, _ := resultMap["confidence"].(float64)
+	if !isFallback && confidence > 0.5 {
+		t.Errorf("expected fallback or low confidence for unknown query, got is_fallback=%v confidence=%f", isFallback, confidence)
 	}
 
 	// AC3: No intent routing errors
@@ -643,19 +621,28 @@ func TestIntegrationCLIChatUnknownQuery(t *testing.T) {
 // THEN the deploy tool is invoked with high confidence
 // AND no intent routing errors appear (AC3)
 func TestIntegrationCLIChatSurgicalToolQuery(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
 	// AC1: Start server
 	ts := NewTestServer(t)
 
 	// AC1: Send surgical deploy query
 	resp := ts.MustQuery("deploy to production")
 
-	// AC1: Validate response
-	resultStr := fmt.Sprintf("%v", resp.Result)
+	// AC1: Validate response is an IntentSuggestion
+	resultMap, ok := resp.Result.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected result to be a map, got: %T (%v)", resp.Result, resp.Result)
+	}
 
-	// AC2: Deploy tool should be invoked (may return KNOWLEDGE_MISSING which is expected)
-	if resultStr == "" {
-		t.Error("surgical tool query should return non-empty result")
+	// AC2: Deploy query should route to deploy tool
+	toolName, _ := resultMap["tool_name"].(string)
+	if toolName != "deploy" {
+		t.Errorf("expected tool_name 'deploy' for deploy query, got: %s", toolName)
+	}
+
+	// AC2: Confidence should be > 0
+	confidence, _ := resultMap["confidence"].(float64)
+	if confidence <= 0 {
+		t.Errorf("expected positive confidence for deploy query, got: %f", confidence)
 	}
 
 	// AC3: No intent routing errors
@@ -668,32 +655,30 @@ func TestIntegrationCLIChatSurgicalToolQuery(t *testing.T) {
 // - AC2: Help, unknown, and surgical tool queries
 // - AC3: No 'could not determine intent' errors in any scenario
 func TestIntegrationCLIChatE2EMatrix(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
 	// AC1: Start server
 	ts := NewTestServer(t)
 
 	testCases := []struct {
-		name       string
-		query      string
-		category   string // help, unknown, or surgical
-		wantInResp string // optional substring to verify
-		allowEmpty bool   // allow empty result (for tool execution errors)
+		name         string
+		query        string
+		category     string // help, unknown, or surgical
+		wantToolName string // expected tool_name in suggestion
 	}{
 		// AC2: Help queries
-		{"help_basic", "help", "help", "OpenExec", false},
-		{"help_what", "what can you do", "help", "", false},
-		{"help_list", "list commands", "help", "", false},
+		{"help_basic", "help", "help", "general_chat"},
+		{"help_what", "what can you do", "help", "general_chat"},
+		{"help_list", "list commands", "help", ""},
 
 		// AC2: Unknown queries (should fall back gracefully)
-		{"unknown_weather", "What is the weather today?", "unknown", "", false},
-		{"unknown_joke", "tell me a joke", "unknown", "", false},
-		{"unknown_math", "what is 2+2?", "unknown", "", false},
-		{"unknown_gibberish", "asdfqwerzxcv", "unknown", "", false},
+		{"unknown_weather", "What is the weather today?", "unknown", "general_chat"},
+		{"unknown_joke", "tell me a joke", "unknown", "general_chat"},
+		{"unknown_math", "what is 2+2?", "unknown", "general_chat"},
+		{"unknown_gibberish", "asdfqwerzxcv", "unknown", "general_chat"},
 
 		// AC2: Surgical tool queries
-		{"surgical_deploy", "deploy to prod", "surgical", "", false},
-		{"surgical_commit", "commit my changes", "surgical", "", true},  // may error without git context
-		{"surgical_symbol", "show function main", "surgical", "", true}, // may error without symbol index
+		{"surgical_deploy", "deploy to prod", "surgical", "deploy"},
+		{"surgical_commit", "commit my changes", "surgical", ""},
+		{"surgical_symbol", "show function main", "surgical", ""},
 	}
 
 	for _, tc := range testCases {
@@ -706,18 +691,26 @@ func TestIntegrationCLIChatE2EMatrix(t *testing.T) {
 				t.Fatalf("query %q failed catastrophically: %v", tc.query, err)
 			}
 
-			// AC1: Non-empty result (unless allowed)
-			if !tc.allowEmpty && resp.Result == nil && resp.Response == "" {
-				t.Errorf("query %q: expected non-empty result", tc.query)
+			// AC1: Result must be an IntentSuggestion map
+			resultMap, ok := resp.Result.(map[string]interface{})
+			if !ok {
+				t.Fatalf("query %q: expected result to be a map, got: %T", tc.query, resp.Result)
 			}
 
-			// AC2: Optional content verification
-			if tc.wantInResp != "" {
-				resultStr := fmt.Sprintf("%v", resp.Result)
-				if !strings.Contains(resultStr, tc.wantInResp) {
-					t.Errorf("query %q: expected result to contain %q, got: %s",
-						tc.query, tc.wantInResp, resultStr)
-				}
+			// tool_name must exist and be a string
+			toolName, ok := resultMap["tool_name"].(string)
+			if !ok || toolName == "" {
+				t.Errorf("query %q: expected non-empty tool_name, got: %v", tc.query, resultMap["tool_name"])
+			}
+
+			// AC2: Optional tool_name verification
+			if tc.wantToolName != "" && toolName != tc.wantToolName {
+				t.Errorf("query %q: expected tool_name %q, got: %s", tc.query, tc.wantToolName, toolName)
+			}
+
+			// confidence must be a number
+			if _, ok := resultMap["confidence"].(float64); !ok {
+				t.Errorf("query %q: expected confidence to be a number, got: %T", tc.query, resultMap["confidence"])
 			}
 
 			// AC3: CRITICAL - No intent routing errors
@@ -775,11 +768,12 @@ func (m *mockErrorRouter) ParseIntent(ctx context.Context, query string) (*route
 }
 
 func TestDCPQueryErrorIntegration(t *testing.T) {
-	t.Skip("DCP tests need update for suggest-only mode")
 	cfg := Config{
 		Port:        0,
 		ProjectsDir: t.TempDir(),
 		DataDir:     t.TempDir(),
+		EnableDCP:   true,
+		SkipPreflight: true,
 	}
 
 	s, err := New(cfg)
@@ -787,7 +781,8 @@ func TestDCPQueryErrorIntegration(t *testing.T) {
 		t.Fatalf("failed to create server: %v", err)
 	}
 
-	// Override with error router and REMOVE general_chat to force a 500
+	// Override with error router — in suggest-only mode, ProcessQuery returns
+	// a fallback IntentSuggestion instead of an error
 	s.Coordinator = dcp.NewCoordinator(&mockErrorRouter{}, nil)
 
 	payload := map[string]string{"query": "trigger error"}
@@ -798,18 +793,30 @@ func TestDCPQueryErrorIntegration(t *testing.T) {
 
 	s.Mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("expected status 500, got %d. Body: %s", rec.Code, rec.Body.String())
+	// In suggest-only mode, router errors produce a fallback suggestion (HTTP 200)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200 (fallback suggestion), got %d. Body: %s", rec.Code, rec.Body.String())
 	}
 
 	var resp struct {
-		Error string `json:"error"`
+		Result map[string]interface{} `json:"result"`
+		Error  string                 `json:"error"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if !strings.Contains(resp.Error, "simulated parsing failure") {
-		t.Errorf("expected error message to contain simulated failure, got: %s", resp.Error)
+	if resp.Error != "" {
+		t.Errorf("expected no error field in fallback suggestion, got: %s", resp.Error)
+	}
+
+	// Verify the fallback suggestion
+	toolName, _ := resp.Result["tool_name"].(string)
+	if toolName != "general_chat" {
+		t.Errorf("expected fallback to general_chat, got tool_name: %s", toolName)
+	}
+	isFallback, _ := resp.Result["is_fallback"].(bool)
+	if !isFallback {
+		t.Error("expected is_fallback=true in fallback suggestion")
 	}
 }

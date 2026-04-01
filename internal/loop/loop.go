@@ -92,14 +92,13 @@ func (l *Loop) Run(ctx context.Context) error {
 		return l.runBlueprint(ctx)
 	}
 
-	// Agentic subloop mode: standalone bounded execution
+	// Agentic subloop mode: single-shot bounded process execution
 	return l.runStandalone(ctx)
 }
 
-// runStandalone executes a bounded execution loop without a blueprint.
-// This is used by agentic stages to run their inner reasoning loops.
+// runStandalone executes a single-shot bounded process for agentic stage execution.
+// This is used by blueprint agentic stages — each stage spawns one process.
 func (l *Loop) runStandalone(ctx context.Context) error {
-	// 1. Start process
 	proc, err := StartProcess(ctx, l.cfg, nil, nil, nil)
 	if err != nil {
 		l.emit(Event{Type: EventError, ErrText: err.Error()})
@@ -107,22 +106,18 @@ func (l *Loop) runStandalone(ctx context.Context) error {
 	}
 	defer func() { _ = proc.Kill() }()
 
-	// 2. Execution loop (Process based)
+	// Capture stderr in background
 	go func() {
-		// Capture stderr in background for diagnostics
 		_, _ = CaptureStderr(proc.Stderr, l.cfg.LogDir)
 	}()
 
-	// Setup parser to pipe events directly to our channel
+	// Parse stdout events
 	parser := NewParser(l.events, 1)
-	
-	// Start parsing in background
 	parseErr := make(chan error, 1)
 	go func() {
 		parseErr <- parser.Parse(proc.Stdout)
 	}()
 
-	// Wait for either process exit or parsing completion
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

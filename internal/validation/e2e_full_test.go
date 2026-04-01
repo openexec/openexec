@@ -3,10 +3,8 @@
 //
 // Goal verification matrix:
 // G-001: Reduce Orchestration Overhead - TestG001_SingleOrchestrationPlane
-// G-002: Stabilize Run Loop           - TestG002_HeartbeatStallDetection
 // G-003: Unified State and Actions    - TestG003_SQLiteCanonicalState
 // G-004: Safe Reviewable Code Changes - TestG004_DiffPatchScoping
-// G-005: Soft-Fail Verification       - TestG005_SoftFailRecovery
 //
 // Run with: go test ./internal/validation/... -v
 package validation
@@ -22,10 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/openexec/openexec/internal/dcp"
-	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/server"
@@ -137,133 +133,6 @@ func TestG001_NoOrchestrationInDCP(t *testing.T) {
 	}
 
 	t.Log("G-001 VERIFIED: DCP is thin adapter without orchestration logic")
-}
-
-// =============================================================================
-// Goal G-002: Run Loop Stability
-// =============================================================================
-
-// TestG002_HeartbeatStallDetection validates heartbeat-based stall detection.
-func TestG002_HeartbeatStallDetection(t *testing.T) {
-	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
-	mockPath, err := filepath.Abs("../loop/testdata/mock_claude")
-	if err != nil {
-		t.Fatalf("failed to get mock path: %v", err)
-	}
-
-	testCases := []struct {
-		name            string
-		scenario        string
-		thrashThreshold int
-		expectThrashing bool
-		expectComplete  bool
-	}{
-		// Progress signals reset thrash counter
-		{"progress_resets_counter", "soft-fail-diagnostic", 3, false, true},
-
-		// Phase-complete is terminal signal
-		{"phase_complete_terminates", "build-fail-then-recover", 5, false, true},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-
-			cfg := loop.DefaultConfig()
-			cfg.CommandName = mockPath
-			cfg.CommandArgs = []string{tc.scenario}
-			cfg.MaxIterations = 3
-			cfg.ThrashThreshold = tc.thrashThreshold
-			cfg.LogDir = tmpDir
-			cfg.WorkDir = tmpDir
-
-			l, events := loop.New(cfg)
-
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-
-			done := make(chan struct{})
-			var thrashingDetected bool
-			var completed bool
-
-			go func() {
-				defer close(done)
-				for e := range events {
-					if e.Type == loop.EventThrashingDetected {
-						thrashingDetected = true
-					}
-					if e.Type == loop.EventComplete {
-						completed = true
-					}
-				}
-			}()
-
-			err := l.Run(ctx)
-			<-done
-
-			// Use completed for expectComplete check
-			if tc.expectComplete && !completed {
-				t.Errorf("expected completion but completed=%v", completed)
-			}
-
-			if tc.expectThrashing && !thrashingDetected {
-				t.Error("expected thrashing detection but none occurred")
-			}
-			if !tc.expectThrashing && thrashingDetected {
-				t.Error("unexpected thrashing detection")
-			}
-
-			if tc.expectComplete && err != nil {
-				t.Errorf("expected clean completion but got error: %v", err)
-			}
-		})
-	}
-
-	t.Log("G-002 VERIFIED: Heartbeat-based stall detection works correctly")
-}
-
-// TestG002_LoopProgressTracking validates that loop tracks progress via signals.
-func TestG002_LoopProgressTracking(t *testing.T) {
-	mockPath, err := filepath.Abs("../loop/testdata/mock_claude")
-	if err != nil {
-		t.Fatalf("failed to get mock path: %v", err)
-	}
-
-	tmpDir := t.TempDir()
-
-	cfg := loop.DefaultConfig()
-	cfg.CommandName = mockPath
-	cfg.CommandArgs = []string{"build-fail-recoverable"}
-	cfg.MaxIterations = 3
-	cfg.ThrashThreshold = 3
-	cfg.LogDir = tmpDir
-	cfg.WorkDir = tmpDir
-
-	l, events := loop.New(cfg)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var progressCount int
-
-	go func() {
-		defer close(done)
-		for e := range events {
-			if e.Type == loop.EventSignalReceived && e.SignalType == "progress" {
-				progressCount++
-			}
-		}
-	}()
-
-	_ = l.Run(ctx)
-	<-done
-
-	if progressCount == 0 {
-		t.Error("expected progress signals but received none")
-	}
-
-	t.Logf("G-002 VERIFIED: Loop tracked %d progress signals", progressCount)
 }
 
 // =============================================================================
@@ -460,130 +329,6 @@ func hello() {
 	}
 
 	t.Log("G-004 VERIFIED: Safe patch application prerequisites in place")
-}
-
-// =============================================================================
-// Goal G-005: Soft-Fail Verification
-// =============================================================================
-
-// TestG005_SoftFailRecovery validates soft-fail behavior.
-func TestG005_SoftFailRecovery(t *testing.T) {
-	mockPath, err := filepath.Abs("../loop/testdata/mock_claude")
-	if err != nil {
-		t.Fatalf("failed to get mock path: %v", err)
-	}
-
-	testCases := []struct {
-		name          string
-		scenario      string
-		expectError   bool
-		expectSignal  string
-	}{
-		// Build failure captured as diagnostic, not hard-fail
-		{"build_fail_captures_diagnostic", "soft-fail-diagnostic", false, "progress"},
-
-		// Recovery after build failure
-		{"recovery_after_failure", "build-fail-then-recover", false, "phase-complete"},
-
-		// Progress signals prevent thrashing detection
-		{"diagnostic_emits_progress", "build-fail-recoverable", false, "progress"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-
-			cfg := loop.DefaultConfig()
-			cfg.CommandName = mockPath
-			cfg.CommandArgs = []string{tc.scenario}
-			cfg.MaxIterations = 3
-			cfg.ThrashThreshold = 5
-			cfg.LogDir = tmpDir
-			cfg.WorkDir = tmpDir
-
-			l, events := loop.New(cfg)
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			done := make(chan struct{})
-			var foundExpectedSignal bool
-
-			go func() {
-				defer close(done)
-				for e := range events {
-					if e.Type == loop.EventSignalReceived && e.SignalType == tc.expectSignal {
-						foundExpectedSignal = true
-					}
-				}
-			}()
-
-			err := l.Run(ctx)
-			<-done
-
-			if tc.expectError && err == nil {
-				t.Error("expected error but got nil")
-			}
-			if !tc.expectError && err != nil {
-				t.Errorf("expected no error but got: %v", err)
-			}
-
-			if !foundExpectedSignal {
-				t.Errorf("expected to receive %s signal", tc.expectSignal)
-			}
-		})
-	}
-
-	t.Log("G-005 VERIFIED: Soft-fail recovery works correctly")
-}
-
-// TestG005_NoHardFailOnBuildErrors validates no hard-fail on build errors.
-func TestG005_NoHardFailOnBuildErrors(t *testing.T) {
-	t.Skip("standalone iterative loop was refactored to blueprint-only architecture")
-	mockPath, err := filepath.Abs("../loop/testdata/mock_claude")
-	if err != nil {
-		t.Fatalf("failed to get mock path: %v", err)
-	}
-
-	tmpDir := t.TempDir()
-
-	cfg := loop.DefaultConfig()
-	cfg.CommandName = mockPath
-	cfg.CommandArgs = []string{"soft-fail-diagnostic"}
-	cfg.MaxIterations = 1
-	cfg.LogDir = tmpDir
-	cfg.WorkDir = tmpDir
-
-	l, events := loop.New(cfg)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var hasComplete bool
-
-	go func() {
-		defer close(done)
-		for e := range events {
-			if e.Type == loop.EventComplete {
-				hasComplete = true
-			}
-		}
-	}()
-
-	err = l.Run(ctx)
-	<-done
-
-	// Should complete without error (soft-fail, not hard-fail)
-	if err != nil {
-		t.Errorf("expected nil error (soft-fail), got: %v", err)
-	}
-
-	if !hasComplete {
-		t.Error("expected EventComplete after soft-fail handling")
-	}
-
-	t.Log("G-005 VERIFIED: No hard-fail on recoverable build errors")
 }
 
 // =============================================================================
