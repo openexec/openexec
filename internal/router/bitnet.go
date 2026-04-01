@@ -42,6 +42,11 @@ func NewBitNetRouter(modelPath string) *BitNetRouter {
 	}
 }
 
+// SetProjectDir sets the project working directory for per-project model lookup.
+func (r *BitNetRouter) SetProjectDir(dir string) {
+	r.manager.SetProjectDir(dir)
+}
+
 // SetSkipAvailabilityCheck is used for unit testing to bypass environment checks
 func (r *BitNetRouter) SetSkipAvailabilityCheck(skip bool) {
 	r.skipAvailabilityCheck = skip

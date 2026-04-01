@@ -344,12 +344,22 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	pipeline.WithRouter(dr)(p)
 
 	// BitNet routing upgrade (optional, feature flag)
+	// When bitnet_routing is enabled and no explicit model path is set,
+	// ModelManager auto-discovers or downloads the model.
+	// - Empty string / default placeholder: auto-download to ~/.openexec/models/
+	// - Absolute path: use specific model file directly
+	// - Relative path: relative to project dir
 	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.BitNetRouting {
 		modelPath := projCfg.Execution.BitNetModel
 		if modelPath == "" {
-			modelPath = "/models/bitnet-2b.gguf"
+			// Empty = auto-download via ModelManager (triggered inside InferenceManager.EnsureReady)
+			modelPath = ""
+		} else if !filepath.IsAbs(modelPath) {
+			// Relative path: resolve relative to project dir
+			modelPath = filepath.Join(m.cfg.WorkDir, modelPath)
 		}
 		br := router.NewBitNetRouter(modelPath)
+		br.SetProjectDir(m.cfg.WorkDir)
 		br.SetSkipAvailabilityCheck(false)
 		pipeline.WithRouter(br)(p) // Overrides deterministic
 	}

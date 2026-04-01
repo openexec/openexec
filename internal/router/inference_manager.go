@@ -10,8 +10,9 @@ import (
 
 // InferenceManager handles the lifecycle of the local 1-bit model
 type InferenceManager struct {
-	modelPath string
-	binPath   string
+	modelPath  string
+	binPath    string
+	projectDir string // optional project dir for per-project model lookup
 }
 
 func NewInferenceManager(modelPath string) *InferenceManager {
@@ -20,11 +21,31 @@ func NewInferenceManager(modelPath string) *InferenceManager {
 	}
 }
 
-// EnsureReady checks if the inference engine is available and attempts to locate it
+// SetProjectDir sets the project directory for per-project model lookup.
+func (m *InferenceManager) SetProjectDir(dir string) {
+	m.projectDir = dir
+}
+
+// EnsureReady checks if the inference engine is available and attempts to locate it.
+// If modelPath is empty or the default placeholder, it uses ModelManager for
+// auto-discovery and download.
 func (m *InferenceManager) EnsureReady() error {
-	// 1. Check if model exists
-	if _, err := os.Stat(m.modelPath); os.IsNotExist(err) {
-		return fmt.Errorf("local model not found at %s. Please run 'openexec setup models'", m.modelPath)
+	// 1. If modelPath is empty or the default placeholder, use ModelManager
+	if m.modelPath == "" || m.modelPath == "/models/bitnet-2b.gguf" {
+		mm := NewModelManager(DefaultModelName)
+		if m.projectDir != "" {
+			mm.SetProjectDir(filepath.Join(m.projectDir, ".openexec", "models"))
+		}
+		modelPath, err := mm.EnsureModel()
+		if err != nil {
+			return fmt.Errorf("model not available: %w", err)
+		}
+		m.modelPath = modelPath
+	} else {
+		// User explicitly set a path — use it directly
+		if _, err := os.Stat(m.modelPath); os.IsNotExist(err) {
+			return fmt.Errorf("local model not found at %s. Please run 'openexec setup models'", m.modelPath)
+		}
 	}
 
 	// 2. Try to find a local inference engine (embedded-first approach)
