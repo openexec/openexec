@@ -233,7 +233,7 @@ stages:
 
 ### 6. Context Pruning (`internal/context/`)
 
-**Status: Not yet wired** — Code exists but is not called from the pipeline.
+**Status: Active, always-on** — Runs after context assembly on every execution.
 
 **Purpose:** Intelligent file selection to reduce token usage.
 
