@@ -151,9 +151,10 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 			defer wg.Done()
 			for node := range readyTasks {
 				log.Printf("[Worker %d] Executing %s: %s", id, node.Task.ID, node.Task.Title)
-				
+
 				start := time.Now()
-				
+				taskFailed := false
+
 				var optsList []StartOption
 				if opts.IsStudy {
 					optsList = append(optsList, WithIsStudy(true))
@@ -161,44 +162,59 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 				if opts.Mode != "" {
 					optsList = append(optsList, WithExecMode(opts.Mode))
 				}
-				
+
 				// Ensure blueprint metadata is passed
 				optsList = append(optsList, WithBlueprint("standard_task"))
 				optsList = append(optsList, WithTaskDescription(node.Task.Description))
 
 				// Start the individual pipeline
 				if err := m.Start(ctx, node.Task.ID, optsList...); err != nil {
+					log.Printf("[Worker %d] ✗ Failed to start %s: %v", id, node.Task.ID, err)
 					errors <- fmt.Errorf("failed to start task %s: %w", node.Task.ID, err)
-					return
+					taskFailed = true
 				}
 
-				// Poll for completion (V1.0 simple wait)
-				// TODO: Replace with event-driven completion signal
-				for {
-					info, err := m.Status(node.Task.ID)
-					if err != nil {
-						errors <- fmt.Errorf("status check failed for %s: %w", node.Task.ID, err)
-						return
+				// Poll for completion
+				if !taskFailed {
+					for {
+						info, err := m.Status(node.Task.ID)
+						if err != nil {
+							log.Printf("[Worker %d] ✗ Status check failed for %s: %v", id, node.Task.ID, err)
+							errors <- fmt.Errorf("status check failed for %s: %w", node.Task.ID, err)
+							taskFailed = true
+							break
+						}
+						if info.Status == StatusComplete {
+							break
+						}
+						if info.Status == StatusError {
+							log.Printf("[Worker %d] ✗ Task %s failed: %s", id, node.Task.ID, info.Error)
+							errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, info.Error)
+							taskFailed = true
+							break
+						}
+						if info.Status == StatusStopped {
+							log.Printf("[Worker %d] ✗ Task %s stopped", id, node.Task.ID)
+							errors <- fmt.Errorf("task %s stopped manually", node.Task.ID)
+							taskFailed = true
+							break
+						}
+						time.Sleep(2 * time.Second)
 					}
-					if info.Status == StatusComplete {
-						break
-					}
-					if info.Status == StatusError {
-						errors <- fmt.Errorf("task %s failed: %s", node.Task.ID, info.Error)
-						return
-					}
-					if info.Status == StatusStopped {
-						errors <- fmt.Errorf("task %s stopped manually", node.Task.ID)
-						return
-					}
-					time.Sleep(2 * time.Second)
 				}
 
-				log.Printf("[Worker %d] ✓ Finished %s in %v (Status: %s)", id, node.Task.ID, time.Since(start).Truncate(time.Second), StatusComplete)
+				if taskFailed {
+					log.Printf("[Worker %d] ✗ %s failed after %v", id, node.Task.ID, time.Since(start).Truncate(time.Second))
+					_ = rel.SetTaskStatus(node.Task.ID, "error")
+				} else {
+					log.Printf("[Worker %d] ✓ Finished %s in %v (Status: %s)", id, node.Task.ID, time.Since(start).Truncate(time.Second), StatusComplete)
+				}
 
 				// Update task status so dependency checks can see completion
-				if err := rel.SetTaskStatus(node.Task.ID, "done"); err != nil {
-					log.Printf("[Worker %d] Warning: failed to update task status for %s: %v", id, node.Task.ID, err)
+				if !taskFailed {
+					if err := rel.SetTaskStatus(node.Task.ID, "done"); err != nil {
+						log.Printf("[Worker %d] Warning: failed to update task status for %s: %v", id, node.Task.ID, err)
+					}
 				}
 
 				mu.Lock()
