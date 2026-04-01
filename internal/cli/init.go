@@ -84,6 +84,7 @@ The project name defaults to the current directory name if not provided.`,
 		// Interactive mode if not explicitly set via flags
 		var plannerModel, executorModel, reviewerModel string
 		var reviewEnabled, parallelEnabled, gitCommitEnabled bool
+		var qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting bool
 		var workerCount int
 
 		if !initNonInteractive {
@@ -99,7 +100,7 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			// 2. Execution Config prompt
-			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, _ = promptExecutionConfig(cmd)
+			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, _, qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting = promptExecutionConfig(cmd)
 		} else {
 			if projectName == "" {
 				projectName = defaultProjectName
@@ -123,6 +124,13 @@ The project name defaults to the current directory name if not provided.`,
 			}
 
 			gitCommitEnabled = false
+
+			// Non-interactive defaults for advanced features
+			qualityGates = true
+			cacheEnabled = true
+			memoryEnabled = false
+			checkpointEnabled = false
+			bitnetRouting = false
 		}
 
 		// Initialize the project structure
@@ -134,14 +142,19 @@ The project name defaults to the current directory name if not provided.`,
 		// Set execution config
 		cfg.GitCommitEnabled = gitCommitEnabled
 		cfg.Execution = project.ExecutionConfig{
-			PlannerModel:   plannerModel,
-			ExecutorModel:  executorModel,
-			ReviewEnabled:  reviewEnabled,
-			ReviewerModel:  reviewerModel,
-			Port:           8080,
-			WorkerCount:    workerCount,
-			TimeoutSeconds: 600,
-			ExecMode:       "danger-full-access",
+			PlannerModel:      plannerModel,
+			ExecutorModel:     executorModel,
+			ReviewEnabled:     reviewEnabled,
+			ReviewerModel:     reviewerModel,
+			Port:              8080,
+			WorkerCount:       workerCount,
+			TimeoutSeconds:    600,
+			ExecMode:          "danger-full-access",
+			QualityGatesV2:    qualityGates,
+			CacheEnabled:      cacheEnabled,
+			MemoryEnabled:     memoryEnabled,
+			CheckpointEnabled: checkpointEnabled,
+			BitNetRouting:     bitnetRouting,
 		}
 
 		// Save updated config
@@ -180,7 +193,7 @@ func init() {
 }
 
 // promptExecutionConfig interactively prompts for execution configuration
-func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int, gitCommitEnabled bool, gitPushEnabled bool) {
+func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorModel string, reviewEnabled bool, reviewerModel string, parallelEnabled bool, workerCount int, gitCommitEnabled bool, gitPushEnabled bool, qualityGates bool, cacheEnabled bool, memoryEnabled bool, checkpointEnabled bool, bitnetRouting bool) {
 	reader := bufio.NewReader(cmd.InOrStdin())
 
 	fmt.Println("\n=== Execution Settings ===")
@@ -253,7 +266,35 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		}
 	}
 
-	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled
+	// Advanced features
+	fmt.Printf("\n=== Advanced Features (all optional) ===\n")
+
+	fmt.Printf("Enable quality gates (auto lint/test after stages)? [Y/n]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	qualityGates = answer != "n" && answer != "no"
+
+	fmt.Printf("Enable caching (avoid redundant work on re-runs)? [Y/n]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	cacheEnabled = answer != "n" && answer != "no"
+
+	fmt.Printf("Enable memory (learn patterns across sessions)? [y/N]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	memoryEnabled = answer == "y" || answer == "yes"
+
+	fmt.Printf("Enable checkpointing (crash recovery)? [y/N]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	checkpointEnabled = answer == "y" || answer == "yes"
+
+	fmt.Printf("Enable BitNet local routing (downloads ~400MB model)? [y/N]: ")
+	answer, _ = reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	bitnetRouting = answer == "y" || answer == "yes"
+
+	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled, qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting
 }
 
 // ensureGitignore ensures .gitignore exists and contains .openexec entries.
