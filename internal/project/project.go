@@ -65,6 +65,13 @@ type ExecutionConfig struct {
 	APIBaseURL  string `json:"api_base_url,omitempty"` // e.g. "https://api.moonshot.cn/v1"
 	APIKey      string `json:"api_key,omitempty"`      // API key or "$ENV_VAR" reference
 	APIModel    string `json:"api_model,omitempty"`    // e.g. "moonshot-v1-128k"
+
+	// Coordinator settings for multi-agent execution (Phase C)
+	CoordinatorModel  string `json:"coordinator_model,omitempty"`   // Frontier model for planning/merging
+	WorkerModel       string `json:"worker_model,omitempty"`        // Model for worker agents (can be cheaper)
+	WorkerAPIProvider string `json:"worker_api_provider,omitempty"` // Provider for workers (defaults to APIProvider)
+	WorkerAPIBaseURL  string `json:"worker_api_base_url,omitempty"` // Base URL for workers (defaults to APIBaseURL)
+	WorkerAPIKey      string `json:"worker_api_key,omitempty"`      // API key for workers (defaults to APIKey)
 }
 
 // Initialize initializes a new OpenExec project

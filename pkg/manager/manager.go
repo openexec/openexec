@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/skills"
+	pagent "github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -394,6 +396,44 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 			pipeline.WithParallelExecution(registry, parallelCfg)(p)
 			log.Printf("[Manager] Parallel execution enabled: %d workers", projCfg.Execution.WorkerCount)
 		}
+
+		// Coordinator-based multi-agent execution (Phase C)
+		// When both worker_count > 1 and api_provider are configured, create a coordinator
+		if projCfg.Execution.APIProvider != "" {
+			coordProvider := m.createAPIProvider(projCfg)
+			if coordProvider != nil {
+				workerProvider := coordProvider // same by default
+
+				// Use different provider for workers if configured
+				if projCfg.Execution.WorkerAPIProvider != "" {
+					wp := m.createWorkerProvider(projCfg)
+					if wp != nil {
+						workerProvider = wp
+					}
+				}
+
+				coordModel := projCfg.Execution.APIModel
+				if projCfg.Execution.CoordinatorModel != "" {
+					coordModel = projCfg.Execution.CoordinatorModel
+				}
+
+				workerModel := coordModel
+				if projCfg.Execution.WorkerModel != "" {
+					workerModel = projCfg.Execution.WorkerModel
+				}
+
+				coord := agent.NewTaskCoordinator(agent.CoordinatorConfig{
+					Provider:       coordProvider,
+					WorkerProvider: workerProvider,
+					MaxWorkers:     projCfg.Execution.WorkerCount,
+					WorkDir:        m.cfg.WorkDir,
+					Model:          coordModel,
+					WorkerModel:    workerModel,
+				})
+				pipeline.WithCoordinator(coord)(p)
+				log.Printf("[Manager] Coordinator enabled: %d workers, model=%s", projCfg.Execution.WorkerCount, coordModel)
+			}
+		}
 	}
 
 	// Create OTel span for the entire run lifecycle
@@ -615,6 +655,58 @@ func (m *Manager) ExportJSON(dir string) error {
 	}
 
 	return os.WriteFile(filepath.Join(dir, "stories.json"), data, 0644)
+}
+
+// createAPIProvider creates a ProviderAdapter from project configuration.
+func (m *Manager) createAPIProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
+	apiKey := projCfg.Execution.APIKey
+	if strings.HasPrefix(apiKey, "$") {
+		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
+	}
+	if apiKey == "" {
+		log.Printf("[Manager] Cannot create API provider: no API key configured")
+		return nil
+	}
+
+	provider, err := pagent.NewOpenAIProvider(pagent.OpenAIProviderConfig{
+		APIKey:  apiKey,
+		BaseURL: projCfg.Execution.APIBaseURL,
+	})
+	if err != nil {
+		log.Printf("[Manager] Failed to create API provider: %v", err)
+		return nil
+	}
+	return provider
+}
+
+// createWorkerProvider creates a separate ProviderAdapter for worker agents.
+func (m *Manager) createWorkerProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
+	apiKey := projCfg.Execution.WorkerAPIKey
+	if apiKey == "" {
+		apiKey = projCfg.Execution.APIKey
+	}
+	if strings.HasPrefix(apiKey, "$") {
+		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
+	}
+	if apiKey == "" {
+		log.Printf("[Manager] Cannot create worker provider: no API key configured")
+		return nil
+	}
+
+	baseURL := projCfg.Execution.WorkerAPIBaseURL
+	if baseURL == "" {
+		baseURL = projCfg.Execution.APIBaseURL
+	}
+
+	provider, err := pagent.NewOpenAIProvider(pagent.OpenAIProviderConfig{
+		APIKey:  apiKey,
+		BaseURL: baseURL,
+	})
+	if err != nil {
+		log.Printf("[Manager] Failed to create worker provider: %v", err)
+		return nil
+	}
+	return provider
 }
 
 // gateRunnerAdapter adapts gates.Runner to the blueprint.GateRunner interface.

@@ -283,6 +283,43 @@ func (pe *ParallelEngine) getMaxAgents(stage *ParallelStage) int {
 	return pe.config.MaxAgents
 }
 
+// ExecuteWithCoordinator executes a stage using the coordinator-based multi-agent pattern.
+// The coordinator decomposes the task into subtasks, runs worker agents, and merges results.
+func (pe *ParallelEngine) ExecuteWithCoordinator(
+	ctx context.Context,
+	run *blueprint.Run,
+	stage *blueprint.Stage,
+	input *blueprint.StageInput,
+	files []string,
+	coordinator *agent.TaskCoordinator,
+) (*blueprint.StageResult, error) {
+	result := blueprint.NewStageResult(stage.Name, 1)
+
+	// Plan: decompose task into subtasks
+	plan, err := coordinator.Plan(ctx, input.TaskDescription, files)
+	if err != nil {
+		result.Fail(fmt.Sprintf("coordinator planning failed: %v", err))
+		return result, err
+	}
+
+	// Execute: run workers in parallel
+	workerResults, err := coordinator.Execute(ctx, plan, input.Briefing)
+	if err != nil {
+		result.Fail(fmt.Sprintf("coordinator execution failed: %v", err))
+		return result, err
+	}
+
+	// Merge: combine worker outputs
+	summary, err := coordinator.Merge(ctx, workerResults)
+	if err != nil {
+		result.Fail(fmt.Sprintf("coordinator merge failed: %v", err))
+		return result, err
+	}
+
+	result.Complete(summary)
+	return result, nil
+}
+
 // GetAgentStatus returns the status of all agents for a run.
 func (pe *ParallelEngine) GetAgentStatus(blueprintID, runID string) ([]*agent.Agent, error) {
 	return pe.agentRegistry.ListByRun(blueprintID, runID)

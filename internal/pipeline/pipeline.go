@@ -140,6 +140,8 @@ type Pipeline struct {
 	predictiveLoader *predictive.Loader
 	contextPruner    *ocontext.Pruner
 
+	coordinator *agent.TaskCoordinator
+
 	currentLoop *loop.Loop
 	mu          sync.Mutex
 
@@ -240,6 +242,15 @@ func WithParallelExecution(registry *agent.AgentRegistry, config *parallel.Paral
 	return func(p *Pipeline) {
 		p.agentRegistry = registry
 		p.parallelConfig = config
+	}
+}
+
+// WithCoordinator sets the coordinator for multi-agent task decomposition.
+// When set and API mode is active, the coordinator decomposes tasks into subtasks,
+// runs worker agents in parallel, and merges results.
+func WithCoordinator(c *agent.TaskCoordinator) Option {
+	return func(p *Pipeline) {
+		p.coordinator = c
 	}
 }
 
@@ -674,9 +685,52 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	}
 
-	// Execute blueprint: use parallel engine if configured, otherwise standard
+	// Execute blueprint: use coordinator, parallel engine, or standard
 	var execErr error
-	if p.agentRegistry != nil && p.parallelConfig != nil && p.parallelConfig.EnableParallelism {
+	if p.coordinator != nil && p.cfg.APIProvider != "" {
+		// Coordinator-based multi-agent execution (Phase C)
+		// Gather workspace files for task decomposition
+		var files []string
+		_ = filepath.Walk(p.cfg.WorkDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() {
+				return nil
+			}
+			rel, _ := filepath.Rel(p.cfg.WorkDir, path)
+			if rel != "" && rel[0] != '.' {
+				files = append(files, rel)
+			}
+			return nil
+		})
+
+		// Use coordinator for the implement stage, standard engine for the rest
+		parallelEngine, pErr := parallel.NewParallelEngine(bp, executor, p.agentRegistry, p.parallelConfig)
+		if pErr != nil {
+			log.Printf("[Pipeline] Coordinator: parallel engine init failed, using coordinator directly")
+		}
+
+		// Run blueprint normally but intercept the implement stage with coordinator
+		if parallelEngine != nil {
+			// Wire coordinator into parallel engine for the implement stage
+			impl, hasImpl := bp.Stages["implement"]
+			if hasImpl && len(files) > 0 {
+				coordResult, err := parallelEngine.ExecuteWithCoordinator(ctx, run, impl, input, files, p.coordinator)
+				if err != nil {
+					log.Printf("[Pipeline] Coordinator execution failed, falling back to standard: %v", err)
+					execErr = engine.Execute(ctx, run, input)
+				} else {
+					run.AddResult(coordResult)
+					input.AddPreviousResult(coordResult)
+					// Skip to post-implement stages by adjusting the run
+					run.CurrentStage = impl.OnSuccess
+					execErr = engine.Execute(ctx, run, input)
+				}
+			} else {
+				execErr = engine.Execute(ctx, run, input)
+			}
+		} else {
+			execErr = engine.Execute(ctx, run, input)
+		}
+	} else if p.agentRegistry != nil && p.parallelConfig != nil && p.parallelConfig.EnableParallelism {
 		parallelEngine, err := parallel.NewParallelEngine(bp, executor, p.agentRegistry, p.parallelConfig)
 		if err != nil {
 			log.Printf("[Pipeline] Parallel engine init failed, falling back to sequential: %v", err)
