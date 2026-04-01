@@ -57,6 +57,8 @@ type ExecutionConfig struct {
 	PredictiveLoad    bool `json:"predictive_load,omitempty"`
 	MemoryEnabled     bool `json:"memory_enabled,omitempty"`
 	CheckpointEnabled bool `json:"checkpoint_enabled,omitempty"`
+	BitNetRouting     bool   `json:"bitnet_routing,omitempty"`
+	BitNetModel       string `json:"bitnet_model,omitempty"`
 }
 
 // Initialize initializes a new OpenExec project

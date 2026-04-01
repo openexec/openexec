@@ -22,6 +22,7 @@ import (
 	"github.com/openexec/openexec/internal/predictive"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
+	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/types"
 	"github.com/openexec/openexec/pkg/telemetry"
 
@@ -115,6 +116,8 @@ type Pipeline struct {
 	qualityManager *quality.Manager
 	checkpointMgr  *checkpoint.Manager
 
+	intentRouter router.Router
+
 	memoryManager    *memory.MemoryManager
 	knowledgeCache   *cache.KnowledgeCache
 	toolResultCache  *cache.ToolResultCache
@@ -196,6 +199,11 @@ func WithPredictiveLoader(l *predictive.Loader) Option {
 // WithMemoryManager sets the memory manager for learning persistence across sessions.
 func WithMemoryManager(m *memory.MemoryManager) Option {
 	return func(p *Pipeline) { p.memoryManager = m }
+}
+
+// WithRouter sets the intent router for deterministic task routing.
+func WithRouter(r router.Router) Option {
+	return func(p *Pipeline) { p.intentRouter = r }
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
@@ -319,6 +327,22 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 // This is the sole execution path - all pipeline runs use blueprint mode.
 // If BlueprintID is empty, it defaults to "standard_task".
 func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
+	// Deterministic routing: classify task and set context parameters
+	if p.intentRouter != nil && p.cfg.TaskDescription != "" {
+		plan, err := router.Route(ctx, p.intentRouter, p.cfg.TaskDescription, nil)
+		if err == nil {
+			if len(plan.RepoZones) > 0 && len(p.cfg.RepoZones) == 0 {
+				p.cfg.RepoZones = plan.RepoZones
+			}
+			if len(plan.KnowledgeSources) > 0 && len(p.cfg.KnowledgeSources) == 0 {
+				p.cfg.KnowledgeSources = plan.KnowledgeSources
+			}
+			if plan.Sensitivity != "" && p.cfg.Sensitivity == "" {
+				p.cfg.Sensitivity = string(plan.Sensitivity)
+			}
+		}
+	}
+
 	// Build context using two-stage assembly
 	var contextPack *ocontext.ContextPack
 	if p.cfg.ContextTokenBudget > 0 {

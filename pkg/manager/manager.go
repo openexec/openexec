@@ -23,6 +23,7 @@ import (
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -334,6 +335,21 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 				pipeline.WithMemoryManager(mm)(p)
 			}
 		}
+	}
+
+	// Deterministic routing is always on
+	dr := router.NewDeterministicRouter()
+	pipeline.WithRouter(dr)(p)
+
+	// BitNet routing upgrade (optional, feature flag)
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.BitNetRouting {
+		modelPath := projCfg.Execution.BitNetModel
+		if modelPath == "" {
+			modelPath = "/models/bitnet-2b.gguf"
+		}
+		br := router.NewBitNetRouter(modelPath)
+		br.SetSkipAvailabilityCheck(false)
+		pipeline.WithRouter(br)(p) // Overrides deterministic
 	}
 
 	// Create OTel span for the entire run lifecycle
