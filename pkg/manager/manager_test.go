@@ -56,6 +56,7 @@ func TestNewManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 	if m == nil {
 		t.Fatal("New returned nil")
 	}
@@ -77,6 +78,7 @@ func TestListEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 	list := m.List()
 	if len(list) != 0 {
 		t.Errorf("List() = %d items, want 0", len(list))
@@ -93,6 +95,7 @@ func TestStatusNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 	_, err = m.Status("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent pipeline")
@@ -106,6 +109,7 @@ func TestStartAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 
 	err = m.Start(context.Background(), "FWU-01")
 	if err != nil {
@@ -152,6 +156,7 @@ func TestStartAfterComplete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 
 	err = m.Start(context.Background(), "FWU-01")
 	if err != nil {
@@ -209,6 +214,7 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 
 	err = m.Start(context.Background(), "FWU-01")
 	if err != nil {
@@ -253,6 +259,7 @@ func TestSubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 
 	err = m.Start(context.Background(), "FWU-01")
 	if err != nil {
@@ -290,6 +297,7 @@ func TestSubscribeNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer m.Close()
 	_, _, err = m.Subscribe("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for nonexistent pipeline")

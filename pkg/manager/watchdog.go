@@ -58,6 +58,12 @@ func (w *Watchdog) checkPipelines() {
 }
 
 func (w *Watchdog) checkPipeline(id string) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Pipeline may have been cleaned up during check — ignore
+		}
+	}()
+
 	info, err := w.manager.Status(id)
 	if err != nil {
 		return

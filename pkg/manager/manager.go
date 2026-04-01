@@ -115,6 +115,8 @@ type Manager struct {
 	mu        sync.RWMutex
 	watchdog  *Watchdog
 	state     *state.Store
+	cancel  context.CancelFunc // Cancels watchdog goroutine
+	relMu   sync.Mutex        // Serializes release manager creation (prevents concurrent migrations)
 }
 
 // ErrNoWorkDir is returned when Manager is created without a WorkDir.
@@ -168,9 +170,18 @@ func New(cfg Config) (*Manager, error) {
 		}
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
 	m.watchdog = NewWatchdog(m)
-	go m.watchdog.Run(context.Background())
+	go m.watchdog.Run(ctx)
 	return m, nil
+}
+
+// Close shuts down the manager, stopping the watchdog goroutine and releasing resources.
+func (m *Manager) Close() {
+	if m.cancel != nil {
+		m.cancel()
+	}
 }
 
 // isTerminal returns true if the status represents a finished pipeline.
@@ -588,6 +599,9 @@ func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
 	if m.state == nil {
 		return nil, fmt.Errorf("state store not configured")
 	}
+	// Serialize creation to prevent concurrent schema migrations on the same DB
+	m.relMu.Lock()
+	defer m.relMu.Unlock()
 	rel, err := release.NewManagerWithDB(m.cfg.WorkDir, release.DefaultConfig(), m.state.GetDB())
 	if err != nil {
 		return nil, err

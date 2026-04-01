@@ -93,6 +93,35 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	checkReady := func() {
 		mu.Lock()
 		defer mu.Unlock()
+
+		// First pass: detect tasks whose dependencies have failed (cascade failure)
+		for _, n := range nodes {
+			if n.Dispatched || n.Finished {
+				continue
+			}
+			for _, depID := range n.Deps {
+				if d, ok := nodes[depID]; ok && d.Finished {
+					// Dependency finished — check if it failed
+					t := rel.GetTask(depID)
+					if t != nil && t.Status == "error" {
+						// Cascade: mark this task as failed too
+						n.Finished = true
+						finishedCount++
+						_ = rel.SetTaskStatus(n.Task.ID, "error")
+						log.Printf("[Scheduler] Task %s skipped: dependency %s failed", n.Task.ID, depID)
+						break
+					}
+				}
+			}
+		}
+
+		// Check if all tasks are now finished (including cascaded failures)
+		if finishedCount == totalToRun {
+			close(readyTasks)
+			return
+		}
+
+		// Second pass: dispatch tasks whose dependencies are satisfied
 		for _, n := range nodes {
 			if n.Dispatched || n.Finished {
 				continue
@@ -120,8 +149,7 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 				continue
 			}
 
-			// 2. Check Story-level dependencies (only for "root" tasks of a story or all if strict)
-			// PR #8: Root tasks of a story are blocked until ALL tasks from its dependency stories are complete.
+			// 2. Check Story-level dependencies
 			allStoryDepsDone := true
 			for _, storyDepID := range n.StoryDeps {
 				if !isStoryFinished(storyDepID) {
