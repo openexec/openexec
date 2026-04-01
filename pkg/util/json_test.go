@@ -31,10 +31,9 @@ func TestJSONSanitization(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "comments",
-			input:    "{\n  \"key\": \"value\" // this is a comment\n}",
-			expected: `{"key": "value"}`,
-			wantErr:  false,
+			name:    "comments are not stripped (would corrupt URLs and paths)",
+			input:   "{\n  \"key\": \"value\" // this is a comment\n}",
+			wantErr: true,
 		},
 		{
 			name:     "truncated object",

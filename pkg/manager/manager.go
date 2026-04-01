@@ -11,11 +11,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/openexec/openexec/internal/cache"
+	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/internal/predictive"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/release"
@@ -301,6 +305,35 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		projectType := quality.DetectProjectType(m.cfg.WorkDir)
 		qm := quality.NewManager(m.cfg.WorkDir, quality.DefaultGates(projectType))
 		pipeline.WithQualityManager(qm)(p)
+	}
+
+	// Wire checkpoint manager for crash recovery if enabled in project config
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.CheckpointEnabled {
+		if cm, err := checkpoint.NewManager(m.cfg.WorkDir); err == nil {
+			pipeline.WithCheckpointManager(cm)(p)
+		}
+	}
+
+	// Wire caching and predictive loading if enabled in project config
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil {
+		if projCfg.Execution.CacheEnabled {
+			if kc, err := cache.NewKnowledgeCache(m.cfg.WorkDir, 24*time.Hour); err == nil {
+				pipeline.WithKnowledgeCache(kc)(p)
+			}
+			if trc, err := cache.NewToolResultCache(m.cfg.WorkDir, 1*time.Hour); err == nil {
+				pipeline.WithToolResultCache(trc)(p)
+			}
+		}
+		if projCfg.Execution.PredictiveLoad {
+			if loader, err := predictive.NewLoader(m.cfg.WorkDir, nil, predictive.DefaultLoaderConfig()); err == nil {
+				pipeline.WithPredictiveLoader(loader)(p)
+			}
+		}
+		if projCfg.Execution.MemoryEnabled {
+			if mm, err := memory.NewMemoryManager(m.cfg.WorkDir); err == nil {
+				pipeline.WithMemoryManager(mm)(p)
+			}
+		}
 	}
 
 	// Create OTel span for the entire run lifecycle

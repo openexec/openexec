@@ -125,7 +125,7 @@ func TestCheckpointManager(t *testing.T) {
 		}
 
 		// Create first checkpoint
-		cp1, _ := manager.Create(run, tmpDir)
+		_, _ = manager.Create(run, tmpDir)
 		time.Sleep(10 * time.Millisecond)
 
 		// Update run and create second checkpoint

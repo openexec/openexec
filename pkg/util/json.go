@@ -39,9 +39,9 @@ func SanitizeJSON(input string) ([]byte, error) {
 	}
 
 	// Strategy 3: Basic cleanup (comments and trailing commas)
-	// Remove // comments
-	reComments := regexp.MustCompile(`(?m)//.*$`)
-	cleaned := reComments.ReplaceAllString(jsonText, "")
+	// Note: // comment stripping was removed because it corrupts JSON containing
+	// file paths (e.g., /tmp/x.patch) and URLs (e.g., https://example.com).
+	cleaned := jsonText
 
 	// Remove trailing commas before } or ]
 	reCommas := regexp.MustCompile(`,\s*([\}\]])`)

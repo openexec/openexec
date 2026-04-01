@@ -13,9 +13,13 @@ import (
 
 	"github.com/openexec/openexec/internal/actions"
 	"github.com/openexec/openexec/internal/blueprint"
+	"github.com/openexec/openexec/internal/cache"
+	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/memory"
+	"github.com/openexec/openexec/internal/predictive"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/types"
@@ -109,6 +113,12 @@ type Pipeline struct {
 
 	gateRunner     types.GateRunner
 	qualityManager *quality.Manager
+	checkpointMgr  *checkpoint.Manager
+
+	memoryManager    *memory.MemoryManager
+	knowledgeCache   *cache.KnowledgeCache
+	toolResultCache  *cache.ToolResultCache
+	predictiveLoader *predictive.Loader
 
 	currentLoop *loop.Loop
 	mu          sync.Mutex
@@ -159,6 +169,33 @@ func WithQualityManager(qm *quality.Manager) Option {
 	return func(p *Pipeline) {
 		p.qualityManager = qm
 	}
+}
+
+// WithCheckpointManager sets the checkpoint manager for crash recovery.
+func WithCheckpointManager(m *checkpoint.Manager) Option {
+	return func(p *Pipeline) {
+		p.checkpointMgr = m
+	}
+}
+
+// WithKnowledgeCache sets the knowledge cache for the pipeline.
+func WithKnowledgeCache(c *cache.KnowledgeCache) Option {
+	return func(p *Pipeline) { p.knowledgeCache = c }
+}
+
+// WithToolResultCache sets the tool result cache for the pipeline.
+func WithToolResultCache(c *cache.ToolResultCache) Option {
+	return func(p *Pipeline) { p.toolResultCache = c }
+}
+
+// WithPredictiveLoader sets the predictive file loader for the pipeline.
+func WithPredictiveLoader(l *predictive.Loader) Option {
+	return func(p *Pipeline) { p.predictiveLoader = l }
+}
+
+// WithMemoryManager sets the memory manager for learning persistence across sessions.
+func WithMemoryManager(m *memory.MemoryManager) Option {
+	return func(p *Pipeline) { p.memoryManager = m }
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
@@ -230,6 +267,25 @@ func (p *Pipeline) Stop() {
 	p.mu.Unlock()
 }
 
+// Close releases resources held by the pipeline.
+func (p *Pipeline) Close() {
+	if p.checkpointMgr != nil {
+		p.checkpointMgr.Close()
+	}
+	if p.memoryManager != nil {
+		p.memoryManager.Close()
+	}
+	if p.predictiveLoader != nil {
+		p.predictiveLoader.Close()
+	}
+	if p.knowledgeCache != nil {
+		p.knowledgeCache.Close()
+	}
+	if p.toolResultCache != nil {
+		p.toolResultCache.Close()
+	}
+}
+
 func (p *Pipeline) emit(e loop.Event) {
 	p.events <- e
 }
@@ -283,6 +339,24 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			})
 		} else {
 			contextPack = pack
+		}
+	}
+
+	// Predictive file pre-loading
+	if p.predictiveLoader != nil && p.cfg.TaskDescription != "" {
+		if predicted, err := p.predictiveLoader.PredictAndLoad(ctx, p.cfg.TaskDescription, nil); err == nil && predicted != nil {
+			for _, pf := range predicted.LoadedFiles {
+				if pf.Content != "" {
+					if contextPack == nil {
+						contextPack = &ocontext.ContextPack{}
+					}
+					contextPack.Items = append(contextPack.Items, &ocontext.ContextItem{
+						Type:    ocontext.ContextTypeRecentFiles,
+						Source:  fmt.Sprintf("predicted:%s", pf.Path),
+						Content: pf.Content,
+					})
+				}
+			}
 		}
 	}
 
@@ -397,6 +471,20 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 				}
 			}()
 		}
+
+		// Create checkpoint after successful stages for crash recovery
+		if p.checkpointMgr != nil && result.Status == types.StageStatusCompleted {
+			go func() {
+				if _, err := p.checkpointMgr.Create(run, p.cfg.WorkDir); err != nil {
+					p.emit(loop.Event{Type: loop.EventError, ErrText: fmt.Sprintf("checkpoint error: %v", err)})
+				}
+			}()
+		}
+
+		// Extract learning patterns from completed stages for memory persistence
+		if p.memoryManager != nil && result.Status == types.StageStatusCompleted {
+			go p.extractMemory(run, result)
+		}
 	}
 	engineConfig.OnCheckpoint = func(run *blueprint.Run, stageName string) {
 		p.emit(loop.Event{
@@ -469,6 +557,14 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			})
 		}
 		input.SetContextFromPack(items)
+	}
+
+	// Inject prior learning context from memory system
+	if p.memoryManager != nil {
+		memCtx := p.loadMemoryContext(p.cfg.TaskDescription)
+		if memCtx != "" {
+			input.Briefing += memCtx
+		}
 	}
 
 	// Handle conditional review stage
