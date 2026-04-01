@@ -127,6 +127,7 @@ type Pipeline struct {
 	knowledgeCache   *cache.KnowledgeCache
 	toolResultCache  *cache.ToolResultCache
 	predictiveLoader *predictive.Loader
+	contextPruner    *ocontext.Pruner
 
 	currentLoop *loop.Loop
 	mu          sync.Mutex
@@ -204,6 +205,12 @@ func WithPredictiveLoader(l *predictive.Loader) Option {
 // WithMemoryManager sets the memory manager for learning persistence across sessions.
 func WithMemoryManager(m *memory.MemoryManager) Option {
 	return func(p *Pipeline) { p.memoryManager = m }
+}
+
+// WithContextPruner sets the context pruner for reducing token usage by selecting
+// only the most relevant context items for a given task.
+func WithContextPruner(cp *ocontext.Pruner) Option {
+	return func(p *Pipeline) { p.contextPruner = cp }
 }
 
 // WithRouter sets the intent router for deterministic task routing.
@@ -306,6 +313,9 @@ func (p *Pipeline) Close() {
 	if p.toolResultCache != nil {
 		p.toolResultCache.Close()
 	}
+	if p.contextPruner != nil {
+		p.contextPruner.Close()
+	}
 }
 
 func (p *Pipeline) emit(e loop.Event) {
@@ -395,6 +405,29 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 					})
 				}
 			}
+		}
+	}
+
+	// Prune context to reduce token usage
+	if p.contextPruner != nil && contextPack != nil && len(contextPack.Items) > 0 {
+		files := make([]ocontext.FileInfo, 0, len(contextPack.Items))
+		for _, item := range contextPack.Items {
+			files = append(files, ocontext.FileInfo{
+				Path:    item.Source,
+				Content: item.Content,
+			})
+		}
+		if pruned, err := p.contextPruner.Prune(files, p.cfg.TaskDescription); err == nil && len(pruned.Files) > 0 {
+			prunedItems := make([]*ocontext.ContextItem, 0, len(pruned.Files))
+			for _, pf := range pruned.Files {
+				prunedItems = append(prunedItems, &ocontext.ContextItem{
+					Type:    ocontext.ContextTypeRecentFiles,
+					Source:  pf.Path,
+					Content: pf.Content,
+				})
+			}
+			contextPack.Items = prunedItems
+			contextPack.TotalTokens = pruned.TotalTokens
 		}
 	}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/openexec/openexec/internal/cache"
 	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
+	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
@@ -337,6 +338,11 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 				pipeline.WithMemoryManager(mm)(p)
 			}
 		}
+	}
+
+	// Context pruning is always enabled when context assembly is used
+	if pruner, err := ocontext.NewPruner(m.cfg.WorkDir, nil, nil, nil); err == nil {
+		pipeline.WithContextPruner(pruner)(p)
 	}
 
 	// Deterministic routing is always on

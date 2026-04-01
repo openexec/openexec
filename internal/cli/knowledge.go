@@ -164,9 +164,113 @@ var knowledgeIndexCmd = &cobra.Command{
 			return err
 		}
 
-		cmd.Println("✓ Indexing complete. Surgical pointers recorded in knowledge.db")
+		stats := indexer.GetStats()
+		cmd.Printf("✓ Indexing complete. %d symbols indexed across %d files.\n", stats.SymbolsExtracted, stats.FilesProcessed)
+		if stats.ErrorCount > 0 {
+			cmd.Printf("  %d file(s) had errors during indexing.\n", stats.ErrorCount)
+		}
+		for lang, count := range stats.ByLanguage {
+			cmd.Printf("  %s: %d symbols\n", lang, count)
+		}
 		return nil
 	},
+}
+
+var knowledgeSymbolsCmd = &cobra.Command{
+	Use:   "symbols",
+	Short: "List indexed symbols (functions, structs, interfaces)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := knowledge.NewStore(".")
+		if err != nil {
+			return fmt.Errorf("failed to open knowledge store: %w", err)
+		}
+		defer store.Close()
+
+		symbols, err := store.ListSymbols()
+		if err != nil {
+			return fmt.Errorf("failed to list symbols: %w", err)
+		}
+
+		if len(symbols) == 0 {
+			cmd.Println("No symbols indexed. Run 'openexec knowledge index' first.")
+			return nil
+		}
+
+		// Print table header
+		cmd.Printf("%-40s %-12s %-30s %s\n", "Name", "Kind", "File", "Lines")
+		cmd.Printf("%-40s %-12s %-30s %s\n",
+			strings.Repeat("-", 40),
+			strings.Repeat("-", 12),
+			strings.Repeat("-", 30),
+			strings.Repeat("-", 10))
+
+		for _, s := range symbols {
+			file := s.FilePath
+			if len(file) > 30 {
+				file = "..." + file[len(file)-27:]
+			}
+			cmd.Printf("%-40s %-12s %-30s %d-%d\n", s.Name, s.Kind, file, s.StartLine, s.EndLine)
+		}
+
+		cmd.Printf("\nTotal: %d symbols\n", len(symbols))
+		return nil
+	},
+}
+
+var knowledgeStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show knowledge base statistics",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectDir := "."
+		absDir, _ := filepath.Abs(projectDir)
+
+		store, err := knowledge.NewStore(projectDir)
+		if err != nil {
+			return fmt.Errorf("failed to open knowledge store: %w", err)
+		}
+		defer store.Close()
+
+		symbols, err := store.ListSymbols()
+		if err != nil {
+			return fmt.Errorf("failed to query symbols: %w", err)
+		}
+
+		envs, _ := store.ListEnvironments()
+		apis, _ := store.ListAPIDocs()
+		policies, _ := store.ListPolicies()
+
+		cmd.Println("Knowledge Base Status")
+		cmd.Println("---------------------")
+		cmd.Printf("  Project:      %s\n", absDir)
+
+		// Check db file size
+		dbPath := filepath.Join(projectDir, ".openexec", "openexec.db")
+		if info, err := os.Stat(dbPath); err == nil {
+			cmd.Printf("  DB file:      %s (%s)\n", dbPath, formatBytes(info.Size()))
+		} else {
+			cmd.Printf("  DB file:      %s\n", dbPath)
+		}
+
+		cmd.Printf("  Symbols:      %d\n", len(symbols))
+		cmd.Printf("  Environments: %d\n", len(envs))
+		cmd.Printf("  API docs:     %d\n", len(apis))
+		cmd.Printf("  Policies:     %d\n", len(policies))
+
+		return nil
+	},
+}
+
+func formatBytes(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 func init() {
@@ -174,5 +278,7 @@ func init() {
 	knowledgeCmd.AddCommand(knowledgeShowCmd)
 	knowledgeCmd.AddCommand(knowledgeInitCmd)
 	knowledgeCmd.AddCommand(knowledgeIndexCmd)
+	knowledgeCmd.AddCommand(knowledgeSymbolsCmd)
+	knowledgeCmd.AddCommand(knowledgeStatusCmd)
 	rootCmd.AddCommand(knowledgeCmd)
 }

@@ -21,7 +21,7 @@ User Intent
     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  OpenExec Orchestration Layer                                    │
-│  ├─ Input Processing (PII shielding, intent parsing)            │
+│  ├─ Input Processing (intent parsing)                            │
 │  ├─ Context Assembly (knowledge index, file pruning)            │
 │  ├─ Quality Gates (lint/test/format validation)                 │
 │  ├─ Blueprint Execution (deterministic workflows)               │
@@ -58,6 +58,8 @@ User Intent
 ## Subsystem Details
 
 ### 1. Model Routing (`internal/runner/`)
+
+**Status: Active, always-on** — Deterministic routing runs on every execution.
 
 **Purpose:** Map abstract model names to concrete CLI commands.
 
@@ -149,6 +151,8 @@ func StartProcess(ctx context.Context, cfg Config) (*Process, error) {
 
 ### 3. Blueprint Engine (`internal/blueprint/`)
 
+**Status: Active, always-on** — Runs on every blueprint-mode execution.
+
 **Purpose:** Deterministic workflow execution.
 
 **Key Files:**
@@ -188,6 +192,8 @@ stages:
 
 ### 4. Quality Gates (`internal/quality/`)
 
+**Status: Opt-in** — Enabled via `quality_gates_v2` in config.json.
+
 **Purpose:** Block execution on lint/test/format failures.
 
 **Key Files:**
@@ -209,6 +215,8 @@ stages:
 
 ### 5. Checkpointing (`internal/checkpoint/`)
 
+**Status: Opt-in** — Enabled via `checkpoint_enabled` in config.json.
+
 **Purpose:** Crash recovery and state persistence.
 
 **Key Files:**
@@ -224,6 +232,8 @@ stages:
 ---
 
 ### 6. Context Pruning (`internal/context/`)
+
+**Status: Not yet wired** — Code exists but is not called from the pipeline.
 
 **Purpose:** Intelligent file selection to reduce token usage.
 
@@ -247,6 +257,8 @@ stages:
 
 ### 7. Predictive Loading (`internal/predictive/`)
 
+**Status: Opt-in** — Enabled via `predictive_load` in config.json.
+
 **Purpose:** Pre-load files before LLM asks for them.
 
 **Key Files:**
@@ -265,6 +277,8 @@ stages:
 
 ### 8. Memory System (`internal/memory/`)
 
+**Status: Opt-in** — Enabled via `memory_enabled` in config.json.
+
 **Purpose:** Learn and apply patterns across sessions.
 
 **Key Files:**
@@ -281,6 +295,8 @@ stages:
 
 ### 9. Multi-Agent Coordination (`internal/agent/`, `internal/parallel/`)
 
+**Status: Opt-in** — Enabled via `worker_count > 1` in config.json.
+
 **Purpose:** Run multiple agents in parallel.
 
 **Key Files:**
@@ -296,6 +312,8 @@ stages:
 ---
 
 ### 10. Caching (`internal/cache/`)
+
+**Status: Opt-in** — Enabled via `cache_enabled` in config.json.
 
 **Purpose:** Avoid redundant computation.
 
@@ -453,375 +471,18 @@ Add installation and usage instructions.
 
 ---
 
-### Adding API-Only LLM Support (No CLI Available)
+### BitNet Routing (Opt-in)
 
-**IMPORTANT:** OpenExec uses **BitNet Router** for tool selection, so the LLM does **NOT** need native tool calling capability!
+**Status: Opt-in** — Enabled via `bitnet_routing` in config.json.
 
-```
-User Query: "Read the auth file"
-        ↓
-┌─────────────────────────────────────────┐
-│  BitNet Router (local 1-bit model)      │  ← OpenExec handles this
-│  ├─ Parses intent from query            │
-│  ├─ Selects tool: "read_file"           │
-│  └─ Extracts args: {"path": "auth.go"}  │
-└─────────────────────────────────────────┘
-        ↓
-┌─────────────────────────────────────────┐
-│  LLM (Kimi/Claude/Codex/etc.)           │  ← Your wrapper provides this
-│  ├─ Receives: "Read file auth.go"       │
-│  ├─ Generates response/content          │
-│  └─ NO tool calling needed!             │
-└─────────────────────────────────────────┘
-        ↓
-┌─────────────────────────────────────────┐
-│  OpenExec executes tool                 │  ← OpenExec handles this
-│  ├─ read_file("auth.go")                │
-│  └─ Returns content to LLM              │
-└─────────────────────────────────────────┘
-```
+OpenExec includes an optional **BitNet Router** that uses a local 1-bit LLM for intent-based tool selection.
 
-**This means:** You only need a **chat wrapper** for any LLM. Tool selection and execution are handled by OpenExec!
+**Key behaviors:**
+- The model **auto-downloads on first use** to `~/.openexec/models/`.
+- Any GGUF model can be used, but the routing prompt is tuned for the default model.
+- **Falls back to deterministic routing** if the model is unavailable or fails to load.
 
----
-
-#### Option 1: Create a Thin Chat Wrapper (Recommended)
-
-Create a minimal CLI that wraps the HTTP API and provides chat capability only:
-
-```go
-// cmd/kimi-cli/main.go
-package main
-
-import (
-    "bufio"
-    "encoding/json"
-    "fmt"
-    "os"
-    "strings"
-)
-
-// Simple chat wrapper - NO tool calling needed!
-func main() {
-    apiKey := os.Getenv("KIMI_API_KEY")
-    
-    scanner := bufio.NewScanner(os.Stdin)
-    var conversation []Message
-    
-    for scanner.Scan() {
-        line := scanner.Text()
-        
-        // Parse incoming message
-        var msg map[string]interface{}
-        if err := json.Unmarshal([]byte(line), &msg); err != nil {
-            continue
-        }
-        
-        // Extract user message
-        content := extractContent(msg)
-        conversation = append(conversation, Message{Role: "user", Content: content})
-        
-        // Call Kimi API (simple chat, no tools!)
-        response := callKimiChatAPI(apiKey, conversation)
-        conversation = append(conversation, Message{Role: "assistant", Content: response})
-        
-        // Return response
-        fmt.Println(response)
-    }
-}
-
-func callKimiChatAPI(apiKey string, messages []Message) string {
-    // Simple HTTP call to Kimi API
-    // POST https://api.moonshot.cn/v1/chat/completions
-    // Body: {"model": "kimi-k2.5", "messages": messages}
-    
-    // Return assistant's response
-    return "..."
-}
-
-type Message struct {
-    Role    string `json:"role"`
-    Content string `json:"content"`
-}
-```
-
-**That's it!** BitNet Router handles:
-- Intent parsing
-- Tool selection  
-- Argument extraction
-- Tool execution (via OpenExec MCP)
-
-Your wrapper just needs to:
-- Accept chat messages
-- Call LLM API
-- Return responses
-
----
-
-#### Option 2: Implement Direct API Provider in OpenExec
-
-Add native API support to OpenExec by implementing the `pkg/agent/` interfaces:
-
-**Files to create/modify:**
-
-1. **Create `pkg/agent/kimi_provider.go`:**
-```go
-package agent
-
-import (
-    "context"
-    "fmt"
-    
-    kimi "github.com/moonshot/kimi-go" // hypothetical SDK
-)
-
-// KimiProvider implements Provider for Moonshot Kimi API
-type KimiProvider struct {
-    client *kimi.Client
-    model  string
-}
-
-func NewKimiProvider(apiKey string, model string) (*KimiProvider, error) {
-    client := kimi.NewClient(apiKey)
-    return &KimiProvider{
-        client: client,
-        model:  model,
-    }, nil
-}
-
-func (p *KimiProvider) GetName() string {
-    return "kimi"
-}
-
-func (p *KimiProvider) GetModels() []string {
-    return []string{"kimi-k2.5", "kimi-k1.5"}
-}
-
-func (p *KimiProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
-    // Call Kimi API
-    // NOTE: No Tools parameter needed! BitNet Router handles tool selection.
-    resp, err := p.client.Chat.Completions.Create(ctx, kimi.ChatCompletionRequest{
-        Model: p.model,
-        Messages: convertMessages(req.Messages),
-        // Tools: NOT NEEDED - BitNet handles this!
-    })
-    if err != nil {
-        return nil, err
-    }
-    
-    return &CompletionResponse{
-        Content: resp.Choices[0].Message.Content,
-        // ToolCalls: NOT NEEDED - BitNet handles this!
-    }, nil
-}
-
-func (p *KimiProvider) Stream(ctx context.Context, req CompletionRequest) (<-chan StreamEvent, error) {
-    // Implement streaming
-}
-```
-
-2. **Modify `internal/runner/runner.go`:**
-```go
-func Resolve(model string, workDir string, env []string) (string, []string, error) {
-    // ... existing CLI resolution ...
-    
-    // Check for API-only models
-    if isAPIModel(model) {
-        // Return special marker for API mode
-        return "__api__", []string{model}, nil
-    }
-}
-
-func isAPIModel(model string) bool {
-    apiModels := []string{"kimi", "mistral", "cohere"}
-    for _, m := range apiModels {
-        if strings.Contains(model, m) {
-            return true
-        }
-    }
-    return false
-}
-```
-
-3. **Modify `internal/loop/process.go`:**
-```go
-func StartProcess(ctx context.Context, cfg Config) (*Process, error) {
-    cmd, args := buildCommand(cfg)
-    
-    // Check if API mode
-    if cmd == "__api__" {
-        return startAPIProvider(ctx, cfg, args[0]) // args[0] is model name
-    }
-    
-    // Existing CLI spawning code...
-}
-
-func startAPIProvider(ctx context.Context, cfg Config, model string) (*Process, error) {
-    // Initialize appropriate provider
-    var provider agent.Provider
-    var err error
-    
-    switch {
-    case strings.Contains(model, "kimi"):
-        provider, err = agent.NewKimiProvider(
-            os.Getenv("KIMI_API_KEY"),
-            model,
-        )
-    case strings.Contains(model, "mistral"):
-        provider, err = agent.NewMistralProvider(
-            os.Getenv("MISTRAL_API_KEY"),
-            model,
-        )
-    }
-    
-    if err != nil {
-        return nil, err
-    }
-    
-    // Start MCP server with this provider
-    mcpServer := mcp.NewServerWithProvider(provider, cfg.WorkDir)
-    
-    // Return process-like interface
-    return &Process{
-        apiProvider: provider,
-        mcpServer:   mcpServer,
-    }, nil
-}
-```
-
-4. **Add configuration** (`internal/loop/config.go`):
-```go
-type Config struct {
-    // ... existing fields ...
-    
-    // APIProviderConfig for direct API mode
-    APIProviderConfig *APIProviderConfig
-}
-
-type APIProviderConfig struct {
-    Provider string            // "kimi", "mistral", "cohere"
-    APIKey   string
-    BaseURL  string            // Optional custom endpoint
-    Model    string
-}
-```
-
-**Pros:**
-- No external CLI dependency
-- Lower latency (direct HTTP)
-- Full control over implementation
-
-**Cons:**
-- More code to maintain
-- Need to handle all API quirks
-- Must implement tool calling for each provider
-
----
-
-#### Option 3: Use a Generic MCP Bridge
-
-Use an existing tool like `mcp-bridge` or `mcp-proxy`:
-
-```bash
-# Install generic MCP bridge
-npm install -g @modelcontextprotocol/bridge
-
-# Configure for Kimi
-export KIMI_API_KEY="your-key"
-mcp-bridge --provider kimi --model kimi-k2.5
-
-# Use with OpenExec
-openexec run --model kimi-k2.5 --mcp-server localhost:8080
-```
-
-**Pros:**
-- Zero code changes to OpenExec
-- Works immediately
-
-**Cons:**
-- External dependency
-- May not support all features
-
----
-
-### Specific Requirements for Kimi K2.5
-
-To add Kimi K2.5 support to OpenExec:
-
-**Prerequisites:**
-1. Moonshot API key (from platform.moonshot.cn)
-2. HTTP client
-3. **NO tool calling support needed!** (BitNet Router handles this)
-
-**Implementation Steps:**
-
-1. **Create simple chat wrapper** (Option 1 is easiest):
-   ```go
-   // cmd/kimi-cli/main.go
-   package main
-   
-   import (
-       "bufio"
-       "bytes"
-       "encoding/json"
-       "fmt"
-       "net/http"
-       "os"
-   )
-   
-   func main() {
-       apiKey := os.Getenv("KIMI_API_KEY")
-       scanner := bufio.NewScanner(os.Stdin)
-       
-       for scanner.Scan() {
-           // Read user message
-           var req struct {
-               Messages []struct {
-                   Role    string `json:"role"`
-                   Content string `json:"content"`
-               } `json:"messages"`
-           }
-           json.Unmarshal(scanner.Bytes(), &req)
-           
-           // Call Kimi API (simple chat, NO tools!)
-           body, _ := json.Marshal(map[string]interface{}{
-               "model":    "kimi-k2.5",
-               "messages": req.Messages,
-               // NO "tools" field - BitNet handles this!
-           })
-           
-           httpReq, _ := http.NewRequest("POST",
-               "https://api.moonshot.cn/v1/chat/completions",
-               bytes.NewReader(body),
-           )
-           httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-           httpReq.Header.Set("Content-Type", "application/json")
-           
-           resp, _ := http.DefaultClient.Do(httpReq)
-           // ... parse and print response ...
-       }
-   }
-   ```
-
-2. **Install wrapper:**
-   ```bash
-   go build -o /usr/local/bin/kimi-cli ./cmd/kimi-cli
-   ```
-
-3. **Use with OpenExec:**
-   ```bash
-   export KIMI_API_KEY="your-key"
-   openexec run --model kimi-k2.5 --task "Refactor auth middleware"
-   ```
-
-**That's it!** BitNet Router will:
-- Parse your intent
-- Select appropriate tools
-- Call the wrapper for LLM responses
-- Execute tools via OpenExec MCP
-- Return results to the wrapper
-
-**No tool calling support needed in the LLM!**
+When enabled, BitNet can classify user intent and select tools locally, reducing round-trips to the cloud LLM. When disabled (the default), deterministic routing handles all classification.
 
 ---
 
@@ -845,7 +506,6 @@ To add Kimi K2.5 support to OpenExec:
 ### Local-First Design
 
 - All orchestration happens locally
-- PII shielding before any data leaves machine
 - No cloud service dependencies (except LLM APIs)
 - User controls all data
 
@@ -862,17 +522,12 @@ To add Kimi K2.5 support to OpenExec:
 
 ### Potential Enhancements
 
-1. **Direct API Mode** (optional)
-   - For users who prefer direct API calls
-   - Bypass CLI overhead
-   - Would require implementing `pkg/agent/` interfaces
-
-2. **Local Model Support**
+1. **Local Model Support**
    - Ollama integration
    - LM Studio support
    - Fully offline operation
 
-3. **Advanced Routing**
+2. **Advanced Routing**
    - Cost-based model selection
    - Capability-based routing
    - A/B testing between models

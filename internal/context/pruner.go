@@ -16,7 +16,7 @@ import (
 
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/memory"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Pruner intelligently selects relevant files to minimize token usage.
