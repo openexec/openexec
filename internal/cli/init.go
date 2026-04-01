@@ -297,10 +297,23 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 	answer = strings.TrimSpace(strings.ToLower(answer))
 	checkpointEnabled = answer == "y" || answer == "yes"
 
-	fmt.Printf("Enable BitNet local routing (downloads ~400MB model)? [y/N]: ")
+	fmt.Println("\n=== Local LLM for Intelligent Routing ===")
+	fmt.Println("OpenExec can use a local 1-bit LLM (BitNet) for intelligent routing")
+	fmt.Println("and tool selection. This provides smarter skill matching but requires")
+	fmt.Println("downloading a ~400MB model file.")
+	fmt.Println()
+	fmt.Println("Without this, OpenExec uses fast rule-based routing (deterministic).")
+	fmt.Println()
+	fmt.Printf("Install and use local LLM for intelligent routing? [y/N]: ")
 	answer, _ = reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 	bitnetRouting = answer == "y" || answer == "yes"
+
+	if bitnetRouting {
+		fmt.Println("\n✓ Local LLM enabled - model will download on first use (~400MB)")
+	} else {
+		fmt.Println("\n✓ Rule-based routing enabled (fast, no download required)")
+	}
 
 	return plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, gitPushEnabled, qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting
 }
