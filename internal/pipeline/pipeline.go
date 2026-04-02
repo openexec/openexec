@@ -462,9 +462,9 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	var bp *blueprint.Blueprint
 	switch p.cfg.BlueprintID {
 	case "standard_task", "":
-		bp = blueprint.DefaultBlueprint
+		bp = blueprint.DefaultBlueprint.Clone()
 	case "quick_fix":
-		bp = blueprint.QuickFixBlueprint
+		bp = blueprint.QuickFixBlueprint.Clone()
 	default:
 		// Try to load from external file in .openexec/blueprints/
 		absWorkDir, _ := filepath.Abs(p.cfg.WorkDir)
