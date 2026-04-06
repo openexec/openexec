@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"time"
 
@@ -46,6 +47,21 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	if len(pending) == 0 {
 		log.Printf("[Scheduler] All tasks already complete or in progress")
 		return nil
+	}
+
+	// Load the set of previously-interrupted run ids so we can prefer
+	// resuming stopped/error runs before starting fresh tasks when both
+	// are ready to dispatch.
+	resumable := make(map[string]bool)
+	if m.state != nil {
+		if ids, err := m.state.ListResumableRunIDs(ctx, m.cfg.WorkDir); err != nil {
+			log.Printf("[Scheduler] Failed to load resumable run ids: %v", err)
+		} else {
+			resumable = ids
+		}
+	}
+	if len(resumable) > 0 {
+		log.Printf("[Scheduler] %d task(s) have prior interrupted runs; they will be prioritised for resume", len(resumable))
 	}
 
 	log.Printf("[Scheduler] Starting execution of %d pending tasks (parallel=%d)", len(pending), opts.MaxParallel)
@@ -121,7 +137,10 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 			return
 		}
 
-		// Second pass: dispatch tasks whose dependencies are satisfied
+		// Second pass: collect tasks whose dependencies are satisfied,
+		// then dispatch them in priority order (previously-interrupted
+		// tasks first, then by task ID for deterministic ordering).
+		var ready []*node
 		for _, n := range nodes {
 			if n.Dispatched || n.Finished {
 				continue
@@ -159,9 +178,24 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 			}
 
 			if allStoryDepsDone {
-				n.Dispatched = true
-				readyTasks <- n
+				ready = append(ready, n)
 			}
+		}
+
+		// Dispatch order: resume previously-interrupted tasks first, then
+		// fresh tasks. Within each group, order by task ID for determinism.
+		sort.SliceStable(ready, func(i, j int) bool {
+			iResume := resumable[ready[i].Task.ID]
+			jResume := resumable[ready[j].Task.ID]
+			if iResume != jResume {
+				return iResume
+			}
+			return ready[i].Task.ID < ready[j].Task.ID
+		})
+
+		for _, n := range ready {
+			n.Dispatched = true
+			readyTasks <- n
 		}
 	}
 

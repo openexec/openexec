@@ -242,6 +242,29 @@ func (s *Store) UpdateRunStatus(ctx context.Context, runID, status, errorMessage
     return err
 }
 
+// ListResumableRunIDs returns the set of run ids (which, for scheduler-driven
+// runs, match the task id used as the fwu id) whose last persisted run status
+// is a non-terminal interruption — 'stopped' or 'error'. The scheduler uses
+// this to prioritise resuming previously-interrupted work over starting fresh
+// tasks when both are ready to dispatch.
+func (s *Store) ListResumableRunIDs(ctx context.Context, projectPath string) (map[string]bool, error) {
+    query := `SELECT id FROM runs WHERE project_path = ? AND status IN ('stopped', 'error')`
+    rows, err := s.db.QueryContext(ctx, query, projectPath)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    out := make(map[string]bool)
+    for rows.Next() {
+        var id string
+        if err := rows.Scan(&id); err != nil {
+            return nil, err
+        }
+        out[id] = true
+    }
+    return out, rows.Err()
+}
+
 // CleanupOrphanRuns reconciles run rows left in a non-terminal state by a
 // prior daemon that crashed or was killed before it could persist the final
 // status. For each orphan, the corresponding task (looked up by runs.task_id
