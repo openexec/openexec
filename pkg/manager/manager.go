@@ -171,6 +171,20 @@ func New(cfg Config) (*Manager, error) {
 		}
 	}
 
+	// SELF-HEALING: Orphan run cleanup
+	// Any row in the runs table still in starting/running/paused at startup
+	// belongs to a previous daemon invocation that crashed or was killed
+	// without writing a terminal status. Without this, the CLI "status" view
+	// keeps showing them as active forever because handleListRuns merges
+	// state-store rows into the active list.
+	if m.state != nil {
+		if n, err := m.state.CleanupOrphanRuns(context.Background(), m.cfg.WorkDir); err != nil {
+			log.Printf("[Manager] Orphan run cleanup failed: %v", err)
+		} else if n > 0 {
+			log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
 	m.watchdog = NewWatchdog(m)
@@ -480,7 +494,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		log.Printf("[Manager] Pipeline %s: running", fwuID)
 		err := p.Run(pipeCtx)
 		m.mu.Lock()
-		defer m.mu.Unlock()
+		var finalStatus PipelineStatus
+		var finalErr string
 		if e, ok := m.pipelines[fwuID]; ok {
 			if err != nil && !isTerminal(e.info.Status) {
 				e.info.Status = StatusError
@@ -498,6 +513,18 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 			}
 			// End the run span when pipeline completes
 			e.runSpan.End()
+			finalStatus = e.info.Status
+			finalErr = e.info.Error
+		}
+		m.mu.Unlock()
+
+		// Persist terminal status to the runs table so CLI/status reflects it.
+		// Without this, run rows stay at "starting" forever and show up as
+		// phantom "Active" runs even after the pipeline has finished.
+		if m.state != nil && isTerminal(finalStatus) {
+			if err := m.state.UpdateRunStatus(context.Background(), fwuID, string(finalStatus), finalErr); err != nil {
+				log.Printf("[Manager] Failed to persist terminal run status for %s: %v", fwuID, err)
+			}
 		}
 	}()
 
@@ -507,18 +534,27 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 // Stop terminates the pipeline for the given FWU ID.
 func (m *Manager) Stop(fwuID string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	e, ok := m.pipelines[fwuID]
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("pipeline %s not found", fwuID)
 	}
 	if isTerminal(e.info.Status) {
-		return fmt.Errorf("pipeline %s already in terminal state: %s", fwuID, e.info.Status)
+		status := e.info.Status
+		m.mu.Unlock()
+		return fmt.Errorf("pipeline %s already in terminal state: %s", fwuID, status)
 	}
 
 	e.info.Status = StatusStopped
 	e.pipeline.Stop()
+	m.mu.Unlock()
+
+	// Persist terminal status so the CLI stops showing this run as active.
+	if m.state != nil {
+		if err := m.state.UpdateRunStatus(context.Background(), fwuID, string(StatusStopped), ""); err != nil {
+			log.Printf("[Manager] Failed to persist stopped run status for %s: %v", fwuID, err)
+		}
+	}
 	return nil
 }
 

@@ -49,10 +49,25 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 
         m.mu.Lock()
         e, ok = m.pipelines[fwuID]
+        var newStatus PipelineStatus
+        var newErr string
+        var becameTerminal bool
         if ok {
+            prev := e.info.Status
             updateInfo(&e.info, event)
+            newStatus = e.info.Status
+            newErr = e.info.Error
+            becameTerminal = !isTerminal(prev) && isTerminal(newStatus)
         }
         m.mu.Unlock()
+
+        // Persist terminal status transitions to the runs table so the CLI
+        // doesn't show completed pipelines as still "Active".
+        if becameTerminal && m.state != nil {
+            if err := m.state.UpdateRunStatus(context.Background(), fwuID, string(newStatus), newErr); err != nil {
+                log.Printf("[Manager] Failed to persist terminal run status for %s: %v", fwuID, err)
+            }
+        }
 
         if ok {
             m.fanOut(fwuID, event)

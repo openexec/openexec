@@ -242,6 +242,20 @@ func (s *Store) UpdateRunStatus(ctx context.Context, runID, status, errorMessage
     return err
 }
 
+// CleanupOrphanRuns marks any run still in a non-terminal state (starting,
+// running, paused) as stopped. Intended to be called at daemon startup to
+// clean up rows left behind by a crashed or killed daemon, so the CLI status
+// view doesn't show phantom "Active" runs. Returns the number of rows updated.
+func (s *Store) CleanupOrphanRuns(ctx context.Context, projectPath string) (int64, error) {
+    query := `UPDATE runs SET status = 'stopped', error_message = 'daemon restarted before completion', updated_at = CURRENT_TIMESTAMP WHERE status IN ('starting','running','paused') AND project_path = ?`
+    res, err := s.db.ExecContext(ctx, query, projectPath)
+    if err != nil {
+        return 0, err
+    }
+    n, _ := res.RowsAffected()
+    return n, nil
+}
+
 // --- STEP OPERATIONS ---
 
 // AddRunStep records a single iteration step of a run.
