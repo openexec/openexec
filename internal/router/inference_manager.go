@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,8 +53,27 @@ func (m *InferenceManager) EnsureReady() error {
 		m.ready = false
 	}
 
-	// 1. If modelPath is empty or the default placeholder, use ModelManager
-	if m.modelPath == "" || m.modelPath == "/models/bitnet-2b.gguf" {
+	// 1. Resolve the model file.
+	//
+	// Resolution order:
+	//   - If the user gave an explicit path that exists on disk, use it as-is.
+	//   - Otherwise (empty, placeholder, or explicit-but-missing), delegate
+	//     to ModelManager which checks project-local first, then the
+	//     user-level cache at ~/.openexec/models/, and downloads to the
+	//     user-level cache on miss. This means enabling bitnet_routing in
+	//     a fresh project will Just Work, and the model is shared across
+	//     every openexec project on the machine.
+	const placeholderPath = "/models/bitnet-2b.gguf"
+	useModelManager := true
+	if m.modelPath != "" && m.modelPath != placeholderPath {
+		if _, err := os.Stat(m.modelPath); err == nil {
+			useModelManager = false
+			log.Printf("[InferenceManager] Using configured model: %s", m.modelPath)
+		} else {
+			log.Printf("[InferenceManager] Configured model %s not found on disk; falling back to user-level cache / auto-download", m.modelPath)
+		}
+	}
+	if useModelManager {
 		mm := NewModelManager(DefaultModelName)
 		if m.projectDir != "" {
 			mm.SetProjectDir(filepath.Join(m.projectDir, ".openexec", "models"))
@@ -62,25 +82,26 @@ func (m *InferenceManager) EnsureReady() error {
 		if err != nil {
 			return fmt.Errorf("model not available: %w", err)
 		}
+		log.Printf("[InferenceManager] Resolved model: %s", modelPath)
 		m.modelPath = modelPath
-	} else {
-		// User explicitly set a path — use it directly
-		if _, err := os.Stat(m.modelPath); os.IsNotExist(err) {
-			return fmt.Errorf("local model not found at %s. Please run 'openexec setup models'", m.modelPath)
-		}
 	}
 
-	// 2. Try to find a local inference engine (embedded-first approach)
-	// We check for local bin, then PATH
+	// 2. Resolve the inference binary.
+	// Search order mirrors the model resolution: project-local first, then
+	// the user-level location at ~/.openexec/bin/, then system PATH. The
+	// user-level location is shared across every openexec project on the
+	// machine, so installing once is enough.
+	userBin := filepath.Join(os.Getenv("HOME"), ".openexec", "bin", "bitnet-cli")
 	possiblePaths := []string{
 		"./bin/bitnet-cli",
-		filepath.Join(os.Getenv("HOME"), ".openexec", "bin", "bitnet-cli"),
+		userBin,
 	}
 
 	for _, p := range possiblePaths {
 		if _, err := os.Stat(p); err == nil {
 			m.binPath = p
 			m.ready = true
+			log.Printf("[InferenceManager] Using inference binary: %s", p)
 			return nil
 		}
 	}
@@ -89,10 +110,11 @@ func (m *InferenceManager) EnsureReady() error {
 	if p, err := exec.LookPath("bitnet-cli"); err == nil {
 		m.binPath = p
 		m.ready = true
+		log.Printf("[InferenceManager] Using inference binary from PATH: %s", p)
 		return nil
 	}
 
-	return fmt.Errorf("no inference engine (bitnet-cli) found. Please install the OpenExec local brain pack")
+	return fmt.Errorf("inference engine (bitnet-cli) not found.\n  Install it once at the user level so every openexec project can share it:\n    %s\n  Or place it at ./bin/bitnet-cli inside the current project, or anywhere on $PATH", userBin)
 }
 
 // RunInference executes the local model with the given prompt

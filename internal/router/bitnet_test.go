@@ -168,10 +168,18 @@ func TestBitNetRouter_FallbackConfidence(t *testing.T) {
 
 func TestBitNetRouter_Availability(t *testing.T) {
 	t.Run("Missing Model", func(t *testing.T) {
+		// When the configured path is missing on disk, EnsureReady falls
+		// back to ModelManager (user-level cache + auto-download). In an
+		// isolated test env there's no cache and the download URL isn't
+		// reachable, so the surfaced error is "model not available".
+		isolated := newTestEnv(t)
+		defer isolated.done()
+		isolated.setHome(isolated.tmpDir)
+
 		r := NewBitNetRouter("/tmp/non-existent-model.bin")
 		err := r.CheckAvailability()
-		if err == nil || !strings.Contains(err.Error(), "not found") {
-			t.Errorf("expected 'not found' error, got %v", err)
+		if err == nil || !strings.Contains(err.Error(), "model not available") {
+			t.Errorf("expected 'model not available' error, got %v", err)
 		}
 	})
 

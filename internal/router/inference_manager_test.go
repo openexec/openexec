@@ -39,22 +39,29 @@ func TestInferenceManager_ModelExists(t *testing.T) {
 }
 
 func TestInferenceManager_ModelMissing(t *testing.T) {
-	// Scenario: Model missing
-	// Given: No model file
-	// When: EnsureReady() called
-	// Then: Returns error with setup instructions
+	// Scenario: Configured model path is missing on disk
+	// Given: Path provided but the file does not exist, and no model is
+	//        cached at the user level either
+	// When: EnsureReady() is called
+	// Then: It falls back to ModelManager (user-level cache + auto-download).
+	//       In this isolated test env there is no cached model and the
+	//       download URL cannot be reached, so EnsureReady surfaces a
+	//       "model not available" error from the download attempt.
+
+	env := newTestEnv(t)
+	defer env.done()
+	// Isolate from the developer's real ~/.openexec so we don't accidentally
+	// pick up a cached model and we don't write into their home dir.
+	env.setHome(env.tmpDir)
 
 	m := NewInferenceManager("/tmp/non-existent-model-abc123.gguf")
 	err := m.EnsureReady()
 
 	if err == nil {
-		t.Fatal("expected error for missing model")
+		t.Fatal("expected error for missing model with no cache and unreachable download")
 	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error should mention 'not found', got: %v", err)
-	}
-	if !strings.Contains(err.Error(), "openexec setup models") {
-		t.Errorf("error should include setup instructions, got: %v", err)
+	if !strings.Contains(err.Error(), "model not available") {
+		t.Errorf("error should mention 'model not available', got: %v", err)
 	}
 }
 
@@ -163,8 +170,8 @@ func TestInferenceManager_NoBinary(t *testing.T) {
 	if !strings.Contains(err.Error(), "bitnet-cli") {
 		t.Errorf("error should mention bitnet-cli, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "OpenExec local brain pack") {
-		t.Errorf("error should include install instructions, got: %v", err)
+	if !strings.Contains(err.Error(), "user level") {
+		t.Errorf("error should hint at the shared user-level install location, got: %v", err)
 	}
 }
 
