@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 )
 
 // InferenceManager handles the lifecycle of the local 1-bit model
@@ -13,6 +14,9 @@ type InferenceManager struct {
 	modelPath  string
 	binPath    string
 	projectDir string // optional project dir for per-project model lookup
+
+	readyMu sync.Mutex
+	ready   bool // Set once EnsureReady has successfully resolved model + binary
 }
 
 func NewInferenceManager(modelPath string) *InferenceManager {
@@ -29,7 +33,25 @@ func (m *InferenceManager) SetProjectDir(dir string) {
 // EnsureReady checks if the inference engine is available and attempts to locate it.
 // If modelPath is empty or the default placeholder, it uses ModelManager for
 // auto-discovery and download.
+//
+// Once the model and binary have been successfully resolved, the result is cached
+// and subsequent calls return immediately. This avoids re-running filesystem
+// probes (and any potential re-download path) on every ParseIntent invocation.
 func (m *InferenceManager) EnsureReady() error {
+	m.readyMu.Lock()
+	defer m.readyMu.Unlock()
+
+	// Fast path: already resolved and files still present.
+	if m.ready && m.modelPath != "" && m.binPath != "" {
+		if _, err := os.Stat(m.modelPath); err == nil {
+			if _, err := os.Stat(m.binPath); err == nil {
+				return nil
+			}
+		}
+		// Something disappeared from disk — fall through and re-resolve.
+		m.ready = false
+	}
+
 	// 1. If modelPath is empty or the default placeholder, use ModelManager
 	if m.modelPath == "" || m.modelPath == "/models/bitnet-2b.gguf" {
 		mm := NewModelManager(DefaultModelName)
@@ -58,6 +80,7 @@ func (m *InferenceManager) EnsureReady() error {
 	for _, p := range possiblePaths {
 		if _, err := os.Stat(p); err == nil {
 			m.binPath = p
+			m.ready = true
 			return nil
 		}
 	}
@@ -65,6 +88,7 @@ func (m *InferenceManager) EnsureReady() error {
 	// Fallback to system PATH
 	if p, err := exec.LookPath("bitnet-cli"); err == nil {
 		m.binPath = p
+		m.ready = true
 		return nil
 	}
 

@@ -117,6 +117,7 @@ type Manager struct {
 	state     *state.Store
 	cancel  context.CancelFunc // Cancels watchdog goroutine
 	relMu   sync.Mutex        // Serializes release manager creation (prevents concurrent migrations)
+	rel     *release.Manager   // Cached release manager; created lazily, reused across calls
 }
 
 // ErrNoWorkDir is returned when Manager is created without a WorkDir.
@@ -600,12 +601,21 @@ func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
 		return nil, fmt.Errorf("state store not configured")
 	}
 	// Serialize creation to prevent concurrent schema migrations on the same DB
+	// and to ensure a single shared in-memory cache across callers (Plan, ExecuteTasks,
+	// handlers, etc.). Previously each call created a fresh release.Manager with its
+	// own cache, causing stale reads where a completed task could be re-dispatched
+	// because a newly-instantiated manager's cache disagreed with the one that wrote
+	// the status update.
 	m.relMu.Lock()
 	defer m.relMu.Unlock()
+	if m.rel != nil {
+		return m.rel, nil
+	}
 	rel, err := release.NewManagerWithDB(m.cfg.WorkDir, release.DefaultConfig(), m.state.GetDB())
 	if err != nil {
 		return nil, err
 	}
+	m.rel = rel
 	return rel, nil
 }
 

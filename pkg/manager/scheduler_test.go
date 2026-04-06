@@ -67,12 +67,14 @@ func newSchedulerTestEnv(t *testing.T) *schedulerTestEnv {
 	}
 	t.Cleanup(func() { mgr.Close() })
 
-	// Create a release manager sharing the same DB
-	relMgr, err := release.NewManagerWithDB(tmpDir, release.DefaultConfig(), stateStore.GetDB())
+	// Use the manager's own cached release manager so tests that create
+	// stories/tasks via env.rel are visible to the manager's scheduler.
+	// The manager caches a single release.Manager instance per process to
+	// keep the in-memory cache consistent across Plan and ExecuteTasks.
+	relMgr, err := mgr.getInternalReleaseManager()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { relMgr.Close() })
 
 	return &schedulerTestEnv{mgr: mgr, rel: relMgr, dir: tmpDir}
 }
@@ -529,11 +531,11 @@ func main() {
 		t.Fatal(err)
 	}
 
-	relMgr, err := release.NewManagerWithDB(tmpDir, release.DefaultConfig(), stateStore.GetDB())
+	// Use the manager's cached release manager so its scheduler sees these tasks.
+	relMgr, err := mgr.getInternalReleaseManager()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { relMgr.Close() })
 
 	createStory(t, relMgr, "S-1", nil)
 	createTask(t, relMgr, "T-A", "S-1", nil)
