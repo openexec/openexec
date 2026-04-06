@@ -26,11 +26,17 @@ const (
 // It is the single source of truth for Sessions, Runs, Steps, and Audit events.
 type Store struct {
 	db           *sql.DB
+	dbPath       string
 	mu           sync.RWMutex
 	asyncQueue   chan func(context.Context) error
 	asyncWg      sync.WaitGroup
 	asyncDropped atomic.Int64
 	closed       atomic.Bool
+}
+
+// Path returns the filesystem path the store was opened from.
+func (s *Store) Path() string {
+	return s.dbPath
 }
 
 // NewStore creates a new state store using the provided SQLite database path.
@@ -40,9 +46,21 @@ func NewStore(dbPath string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open state database: %w", err)
 	}
+	// Apply a busy_timeout via PRAGMA so concurrent writers (e.g. the
+	// symbol indexer running against the same file from a separate
+	// connection) wait politely instead of failing immediately with
+	// SQLITE_BUSY. PRAGMA is more reliable than DSN params across drivers.
+	// Combined with SetMaxOpenConns(1) below, every write goes through a
+	// single connection that has the PRAGMA applied.
+	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to set busy_timeout: %w", err)
+	}
+	db.SetMaxOpenConns(1)
 
 	s := &Store{
 		db:         db,
+		dbPath:     dbPath,
 		asyncQueue: make(chan func(context.Context) error, MaxAsyncQueueSize),
 	}
 

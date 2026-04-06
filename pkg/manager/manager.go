@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -18,6 +19,7 @@ import (
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/execution/gates"
+	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/parallel"
@@ -94,6 +96,8 @@ type PipelineInfo struct {
 	LastActivity  time.Time      `json:"last_activity"`
 	CurrentPID    int            `json:"current_pid,omitempty"`
 	DroppedEvents int            `json:"dropped_events,omitempty"`
+	DoneTasks     int            `json:"done_tasks"`
+	TotalTasks    int            `json:"total_tasks"`
 }
 
 type entry struct {
@@ -182,6 +186,28 @@ func New(cfg Config) (*Manager, error) {
 			log.Printf("[Manager] Orphan run cleanup failed: %v", err)
 		} else if n > 0 {
 			log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
+		}
+	}
+
+	// Symbol indexing: populate the knowledge.Store symbols table so that
+	// downstream consumers (predictive loader, future pre-resolver) have a
+	// real pointer record to query. The indexer was previously only invoked
+	// from the DCP coordinator path, which is disabled in most setups, so
+	// the symbols table sat empty. We now run it on every Manager startup
+	// behind an opt-out feature flag (see project.IsSymbolIndexingEnabled).
+	//
+	// The goroutine opens its own SQLite connection (with busy_timeout) so
+	// it cannot SQLITE_BUSY the state store's async writer. The two
+	// connections share the same file and SQLite WAL mode handles
+	// cross-connection concurrency politely.
+	if m.state != nil {
+		projCfg, _ := project.LoadProjectConfig(m.cfg.WorkDir)
+		enabled := true
+		if projCfg != nil {
+			enabled = projCfg.Execution.IsSymbolIndexingEnabled()
+		}
+		if enabled {
+			go m.runSymbolIndexer()
 		}
 	}
 
@@ -601,20 +627,46 @@ func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 		info.CurrentPID = h.CurrentPID
 	}
 
-    info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
-    // include drop count
-    m.mu.RLock()
-    if e, ok := m.pipelines[fwuID]; ok {
-        info.DroppedEvents = e.drops
-    }
-    m.mu.RUnlock()
-    return info, nil
+	info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
+	// include drop count
+	m.mu.RLock()
+	if e, ok := m.pipelines[fwuID]; ok {
+		info.DroppedEvents = e.drops
+	}
+	m.mu.RUnlock()
+
+	// Add task counts
+	if rel, err := m.getInternalReleaseManager(); err == nil {
+		tasks := rel.GetTasks()
+		info.TotalTasks = len(tasks)
+		doneCount := 0
+		for _, t := range tasks {
+			if t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved {
+				doneCount++
+			}
+		}
+		info.DoneTasks = doneCount
+	}
+
+	return info, nil
 }
 
 // List returns info snapshots for all known pipelines.
 func (m *Manager) List() []PipelineInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	// Get task counts once if possible
+	var total, done int
+	if rel, err := m.getInternalReleaseManager(); err == nil {
+		tasks := rel.GetTasks()
+		total = len(tasks)
+		for _, t := range tasks {
+			if t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved {
+				done++
+			}
+		}
+	}
 
 	result := make([]PipelineInfo, 0, len(m.pipelines))
 	for _, e := range m.pipelines {
@@ -627,16 +679,84 @@ func (m *Manager) List() []PipelineInfo {
 			info.CurrentPID = h.CurrentPID
 		}
 
-        info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
-        info.DroppedEvents = e.drops
-        result = append(result, info)
-    }
-    return result
+		info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
+		info.DroppedEvents = e.drops
+		info.TotalTasks = total
+		info.DoneTasks = done
+		result = append(result, info)
+	}
+	return result
 }
 
 // GetConfig returns the manager's configuration.
 func (m *Manager) GetConfig() Config {
 	return m.cfg
+}
+
+// runSymbolIndexer populates the knowledge.Store symbols table from the
+// current WorkDir. Intended to be called in a background goroutine from
+// Manager.New(). Opens its own SQLite connection (separate from the state
+// store's connection pool) with busy_timeout so its writes serialize
+// politely against the state store's asyncWorker instead of erroring out.
+//
+// Skips if the symbols table was indexed within the last hour (cheap
+// freshness check via MAX(updated_at)).
+func (m *Manager) runSymbolIndexer() {
+	if m.state == nil {
+		return
+	}
+	dbPath := m.state.Path()
+	if dbPath == "" {
+		return
+	}
+	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=on")
+	if err != nil {
+		log.Printf("[Indexer] open db failed: %v", err)
+		return
+	}
+	defer db.Close()
+	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
+		log.Printf("[Indexer] set busy_timeout failed: %v", err)
+		return
+	}
+	// Single connection: keeps the indexer's writes serialized through one
+	// SQLite connection so the busy_timeout above actually applies to all
+	// of them. Without this the pool can hand a fresh connection that
+	// hasn't run the PRAGMA yet.
+	db.SetMaxOpenConns(1)
+
+	store, err := knowledge.NewStoreWithDB(db)
+	if err != nil {
+		log.Printf("[Indexer] knowledge store init failed: %v", err)
+		return
+	}
+
+	// Cheap freshness check: skip if any row in symbols was updated in the
+	// last hour. The very first invocation has zero rows so the query
+	// returns NULL and we proceed to index.
+	var lastIndexedStr sql.NullString
+	if err := db.QueryRow(`SELECT MAX(updated_at) FROM symbols`).Scan(&lastIndexedStr); err == nil && lastIndexedStr.Valid {
+		// SQLite stores CURRENT_TIMESTAMP as "YYYY-MM-DD HH:MM:SS" UTC.
+		if t, perr := time.Parse("2006-01-02 15:04:05", lastIndexedStr.String); perr == nil {
+			if time.Since(t) < time.Hour {
+				log.Printf("[Indexer] Skipping: symbols table indexed %s ago (within freshness window)", time.Since(t).Truncate(time.Second))
+				return
+			}
+		}
+	}
+
+	indexer := knowledge.NewIndexer(store)
+	start := time.Now()
+	if err := indexer.IndexProject(m.cfg.WorkDir); err != nil {
+		log.Printf("[Indexer] IndexProject failed: %v", err)
+		return
+	}
+	stats := indexer.GetStats()
+	log.Printf("[Indexer] Indexed %d symbols across %d files in %s (errors=%d)",
+		stats.SymbolsExtracted, stats.FilesProcessed, time.Since(start).Truncate(time.Millisecond), stats.ErrorCount)
+	if len(stats.ByLanguage) > 0 {
+		log.Printf("[Indexer] By language: %v", stats.ByLanguage)
+	}
 }
 
 func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {

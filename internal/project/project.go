@@ -64,6 +64,12 @@ type ExecutionConfig struct {
 	// router. Off by default for safety: see ADR-002. Has no effect on the CLI
 	// runner path.
 	ToolsetFiltering bool `json:"toolset_filtering,omitempty"`
+	// SymbolIndexing controls whether the daemon automatically indexes the
+	// project's source code into the knowledge.Store symbols table at startup.
+	// Pointer with nil-default-true semantics: leave unset to enable; set to
+	// false explicitly to disable. The indexer runs in a background goroutine
+	// so startup is not blocked. See ADR-003 (Layer 1).
+	SymbolIndexing *bool `json:"symbol_indexing,omitempty"`
 
 	// API provider settings (OpenAI-compatible endpoints)
 	APIProvider string `json:"api_provider,omitempty"` // "openai_compat"
@@ -77,6 +83,16 @@ type ExecutionConfig struct {
 	WorkerAPIProvider string `json:"worker_api_provider,omitempty"` // Provider for workers (defaults to APIProvider)
 	WorkerAPIBaseURL  string `json:"worker_api_base_url,omitempty"` // Base URL for workers (defaults to APIBaseURL)
 	WorkerAPIKey      string `json:"worker_api_key,omitempty"`      // API key for workers (defaults to APIKey)
+}
+
+// IsSymbolIndexingEnabled returns true when the symbol indexer should run.
+// The flag is opt-out: nil (the default for existing configs) means enabled,
+// and only an explicit `"symbol_indexing": false` disables it.
+func (e *ExecutionConfig) IsSymbolIndexingEnabled() bool {
+	if e.SymbolIndexing == nil {
+		return true
+	}
+	return *e.SymbolIndexing
 }
 
 // Initialize initializes a new OpenExec project
