@@ -242,12 +242,29 @@ func (s *Store) UpdateRunStatus(ctx context.Context, runID, status, errorMessage
     return err
 }
 
-// CleanupOrphanRuns marks any run still in a non-terminal state (starting,
-// running, paused) as stopped. Intended to be called at daemon startup to
-// clean up rows left behind by a crashed or killed daemon, so the CLI status
-// view doesn't show phantom "Active" runs. Returns the number of rows updated.
+// CleanupOrphanRuns reconciles run rows left in a non-terminal state by a
+// prior daemon that crashed or was killed before it could persist the final
+// status. For each orphan, the corresponding task (looked up by runs.task_id
+// or, as a fallback, by the run id — which the scheduler uses as the fwu id)
+// is consulted: if the task reached 'done' or 'approved', the run is marked
+// 'complete' (the work genuinely finished, only the run-row update was lost);
+// otherwise it's marked 'stopped'. Returns the number of rows updated.
 func (s *Store) CleanupOrphanRuns(ctx context.Context, projectPath string) (int64, error) {
-    query := `UPDATE runs SET status = 'stopped', error_message = 'daemon restarted before completion', updated_at = CURRENT_TIMESTAMP WHERE status IN ('starting','running','paused') AND project_path = ?`
+    query := `
+UPDATE runs
+SET
+    status = CASE
+        WHEN (SELECT t.status FROM tasks t WHERE t.id = COALESCE(NULLIF(runs.task_id, ''), runs.id)) IN ('done', 'approved')
+            THEN 'complete'
+        ELSE 'stopped'
+    END,
+    error_message = CASE
+        WHEN (SELECT t.status FROM tasks t WHERE t.id = COALESCE(NULLIF(runs.task_id, ''), runs.id)) IN ('done', 'approved')
+            THEN ''
+        ELSE 'daemon restarted before completion'
+    END,
+    updated_at = CURRENT_TIMESTAMP
+WHERE status IN ('starting', 'running', 'paused') AND project_path = ?`
     res, err := s.db.ExecContext(ctx, query, projectPath)
     if err != nil {
         return 0, err

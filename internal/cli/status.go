@@ -184,11 +184,11 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 			r := completedRuns[i]
 			statusIcon := "?"
 			switch r.Status {
-			case "completed", "done":
+			case "complete", "completed", "done":
 				statusIcon = "✓"
 			case "failed", "error":
 				statusIcon = "✗"
-			case "cancelled":
+			case "cancelled", "stopped":
 				statusIcon = "○"
 			}
 			cmd.Printf("  %s %s: %s\n", statusIcon, r.GetID(), r.Status)
