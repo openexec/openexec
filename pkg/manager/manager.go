@@ -297,6 +297,8 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 			pCfg.APIKey = projCfg.Execution.APIKey
 			pCfg.APIModel = projCfg.Execution.APIModel
 		}
+		// Toolset filtering opt-in flag (see ADR-002).
+		pCfg.ToolsetFiltering = projCfg.Execution.ToolsetFiltering
 	}
 
 	for _, opt := range opts {
@@ -449,12 +451,17 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 				}
 
 				coord := agent.NewTaskCoordinator(agent.CoordinatorConfig{
-					Provider:       coordProvider,
-					WorkerProvider: workerProvider,
-					MaxWorkers:     projCfg.Execution.WorkerCount,
-					WorkDir:        m.cfg.WorkDir,
-					Model:          coordModel,
-					WorkerModel:    workerModel,
+					Provider:         coordProvider,
+					WorkerProvider:   workerProvider,
+					MaxWorkers:       projCfg.Execution.WorkerCount,
+					WorkDir:          m.cfg.WorkDir,
+					Model:            coordModel,
+					WorkerModel:      workerModel,
+					ToolsetFiltering: projCfg.Execution.ToolsetFiltering,
+					// SelectedToolset is populated per-task via the routing
+					// plan; the coordinator itself runs once per task so we
+					// don't have it at coordinator construction time. The
+					// pipeline path is the primary integration point.
 				})
 				pipeline.WithCoordinator(coord)(p)
 				log.Printf("[Manager] Coordinator enabled: %d workers, model=%s", projCfg.Execution.WorkerCount, coordModel)

@@ -59,6 +59,11 @@ type ExecutionConfig struct {
 	CheckpointEnabled bool `json:"checkpoint_enabled,omitempty"`
 	BitNetRouting     bool   `json:"bitnet_routing,omitempty"`
 	BitNetModel       string `json:"bitnet_model,omitempty"`
+	// ToolsetFiltering, when true, restricts the tool definitions sent to the
+	// frontier model on the API path to the toolset selected by the local
+	// router. Off by default for safety: see ADR-002. Has no effect on the CLI
+	// runner path.
+	ToolsetFiltering bool `json:"toolset_filtering,omitempty"`
 
 	// API provider settings (OpenAI-compatible endpoints)
 	APIProvider string `json:"api_provider,omitempty"` // "openai_compat"

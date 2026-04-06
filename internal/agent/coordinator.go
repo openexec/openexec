@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/toolset"
 	pagent "github.com/openexec/openexec/pkg/agent"
 )
 
@@ -26,6 +27,13 @@ type CoordinatorConfig struct {
 	Model string
 	// WorkerModel is the model ID for the worker provider.
 	WorkerModel string
+	// SelectedToolset, if set together with ToolsetFiltering, restricts the
+	// tools sent to worker agents to that toolset's declared tool list.
+	// See ADR-002.
+	SelectedToolset string
+	// ToolsetFiltering enables the SelectedToolset narrowing for worker
+	// API requests. Off by default; matches the project config flag.
+	ToolsetFiltering bool
 }
 
 // WorkPlan is the decomposition of a task into subtasks.
@@ -246,8 +254,19 @@ Instructions:
 - Make minimal, targeted changes
 - Do not modify files outside your assignment`, subtask.Description, strings.Join(subtask.Files, "\n"), briefing)
 
-	// Build tool definitions
-	tools := loop.BuildAPIToolDefinitions()
+	// Build tool definitions. When toolset filtering is enabled and the
+	// coordinator has a selected toolset, narrow the worker's tool menu to
+	// just that toolset's tools. See ADR-002.
+	var tools []pagent.ToolDefinition
+	if c.config.ToolsetFiltering && c.config.SelectedToolset != "" {
+		registry := toolset.NewRegistry()
+		if ts, ok := registry.Get(c.config.SelectedToolset); ok {
+			tools = loop.BuildAPIToolDefinitionsFor(ts.Tools)
+		}
+	}
+	if tools == nil {
+		tools = loop.BuildAPIToolDefinitions()
+	}
 
 	// Create event channel and runner
 	ch := make(chan loop.Event, 100)

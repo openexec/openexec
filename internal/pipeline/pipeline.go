@@ -27,6 +27,7 @@ import (
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/skills"
+	"github.com/openexec/openexec/internal/toolset"
 	"github.com/openexec/openexec/internal/types"
 	pagent "github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -104,6 +105,16 @@ type Config struct {
 	APIBaseURL  string // e.g. "https://api.moonshot.cn/v1"
 	APIKey      string // API key or "$ENV_VAR" reference
 	APIModel    string // e.g. "moonshot-v1-128k"
+
+	// SelectedToolset is the toolset name chosen by the local router for this
+	// task. Populated in runBlueprintMode from RoutingPlan.Toolset and consumed
+	// by createAPIAgenticLoop when ToolsetFiltering is enabled. See ADR-002.
+	SelectedToolset string
+
+	// ToolsetFiltering enables sending only the SelectedToolset's tools in
+	// API requests instead of the full hardcoded list. Mirrors the
+	// execution.toolset_filtering project config flag.
+	ToolsetFiltering bool
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
@@ -380,7 +391,11 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Deterministic routing: classify task and set context parameters
 	if p.intentRouter != nil && p.cfg.TaskDescription != "" {
-		plan, err := router.Route(ctx, p.intentRouter, p.cfg.TaskDescription, nil)
+		// Pass a real toolset registry so RoutingPlan.Toolset gets populated
+		// via intent-based lookup as well as the keyword selector. Previously
+		// nil, which forced selectToolset down its keyword-only path.
+		registry := toolset.NewRegistry()
+		plan, err := router.Route(ctx, p.intentRouter, p.cfg.TaskDescription, registry)
 		if err == nil {
 			if len(plan.RepoZones) > 0 && len(p.cfg.RepoZones) == 0 {
 				p.cfg.RepoZones = plan.RepoZones
@@ -390,6 +405,11 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			}
 			if plan.Sensitivity != "" && p.cfg.Sensitivity == "" {
 				p.cfg.Sensitivity = string(plan.Sensitivity)
+			}
+			// Store the routed toolset so createAPIAgenticLoop can filter
+			// req.Tools when ToolsetFiltering is enabled. See ADR-002.
+			if plan.Toolset != "" && p.cfg.SelectedToolset == "" {
+				p.cfg.SelectedToolset = plan.Toolset
 			}
 		}
 	}
@@ -838,8 +858,20 @@ func (p *Pipeline) createAPIAgenticLoop(ctx context.Context, prompt string, work
 		return nil, fmt.Errorf("create API provider: %w", err)
 	}
 
-	// Build tool definitions for the API
-	tools := loop.BuildAPIToolDefinitions()
+	// Build tool definitions for the API. When toolset filtering is enabled
+	// and the local router has selected a specific toolset, send only that
+	// toolset's tools instead of the full hardcoded list. See ADR-002.
+	var tools []pagent.ToolDefinition
+	if p.cfg.ToolsetFiltering && p.cfg.SelectedToolset != "" {
+		registry := toolset.NewRegistry()
+		if ts, ok := registry.Get(p.cfg.SelectedToolset); ok {
+			tools = loop.BuildAPIToolDefinitionsFor(ts.Tools)
+			log.Printf("[Pipeline] Toolset filtering: toolset=%s, %d/%d tools", p.cfg.SelectedToolset, len(tools), len(loop.BuildAPIToolDefinitions()))
+		}
+	}
+	if tools == nil {
+		tools = loop.BuildAPIToolDefinitions()
+	}
 
 	// Create event channel and runner
 	ch := make(chan loop.Event, 100)

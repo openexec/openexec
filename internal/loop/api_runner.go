@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -313,13 +314,17 @@ func truncateOutput(s string, maxLen int) string {
 	return s[:maxLen] + "\n... (truncated)"
 }
 
-// BuildAPIToolDefinitions returns the standard tool definitions for API-based execution.
-func BuildAPIToolDefinitions() []agent.ToolDefinition {
-	return []agent.ToolDefinition{
-		{
-			Name:        "read_file",
-			Description: "Read the contents of a file at the specified path. Returns the file content as text.",
-			InputSchema: json.RawMessage(`{
+// apiToolDefinitions is the canonical name → definition map for tools that the
+// API runner can actually execute via MCPToolHandler. The toolset registry in
+// internal/toolset declares additional tool names (e.g. glob, grep, web_fetch)
+// that are not yet implemented here; BuildAPIToolDefinitionsFor silently skips
+// any name it does not know about, so an aspirational toolset definition will
+// degrade gracefully to whatever subset is actually wired up.
+var apiToolDefinitions = map[string]agent.ToolDefinition{
+	"read_file": {
+		Name:        "read_file",
+		Description: "Read the contents of a file at the specified path. Returns the file content as text.",
+		InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
 					"path": {
@@ -329,11 +334,11 @@ func BuildAPIToolDefinitions() []agent.ToolDefinition {
 				},
 				"required": ["path"]
 			}`),
-		},
-		{
-			Name:        "write_file",
-			Description: "Write content to a file at the specified path. Creates the file if it doesn't exist, or overwrites it if it does.",
-			InputSchema: json.RawMessage(`{
+	},
+	"write_file": {
+		Name:        "write_file",
+		Description: "Write content to a file at the specified path. Creates the file if it doesn't exist, or overwrites it if it does.",
+		InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
 					"path": {
@@ -352,11 +357,11 @@ func BuildAPIToolDefinitions() []agent.ToolDefinition {
 				},
 				"required": ["path", "content"]
 			}`),
-		},
-		{
-			Name:        "run_shell_command",
-			Description: "Execute a shell command and return its output. Returns stdout, stderr, and exit code.",
-			InputSchema: json.RawMessage(`{
+	},
+	"run_shell_command": {
+		Name:        "run_shell_command",
+		Description: "Execute a shell command and return its output. Returns stdout, stderr, and exit code.",
+		InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
 					"command": {
@@ -375,11 +380,11 @@ func BuildAPIToolDefinitions() []agent.ToolDefinition {
 				},
 				"required": ["command"]
 			}`),
-		},
-		{
-			Name:        "git_apply_patch",
-			Description: "Apply a unified diff/patch to files in a git repository.",
-			InputSchema: json.RawMessage(`{
+	},
+	"git_apply_patch": {
+		Name:        "git_apply_patch",
+		Description: "Apply a unified diff/patch to files in a git repository.",
+		InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
 					"patch": {
@@ -393,6 +398,42 @@ func BuildAPIToolDefinitions() []agent.ToolDefinition {
 				},
 				"required": ["patch"]
 			}`),
-		},
+	},
+}
+
+// allAPIToolNames is the deterministic ordering used when the caller asks for
+// every known tool. Sorted at init for stable test output and reproducible
+// request bodies.
+var allAPIToolNames = func() []string {
+	names := make([]string, 0, len(apiToolDefinitions))
+	for name := range apiToolDefinitions {
+		names = append(names, name)
 	}
+	sort.Strings(names)
+	return names
+}()
+
+// BuildAPIToolDefinitions returns the full set of tool definitions known to the
+// API runner. This is the unfiltered path used when toolset filtering is off.
+func BuildAPIToolDefinitions() []agent.ToolDefinition {
+	return BuildAPIToolDefinitionsFor(allAPIToolNames)
+}
+
+// BuildAPIToolDefinitionsFor returns the subset of tool definitions whose names
+// appear in the supplied list. Names with no matching definition are silently
+// skipped — this lets a toolset declare aspirational tool names without
+// breaking callers when those tools are not yet implemented.
+func BuildAPIToolDefinitionsFor(names []string) []agent.ToolDefinition {
+	out := make([]agent.ToolDefinition, 0, len(names))
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		if def, ok := apiToolDefinitions[name]; ok {
+			out = append(out, def)
+		}
+	}
+	return out
 }
