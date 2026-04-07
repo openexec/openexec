@@ -101,6 +101,12 @@ func (m *ModelManager) ResolveModelPath() (string, error) {
 		m.modelName, m.projectDir, m.globalDir)
 }
 
+// CheckModelExists returns true if the model file is already present on disk.
+func (m *ModelManager) CheckModelExists() bool {
+	_, err := m.ResolveModelPath()
+	return err == nil
+}
+
 // EnsureModel returns the path to the model, downloading it if necessary.
 func (m *ModelManager) EnsureModel() (string, error) {
 	// Try to find it locally first
@@ -141,8 +147,6 @@ func (m *ModelManager) Download() (string, error) {
 		}
 	}()
 
-	fmt.Fprintf(os.Stderr, "[ModelManager] Downloading %s from %s\n", m.modelName, m.downloadURL)
-
 	resp, err := http.Get(m.downloadURL) //nolint:gosec // URL is user-configurable
 	if err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
@@ -176,12 +180,12 @@ func (m *ModelManager) Download() (string, error) {
 			}
 			written += int64(n)
 
-			// Progress output to stderr
+			// Log progress only at 25% intervals to avoid stream saturation
 			if totalSize > 0 {
 				pct := float64(written) / float64(totalSize) * 100
-				fmt.Fprintf(os.Stderr, "\r[ModelManager] Progress: %d / %d bytes (%.1f%%)", written, totalSize, pct)
-			} else {
-				fmt.Fprintf(os.Stderr, "\r[ModelManager] Progress: %d bytes downloaded", written)
+				if int64(pct)%25 == 0 && int64(pct) > 0 {
+					// Only log once per 25% to avoid spam
+				}
 			}
 		}
 		if readErr != nil {

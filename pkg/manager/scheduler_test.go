@@ -71,7 +71,7 @@ func newSchedulerTestEnv(t *testing.T) *schedulerTestEnv {
 	// stories/tasks via env.rel are visible to the manager's scheduler.
 	// The manager caches a single release.Manager instance per process to
 	// keep the in-memory cache consistent across Plan and ExecuteTasks.
-	relMgr, err := mgr.getInternalReleaseManager()
+	relMgr, err := mgr.GetInternalReleaseManager()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +532,7 @@ func main() {
 	}
 
 	// Use the manager's cached release manager so its scheduler sees these tasks.
-	relMgr, err := mgr.getInternalReleaseManager()
+	relMgr, err := mgr.GetInternalReleaseManager()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +569,7 @@ func TestScheduler_WorkerCountRespected(t *testing.T) {
 	// the single worker must process all 3 sequentially.
 	//
 	// NOTE: We use MaxParallel=1 because concurrent m.Start() calls trigger
-	// a race in getInternalReleaseManager() where schema migrations run
+	// a race in GetInternalReleaseManager() where schema migrations run
 	// concurrently on the same DB connection (a pre-existing production bug).
 	// The structural guarantee that the scheduler creates exactly workerCount
 	// goroutines is verified by code inspection; this test verifies the

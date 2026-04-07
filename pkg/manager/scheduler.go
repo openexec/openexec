@@ -20,7 +20,7 @@ type RunOptions struct {
 
 // ExecuteTasks runs all pending tasks in the dependency graph.
 func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
-	rel, err := m.getInternalReleaseManager()
+	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return err
 	}

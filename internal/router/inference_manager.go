@@ -78,9 +78,9 @@ func (m *InferenceManager) EnsureReady() error {
 		if m.projectDir != "" {
 			mm.SetProjectDir(filepath.Join(m.projectDir, ".openexec", "models"))
 		}
-		modelPath, err := mm.EnsureModel()
+		modelPath, err := mm.ResolveModelPath()
 		if err != nil {
-			return fmt.Errorf("model not available: %w", err)
+			return fmt.Errorf("model not available: %w (run 'openexec setup' or enable internet access for auto-download at startup)", err)
 		}
 		log.Printf("[InferenceManager] Resolved model: %s", modelPath)
 		m.modelPath = modelPath

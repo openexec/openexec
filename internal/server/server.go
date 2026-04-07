@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -520,6 +521,36 @@ func (s *Server) registerPreflightChecks() {
 
 // Start runs the server and blocks
 func (s *Server) Start(ctx context.Context) error {
+	// Enable global panic recovery for the daemon
+	defer func() {
+		if r := recover(); r != nil {
+			logDir := filepath.Join(s.ProjectsDir, ".openexec")
+			_ = os.MkdirAll(logDir, 0750)
+			crashLog := filepath.Join(logDir, "crash.log")
+			
+			f, err := os.OpenFile(crashLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				fmt.Fprintf(f, "\n=== DAEMON CRASH AT %s ===\n", time.Now().Format(time.RFC3339))
+				fmt.Fprintf(f, "Panic: %v\n", r)
+				// Write stack trace
+				buf := make([]byte, 64<<10) // 64KB
+				n := runtime.Stack(buf, true)
+				f.Write(buf[:n])
+				fmt.Fprintf(f, "\n=== END CRASH LOG ===\n")
+				f.Close()
+			}
+			
+			log.Printf("[Server] 🚨 CRITICAL ERROR: Daemon panicked! Details written to %s", crashLog)
+			// Re-panic to ensure process exits (we want it to restart, not stay in broken state)
+			panic(r)
+		}
+	}()
+
+	// Perform pre-flight setup (model downloads, indexing)
+	if err := s.Mgr.EnsureReady(ctx); err != nil {
+		return fmt.Errorf("failed pre-flight readiness: %w", err)
+	}
+
 	// Initialize OpenTelemetry
 	shutdown, err := telemetry.InitOTel(ctx, "openexec-daemon", os.Stdout)
 	if err != nil {

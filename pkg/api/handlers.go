@@ -12,6 +12,7 @@ import (
     "time"
 
     "github.com/openexec/openexec/internal/approval"
+    "github.com/openexec/openexec/internal/release"
     "github.com/openexec/openexec/pkg/audit"
     "github.com/openexec/openexec/pkg/db/session"
     "github.com/openexec/openexec/pkg/db/state"
@@ -494,7 +495,23 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-    WriteJSON(w, http.StatusOK, map[string]interface{}{"runs": result})
+    // Project-wide progress
+    var total, done int
+    if rel, err := s.Mgr.GetInternalReleaseManager(); err == nil {
+        tasks := rel.GetTasks()
+        total = len(tasks)
+        for _, t := range tasks {
+            if t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved {
+                done++
+            }
+        }
+    }
+
+    WriteJSON(w, http.StatusOK, map[string]interface{}{
+        "runs":        result,
+        "total_tasks": total,
+        "done_tasks":  done,
+    })
 }
 
 // Legacy FWU handlers (handleStart, handleStatus, handleList, handlePause, handleStop, handleEvents)

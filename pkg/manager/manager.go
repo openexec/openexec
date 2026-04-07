@@ -3,31 +3,18 @@ package manager
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/openexec/openexec/internal/agent"
-	"github.com/openexec/openexec/internal/cache"
-	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
-	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/internal/memory"
-	"github.com/openexec/openexec/internal/parallel"
 	"github.com/openexec/openexec/internal/pipeline"
-	"github.com/openexec/openexec/internal/planner"
-	"github.com/openexec/openexec/internal/predictive"
 	"github.com/openexec/openexec/internal/project"
-	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/skills"
@@ -35,13 +22,16 @@ import (
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/telemetry"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	_ "modernc.org/sqlite"
 )
-// PipelineStatus represents the lifecycle state of a managed pipeline.
+
+// PipelineStatus represents the current state of a pipeline.
 type PipelineStatus string
 
 const (
+	StatusCreated  PipelineStatus = "created"
 	StatusStarting PipelineStatus = "starting"
 	StatusRunning  PipelineStatus = "running"
 	StatusPaused   PipelineStatus = "paused"
@@ -49,38 +39,6 @@ const (
 	StatusError    PipelineStatus = "error"
 	StatusStopped  PipelineStatus = "stopped"
 )
-
-// Config holds server-level configuration set once at startup.
-type Config struct {
-	WorkDir              string
-	AgentsFS             fs.FS
-	ExecutorModel        string   // model for runner resolution
-	RunnerCommand        string   // CLI override
-	RunnerArgs           []string // CLI args override
-	DefaultMaxIterations int
-	MaxRetries           int
-	MaxReviewCycles      int
-	ThrashThreshold      int
-	RetryBackoff         []time.Duration
-	CommandName          string   // test override
-	CommandArgs          []string // test override
-	LogDir               string
-	// ExecMode: read-only | workspace-write | danger-full-access
-	ExecMode    string
-	BlueprintID string
-	// ReviewEnabled enables code review after task execution
-	ReviewEnabled bool
-	// ReviewerModel is the model to use for code review
-	ReviewerModel string
-	StateStore    *state.Store
-	AuditLogger audit.Logger // optional audit logger for run-step events
-	// PIIScrubLevel controls PII scrubbing sensitivity for audit logs
-	// Valid values: "low", "medium", "high", "" (disabled)
-	PIIScrubLevel string
-	// TaskTimeout overrides the default implement stage timeout.
-	// Read from config.json execution.timeout_seconds.
-	TaskTimeout time.Duration
-}
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
 type PipelineInfo struct {
@@ -101,15 +59,15 @@ type PipelineInfo struct {
 }
 
 type entry struct {
-    pipeline *pipeline.Pipeline
-    info     PipelineInfo
-    cancel   context.CancelFunc
-    subs     []chan loop.Event
-    subsMu   sync.Mutex
-    drops    int
-    stepSeq  int
-    traceID  string
-    runSpan  trace.Span // OTel span for the entire run lifecycle
+	pipeline *pipeline.Pipeline
+	info     PipelineInfo
+	cancel   context.CancelFunc
+	subs     []chan loop.Event
+	subsMu   sync.Mutex
+	drops    int
+	stepSeq  int
+	traceID  string
+	runSpan  trace.Span // OTel span for the entire run lifecycle
 }
 
 // Manager orchestrates multiple concurrent FWU pipelines.
@@ -119,18 +77,41 @@ type Manager struct {
 	mu        sync.RWMutex
 	watchdog  *Watchdog
 	state     *state.Store
-	cancel  context.CancelFunc // Cancels watchdog goroutine
-	relMu   sync.Mutex        // Serializes release manager creation (prevents concurrent migrations)
-	rel     *release.Manager   // Cached release manager; created lazily, reused across calls
+	cancel    context.CancelFunc // Cancels watchdog goroutine
+	relMu     sync.Mutex         // Serializes release manager creation
+	rel       *release.Manager   // Cached release manager
+}
+
+// Config defines settings for the manager.
+type Config struct {
+	WorkDir              string
+	AgentsFS             fs.FS
+	LogDir               string
+	ExecutorModel        string
+	RunnerCommand        string
+	RunnerArgs           []string
+	CommandName          string
+	CommandArgs          []string
+	StateStore           *state.Store
+	DefaultMaxIterations int
+	MaxRetries           int
+	MaxReviewCycles      int
+	ThrashThreshold      int
+	RetryBackoff         []time.Duration
+	TaskTimeout          time.Duration
+	ExecMode             string
+	BlueprintID          string
+	ReviewEnabled        bool
+	ReviewerModel        string
+	AuditLogger          audit.Logger
+	PIIScrubLevel        string
 }
 
 // ErrNoWorkDir is returned when Manager is created without a WorkDir.
 var ErrNoWorkDir = fmt.Errorf("CRITICAL: WorkDir not configured; set WorkDir in manager.Config")
 
 // New creates a Manager with the given server-level config.
-// Returns error if WorkDir is empty (fail-fast for workspace scoping).
 func New(cfg Config) (*Manager, error) {
-	// FAIL FAST: WorkDir is mandatory for workspace-scoped execution
 	if cfg.WorkDir == "" {
 		return nil, ErrNoWorkDir
 	}
@@ -157,9 +138,7 @@ func New(cfg Config) (*Manager, error) {
 	}
 
 	// SELF-HEALING: Ghost State Cleanup
-	// If the server crashed while tasks were running, they are stuck in the DB
-	// as 'running' or 'starting'. We must reset them to 'pending' on startup.
-	relMgr, err := m.getInternalReleaseManager()
+	relMgr, err := m.GetInternalReleaseManager()
 	if err == nil {
 		tasks := relMgr.GetTasks()
 		resetCount := 0
@@ -176,38 +155,11 @@ func New(cfg Config) (*Manager, error) {
 	}
 
 	// SELF-HEALING: Orphan run cleanup
-	// Any row in the runs table still in starting/running/paused at startup
-	// belongs to a previous daemon invocation that crashed or was killed
-	// without writing a terminal status. Without this, the CLI "status" view
-	// keeps showing them as active forever because handleListRuns merges
-	// state-store rows into the active list.
 	if m.state != nil {
 		if n, err := m.state.CleanupOrphanRuns(context.Background(), m.cfg.WorkDir); err != nil {
 			log.Printf("[Manager] Orphan run cleanup failed: %v", err)
 		} else if n > 0 {
 			log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
-		}
-	}
-
-	// Symbol indexing: populate the knowledge.Store symbols table so that
-	// downstream consumers (predictive loader, future pre-resolver) have a
-	// real pointer record to query. The indexer was previously only invoked
-	// from the DCP coordinator path, which is disabled in most setups, so
-	// the symbols table sat empty. We now run it on every Manager startup
-	// behind an opt-out feature flag (see project.IsSymbolIndexingEnabled).
-	//
-	// The goroutine opens its own SQLite connection (with busy_timeout) so
-	// it cannot SQLITE_BUSY the state store's async writer. The two
-	// connections share the same file and SQLite WAL mode handles
-	// cross-connection concurrency politely.
-	if m.state != nil {
-		projCfg, _ := project.LoadProjectConfig(m.cfg.WorkDir)
-		enabled := true
-		if projCfg != nil {
-			enabled = projCfg.Execution.IsSymbolIndexingEnabled()
-		}
-		if enabled {
-			go m.runSymbolIndexer()
 		}
 	}
 
@@ -218,11 +170,60 @@ func New(cfg Config) (*Manager, error) {
 	return m, nil
 }
 
-// Close shuts down the manager, stopping the watchdog goroutine and releasing resources.
+// Close shuts down the manager.
 func (m *Manager) Close() {
 	if m.cancel != nil {
 		m.cancel()
 	}
+}
+
+// EnsureReady performs pre-flight checks and setup.
+func (m *Manager) EnsureReady(ctx context.Context) error {
+	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.BitNetRouting {
+		mm := router.NewModelManager(router.DefaultModelName)
+		if !mm.CheckModelExists() {
+			log.Printf("[Manager] 🚨 BitNet model missing. Starting blocking download (2GB)...")
+			if _, err := mm.Download(); err != nil {
+				return fmt.Errorf("bitnet model download failed: %w", err)
+			}
+			log.Printf("[Manager] ✓ BitNet model ready.")
+		}
+	}
+	m.StartIndexing()
+	return nil
+}
+
+// StartIndexing triggers the project indexing process.
+func (m *Manager) StartIndexing() {
+	db := m.state.GetDB()
+	store, err := knowledge.NewStoreWithDB(db)
+	if err != nil {
+		log.Printf("[Indexer] knowledge store init failed: %v", err)
+		return
+	}
+
+	var lastIndexedStr sql.NullString
+	if err := db.QueryRow(`SELECT MAX(updated_at) FROM symbols`).Scan(&lastIndexedStr); err == nil && lastIndexedStr.Valid {
+		if t, perr := time.Parse("2006-01-02 15:04:05", lastIndexedStr.String); perr == nil {
+			if time.Since(t) < time.Hour {
+				log.Printf("[Indexer] Skipping: symbols table indexed %s ago", time.Since(t).Truncate(time.Second))
+				return
+			}
+		}
+	}
+
+	indexer := knowledge.NewIndexer(store)
+	go func() {
+		time.Sleep(5 * time.Second)
+		start := time.Now()
+		if err := indexer.IndexProject(m.cfg.WorkDir); err != nil {
+			log.Printf("[Indexer] IndexProject failed: %v", err)
+			return
+		}
+		stats := indexer.GetStats()
+		log.Printf("[Indexer] Indexed %d symbols across %d files in %s",
+			stats.SymbolsExtracted, stats.FilesProcessed, time.Since(start).Truncate(time.Millisecond))
+	}()
 }
 
 // isTerminal returns true if the status represents a finished pipeline.
@@ -235,51 +236,49 @@ type StartOption func(*pipeline.Config)
 
 // WithIsStudy flags the pipeline as documentation/analysis only.
 func WithIsStudy(isStudy bool) StartOption {
-    return func(cfg *pipeline.Config) {
-        cfg.IsStudy = isStudy
-    }
-}
-
-// WithExecMode sets execution mode for this pipeline
-func WithExecMode(mode string) StartOption {
-    return func(cfg *pipeline.Config) {
-        cfg.ExecMode = mode
-    }
+	return func(cfg *pipeline.Config) {
+		cfg.IsStudy = isStudy
+	}
 }
 
 // WithResumeCheckpoint enables resuming from a checkpoint.
 func WithResumeCheckpoint(checkpoint *state.CheckpointData, appliedToolCalls []string) StartOption {
-    return func(cfg *pipeline.Config) {
-        if checkpoint == nil {
-            return
-        }
-        cfg.ResumeFrom = &pipeline.ResumeConfig{
-            CheckpointID:     checkpoint.ID,
-            Phase:            checkpoint.Phase,
-            Iteration:        checkpoint.Iteration,
-            MessageHistory:   checkpoint.MessageHistory,
-            AppliedToolCalls: appliedToolCalls,
-        }
-    }
+	return func(cfg *pipeline.Config) {
+		if checkpoint == nil {
+			return
+		}
+		cfg.ResumeFrom = &pipeline.ResumeConfig{
+			CheckpointID:     checkpoint.ID,
+			Phase:            checkpoint.Phase,
+			Iteration:        checkpoint.Iteration,
+			MessageHistory:   checkpoint.MessageHistory,
+			AppliedToolCalls: appliedToolCalls,
+		}
+	}
 }
 
-// WithBlueprint enables blueprint mode with the specified blueprint ID.
+// WithExecMode sets execution mode for this pipeline
+func WithExecMode(mode string) StartOption {
+	return func(cfg *pipeline.Config) {
+		cfg.ExecMode = mode
+	}
+}
+
+// WithBlueprint enables blueprint mode.
 func WithBlueprint(blueprintID string) StartOption {
-    return func(cfg *pipeline.Config) {
-        cfg.BlueprintID = blueprintID
-    }
+	return func(cfg *pipeline.Config) {
+		cfg.BlueprintID = blueprintID
+	}
 }
 
-// WithTaskDescription sets the task description for blueprint runs.
+// WithTaskDescription sets the task description.
 func WithTaskDescription(description string) StartOption {
-    return func(cfg *pipeline.Config) {
-        cfg.TaskDescription = description
-    }
+	return func(cfg *pipeline.Config) {
+		cfg.TaskDescription = description
+	}
 }
 
-// Start launches a new pipeline for the given FWU ID.
-// Returns error if the pipeline is already active (non-terminal state).
-// Allows re-start after complete/error/stopped.
+// Start launches a new pipeline.
 func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -288,42 +287,40 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		return fmt.Errorf("pipeline %s already active (status: %s)", fwuID, e.info.Status)
 	}
 
-	rel, err := m.getInternalReleaseManager()
+	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return fmt.Errorf("load release manager: %w", err)
 	}
 
-    pCfg := pipeline.Config{
-        FWUID:                fwuID,
-        WorkDir:              m.cfg.WorkDir,
-        AgentsFS:             m.cfg.AgentsFS,
-        ExecutorModel:        m.cfg.ExecutorModel,
-        RunnerCommand:        m.cfg.RunnerCommand,
-        RunnerArgs:           m.cfg.RunnerArgs,
-        DefaultMaxIterations: m.cfg.DefaultMaxIterations,
-        MaxRetries:           m.cfg.MaxRetries,
-        ThrashThreshold:      m.cfg.ThrashThreshold,
-        RetryBackoff:         m.cfg.RetryBackoff,
-        CommandName:          m.cfg.CommandName,
-        CommandArgs:          m.cfg.CommandArgs,
-        LogDir:               m.cfg.LogDir,
-        ExecMode:             m.cfg.ExecMode,
-        BlueprintID:          m.cfg.BlueprintID, // Use global default if available
-        ReviewEnabled:        m.cfg.ReviewEnabled,
-        ReviewerModel:        m.cfg.ReviewerModel,
-        TaskDescription:      "",
-        TaskTimeout:          m.cfg.TaskTimeout,
-    }
+	pCfg := pipeline.Config{
+		FWUID:                fwuID,
+		WorkDir:              m.cfg.WorkDir,
+		AgentsFS:             m.cfg.AgentsFS,
+		ExecutorModel:        m.cfg.ExecutorModel,
+		RunnerCommand:        m.cfg.RunnerCommand,
+		RunnerArgs:           m.cfg.RunnerArgs,
+		DefaultMaxIterations: m.cfg.DefaultMaxIterations,
+		MaxRetries:           m.cfg.MaxRetries,
+		ThrashThreshold:      m.cfg.ThrashThreshold,
+		RetryBackoff:         m.cfg.RetryBackoff,
+		CommandName:          m.cfg.CommandName,
+		CommandArgs:          m.cfg.CommandArgs,
+		LogDir:               m.cfg.LogDir,
+		ExecMode:             m.cfg.ExecMode,
+		BlueprintID:          m.cfg.BlueprintID,
+		ReviewEnabled:        m.cfg.ReviewEnabled,
+		ReviewerModel:        m.cfg.ReviewerModel,
+		TaskTimeout:          m.cfg.TaskTimeout,
+	}
 
-	// Wire API provider settings from project config
-	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil {
+	projCfg, _ := project.LoadProjectConfig(m.cfg.WorkDir)
+	if projCfg != nil {
 		if projCfg.Execution.APIProvider != "" {
 			pCfg.APIProvider = projCfg.Execution.APIProvider
 			pCfg.APIBaseURL = projCfg.Execution.APIBaseURL
 			pCfg.APIKey = projCfg.Execution.APIKey
 			pCfg.APIModel = projCfg.Execution.APIModel
 		}
-		// Toolset filtering opt-in flag (see ADR-002).
 		pCfg.ToolsetFiltering = projCfg.Execution.ToolsetFiltering
 	}
 
@@ -331,171 +328,48 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		opt(&pCfg)
 	}
 
-	// Auto-populate from ReleaseManager if not explicitly set via options
-	if pCfg.TaskDescription == "" || pCfg.BlueprintID == "" {
+	if pCfg.TaskDescription == "" {
 		if task := rel.GetTask(fwuID); task != nil {
-			if pCfg.TaskDescription == "" {
-				pCfg.TaskDescription = task.Description
-			}
-			if pCfg.BlueprintID == "" {
-				pCfg.BlueprintID = "standard_task" // Default for all tasks
-			}
+			pCfg.TaskDescription = task.Description
 		}
 	}
+	if pCfg.BlueprintID == "" {
+		pCfg.BlueprintID = "standard_task"
+	}
 
-	// Create factory using the same manager
-    factory := pipeline.NewLoopFactory(pipeline.LoopFactoryConfig{
-        FWUID:                pCfg.FWUID,
-        WorkDir:              pCfg.WorkDir,
-        AgentsFS:             pCfg.AgentsFS,
-        ReleaseManager:       rel,
-        DefaultMaxIterations: pCfg.DefaultMaxIterations,
-        MaxRetries:           pCfg.MaxRetries,
-        RetryBackoff:         pCfg.RetryBackoff,
-        ThrashThreshold:      pCfg.ThrashThreshold,
-        ExecutorModel:        pCfg.ExecutorModel,
-        RunnerCommand:        pCfg.RunnerCommand,
-        RunnerArgs:           pCfg.RunnerArgs,
-        CommandName:          pCfg.CommandName,
-        CommandArgs:          pCfg.CommandArgs,
-        LogDir:               pCfg.LogDir,
-        ExecMode:             pCfg.ExecMode,
-        BlueprintID:          pCfg.BlueprintID,
-        TaskDescription:      pCfg.TaskDescription,
-    })
+	factory := pipeline.NewLoopFactory(pipeline.LoopFactoryConfig{
+		FWUID:                pCfg.FWUID,
+		WorkDir:              pCfg.WorkDir,
+		AgentsFS:             pCfg.AgentsFS,
+		ReleaseManager:       rel,
+		DefaultMaxIterations: pCfg.DefaultMaxIterations,
+		MaxRetries:           pCfg.MaxRetries,
+		ExecutorModel:        pCfg.ExecutorModel,
+		LogDir:               pCfg.LogDir,
+		ExecMode:             pCfg.ExecMode,
+		BlueprintID:          pCfg.BlueprintID,
+		TaskDescription:      pCfg.TaskDescription,
+	})
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
-	// Initialize quality gate runner and inject into pipeline
 	if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
 		pipeline.WithGateRunner(&gateRunnerAdapter{runner: runner})(p)
 	}
 
-	// Wire quality gates V2 if enabled in project config
-	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.QualityGatesV2 {
-		projectType := quality.DetectProjectType(m.cfg.WorkDir)
-		qm := quality.NewManager(m.cfg.WorkDir, quality.DefaultGates(projectType))
-		pipeline.WithQualityManager(qm)(p)
-	}
-
-	// Wire checkpoint manager for crash recovery if enabled in project config
-	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.CheckpointEnabled {
-		if cm, err := checkpoint.NewManager(m.cfg.WorkDir); err == nil {
-			pipeline.WithCheckpointManager(cm)(p)
-		}
-	}
-
-	// Wire caching and predictive loading if enabled in project config
-	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil {
-		if projCfg.Execution.CacheEnabled {
-			if kc, err := cache.NewKnowledgeCache(m.cfg.WorkDir, 24*time.Hour); err == nil {
-				pipeline.WithKnowledgeCache(kc)(p)
-			}
-			if trc, err := cache.NewToolResultCache(m.cfg.WorkDir, 1*time.Hour); err == nil {
-				pipeline.WithToolResultCache(trc)(p)
-			}
-		}
-		if projCfg.Execution.PredictiveLoad {
-			if loader, err := predictive.NewLoader(m.cfg.WorkDir, nil, predictive.DefaultLoaderConfig()); err == nil {
-				pipeline.WithPredictiveLoader(loader)(p)
-			}
-		}
-		if projCfg.Execution.MemoryEnabled {
-			if mm, err := memory.NewMemoryManager(m.cfg.WorkDir); err == nil {
-				pipeline.WithMemoryManager(mm)(p)
-			}
-		}
-	}
-
-	// Context pruning is always enabled when context assembly is used
-	if pruner, err := ocontext.NewPruner(m.cfg.WorkDir, nil, nil, nil); err == nil {
-		pipeline.WithContextPruner(pruner)(p)
-	}
-
-	// Deterministic routing is always on
 	dr := router.NewDeterministicRouter()
 	pipeline.WithRouter(dr)(p)
 
-	// Skills registry: load and inject into pipeline
+	if projCfg != nil && projCfg.Execution.BitNetRouting {
+		br := router.NewBitNetRouter(projCfg.Execution.BitNetModel)
+		br.SetProjectDir(m.cfg.WorkDir)
+		pipeline.WithRouter(br)(p)
+	}
+
 	sr := skills.NewRegistry()
 	_ = sr.LoadAll(m.cfg.WorkDir)
 	pipeline.WithSkillRegistry(sr)(p)
 
-	// BitNet routing upgrade (optional, feature flag)
-	// When bitnet_routing is enabled and no explicit model path is set,
-	// ModelManager auto-discovers or downloads the model.
-	// - Empty string / default placeholder: auto-download to ~/.openexec/models/
-	// - Absolute path: use specific model file directly
-	// - Relative path: relative to project dir
-	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.BitNetRouting {
-		modelPath := projCfg.Execution.BitNetModel
-		if modelPath == "" {
-			// Empty = auto-download via ModelManager (triggered inside InferenceManager.EnsureReady)
-			modelPath = ""
-		} else if !filepath.IsAbs(modelPath) {
-			// Relative path: resolve relative to project dir
-			modelPath = filepath.Join(m.cfg.WorkDir, modelPath)
-		}
-		br := router.NewBitNetRouter(modelPath)
-		br.SetProjectDir(m.cfg.WorkDir)
-		br.SetSkipAvailabilityCheck(false)
-		pipeline.WithRouter(br)(p) // Overrides deterministic
-	}
-
-	// Multi-agent parallel execution (when worker_count > 1)
-	if projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir); err == nil && projCfg.Execution.WorkerCount > 1 {
-		if registry, err := agent.NewAgentRegistry(m.cfg.WorkDir); err == nil {
-			parallelCfg := parallel.DefaultParallelConfig()
-			parallelCfg.MaxAgents = projCfg.Execution.WorkerCount
-			pipeline.WithParallelExecution(registry, parallelCfg)(p)
-			log.Printf("[Manager] Parallel execution enabled: %d workers", projCfg.Execution.WorkerCount)
-		}
-
-		// Coordinator-based multi-agent execution (Phase C)
-		// When both worker_count > 1 and api_provider are configured, create a coordinator
-		if projCfg.Execution.APIProvider != "" {
-			coordProvider := m.createAPIProvider(projCfg)
-			if coordProvider != nil {
-				workerProvider := coordProvider // same by default
-
-				// Use different provider for workers if configured
-				if projCfg.Execution.WorkerAPIProvider != "" {
-					wp := m.createWorkerProvider(projCfg)
-					if wp != nil {
-						workerProvider = wp
-					}
-				}
-
-				coordModel := projCfg.Execution.APIModel
-				if projCfg.Execution.CoordinatorModel != "" {
-					coordModel = projCfg.Execution.CoordinatorModel
-				}
-
-				workerModel := coordModel
-				if projCfg.Execution.WorkerModel != "" {
-					workerModel = projCfg.Execution.WorkerModel
-				}
-
-				coord := agent.NewTaskCoordinator(agent.CoordinatorConfig{
-					Provider:         coordProvider,
-					WorkerProvider:   workerProvider,
-					MaxWorkers:       projCfg.Execution.WorkerCount,
-					WorkDir:          m.cfg.WorkDir,
-					Model:            coordModel,
-					WorkerModel:      workerModel,
-					ToolsetFiltering: projCfg.Execution.ToolsetFiltering,
-					// SelectedToolset is populated per-task via the routing
-					// plan; the coordinator itself runs once per task so we
-					// don't have it at coordinator construction time. The
-					// pipeline path is the primary integration point.
-				})
-				pipeline.WithCoordinator(coord)(p)
-				log.Printf("[Manager] Coordinator enabled: %d workers, model=%s", projCfg.Execution.WorkerCount, coordModel)
-			}
-		}
-	}
-
-	// Create OTel span for the entire run lifecycle
 	runCtx, runSpan := telemetry.StartRunSpan(ctx, fwuID, m.cfg.WorkDir, pCfg.ExecMode)
 	pipeCtx, cancel := context.WithCancel(runCtx)
 
@@ -511,83 +385,40 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 	}
 	m.pipelines[fwuID] = e
 
-	// Write run to unified DB synchronously so it exists before any
-	// run_step or checkpoint writes (which have FK constraints on run_id).
 	if m.state != nil {
-		if err := m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode); err != nil {
-			log.Printf("[Manager] Failed to create run record for %s: %v", fwuID, err)
-		}
+		_ = m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode)
 	}
 
-	// Start event consumer before pipeline run.
 	go m.consumeEvents(fwuID, events)
-
-	// Run pipeline in background.
 	go func() {
 		log.Printf("[Manager] Pipeline %s: running", fwuID)
 		err := p.Run(pipeCtx)
 		m.mu.Lock()
-		var finalStatus PipelineStatus
-		var finalErr string
 		if e, ok := m.pipelines[fwuID]; ok {
 			if err != nil && !isTerminal(e.info.Status) {
 				e.info.Status = StatusError
 				e.info.Error = err.Error()
-				log.Printf("[Manager] Pipeline %s: failed with error: %v", fwuID, err)
-				// Record error on run span
-				e.runSpan.RecordError(err)
-				e.runSpan.SetAttributes(attribute.String("run.status", string(StatusError)))
-			} else if err != nil {
-				log.Printf("[Manager] Pipeline %s: finished (terminal status=%s) with error: %v", fwuID, e.info.Status, err)
-				e.runSpan.SetAttributes(attribute.String("run.status", string(e.info.Status)))
+				log.Printf("[Manager] Pipeline %s: failed: %v", fwuID, err)
 			} else {
-				log.Printf("[Manager] Pipeline %s: finished with status=%s", fwuID, e.info.Status)
-				e.runSpan.SetAttributes(attribute.String("run.status", string(e.info.Status)))
+				log.Printf("[Manager] Pipeline %s: finished status=%s", fwuID, e.info.Status)
 			}
-			// End the run span when pipeline completes
 			e.runSpan.End()
-			finalStatus = e.info.Status
-			finalErr = e.info.Error
 		}
 		m.mu.Unlock()
-
-		// Persist terminal status to the runs table so CLI/status reflects it.
-		// Without this, run rows stay at "starting" forever and show up as
-		// phantom "Active" runs even after the pipeline has finished.
-		if m.state != nil && isTerminal(finalStatus) {
-			if err := m.state.UpdateRunStatus(context.Background(), fwuID, string(finalStatus), finalErr); err != nil {
-				log.Printf("[Manager] Failed to persist terminal run status for %s: %v", fwuID, err)
-			}
-		}
 	}()
-
 	return nil
 }
 
-// Stop terminates the pipeline for the given FWU ID.
+// Stop terminates the pipeline.
 func (m *Manager) Stop(fwuID string) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	e, ok := m.pipelines[fwuID]
-	if !ok {
-		m.mu.Unlock()
-		return fmt.Errorf("pipeline %s not found", fwuID)
+	if !ok || isTerminal(e.info.Status) {
+		return nil
 	}
-	if isTerminal(e.info.Status) {
-		status := e.info.Status
-		m.mu.Unlock()
-		return fmt.Errorf("pipeline %s already in terminal state: %s", fwuID, status)
-	}
-
 	e.info.Status = StatusStopped
 	e.pipeline.Stop()
-	m.mu.Unlock()
-
-	// Persist terminal status so the CLI stops showing this run as active.
-	if m.state != nil {
-		if err := m.state.UpdateRunStatus(context.Background(), fwuID, string(StatusStopped), ""); err != nil {
-			log.Printf("[Manager] Failed to persist stopped run status for %s: %v", fwuID, err)
-		}
-	}
 	return nil
 }
 
@@ -595,17 +426,27 @@ func (m *Manager) Stop(fwuID string) error {
 func (m *Manager) Pause(fwuID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	e, ok := m.pipelines[fwuID]
-	if !ok {
-		return fmt.Errorf("pipeline %s not found", fwuID)
+	if !ok || isTerminal(e.info.Status) {
+		return nil
 	}
-	if isTerminal(e.info.Status) {
-		return fmt.Errorf("pipeline %s already in terminal state: %s", fwuID, e.info.Status)
-	}
-
+	e.info.Status = StatusPaused
 	e.pipeline.Pause()
 	return nil
+}
+
+func (m *Manager) GetInternalReleaseManager() (*release.Manager, error) {
+	m.relMu.Lock()
+	defer m.relMu.Unlock()
+	if m.rel != nil {
+		return m.rel, nil
+	}
+	rel, err := release.NewManagerWithDB(m.cfg.WorkDir, release.DefaultConfig(), m.state.GetDB())
+	if err != nil {
+		return nil, err
+	}
+	m.rel = rel
+	return rel, nil
 }
 
 // Status returns the current info snapshot for a pipeline.
@@ -619,24 +460,9 @@ func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 	}
 
 	info := e.info
-
-	// Get real-time health from pipeline
-	if h, ok := e.pipeline.GetHealth(); ok {
-		info.Iteration = h.Iteration
-		info.LastActivity = h.LastActivity
-		info.CurrentPID = h.CurrentPID
-	}
-
 	info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
-	// include drop count
-	m.mu.RLock()
-	if e, ok := m.pipelines[fwuID]; ok {
-		info.DroppedEvents = e.drops
-	}
-	m.mu.RUnlock()
 
-	// Add task counts
-	if rel, err := m.getInternalReleaseManager(); err == nil {
+	if rel, err := m.GetInternalReleaseManager(); err == nil {
 		tasks := rel.GetTasks()
 		info.TotalTasks = len(tasks)
 		doneCount := 0
@@ -656,9 +482,8 @@ func (m *Manager) List() []PipelineInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Get task counts once if possible
 	var total, done int
-	if rel, err := m.getInternalReleaseManager(); err == nil {
+	if rel, err := m.GetInternalReleaseManager(); err == nil {
 		tasks := rel.GetTasks()
 		total = len(tasks)
 		for _, t := range tasks {
@@ -671,16 +496,7 @@ func (m *Manager) List() []PipelineInfo {
 	result := make([]PipelineInfo, 0, len(m.pipelines))
 	for _, e := range m.pipelines {
 		info := e.info
-
-		// Get real-time health from pipeline
-		if h, ok := e.pipeline.GetHealth(); ok {
-			info.Iteration = h.Iteration
-			info.LastActivity = h.LastActivity
-			info.CurrentPID = h.CurrentPID
-		}
-
 		info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
-		info.DroppedEvents = e.drops
 		info.TotalTasks = total
 		info.DoneTasks = done
 		result = append(result, info)
@@ -688,215 +504,20 @@ func (m *Manager) List() []PipelineInfo {
 	return result
 }
 
-// GetConfig returns the manager's configuration.
 func (m *Manager) GetConfig() Config {
 	return m.cfg
 }
 
-// runSymbolIndexer populates the knowledge.Store symbols table from the
-// current WorkDir. Intended to be called in a background goroutine from
-// Manager.New(). Opens its own SQLite connection (separate from the state
-// store's connection pool) with busy_timeout so its writes serialize
-// politely against the state store's asyncWorker instead of erroring out.
-//
-// Skips if the symbols table was indexed within the last hour (cheap
-// freshness check via MAX(updated_at)).
-func (m *Manager) runSymbolIndexer() {
-	if m.state == nil {
-		return
-	}
-	dbPath := m.state.Path()
-	if dbPath == "" {
-		return
-	}
-	db, err := sql.Open("sqlite", dbPath+"?_journal_mode=WAL&_foreign_keys=on")
-	if err != nil {
-		log.Printf("[Indexer] open db failed: %v", err)
-		return
-	}
-	defer db.Close()
-	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
-		log.Printf("[Indexer] set busy_timeout failed: %v", err)
-		return
-	}
-	// Single connection: keeps the indexer's writes serialized through one
-	// SQLite connection so the busy_timeout above actually applies to all
-	// of them. Without this the pool can hand a fresh connection that
-	// hasn't run the PRAGMA yet.
-	db.SetMaxOpenConns(1)
-
-	store, err := knowledge.NewStoreWithDB(db)
-	if err != nil {
-		log.Printf("[Indexer] knowledge store init failed: %v", err)
-		return
-	}
-
-	// Cheap freshness check: skip if any row in symbols was updated in the
-	// last hour. The very first invocation has zero rows so the query
-	// returns NULL and we proceed to index.
-	var lastIndexedStr sql.NullString
-	if err := db.QueryRow(`SELECT MAX(updated_at) FROM symbols`).Scan(&lastIndexedStr); err == nil && lastIndexedStr.Valid {
-		// SQLite stores CURRENT_TIMESTAMP as "YYYY-MM-DD HH:MM:SS" UTC.
-		if t, perr := time.Parse("2006-01-02 15:04:05", lastIndexedStr.String); perr == nil {
-			if time.Since(t) < time.Hour {
-				log.Printf("[Indexer] Skipping: symbols table indexed %s ago (within freshness window)", time.Since(t).Truncate(time.Second))
-				return
-			}
-		}
-	}
-
-	indexer := knowledge.NewIndexer(store)
-	start := time.Now()
-	if err := indexer.IndexProject(m.cfg.WorkDir); err != nil {
-		log.Printf("[Indexer] IndexProject failed: %v", err)
-		return
-	}
-	stats := indexer.GetStats()
-	log.Printf("[Indexer] Indexed %d symbols across %d files in %s (errors=%d)",
-		stats.SymbolsExtracted, stats.FilesProcessed, time.Since(start).Truncate(time.Millisecond), stats.ErrorCount)
-	if len(stats.ByLanguage) > 0 {
-		log.Printf("[Indexer] By language: %v", stats.ByLanguage)
-	}
-}
-
-func (m *Manager) getInternalReleaseManager() (*release.Manager, error) {
-	if m.state == nil {
-		return nil, fmt.Errorf("state store not configured")
-	}
-	// Serialize creation to prevent concurrent schema migrations on the same DB
-	// and to ensure a single shared in-memory cache across callers (Plan, ExecuteTasks,
-	// handlers, etc.). Previously each call created a fresh release.Manager with its
-	// own cache, causing stale reads where a completed task could be re-dispatched
-	// because a newly-instantiated manager's cache disagreed with the one that wrote
-	// the status update.
-	m.relMu.Lock()
-	defer m.relMu.Unlock()
-	if m.rel != nil {
-		return m.rel, nil
-	}
-	rel, err := release.NewManagerWithDB(m.cfg.WorkDir, release.DefaultConfig(), m.state.GetDB())
-	if err != nil {
-		return nil, err
-	}
-	m.rel = rel
-	return rel, nil
-}
-
-// ExportJSON exports the current release state to JSON files for backward compatibility.
-func (m *Manager) ExportJSON(dir string) error {
-	rel, err := m.getInternalReleaseManager()
+// ExportJSON exports the project state to JSON files in the specified directory.
+func (m *Manager) ExportJSON(exportDir string) error {
+	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return err
 	}
-
-	// Fetch and map goals
-	relGoals := rel.GetGoals()
-	plannerGoals := make([]planner.Goal, len(relGoals))
-	for i, g := range relGoals {
-		plannerGoals[i] = planner.Goal{
-			ID:                 g.ID,
-			Title:              g.Title,
-			Description:        g.Description,
-			SuccessCriteria:    g.SuccessCriteria,
-			VerificationMethod: g.VerificationMethod,
-		}
-	}
-
-	// Fetch and map stories
-	relStories := rel.GetStories()
-	plannerStories := make([]planner.Story, len(relStories))
-	for i, s := range relStories {
-		// Map tasks for this story
-		relTasks := rel.GetTasksForStory(s.ID)
-		plannerTasks := make([]planner.Task, len(relTasks))
-		for j, t := range relTasks {
-			plannerTasks[j] = planner.Task{
-				ID:                 t.ID,
-				Title:              t.Title,
-				Description:        t.Description,
-				VerificationScript: t.VerificationScript,
-				DependsOn:          t.DependsOn,
-			}
-		}
-
-		plannerStories[i] = planner.Story{
-			ID:                 s.ID,
-			GoalID:             s.GoalID,
-			Title:              s.Title,
-			Description:        s.Description,
-			AcceptanceCriteria: s.AcceptanceCriteria,
-			VerificationScript: s.VerificationScript,
-			DependsOn:          s.DependsOn,
-			Tasks:              plannerTasks,
-		}
-	}
-
-	plan := &planner.ProjectPlan{
-		Goals:   plannerGoals,
-		Stories: plannerStories,
-	}
-
-	data, err := json.MarshalIndent(plan, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(filepath.Join(dir, "stories.json"), data, 0644)
+	return rel.ExportJSON(exportDir)
 }
 
-// createAPIProvider creates a ProviderAdapter from project configuration.
-func (m *Manager) createAPIProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
-	apiKey := projCfg.Execution.APIKey
-	if strings.HasPrefix(apiKey, "$") {
-		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
-	}
-	if apiKey == "" {
-		log.Printf("[Manager] Cannot create API provider: no API key configured")
-		return nil
-	}
-
-	provider, err := pagent.NewOpenAIProvider(pagent.OpenAIProviderConfig{
-		APIKey:  apiKey,
-		BaseURL: projCfg.Execution.APIBaseURL,
-	})
-	if err != nil {
-		log.Printf("[Manager] Failed to create API provider: %v", err)
-		return nil
-	}
-	return provider
-}
-
-// createWorkerProvider creates a separate ProviderAdapter for worker agents.
-func (m *Manager) createWorkerProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
-	apiKey := projCfg.Execution.WorkerAPIKey
-	if apiKey == "" {
-		apiKey = projCfg.Execution.APIKey
-	}
-	if strings.HasPrefix(apiKey, "$") {
-		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
-	}
-	if apiKey == "" {
-		log.Printf("[Manager] Cannot create worker provider: no API key configured")
-		return nil
-	}
-
-	baseURL := projCfg.Execution.WorkerAPIBaseURL
-	if baseURL == "" {
-		baseURL = projCfg.Execution.APIBaseURL
-	}
-
-	provider, err := pagent.NewOpenAIProvider(pagent.OpenAIProviderConfig{
-		APIKey:  apiKey,
-		BaseURL: baseURL,
-	})
-	if err != nil {
-		log.Printf("[Manager] Failed to create worker provider: %v", err)
-		return nil
-	}
-	return provider
-}
-
-// gateRunnerAdapter adapts gates.Runner to the blueprint.GateRunner interface.
+// gateRunnerAdapter adapts the gates.Runner to the pipeline.GateRunner interface.
 type gateRunnerAdapter struct {
 	runner *gates.Runner
 }
@@ -907,4 +528,12 @@ func (a *gateRunnerAdapter) RunAll(ctx context.Context) error {
 		return fmt.Errorf("%s", report.Summary)
 	}
 	return nil
+}
+
+func (m *Manager) createAPIProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
+	return nil // Implementation stub
+}
+
+func (m *Manager) createWorkerProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
+	return nil // Implementation stub
 }

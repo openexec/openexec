@@ -176,7 +176,7 @@ func (m *Manager) writePlanArtifact(plan *planner.ProjectPlan) (planID, artifact
 }
 
 func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
-	rel, err := m.getInternalReleaseManager()
+	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return err
 	}

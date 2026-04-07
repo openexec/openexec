@@ -146,20 +146,20 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 	cmd.Println()
 
 	// Fetch runs from API
-	runs, err := fetchRuns(port)
+	runs, totalTasks, doneTasks, err := fetchRuns(port)
 	if err != nil {
 		cmd.Printf("API:     error fetching runs: %v\n", err)
 		return nil
 	}
 
 	// Active runs
-	var activeRuns []runInfo
-	var completedRuns []runInfo
+	activeRuns := []runInfo{}
+	completedRuns := []runInfo{}
+
 	for _, r := range runs {
-		switch r.Status {
-		case "running", "pending", "starting":
+		if r.Status == "running" || r.Status == "starting" || r.Status == "created" {
 			activeRuns = append(activeRuns, r)
-		default:
+		} else {
 			completedRuns = append(completedRuns, r)
 		}
 	}
@@ -169,7 +169,15 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 		cmd.Printf("  - %s: %s (%s)\n", r.GetID(), r.Status, r.GetStage())
 	}
 
+	// Progress summary (now uses top-level counts from API)
+	if totalTasks > 0 {
+		cmd.Println()
+		cmd.Printf("Progress: %d/%d tasks completed (%.1f%%)\n",
+			doneTasks, totalTasks, float64(doneTasks)/float64(totalTasks)*100)
+	}
+
 	cmd.Println()
+
 
 	// Recent completed runs (last 5)
 	cmd.Println("Recent Runs:")
@@ -216,9 +224,11 @@ func outputStatusJSON(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 	}
 
 	if daemonRunning {
-		runs, err := fetchRuns(port)
+		runs, total, done, err := fetchRuns(port)
 		if err == nil {
 			status["runs"] = runs
+			status["total_tasks"] = total
+			status["done_tasks"] = done
 		} else {
 			status["error"] = err.Error()
 		}
@@ -230,13 +240,15 @@ func outputStatusJSON(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 }
 
 type runInfo struct {
-	ID        string `json:"id"`
-	RunID     string `json:"run_id"`
-	FWUID     string `json:"fwu_id"`
-	Status    string `json:"status"`
-	Phase     string `json:"phase,omitempty"`
-	Stage     string `json:"stage,omitempty"`
-	CreatedAt string `json:"created_at,omitempty"`
+	ID         string `json:"id"`
+	RunID      string `json:"run_id"`
+	FWUID      string `json:"fwu_id"`
+	Status     string `json:"status"`
+	Phase      string `json:"phase,omitempty"`
+	Stage      string `json:"stage,omitempty"`
+	CreatedAt  string `json:"created_at,omitempty"`
+	DoneTasks  int    `json:"done_tasks"`
+	TotalTasks int    `json:"total_tasks"`
 }
 
 func (r runInfo) GetID() string {
@@ -256,37 +268,38 @@ func (r runInfo) GetStage() string {
 	return r.Phase
 }
 
-func fetchRuns(port int) ([]runInfo, error) {
+func fetchRuns(port int) ([]runInfo, int, int, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/api/v1/runs", port))
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+		return nil, 0, 0, fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
-	// Try parsing as array first
-	var runs []runInfo
-	if err := json.Unmarshal(body, &runs); err != nil {
-		// Try parsing as object with "runs" field
-		var wrapper struct {
-			Runs []runInfo `json:"runs"`
+	var wrapper struct {
+		Runs       []runInfo `json:"runs"`
+		TotalTasks int       `json:"total_tasks"`
+		DoneTasks  int       `json:"done_tasks"`
+	}
+	if err := json.Unmarshal(body, &wrapper); err != nil {
+		// Try legacy array-only format
+		var runs []runInfo
+		if err := json.Unmarshal(body, &runs); err == nil {
+			return runs, 0, 0, nil
 		}
-		if err := json.Unmarshal(body, &wrapper); err != nil {
-			return nil, fmt.Errorf("failed to parse runs: %w", err)
-		}
-		runs = wrapper.Runs
+		return nil, 0, 0, fmt.Errorf("failed to parse runs: %w", err)
 	}
 
-	return runs, nil
+	return wrapper.Runs, wrapper.TotalTasks, wrapper.DoneTasks, nil
 }
 
 func runStatusWatch(cmd *cobra.Command, config *project.ProjectConfig) error {
