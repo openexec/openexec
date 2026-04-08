@@ -9,6 +9,7 @@ import (
 
 	"github.com/openexec/openexec/internal/git"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/templates"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +23,7 @@ var (
 	initParallel       bool
 	initWorkerCount    int
 	initForce          bool
+	initTemplate       string
 )
 
 // Available models by provider
@@ -80,6 +82,18 @@ The project name defaults to the current directory name if not provided.`,
 		config, err := project.LoadProjectConfig(absProjectDir)
 		if err == nil && config != nil && !initForce {
 			return fmt.Errorf("project already initialized: %s (use --force to re-initialize)", config.Name)
+		}
+
+		// If --template is provided, copy the template scaffold into place before
+		// running the rest of initialization. Existing files are preserved.
+		if initTemplate != "" {
+			if !templates.Exists(initTemplate) {
+				return fmt.Errorf("unknown template %q", initTemplate)
+			}
+			if err := templates.CopyTemplate(initTemplate, absProjectDir); err != nil {
+				return fmt.Errorf("failed to copy template %q: %w", initTemplate, err)
+			}
+			cmd.Printf("✓ Applied template: %s\n", initTemplate)
 		}
 
 		// Interactive mode if not explicitly set via flags
@@ -197,6 +211,7 @@ func init() {
 	initCmd.Flags().BoolVar(&initParallel, "parallel", true, "Enable parallel task execution (non-interactive)")
 	initCmd.Flags().IntVar(&initWorkerCount, "worker-count", 4, "Number of concurrent workers (non-interactive)")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "Force re-initialization of an existing project")
+	initCmd.Flags().StringVar(&initTemplate, "template", "", "Scaffold template to apply (e.g. sveltekit-postgres)")
 
 	rootCmd.AddCommand(initCmd)
 }

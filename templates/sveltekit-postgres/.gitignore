@@ -1,0 +1,17 @@
+node_modules/
+.svelte-kit/
+build/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+coverage/
+playwright-report/
+test-results/
+
+# OpenExec
+.openexec/logs/
+.openexec/data/
+.openexec/engram/cache/
