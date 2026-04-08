@@ -70,6 +70,7 @@ func (s *GoScanner) scanFile(path string) ([]Finding, error) {
 	// --- AST-based rules (if parse succeeded) ---
 	handler := false
 	hasDB := false
+	stateless := isStatelessHandlerPath(path)
 	if parseErr == nil && file != nil {
 		// Detect DB-ish imports for rule 4.
 		for _, imp := range file.Imports {
@@ -91,7 +92,7 @@ func (s *GoScanner) scanFile(path string) ([]Finding, error) {
 			handler = true
 
 			// Rule 9: empty_handler — body is only `return` or single return of nil.
-			if fn.Body != nil && ruleActive(s.cfg, RuleEmptyHandler) {
+			if fn.Body != nil && !stateless && ruleActive(s.cfg, RuleEmptyHandler) {
 				if isEmptyBody(fn.Body) {
 					pos := fset.Position(fn.Body.Lbrace)
 					findings = append(findings, Finding{
@@ -105,7 +106,7 @@ func (s *GoScanner) scanFile(path string) ([]Finding, error) {
 			}
 
 			// Rule 5: hardcoded literal return inside handler.
-			if fn.Body != nil && ruleActive(s.cfg, RuleHandlerHardcoded) {
+			if fn.Body != nil && !stateless && ruleActive(s.cfg, RuleHandlerHardcoded) {
 				ast.Inspect(fn.Body, func(nn ast.Node) bool {
 					ret, ok := nn.(*ast.ReturnStmt)
 					if !ok {
@@ -194,7 +195,7 @@ func (s *GoScanner) scanFile(path string) ([]Finding, error) {
 	}
 
 	// Rule 4: handler_no_db_import — fallback when AST didn't see DB import.
-	if handler && !hasDB && ruleActive(s.cfg, RuleHandlerNoDBImport) && !hasDBImport(content) {
+	if handler && !stateless && !hasDB && ruleActive(s.cfg, RuleHandlerNoDBImport) && !hasDBImport(content) {
 		findings = append(findings, Finding{
 			File:     path,
 			Line:     1,

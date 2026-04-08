@@ -117,9 +117,10 @@ func (s *TSScanner) scanFile(path string) ([]Finding, error) {
 	}
 
 	handler := isHandlerFile(path, content)
+	stateless := isStatelessHandlerPath(path)
 
 	// Rule 4: handler_no_db_import.
-	if !test && handler && ruleActive(s.cfg, RuleHandlerNoDBImport) && !hasDBImport(content) {
+	if !test && handler && !stateless && ruleActive(s.cfg, RuleHandlerNoDBImport) && !hasDBImport(content) {
 		findings = append(findings, Finding{
 			File:     path,
 			Line:     1,
@@ -130,7 +131,7 @@ func (s *TSScanner) scanFile(path string) ([]Finding, error) {
 	}
 
 	// Rule 5: handler_hardcoded_return.
-	if !test && handler && ruleActive(s.cfg, RuleHandlerHardcoded) {
+	if !test && handler && !stateless && ruleActive(s.cfg, RuleHandlerHardcoded) {
 		for i, line := range lines {
 			if reHardcodedReturnJS.MatchString(line) {
 				findings = append(findings, Finding{
@@ -146,7 +147,7 @@ func (s *TSScanner) scanFile(path string) ([]Finding, error) {
 	}
 
 	// Rule 6: server_no_await for SvelteKit +server.ts files.
-	if !test && ruleActive(s.cfg, RuleServerNoAwait) {
+	if !test && !stateless && ruleActive(s.cfg, RuleServerNoAwait) {
 		lower := strings.ToLower(filepath.ToSlash(path))
 		if strings.Contains(lower, "/routes/") && strings.HasSuffix(lower, "+server.ts") {
 			if !strings.Contains(content, "await") {
@@ -194,7 +195,7 @@ func (s *TSScanner) scanFile(path string) ([]Finding, error) {
 	}
 
 	// Rule 9: empty_handler.
-	if !test && handler && ruleActive(s.cfg, RuleEmptyHandler) {
+	if !test && handler && !stateless && ruleActive(s.cfg, RuleEmptyHandler) {
 		for i, line := range lines {
 			if reEmptyReturn.MatchString(line) {
 				findings = append(findings, Finding{

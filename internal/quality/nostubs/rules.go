@@ -126,17 +126,69 @@ var (
 	reHandlerPy = regexp.MustCompile(`@(app|router|bp|blueprint)\.(get|post|put|delete|patch|route)\b`)
 )
 
+// isStatelessHandlerPath reports whether the handler path is a stateless
+// endpoint that legitimately has no database interaction — auth flows
+// (login/logout/signup), health checks, and similar infrastructure routes.
+// Used to suppress rules 4, 5, 6, 9 on these paths.
+func isStatelessHandlerPath(path string) bool {
+	lower := strings.ToLower(filepath.ToSlash(path))
+	// SvelteKit / Next.js style
+	if strings.Contains(lower, "/routes/api/auth/") ||
+		strings.Contains(lower, "/routes/api/health") ||
+		strings.Contains(lower, "/api/auth/") ||
+		strings.Contains(lower, "/api/health") {
+		return true
+	}
+	// Generic "health" or "healthz" endpoints
+	base := filepath.Base(lower)
+	dir := filepath.Base(filepath.Dir(lower))
+	if dir == "health" || dir == "healthz" || dir == "readyz" || dir == "livez" {
+		return true
+	}
+	if base == "health.ts" || base == "health.js" || base == "health.go" || base == "health.py" {
+		return true
+	}
+	return false
+}
+
 // isHandlerFile reports whether the path looks like an HTTP handler file.
 // Used by rules 4, 5, 9 to reduce noise.
 func isHandlerFile(path, content string) bool {
 	lower := strings.ToLower(filepath.ToSlash(path))
+
+	// Explicitly NOT handlers: SvelteKit UI files, library helpers.
+	if strings.HasSuffix(lower, "+page.svelte") ||
+		strings.HasSuffix(lower, "+layout.svelte") ||
+		strings.HasSuffix(lower, "+page.ts") ||
+		strings.HasSuffix(lower, "+page.js") ||
+		strings.HasSuffix(lower, "+layout.ts") ||
+		strings.HasSuffix(lower, "+layout.js") {
+		return false
+	}
+	if strings.Contains(lower, "/lib/") {
+		return false
+	}
+
+	// SvelteKit / Remix / Next-style explicit handler files.
 	if strings.HasSuffix(lower, "+server.ts") || strings.HasSuffix(lower, "+server.js") {
 		return true
 	}
-	if strings.Contains(lower, "/routes/") || strings.Contains(lower, "/api/") ||
-		strings.Contains(lower, "/handlers/") || strings.Contains(lower, "/controllers/") {
+
+	// Path-based detection — require /routes/api/ (API routes only, not UI
+	// routes), or an explicit handlers/controllers directory.
+	if strings.Contains(lower, "/routes/api/") ||
+		strings.Contains(lower, "/handlers/") ||
+		strings.Contains(lower, "/controllers/") {
 		return true
 	}
+	// /api/ alone is ambiguous (could be a client SDK); require an adjacent
+	// handler-signature regex match to confirm.
+	if strings.Contains(lower, "/api/") &&
+		(reHandlerJS.MatchString(content) || reHandlerGo.MatchString(content) || reHandlerPy.MatchString(content)) {
+		return true
+	}
+
+	// Content-only detection: handler signature regex in any file.
 	if reHandlerJS.MatchString(content) || reHandlerGo.MatchString(content) || reHandlerPy.MatchString(content) {
 		return true
 	}

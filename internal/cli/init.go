@@ -86,6 +86,7 @@ The project name defaults to the current directory name if not provided.`,
 
 		// If --template is provided, copy the template scaffold into place before
 		// running the rest of initialization. Existing files are preserved.
+		var templateQualityGates *project.QualityGatesConfig
 		if initTemplate != "" {
 			if !templates.Exists(initTemplate) {
 				return fmt.Errorf("unknown template %q", initTemplate)
@@ -94,6 +95,13 @@ The project name defaults to the current directory name if not provided.`,
 				return fmt.Errorf("failed to copy template %q: %w", initTemplate, err)
 			}
 			cmd.Printf("✓ Applied template: %s\n", initTemplate)
+
+			// Capture the template's prewired quality_gates so Initialize (which
+			// constructs a fresh config) doesn't clobber them.
+			if tpl, err := project.LoadProjectConfig(absProjectDir); err == nil && tpl != nil {
+				qg := tpl.QualityGates
+				templateQualityGates = &qg
+			}
 		}
 
 		// Interactive mode if not explicitly set via flags
@@ -178,6 +186,12 @@ The project name defaults to the current directory name if not provided.`,
 			APIBaseURL:        apiBaseURL,
 			APIKey:            apiKey,
 			APIModel:          apiModel,
+		}
+
+		// Restore template-prewired quality_gates (Initialize constructs a fresh
+		// config and would otherwise drop them).
+		if templateQualityGates != nil {
+			cfg.QualityGates = *templateQualityGates
 		}
 
 		// Save updated config

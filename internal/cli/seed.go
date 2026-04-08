@@ -14,9 +14,8 @@ import (
 	"github.com/openexec/openexec/internal/contracts"
 	"github.com/spf13/cobra"
 
-	// Register the sqlite driver — it is the only database driver
-	// currently vendored in this binary. The --clear flag supports
-	// sqlite today; other engines surface a clear error.
+	// Register database drivers used by the --clear path.
+	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -138,9 +137,9 @@ func runSeedClear(ctx context.Context, cmd *cobra.Command) error {
 }
 
 // resolveSeedDriver picks a database/sql driver name based on the
-// DATABASE_URL scheme. Only sqlite variants are supported because
-// that is the only driver currently vendored; postgres/mysql URLs
-// return a clear error so the failure mode is obvious.
+// DATABASE_URL scheme. Supported: sqlite (file paths, sqlite:, file:)
+// and postgres (postgres://, postgresql://). MySQL still surfaces a
+// clear error.
 func resolveSeedDriver(dsn string) (driver, cleaned string, err error) {
 	lower := strings.ToLower(dsn)
 	switch {
@@ -151,7 +150,8 @@ func resolveSeedDriver(dsn string) (driver, cleaned string, err error) {
 	case strings.HasPrefix(lower, "file:"):
 		return "sqlite3", dsn, nil
 	case strings.HasPrefix(lower, "postgres://"), strings.HasPrefix(lower, "postgresql://"):
-		return "", "", fmt.Errorf("postgres DATABASE_URL not supported by this build; run DELETE FROM users WHERE email LIKE 'bot\\_%%@%%' ESCAPE '\\' manually")
+		// lib/pq accepts postgres:// URLs directly.
+		return "postgres", dsn, nil
 	case strings.HasPrefix(lower, "mysql://"):
 		return "", "", fmt.Errorf("mysql DATABASE_URL not supported by this build")
 	default:
