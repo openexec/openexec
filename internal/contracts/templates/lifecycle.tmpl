@@ -1,0 +1,28 @@
+
+  test('{{.OpID}} full CRUD lifecycle', async () => {
+    const actor = await createTestUser();
+
+    // CREATE
+    const created = await apiCall('POST', '{{.CollectionPath}}', { /* TODO: valid payload */ }, actor);
+    expect(created.status).toBeGreaterThanOrEqual(200);
+    expect(created.status).toBeLessThan(300);
+    const createdBody = (created.body ?? {}) as Record<string, unknown>;
+    const id = createdBody.id as string | number | undefined;
+    expect(id, 'create must return an id').toBeDefined();
+
+    // READ
+    const read = await apiCall('GET', `{{.CollectionPath}}/${id}`, undefined, actor);
+    expect(read.status).toBe(200);
+
+    // UPDATE
+    const updated = await apiCall('PUT', `{{.CollectionPath}}/${id}`, { /* TODO: update payload */ }, actor);
+    expect([200, 204]).toContain(updated.status);
+
+    // DELETE
+    const deleted = await apiCall('DELETE', `{{.CollectionPath}}/${id}`, undefined, actor);
+    expect([200, 204]).toContain(deleted.status);
+
+    // READ after delete -> 404
+    const gone = await apiCall('GET', `{{.CollectionPath}}/${id}`, undefined, actor);
+    expect(gone.status).toBe(404);
+  });

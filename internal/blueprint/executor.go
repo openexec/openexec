@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/actions"
+	"github.com/openexec/openexec/internal/contracts"
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/types"
 )
 
@@ -69,10 +71,14 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 	// 1. Try Action Registry first (Go-native logic)
 	if stage.Action != "" && e.ActionRegistry != nil {
 		if action, ok := e.ActionRegistry.Get(stage.Action); ok {
+			inputs := map[string]any{"task_description": input.TaskDescription}
+			for k, v := range stage.Inputs {
+				inputs[k] = expandVars(v, input.Variables)
+			}
 			resp, err := action.Execute(ctx, actions.ActionRequest{
 				RunID:        input.RunID,
 				WorkspaceDir: e.WorkDir,
-				Inputs:       map[string]any{"task_description": input.TaskDescription},
+				Inputs:       inputs,
 			})
 			if err != nil {
 				result.Fail(err.Error())
@@ -348,6 +354,9 @@ func buildAgenticPrompt(stage *Stage, input *StageInput) string {
 	switch stage.Name {
 	case "implement":
 		sb.WriteString("Implement the requested changes. Create new files with your Write tool, and use git_apply_patch or Edit for modifying existing files.\n")
+		if section := completionContractForInput(input); section != "" {
+			sb.WriteString(section)
+		}
 	case "fix_lint":
 		sb.WriteString("Fix the linting errors from the previous stage. Use git_apply_patch or Edit for code modifications.\n")
 	case "fix_tests":
@@ -359,6 +368,44 @@ func buildAgenticPrompt(stage *Stage, input *StageInput) string {
 	sb.WriteString("\nWhen complete, emit an openexec_signal with type 'phase-complete'.\n")
 
 	return sb.String()
+}
+
+// completionContractForInput returns the Completion Contract prompt
+// block for the current feature if the stage input carries a
+// contract_path and feature variable pointing at an entry in the
+// blueprint's feature_completeness_contracts map. Returns empty if
+// no contract is available.
+func completionContractForInput(input *StageInput) string {
+	if input == nil || len(input.Variables) == 0 {
+		return ""
+	}
+	contractPath := input.Variables["contract_path"]
+	feature := input.Variables["feature"]
+	if contractPath == "" || feature == "" {
+		return ""
+	}
+	cf, err := contracts.LoadFromYAML(contractPath)
+	if err != nil || cf == nil {
+		return ""
+	}
+	ops, ok := cf.Features[feature]
+	if !ok || len(ops) == 0 {
+		return ""
+	}
+	return planner.CompletionContractSection(feature, ops)
+}
+
+// expandVars performs simple ${var} substitution against vars. Keys
+// that are not present in vars are left as-is.
+func expandVars(s string, vars map[string]string) string {
+	if s == "" || !strings.Contains(s, "${") || len(vars) == 0 {
+		return s
+	}
+	out := s
+	for k, v := range vars {
+		out = strings.ReplaceAll(out, "${"+k+"}", v)
+	}
+	return out
 }
 
 // truncate shortens a string to maxLen, adding "..." if truncated.

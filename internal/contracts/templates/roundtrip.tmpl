@@ -1,0 +1,12 @@
+
+  test('{{.OpID}} persists to database (no stubs)', async () => {
+    const actor = await createTestUser();
+    const res = await apiCall('{{.Method}}', '{{.Path}}', { /* TODO: valid payload */ }, actor);
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+{{range .Mutates}}
+    // must_persist assertion: {{.}}
+    const stored{{titleCase (tableName .)}} = await db.select().from(schema.{{camelCase (tableName .)}});
+    expect(stored{{titleCase (tableName .)}}.length).toBeGreaterThan(0);
+{{end}}
+  });

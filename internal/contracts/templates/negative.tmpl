@@ -1,0 +1,18 @@
+
+  test('{{.OpID}} rejects unauthenticated requests with 401', async () => {
+    const res = await apiCall('{{.Method}}', '{{.Path}}', { /* TODO: payload */ }, null);
+    expect(res.status).toBe(401);
+  });
+
+  test('{{.OpID}} rejects malformed payloads with 400', async () => {
+    const actor = await createTestUser();
+    const res = await apiCall('{{.Method}}', '{{.Path}}', { __invalid_contract_field__: true }, actor);
+    expect([400, 422]).toContain(res.status);
+  });
+{{if .HasAuthorization}}
+  test('{{.OpID}} rejects forbidden actors with 403', async () => {
+    const actor = await createTestUser({ role: 'guest' });
+    const res = await apiCall('{{.Method}}', '{{.Path}}', { /* TODO: payload */ }, actor);
+    expect([401, 403]).toContain(res.status);
+  });
+{{end}}

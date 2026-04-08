@@ -1,0 +1,42 @@
+
+  test('{{.OpID}} handles N concurrent calls', async () => {
+    const actor = await createTestUser();
+    const N = 10;
+{{if eq .Method "GET"}}
+    // Read-only concurrency: all responses must be identical (no race in read path).
+    const results = await Promise.all(
+      Array.from({ length: N }, () => apiCall('{{.Method}}', '{{.Path}}', undefined, actor))
+    );
+    const ok = results.filter((r) => r.status >= 200 && r.status < 300).length;
+    const conflict = results.filter((r) => r.status === 409).length;
+    expect(ok + conflict).toBe(N);
+
+    const successful = results.filter((r) => r.status >= 200 && r.status < 300);
+    expect(successful.length).toBeGreaterThan(0);
+    const baseline = JSON.stringify(successful[0].body ?? null);
+    for (const r of successful) {
+      expect(JSON.stringify(r.body ?? null), '{{.OpID}}: read responses diverged under concurrency').toBe(baseline);
+    }
+{{else}}
+    // Mutating concurrency: ok + conflict must equal N, and the DB must reflect
+    // exactly the number of successful writes (no silent double-writes).
+{{range .Mutates}}
+    const before{{titleCase (tableName .)}} = await db.select().from(schema.{{camelCase (tableName .)}});
+{{end}}
+    const results = await Promise.all(
+      Array.from({ length: N }, () => apiCall('{{.Method}}', '{{.Path}}', { /* TODO: payload */ }, actor))
+    );
+    const ok = results.filter((r) => r.status >= 200 && r.status < 300).length;
+    const conflict = results.filter((r) => r.status === 409).length;
+    expect(ok + conflict).toBe(N);
+{{range .Mutates}}
+    // Row-count check for {{.}}: new rows must match the number of 2xx responses.
+    const after{{titleCase (tableName .)}} = await db.select().from(schema.{{camelCase (tableName .)}});
+    const delta{{titleCase (tableName .)}} = after{{titleCase (tableName .)}}.length - before{{titleCase (tableName .)}}.length;
+    expect(
+      delta{{titleCase (tableName .)}},
+      '{{.}}: expected exactly ' + ok + ' new rows to match successful writes (no silent double-writes)'
+    ).toBe(ok);
+{{end}}
+{{end}}
+  });

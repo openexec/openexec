@@ -24,6 +24,11 @@ type Stage struct {
 	// Action is the Go-native action name to execute (for deterministic stages).
 	Action string `json:"action,omitempty" yaml:"action,omitempty"`
 
+	// Inputs is an optional map of static inputs passed to the action
+	// at execution time. Values support simple `${var}` substitution
+	// against the StageInput.Variables map at runtime.
+	Inputs map[string]string `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+
 	// MaxRetries is the maximum number of retry attempts.
 	MaxRetries int `json:"max_retries,omitempty" yaml:"max_retries,omitempty"`
 

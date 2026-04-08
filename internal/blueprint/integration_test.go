@@ -104,7 +104,7 @@ func TestBlueprint_DefaultStageOrder(t *testing.T) {
 	}
 
 	got := mock.getStagesExecuted()
-	want := []string{"gather_context", "implement", "lint", "test", "review"}
+	want := []string{"gather_context", "implement", "generate_contract_tests", "lint", "test", "production_readiness_check", "review"}
 
 	if len(got) != len(want) {
 		t.Fatalf("stage count mismatch: got %v, want %v", got, want)

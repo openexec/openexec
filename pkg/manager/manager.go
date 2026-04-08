@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/quality/checklist"
+	"github.com/openexec/openexec/internal/quality/nostubs"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/skills"
@@ -353,8 +356,31 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
+	var gateRunners []ptypesGateRunner
 	if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
-		pipeline.WithGateRunner(&gateRunnerAdapter{runner: runner})(p)
+		gateRunners = append(gateRunners, &gateRunnerAdapter{runner: runner})
+	}
+	if projCfg == nil || projCfg.QualityGates.IsNoStubsEnabled() {
+		var overrides map[string]nostubs.Severity
+		if projCfg != nil && len(projCfg.QualityGates.NoStubsRules) > 0 {
+			overrides = make(map[string]nostubs.Severity, len(projCfg.QualityGates.NoStubsRules))
+			for k, v := range projCfg.QualityGates.NoStubsRules {
+				overrides[k] = nostubs.Severity(v)
+			}
+		}
+		nsGate := nostubs.NewGate(m.cfg.WorkDir, nostubs.Config{RuleOverrides: overrides})
+		gateRunners = append(gateRunners, nsGate)
+	}
+	if projCfg == nil || projCfg.QualityGates.IsProductionReadyEnabled() {
+		var skip []string
+		if projCfg != nil && len(projCfg.QualityGates.ProductionReadySkip) > 0 {
+			skip = append(skip, projCfg.QualityGates.ProductionReadySkip...)
+		}
+		prGate := checklist.NewGate(m.cfg.WorkDir, checklist.Config{Skip: skip})
+		gateRunners = append(gateRunners, prGate)
+	}
+	if len(gateRunners) > 0 {
+		pipeline.WithGateRunner(&compositeGateRunner{runners: gateRunners})(p)
 	}
 
 	dr := router.NewDeterministicRouter()
@@ -528,6 +554,32 @@ func (a *gateRunnerAdapter) RunAll(ctx context.Context) error {
 		return fmt.Errorf("%s", report.Summary)
 	}
 	return nil
+}
+
+// ptypesGateRunner is a narrow local alias matching internal/types.GateRunner
+// so we can chain multiple runners without importing the types package here.
+type ptypesGateRunner interface {
+	RunAll(ctx context.Context) error
+}
+
+// compositeGateRunner runs a sequence of gate runners and returns a combined
+// error. All runners are executed even if an earlier one fails so the user
+// sees every failure at once.
+type compositeGateRunner struct {
+	runners []ptypesGateRunner
+}
+
+func (c *compositeGateRunner) RunAll(ctx context.Context) error {
+	var errs []string
+	for _, r := range c.runners {
+		if err := r.RunAll(ctx); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("quality gates failed: %s", strings.Join(errs, "; "))
 }
 
 func (m *Manager) createAPIProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {

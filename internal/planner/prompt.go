@@ -1,5 +1,47 @@
 package planner
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/openexec/openexec/internal/contracts"
+)
+
+// CompletionContractSection returns a markdown block to be appended to
+// the implement-stage prompt whenever the current feature has a
+// feature_completeness_contracts entry. The block tells the model that
+// the listed operations MUST be fully implemented end-to-end because a
+// generated Vitest contract test will exercise each one against a real
+// database.
+//
+// If feature is empty or the feature has no operations, the returned
+// string is empty so callers can safely append unconditionally.
+func CompletionContractSection(feature string, ops []contracts.Operation) string {
+	if feature == "" || len(ops) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n## Completion Contract\n")
+	fmt.Fprintf(&sb, "You are implementing the %q feature. The following operations MUST be fully implemented end-to-end. Stubbed handlers, mock arrays, hardcoded responses, and \"not implemented\" returns will fail the quality gates and the build will be rejected.\n\n", feature)
+	sb.WriteString("Operations required:\n")
+	for _, op := range ops {
+		mutates := "[]"
+		if len(op.Mutates) > 0 {
+			mutates = "[" + strings.Join(op.Mutates, ", ") + "]"
+		}
+		fmt.Fprintf(&sb, "- %s %s (%s) — mutates: %s, must_persist: %v\n", op.Method, op.Path, op.ID, mutates, op.MustPersist)
+	}
+	sb.WriteString("\nFor every mutating operation, the generated contract tests will:\n")
+	sb.WriteString("1. Call the endpoint with valid input and assert 2xx\n")
+	sb.WriteString("2. Query the database directly afterward to prove the row exists (NO STUBS)\n")
+	sb.WriteString("3. Test unauthenticated access returns 401\n")
+	sb.WriteString("4. Fire N parallel requests to verify concurrency safety\n\n")
+	sb.WriteString("These tests run against a real Postgres via testcontainers. You cannot fake them.\n")
+	return sb.String()
+}
+
+
 const StoryGenerationPrompt = `You are a software architect generating user stories from an intent document.
 
 Analyze the intent document below and generate a JSON array of user stories.

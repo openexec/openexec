@@ -53,5 +53,7 @@ func DefaultRegistry(projectDir string) *Registry {
 	_ = r.Register(NewRunGatesAction(projectDir))
 	_ = r.Register(NewBuildContextAction(projectDir))
 	_ = r.Register(NewApplyPatchAction(projectDir))
+	_ = r.Register(NewGenerateContractTestsAction(projectDir))
+	_ = r.Register(NewChecklistRunAction(projectDir))
 	return r
 }

@@ -106,8 +106,21 @@ var DefaultBlueprint = &Blueprint{
 			Toolset:     "coding_backend",
 			MaxRetries:  3,
 			Timeout:     10 * time.Minute,
-			OnSuccess:   "lint",
+			OnSuccess:   "generate_contract_tests",
 			OnFailure:   "implement",
+		},
+		"generate_contract_tests": {
+			Name:        "generate_contract_tests",
+			Description: "Render Vitest feature-completeness contract tests from the active blueprint YAML",
+			Type:        types.StageTypeDeterministic,
+			Toolset:     "coding_backend",
+			Action:      "contracts.GenerateTests",
+			Inputs: map[string]string{
+				"contract_path": "${contract_path}",
+				"target_dir":    "${target_dir}",
+			},
+			OnSuccess: "lint",
+			OnFailure: "lint",
 		},
 		"lint": {
 			Name:        "lint",
@@ -132,7 +145,7 @@ var DefaultBlueprint = &Blueprint{
 			Type:        types.StageTypeDeterministic,
 			Toolset:     "coding_backend",
 			Commands:    nil, // Set from project config; empty = auto-pass
-			OnSuccess:   "review",
+			OnSuccess:   "production_readiness_check",
 			OnFailure:   "fix_tests",
 		},
 		"fix_tests": {
@@ -142,6 +155,21 @@ var DefaultBlueprint = &Blueprint{
 			Toolset:     "coding_backend",
 			MaxRetries:  2,
 			OnSuccess:   "test",
+		},
+		"production_readiness_check": {
+			Name:        "production_readiness_check",
+			Description: "Run the production-readiness checklist (env vars, secrets, migrations, auth, health)",
+			Type:        types.StageTypeDeterministic,
+			Toolset:     "repo_readonly",
+			Action:      "checklist.Run",
+			Inputs: map[string]string{
+				"skip": "${checklist_skip}",
+			},
+			// Non-blocking at the stage level — the manager-side gate
+			// is what actually fails builds. Match the pattern used by
+			// generate_contract_tests.
+			OnSuccess: "review",
+			OnFailure: "review",
 		},
 		"review": {
 			Name:             "review",

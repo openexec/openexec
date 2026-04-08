@@ -1,0 +1,18 @@
+
+  test('{{.OpID}} mutation writes match submitted payload', async () => {
+    const actor = await createTestUser();
+    const payload = { /* TODO: valid payload */ } as Record<string, unknown>;
+    const res = await apiCall('{{.Method}}', '{{.Path}}', payload, actor);
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+{{range .Mutates}}
+    // mutation target: {{.}}
+    const rows{{titleCase (tableName .)}} = await db.select().from(schema.{{camelCase (tableName .)}});
+    expect(rows{{titleCase (tableName .)}}.length).toBeGreaterThan(0);
+    // The implement stage MUST ensure at least one persisted row reflects the submitted payload.
+    const match{{titleCase (tableName .)}} = rows{{titleCase (tableName .)}}.find((row: Record<string, unknown>) =>
+      Object.entries(payload).every(([k, v]) => v === undefined || row[k] === v)
+    );
+    expect(match{{titleCase (tableName .)}}, 'submitted payload must be persisted to {{.}}').toBeDefined();
+{{end}}
+  });

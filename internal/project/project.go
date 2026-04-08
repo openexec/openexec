@@ -19,6 +19,52 @@ type ProjectConfig struct {
 
 	// Execution settings
 	Execution ExecutionConfig `json:"execution,omitempty"`
+
+	// QualityGates holds project-level quality gate toggles and overrides.
+	// Fields are additive and backwards compatible: missing values leave
+	// gates enabled with default severities.
+	QualityGates QualityGatesConfig `json:"quality_gates,omitempty"`
+}
+
+// QualityGatesConfig configures the project-level quality gates that run
+// outside of the openexec.yaml command-based gates.
+type QualityGatesConfig struct {
+	// NoStubs toggles the no-stubs verifier gate. Pointer with nil-default-true
+	// semantics: leave unset to enable; set to false to disable explicitly.
+	NoStubs *bool `json:"no_stubs,omitempty"`
+
+	// NoStubsRules maps a no-stubs rule ID to a severity string ("high",
+	// "warn", "low", or "off"). Empty map leaves rules at their defaults.
+	NoStubsRules map[string]string `json:"no_stubs_rules,omitempty"`
+
+	// ProductionReady toggles the production-readiness checklist gate
+	// (env vars documented, no committed secrets, reversible migrations,
+	// session checks on API handlers, health endpoint present). Pointer
+	// with nil-default-true semantics: leave unset to enable; set to
+	// false to disable explicitly.
+	ProductionReady *bool `json:"production_ready,omitempty"`
+
+	// ProductionReadySkip lists checklist check IDs to skip when the
+	// gate runs. Empty slice runs all default checkers.
+	ProductionReadySkip []string `json:"production_ready_skip,omitempty"`
+}
+
+// IsNoStubsEnabled reports whether the no-stubs gate should run. Defaults to
+// true when the field is unset.
+func (q *QualityGatesConfig) IsNoStubsEnabled() bool {
+	if q.NoStubs == nil {
+		return true
+	}
+	return *q.NoStubs
+}
+
+// IsProductionReadyEnabled reports whether the production-readiness
+// checklist gate should run. Defaults to true when the field is unset.
+func (q *QualityGatesConfig) IsProductionReadyEnabled() bool {
+	if q.ProductionReady == nil {
+		return true
+	}
+	return *q.ProductionReady
 }
 
 // ExecutionConfig holds execution engine settings
