@@ -51,6 +51,28 @@ func (b *Blueprint) GetStage(name string) (*Stage, bool) {
 	return stage, ok
 }
 
+// Clone returns a deep copy of the blueprint so callers can mutate stages
+// without affecting the original (important for package-level defaults).
+func (b *Blueprint) Clone() *Blueprint {
+	stages := make(map[string]*Stage, len(b.Stages))
+	for name, s := range b.Stages {
+		clone := *s
+		if s.Commands != nil {
+			clone.Commands = make([]string, len(s.Commands))
+			copy(clone.Commands, s.Commands)
+		}
+		stages[name] = &clone
+	}
+	return &Blueprint{
+		ID:           b.ID,
+		Name:         b.Name,
+		Description:  b.Description,
+		Stages:       stages,
+		InitialStage: b.InitialStage,
+		Version:      b.Version,
+	}
+}
+
 // Validate checks if the blueprint is valid.
 func (b *Blueprint) Validate() error {
 	if b.ID == "" {

@@ -5,3 +5,6 @@ project:
 quality:
   gates:
     - lint
+  custom:
+    - name: lint
+      command: "go vet ./..."
