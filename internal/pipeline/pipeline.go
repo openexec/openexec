@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io/fs"
 	"log"
@@ -115,6 +116,20 @@ type Config struct {
 	// API requests instead of the full hardcoded list. Mirrors the
 	// execution.toolset_filtering project config flag.
 	ToolsetFiltering bool
+
+	// StateDB is the underlying *sql.DB from the state store, passed through
+	// so the pre-resolver can query the symbols table without opening a new
+	// connection. May be nil when running outside the daemon.
+	StateDB *sql.DB
+
+	// PreResolvedContext holds pre-resolved symbol context injected by the
+	// Layer 2 pre-resolver. Populated in runBlueprintMode before briefing
+	// assembly and appended to input.Briefing.
+	PreResolvedContext string
+
+	// LocalPreResolveEnabled mirrors the project feature flag. When true
+	// (default), the pre-resolver pre-pass runs before the implement stage.
+	LocalPreResolveEnabled bool
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
@@ -414,6 +429,15 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	}
 
+	// Pre-resolve symbols from task description (Layer 2)
+	if p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
+		pr := &PreResolver{}
+		preResolved := pr.Resolve(ctx, p.cfg.TaskDescription, p.cfg.WorkDir, p.cfg.StateDB)
+		if preResolved != "" {
+			p.cfg.PreResolvedContext = preResolved
+		}
+	}
+
 	// Build context using two-stage assembly
 	var contextPack *ocontext.ContextPack
 	if p.cfg.ContextTokenBudget > 0 {
@@ -692,6 +716,11 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		for _, skill := range selected {
 			input.Briefing += fmt.Sprintf("\n\n--- Skill: %s ---\n%s", skill.Name, skill.Content)
 		}
+	}
+
+	// Inject pre-resolved symbol context into briefing (Layer 2)
+	if p.cfg.PreResolvedContext != "" {
+		input.Briefing += "\n\n" + p.cfg.PreResolvedContext
 	}
 
 	// Handle conditional review stage

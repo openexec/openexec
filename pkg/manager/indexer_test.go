@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -52,9 +53,14 @@ func TestSymbolIndexer_PopulatesSymbolsTable(t *testing.T) {
 	}
 	t.Cleanup(func() { m.Close() })
 
-	// Indexing runs in a background goroutine. Poll until at least one
-	// symbol is present or the timeout fires.
-	deadline := time.Now().Add(10 * time.Second)
+	// StartIndexing is called from EnsureReady, not New.
+	if err := m.EnsureReady(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Indexing runs in a background goroutine with a startup delay
+	// (time.Sleep in StartIndexing). Poll generously.
+	deadline := time.Now().Add(20 * time.Second)
 	var count int
 	for time.Now().Before(deadline) {
 		_ = stateStore.GetDB().QueryRow(`SELECT COUNT(*) FROM symbols`).Scan(&count)

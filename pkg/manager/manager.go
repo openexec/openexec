@@ -325,6 +325,13 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 			pCfg.APIModel = projCfg.Execution.APIModel
 		}
 		pCfg.ToolsetFiltering = projCfg.Execution.ToolsetFiltering
+		pCfg.LocalPreResolveEnabled = projCfg.Execution.IsLocalPreResolveEnabled()
+	}
+
+	// Pass the state store's DB handle so the pre-resolver can query the
+	// symbols table without opening a separate connection (Layer 2).
+	if m.state != nil {
+		pCfg.StateDB = m.state.GetDB()
 	}
 
 	for _, opt := range opts {

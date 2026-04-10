@@ -116,6 +116,12 @@ type ExecutionConfig struct {
 	// false explicitly to disable. The indexer runs in a background goroutine
 	// so startup is not blocked. See ADR-003 (Layer 1).
 	SymbolIndexing *bool `json:"symbol_indexing,omitempty"`
+	// LocalPreResolve controls whether the pre-resolver pre-pass runs before
+	// the implement stage. It extracts symbol references from the task
+	// description and injects their signatures + first N lines into the
+	// briefing. Pointer with nil-default-true semantics: leave unset to
+	// enable; set to false explicitly to disable. See ADR-003 (Layer 2).
+	LocalPreResolve *bool `json:"local_pre_resolve,omitempty"`
 
 	// API provider settings (OpenAI-compatible endpoints)
 	APIProvider string `json:"api_provider,omitempty"` // "openai_compat"
@@ -139,6 +145,16 @@ func (e *ExecutionConfig) IsSymbolIndexingEnabled() bool {
 		return true
 	}
 	return *e.SymbolIndexing
+}
+
+// IsLocalPreResolveEnabled returns true when the pre-resolver pre-pass should
+// run. The flag is opt-out: nil (the default for existing configs) means
+// enabled, and only an explicit `"local_pre_resolve": false` disables it.
+func (e *ExecutionConfig) IsLocalPreResolveEnabled() bool {
+	if e.LocalPreResolve == nil {
+		return true
+	}
+	return *e.LocalPreResolve
 }
 
 // Initialize initializes a new OpenExec project
