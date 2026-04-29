@@ -58,6 +58,15 @@ type OpenAIProviderConfig struct {
 
 	// HTTPClient is an optional custom HTTP client.
 	HTTPClient *http.Client
+
+	// Name is the provider identifier (defaults to "openai").
+	Name string
+
+	// Models is an optional list of available model IDs.
+	Models []string
+
+	// ModelInfo is an optional map of model information.
+	ModelInfo map[string]*ModelInfo
 }
 
 // OpenAIProvider implements ProviderAdapter for OpenAI's API.
@@ -66,6 +75,7 @@ type OpenAIProvider struct {
 	httpClient *http.Client
 	models     []string
 	modelInfo  map[string]*ModelInfo
+	name       string
 }
 
 // Compile-time check that OpenAIProvider implements ProviderAdapter.
@@ -75,11 +85,20 @@ var _ ProviderAdapter = (*OpenAIProvider)(nil)
 func NewOpenAIProvider(config OpenAIProviderConfig) (*OpenAIProvider, error) {
 	if config.APIKey == "" {
 		// Try to get from environment
-		config.APIKey = os.Getenv("OPENAI_API_KEY")
+		envKey := "OPENAI_API_KEY"
+		if config.Name != "" && config.Name != "openai" {
+			envKey = strings.ToUpper(config.Name) + "_API_KEY"
+		}
+		config.APIKey = os.Getenv(envKey)
+		if config.APIKey == "" && envKey != "OPENAI_API_KEY" {
+			// Fallback to OPENAI_API_KEY if specific one not found
+			config.APIKey = os.Getenv("OPENAI_API_KEY")
+		}
+
 		if config.APIKey == "" {
 			return nil, &ProviderError{
 				Code:    ErrCodeAuthentication,
-				Message: "OpenAI API key is required (set OPENAI_API_KEY environment variable or provide in config)",
+				Message: fmt.Sprintf("%s API key is required (set %s environment variable or provide in config)", config.Name, envKey),
 			}
 		}
 	}
@@ -99,11 +118,27 @@ func NewOpenAIProvider(config OpenAIProviderConfig) (*OpenAIProvider, error) {
 		}
 	}
 
+	name := config.Name
+	if name == "" {
+		name = "openai"
+	}
+
+	models := config.Models
+	if models == nil {
+		models = DefaultOpenAIModels()
+	}
+
+	modelInfo := config.ModelInfo
+	if modelInfo == nil {
+		modelInfo = DefaultOpenAIModelInfo()
+	}
+
 	p := &OpenAIProvider{
 		config:     config,
 		httpClient: httpClient,
-		models:     defaultOpenAIModels(),
-		modelInfo:  defaultOpenAIModelInfo(),
+		models:     models,
+		modelInfo:  modelInfo,
+		name:       name,
 	}
 
 	return p, nil
@@ -111,12 +146,12 @@ func NewOpenAIProvider(config OpenAIProviderConfig) (*OpenAIProvider, error) {
 
 // NewOpenAIProviderFromEnv creates a new OpenAI provider using environment variables.
 func NewOpenAIProviderFromEnv() (*OpenAIProvider, error) {
-	return NewOpenAIProvider(OpenAIProviderConfig{})
+	return NewOpenAIProvider(OpenAIProviderConfig{Name: "openai"})
 }
 
 // GetName returns the provider identifier.
 func (p *OpenAIProvider) GetName() string {
-	return "openai"
+	return p.name
 }
 
 // GetModels returns the list of available model IDs.
@@ -733,8 +768,8 @@ func isReasoningModel(model string) bool {
 	return strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3")
 }
 
-// defaultOpenAIModels returns the default list of supported OpenAI models.
-func defaultOpenAIModels() []string {
+// DefaultOpenAIModels returns the default list of supported OpenAI models.
+func DefaultOpenAIModels() []string {
 	return []string{
 		ModelGPT4o,
 		ModelGPT4oMini,
@@ -751,8 +786,8 @@ func defaultOpenAIModels() []string {
 	}
 }
 
-// defaultOpenAIModelInfo returns model information for all supported models.
-func defaultOpenAIModelInfo() map[string]*ModelInfo {
+// DefaultOpenAIModelInfo returns model information for all supported models.
+func DefaultOpenAIModelInfo() map[string]*ModelInfo {
 	return map[string]*ModelInfo{
 		ModelGPT4o: {
 			ID:       ModelGPT4o,

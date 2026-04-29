@@ -19,9 +19,10 @@ import (
 type ProviderName string
 
 const (
-	ProviderOpenAI    ProviderName = "openai"
-	ProviderAnthropic ProviderName = "anthropic"
-	ProviderGemini    ProviderName = "gemini"
+	ProviderOpenAI      ProviderName = "openai"
+	ProviderAnthropic   ProviderName = "anthropic"
+	ProviderGemini      ProviderName = "gemini"
+	ProviderAgenticsNZ ProviderName = "agenticsnz"
 )
 
 // ProviderFactory is a function that creates a new provider instance.
@@ -375,6 +376,48 @@ func RegisterDefaultFactories(registry *ProviderRegistry) {
 	registry.RegisterFactory(ProviderGemini, func() (ProviderAdapter, error) {
 		return NewGeminiProviderFromEnv()
 	})
+
+	// AgenticsNZ factory
+	registry.RegisterFactory(ProviderAgenticsNZ, func() (ProviderAdapter, error) {
+		models := []string{
+			"bartowski/google_gemma-4-31B-it-GGUF",
+			"unsloth/Qwen3.6-35B-A3B-GGUF",
+		}
+		modelInfo := map[string]*ModelInfo{
+			"bartowski/google_gemma-4-31B-it-GGUF": {
+				ID:       "bartowski/google_gemma-4-31B-it-GGUF",
+				Name:     "Gemma 4 31B (AgenticsNZ)",
+				Provider: "agenticsnz",
+				Capabilities: ProviderCapabilities{
+					Streaming:        true,
+					ToolUse:          true,
+					SystemPrompt:     true,
+					MultiTurn:        true,
+					MaxContextTokens: 32768,
+					MaxOutputTokens:  4096,
+				},
+			},
+			"unsloth/Qwen3.6-35B-A3B-GGUF": {
+				ID:       "unsloth/Qwen3.6-35B-A3B-GGUF",
+				Name:     "Qwen 3.6 35B (AgenticsNZ)",
+				Provider: "agenticsnz",
+				Capabilities: ProviderCapabilities{
+					Streaming:        true,
+					ToolUse:          true,
+					SystemPrompt:     true,
+					MultiTurn:        true,
+					MaxContextTokens: 32768,
+					MaxOutputTokens:  4096,
+				},
+			},
+		}
+		return NewOpenAIProvider(OpenAIProviderConfig{
+			Name:      string(ProviderAgenticsNZ),
+			BaseURL:   "https://api.agentics.org.nz/v1",
+			Models:    models,
+			ModelInfo: modelInfo,
+		})
+	})
 }
 
 // InitializeDefaultRegistry initializes the default registry with all available providers.
@@ -406,9 +449,10 @@ func GetProviderForModel(modelID string) (ProviderAdapter, error) {
 // RequiredEnvVars returns the environment variable names required for each provider.
 func RequiredEnvVars() map[ProviderName][]string {
 	return map[ProviderName][]string{
-		ProviderOpenAI:    {"OPENAI_API_KEY"},
-		ProviderAnthropic: {"ANTHROPIC_API_KEY"},
-		ProviderGemini:    {"GEMINI_API_KEY", "GOOGLE_API_KEY"}, // Either one works
+		ProviderOpenAI:      {"OPENAI_API_KEY"},
+		ProviderAnthropic:   {"ANTHROPIC_API_KEY"},
+		ProviderGemini:      {"GEMINI_API_KEY", "GOOGLE_API_KEY"}, // Either one works
+		ProviderAgenticsNZ: {"AGENTICSNZ_API_KEY"},
 	}
 }
 
@@ -419,6 +463,7 @@ func CheckEnvVars() map[ProviderName]bool {
 	result[ProviderOpenAI] = os.Getenv("OPENAI_API_KEY") != ""
 	result[ProviderAnthropic] = os.Getenv("ANTHROPIC_API_KEY") != ""
 	result[ProviderGemini] = os.Getenv("GEMINI_API_KEY") != "" || os.Getenv("GOOGLE_API_KEY") != ""
+	result[ProviderAgenticsNZ] = os.Getenv("AGENTICSNZ_API_KEY") != ""
 
 	return result
 }

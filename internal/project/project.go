@@ -123,11 +123,25 @@ type ExecutionConfig struct {
 	// enable; set to false explicitly to disable. See ADR-003 (Layer 2).
 	LocalPreResolve *bool `json:"local_pre_resolve,omitempty"`
 
-	// API provider settings (OpenAI-compatible endpoints)
-	APIProvider string `json:"api_provider,omitempty"` // "openai_compat"
-	APIBaseURL  string `json:"api_base_url,omitempty"` // e.g. "https://api.moonshot.cn/v1"
-	APIKey      string `json:"api_key,omitempty"`      // API key or "$ENV_VAR" reference
-	APIModel    string `json:"api_model,omitempty"`    // e.g. "moonshot-v1-128k"
+	// API provider settings (OpenAI-compatible endpoints).
+	//
+	// Two shapes are supported. Prefer the named-providers shape:
+	//
+	//   "providers": {
+	//     "agentics-personal": { "base_url": "...", "api_key": "$AGENTICSNZ_API_KEY", "model": "..." },
+	//     "vllm-local":        { "base_url": "http://localhost:8000/v1", "api_key": "...", "model": "..." }
+	//   },
+	//   "active_provider": "agentics-personal"
+	//
+	// The legacy fields (APIProvider/APIBaseURL/APIKey/APIModel) remain readable
+	// for older configs. Use ActiveAPI() to resolve the effective endpoint.
+	Providers      map[string]ProviderConfig `json:"providers,omitempty"`
+	ActiveProvider string                    `json:"active_provider,omitempty"`
+
+	APIProvider string `json:"api_provider,omitempty"` // legacy: "openai_compat", "agenticsnz"
+	APIBaseURL  string `json:"api_base_url,omitempty"` // legacy: e.g. "https://api.moonshot.cn/v1"
+	APIKey      string `json:"api_key,omitempty"`      // legacy: API key or "$ENV_VAR" reference
+	APIModel    string `json:"api_model,omitempty"`    // legacy: e.g. "moonshot-v1-128k"
 
 	// Coordinator settings for multi-agent execution (Phase C)
 	CoordinatorModel  string `json:"coordinator_model,omitempty"`   // Frontier model for planning/merging
@@ -135,6 +149,42 @@ type ExecutionConfig struct {
 	WorkerAPIProvider string `json:"worker_api_provider,omitempty"` // Provider for workers (defaults to APIProvider)
 	WorkerAPIBaseURL  string `json:"worker_api_base_url,omitempty"` // Base URL for workers (defaults to APIBaseURL)
 	WorkerAPIKey      string `json:"worker_api_key,omitempty"`      // API key for workers (defaults to APIKey)
+}
+
+// ProviderConfig holds a single named OpenAI-compatible endpoint.
+// All entries today are openai_compat — the wire protocol is the same for
+// AgenticsNZ, OpenAI, Kimi, vLLM, Ollama, etc.
+type ProviderConfig struct {
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key"`
+	Model   string `json:"model"`
+}
+
+// ActiveAPI resolves the currently active API endpoint. It returns the
+// provider name, base URL, API key (raw or "$ENV_VAR"), and model.
+//
+// Resolution order:
+//  1. Providers[ActiveProvider] when both are set.
+//  2. The single entry in Providers when ActiveProvider is empty.
+//  3. The legacy APIProvider/APIBaseURL/APIKey/APIModel fields.
+//
+// Returns ("", "", "", "") when no API config is present (CLI-runner mode).
+func (e *ExecutionConfig) ActiveAPI() (name, baseURL, apiKey, model string) {
+	if len(e.Providers) > 0 {
+		key := e.ActiveProvider
+		if key == "" && len(e.Providers) == 1 {
+			for k := range e.Providers {
+				key = k
+			}
+		}
+		if entry, ok := e.Providers[key]; ok {
+			return key, entry.BaseURL, entry.APIKey, entry.Model
+		}
+	}
+	if e.APIProvider != "" {
+		return e.APIProvider, e.APIBaseURL, e.APIKey, e.APIModel
+	}
+	return "", "", "", ""
 }
 
 // IsSymbolIndexingEnabled returns true when the symbol indexer should run.

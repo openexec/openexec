@@ -44,6 +44,38 @@ var availableModels = []struct {
 	// Gemini (Google)
 	{"gemini", "gemini-3.1-pro-preview", "Gemini 3.1 Pro"},
 	{"gemini", "gemini-3.1-flash-preview", "Gemini 3.1 Flash"},
+	// AgenticsNZ
+	{"agenticsnz", "bartowski/google_gemma-4-31B-it-GGUF", "Gemma 4 31B (AgenticsNZ)"},
+	{"agenticsnz", "unsloth/Qwen3.6-35B-A3B-GGUF", "Qwen 3.6 35B (AgenticsNZ)"},
+}
+
+// providerPreset describes a preconfigured OpenAI-compatible endpoint that
+// init/config-provider-add can prefill so the user only has to supply a token
+// (and pick a model). A preset doesn't pin the saved entry's name — the user
+// chooses that, and can save multiple entries from the same preset (e.g.
+// "agentics-work" and "agentics-personal").
+type providerPreset struct {
+	Key       string   // short identifier, used as the default name
+	Label     string   // shown in the menu
+	BaseURL   string   // prefilled
+	EnvVar    string   // suggested $ENV_VAR for the API key
+	Models    []string // pick-from list; empty means free-form
+	ModelHint string   // shown when Models is empty
+}
+
+// providerPresets is the registry of one-token-and-go endpoints. Add new
+// presets here; nothing else needs to change.
+var providerPresets = []providerPreset{
+	{
+		Key:     "agenticsnz",
+		Label:   "AgenticsNZ (managed API — only token needed)",
+		BaseURL: "https://api.agentics.org.nz/v1",
+		EnvVar:  "AGENTICSNZ_API_KEY",
+		Models: []string{
+			"bartowski/google_gemma-4-31B-it-GGUF",
+			"unsloth/Qwen3.6-35B-A3B-GGUF",
+		},
+	},
 }
 
 var initCmd = &cobra.Command{
@@ -109,7 +141,8 @@ The project name defaults to the current directory name if not provided.`,
 		var reviewEnabled, parallelEnabled, gitCommitEnabled bool
 		var qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting bool
 		var workerCount int
-		var apiProvider, apiBaseURL, apiKey, apiModel string
+		var providerName string
+		var providerEntry *project.ProviderConfig
 
 		if !initNonInteractive {
 			// 1. Project Name prompt
@@ -123,8 +156,9 @@ The project name defaults to the current directory name if not provided.`,
 				}
 			}
 
-			// 2. Execution mode (CLI vs API)
-			apiProvider, apiBaseURL, apiKey, apiModel = promptAPIConfig(cmd)
+			// 2. Execution mode (CLI vs API). Returns a named provider entry
+			// to save into Providers[name], or ("", nil) for CLI mode.
+			providerName, providerEntry = promptAPIConfig(cmd, true)
 
 			// 3. Execution Config prompt
 			plannerModel, executorModel, reviewEnabled, reviewerModel, parallelEnabled, workerCount, gitCommitEnabled, _, qualityGates, cacheEnabled, memoryEnabled, checkpointEnabled, bitnetRouting = promptExecutionConfig(cmd)
@@ -182,10 +216,12 @@ The project name defaults to the current directory name if not provided.`,
 			MemoryEnabled:     memoryEnabled,
 			CheckpointEnabled: checkpointEnabled,
 			BitNetRouting:     bitnetRouting,
-			APIProvider:       apiProvider,
-			APIBaseURL:        apiBaseURL,
-			APIKey:            apiKey,
-			APIModel:          apiModel,
+		}
+		if providerEntry != nil && providerName != "" {
+			cfg.Execution.Providers = map[string]project.ProviderConfig{
+				providerName: *providerEntry,
+			}
+			cfg.Execution.ActiveProvider = providerName
 		}
 
 		// Restore template-prewired quality_gates (Initialize constructs a fresh
@@ -349,36 +385,169 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 }
 
 // promptAPIConfig interactively prompts for API provider configuration.
-// Returns empty strings if user selects CLI mode.
-func promptAPIConfig(cmd *cobra.Command) (apiProvider, apiBaseURL, apiKey, apiModel string) {
+// Returns ("", nil) when the user chooses CLI mode (only available when
+// includeCLIOption is true) or cancels; otherwise returns the user-chosen
+// entry name and its ProviderConfig (intended to live in
+// ExecutionConfig.Providers[name] with ActiveProvider=name).
+//
+// Callers: openexec init passes includeCLIOption=true so users can opt out of
+// API mode entirely. `openexec config provider add` passes false — the user
+// has already declared they want an API provider by running that command.
+func promptAPIConfig(cmd *cobra.Command, includeCLIOption bool) (string, *project.ProviderConfig) {
 	reader := bufio.NewReader(cmd.InOrStdin())
 
 	fmt.Println("\n=== Execution Mode ===")
-	fmt.Println("  [1] CLI tool (claude/codex/gemini) - default")
-	fmt.Println("  [2] API provider (OpenAI-compatible)")
-	fmt.Printf("\nSelect execution mode [1]: ")
+	idx := 1
+	cliIdx := 0
+	if includeCLIOption {
+		fmt.Printf("  [%d] CLI tool (claude/codex/gemini) - default\n", idx)
+		cliIdx = idx
+		idx++
+	}
+	presetStart := idx
+	for _, p := range providerPresets {
+		fmt.Printf("  [%d] %s\n", idx, p.Label)
+		idx++
+	}
+	customIdx := idx
+	fmt.Printf("  [%d] Custom OpenAI-compatible endpoint (URL + token + model)\n", customIdx)
+
+	defaultPrompt := fmt.Sprintf("[%d]", presetStart)
+	if includeCLIOption {
+		defaultPrompt = fmt.Sprintf("[%d]", cliIdx)
+	}
+	fmt.Printf("\nSelect execution mode %s: ", defaultPrompt)
 	answer, _ := reader.ReadString('\n')
 	answer = strings.TrimSpace(answer)
 
-	if answer != "2" {
-		return "", "", "", ""
+	// Empty input: take the default. CLI when offered, otherwise first preset.
+	if answer == "" {
+		if includeCLIOption {
+			return "", nil
+		}
+		return promptPresetProvider(reader, providerPresets[0])
 	}
 
-	apiProvider = "openai_compat"
+	var choice int
+	if _, err := fmt.Sscanf(answer, "%d", &choice); err != nil {
+		return "", nil
+	}
+
+	if includeCLIOption && choice == cliIdx {
+		return "", nil
+	}
+
+	// Preset selection
+	if choice >= presetStart && choice < customIdx {
+		return promptPresetProvider(reader, providerPresets[choice-presetStart])
+	}
+
+	// Custom
+	if choice == customIdx {
+		return promptCustomProvider(reader)
+	}
+
+	return "", nil
+}
+
+// promptPresetProvider walks the user through configuring an entry from a
+// preset: it prefills BaseURL and the env-var hint, then asks only for the
+// entry name, key, and model.
+func promptPresetProvider(reader *bufio.Reader, p providerPreset) (string, *project.ProviderConfig) {
+	fmt.Printf("\nProvider entry name [%s]: ", p.Key)
+	name, _ := reader.ReadString('\n')
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = p.Key
+	}
+
+	envHint := "$" + p.EnvVar
+	fmt.Printf("API Key (or %s): ", envHint)
+	apiKey, _ := reader.ReadString('\n')
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		apiKey = envHint
+	}
+
+	model := promptModelChoice(reader, p)
+
+	return name, &project.ProviderConfig{
+		BaseURL: p.BaseURL,
+		APIKey:  apiKey,
+		Model:   model,
+	}
+}
+
+// promptCustomProvider prompts for a fully user-supplied entry. Aborts (and
+// returns ("", nil)) when any required field is left empty, since silently
+// saving a half-configured entry would surface as a confusing failure on the
+// first task run.
+func promptCustomProvider(reader *bufio.Reader) (string, *project.ProviderConfig) {
+	fmt.Printf("\nProvider entry name (e.g. vllm-local, kimi-prod): ")
+	name, _ := reader.ReadString('\n')
+	name = strings.TrimSpace(name)
+	if name == "" {
+		fmt.Println("  (no name given — aborted)")
+		return "", nil
+	}
 
 	fmt.Printf("API Base URL (e.g. https://api.openai.com/v1): ")
-	apiBaseURL, _ = reader.ReadString('\n')
-	apiBaseURL = strings.TrimSpace(apiBaseURL)
+	baseURL, _ := reader.ReadString('\n')
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		fmt.Println("  (base URL is required — aborted)")
+		return "", nil
+	}
 
 	fmt.Printf("API Key (or $ENV_VAR): ")
-	apiKey, _ = reader.ReadString('\n')
+	apiKey, _ := reader.ReadString('\n')
 	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		fmt.Println("  (API key is required — aborted)")
+		return "", nil
+	}
 
 	fmt.Printf("Model name (e.g. gpt-4o, moonshot-v1-128k): ")
-	apiModel, _ = reader.ReadString('\n')
-	apiModel = strings.TrimSpace(apiModel)
+	model, _ := reader.ReadString('\n')
+	model = strings.TrimSpace(model)
+	if model == "" {
+		fmt.Println("  (model name is required — aborted)")
+		return "", nil
+	}
 
-	return apiProvider, apiBaseURL, apiKey, apiModel
+	return name, &project.ProviderConfig{
+		BaseURL: baseURL,
+		APIKey:  apiKey,
+		Model:   model,
+	}
+}
+
+// promptModelChoice picks a model from the preset's list, or asks free-form
+// when the preset doesn't pin a list.
+func promptModelChoice(reader *bufio.Reader, p providerPreset) string {
+	if len(p.Models) == 0 {
+		hint := p.ModelHint
+		if hint == "" {
+			hint = "model name"
+		}
+		fmt.Printf("Model (%s): ", hint)
+		model, _ := reader.ReadString('\n')
+		return strings.TrimSpace(model)
+	}
+
+	fmt.Println("\nSelect model:")
+	for i, m := range p.Models {
+		fmt.Printf("  [%d] %s\n", i+1, m)
+	}
+	fmt.Printf("Select model [1]: ")
+	choice, _ := reader.ReadString('\n')
+	choice = strings.TrimSpace(choice)
+
+	var idx int
+	if _, err := fmt.Sscanf(choice, "%d", &idx); err == nil && idx >= 1 && idx <= len(p.Models) {
+		return p.Models[idx-1]
+	}
+	return p.Models[0]
 }
 
 // ensureGitignore ensures .gitignore exists and contains .openexec entries.

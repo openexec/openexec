@@ -318,11 +318,11 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 
 	projCfg, _ := project.LoadProjectConfig(m.cfg.WorkDir)
 	if projCfg != nil {
-		if projCfg.Execution.APIProvider != "" {
-			pCfg.APIProvider = projCfg.Execution.APIProvider
-			pCfg.APIBaseURL = projCfg.Execution.APIBaseURL
-			pCfg.APIKey = projCfg.Execution.APIKey
-			pCfg.APIModel = projCfg.Execution.APIModel
+		if name, baseURL, key, model := projCfg.Execution.ActiveAPI(); name != "" {
+			pCfg.APIProvider = name
+			pCfg.APIBaseURL = baseURL
+			pCfg.APIKey = key
+			pCfg.APIModel = model
 		}
 		pCfg.ToolsetFiltering = projCfg.Execution.ToolsetFiltering
 		pCfg.LocalPreResolveEnabled = projCfg.Execution.IsLocalPreResolveEnabled()

@@ -881,7 +881,16 @@ func (p *Pipeline) createAPIAgenticLoop(ctx context.Context, prompt string, work
 	providerCfg := pagent.OpenAIProviderConfig{
 		APIKey:  apiKey,
 		BaseURL: p.cfg.APIBaseURL,
+		Name:    p.cfg.APIProvider,
 	}
+
+	// Allow the configured model through validation alongside the standard
+	// OpenAI model list. Provider entries are user-named (e.g. "agentics-personal",
+	// "vllm-local"), so we can't gate validation on the provider name.
+	if p.cfg.APIModel != "" {
+		providerCfg.Models = append(pagent.DefaultOpenAIModels(), p.cfg.APIModel)
+	}
+
 	provider, err := pagent.NewOpenAIProvider(providerCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create API provider: %w", err)
