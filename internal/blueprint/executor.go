@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/openexec/openexec/internal/actions"
 	"github.com/openexec/openexec/internal/contracts"
 	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/internal/skills"
 	"github.com/openexec/openexec/internal/types"
 )
 
@@ -419,10 +422,61 @@ func buildAgenticPrompt(stage *Stage, input *StageInput) string {
 	case "review":
 		sb.WriteString("Review the changes made in previous stages. Provide a summary of what was done and any concerns.\n")
 		sb.WriteString("If this run surfaced a durable, project-specific lesson (a framework quirk, a recurring fix, a convention future sessions must know — NOT a one-off fix), capture it with the skill_propose tool. A human reviews proposals before they activate; do not propose more than one skill per run.\n")
+		// Push project conventions to the reviewer. Implement stages rely on
+		// pull (skill routing); the reviewer cannot verify compliance with
+		// standards it never loaded, so conventions are injected here.
+		if section := projectConventionsSection(input.WorkingDirectory); section != "" {
+			sb.WriteString(section)
+		}
 	}
 
 	sb.WriteString("\nWhen complete, emit an openexec_signal with type 'phase-complete'.\n")
 
+	return sb.String()
+}
+
+// Limits for convention injection: deterministic gates already enforce
+// machine-checkable standards, so this section carries only the project
+// skills (naming, boundaries, architecture rules) and stays bounded.
+const (
+	maxConventionSkillChars = 4000
+	maxConventionTotalChars = 12000
+)
+
+// projectConventionsSection loads active project-local skills and renders
+// them as review criteria. Only the review stage receives this push —
+// reviewing against standards requires having them in context, whereas
+// implementers pull skills on demand via routing.
+func projectConventionsSection(projectDir string) string {
+	if projectDir == "" {
+		return ""
+	}
+	reg := skills.NewRegistry()
+	if err := reg.LoadFromDir(filepath.Join(projectDir, ".openexec", "skills"), "project"); err != nil {
+		return ""
+	}
+	list := reg.List()
+	if len(list) == 0 {
+		return ""
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
+
+	var sb strings.Builder
+	sb.WriteString("\n## Project Conventions (review the changes against ALL of these)\n")
+	total := sb.Len()
+	for _, sk := range list {
+		content := strings.TrimSpace(sk.Content)
+		if len(content) > maxConventionSkillChars {
+			content = content[:maxConventionSkillChars] + "\n[truncated]"
+		}
+		entry := fmt.Sprintf("\n### %s — %s\n%s\n", sk.Name, sk.Description, content)
+		if total+len(entry) > maxConventionTotalChars {
+			sb.WriteString("\n[further conventions truncated — run `openexec skills list` for the full set]\n")
+			break
+		}
+		sb.WriteString(entry)
+		total += len(entry)
+	}
 	return sb.String()
 }
 

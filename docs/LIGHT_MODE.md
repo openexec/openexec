@@ -59,6 +59,11 @@ database is opened lazily on first tool use.
   are visible immediately.
 - An uninitialized workspace (no `.openexec/` directory) lists as an empty
   backlog; mutating tools explain that no project exists yet.
+- **`backlog_list_stories` reports the project phase** (`new` → `planned` →
+  `building` → `maintaining`). Once the phase is `maintaining` — the initial
+  heavy build has worked off the backlog — light mode is the default lane;
+  reach for `openexec run` only when the next big feature or refactor needs
+  the full pipeline.
 
 ## Typical light-mode session
 

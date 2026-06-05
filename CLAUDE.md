@@ -103,6 +103,12 @@ The story-generation prompt (`internal/planner/prompt.go`, rules 4–5) decompos
 ### Light Mode (story backlog over MCP)
 `openexec mcp-serve` exposes the story backlog to external MCP clients (Claude Code) without booting the daemon: `backlog_list_stories`, `backlog_get_story`, `backlog_claim_story` (one story in progress at a time), `backlog_complete_task`, `backlog_complete_story`, `memory_read`. Implementation in `internal/mcp/backlog.go`. Two invariants: (1) every handler calls `Load()` — mcp-serve is long-lived and other processes write the same `.openexec/openexec.db`, so cached state must never be served; (2) backlog writes are allowed in **all** permission modes including read-only chat — they mutate orchestrator bookkeeping, not workspace files (documented exception, see `docs/LIGHT_MODE.md`).
 
+### Project Phases (two-speed routing signal)
+`release.ComputePhase(stories)` / `Manager.Phase()` derive a phase from backlog state: `new` (no plan) → `planned` (plan exists, nothing done) → `building` (initial build underway) → `maintaining` (all stories done — heavy lifting complete). `backlog_list_stories` returns `phase` (for clients/UI), and `openexec chat` prints a light-mode hint in `maintaining` phase before booting the engine. Phase is guidance for lane selection, never a gate.
+
+### Review-Stage Convention Push
+The blueprint review-stage prompt force-injects active project skills as review criteria (`projectConventionsSection` in `internal/blueprint/executor.go`, size-capped). Push is review-only: a reviewer cannot verify compliance with standards it never loaded, while implement stages keep pull-based skill routing. Unapproved `_candidates` are never injected. Schema↔struct consistency for all MCP tools is enforced by `internal/mcp/schema_audit_test.go` — extend `allToolDefs()` and the struct-pair list when adding tools.
+
 ### Skill Synthesis (propose-then-approve)
 Agents capture durable project lessons via the `skill_propose` MCP tool (`internal/mcp/skills.go`). Proposals are written to `.openexec/skills/_candidates/<name>/SKILL.md` (`internal/skills/candidates.go`) and are **never** loaded by the registry — `LoadFromDir` skips `_`-prefixed directories — until a human runs `openexec skills approve <name>` (also: `skills proposals`, `skills reject`). Candidate names are a security boundary (kebab-case regex; they become directory components). The asymmetry is deliberate: agents may propose in any mode, only humans activate — an unsupervised agent must never be able to poison future runs with a wrong lesson.
 

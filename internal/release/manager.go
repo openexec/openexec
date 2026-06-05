@@ -736,6 +736,11 @@ func (m *Manager) SetTaskStatus(taskID string, status string) error {
 	return m.UpdateTask(&updated)
 }
 
+// Phase returns the project phase derived from current backlog state.
+func (m *Manager) Phase() string {
+	return ComputePhase(m.GetStories())
+}
+
 // SetStoryStatus updates the lifecycle status of a story and persists it.
 func (m *Manager) SetStoryStatus(storyID string, status string) error {
 	m.mu.Lock()

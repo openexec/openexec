@@ -375,3 +375,53 @@ func TestDefaultExecutor_SmartZone_UnderBudgetAndDisabled(t *testing.T) {
 		})
 	}
 }
+
+func TestReviewStagePromptPushesConventions(t *testing.T) {
+	projDir := t.TempDir()
+	skillDir := filepath.Join(projDir, ".openexec", "skills", "naming-rules")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	skillMD := `---
+name: naming-rules
+description: "Service modules use the verbNoun naming convention"
+---
+All exported service functions are verbNoun (fetchUser, not userFetch).`
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillMD), 0o644); err != nil {
+		t.Fatalf("write skill: %v", err)
+	}
+	// A pending candidate must NOT be pushed.
+	candDir := filepath.Join(projDir, ".openexec", "skills", "_candidates", "unapproved")
+	if err := os.MkdirAll(candDir, 0o755); err != nil {
+		t.Fatalf("mkdir candidate: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(candDir, "SKILL.md"), []byte("---\nname: unapproved\ndescription: \"x\"\n---\nnot approved yet"), 0o644); err != nil {
+		t.Fatalf("write candidate: %v", err)
+	}
+
+	input := NewStageInput("run-1", "review the work", projDir)
+
+	// Review stage: conventions pushed.
+	reviewPrompt := buildAgenticPrompt(&Stage{Name: "review", Type: types.StageTypeAgentic}, input)
+	if !strings.Contains(reviewPrompt, "Project Conventions") || !strings.Contains(reviewPrompt, "verbNoun") {
+		t.Fatalf("review prompt missing pushed conventions:\n%s", reviewPrompt)
+	}
+	if strings.Contains(reviewPrompt, "not approved yet") {
+		t.Fatal("unapproved candidate skill leaked into the review prompt")
+	}
+
+	// Implement stage: conventions are pull-based, not pushed.
+	implPrompt := buildAgenticPrompt(&Stage{Name: "implement", Type: types.StageTypeAgentic}, input)
+	if strings.Contains(implPrompt, "Project Conventions") {
+		t.Fatal("implement stage must not receive pushed conventions (pull via routing)")
+	}
+}
+
+func TestReviewStagePromptNoSkills(t *testing.T) {
+	// No project skills → no conventions section, no error.
+	prompt := buildAgenticPrompt(&Stage{Name: "review", Type: types.StageTypeAgentic},
+		NewStageInput("run-1", "review", t.TempDir()))
+	if strings.Contains(prompt, "Project Conventions") {
+		t.Fatal("conventions section must be absent when no project skills exist")
+	}
+}

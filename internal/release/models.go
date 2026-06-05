@@ -234,6 +234,44 @@ const (
 	TaskModeHITL = "hitl" // requires a human in the loop; never auto-dispatched
 )
 
+// Project phases derived from backlog state. The phase tells clients which
+// lane fits: heavy mode does the initial intent → plan → build lifting;
+// once that backlog is worked off, lightweight interactive work (light mode,
+// chat) is usually all that is needed.
+const (
+	// PhaseNew: no stories exist — intent planning has not run.
+	PhaseNew = "new"
+	// PhasePlanned: a plan exists but no story has completed — the initial
+	// heavy build run is still ahead.
+	PhasePlanned = "planned"
+	// PhaseBuilding: the initial build is underway (some stories done).
+	PhaseBuilding = "building"
+	// PhaseMaintaining: every story is done or approved — the heavy lifting
+	// is complete and new work defaults to the lightweight lane.
+	PhaseMaintaining = "maintaining"
+)
+
+// ComputePhase derives the project phase from its stories.
+func ComputePhase(stories []*Story) string {
+	if len(stories) == 0 {
+		return PhaseNew
+	}
+	completed := 0
+	for _, st := range stories {
+		if st.Status == StoryStatusDone || st.Status == StoryStatusApproved {
+			completed++
+		}
+	}
+	switch {
+	case completed == 0:
+		return PhasePlanned
+	case completed == len(stories):
+		return PhaseMaintaining
+	default:
+		return PhaseBuilding
+	}
+}
+
 // StoryType constants
 const (
 	StoryTypeFeature  = "feature"

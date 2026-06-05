@@ -6,12 +6,14 @@ import (
     "io"
     "net/http"
     "os"
+    "path/filepath"
     "strings"
     "time"
 
     "github.com/chzyer/readline"
     "github.com/fatih/color"
     "github.com/openexec/openexec/internal/project"
+    "github.com/openexec/openexec/internal/release"
     "github.com/spf13/cobra"
 )
 
@@ -42,6 +44,11 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 				startPort = config.Execution.Port
 			}
 		}
+
+		// Phase-aware guidance: once the initial heavy build is complete,
+		// chat (which boots the full engine) is usually the wrong lane for
+		// small tasks — say so before paying the daemon startup cost.
+		printPhaseHint(projectDir)
 
 		// Check if server is running, if not, start it in background
 		if !isServerRunning(projectDir, startPort) {
@@ -88,6 +95,29 @@ Talk to your project, ask questions about the codebase, or trigger automated tas
 
 		return runChatREPL(cmd, projectName)
 	},
+}
+
+// printPhaseHint inspects the backlog (cheap, read-only — no daemon) and, when
+// the initial build is already complete, recommends the lightweight lane.
+// Errors are deliberately swallowed: this is guidance, never a gate.
+func printPhaseHint(projectDir string) {
+	if _, err := os.Stat(filepath.Join(projectDir, ".openexec")); err != nil {
+		return
+	}
+	mgr, err := release.NewManager(projectDir, nil)
+	if err != nil {
+		return
+	}
+	defer func() { _ = mgr.Close() }()
+	if err := mgr.Load(); err != nil {
+		return
+	}
+	if mgr.Phase() == release.PhaseMaintaining {
+		fmt.Println(color.YellowString("💡 Initial build is complete (all stories done)."))
+		fmt.Println(color.YellowString("   For quick tasks and questions, light mode is faster: connect Claude Code"))
+		fmt.Println(color.YellowString("   via `openexec mcp-serve` (see docs/LIGHT_MODE.md) instead of booting the engine."))
+		fmt.Println()
+	}
 }
 
 func runChatREPL(cmd *cobra.Command, projectName string) error {

@@ -242,11 +242,16 @@ func (s *Server) handleBacklogListStories(req Request, params toolsCallParams) {
 		lines = append(lines, fmt.Sprintf("- %s [%s] %s", st.ID, st.Status, st.Title))
 	}
 
-	text := fmt.Sprintf("%d stories", len(stories))
+	phase := mgr.Phase()
+
+	text := fmt.Sprintf("%d stories (project phase: %s)", len(stories), phase)
 	if len(lines) > 0 {
 		text += "\n" + strings.Join(lines, "\n")
 	} else if args.Status == "" {
 		text = "Backlog is empty — no plan has been generated for this project yet."
+	}
+	if phase == release.PhaseMaintaining {
+		text += "\nInitial build is complete: the heavy pipeline has worked off the backlog. New small tasks fit this light mode; reach for `openexec run` only for the next big feature or refactor."
 	}
 
 	s.writeResult(req.ID, map[string]interface{}{
@@ -254,6 +259,7 @@ func (s *Server) handleBacklogListStories(req Request, params toolsCallParams) {
 			map[string]interface{}{"type": "text", "text": text},
 		},
 		"stories": stories,
+		"phase":   phase,
 	})
 }
 

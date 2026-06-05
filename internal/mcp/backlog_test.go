@@ -307,3 +307,37 @@ func TestSkillPropose(t *testing.T) {
 		t.Fatal("expected hostile skill name to be rejected")
 	}
 }
+
+// TestBacklogPhaseReporting: the list response carries the project phase so
+// clients (and the UI) can default to the right lane.
+func TestBacklogPhaseReporting(t *testing.T) {
+	projDir := t.TempDir()
+	external := seedBacklog(t, projDir)
+	srv, out := newBacklogTestServer(t, projDir)
+
+	// Plan exists, nothing done yet.
+	result := callTool(t, srv, out, "backlog_list_stories", nil)
+	if result["phase"] != "planned" {
+		t.Fatalf("expected phase=planned, got %v", result["phase"])
+	}
+
+	// External completion of the whole backlog → maintaining + light-mode hint.
+	for _, id := range []string{"T-US-001-001", "T-US-001-002", "T-US-002-001"} {
+		if err := external.SetTaskStatus(id, release.TaskStatusDone); err != nil {
+			t.Fatalf("SetTaskStatus: %v", err)
+		}
+	}
+	for _, id := range []string{"US-001", "US-002"} {
+		if err := external.SetStoryStatus(id, release.StoryStatusDone); err != nil {
+			t.Fatalf("SetStoryStatus: %v", err)
+		}
+	}
+
+	result = callTool(t, srv, out, "backlog_list_stories", nil)
+	if result["phase"] != "maintaining" {
+		t.Fatalf("expected phase=maintaining, got %v", result["phase"])
+	}
+	if !strings.Contains(resultText(result), "Initial build is complete") {
+		t.Fatalf("expected light-mode guidance in maintaining phase, got: %s", resultText(result))
+	}
+}
