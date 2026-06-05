@@ -106,6 +106,8 @@ The story-generation prompt (`internal/planner/prompt.go`, rules 4–5) decompos
 ### Project Phases (two-speed routing signal)
 `release.ComputePhase(stories)` / `Manager.Phase()` derive a phase from backlog state: `new` (no plan) → `planned` (plan exists, nothing done) → `building` (initial build underway) → `maintaining` (all stories done — heavy lifting complete). `backlog_list_stories` returns `phase` (for clients/UI), and `openexec chat` prints a light-mode hint in `maintaining` phase before booting the engine. Phase is guidance for lane selection, never a gate.
 
+**Re-planning** (heavy phase rerun, e.g. a refactor epic after `maintaining`): just run planning again. The generator numbers from US-001/G-001, so `planner.RemapPlanIDs` (called by `importPlan`) remaps colliding IDs to free ones — same-ID + same-title items are treated as identical and skipped (idempotent re-import), different-title collisions get the next free ID with goal/story/task references following. New stories append to the backlog and phase automatically returns to `planned`/`building`.
+
 ### Review-Stage Convention Push
 The blueprint review-stage prompt force-injects active project skills as review criteria (`projectConventionsSection` in `internal/blueprint/executor.go`, size-capped). Push is review-only: a reviewer cannot verify compliance with standards it never loaded, while implement stages keep pull-based skill routing. Unapproved `_candidates` are never injected. Schema↔struct consistency for all MCP tools is enforced by `internal/mcp/schema_audit_test.go` — extend `allToolDefs()` and the struct-pair list when adding tools.
 

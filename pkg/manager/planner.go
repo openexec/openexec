@@ -181,6 +181,29 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 		return err
 	}
 
+	// Re-plan support: the generator always numbers from US-001/G-001, so a
+	// second plan (refactor epic, post-build feature wave) collides with the
+	// existing backlog. Remap genuinely-new colliding IDs to free ones;
+	// identical items (same ID and title) stay put and are skipped below.
+	remapped := planner.RemapPlanIDs(plan, planner.ExistingLookup{
+		GoalTitle: func(id string) (string, bool) {
+			if g := rel.GetGoal(id); g != nil {
+				return g.Title, true
+			}
+			return "", false
+		},
+		StoryTitle: func(id string) (string, bool) {
+			if s := rel.GetStory(id); s != nil {
+				return s.Title, true
+			}
+			return "", false
+		},
+		TaskExists: func(id string) bool { return rel.GetTask(id) != nil },
+	})
+	if remapped > 0 {
+		log.Printf("[Planner] Re-plan detected: remapped %d colliding IDs so the new plan appends to the existing backlog", remapped)
+	}
+
 	now := time.Now()
 	var importedGoals, importedStories, importedTasks int
 
