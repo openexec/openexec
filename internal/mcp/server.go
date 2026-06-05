@@ -268,6 +268,7 @@ func (s *Server) handleToolsList(req Request) {
         BacklogCompleteTaskToolDef(),
         BacklogCompleteStoryToolDef(),
         MemoryReadToolDef(),
+        SkillProposeToolDef(),
     }
 
     // Dangerous tools only advertised in danger-full-access mode
@@ -485,6 +486,9 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "memory_read":
 		s.handleMemoryRead(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "skill_propose":
+		s.handleSkillPropose(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))

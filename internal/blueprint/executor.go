@@ -418,6 +418,7 @@ func buildAgenticPrompt(stage *Stage, input *StageInput) string {
 		sb.WriteString("Fix the failing tests from the previous stage. Use git_apply_patch or Edit for code modifications.\n")
 	case "review":
 		sb.WriteString("Review the changes made in previous stages. Provide a summary of what was done and any concerns.\n")
+		sb.WriteString("If this run surfaced a durable, project-specific lesson (a framework quirk, a recurring fix, a convention future sessions must know — NOT a one-off fix), capture it with the skill_propose tool. A human reviews proposals before they activate; do not propose more than one skill per run.\n")
 	}
 
 	sb.WriteString("\nWhen complete, emit an openexec_signal with type 'phase-complete'.\n")

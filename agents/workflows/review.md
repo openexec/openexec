@@ -18,11 +18,15 @@ Execute full code review workflow with trust-first priority.
    - Write explanatory feedback ("this breaks because X")
    - Ask curious questions when approach is unclear
    - Provide concrete alternatives
-5. Self-check: Grade all comments for constructiveness
-6. Compile review (story file comments + code annotations)
-7. Make routing decision:
+5. Skill synthesis check: if this review surfaced a durable, project-specific
+   lesson (framework quirk, recurring failure mode, convention future sessions
+   must know — not a one-off fix), capture it with the skill_propose tool.
+   A human reviews proposals before they activate; at most one per review.
+6. Self-check: Grade all comments for constructiveness
+7. Compile review (story file comments + code annotations)
+8. Make routing decision:
    - Issues found → Return to Spark
    - Design concerns → Consult Clario first
    - Approved → Handoff to Hon
-8. Sign off: "The cuts are marked. Ready for refinement."
+9. Sign off: "The cuts are marked. Ready for refinement."
 </process>

@@ -42,6 +42,7 @@ database is opened lazily on first tool use.
 | `backlog_complete_task` | backlog state | Mark a task done after its verification passes |
 | `backlog_complete_story` | backlog state | Mark a story done. Refused while tasks remain unfinished |
 | `memory_read` | none | OpenExec's merged layered memory (decisions, patterns, preferences from prior runs) |
+| `skill_propose` | candidate file | Capture a durable project lesson as a **candidate** skill. Never active until a human runs `openexec skills approve <name>` |
 
 ## Semantics worth knowing
 
@@ -68,3 +69,6 @@ database is opened lazily on first tool use.
    `verification_script`; `backlog_complete_task` as each one passes
 5. `backlog_complete_story` when acceptance criteria are met
 6. hitl-tagged tasks are yours by definition — do them, don't delegate them
+7. Learned a durable project quirk along the way? `skill_propose` it, then
+   review with `openexec skills proposals` and approve or reject. Proposals
+   never activate themselves — that is the point.

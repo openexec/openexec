@@ -104,6 +104,12 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 		// backlog one story at a time.
 		return true, ""
 
+	case "skill_propose":
+		// Skill proposals are allowed in every mode: they write a CANDIDATE
+		// under .openexec/skills/_candidates/ that is never loaded until a
+		// human approves it — proposing carries no execution-time risk.
+		return true, ""
+
 	case "git_apply_patch":
 		if b.mode == ModeSuggest {
 			// In suggest mode, only allow dry-run (check_only=true)
@@ -155,6 +161,7 @@ func isControlPlaneTool(toolName string) bool {
 		"backlog_complete_task":  true,
 		"backlog_complete_story": true,
 		"memory_read":            true,
+		"skill_propose":          true,
 	}
 	return controlPlaneTools[toolName]
 }

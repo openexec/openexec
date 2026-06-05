@@ -38,6 +38,12 @@ func (r *Registry) LoadFromDir(dir, source string) error {
 		if !entry.IsDir() {
 			continue
 		}
+		// "_"-prefixed directories are reserved for non-active skills
+		// (e.g. _candidates: agent-proposed skills awaiting human approval,
+		// see candidates.go). They must never load into the registry.
+		if strings.HasPrefix(entry.Name(), "_") {
+			continue
+		}
 
 		skillPath := filepath.Join(dir, entry.Name(), "SKILL.md")
 		if _, err := os.Stat(skillPath); err != nil {

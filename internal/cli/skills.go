@@ -242,6 +242,70 @@ var skillsDisableCmd = &cobra.Command{
 	},
 }
 
+var skillsProposalsCmd = &cobra.Command{
+	Use:   "proposals",
+	Short: "List agent-proposed candidate skills awaiting review",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectDir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		candidates, err := skills.ListCandidates(projectDir)
+		if err != nil {
+			return err
+		}
+		if len(candidates) == 0 {
+			cmd.Println("No candidate skills awaiting review.")
+			return nil
+		}
+		cmd.Printf("%d candidate skill(s) awaiting review:\n\n", len(candidates))
+		for _, c := range candidates {
+			cmd.Printf("  %s — %s\n", c.Name, c.Description)
+			if c.WhenToUse != "" {
+				cmd.Printf("    when: %s\n", c.WhenToUse)
+			}
+			cmd.Printf("    review: %s\n", c.SourcePath)
+		}
+		cmd.Println("\nApprove with: openexec skills approve <name>   Reject with: openexec skills reject <name>")
+		return nil
+	},
+}
+
+var skillsApproveCmd = &cobra.Command{
+	Use:   "approve <name>",
+	Short: "Activate a candidate skill (review it first: openexec skills proposals)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectDir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		path, err := skills.ApproveCandidate(projectDir, args[0])
+		if err != nil {
+			return err
+		}
+		cmd.Printf("Approved skill %q — now active at %s\n", args[0], path)
+		return nil
+	},
+}
+
+var skillsRejectCmd = &cobra.Command{
+	Use:   "reject <name>",
+	Short: "Discard a candidate skill without activating it",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectDir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		if err := skills.RejectCandidate(projectDir, args[0]); err != nil {
+			return err
+		}
+		cmd.Printf("Rejected candidate skill %q\n", args[0])
+		return nil
+	},
+}
+
 func init() {
 	skillsListCmd.Flags().String("category", "", "Filter by category")
 	skillsImportCmd.Flags().Bool("from-claude", false, "Import from ~/.claude/skills/")
@@ -254,5 +318,8 @@ func init() {
 	skillsCmd.AddCommand(skillsCreateCmd)
 	skillsCmd.AddCommand(skillsEnableCmd)
 	skillsCmd.AddCommand(skillsDisableCmd)
+	skillsCmd.AddCommand(skillsProposalsCmd)
+	skillsCmd.AddCommand(skillsApproveCmd)
+	skillsCmd.AddCommand(skillsRejectCmd)
 	rootCmd.AddCommand(skillsCmd)
 }

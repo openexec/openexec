@@ -273,3 +273,37 @@ func TestMemoryRead(t *testing.T) {
 		t.Fatalf("expected memory content, got: %s", resultText(result))
 	}
 }
+
+// TestSkillPropose verifies the propose-then-approve seam over MCP: proposals
+// land as candidates (registry-invisible) and hostile names are rejected.
+func TestSkillPropose(t *testing.T) {
+	projDir := t.TempDir()
+	srv, out := newBacklogTestServer(t, projDir)
+
+	result := callTool(t, srv, out, "skill_propose", map[string]interface{}{
+		"name":        "pg-testcontainer-setup",
+		"description": "How this repo boots Postgres testcontainers",
+		"when_to_use": "When writing integration tests that need a database",
+		"content":     "## Rule\nReuse the shared container helper in tests/db.",
+	})
+	if isToolError(result) {
+		t.Fatalf("skill_propose failed: %s", resultText(result))
+	}
+	if active, _ := result["active"].(bool); active {
+		t.Fatal("proposal must not be active")
+	}
+	candidate := filepath.Join(projDir, ".openexec", "skills", "_candidates", "pg-testcontainer-setup", "SKILL.md")
+	if _, err := os.Stat(candidate); err != nil {
+		t.Fatalf("candidate file not written: %v", err)
+	}
+
+	// Hostile name → tool error, nothing written outside _candidates.
+	result = callTool(t, srv, out, "skill_propose", map[string]interface{}{
+		"name":        "../../evil",
+		"description": "x",
+		"content":     "x",
+	})
+	if !isToolError(result) {
+		t.Fatal("expected hostile skill name to be rejected")
+	}
+}

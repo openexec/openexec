@@ -101,10 +101,10 @@ func TestToolsList(t *testing.T) {
 
 	result, _ := resps[0].Result.(map[string]interface{})
 	tools, _ := result["tools"].([]interface{})
-	// In danger-full-access mode (set in TestMain), we expect 13 tools:
-	// 5 core tools + 6 backlog/memory tools + write_file + run_shell_command
-	if len(tools) != 13 {
-		t.Fatalf("expected 13 tools in danger-full-access mode, got %d", len(tools))
+	// In danger-full-access mode (set in TestMain), we expect 14 tools:
+	// 5 core + 6 backlog/memory + skill_propose + write_file + run_shell_command
+	if len(tools) != 14 {
+		t.Fatalf("expected 14 tools in danger-full-access mode, got %d", len(tools))
 	}
 
 	// Check openexec_signal tool
@@ -161,8 +161,8 @@ func TestToolsList(t *testing.T) {
 		t.Errorf("tool[5] name = %v, want backlog_list_stories", toolB["name"])
 	}
 
-	// Check write_file tool (index 11, only in full-auto mode)
-	tool6, _ := tools[11].(map[string]interface{})
+	// Check write_file tool (index 12, only in full-auto mode)
+	tool6, _ := tools[12].(map[string]interface{})
 	if tool6["name"] != "write_file" {
 		t.Errorf("tool[11] name = %v, want write_file", tool6["name"])
 	}
@@ -176,8 +176,8 @@ func TestToolsList(t *testing.T) {
 		t.Error("missing 'content' in write_file input schema properties")
 	}
 
-	// Check run_shell_command tool (index 12, only in full-auto mode)
-	tool7, _ := tools[12].(map[string]interface{})
+	// Check run_shell_command tool (index 13, only in full-auto mode)
+	tool7, _ := tools[13].(map[string]interface{})
 	if tool7["name"] != "run_shell_command" {
 		t.Errorf("tool[12] name = %v, want run_shell_command", tool7["name"])
 	}
