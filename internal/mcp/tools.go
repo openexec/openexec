@@ -338,6 +338,11 @@ type GitApplyPatchRequest struct {
 	ThreeWay         bool   `json:"three_way,omitempty"`
 	IgnoreWhitespace bool   `json:"ignore_whitespace,omitempty"`
 	ContextLines     int    `json:"context_lines,omitempty"`
+
+	// Recount is set internally by validation when hunk line counts in the
+	// patch header do not match content: git apply runs with --recount so the
+	// counts are recomputed instead of the call failing. Not client-settable.
+	Recount bool `json:"-"`
 }
 
 // Default constants for git_apply_patch
@@ -519,6 +524,11 @@ func ValidateGitApplyPatchRequest(req *GitApplyPatchRequest) error {
 
 	// Store the parsed patch for later use (could be used by handler)
 	_ = patch
+
+	// Hunk count drift is tolerated: apply with --recount (see patch.go).
+	if validationResult.CountMismatch {
+		req.Recount = true
+	}
 
 	// Check for validation errors
 	if !validationResult.Valid {

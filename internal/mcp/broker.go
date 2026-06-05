@@ -93,6 +93,17 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 		"openexec_result", "openexec_action":
 		return true, "" // Always allowed (Read-only or control plane)
 
+	case "backlog_list_stories", "backlog_get_story", "memory_read":
+		return true, "" // Read-only backlog/memory access, allowed in every mode
+
+	case "backlog_claim_story", "backlog_complete_task", "backlog_complete_story":
+		// Backlog state writes are allowed in every mode, including read-only
+		// chat: they mutate orchestrator bookkeeping (the .openexec database),
+		// not workspace files. This is the documented light-mode exception
+		// that lets an external MCP client (e.g. Claude Code) drive the
+		// backlog one story at a time.
+		return true, ""
+
 	case "git_apply_patch":
 		if b.mode == ModeSuggest {
 			// In suggest mode, only allow dry-run (check_only=true)
@@ -136,6 +147,14 @@ func isControlPlaneTool(toolName string) bool {
 		"get_fork_info":      true,
 		"list_session_forks": true,
 		"fork_session":       true,
+		// Backlog/memory tools are control plane: they manage orchestrator
+		// state, not workspace files, so toolset filtering never blocks them.
+		"backlog_list_stories":   true,
+		"backlog_get_story":      true,
+		"backlog_claim_story":    true,
+		"backlog_complete_task":  true,
+		"backlog_complete_story": true,
+		"memory_read":            true,
 	}
 	return controlPlaneTools[toolName]
 }

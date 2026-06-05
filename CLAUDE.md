@@ -100,6 +100,9 @@ Planner-generated tasks carry `"mode": "afk" | "hitl"` (story-generation prompt 
 ### Vertical Slices (task decomposition)
 The story-generation prompt (`internal/planner/prompt.go`, rules 4–5) decomposes complex work into **vertical slices**: each task crosses every layer it needs (schema → service → UI) and ends in something runnable; layer-by-layer (horizontal) plans and Diagnose/Implement/Verify phase tasks are rejected by the story review prompt. The first slice of a story must be a tracer bullet — the thinnest end-to-end path.
 
+### Light Mode (story backlog over MCP)
+`openexec mcp-serve` exposes the story backlog to external MCP clients (Claude Code) without booting the daemon: `backlog_list_stories`, `backlog_get_story`, `backlog_claim_story` (one story in progress at a time), `backlog_complete_task`, `backlog_complete_story`, `memory_read`. Implementation in `internal/mcp/backlog.go`. Two invariants: (1) every handler calls `Load()` — mcp-serve is long-lived and other processes write the same `.openexec/openexec.db`, so cached state must never be served; (2) backlog writes are allowed in **all** permission modes including read-only chat — they mutate orchestrator bookkeeping, not workspace files (documented exception, see `docs/LIGHT_MODE.md`).
+
 ### Smart-Zone Budget (context size flagging)
 Agentic runners report the **peak single-call context size** (input + cache tokens of one call — never a cumulative sum across turns, which would overcount) as the `peak_context_tokens` artifact: the CLI parser extracts it from assistant-message usage, the API runner tracks it across turns. `blueprint.DefaultExecutor` flags stages whose peak exceeds `SmartZoneTokens` (0 → `DefaultSmartZoneTokens` 100k, −1 disables) with a `smart_zone_exceeded` artifact, "task is too big, split it" diagnostics, and a `[SmartZone]` log line. It is a flag, not a failure — the stage still completes.
 

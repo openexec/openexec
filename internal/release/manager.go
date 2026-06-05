@@ -736,6 +736,19 @@ func (m *Manager) SetTaskStatus(taskID string, status string) error {
 	return m.UpdateTask(&updated)
 }
 
+// SetStoryStatus updates the lifecycle status of a story and persists it.
+func (m *Manager) SetStoryStatus(storyID string, status string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	story, ok := m.stories[storyID]
+	if !ok {
+		return fmt.Errorf("story %s not found", storyID)
+	}
+	story.Status = status
+	return m.saveUnlocked()
+}
+
 // DeleteTask removes a task from the tracking system and its parent story.
 func (m *Manager) DeleteTask(taskID string) error {
 	m.mu.Lock()

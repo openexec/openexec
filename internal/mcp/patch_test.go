@@ -321,20 +321,25 @@ func TestValidatePatch_LineCountMismatch(t *testing.T) {
 	}
 
 	result := ValidatePatch(patch)
-	if result.Valid {
-		t.Error("expected validation to fail due to line count mismatch")
+	// Count mismatches are tolerated (applied with git apply --recount), not
+	// rejected: the patch stays valid, the drift is flagged for the handler.
+	if !result.Valid {
+		t.Error("expected patch with count mismatch to remain valid (tolerated via --recount)")
+	}
+	if !result.CountMismatch {
+		t.Error("expected CountMismatch flag to be set")
 	}
 
-	// Should have errors about line count mismatch
+	// Should have warnings about line count mismatch
 	found := false
-	for _, e := range result.Errors {
-		if strings.Contains(e.Message, "line count mismatch") {
+	for _, w := range result.Warnings {
+		if strings.Contains(w.Message, "line count mismatch") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected error about line count mismatch")
+		t.Error("expected warning about line count mismatch")
 	}
 }
 
@@ -974,5 +979,43 @@ func TestParsePatch_MultipleHunksInMultipleFiles(t *testing.T) {
 
 	if len(patch.Files[1].Hunks) != 1 {
 		t.Errorf("expected 1 hunk in file2, got %d", len(patch.Files[1].Hunks))
+	}
+}
+
+func TestGitApplyPatch_RecountToleratesMiscountedHunks(t *testing.T) {
+	// Validation must set Recount for a patch whose hunk header miscounts lines.
+	req := &GitApplyPatchRequest{
+		Patch: `--- a/file.txt
++++ b/file.txt
+@@ -1,5 +1,4 @@
+ line1
++new line
+ line2
+ line3
+`,
+	}
+	if err := ValidateGitApplyPatchRequest(req); err != nil {
+		t.Fatalf("miscounted patch should pass validation (tolerated), got: %v", err)
+	}
+	if !req.Recount {
+		t.Fatal("expected Recount to be set for miscounted hunk header")
+	}
+
+	// A correctly counted patch must not trigger recount.
+	req2 := &GitApplyPatchRequest{
+		Patch: `--- a/file.txt
++++ b/file.txt
+@@ -1,3 +1,4 @@
+ line1
++new line
+ line2
+ line3
+`,
+	}
+	if err := ValidateGitApplyPatchRequest(req2); err != nil {
+		t.Fatalf("correct patch failed validation: %v", err)
+	}
+	if req2.Recount {
+		t.Fatal("Recount must not be set for a correctly counted patch")
 	}
 }

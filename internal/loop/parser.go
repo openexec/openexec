@@ -3,6 +3,7 @@ package loop
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -11,6 +12,10 @@ import (
 	"github.com/openexec/openexec/internal/schema"
 	"github.com/openexec/openexec/pkg/util"
 )
+
+// parserThrashThreshold is the number of consecutive identical tool failures
+// before the parser emits EventThrashingDetected.
+const parserThrashThreshold = 3
 
 // Parser reads line-delimited stream-JSON from Claude Code and emits typed Events.
 type Parser struct {
@@ -21,6 +26,15 @@ type Parser struct {
 	// peakContextTokens is the largest single-call context size (input +
 	// cache tokens) observed across assistant messages in this session.
 	peakContextTokens int64
+
+	// Cognitive-thrash detection: the stall detector only sees process
+	// silence, so an agent that keeps regenerating the same failing tool
+	// call (e.g. an identical broken patch after every rejection) looks
+	// healthy. Track consecutive identical failures and flag them.
+	lastToolName        string
+	lastFailureSig      string
+	consecutiveFailures int
+	thrashWarned        bool
 }
 
 // NewParser creates a Parser that sends events to ch.
@@ -188,6 +202,7 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 			if isOpenExecSignal(item.Name) {
 				p.emitSignal(item.Input)
 			} else {
+				p.lastToolName = item.Name
 				p.emit(Event{
 					Type:      EventToolStart,
 					Iteration: p.iteration,
@@ -233,6 +248,7 @@ func (p *Parser) parseToolResult(data json.RawMessage) {
             }
         }
         p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: b.String(), Artifacts: artifacts})
+        p.trackToolFailure(b.String())
         return
     }
 
@@ -240,10 +256,54 @@ func (p *Parser) parseToolResult(data json.RawMessage) {
     var s string
     if err := json.Unmarshal(data, &s); err == nil {
         p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: s})
+        p.trackToolFailure(s)
         return
     }
     // Last resort: raw JSON string
     p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: string(data)})
+}
+
+// trackToolFailure detects cognitive thrashing: an agent repeating the same
+// failing tool call. Three consecutive identical failures emit a single
+// EventThrashingDetected so the orchestrator and audit trail surface a loop
+// that process-level stall detection cannot see (the agent is actively
+// producing output the whole time).
+func (p *Parser) trackToolFailure(text string) {
+	lower := strings.ToLower(text)
+	isFailure := strings.Contains(lower, "validation error") ||
+		strings.Contains(lower, "invalid patch") ||
+		strings.Contains(lower, "failed to apply patch") ||
+		strings.HasPrefix(lower, "error:") ||
+		strings.HasPrefix(lower, "error ")
+	if !isFailure {
+		p.lastFailureSig = ""
+		p.consecutiveFailures = 0
+		p.thrashWarned = false
+		return
+	}
+
+	sig := p.lastToolName + "|" + lower
+	if len(sig) > 200 {
+		sig = sig[:200]
+	}
+	if sig == p.lastFailureSig {
+		p.consecutiveFailures++
+	} else {
+		p.lastFailureSig = sig
+		p.consecutiveFailures = 1
+		p.thrashWarned = false
+	}
+
+	if p.consecutiveFailures >= parserThrashThreshold && !p.thrashWarned {
+		p.thrashWarned = true
+		p.emit(Event{
+			Type:      EventThrashingDetected,
+			Iteration: p.iteration,
+			Tool:      p.lastToolName,
+			Text: fmt.Sprintf("agent repeated the same failing %s call %d times in a row — likely thrashing, consider aborting or changing strategy",
+				p.lastToolName, p.consecutiveFailures),
+		})
+	}
 }
 
 func (p *Parser) emit(e Event) {

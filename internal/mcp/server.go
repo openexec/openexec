@@ -12,12 +12,14 @@ import (
     "os/exec"
     "path/filepath"
     "strings"
+    "sync"
     "syscall"
     "time"
     "crypto/sha256"
     "encoding/hex"
 
     "github.com/openexec/openexec/internal/mode"
+    "github.com/openexec/openexec/internal/release"
     "github.com/openexec/openexec/internal/toolset"
     "github.com/openexec/openexec/pkg/telemetry"
 )
@@ -71,6 +73,10 @@ type Server struct {
 	toolsetRegistry     *toolset.Registry   // Toolset-based tool filtering
 	currentMode         mode.Mode           // Current operational mode (chat/task/run)
 	activeToolset       string              // Currently active toolset name
+
+	// Backlog tools state (see backlog.go). Lazily opened; guarded by backlogMu.
+	backlogMu  sync.Mutex
+	backlogMgr *release.Manager
 }
 
 // SetContext sets the tracing context and run ID for the server.
@@ -254,6 +260,14 @@ func (s *Server) handleToolsList(req Request) {
         GitApplyPatchToolDef(),     // Patch tool available (with mode restrictions in Authorize)
         OpenExecResultToolDef(),    // Typed step results
         OpenExecActionToolDef(),    // Unified action envelope
+
+        // Backlog + memory tools for lightweight external clients (see backlog.go).
+        BacklogListStoriesToolDef(),
+        BacklogGetStoryToolDef(),
+        BacklogClaimStoryToolDef(),
+        BacklogCompleteTaskToolDef(),
+        BacklogCompleteStoryToolDef(),
+        MemoryReadToolDef(),
     }
 
     // Dangerous tools only advertised in danger-full-access mode
@@ -453,6 +467,24 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "openexec_action":
 		s.handleOpenExecAction(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "backlog_list_stories":
+		s.handleBacklogListStories(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "backlog_get_story":
+		s.handleBacklogGetStory(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "backlog_claim_story":
+		s.handleBacklogClaimStory(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "backlog_complete_task":
+		s.handleBacklogCompleteTask(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "backlog_complete_story":
+		s.handleBacklogCompleteStory(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "memory_read":
+		s.handleMemoryRead(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))
@@ -907,6 +939,10 @@ func (s *Server) handleGitApplyPatch(req Request, params toolsCallParams) {
 	if gapReq.ContextLines != DefaultContextLines {
 		args = append(args, fmt.Sprintf("-C%d", gapReq.ContextLines))
 	}
+	if gapReq.Recount {
+		// Hunk headers declared wrong line counts; recompute from content.
+		args = append(args, "--recount")
+	}
 
 	// Apply patch from stdin
 	args = append(args, "-")
@@ -970,6 +1006,9 @@ func (s *Server) handleGitApplyPatch(req Request, params toolsCallParams) {
         } else {
             resultText = fmt.Sprintf("Failed to apply patch:\n%s", stderrStr)
         }
+    }
+    if gapReq.Recount && err == nil {
+        resultText += "\nWarning: hunk line counts in the patch header did not match the content; applied with --recount. Emit exact line counts in hunk headers next time."
     }
     if artHash != "" {
         resultText += "\nARTIFACT:patch " + artHash + " " + artPath

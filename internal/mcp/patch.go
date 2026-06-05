@@ -97,6 +97,12 @@ type PatchValidationResult struct {
 	Errors   []PatchValidationError // List of validation errors
 	Warnings []PatchValidationError // List of validation warnings
 	Stats    PatchStats             // Patch statistics
+
+	// CountMismatch is set when hunk headers declare line counts that do not
+	// match the hunk content — the most common LLM diff-formatting drift.
+	// Tolerated (git apply --recount recomputes counts) rather than rejected,
+	// so a one-line miscount does not cost a failed tool call.
+	CountMismatch bool
 }
 
 // Regular expressions for parsing
@@ -425,10 +431,14 @@ func ValidatePatch(patch *Patch) *PatchValidationResult {
 				}
 			}
 
-			// Validate line counts match header
+			// Line counts that disagree with the header are tolerated as
+			// warnings: the patch structure and file paths are still sound
+			// (security checks are unaffected) and `git apply --recount`
+			// recomputes counts from content. Rejecting these outright makes
+			// LLM-generated diffs fail on the most common formatting drift.
 			if oldLines != hunk.OldCount {
-				result.Valid = false
-				result.Errors = append(result.Errors, PatchValidationError{
+				result.CountMismatch = true
+				result.Warnings = append(result.Warnings, PatchValidationError{
 					File:    fileName,
 					Hunk:    hunkNum,
 					Message: fmt.Sprintf("old line count mismatch: header says %d but found %d", hunk.OldCount, oldLines),
@@ -436,8 +446,8 @@ func ValidatePatch(patch *Patch) *PatchValidationResult {
 			}
 
 			if newLines != hunk.NewCount {
-				result.Valid = false
-				result.Errors = append(result.Errors, PatchValidationError{
+				result.CountMismatch = true
+				result.Warnings = append(result.Warnings, PatchValidationError{
 					File:    fileName,
 					Hunk:    hunkNum,
 					Message: fmt.Sprintf("new line count mismatch: header says %d but found %d", hunk.NewCount, newLines),

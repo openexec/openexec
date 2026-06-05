@@ -170,9 +170,13 @@ func (b *stderrTailBuffer) String() string {
 }
 
 // autonomousPreamble is prepended to every prompt to ensure Claude operates
-// autonomously without attempting interactive workflows.
+// autonomously without attempting interactive workflows. It forbids the
+// interactive plan-mode WORKFLOW (which would block forever in -p mode), but
+// deliberately encourages reasoning before edits — suppressing think-first
+// behavior measurably degrades edit precision.
 const autonomousPreamble = `IMPORTANT: You are running autonomously in a non-interactive pipeline. ` +
-    `There is no human operator present. Do NOT plan — proceed directly with implementation. ` +
+    `There is no human operator present: do not enter plan mode and do not ask questions — no approval or answer will ever come. ` +
+    `Do reason through your approach and the files involved before editing, then proceed directly with implementation. ` +
     `Work independently and make reasonable decisions. ` +
     `For code edits, prefer the git_apply_patch MCP tool for unified diffs, but you may use your built-in Write and Edit tools when creating new files or when patches are impractical. ` +
     `If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
