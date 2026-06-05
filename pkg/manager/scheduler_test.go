@@ -734,3 +734,71 @@ func TestScheduler_DefaultWorkerCount(t *testing.T) {
 		t.Errorf("task T-1 status = %q, want done", status)
 	}
 }
+
+func TestFilterAutoDispatchable_HoldsBackHITLAndDependents(t *testing.T) {
+	hitl := &release.Task{
+		ID:       "T-1",
+		StoryID:  "US-1",
+		Metadata: map[string]interface{}{"mode": release.TaskModeHITL},
+	}
+	dependsOnHITL := &release.Task{
+		ID:        "T-2",
+		StoryID:   "US-1",
+		DependsOn: []string{"T-1"},
+	}
+	transitive := &release.Task{
+		ID:        "T-3",
+		StoryID:   "US-1",
+		DependsOn: []string{"T-2"},
+	}
+	// US-2 depends on the story containing the hitl task.
+	inDependentStory := &release.Task{
+		ID:      "T-4",
+		StoryID: "US-2",
+	}
+	free := &release.Task{
+		ID:      "T-5",
+		StoryID: "US-3",
+	}
+
+	storyMap := map[string]*release.Story{
+		"US-1": {ID: "US-1"},
+		"US-2": {ID: "US-2", DependsOn: []string{"US-1"}},
+		"US-3": {ID: "US-3"},
+	}
+
+	pending := []*release.Task{hitl, dependsOnHITL, transitive, inDependentStory, free}
+	runnable, held := filterAutoDispatchable(pending, storyMap)
+
+	if len(runnable) != 1 || runnable[0].ID != "T-5" {
+		t.Fatalf("expected only T-5 runnable, got %d tasks", len(runnable))
+	}
+	if len(held) != 4 {
+		t.Fatalf("expected 4 held tasks, got %d", len(held))
+	}
+}
+
+func TestFilterAutoDispatchable_DefaultsToAFK(t *testing.T) {
+	// Tasks without metadata (or with unknown mode values) default to AFK.
+	noMeta := &release.Task{ID: "T-1", StoryID: "US-1"}
+	unknownMode := &release.Task{
+		ID:       "T-2",
+		StoryID:  "US-1",
+		Metadata: map[string]interface{}{"mode": "weird"},
+	}
+	afk := &release.Task{
+		ID:       "T-3",
+		StoryID:  "US-1",
+		Metadata: map[string]interface{}{"mode": release.TaskModeAFK},
+	}
+
+	storyMap := map[string]*release.Story{"US-1": {ID: "US-1"}}
+	runnable, held := filterAutoDispatchable([]*release.Task{noMeta, unknownMode, afk}, storyMap)
+
+	if len(held) != 0 {
+		t.Fatalf("expected no held tasks, got %d", len(held))
+	}
+	if len(runnable) != 3 {
+		t.Fatalf("expected 3 runnable tasks, got %d", len(runnable))
+	}
+}

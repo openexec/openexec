@@ -18,6 +18,73 @@ type RunOptions struct {
 	Mode        string `json:"mode"`
 }
 
+// filterAutoDispatchable splits pending tasks into auto-dispatchable tasks and
+// held-back tasks. A task is held back when it is marked hitl (human in the
+// loop), depends on a held-back task, or belongs to a story that depends on a
+// story containing a held-back task.
+func filterAutoDispatchable(pending []*release.Task, storyMap map[string]*release.Story) (runnable, held []*release.Task) {
+	excluded := make(map[string]bool)
+	for _, t := range pending {
+		if t.ExecutionMode() == release.TaskModeHITL {
+			excluded[t.ID] = true
+		}
+	}
+
+	// Propagate exclusion transitively through task and story dependencies.
+	for changed := len(excluded) > 0; changed; {
+		changed = false
+
+		excludedStories := make(map[string]bool)
+		for _, t := range pending {
+			if excluded[t.ID] {
+				excludedStories[t.StoryID] = true
+			}
+		}
+
+		for _, t := range pending {
+			if excluded[t.ID] {
+				continue
+			}
+			for _, dep := range t.DependsOn {
+				if excluded[dep] {
+					excluded[t.ID] = true
+					changed = true
+					break
+				}
+			}
+			if excluded[t.ID] {
+				continue
+			}
+			if story, ok := storyMap[t.StoryID]; ok {
+				for _, sdep := range story.DependsOn {
+					if excludedStories[sdep] {
+						excluded[t.ID] = true
+						changed = true
+						break
+					}
+				}
+			}
+		}
+	}
+
+	for _, t := range pending {
+		if excluded[t.ID] {
+			held = append(held, t)
+		} else {
+			runnable = append(runnable, t)
+		}
+	}
+	return runnable, held
+}
+
+// holdReason describes why a task was held back from auto-dispatch.
+func holdReason(t *release.Task) string {
+	if t.ExecutionMode() == release.TaskModeHITL {
+		return "requires a human in the loop"
+	}
+	return "depends on a human-in-the-loop task"
+}
+
 // ExecuteTasks runs all pending tasks in the dependency graph.
 func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 	rel, err := m.GetInternalReleaseManager()
@@ -46,6 +113,22 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 
 	if len(pending) == 0 {
 		log.Printf("[Scheduler] All tasks already complete or in progress")
+		return nil
+	}
+
+	// Hold back human-in-the-loop tasks: the batch scheduler only auto-dispatches
+	// AFK tasks. Tasks depending on a held-back task (directly or via story
+	// dependencies) must also be held back, otherwise the dependency resolver
+	// below would wait on them forever and deadlock the worker pool.
+	pending, held := filterAutoDispatchable(pending, storyMap)
+	if len(held) > 0 {
+		for _, t := range held {
+			log.Printf("[Scheduler] Holding back %s (%s): %s", t.ID, t.Title, holdReason(t))
+		}
+		log.Printf("[Scheduler] %d task(s) held back for human action; run them individually when ready", len(held))
+	}
+	if len(pending) == 0 {
+		log.Printf("[Scheduler] All remaining tasks require a human in the loop")
 		return nil
 	}
 

@@ -149,6 +149,17 @@ type Task struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
+// ExecutionMode returns the task's execution mode (TaskModeAFK or TaskModeHITL).
+// Tasks without an explicit mode default to AFK (autonomous).
+func (t *Task) ExecutionMode() string {
+	if t.Metadata != nil {
+		if m, ok := t.Metadata["mode"].(string); ok && m == TaskModeHITL {
+			return TaskModeHITL
+		}
+	}
+	return TaskModeAFK
+}
+
 // TaskGitInfo holds git-related information for a task.
 type TaskGitInfo struct {
 	Commits  []string `json:"commits"`             // Commit hashes implementing this task
@@ -214,6 +225,13 @@ const (
 	TaskStatusApproved    = "approved"
 	TaskStatusDone        = "done"
 	TaskStatusFailed      = "failed"
+)
+
+// Task execution modes, stored in Task.Metadata["mode"].
+// Mirrored by planner.TaskModeAFK/TaskModeHITL.
+const (
+	TaskModeAFK  = "afk"  // agent can complete and verify autonomously (default)
+	TaskModeHITL = "hitl" // requires a human in the loop; never auto-dispatched
 )
 
 // StoryType constants

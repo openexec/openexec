@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"strconv"
 	"strings"
 
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/schema"
 	"github.com/openexec/openexec/pkg/util"
 )
@@ -15,6 +17,10 @@ type Parser struct {
 	events    chan<- Event
 	iteration int
 	tracker   *SignalTracker // optional, set by Loop for signal tracking
+
+	// peakContextTokens is the largest single-call context size (input +
+	// cache tokens) observed across assistant messages in this session.
+	peakContextTokens int64
 }
 
 // NewParser creates a Parser that sends events to ch.
@@ -53,6 +59,21 @@ type rawMessage struct {
 // messageBody is the shape of the "message" field.
 type messageBody struct {
 	Content []contentItem `json:"content"`
+	Usage   *usageBody    `json:"usage,omitempty"`
+}
+
+// usageBody is the per-call token usage attached to assistant messages.
+type usageBody struct {
+	InputTokens              int64 `json:"input_tokens"`
+	CacheCreationInputTokens int64 `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int64 `json:"cache_read_input_tokens"`
+	OutputTokens             int64 `json:"output_tokens"`
+}
+
+// contextTokens returns the context size of a single call: fresh input plus
+// cache reads/writes (cached tokens still occupy the context window).
+func (u *usageBody) contextTokens() int64 {
+	return u.InputTokens + u.CacheCreationInputTokens + u.CacheReadInputTokens
 }
 
 // contentItem is a single item inside message.content[].
@@ -81,7 +102,18 @@ func (p *Parser) parseLine(line []byte) {
 		p.parseToolResult(raw.Content)
 
 	case "result":
-		// End of output — process about to exit. Nothing to emit.
+		// End of output — process about to exit. Surface the peak per-call
+		// context size observed this session so the stage result can flag
+		// smart-zone overruns (see blueprint.DefaultSmartZoneTokens).
+		if p.peakContextTokens > 0 {
+			p.emit(Event{
+				Type:      EventProgress,
+				Iteration: p.iteration,
+				Artifacts: map[string]string{
+					blueprint.ArtifactPeakContextTokens: strconv.FormatInt(p.peakContextTokens, 10),
+				},
+			})
+		}
 		return
 
 	default:
@@ -102,6 +134,15 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 	if err := util.UnmarshalRobust(string(data), &body); err != nil {
 		return
 	}
+
+	// Track the largest single-call context size (peak, not cumulative —
+	// each call re-sends the conversation, so summing would overcount).
+	if body.Usage != nil {
+		if ctx := body.Usage.contextTokens(); ctx > p.peakContextTokens {
+			p.peakContextTokens = ctx
+		}
+	}
+
 	for _, item := range body.Content {
 		switch item.Type {
 		case "text":

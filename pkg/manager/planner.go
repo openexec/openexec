@@ -252,6 +252,9 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 					Status:             release.TaskStatusPending,
 					CreatedAt:          now,
 				}
+				if t.Mode == planner.TaskModeHITL {
+					task.Metadata = map[string]interface{}{"mode": release.TaskModeHITL}
+				}
 
 				if err := rel.CreateTask(task); err != nil {
 					return fmt.Errorf("import task %s: %w", t.ID, err)

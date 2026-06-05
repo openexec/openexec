@@ -18,6 +18,12 @@ type Goal struct {
 	VerificationMethod string `json:"verification_method"`
 }
 
+// Task execution modes. Mirrored by release.TaskModeAFK/TaskModeHITL.
+const (
+	TaskModeAFK  = "afk"  // agent can complete and verify autonomously (default)
+	TaskModeHITL = "hitl" // requires a human in the loop; never auto-dispatched
+)
+
 // Task represents a technical unit of work within a story
 type Task struct {
 	ID                 string   `json:"id"`
@@ -25,6 +31,7 @@ type Task struct {
 	Description        string   `json:"description"`
 	TechnicalStrategy  string   `json:"technical_strategy"`
 	DependsOn          []string `json:"depends_on"`
+	Mode               string   `json:"mode,omitempty"` // TaskModeAFK (default) or TaskModeHITL
 	VerificationScript string   `json:"verification_script"`
 }
 

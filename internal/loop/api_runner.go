@@ -8,9 +8,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/pkg/agent"
 )
 
@@ -33,6 +35,11 @@ type APIRunner struct {
 	config APIRunnerConfig
 	events chan<- Event
 	tools  *MCPToolHandler
+
+	// peakContextTokens is the largest single-call context size (prompt +
+	// cache tokens) observed across turns. Peak, not cumulative: each turn
+	// re-sends the conversation, so summing would overcount.
+	peakContextTokens int64
 }
 
 // NewAPIRunner creates a new API-based agentic runner.
@@ -86,6 +93,12 @@ func (r *APIRunner) Run(ctx context.Context) error {
 			return fmt.Errorf("API provider error: %w", err)
 		}
 
+		// Track peak single-call context size for smart-zone flagging.
+		ctxTokens := int64(resp.Usage.PromptTokens + resp.Usage.CacheReadTokens + resp.Usage.CacheWriteTokens)
+		if ctxTokens > r.peakContextTokens {
+			r.peakContextTokens = ctxTokens
+		}
+
 		// Emit text content
 		text := resp.GetText()
 		if text != "" {
@@ -100,8 +113,9 @@ func (r *APIRunner) Run(ctx context.Context) error {
 		if len(toolCalls) == 0 {
 			// No tool calls: model is done
 			r.emit(Event{
-				Type: EventComplete,
-				Text: text,
+				Type:      EventComplete,
+				Text:      text,
+				Artifacts: r.usageArtifacts(),
 				Result: &StepResult{
 					Status:     "complete",
 					Reason:     "end_turn",
@@ -153,13 +167,25 @@ func (r *APIRunner) Run(ctx context.Context) error {
 		Text:    fmt.Sprintf("Reached maximum of %d turns", r.config.MaxTurns),
 	})
 	r.emit(Event{
-		Type: EventComplete,
+		Type:      EventComplete,
+		Artifacts: r.usageArtifacts(),
 		Result: &StepResult{
 			Status: "complete",
 			Reason: "max_turns",
 		},
 	})
 	return nil
+}
+
+// usageArtifacts reports the peak context size for smart-zone flagging, or
+// nil when no usage was observed (e.g. providers that omit usage).
+func (r *APIRunner) usageArtifacts() map[string]string {
+	if r.peakContextTokens <= 0 {
+		return nil
+	}
+	return map[string]string{
+		blueprint.ArtifactPeakContextTokens: strconv.FormatInt(r.peakContextTokens, 10),
+	}
 }
 
 func (r *APIRunner) emit(e Event) {

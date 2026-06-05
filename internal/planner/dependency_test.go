@@ -432,3 +432,50 @@ func TestPlanJSON_DependsOnSerialization(t *testing.T) {
 		t.Errorf("T-002 depends_on should be [T-001], got %v", restored.Stories[1].Tasks[0].DependsOn)
 	}
 }
+
+func TestEnforceFastTrack_ChassisInheritsHITLMode(t *testing.T) {
+	plan := &ProjectPlan{
+		Goals: []Goal{{ID: "G-001"}},
+		Stories: []Story{
+			{
+				ID:    "US-001",
+				Title: "Feature with manual QA",
+				Tasks: []Task{
+					{ID: "T-1", Title: "Implement", Mode: TaskModeAFK},
+					{ID: "T-2", Title: "Manual QA", Mode: TaskModeHITL},
+				},
+			},
+			{
+				ID:    "US-002",
+				Title: "Fully autonomous feature",
+				Tasks: []Task{
+					{ID: "T-3", Title: "Implement", Mode: TaskModeAFK},
+					{ID: "T-4", Title: "Verify", Mode: ""},
+				},
+			},
+		},
+	}
+
+	EnforceFastTrack(plan, "surgical", "greenfield")
+
+	if got := plan.Stories[0].Tasks[0].Mode; got != TaskModeHITL {
+		t.Errorf("chassis merging a hitl task must be hitl, got %q", got)
+	}
+	if got := plan.Stories[1].Tasks[0].Mode; got == TaskModeHITL {
+		t.Errorf("chassis of afk-only tasks must not be hitl, got %q", got)
+	}
+}
+
+func TestParseResponse_TaskMode(t *testing.T) {
+	p := &Planner{}
+	plan, err := p.parseResponse(`{"schema_version":"1.1","stories":[{"id":"US-001","title":"S","tasks":[{"id":"T-1","title":"impl","mode":"afk"},{"id":"T-2","title":"qa","mode":"hitl"}]}]}`)
+	if err != nil {
+		t.Fatalf("parseResponse failed: %v", err)
+	}
+	if plan.Stories[0].Tasks[0].Mode != TaskModeAFK {
+		t.Errorf("expected afk, got %q", plan.Stories[0].Tasks[0].Mode)
+	}
+	if plan.Stories[0].Tasks[1].Mode != TaskModeHITL {
+		t.Errorf("expected hitl, got %q", plan.Stories[0].Tasks[1].Mode)
+	}
+}

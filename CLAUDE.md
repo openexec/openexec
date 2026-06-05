@@ -68,6 +68,7 @@ Tasks in blueprint mode progress through: **gather_context → implement → lin
 | `internal/toolset/` | Toolset definitions and registry |
 | `internal/context/` | Two-stage context assembly (deterministic + LLM ranking) |
 | `internal/mcp/` | Model Context Protocol server (JSON-RPC stdio) |
+| `internal/planner/` | Intent → goals/stories/tasks generation (prompts enforce vertical slices + afk/hitl tagging) |
 | `internal/prompt/` | Prompt assembly from personas/workflows/manifests |
 | `internal/release/` | SQLite-backed task/story state management |
 | `pkg/agent/` | AI provider adapters (anthropic, openai, gemini) |
@@ -92,6 +93,15 @@ Agent personas, workflows, and manifests live in `agents/`:
 - `agents/personas/` - Role definitions (YAML)
 - `agents/workflows/` - Prompt templates
 - `agents/manifests/` - Agent metadata linking persona to workflow
+
+### Task Execution Modes (afk/hitl)
+Planner-generated tasks carry `"mode": "afk" | "hitl"` (story-generation prompt rule 12), stored in `release.Task.Metadata["mode"]` and read via `Task.ExecutionMode()` (defaults to afk). The batch scheduler (`pkg/manager/scheduler.go`, `ExecuteTasks`) never auto-dispatches hitl tasks and transitively holds back their dependents (task- and story-level) so the dependency resolver cannot deadlock. Single-task runs via `Manager.Start` are not gated — humans run hitl tasks individually. Surgical-scope chassis merging (`internal/planner/postprocess.go`) inherits hitl if any merged task was hitl.
+
+### Vertical Slices (task decomposition)
+The story-generation prompt (`internal/planner/prompt.go`, rules 4–5) decomposes complex work into **vertical slices**: each task crosses every layer it needs (schema → service → UI) and ends in something runnable; layer-by-layer (horizontal) plans and Diagnose/Implement/Verify phase tasks are rejected by the story review prompt. The first slice of a story must be a tracer bullet — the thinnest end-to-end path.
+
+### Smart-Zone Budget (context size flagging)
+Agentic runners report the **peak single-call context size** (input + cache tokens of one call — never a cumulative sum across turns, which would overcount) as the `peak_context_tokens` artifact: the CLI parser extracts it from assistant-message usage, the API runner tracks it across turns. `blueprint.DefaultExecutor` flags stages whose peak exceeds `SmartZoneTokens` (0 → `DefaultSmartZoneTokens` 100k, −1 disables) with a `smart_zone_exceeded` artifact, "task is too big, split it" diagnostics, and a `[SmartZone]` log line. It is a flag, not a failure — the stage still completes.
 
 ### State & Persistence
 - **SQLite**: Canonical state store at `.openexec/data/audit.db`

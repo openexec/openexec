@@ -73,10 +73,15 @@ func EnforceFastTrack(plan *ProjectPlan, scope string, flow string) {
 				// Collapse into a single Chassis task
 				var combinedDesc strings.Builder
 				var combinedStrategy strings.Builder
-				
+				mode := ""
+
 				for _, t := range s.Tasks {
 					combinedDesc.WriteString(t.Title + ": " + t.Description + "\n")
 					combinedStrategy.WriteString(t.TechnicalStrategy + " ")
+					// If any merged task needs a human, the chassis does too.
+					if t.Mode == TaskModeHITL {
+						mode = TaskModeHITL
+					}
 				}
 
 				chassisTask := Task{
@@ -84,6 +89,7 @@ func EnforceFastTrack(plan *ProjectPlan, scope string, flow string) {
 					Title:              "Chassis: " + s.Title,
 					Description:        combinedDesc.String(),
 					TechnicalStrategy:  "FAST-TRACK: " + combinedStrategy.String() + " Complete implementation and verification in a single atomic loop.",
+					Mode:               mode,
 					VerificationScript: s.VerificationScript,
 				}
 				s.Tasks = []Task{chassisTask}

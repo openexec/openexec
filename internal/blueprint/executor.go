@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,21 @@ import (
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/types"
 )
+
+// DefaultSmartZoneTokens is the peak single-call context size (in tokens)
+// beyond which model quality degrades noticeably (the "dumb zone"). Agentic
+// stages whose peak context exceeds the budget are flagged so the task can be
+// split, instead of degrading silently.
+const DefaultSmartZoneTokens = 100_000
+
+// ArtifactPeakContextTokens is the artifact key under which agentic runners
+// report the largest single-call context size (prompt + cache tokens of one
+// call, NOT a cumulative sum across turns) observed during a stage.
+const ArtifactPeakContextTokens = "peak_context_tokens"
+
+// ArtifactSmartZoneExceeded marks a stage whose peak context size exceeded
+// the smart-zone budget.
+const ArtifactSmartZoneExceeded = "smart_zone_exceeded"
 
 // DefaultExecutor executes blueprint stages.
 // Deterministic stages run shell commands; agentic stages use bounded subloops.
@@ -29,6 +46,10 @@ type DefaultExecutor struct {
 
 	// AgenticRunner runs agentic stages. If nil, agentic stages fail.
 	AgenticRunner AgenticRunner
+
+	// SmartZoneTokens is the peak single-call context budget for agentic
+	// stages. Zero means DefaultSmartZoneTokens; negative disables the check.
+	SmartZoneTokens int64
 
 	// OnCommandStart is called when a command starts.
 	OnCommandStart func(stage *Stage, cmd string)
@@ -240,10 +261,44 @@ func (e *DefaultExecutor) executeAgentic(ctx context.Context, stage *Stage, inpu
 
 	result.Complete(output)
 
+	// Flag smart-zone overruns so oversized tasks surface as a task-sizing
+	// signal ("split this task") instead of degrading silently.
+	e.flagSmartZoneOverrun(result)
+
 	// Run Quality Gates after agentic stage succeeds
 	e.runQualityGates(ctx, stage, input, result)
 
 	return result, nil
+}
+
+// flagSmartZoneOverrun checks the stage's reported peak context size against
+// the smart-zone budget and flags the result when the budget was exceeded.
+// Stages whose runner did not report usage are left unflagged.
+func (e *DefaultExecutor) flagSmartZoneOverrun(result *StageResult) {
+	budget := e.SmartZoneTokens
+	if budget < 0 {
+		return
+	}
+	if budget == 0 {
+		budget = DefaultSmartZoneTokens
+	}
+
+	raw, ok := result.Artifacts[ArtifactPeakContextTokens]
+	if !ok {
+		return
+	}
+	peak, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || peak <= budget {
+		return
+	}
+
+	result.AddArtifact(ArtifactSmartZoneExceeded, "true")
+	msg := fmt.Sprintf("smart-zone budget exceeded: peak context %d tokens > budget %d — task is too big, split it into smaller tasks", peak, budget)
+	if result.Diagnostics != "" {
+		result.Diagnostics += "\n"
+	}
+	result.Diagnostics += msg
+	log.Printf("[SmartZone] Stage %q: %s", result.StageName, msg)
 }
 
 // SimpleAgenticRunner is a basic agentic runner that uses a callback function.

@@ -55,13 +55,20 @@ RULES:
    - The Study story tasks must focus on reading existing files, mapping dependencies, and documenting APIs into the knowledge base before any code is changed.
 4. DYNAMIC TASK SIZING: Evaluate the complexity of the requirement:
    - For SIMPLE fixes/features (e.g., changing a YAML file, fixing a specific UI bug, updating a single component): Create exactly ONE "Chassis" task per story. A Chassis task combines Diagnose, Implement, and Verify into a single, cohesive unit to reduce orchestrator overhead.
-   - For COMPLEX refactors/features (e.g., massive architectural changes, cross-cutting concerns): Use the Vertical Slice sequence: Task 1 (Diagnose), Task 2 (Implement), Task 3 (Verify).
-5. PARALLELISM: Maximize parallelism where possible. Only add depends_on between stories when there is a true data or artifact dependency (e.g., Story B needs files created by Story A). Stories that are orthogonal (touching different files/modules) MUST NOT depend on each other.
-6. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
-7. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command). This script must specifically verify the GOAL it is linked to.
-8. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
-9. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories.
-10. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
+   - For COMPLEX refactors/features (e.g., massive architectural changes, cross-cutting concerns): Decompose into VERTICAL SLICES (rule 5). Each task is one thin slice that diagnoses, implements, and verifies its own scope. Do NOT emit separate Diagnose/Implement/Verify phase tasks — phases delay feedback until the last phase.
+5. VERTICAL SLICES (TRACER BULLETS): Slice work vertically across system layers, never horizontally by layer:
+   - Each task must cross ALL the layers its feature needs (e.g., schema → service → API → UI) and end in something runnable and verifiable.
+   - NEVER create layer-by-layer tasks ("all schema changes", then "all API endpoints", then "all UI"): horizontal slicing means nothing is testable end-to-end until the last layer lands.
+   - The FIRST slice of a story must be the thinnest possible end-to-end path through the feature (a tracer bullet). Later slices add depth to that already-working path.
+6. PARALLELISM: Maximize parallelism where possible. Only add depends_on between stories when there is a true data or artifact dependency (e.g., Story B needs files created by Story A). Stories that are orthogonal (touching different files/modules) MUST NOT depend on each other.
+7. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
+8. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command). This script must specifically verify the GOAL it is linked to.
+9. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
+10. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories.
+11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
+12. EXECUTION MODE: Tag every task with "mode": "afk" or "hitl".
+   - "afk" (default): an agent can complete AND verify the task autonomously (code change + script verification).
+   - "hitl": the task requires a human in the loop (manual QA, taste/design judgment, external credentials, irreversible operations). The scheduler never auto-dispatches hitl tasks. Planning and manual QA tasks are ALWAYS hitl.
 
 OUTPUT FORMAT (JSON object):
 {
@@ -96,6 +103,7 @@ OUTPUT FORMAT (JSON object):
           "description": "Create Dockerfile with development target stage",
           "technical_strategy": "Use python:3.11-slim as base. Separate pip install from code COPY to leverage cache. Use backslashes for multi-line RUN commands.",
           "depends_on": [],
+          "mode": "afk",
           "verification_script": "docker build --target dev ."
         },
         {
@@ -104,6 +112,7 @@ OUTPUT FORMAT (JSON object):
           "description": "Configure docker-compose with volume mounts",
           "technical_strategy": "Define 'backend' service. Map host root to /app. Set env MAGPIE_ENV=dev.",
           "depends_on": ["T-US-001-001"],
+          "mode": "afk",
           "verification_script": "docker compose config"
         }
       ]
@@ -139,6 +148,12 @@ REVIEW THE STORIES AGAINST THESE CRITERIA:
    - Do depends_on links reflect true data/artifact dependencies?
    - Stories that touch different files/modules should be parallel, not chained.
    - If stories have unnecessary serialization (depends_on without true dependency), REJECT.
+
+4. **Vertical Slicing (Tracer Bullets)**: Implementation tasks must be thin vertical
+   slices that cross every layer the feature needs and end in something runnable.
+   - If tasks are layered horizontally (a "schema" task, then an "API" task, then a
+     "UI" task — or Diagnose/Implement/Verify phase tasks), REJECT: nothing is
+     testable end-to-end until the last layer lands.
 
 5. **Quality & Correctness**: No parsing errors, hallucinations, or corrupted titles.
 

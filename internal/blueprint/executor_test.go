@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -303,5 +304,74 @@ func TestTruncate(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("truncate(%q, %d) = %q, want %q", tc.input, tc.maxLen, got, tc.want)
 		}
+	}
+}
+
+func TestDefaultExecutor_SmartZone_FlagsOverrun(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	executor := NewDefaultExecutor(tmpDir)
+	executor.AgenticRunner = &SimpleAgenticRunner{
+		RunFunc: func(ctx context.Context, stage *Stage, input *StageInput) (string, map[string]string, error) {
+			return "ok", map[string]string{ArtifactPeakContextTokens: "150000"}, nil
+		},
+	}
+
+	stage := &Stage{Name: "implement", Type: types.StageTypeAgentic}
+	input := NewStageInput("run-1", "big task", tmpDir)
+
+	result, err := executor.Execute(context.Background(), stage, input)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if result.Artifacts[ArtifactSmartZoneExceeded] != "true" {
+		t.Errorf("expected smart_zone_exceeded=true, got %v", result.Artifacts)
+	}
+	if !strings.Contains(result.Diagnostics, "split it") {
+		t.Errorf("expected split-it diagnostics, got %q", result.Diagnostics)
+	}
+	// Overrun is a flag, not a failure.
+	if result.Status != types.StageStatusCompleted {
+		t.Errorf("expected completed status, got %s", result.Status)
+	}
+}
+
+func TestDefaultExecutor_SmartZone_UnderBudgetAndDisabled(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cases := []struct {
+		name   string
+		budget int64
+		peak   string
+	}{
+		{"under default budget", 0, "99999"},
+		{"check disabled", -1, "150000"},
+		{"no usage reported", 0, ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			executor := NewDefaultExecutor(tmpDir)
+			executor.SmartZoneTokens = tc.budget
+			executor.AgenticRunner = &SimpleAgenticRunner{
+				RunFunc: func(ctx context.Context, stage *Stage, input *StageInput) (string, map[string]string, error) {
+					artifacts := map[string]string{}
+					if tc.peak != "" {
+						artifacts[ArtifactPeakContextTokens] = tc.peak
+					}
+					return "ok", artifacts, nil
+				},
+			}
+
+			stage := &Stage{Name: "implement", Type: types.StageTypeAgentic}
+			result, err := executor.Execute(context.Background(), stage, NewStageInput("run-1", "task", tmpDir))
+			if err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			if _, flagged := result.Artifacts[ArtifactSmartZoneExceeded]; flagged {
+				t.Errorf("expected no smart-zone flag, got artifacts %v", result.Artifacts)
+			}
+		})
 	}
 }
