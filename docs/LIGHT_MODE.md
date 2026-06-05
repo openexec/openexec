@@ -41,6 +41,7 @@ database is opened lazily on first tool use.
 | `backlog_claim_story` | backlog state | Mark a story in_progress. **One story at a time** — refused while another story is in progress |
 | `backlog_complete_task` | backlog state | Mark a task done after its verification passes |
 | `backlog_complete_story` | backlog state | Mark a story done. Refused while tasks remain unfinished |
+| `backlog_add_task` | backlog state | File surgical work into the rolling maintenance story so light-mode fixes leave a record. Phase-neutral; default mode hitl |
 | `memory_read` | none | OpenExec's merged layered memory (decisions, patterns, preferences from prior runs) |
 | `skill_propose` | candidate file | Capture a durable project lesson as a **candidate** skill. Never active until a human runs `openexec skills approve <name>` |
 
@@ -64,6 +65,30 @@ database is opened lazily on first tool use.
   heavy build has worked off the backlog — light mode is the default lane;
   reach for `openexec run` only when the next big feature or refactor needs
   the full pipeline.
+
+## The once-heavy-then-light lifecycle
+
+Per project, the heavy pipeline typically runs **once** — a greenfield build,
+or one refactoring pass on a freshly cloned codebase — and light mode is the
+default forever after:
+
+1. **Heavy run** — `openexec plan` + `openexec run`. The study/terminus
+   stories write `docs/ARCHITECTURE.md` so the run's understanding is durable
+   and readable here (the knowledge base alone is not readable outside
+   OpenExec).
+2. **The hitl handoff** — the heavy pipeline never auto-runs hitl tasks
+   (manual QA is always hitl), so the run ends with them pending and the
+   phase stuck in `building`. The backlog listing shows `hitl_pending` and
+   tells you: claim the story, do the work, `backlog_complete_task` each one.
+   Then the phase reaches `maintaining`.
+3. **Light mode forever** — surgical fixes here. File them with
+   `backlog_add_task` so they stay on the record (the maintenance story is
+   phase-neutral and never blocks claims). Capture lessons with
+   `skill_propose`; promote the cross-project ones with
+   `openexec skills promote <name>` so the next project's heavy run starts
+   smarter.
+4. **Next epic** — run planning again; colliding IDs remap and the new
+   stories append (`docs/CLAUDE.md`, re-planning).
 
 ## Typical light-mode session
 

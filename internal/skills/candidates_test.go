@@ -108,3 +108,47 @@ func TestCandidateNameValidation(t *testing.T) {
 		t.Fatal("path traversal escaped the candidates directory")
 	}
 }
+
+func TestPromoteSkill(t *testing.T) {
+	projDir := t.TempDir()
+	userSkillsDir := filepath.Join(t.TempDir(), "user")
+
+	// No active project skill → refused (candidates don't count).
+	if _, err := ProposeCandidate(projDir, "shared-lesson", "A lesson", "", nil, "## Rule"); err != nil {
+		t.Fatalf("ProposeCandidate: %v", err)
+	}
+	if _, err := PromoteSkill(projDir, "shared-lesson", userSkillsDir); err == nil {
+		t.Fatal("promoting an unapproved candidate must be refused")
+	}
+
+	// Approve, then promote.
+	if _, err := ApproveCandidate(projDir, "shared-lesson"); err != nil {
+		t.Fatalf("ApproveCandidate: %v", err)
+	}
+	dst, err := PromoteSkill(projDir, "shared-lesson", userSkillsDir)
+	if err != nil {
+		t.Fatalf("PromoteSkill: %v", err)
+	}
+
+	// Both copies exist: promotion shares, it does not move.
+	if _, err := os.Stat(filepath.Join(dst, "SKILL.md")); err != nil {
+		t.Fatalf("user copy missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projDir, ".openexec", "skills", "shared-lesson", "SKILL.md")); err != nil {
+		t.Fatalf("project copy must remain: %v", err)
+	}
+
+	// User-level registry loads it.
+	reg := NewRegistry()
+	if err := reg.LoadFromDir(userSkillsDir, "user"); err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+	if _, found := reg.Get("shared-lesson"); !found {
+		t.Fatal("promoted skill not loadable from user dir")
+	}
+
+	// Re-promotion refused.
+	if _, err := PromoteSkill(projDir, "shared-lesson", userSkillsDir); err == nil {
+		t.Fatal("promoting over an existing user skill must be refused")
+	}
+}

@@ -96,7 +96,7 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 	case "backlog_list_stories", "backlog_get_story", "memory_read":
 		return true, "" // Read-only backlog/memory access, allowed in every mode
 
-	case "backlog_claim_story", "backlog_complete_task", "backlog_complete_story":
+	case "backlog_claim_story", "backlog_complete_task", "backlog_complete_story", "backlog_add_task":
 		// Backlog state writes are allowed in every mode, including read-only
 		// chat: they mutate orchestrator bookkeeping (the .openexec database),
 		// not workspace files. This is the documented light-mode exception
@@ -160,6 +160,7 @@ func isControlPlaneTool(toolName string) bool {
 		"backlog_claim_story":    true,
 		"backlog_complete_task":  true,
 		"backlog_complete_story": true,
+		"backlog_add_task":       true,
 		"memory_read":            true,
 		"skill_propose":          true,
 	}

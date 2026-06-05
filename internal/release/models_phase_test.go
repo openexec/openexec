@@ -26,3 +26,17 @@ func TestComputePhase(t *testing.T) {
 		})
 	}
 }
+
+func TestComputePhase_IgnoresMaintenanceStory(t *testing.T) {
+	done := &Story{Status: StoryStatusDone}
+	maint := &Story{Status: StoryStatusInProgress, StoryType: StoryTypeMaintenance}
+
+	// All real stories done + open maintenance story → still maintaining.
+	if got := ComputePhase([]*Story{done, maint}); got != PhaseMaintaining {
+		t.Errorf("maintenance story must not block maintaining, got %q", got)
+	}
+	// Only a maintenance story (no plan) → new.
+	if got := ComputePhase([]*Story{maint}); got != PhaseNew {
+		t.Errorf("maintenance-only backlog should be phase new, got %q", got)
+	}
+}

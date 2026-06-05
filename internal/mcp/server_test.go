@@ -101,10 +101,19 @@ func TestToolsList(t *testing.T) {
 
 	result, _ := resps[0].Result.(map[string]interface{})
 	tools, _ := result["tools"].([]interface{})
-	// In danger-full-access mode (set in TestMain), we expect 14 tools:
-	// 5 core + 6 backlog/memory + skill_propose + write_file + run_shell_command
-	if len(tools) != 14 {
-		t.Fatalf("expected 14 tools in danger-full-access mode, got %d", len(tools))
+	// In danger-full-access mode (set in TestMain), we expect 15 tools:
+	// 5 core + 7 backlog/memory + skill_propose + write_file + run_shell_command
+	if len(tools) != 15 {
+		t.Fatalf("expected 15 tools in danger-full-access mode, got %d", len(tools))
+	}
+
+	// Index-independent lookup: adding tools must not break these assertions.
+	byName := map[string]map[string]interface{}{}
+	for _, raw := range tools {
+		tool, _ := raw.(map[string]interface{})
+		if n, _ := tool["name"].(string); n != "" {
+			byName[n] = tool
+		}
 	}
 
 	// Check openexec_signal tool
@@ -155,16 +164,15 @@ func TestToolsList(t *testing.T) {
 		t.Errorf("tool[4] name = %v, want openexec_action", tool5["name"])
 	}
 
-	// Check first backlog tool (index 5)
-	toolB, _ := tools[5].(map[string]interface{})
-	if toolB["name"] != "backlog_list_stories" {
-		t.Errorf("tool[5] name = %v, want backlog_list_stories", toolB["name"])
+	// Check backlog tool present
+	if _, ok := byName["backlog_list_stories"]; !ok {
+		t.Error("backlog_list_stories missing from tools list")
 	}
 
-	// Check write_file tool (index 12, only in full-auto mode)
-	tool6, _ := tools[12].(map[string]interface{})
-	if tool6["name"] != "write_file" {
-		t.Errorf("tool[11] name = %v, want write_file", tool6["name"])
+	// Check write_file tool (only in full-auto mode)
+	tool6, ok := byName["write_file"]
+	if !ok {
+		t.Fatal("write_file missing from tools list in full-auto mode")
 	}
 
 	schema6, _ := tool6["inputSchema"].(map[string]interface{})
@@ -176,10 +184,10 @@ func TestToolsList(t *testing.T) {
 		t.Error("missing 'content' in write_file input schema properties")
 	}
 
-	// Check run_shell_command tool (index 13, only in full-auto mode)
-	tool7, _ := tools[13].(map[string]interface{})
-	if tool7["name"] != "run_shell_command" {
-		t.Errorf("tool[12] name = %v, want run_shell_command", tool7["name"])
+	// Check run_shell_command tool (only in full-auto mode)
+	tool7, ok := byName["run_shell_command"]
+	if !ok {
+		t.Fatal("run_shell_command missing from tools list in full-auto mode")
 	}
 
 	schema7, _ := tool7["inputSchema"].(map[string]interface{})

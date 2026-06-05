@@ -479,3 +479,26 @@ func TestParseResponse_TaskMode(t *testing.T) {
 		t.Errorf("expected hitl, got %q", plan.Stories[0].Tasks[1].Mode)
 	}
 }
+
+func TestEnforceFastTrack_StudyStoryWritesDocs(t *testing.T) {
+	plan := &ProjectPlan{
+		Goals:   []Goal{{ID: "G-001", Title: "Refactor"}},
+		Stories: []Story{{ID: "US-001", Title: "Do the refactor"}},
+	}
+	EnforceFastTrack(plan, "epic", "existing")
+
+	study := plan.Stories[0]
+	if study.ID != "US-000" {
+		t.Fatalf("expected injected study story first, got %s", study.ID)
+	}
+	foundDocTask := false
+	for _, task := range study.Tasks {
+		if strings.Contains(task.Description, "docs/ARCHITECTURE.md") &&
+			strings.Contains(task.VerificationScript, "docs/ARCHITECTURE.md") {
+			foundDocTask = true
+		}
+	}
+	if !foundDocTask {
+		t.Fatal("injected study story must include a durable-docs task (docs/ARCHITECTURE.md) — the knowledge base is not readable outside OpenExec")
+	}
+}

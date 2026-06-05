@@ -53,6 +53,7 @@ RULES:
    - This Study story must depend on nothing.
    - ALL subsequent implementation stories MUST depend on this Study story.
    - The Study story tasks must focus on reading existing files, mapping dependencies, and documenting APIs into the knowledge base before any code is changed.
+   - The Study story MUST include a task that writes durable documentation into the repository (docs/ARCHITECTURE.md: module map, key APIs, data flow, conventions). The knowledge base is not readable outside OpenExec — repo docs are what lightweight sessions and humans rely on later.
 4. DYNAMIC TASK SIZING: Evaluate the complexity of the requirement:
    - For SIMPLE fixes/features (e.g., changing a YAML file, fixing a specific UI bug, updating a single component): Create exactly ONE "Chassis" task per story. A Chassis task combines Diagnose, Implement, and Verify into a single, cohesive unit to reduce orchestrator overhead.
    - For COMPLEX refactors/features (e.g., massive architectural changes, cross-cutting concerns): Decompose into VERTICAL SLICES (rule 5). Each task is one thin slice that diagnoses, implements, and verifies its own scope. Do NOT emit separate Diagnose/Implement/Verify phase tasks — phases delay feedback until the last phase.
@@ -64,7 +65,7 @@ RULES:
 7. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
 8. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command). This script must specifically verify the GOAL it is linked to.
 9. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
-10. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories.
+10. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories. The terminus MUST include a task that writes or updates docs/ARCHITECTURE.md (module map, key APIs, conventions) so later lightweight sessions inherit this build's understanding.
 11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
 12. EXECUTION MODE: Tag every task with "mode": "afk" or "hitl".
    - "afk" (default): an agent can complete AND verify the task autonomously (code change + script verification).

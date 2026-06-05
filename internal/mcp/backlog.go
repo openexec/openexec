@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/release"
@@ -157,6 +158,127 @@ func BacklogCompleteStoryToolDef() map[string]interface{} {
 	}
 }
 
+// maintenanceStoryID is the rolling story that collects light-mode surgical
+// work. It is created on first use, excluded from phase computation and the
+// one-story claim rule, and never completes.
+const maintenanceStoryID = "US-MAINT"
+
+func BacklogAddTaskToolDef() map[string]interface{} {
+	return map[string]interface{}{
+		"name": "backlog_add_task",
+		"description": "File a new task into the rolling maintenance story (created automatically on first use). Use this so surgical fixes and small follow-ups done in light mode leave a record in the backlog instead of happening off the books. Maintenance tasks never change the project phase. Default mode is hitl (you do the work); pass mode=afk only for tasks the heavy pipeline should pick up on its next run.",
+		"inputSchema": map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"title": map[string]interface{}{
+					"type":        "string",
+					"description": "Short imperative title for the task, e.g. \"Fix off-by-one in week-4 retention query\".",
+				},
+				"description": map[string]interface{}{
+					"type":        "string",
+					"description": "What needs to be done and why — written for someone with no context from this session.",
+				},
+				"mode": map[string]interface{}{
+					"type":        "string",
+					"enum":        []string{"afk", "hitl"},
+					"description": "Execution mode: hitl (default) = this light-mode session or a human does it; afk = the heavy pipeline may auto-dispatch it on its next run.",
+				},
+				"verification_script": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional shell command that proves the task is done, e.g. \"go test ./internal/foo/\".",
+				},
+			},
+			"required": []string{"title"},
+		},
+	}
+}
+
+type backlogAddTaskArgs struct {
+	Title              string `json:"title"`
+	Description        string `json:"description"`
+	Mode               string `json:"mode"`
+	VerificationScript string `json:"verification_script"`
+}
+
+func (s *Server) handleBacklogAddTask(req Request, params toolsCallParams) {
+	var args backlogAddTaskArgs
+	if err := json.Unmarshal(params.Arguments, &args); err != nil || strings.TrimSpace(args.Title) == "" {
+		s.writeError(req.ID, -32602, "backlog_add_task requires a title")
+		return
+	}
+	mode := args.Mode
+	switch mode {
+	case "":
+		mode = release.TaskModeHITL // light-mode work by default
+	case release.TaskModeAFK, release.TaskModeHITL:
+	default:
+		s.writeToolError(req.ID, fmt.Sprintf("invalid mode %q: use %q or %q", args.Mode, release.TaskModeAFK, release.TaskModeHITL))
+		return
+	}
+
+	mgr, err := s.loadedBacklog()
+	if err != nil {
+		s.writeToolError(req.ID, err.Error())
+		return
+	}
+
+	// Ensure the rolling maintenance story exists.
+	if mgr.GetStory(maintenanceStoryID) == nil {
+		st := &release.Story{
+			ID:          maintenanceStoryID,
+			Title:       "Maintenance & surgical fixes",
+			Description: "Rolling story for light-mode work filed after the initial build. Excluded from phase computation and the one-story rule; it never completes.",
+			StoryType:   release.StoryTypeMaintenance,
+			Status:      release.StoryStatusInProgress,
+			CreatedAt:   time.Now(),
+		}
+		if err := mgr.CreateStory(st); err != nil {
+			s.writeToolError(req.ID, fmt.Sprintf("create maintenance story: %v", err))
+			return
+		}
+	}
+
+	// Next free maintenance task ID.
+	taskID := ""
+	for n := len(mgr.GetTasksForStory(maintenanceStoryID)) + 1; ; n++ {
+		candidate := fmt.Sprintf("T-MAINT-%03d", n)
+		if mgr.GetTask(candidate) == nil {
+			taskID = candidate
+			break
+		}
+	}
+
+	task := &release.Task{
+		ID:                 taskID,
+		StoryID:            maintenanceStoryID,
+		Title:              strings.TrimSpace(args.Title),
+		Description:        args.Description,
+		VerificationScript: args.VerificationScript,
+		Status:             release.TaskStatusPending,
+		MaxAttempts:        3,
+		CreatedAt:          time.Now(),
+	}
+	if mode == release.TaskModeHITL {
+		task.Metadata = map[string]interface{}{"mode": release.TaskModeHITL}
+	}
+	if err := mgr.CreateTask(task); err != nil {
+		s.writeToolError(req.ID, fmt.Sprintf("create task: %v", err))
+		return
+	}
+
+	s.writeResult(req.ID, map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "text",
+				"text": fmt.Sprintf("Filed %s [%s] %q in the maintenance story. Complete it with backlog_complete_task when done.", taskID, mode, task.Title),
+			},
+		},
+		"task_id":  taskID,
+		"story_id": maintenanceStoryID,
+		"mode":     mode,
+	})
+}
+
 func MemoryReadToolDef() map[string]interface{} {
 	return map[string]interface{}{
 		"name": "memory_read",
@@ -244,6 +366,17 @@ func (s *Server) handleBacklogListStories(req Request, params toolsCallParams) {
 
 	phase := mgr.Phase()
 
+	// Pending human-in-the-loop tasks block their stories from completing —
+	// the build cannot reach maintaining until a human does them. Surface
+	// that instead of leaving the project mysteriously stuck.
+	hitlPending := 0
+	for _, t := range mgr.GetTasks() {
+		if t.ExecutionMode() == release.TaskModeHITL &&
+			t.Status != release.TaskStatusDone && t.Status != release.TaskStatusApproved {
+			hitlPending++
+		}
+	}
+
 	text := fmt.Sprintf("%d stories (project phase: %s)", len(stories), phase)
 	if len(lines) > 0 {
 		text += "\n" + strings.Join(lines, "\n")
@@ -251,15 +384,19 @@ func (s *Server) handleBacklogListStories(req Request, params toolsCallParams) {
 		text = "Backlog is empty — no plan has been generated for this project yet."
 	}
 	if phase == release.PhaseMaintaining {
-		text += "\nInitial build is complete: the heavy pipeline has worked off the backlog. New small tasks fit this light mode; reach for `openexec run` only for the next big feature or refactor."
+		text += "\nInitial build is complete: the heavy pipeline has worked off the backlog. New small tasks fit this light mode (file them with backlog_add_task); reach for `openexec run` only for the next big feature or refactor."
+	}
+	if hitlPending > 0 && (phase == release.PhasePlanned || phase == release.PhaseBuilding) {
+		text += fmt.Sprintf("\n%d hitl task(s) await a human — the heavy pipeline never auto-runs them. Claim their story, do the work, and backlog_complete_task each one to finish the build.", hitlPending)
 	}
 
 	s.writeResult(req.ID, map[string]interface{}{
 		"content": []interface{}{
 			map[string]interface{}{"type": "text", "text": text},
 		},
-		"stories": stories,
-		"phase":   phase,
+		"stories":      stories,
+		"phase":        phase,
+		"hitl_pending": hitlPending,
 	})
 }
 
@@ -335,8 +472,11 @@ func (s *Server) handleBacklogClaimStory(req Request, params toolsCallParams) {
 	}
 
 	// One story at a time: refuse when a different story is already claimed.
+	// The rolling maintenance story is exempt — it is perpetually open and
+	// must never block claiming real stories.
 	for _, other := range mgr.GetStories() {
-		if other.ID != st.ID && other.Status == release.StoryStatusInProgress {
+		if other.ID != st.ID && other.Status == release.StoryStatusInProgress &&
+			other.StoryType != release.StoryTypeMaintenance {
 			s.writeToolError(req.ID, fmt.Sprintf(
 				"story %s (%q) is already in progress — complete it before claiming %s (one story at a time)",
 				other.ID, other.Title, st.ID))
@@ -423,6 +563,11 @@ func (s *Server) handleBacklogCompleteStory(req Request, params toolsCallParams)
 	st := mgr.GetStory(args.StoryID)
 	if st == nil {
 		s.writeToolError(req.ID, fmt.Sprintf("story %s not found", args.StoryID))
+		return
+	}
+
+	if st.StoryType == release.StoryTypeMaintenance {
+		s.writeToolError(req.ID, "the maintenance story stays open — complete its tasks individually with backlog_complete_task")
 		return
 	}
 

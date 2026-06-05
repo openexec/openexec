@@ -251,21 +251,27 @@ const (
 	PhaseMaintaining = "maintaining"
 )
 
-// ComputePhase derives the project phase from its stories.
+// ComputePhase derives the project phase from its stories. Maintenance
+// stories are excluded: surgical tasks filed after the initial build must
+// not move a maintaining project back to building.
 func ComputePhase(stories []*Story) string {
-	if len(stories) == 0 {
-		return PhaseNew
-	}
-	completed := 0
+	counted, completed := 0, 0
 	for _, st := range stories {
+		if st.StoryType == StoryTypeMaintenance {
+			continue
+		}
+		counted++
 		if st.Status == StoryStatusDone || st.Status == StoryStatusApproved {
 			completed++
 		}
 	}
+	if counted == 0 {
+		return PhaseNew
+	}
 	switch {
 	case completed == 0:
 		return PhasePlanned
-	case completed == len(stories):
+	case completed == counted:
 		return PhaseMaintaining
 	default:
 		return PhaseBuilding
@@ -278,4 +284,9 @@ const (
 	StoryTypeBugfix   = "bugfix"
 	StoryTypeChore    = "chore"
 	StoryTypeRefactor = "refactor"
+	// StoryTypeMaintenance is the rolling story that collects surgical work
+	// filed from light mode after the initial build. It is excluded from
+	// phase computation and from the one-story-at-a-time claim rule: a
+	// one-off fix must not flip a maintaining project back to building.
+	StoryTypeMaintenance = "maintenance"
 )

@@ -306,6 +306,29 @@ var skillsRejectCmd = &cobra.Command{
 	},
 }
 
+var skillsPromoteCmd = &cobra.Command{
+	Use:   "promote <name>",
+	Short: "Copy an active project skill to your user skills (applies across all projects)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectDir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("resolve home directory: %w", err)
+		}
+		userSkillsDir := filepath.Join(home, ".openexec", "skills", "user")
+		dst, err := skills.PromoteSkill(projectDir, args[0], userSkillsDir)
+		if err != nil {
+			return err
+		}
+		cmd.Printf("Promoted skill %q to %s — it now applies in every project.\n", args[0], dst)
+		return nil
+	},
+}
+
 func init() {
 	skillsListCmd.Flags().String("category", "", "Filter by category")
 	skillsImportCmd.Flags().Bool("from-claude", false, "Import from ~/.claude/skills/")
@@ -321,5 +344,6 @@ func init() {
 	skillsCmd.AddCommand(skillsProposalsCmd)
 	skillsCmd.AddCommand(skillsApproveCmd)
 	skillsCmd.AddCommand(skillsRejectCmd)
+	skillsCmd.AddCommand(skillsPromoteCmd)
 	rootCmd.AddCommand(skillsCmd)
 }

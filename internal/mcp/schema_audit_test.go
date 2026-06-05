@@ -30,6 +30,7 @@ func allToolDefs() []map[string]interface{} {
 		BacklogClaimStoryToolDef(),
 		BacklogCompleteTaskToolDef(),
 		BacklogCompleteStoryToolDef(),
+		BacklogAddTaskToolDef(),
 		MemoryReadToolDef(),
 		SkillProposeToolDef(),
 	}
@@ -116,6 +117,7 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{ListSessionForksToolDef(), ListSessionForksRequest{}},
 		{OpenExecResultToolDef(), OpenExecResultRequest{}},
 		{SkillProposeToolDef(), skillProposeArgs{}},
+		{BacklogAddTaskToolDef(), backlogAddTaskArgs{}},
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}

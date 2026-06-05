@@ -341,3 +341,94 @@ func TestBacklogPhaseReporting(t *testing.T) {
 		t.Fatalf("expected light-mode guidance in maintaining phase, got: %s", resultText(result))
 	}
 }
+
+// TestBacklogAddTask: surgical work filed from light mode lands in the rolling
+// maintenance story without disturbing phase or the one-story claim rule.
+func TestBacklogAddTask(t *testing.T) {
+	projDir := t.TempDir()
+	external := seedBacklog(t, projDir)
+	srv, out := newBacklogTestServer(t, projDir)
+
+	// Complete the whole initial backlog → maintaining.
+	for _, id := range []string{"T-US-001-001", "T-US-001-002", "T-US-002-001"} {
+		_ = external.SetTaskStatus(id, release.TaskStatusDone)
+	}
+	for _, id := range []string{"US-001", "US-002"} {
+		_ = external.SetStoryStatus(id, release.StoryStatusDone)
+	}
+
+	// File a surgical task (default mode hitl).
+	result := callTool(t, srv, out, "backlog_add_task", map[string]interface{}{
+		"title":       "Fix retention query off-by-one",
+		"description": "Week-4 window starts a day late.",
+	})
+	if isToolError(result) {
+		t.Fatalf("add_task failed: %s", resultText(result))
+	}
+	taskID, _ := result["task_id"].(string)
+	if taskID == "" || result["story_id"] != "US-MAINT" {
+		t.Fatalf("unexpected add_task result: %v", result)
+	}
+	if result["mode"] != "hitl" {
+		t.Fatalf("default mode must be hitl, got %v", result["mode"])
+	}
+
+	// Phase must stay maintaining despite the new pending task.
+	result = callTool(t, srv, out, "backlog_list_stories", nil)
+	if result["phase"] != "maintaining" {
+		t.Fatalf("maintenance task must not change phase, got %v", result["phase"])
+	}
+
+	// The open maintenance story must not block claiming a real story.
+	if err := external.CreateStory(&release.Story{ID: "US-003", Title: "New epic story", Status: release.StoryStatusPending}); err != nil {
+		t.Fatalf("CreateStory: %v", err)
+	}
+	result = callTool(t, srv, out, "backlog_claim_story", map[string]interface{}{"story_id": "US-003"})
+	if isToolError(result) {
+		t.Fatalf("maintenance story blocked a real claim: %s", resultText(result))
+	}
+
+	// Maintenance story itself never completes.
+	result = callTool(t, srv, out, "backlog_complete_task", map[string]interface{}{"task_id": taskID})
+	if isToolError(result) {
+		t.Fatalf("complete maintenance task failed: %s", resultText(result))
+	}
+	result = callTool(t, srv, out, "backlog_complete_story", map[string]interface{}{"story_id": "US-MAINT"})
+	if !isToolError(result) {
+		t.Fatal("completing the maintenance story must be refused")
+	}
+
+	// Second add gets the next free ID.
+	result = callTool(t, srv, out, "backlog_add_task", map[string]interface{}{"title": "Another fix", "mode": "afk"})
+	if isToolError(result) {
+		t.Fatalf("second add_task failed: %s", resultText(result))
+	}
+	if result["task_id"] == taskID {
+		t.Fatal("task IDs must not collide")
+	}
+	if result["mode"] != "afk" {
+		t.Fatalf("explicit afk mode not honored, got %v", result["mode"])
+	}
+}
+
+// TestBacklogHitlPendingSurfaced: pending hitl tasks block maintaining and the
+// listing must say so.
+func TestBacklogHitlPendingSurfaced(t *testing.T) {
+	projDir := t.TempDir()
+	external := seedBacklog(t, projDir) // T-US-001-002 is hitl
+	srv, out := newBacklogTestServer(t, projDir)
+
+	// Heavy run finished everything except the hitl task.
+	_ = external.SetTaskStatus("T-US-001-001", release.TaskStatusDone)
+	_ = external.SetTaskStatus("T-US-002-001", release.TaskStatusDone)
+	_ = external.SetStoryStatus("US-002", release.StoryStatusDone)
+
+	result := callTool(t, srv, out, "backlog_list_stories", nil)
+	hitl, _ := result["hitl_pending"].(float64)
+	if int(hitl) != 1 {
+		t.Fatalf("expected hitl_pending=1, got %v", result["hitl_pending"])
+	}
+	if !strings.Contains(resultText(result), "await a human") {
+		t.Fatalf("expected hitl handoff guidance, got: %s", resultText(result))
+	}
+}

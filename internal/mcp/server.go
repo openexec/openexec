@@ -267,6 +267,7 @@ func (s *Server) handleToolsList(req Request) {
         BacklogClaimStoryToolDef(),
         BacklogCompleteTaskToolDef(),
         BacklogCompleteStoryToolDef(),
+        BacklogAddTaskToolDef(),
         MemoryReadToolDef(),
         SkillProposeToolDef(),
     }
@@ -486,6 +487,9 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "memory_read":
 		s.handleMemoryRead(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "backlog_add_task":
+		s.handleBacklogAddTask(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	case "skill_propose":
 		s.handleSkillPropose(req, params)

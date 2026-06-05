@@ -41,6 +41,14 @@ func EnforceFastTrack(plan *ProjectPlan, scope string, flow string) {
 						TechnicalStrategy:  "Read existing core files. Map inputs/outputs. Verify local buildability.",
 						VerificationScript: "openexec knowledge show codebase",
 					},
+					{
+						ID:                 "T-US-000-002",
+						Title:              "Write architecture documentation",
+						Description:        "Write docs/ARCHITECTURE.md: module map, key APIs, data flow, and conventions discovered during the study.",
+						TechnicalStrategy:  "Distill the study findings into durable repo docs. The knowledge base is not readable outside OpenExec — this file is what lightweight sessions and humans use later.",
+						DependsOn:          []string{"T-US-000-001"},
+						VerificationScript: "test -f docs/ARCHITECTURE.md",
+					},
 				},
 			}
 			// Prepend to stories
