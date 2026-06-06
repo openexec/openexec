@@ -35,3 +35,22 @@ To prevent thrashing and stalling during task execution, agents MUST adhere to t
 ## Known Project Quirks
 - **Vitest & JSDOM**: Be aware that JSDOM does not perfectly simulate all layout-related events (like `onMouseEnter`). If tests fail on interactions, check if the component depends on layout properties.
 - **Audit Database**: The real source of truth for task progress is `openexec/.openexec/data/audit.db`.
+
+---
+
+## 📚 Three-Tier Reusability Mandate for AI Agents
+
+To prevent code duplication and architectural drift, all AI agents working on this workspace MUST adhere to our **Three-Tier Reusability Ecosystem**:
+
+### 1. Structure: Consult Tier 1 Architectural Library (`blueprints`)
+- Before creating a new service, database schema, or API endpoint, always verify if a matching layout or specification exists in `/Users/perttu/projects/blueprints`.
+- **Constraint**: Match the directory paths, schema types, and operation contracts defined in the blueprints. Do not design ad-hoc structures.
+
+### 2. Functional Requirements: Consult Tier 2 Functional Library (`intent-compiler/packs`)
+- Check `/Users/perttu/projects/intent-compiler/packs/` for standard logic models (e.g., `auth_standard.yaml`, `security_baseline.yaml`).
+- **Constraint**: Ensure your implementations are legally and technically compliant with the injected security rules and `evidence_required` test logging parameters of matching packs.
+
+### 3. Implementation Patterns: Consult Tier 3 Skills Engine (`SKILL.md`)
+- Check active local skills under `.openexec/skills/` or general skills under `~/.claude/skills/`.
+- **Constraint**: Reuse pre-built UI components, helper utilities, and test mocks defined in these packages. Do not write helper logic from scratch if a corresponding skill template is loaded.
+

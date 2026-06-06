@@ -94,6 +94,11 @@ API mode enables true multi-agent parallel execution with the coordinator patter
 - **Web UI**: React/Vite dashboard (embedded in binary)
 - **Terminal UI**: Bubble Tea TUI
 
+**The Reusability Ecosystem (Three-Tier AI Libraries):**
+- **Tier 1 (Architecture)**: Standardize layouts, data schemas, and API contracts using [blueprints](https://github.com/openexec/blueprints).
+- **Tier 2 (Functional)**: Ingest regulatory, compliance, and functional standards dynamically using [intent-compiler packs](https://github.com/openexec/intent-compiler).
+- **Tier 3 (Code/Implementation)**: Reuse components and utility snippets instantly via [Skills](docs/REUSABILITY_LIBRARIES.md) (`SKILL.md` format).
+
 ### Opt-in Configuration
 
 ```json

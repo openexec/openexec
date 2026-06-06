@@ -182,6 +182,38 @@ curl -X POST "http://localhost:8080/api/v1/sessions/sess_abc123/run" \
 
 Monitor progress via WebSocket (`/ws`) or the timeline API (`GET /api/v1/runs/{run_id}/timeline`).
 
+## 5. Light Mode: Two-Speed Execution via Claude Code
+
+If you want a lightning-fast, interactive CLI session without booting the background daemon, port binders, or holding process-level locks, you can use **Light Mode**. 
+
+OpenExec exposes its story backlog and layered memories directly over standard I/O via the Model Context Protocol (MCP):
+
+```bash
+# Start the stdio MCP server
+./openexec mcp-serve
+```
+
+### Adding to Claude Code
+Simply add OpenExec as an MCP server in your project's `.mcp.json` file:
+
+```json
+{
+  "mcpServers": {
+    "openexec": {
+      "command": "openexec",
+      "args": ["mcp-serve"]
+    }
+  }
+}
+```
+
+Once added, Claude Code becomes your light client:
+- **`backlog_list_stories`**: See what work is queued.
+- **`backlog_claim_story`**: Claim one user story at a time (enforced advisory locking).
+- **`backlog_complete_task`**: Complete tasks individually using Claude Code's own lightning-fast file-editing and terminal-running tools.
+
+This enables a seamless, two-speed workflow: **Heavy Mode** (`openexec run`) generates the backlog and runs heavy automated blueprint gates, while **Light Mode** (Claude Code) reads that backlog and implements tasks at local CLI speed. See [Light Mode Guide](LIGHT_MODE.md) for details.
+
 ## 6. Development Mode (Advanced)
 
 If you are modifying the React UI and want Hot Module Replacement (HMR):
@@ -207,7 +239,8 @@ This will check the latest version on openexec.io and replace your current binar
 ## 8. Troubleshooting
 
 - **Logs:** Check `.openexec/daemon.log` for background process output.
-- **Audit Database:** All AI decisions and tool calls are stored in `.openexec/data/audit.db`. You can inspect this with any SQLite browser.
+- **State Database:** The canonical task progress, stories, and execution state are stored in `.openexec/openexec.db`.
+- **Audit Database:** Raw tool decisions, LLM costs, and audit trails are logged to `.openexec/data/audit.db`. You can inspect both with any SQLite browser.
 - **Missing Directory Error:** If the server fails to start, ensure `.openexec/data` exists (this is fixed in v0.1.1+).
 
 ---

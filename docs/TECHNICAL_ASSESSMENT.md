@@ -60,12 +60,15 @@ The standalone iterative loop was gutted during blueprint refactoring:
 
 ### 3. New Packages Not Wired
 
-**Status:** ⚠️ **ISSUE CONFIRMED**
+**Status:** ⚠️ **PARTIALLY RESOLVED - WIRED VIA TWO-SPEED SEAM**
 
-New packages added today compile and pass unit tests, but aren't connected to execution:
+Several architectural modules have been successfully wired as part of the live **Two-Speed Seam (P1-B)**. Other packages added today compile and pass unit tests, but are awaiting direct execution integration:
 
 | Package | Status | Wired? |
 |---------|--------|--------|
+| `internal/release` | ✅ Compiles, tests pass | 🚀 **WIRED** (Backlog state manager) |
+| `internal/mcp/backlog` | ✅ Compiles, tests pass | 🚀 **WIRED** (6 backlog & memory tools) |
+| `internal/cli/mcp_serve` | ✅ Compiles, tests pass | 🚀 **WIRED** (Unhidden stdio command) |
 | `agent/registry` | ✅ Compiles, tests pass | ❌ Not called |
 | `parallel/engine` | ✅ Compiles, tests pass | ❌ Not called |
 | `predictive/loader` | ✅ Compiles, tests pass | ❌ Not called |
@@ -74,30 +77,25 @@ New packages added today compile and pass unit tests, but aren't connected to ex
 | `cache/*` | ✅ Compiles, tests pass | ❌ Not called |
 | `checkpoint/manager` | ✅ Compiles, tests pass | ❌ Not called |
 
-**The Harness:**
-- Composition layer that ties everything together
-- Nothing in CLI (`cmd/openexec`) calls it
-- Nothing in server (`internal/server`) calls it
-
-**Impact:** Significant code with zero production usage.
-
-**Recommendation:** Create integration test that exercises full harness, then wire into CLI.
+**The Two-Speed Integration:**
+- Exposes your story backlog via `openexec mcp-serve` stdio.
+- The `mcp-serve` server lazily loads the release store database, ensuring zero-overhead startup.
+- Directly enables external lightweight clients (like Claude Code) to claim, implement, and complete tasks from your backlog with zero daemon boot lag.
 
 ---
 
 ### 4. SQLite Migration Incomplete
 
-**Status:** ⚠️ **ISSUE CONFIRMED - FIXED TODAY**
+**Status:** ⚠️ **ISSUE CONFIRMED - FULLY FIXED (Commit 4c39c08)**
 
-Dockerfile claimed migration from `mattn/go-sqlite3` to `modernc.org/sqlite` was done, but:
-- 6 files still using old import
-- Distributed binaries broken for anyone without CGO
+The migration from `mattn/go-sqlite3` to `modernc.org/sqlite` is now fully complete, and a critical **concurrency bug has been resolved**:
+*   **The ModernC DSN Issue:** The `modernc` driver silently ignored mattn-style connection string parameters (like `_journal_mode=WAL` or `_busy_timeout=5000`). This meant WAL was never on, busy timeouts were zero, and concurrent writers from the daemon/interactive clients would instantly crash with database locks.
+*   **The Fix (Commit 4c39c08):** Enabled WAL mode, foreign keys, and 5000ms busy timeouts across all 13 sites by explicitly executing database pragmas post-initialization. Supported by a regression test asserting active pragma state.
+*   **CGO-Free Builds:** Old imports removed, ensuring clean builds on systems without CGO toolchains.
 
-**Fix Applied:** Updated imports in 6 files today.
+**Impact:** True concurrent read-write safety between the background daemon and lightweight stdio MCP servers.
 
-**Impact:** Users without CGO toolchain couldn't run OpenExec.
-
-**Recommendation:** Audit all imports, add CI check for CGO-free builds.
+**Recommendation:** Maintain explicit pragma executions for any future SQLite database handles.
 
 ---
 
