@@ -134,6 +134,15 @@ func New(cfg Config) (*Manager, error) {
 	if cfg.RetryBackoff == nil {
 		cfg.RetryBackoff = config.DefaultRetryBackoff
 	}
+
+	if cfg.StateStore == nil {
+		// Automatically fallback to an in-memory state store for testing/uninitialized cases
+		stateStore, err := state.NewStore(":memory:")
+		if err == nil {
+			cfg.StateStore = stateStore
+		}
+	}
+
 	m := &Manager{
 		cfg:       cfg,
 		pipelines: make(map[string]*entry),
