@@ -251,3 +251,32 @@ Any SSH keys provisioned for OpenExec to access staging or production hosts must
     ```
 *   **Why it works:** Even if an agent gets access to the SSH private key, any connection attempt to the target DB host is forced by the host's SSH daemon to *only* execute that single pre-approved, safe diagnostic script—making manual database dropping or table modification over SSH physically impossible.
 
+---
+
+## Neutralizing Indirect Payload Generation & Script Escapes
+
+### The Threat Scenario
+You are completely restricting raw terminal commands, but the AI still has access to file editing tools (like `write_file` or `git_apply_patch`). 
+To bypass your command allowlist, the AI writes a highly destructive script to a temporary file (e.g. `/tmp/deploy.sh` containing `rm -rf /` or database drop statements) and then uses a seemingly "harmless" whitelisted tool (or an allowed playbook/script executor) to trigger the execution of that local script file. 
+
+This is an **Indirect Payload Generation (Privilege Escalation)** exploit. To mathematically neutralize this vector, OpenExec implements three structural safety barriers:
+
+### 1. Absolute Write-Run Tool Separation (No Generic Interpreters)
+If an agent can write files, but **the execution environment lacks any generic interpreter tool**, it cannot execute the script.
+*   **The Guardrail:** During infrastructure-touching runs, we never expose `run_shell_command` or any generic script runner.
+*   **Why it works:** The AI can write 100 malicious scripts to `/tmp/deploy.sh`, but if the only tools it is given are `terraform_plan`, `terraform_apply`, and `ansible_run_playbook`, **none of these tools accept an arbitrary file path to execute.** 
+    - `terraform_apply` only accepts a compiled, binary `.tfplan` file.
+    - `ansible_run_playbook` only executes playbooks from your audited config list.
+    The AI is left with a collection of malicious text files that it has no physical mechanism to execute.
+
+### 2. Read-Only Git Allowlists for Playbooks and States
+An agent might try to modify a pre-approved Ansible playbook in the local workspace (e.g. appending a malicious shell task to `deploy_staging.yml`) and then execute it via the whitelisted `ansible_run_playbook` tool.
+*   **The Guardrail:** The Go-based `ansible_run_playbook` executor must **strictly checkout and execute playbooks from a read-only Git commit reference, or read them from a read-only system directory** (e.g., `/etc/openexec/playbooks/`).
+*   **Why it works:** Even if the agent modifies `deploy_staging.yml` in its local workspace, the Go backend completely ignores those local changes during execution. It pulls the pristine, signed `main` branch version of that playbook from Git or read-only storage, neutralizing the modified payload entirely.
+
+### 3. File System `noexec` Sandboxing
+If OpenExec is executing infrastructure actions locally, we can enforce operating system-level restrictions on script execution.
+*   **The Guardrail:** Mount the local temporary directory (`/tmp/`) and the agent's active workspace directory with the **`noexec` mount option** (or run inside a highly restricted, read-only Docker container containerized sandbox).
+*   **Why it works:** The operating system's kernel itself will refuse to execute any binary, shell script, or Python payload located within `/tmp/` or the workspace, throwing an immediate `Permission Denied` error even if a process attempts to trigger it.
+
+
