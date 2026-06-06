@@ -26,9 +26,14 @@ const (
 	PersistentGateSessionID = "infra"
 
 	// DefaultWaitTimeout bounds how long an agent call blocks awaiting
-	// sign-off. Async-friendly but finite: a forgotten request should not
-	// pin an MCP call forever.
-	DefaultWaitTimeout = 30 * time.Minute
+	// sign-off. Deliberately short: the MCP tool call holding this wait is
+	// subject to the CLIENT's tool-call timeout (often well under 30m for
+	// Claude Code and peers) — a server-side wait longer than the client's
+	// patience just strands an approved-too-late request. Operators who
+	// align their client timeout can raise OPENEXEC_APPROVAL_WAIT; truly
+	// async flows should approve first (approve list/yes --local) and have
+	// the agent re-invoke the tool.
+	DefaultWaitTimeout = 5 * time.Minute
 
 	// pollInterval is how often the gate re-reads the shared database.
 	pollInterval = 2 * time.Second

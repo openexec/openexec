@@ -180,8 +180,12 @@ If the plan verification fails (e.g., a database replacement is detected), the G
 > while ANY other process signs off: `openexec approve list|yes|no <id> --local` from a terminal,
 > or the `approval_list`/`approval_decide` MCP tools in a second mcp-serve session started with
 > `OPENEXEC_OPERATOR_SESSION=1` (agent sessions can name those tools but never use them —
-> self-approval would mean no gate at all). Default wait 30m (`OPENEXEC_APPROVAL_WAIT` override);
-> the seeded policy's 5-minute expiry is extended to the wait window. Environment tiering:
+> self-approval would mean no gate at all). Default wait 5m (`OPENEXEC_APPROVAL_WAIT` override);
+> the seeded policy's expiry is extended to the wait window. **Caveat:** the blocked MCP tool
+> call is also subject to the *client's* tool-call timeout — the operator must sign off within
+> whichever window is shorter, or align both via `OPENEXEC_APPROVAL_WAIT` and the client's
+> timeout setting; for longer reviews, reject/let it expire and re-invoke after approving.
+> Environment tiering:
 > `risk_profile: low` environments run apply-class commands autonomously, `high` requires
 > sign-off, and deterministically-detected destructive terraform changes always require a human
 > regardless of tier. Apply-class infra tools are pinned to RiskLevelHigh so the seeded
