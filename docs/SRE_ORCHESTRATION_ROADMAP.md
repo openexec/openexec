@@ -214,3 +214,40 @@ As an optional optimization pass:
 *   Configure a local, quantized, 1-bit LLM (such as a 1.5B or 7B Qwen/Llama GGUF) running locally on the operator's machine or as a lightweight sidecar in the VPC.
 *   The model receives the developer's raw prompt and outputs a structured classification mapping (e.g., `{"tool": "ansible_run_playbook", "args": {"playbook": "rolling_restart.yml", "limit": "nginx"}}`).
 *   **Safety Boundary:** The BitNet output is treated strictly as an *untrusted proposal*. It is fed into the Go `CommandRegistry` compiler, which validates that the proposed arguments conform perfectly to your whitelist and regex checks before spawning any process.
+
+---
+
+## Preventing Tool Bypasses & Schema Migration Escapes
+
+### The Threat Scenario
+An agent is tasked with deploying a schema migration. Instead of writing and running a pre-approved, automated migration script (or because it gets confused by a database error), the agent:
+- Tries to run raw SSH commands directly on the production DB host to manually modify tables.
+- Tries to bypass Terraform by calling `gcloud sql databases delete` or direct Cloud CLI commands.
+- Forgets the migration step entirely and deploys code that causes DB schema misalignment or data loss.
+
+To mathematically eliminate this "Execution Escape" vector, OpenExec enforces four strict system-level security boundaries:
+
+### 1. Zero Ambient Admin Credentials (Credential Sandboxing)
+Never run OpenExec's execution runner inside an environment that has master, administrator-level cloud credentials (`gcloud`, `aws`, `kubectl`) or unscoped SSH private keys loaded in its environment variables.
+*   **The Guardrail:** The runner process should only hold a highly scoped service account token that *only* has permission to read/write specific states, view configurations, or trigger Salt/Ansible targets.
+*   **Why it works:** If the LLM somehow attempts to bypass Terraform and run a raw `gcloud sql databases delete` command, the Cloud Provider's IAM API will instantly reject the call with a `403 Forbidden` because OpenExec's token lacks administrative delete privileges.
+
+### 2. Total Toolset Pruning (No Generic Shell Access)
+When OpenExec is executing an infrastructure or SRE deployment blueprint, **the generic `run_shell_command` tool is completely removed from the model's active tool list.**
+*   **The Guardrail:** The model's available tool schema is restricted strictly to: `terraform_plan`, `terraform_apply`, `ansible_run_playbook`, and `ssh_query_status`.
+*   **Why it works:** Because there is no general-purpose command-line tool exposed in the active MCP schema, **the model physically has no "mouth" to invoke raw `gcloud` or `ssh` commands.** It is structurally locked within the boundaries of your compiled command registry.
+
+### 3. Pre-Flight Migration Integrity Gates (Go-based)
+To prevent the model from "forgetting" to run migration scripts and deploying misaligned code:
+*   **The Guardrail:** The Go-based deployment blueprint contains a mandatory **Pre-Flight Migration Gate** (Step 0) executed before any Terraform or Ansible apply.
+*   **The Logic:** The Go gate parses the local Git diff. If it detects changes to database entities (e.g., entity models, schema definitions) *without* finding a corresponding new migration script appended to your pre-approved `migrations/` folder, the Go pipeline **instantly blocks the deployment** and raises a `decision-point` signal.
+*   **Why it works:** The AI cannot "forget" to run migrations because a deterministic Go parser verifies that migration scripts exist and are registered before letting the deployment start.
+
+### 4. Host-Level Command Scoping (SSH Restrictions)
+Any SSH keys provisioned for OpenExec to access staging or production hosts must be locked down at the target host level, rather than granting full shell access.
+*   **The Guardrail:** Configure target host SSH directories (`.ssh/authorized_keys`) to force command-scoping:
+    ```bash
+    command="/usr/bin/safe_diagnostic_script",no-port-forwarding,no-x11-forwarding ssh-rsa AAAAB3NzaC1y...
+    ```
+*   **Why it works:** Even if an agent gets access to the SSH private key, any connection attempt to the target DB host is forced by the host's SSH daemon to *only* execute that single pre-approved, safe diagnostic script—making manual database dropping or table modification over SSH physically impossible.
+
