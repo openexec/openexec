@@ -35,7 +35,7 @@ const infraOutputLimit = 16000
 // isInfraTool reports whether a tool name belongs to the infra plane.
 func isInfraTool(name string) bool {
 	switch name {
-	case "ansible_run_playbook", "salt_apply_state", "ssh_run_query", "terraform_plan":
+	case "ansible_run_playbook", "salt_apply_state", "ssh_run_query", "terraform_plan", "terraform_apply":
 		return true
 	}
 	return false
@@ -80,6 +80,11 @@ type SSHRunQueryRequest struct {
 type TerraformPlanRequest struct {
 	Environment string            `json:"environment"`
 	Vars        map[string]string `json:"vars,omitempty"`
+	Save        bool              `json:"save,omitempty"`
+}
+
+type TerraformApplyRequest struct {
+	Environment string `json:"environment"`
 }
 
 // --- Tool definitions (enums compiled from the operator's allowlist) ---
@@ -160,7 +165,7 @@ func SSHRunQueryToolDef(reg *infra.Registry) map[string]interface{} {
 func TerraformPlanToolDef(reg *infra.Registry) map[string]interface{} {
 	return map[string]interface{}{
 		"name":        "terraform_plan",
-		"description": "Run terraform plan in the environment's configured working directory with optional allowlisted variables. Read-class: plan renders pending changes without mutating infrastructure. There is deliberately no terraform apply tool in Phase 1 — safe applies require the saved-plan pipeline (Phase 2 of the SRE roadmap).",
+		"description": "Run terraform plan in the environment's configured working directory with optional allowlisted variables. Read-class: plan renders pending changes without mutating infrastructure. Set save=true to write the per-environment saved plan file that terraform_apply consumes — apply can only ever run a saved plan.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -170,6 +175,24 @@ func TerraformPlanToolDef(reg *infra.Registry) map[string]interface{} {
 					"description":          "Optional terraform input variables as name/value string pairs; every name must be in the environment's allowed_variables list.",
 					"additionalProperties": map[string]interface{}{"type": "string"},
 				},
+				"save": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Also write the fixed per-environment plan file (-out) so terraform_apply can later apply exactly this plan.",
+				},
+			},
+			"required": []string{"environment"},
+		},
+	}
+}
+
+func TerraformApplyToolDef(reg *infra.Registry) map[string]interface{} {
+	return map[string]interface{}{
+		"name":        "terraform_apply",
+		"description": "Apply the previously saved terraform plan for an environment (created by terraform_plan with save=true). TOCTOU-safe: only the fixed saved plan file can be applied — no variables, targets, or paths are accepted, and terraform refuses a stale plan if state drifted. The saved plan is first inspected via `terraform show -json` and destructive actions (delete/replace) are detected deterministically in Go and surfaced to the approver. Apply-class: requires human approval through the approval gate.",
+		"inputSchema": map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"environment": enumProp("Target environment from the allowlist whose saved plan should be applied.", reg.Environments()),
 			},
 			"required": []string{"environment"},
 		},
@@ -190,7 +213,7 @@ func InfraToolDefs(reg *infra.Registry) []interface{} {
 		defs = append(defs, SSHRunQueryToolDef(reg))
 	}
 	if reg.HasEngine("terraform") {
-		defs = append(defs, TerraformPlanToolDef(reg))
+		defs = append(defs, TerraformPlanToolDef(reg), TerraformApplyToolDef(reg))
 	}
 	return defs
 }
@@ -210,19 +233,33 @@ func (s *Server) infraEnabled(req Request) bool {
 
 // runInfraCommand is the single execution path for all infra tools:
 // approval for apply-class, then argv execution, then a structured result.
-func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMessage, cmd *infra.Command) {
+// destructive carries deterministically-detected destructive changes (the
+// Phase-2 terraform plan gate) so the approver sees exactly what would be
+// deleted or replaced.
+func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMessage, cmd *infra.Command, destructive []string) {
 	if cmd.ApplyClass {
 		// FAIL CLOSED: an apply-class infra command without an operational
 		// approval channel is refused, not waved through. (Contrast with
 		// RequestToolApproval's permissive nil-gate default for coding
 		// tools — infrastructure mutation gets the strict variant.)
 		if GetApprovalGateForServer(s) == nil {
-			s.writeToolError(req.ID, fmt.Sprintf(
-				"%s: this is an apply-class infrastructure command and no approval gate is wired on this server — refusing (fail-closed). Run a dry-run instead (check/test), or use a session with an operator approval channel.", toolName))
+			msg := fmt.Sprintf(
+				"%s: this is an apply-class infrastructure command and no approval gate is wired on this server — refusing (fail-closed). Run a dry-run instead (check/test), or use a session with an operator approval channel.", toolName)
+			if len(destructive) > 0 {
+				msg += "\nDestructive changes detected in the saved plan:\n  " + strings.Join(destructive, "\n  ")
+			}
+			s.writeToolError(req.ID, msg)
 			return
 		}
 		var argsMap map[string]interface{}
 		_ = json.Unmarshal(args, &argsMap)
+		if argsMap == nil {
+			argsMap = map[string]interface{}{}
+		}
+		// Surface the deterministic findings to the human approver.
+		if len(destructive) > 0 {
+			argsMap["destructive_changes"] = destructive
+		}
 		ctx := s.ctx
 		if ctx == nil {
 			ctx = context.Background()
@@ -255,7 +292,7 @@ func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMess
 		text += fmt.Sprintf("\n[error: %v]", err)
 	}
 
-	s.writeResult(req.ID, map[string]interface{}{
+	result := map[string]interface{}{
 		"content": []interface{}{
 			map[string]interface{}{"type": "text", "text": text},
 		},
@@ -264,7 +301,11 @@ func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMess
 		"risk":        cmd.RiskProfile,
 		"apply_class": cmd.ApplyClass,
 		"exit_code":   exitCode,
-	})
+	}
+	if destructive != nil {
+		result["destructive_changes"] = destructive
+	}
+	s.writeResult(req.ID, result)
 }
 
 func (s *Server) handleAnsibleRunPlaybook(req Request, params toolsCallParams) {
@@ -281,7 +322,7 @@ func (s *Server) handleAnsibleRunPlaybook(req Request, params toolsCallParams) {
 		s.writeToolError(req.ID, err.Error())
 		return
 	}
-	s.runInfraCommand(req, params.Name, params.Arguments, cmd)
+	s.runInfraCommand(req, params.Name, params.Arguments, cmd, nil)
 }
 
 func (s *Server) handleSaltApplyState(req Request, params toolsCallParams) {
@@ -298,7 +339,7 @@ func (s *Server) handleSaltApplyState(req Request, params toolsCallParams) {
 		s.writeToolError(req.ID, err.Error())
 		return
 	}
-	s.runInfraCommand(req, params.Name, params.Arguments, cmd)
+	s.runInfraCommand(req, params.Name, params.Arguments, cmd, nil)
 }
 
 func (s *Server) handleSSHRunQuery(req Request, params toolsCallParams) {
@@ -315,7 +356,7 @@ func (s *Server) handleSSHRunQuery(req Request, params toolsCallParams) {
 		s.writeToolError(req.ID, err.Error())
 		return
 	}
-	s.runInfraCommand(req, params.Name, params.Arguments, cmd)
+	s.runInfraCommand(req, params.Name, params.Arguments, cmd, nil)
 }
 
 func (s *Server) handleTerraformPlan(req Request, params toolsCallParams) {
@@ -327,10 +368,62 @@ func (s *Server) handleTerraformPlan(req Request, params toolsCallParams) {
 		s.writeToolError(req.ID, "invalid arguments: "+err.Error())
 		return
 	}
-	cmd, err := s.infraRegistry.ResolveTerraformPlan(r.Environment, r.Vars)
+	cmd, err := s.infraRegistry.ResolveTerraformPlan(r.Environment, r.Vars, r.Save)
 	if err != nil {
 		s.writeToolError(req.ID, err.Error())
 		return
 	}
-	s.runInfraCommand(req, params.Name, params.Arguments, cmd)
+	s.runInfraCommand(req, params.Name, params.Arguments, cmd, nil)
+}
+
+// handleTerraformApply implements the Phase-2 saved-plan pipeline:
+//
+//	[1] terraform show -json <saved plan>   (read, deterministic)
+//	[2] Go gate: detect delete/replace      (never an LLM judgment)
+//	[3] approval with findings attached     (fail-closed without a gate)
+//	[4] terraform apply <saved plan>        (TOCTOU-safe: the plan binds
+//	    the exact changes; terraform refuses it if state drifted)
+func (s *Server) handleTerraformApply(req Request, params toolsCallParams) {
+	if !s.infraEnabled(req) {
+		return
+	}
+	var r TerraformApplyRequest
+	if err := json.Unmarshal(params.Arguments, &r); err != nil {
+		s.writeToolError(req.ID, "invalid arguments: "+err.Error())
+		return
+	}
+
+	showCmd, err := s.infraRegistry.ResolveTerraformShowPlan(r.Environment)
+	if err != nil {
+		s.writeToolError(req.ID, err.Error())
+		return
+	}
+	ctx := s.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	planJSON, _, err := s.infraRunner.Run(ctx, showCmd.Binary, showCmd.Args)
+	if err != nil {
+		s.writeToolError(req.ID, fmt.Sprintf(
+			"cannot inspect the saved plan for %q (run terraform_plan with save=true first): %v\n%s",
+			r.Environment, err, planJSON))
+		return
+	}
+	// An unverifiable plan must never reach apply.
+	destructive, err := infra.DestructiveChanges([]byte(planJSON))
+	if err != nil {
+		s.writeToolError(req.ID, fmt.Sprintf(
+			"refusing to apply: the saved plan for %q could not be verified deterministically: %v", r.Environment, err))
+		return
+	}
+
+	applyCmd, err := s.infraRegistry.ResolveTerraformApply(r.Environment)
+	if err != nil {
+		s.writeToolError(req.ID, err.Error())
+		return
+	}
+	if destructive == nil {
+		destructive = []string{} // non-nil: result always reports the gate ran
+	}
+	s.runInfraCommand(req, params.Name, params.Arguments, applyCmd, destructive)
 }

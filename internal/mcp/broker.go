@@ -138,7 +138,7 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 		}
 		return b.validateShellCommand(arguments)
 
-	case "ansible_run_playbook", "salt_apply_state", "ssh_run_query", "terraform_plan":
+	case "ansible_run_playbook", "salt_apply_state", "ssh_run_query", "terraform_plan", "terraform_apply":
 		// Infra tools execute processes against real infrastructure, so —
 		// like run_shell_command — all of them require danger-full-access
 		// mode, uniformly (read-class included; relax later only if real use

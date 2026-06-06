@@ -519,6 +519,9 @@ func (s *Server) handleToolsCall(req Request) {
 	case "terraform_plan":
 		s.handleTerraformPlan(req, params)
 		telemetry.RecordToolSuccess(span, "")
+	case "terraform_apply":
+		s.handleTerraformApply(req, params)
+		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))
 		telemetry.RecordToolError(span, fmt.Errorf("unknown tool: %s", params.Name))

@@ -12,17 +12,32 @@ import (
 )
 
 // fakeRunner records the argv it was asked to run instead of executing.
+// Optional per-call scripted results support multi-step handlers
+// (terraform_apply runs show -json before apply).
+type fakeResult struct {
+	out  string
+	code int
+	err  error
+}
+
 type fakeRunner struct {
-	binary string
-	args   []string
-	output string
-	calls  int
+	binary  string // last call
+	args    []string
+	output  string
+	calls   int
+	history [][]string
+	script  []fakeResult // consumed in order; falls back to output/0/nil
 }
 
 func (f *fakeRunner) Run(_ context.Context, binary string, args []string) (string, int, error) {
 	f.binary = binary
 	f.args = append([]string{}, args...)
+	f.history = append(f.history, append([]string{binary}, args...))
 	f.calls++
+	if len(f.script) > 0 && f.calls <= len(f.script) {
+		r := f.script[f.calls-1]
+		return r.out, r.code, r.err
+	}
 	return f.output, 0, nil
 }
 
@@ -202,6 +217,115 @@ func TestInfraToolWithoutRegistryRefuses(t *testing.T) {
 	result := callTool(t, srv, out, "terraform_plan", map[string]interface{}{"environment": "staging"})
 	if !isToolError(result) || !strings.Contains(resultText(result), "not enabled") {
 		t.Errorf("infra tool without a loaded allowlist must refuse, got: %s", resultText(result))
+	}
+}
+
+const safePlanJSON = `{"resource_changes":[{"address":"aws_instance.web","change":{"actions":["update"]}}]}`
+const destructivePlanJSON = `{"resource_changes":[{"address":"aws_db_instance.main","change":{"actions":["delete","create"]}}]}`
+
+func TestTerraformApply_SavedPlanPipeline(t *testing.T) {
+	srv, out, runner := newInfraTestServer(t, "danger-full-access")
+	gate := &fakeGate{approve: true}
+	SetApprovalGateForServer(srv, gate)
+	t.Cleanup(func() { CleanupApprovalGateForServer(srv) })
+	runner.script = []fakeResult{
+		{out: safePlanJSON}, // show -json
+		{out: "Apply complete! Resources: 0 added, 1 changed, 0 destroyed."}, // apply
+	}
+
+	result := callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "staging"})
+	if isToolError(result) {
+		t.Fatalf("approved apply should run: %s", resultText(result))
+	}
+	if len(runner.history) != 2 {
+		t.Fatalf("expected show then apply, got %d calls: %v", len(runner.history), runner.history)
+	}
+	if !strings.Contains(strings.Join(runner.history[0], " "), "show -json openexec-staging.tfplan") {
+		t.Errorf("first call should inspect the saved plan: %v", runner.history[0])
+	}
+	if !strings.Contains(strings.Join(runner.history[1], " "), "apply -input=false -no-color -lock-timeout=30s openexec-staging.tfplan") {
+		t.Errorf("second call should apply the saved plan: %v", runner.history[1])
+	}
+	if len(gate.requests) != 1 {
+		t.Fatalf("apply must request approval, got %d", len(gate.requests))
+	}
+}
+
+func TestTerraformApply_DestructiveSurfacedToApprover(t *testing.T) {
+	srv, out, runner := newInfraTestServer(t, "danger-full-access")
+	gate := &fakeGate{approve: true}
+	SetApprovalGateForServer(srv, gate)
+	t.Cleanup(func() { CleanupApprovalGateForServer(srv) })
+	runner.script = []fakeResult{{out: destructivePlanJSON}, {out: "applied"}}
+
+	result := callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "staging"})
+	if isToolError(result) {
+		t.Fatalf("operator-approved destructive apply should run: %s", resultText(result))
+	}
+	// The deterministic findings must reach the human approver.
+	dc, _ := gate.requests[0].ToolArgs["destructive_changes"].([]string)
+	if len(dc) != 1 || !strings.Contains(dc[0], "[replace] aws_db_instance.main") {
+		t.Errorf("approver did not see destructive changes: %+v", gate.requests[0].ToolArgs)
+	}
+	// And the result reports them.
+	got, _ := result["destructive_changes"].([]interface{})
+	if len(got) != 1 {
+		t.Errorf("result should carry destructive_changes: %v", result["destructive_changes"])
+	}
+}
+
+func TestTerraformApply_FailClosedListsDestructive(t *testing.T) {
+	srv, out, runner := newInfraTestServer(t, "danger-full-access")
+	// No gate: apply must refuse and the refusal must name what would be destroyed.
+	runner.script = []fakeResult{{out: destructivePlanJSON}}
+
+	result := callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "staging"})
+	if !isToolError(result) || !strings.Contains(resultText(result), "fail-closed") {
+		t.Fatalf("apply without gate must fail closed: %s", resultText(result))
+	}
+	if !strings.Contains(resultText(result), "[replace] aws_db_instance.main") {
+		t.Errorf("refusal should list destructive changes: %s", resultText(result))
+	}
+	if len(runner.history) != 1 {
+		t.Errorf("only show may run without a gate, got %v", runner.history)
+	}
+}
+
+func TestTerraformApply_NoSavedPlanOrUnverifiable(t *testing.T) {
+	srv, out, runner := newInfraTestServer(t, "danger-full-access")
+	gate := &fakeGate{approve: true}
+	SetApprovalGateForServer(srv, gate)
+	t.Cleanup(func() { CleanupApprovalGateForServer(srv) })
+
+	// show fails → no saved plan.
+	runner.script = []fakeResult{{out: "no plan file", code: 1, err: context.DeadlineExceeded}}
+	result := callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "staging"})
+	if !isToolError(result) || !strings.Contains(resultText(result), "save=true") {
+		t.Errorf("missing saved plan should point at terraform_plan save=true: %s", resultText(result))
+	}
+
+	// show succeeds but emits garbage → unverifiable, refuse.
+	runner.script = []fakeResult{{out: "not json"}}
+	runner.calls = 0
+	result = callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "staging"})
+	if !isToolError(result) || !strings.Contains(resultText(result), "could not be verified") {
+		t.Errorf("unverifiable plan must refuse: %s", resultText(result))
+	}
+	if len(gate.requests) != 0 {
+		t.Error("no approval request should be made for an unverifiable plan")
+	}
+}
+
+func TestTerraformPlan_SaveWritesPlanfile(t *testing.T) {
+	srv, out, runner := newInfraTestServer(t, "danger-full-access")
+	result := callTool(t, srv, out, "terraform_plan", map[string]interface{}{
+		"environment": "staging", "save": true,
+	})
+	if isToolError(result) {
+		t.Fatalf("plan save should run: %s", resultText(result))
+	}
+	if runner.args[len(runner.args)-1] != "-out=openexec-staging.tfplan" {
+		t.Errorf("argv = %q", runner.args)
 	}
 }
 

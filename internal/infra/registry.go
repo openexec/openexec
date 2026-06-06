@@ -295,12 +295,19 @@ func (r *Registry) ResolveSSHQuery(env, host, query string) (*Command, error) {
 	}, nil
 }
 
+// terraformPlanFile is the fixed, per-environment saved-plan filename
+// (relative to the terraform working dir via -chdir). It is deliberately
+// NOT caller-suppliable: the apply tool can only ever consume the plan the
+// plan tool wrote, which is the TOCTOU guarantee of the saved-plan pipeline.
+func terraformPlanFile(env string) string {
+	return "openexec-" + env + ".tfplan"
+}
+
 // ResolveTerraformPlan validates and builds a terraform plan command.
-// Plan is read-class: it refreshes and renders changes but mutates nothing.
-// terraform APPLY is deliberately absent in Phase 1 — a safe apply requires
-// the saved-plan pipeline (plan -out → deterministic JSON gate → apply
-// <planfile>), which is Phase 2 of the roadmap.
-func (r *Registry) ResolveTerraformPlan(env string, vars map[string]string) (*Command, error) {
+// Plan is read-class: it refreshes and renders changes but mutates nothing
+// (save=true additionally writes the local saved-plan file for
+// ResolveTerraformApply to consume).
+func (r *Registry) ResolveTerraformPlan(env string, vars map[string]string, save bool) (*Command, error) {
 	ec, err := r.env(env)
 	if err != nil {
 		return nil, err
@@ -327,10 +334,57 @@ func (r *Registry) ResolveTerraformPlan(env string, vars map[string]string) (*Co
 		// argument or option no matter what it contains.
 		args = append(args, "-var="+name+"="+value)
 	}
+	if save {
+		args = append(args, "-out="+terraformPlanFile(env))
+	}
 	return &Command{
 		Binary:      "terraform",
 		Args:        args,
 		ApplyClass:  false,
+		Environment: env,
+		RiskProfile: ec.RiskProfile,
+	}, nil
+}
+
+// ResolveTerraformShowPlan builds the `terraform show -json <planfile>`
+// command used to deterministically inspect the saved plan before apply.
+// Read-class.
+func (r *Registry) ResolveTerraformShowPlan(env string) (*Command, error) {
+	ec, err := r.env(env)
+	if err != nil {
+		return nil, err
+	}
+	tf := ec.Terraform
+	if tf == nil {
+		return nil, fmt.Errorf("environment %q does not allow terraform", env)
+	}
+	return &Command{
+		Binary:      "terraform",
+		Args:        []string{"-chdir=" + tf.WorkingDir, "show", "-json", terraformPlanFile(env)},
+		ApplyClass:  false,
+		Environment: env,
+		RiskProfile: ec.RiskProfile,
+	}, nil
+}
+
+// ResolveTerraformApply builds the saved-plan apply (Phase 2). It only
+// ever applies the fixed per-environment plan file — there is no way to
+// pass variables, targets, or a different plan path, and terraform itself
+// refuses a stale plan if state drifted since planning (the TOCTOU fix).
+// Apply-class: requires approval upstream.
+func (r *Registry) ResolveTerraformApply(env string) (*Command, error) {
+	ec, err := r.env(env)
+	if err != nil {
+		return nil, err
+	}
+	tf := ec.Terraform
+	if tf == nil {
+		return nil, fmt.Errorf("environment %q does not allow terraform", env)
+	}
+	return &Command{
+		Binary:      "terraform",
+		Args:        []string{"-chdir=" + tf.WorkingDir, "apply", "-input=false", "-no-color", "-lock-timeout=30s", terraformPlanFile(env)},
+		ApplyClass:  true,
 		Environment: env,
 		RiskProfile: ec.RiskProfile,
 	}, nil

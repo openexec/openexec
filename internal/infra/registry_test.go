@@ -177,7 +177,7 @@ func TestResolveTerraformPlan_ArgvAndDenials(t *testing.T) {
 	cmd, err := reg.ResolveTerraformPlan("staging", map[string]string{
 		"node_type":      "e2-small",
 		"instance_count": "3",
-	})
+	}, false)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -192,14 +192,64 @@ func TestResolveTerraformPlan_ArgvAndDenials(t *testing.T) {
 		t.Error("terraform plan is read-class; apply does not exist until Phase 2")
 	}
 
-	if _, err := reg.ResolveTerraformPlan("staging", map[string]string{"admin_password": "x"}); err == nil {
+	if _, err := reg.ResolveTerraformPlan("staging", map[string]string{"admin_password": "x"}, false); err == nil {
 		t.Error("variable not in allowlist must be rejected")
 	}
-	if _, err := reg.ResolveTerraformPlan("staging", map[string]string{"node_type": "a\nb"}); err == nil {
+	if _, err := reg.ResolveTerraformPlan("staging", map[string]string{"node_type": "a\nb"}, false); err == nil {
 		t.Error("variable value with newline must be rejected")
 	}
-	if _, err := reg.ResolveTerraformPlan("production", nil); err == nil {
+	if _, err := reg.ResolveTerraformPlan("production", nil, false); err == nil {
 		t.Error("production has no terraform config; must be rejected")
+	}
+}
+
+func TestResolveTerraformSavedPlanPipeline(t *testing.T) {
+	reg := mustRegistry(t)
+
+	// plan with save=true writes the fixed per-environment plan file.
+	plan, err := reg.ResolveTerraformPlan("staging", nil, true)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if plan.Args[len(plan.Args)-1] != "-out=openexec-staging.tfplan" {
+		t.Errorf("save plan argv = %q", plan.Args)
+	}
+	if plan.ApplyClass {
+		t.Error("plan (even with save) is read-class")
+	}
+
+	// show -json inspects exactly that file.
+	show, err := reg.ResolveTerraformShowPlan("staging")
+	if err != nil {
+		t.Fatalf("show: %v", err)
+	}
+	wantShow := []string{"-chdir=./infra/staging", "show", "-json", "openexec-staging.tfplan"}
+	if !reflect.DeepEqual(show.Args, wantShow) {
+		t.Errorf("show argv = %q, want %q", show.Args, wantShow)
+	}
+	if show.ApplyClass {
+		t.Error("show is read-class")
+	}
+
+	// apply consumes only the saved plan: no vars, no targets, no paths.
+	apply, err := reg.ResolveTerraformApply("staging")
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	wantApply := []string{"-chdir=./infra/staging", "apply", "-input=false", "-no-color", "-lock-timeout=30s", "openexec-staging.tfplan"}
+	if !reflect.DeepEqual(apply.Args, wantApply) {
+		t.Errorf("apply argv = %q, want %q", apply.Args, wantApply)
+	}
+	if !apply.ApplyClass {
+		t.Error("apply must be apply-class")
+	}
+
+	// Environments without terraform config refuse the whole pipeline.
+	if _, err := reg.ResolveTerraformShowPlan("production"); err == nil {
+		t.Error("production has no terraform config; show must be rejected")
+	}
+	if _, err := reg.ResolveTerraformApply("production"); err == nil {
+		t.Error("production has no terraform config; apply must be rejected")
 	}
 }
 

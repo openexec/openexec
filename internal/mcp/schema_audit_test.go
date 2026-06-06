@@ -41,6 +41,7 @@ func allToolDefs() []map[string]interface{} {
 		SaltApplyStateToolDef(auditInfraRegistry()),
 		SSHRunQueryToolDef(auditInfraRegistry()),
 		TerraformPlanToolDef(auditInfraRegistry()),
+		TerraformApplyToolDef(auditInfraRegistry()),
 	}
 }
 
@@ -164,6 +165,7 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{SaltApplyStateToolDef(auditInfraRegistry()), SaltApplyStateRequest{}},
 		{SSHRunQueryToolDef(auditInfraRegistry()), SSHRunQueryRequest{}},
 		{TerraformPlanToolDef(auditInfraRegistry()), TerraformPlanRequest{}},
+		{TerraformApplyToolDef(auditInfraRegistry()), TerraformApplyRequest{}},
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}
