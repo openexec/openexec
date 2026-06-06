@@ -237,7 +237,13 @@ func (s *Server) infraEnabled(req Request) bool {
 // Phase-2 terraform plan gate) so the approver sees exactly what would be
 // deleted or replaced.
 func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMessage, cmd *infra.Command, destructive []string) {
-	if cmd.ApplyClass {
+	// Phase-3 environment tiering: an environment the operator explicitly
+	// marked risk_profile=low (e.g. staging) runs apply-class commands
+	// autonomously — EXCEPT when the deterministic plan gate found
+	// destructive changes, which always require a human regardless of tier.
+	needsApproval := cmd.ApplyClass && (cmd.RiskProfile != "low" || len(destructive) > 0)
+
+	if needsApproval {
 		// FAIL CLOSED: an apply-class infra command without an operational
 		// approval channel is refused, not waved through. (Contrast with
 		// RequestToolApproval's permissive nil-gate default for coding

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openexec/openexec/internal/approval"
 	"github.com/openexec/openexec/internal/infra"
@@ -149,9 +151,10 @@ func TestInfraDenyByDefaultSurfacesAsToolError(t *testing.T) {
 
 func TestApplyClassFailsClosedWithoutGate(t *testing.T) {
 	srv, out, runner := newInfraTestServer(t, "danger-full-access")
-	// No approval gate wired: a real playbook run must refuse.
+	// No approval gate wired: a real playbook run in a HIGH-risk
+	// environment must refuse.
 	result := callTool(t, srv, out, "ansible_run_playbook", map[string]interface{}{
-		"environment": "staging", "playbook": "deploy.yml",
+		"environment": "production", "playbook": "deploy.yml",
 	})
 	if !isToolError(result) || !strings.Contains(resultText(result), "fail-closed") {
 		t.Errorf("apply-class without a gate must fail closed, got: %s", resultText(result))
@@ -162,13 +165,32 @@ func TestApplyClassFailsClosedWithoutGate(t *testing.T) {
 
 	// The --check dry-run is read-class and runs without a gate.
 	result = callTool(t, srv, out, "ansible_run_playbook", map[string]interface{}{
-		"environment": "staging", "playbook": "deploy.yml", "check": true,
+		"environment": "production", "playbook": "deploy.yml", "check": true,
 	})
 	if isToolError(result) {
 		t.Fatalf("--check dry-run should run without a gate: %s", resultText(result))
 	}
 	if runner.calls != 1 || runner.args[len(runner.args)-1] != "--check" {
 		t.Errorf("dry-run argv = %q (calls=%d)", runner.args, runner.calls)
+	}
+}
+
+// Phase-3 environment tiering: an operator-declared low-risk environment
+// runs apply-class commands autonomously — no gate required.
+func TestLowRiskEnvironmentRunsApplyAutonomously(t *testing.T) {
+	srv, out, runner := newInfraTestServer(t, "danger-full-access")
+	// staging is risk_profile=low; no gate is wired at all.
+	result := callTool(t, srv, out, "ansible_run_playbook", map[string]interface{}{
+		"environment": "staging", "playbook": "deploy.yml",
+	})
+	if isToolError(result) {
+		t.Fatalf("low-risk env apply should run without a gate: %s", resultText(result))
+	}
+	if runner.calls != 1 {
+		t.Errorf("expected exactly one execution, got %d", runner.calls)
+	}
+	if risk, _ := result["risk"].(string); risk != "low" {
+		t.Errorf("result risk = %q, want low", risk)
 	}
 }
 
@@ -179,7 +201,7 @@ func TestApplyClassWithGate(t *testing.T) {
 	t.Cleanup(func() { CleanupApprovalGateForServer(srv) })
 
 	result := callTool(t, srv, out, "salt_apply_state", map[string]interface{}{
-		"environment": "staging", "state": "app.deploy", "target": "web*",
+		"environment": "production", "state": "app.deploy", "target": "web*",
 	})
 	if isToolError(result) {
 		t.Fatalf("approved apply should run: %s", resultText(result))
@@ -195,7 +217,7 @@ func TestApplyClassWithGate(t *testing.T) {
 	gate.approve = false
 	runner.calls = 0
 	result = callTool(t, srv, out, "salt_apply_state", map[string]interface{}{
-		"environment": "staging", "state": "app.deploy", "target": "web*",
+		"environment": "production", "state": "app.deploy", "target": "web*",
 	})
 	if !isToolError(result) || !strings.Contains(resultText(result), "operator said no") {
 		t.Errorf("rejected apply should surface the rejection: %s", resultText(result))
@@ -233,17 +255,17 @@ func TestTerraformApply_SavedPlanPipeline(t *testing.T) {
 		{out: "Apply complete! Resources: 0 added, 1 changed, 0 destroyed."}, // apply
 	}
 
-	result := callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "staging"})
+	result := callTool(t, srv, out, "terraform_apply", map[string]interface{}{"environment": "production"})
 	if isToolError(result) {
 		t.Fatalf("approved apply should run: %s", resultText(result))
 	}
 	if len(runner.history) != 2 {
 		t.Fatalf("expected show then apply, got %d calls: %v", len(runner.history), runner.history)
 	}
-	if !strings.Contains(strings.Join(runner.history[0], " "), "show -json openexec-staging.tfplan") {
+	if !strings.Contains(strings.Join(runner.history[0], " "), "show -json openexec-production.tfplan") {
 		t.Errorf("first call should inspect the saved plan: %v", runner.history[0])
 	}
-	if !strings.Contains(strings.Join(runner.history[1], " "), "apply -input=false -no-color -lock-timeout=30s openexec-staging.tfplan") {
+	if !strings.Contains(strings.Join(runner.history[1], " "), "apply -input=false -no-color -lock-timeout=30s openexec-production.tfplan") {
 		t.Errorf("second call should apply the saved plan: %v", runner.history[1])
 	}
 	if len(gate.requests) != 1 {
@@ -350,6 +372,62 @@ func TestTerraformPlan_VarsValidated(t *testing.T) {
 		t.Error("non-allowlisted var must be rejected")
 	}
 }
+
+func TestOperatorApprovalTools(t *testing.T) {
+	// Agent session (no operator env): tools refuse even when named.
+	srv, out, _ := newInfraTestServer(t, "suggest")
+	dbPath := filepath.Join(t.TempDir(), "approvals.db")
+	_, mgr, err := approval.OpenPersistentGate(dbPath, t.TempDir(), time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.SetApprovalManager(mgr)
+	result := callTool(t, srv, out, "approval_list", map[string]interface{}{})
+	if !isToolError(result) || !strings.Contains(resultText(result), "operator session") {
+		t.Errorf("agent session must not use approval tools: %s", resultText(result))
+	}
+
+	// Operator session: list shows the pending request; decide resolves it.
+	srv.operatorSession = true
+	if _, _, err := mgr.RequestApproval(contextBG(), approval.PersistentGateSessionID, "tc-1", "terraform_apply", `{"environment":"production"}`, "agent", ""); err != nil {
+		t.Fatal(err)
+	}
+	result = callTool(t, srv, out, "approval_list", map[string]interface{}{})
+	if isToolError(result) {
+		t.Fatalf("operator list failed: %s", resultText(result))
+	}
+	if count, _ := result["count"].(float64); count != 1 {
+		t.Fatalf("expected 1 pending, got %v", result["count"])
+	}
+	pending, _ := result["pending"].([]interface{})
+	first, _ := pending[0].(map[string]interface{})
+	reqID, _ := first["request_id"].(string)
+	if reqID == "" {
+		t.Fatal("pending entry missing request_id")
+	}
+
+	result = callTool(t, srv, out, "approval_decide", map[string]interface{}{
+		"request_id": reqID, "decision": "approve", "reason": "ok",
+	})
+	if isToolError(result) {
+		t.Fatalf("approve failed: %s", resultText(result))
+	}
+	// The list must now be empty.
+	result = callTool(t, srv, out, "approval_list", map[string]interface{}{})
+	if count, _ := result["count"].(float64); count != 0 {
+		t.Errorf("expected 0 pending after decision, got %v", result["count"])
+	}
+
+	// Garbage decision is refused.
+	result = callTool(t, srv, out, "approval_decide", map[string]interface{}{
+		"request_id": reqID, "decision": "shrug",
+	})
+	if !isToolError(result) {
+		t.Error("unknown decision value must be refused")
+	}
+}
+
+func contextBG() context.Context { return context.Background() }
 
 // Guard against accidental re-introduction of generic-path gating for infra
 // tools (it would double-prompt and cannot distinguish dry-runs).

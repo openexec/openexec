@@ -18,6 +18,7 @@ import (
     "crypto/sha256"
     "encoding/hex"
 
+    "github.com/openexec/openexec/internal/approval"
     "github.com/openexec/openexec/internal/infra"
     "github.com/openexec/openexec/internal/mode"
     "github.com/openexec/openexec/internal/release"
@@ -82,6 +83,12 @@ type Server struct {
 	// Infra tools state (see infra.go). Nil registry = no infra tools.
 	infraRegistry *infra.Registry
 	infraRunner   infra.Runner
+
+	// Operator-session approval tools (see approvals.go). operatorSession
+	// is read once from OPENEXEC_OPERATOR_SESSION at construction — agent
+	// sessions must never gain self-approval at runtime.
+	operatorSession bool
+	approvalMgr     *approval.Manager
 }
 
 // SetContext sets the tracing context and run ID for the server.
@@ -171,6 +178,7 @@ func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) (*Server
 		in:              in,
 		out:             out,
 		broker:          NewToolBroker(cfg.Mode),
+		operatorSession: os.Getenv("OPENEXEC_OPERATOR_SESSION") == "1",
 		workspaceRoots:  roots,
 		toolsetRegistry: toolset.NewRegistry(),
 		currentMode:     mode.ModeChat, // Start in chat mode
@@ -289,6 +297,15 @@ func (s *Server) handleToolsList(req Request) {
         if s.infraRegistry != nil {
             tools = append(tools, InfraToolDefs(s.infraRegistry)...)
         }
+    }
+
+    // Operator-session sign-off tools (see approvals.go): only advertised
+    // when this server was explicitly started as an operator session.
+    if s.operatorSession && s.approvalMgr != nil {
+        tools = append(tools,
+            ApprovalListToolDef(),
+            ApprovalDecideToolDef(),
+        )
     }
 
     // Add fork tools if fork manager is configured
@@ -521,6 +538,12 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "terraform_apply":
 		s.handleTerraformApply(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "approval_list":
+		s.handleApprovalList(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "approval_decide":
+		s.handleApprovalDecide(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))

@@ -42,6 +42,8 @@ func allToolDefs() []map[string]interface{} {
 		SSHRunQueryToolDef(auditInfraRegistry()),
 		TerraformPlanToolDef(auditInfraRegistry()),
 		TerraformApplyToolDef(auditInfraRegistry()),
+		ApprovalListToolDef(),
+		ApprovalDecideToolDef(),
 	}
 }
 
@@ -68,6 +70,25 @@ func auditInfraRegistry() *infra.Registry {
 				},
 				Terraform: &infra.TerraformConfig{
 					WorkingDir:       "./infra",
+					AllowedVariables: []string{"instance_count"},
+				},
+			},
+			// production is risk_profile=high: apply-class commands here
+			// exercise the approval-gate paths in tests (staging is low →
+			// autonomous under Phase-3 environment tiering).
+			"production": {
+				RiskProfile: "high",
+				Ansible: &infra.AnsibleConfig{
+					PlaybookDir: "/etc/openexec/playbooks",
+					Inventory:   "/etc/openexec/prod.ini",
+					Playbooks:   []string{"deploy.yml"},
+				},
+				Salt: &infra.SaltConfig{
+					Targets: []string{"web*"},
+					States:  []string{"app.deploy"},
+				},
+				Terraform: &infra.TerraformConfig{
+					WorkingDir:       "./infra/prod",
 					AllowedVariables: []string{"instance_count"},
 				},
 			},
@@ -166,6 +187,7 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{SSHRunQueryToolDef(auditInfraRegistry()), SSHRunQueryRequest{}},
 		{TerraformPlanToolDef(auditInfraRegistry()), TerraformPlanRequest{}},
 		{TerraformApplyToolDef(auditInfraRegistry()), TerraformApplyRequest{}},
+		{ApprovalDecideToolDef(), ApprovalDecideRequest{}},
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}

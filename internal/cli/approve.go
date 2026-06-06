@@ -51,6 +51,9 @@ Examples:
   openexec approve list --json    # Output as JSON
   openexec approve list --run-id run_123  # Filter by run`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if local, _ := cmd.Flags().GetBool("local"); local {
+			return approveListLocal()
+		}
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
 			return fmt.Errorf("project not initialized: run 'openexec init' first")
@@ -178,6 +181,10 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		requestID := args[0]
+		if local, _ := cmd.Flags().GetBool("local"); local {
+			note, _ := cmd.Flags().GetString("note")
+			return approveYesLocal(requestID, note)
+		}
 
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
@@ -239,6 +246,9 @@ Examples:
 		reason := "Rejected by user"
 		if len(args) > 1 {
 			reason = strings.Join(args[1:], " ")
+		}
+		if local, _ := cmd.Flags().GetBool("local"); local {
+			return approveNoLocal(requestID, reason)
 		}
 
 		config, err := project.LoadProjectConfig(".")

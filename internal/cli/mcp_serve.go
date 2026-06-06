@@ -3,7 +3,10 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"time"
 
+	"github.com/openexec/openexec/internal/approval"
 	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/mcp"
 	"github.com/spf13/cobra"
@@ -48,6 +51,35 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 		}
 		if infraReg != nil {
 			srv.SetInfraRegistry(infraReg)
+
+			// Persistent approval gate (Phase 3): apply-class infra commands
+			// block on the shared approvals DB until an operator signs off
+			// via `openexec approve list/yes/no --local` or an
+			// OPENEXEC_OPERATOR_SESSION=1 mcp-serve session.
+			waitTimeout := approval.DefaultWaitTimeout
+			if v := os.Getenv("OPENEXEC_APPROVAL_WAIT"); v != "" {
+				d, perr := time.ParseDuration(v)
+				if perr != nil {
+					fmt.Fprintf(os.Stderr, "invalid OPENEXEC_APPROVAL_WAIT %q: %v\n", v, perr)
+					return perr
+				}
+				waitTimeout = d
+			}
+			gate, mgr, gerr := approval.OpenPersistentGate(
+				filepath.Join(workDir, ".openexec", "approvals.db"), workDir, waitTimeout)
+			if gerr != nil {
+				fmt.Fprintf(os.Stderr, "approvals store error: %v\n", gerr)
+				return gerr
+			}
+			// Apply-class infra tools must never be auto-approved by the
+			// seeded risk-based policy (it auto-approves low risk only;
+			// unknown tools default to medium — pin them to high anyway).
+			if rerr := gate.SetToolRisk(approval.RiskLevelHigh,
+				"ansible_run_playbook", "salt_apply_state", "terraform_apply"); rerr != nil {
+				return rerr
+			}
+			mcp.SetApprovalGateForServer(srv, gate)
+			srv.SetApprovalManager(mgr)
 		}
 
 		return srv.Serve()

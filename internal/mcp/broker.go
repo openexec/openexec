@@ -85,7 +85,7 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 			// the toolset filter does not apply to them because their own
 			// registry (.openexec/infra.yaml, deny-by-default) is a stricter
 			// boundary — but they remain mode-gated below.
-			if !isControlPlaneTool(toolName) && !isInfraTool(toolName) && !ts.HasTool(toolName) {
+			if !isControlPlaneTool(toolName) && !isInfraTool(toolName) && !isApprovalTool(toolName) && !ts.HasTool(toolName) {
 				return false, fmt.Sprintf("[Toolset %s] tool '%s' is not available in the current toolset", b.activeToolset, toolName)
 			}
 		}
@@ -137,6 +137,14 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 			return false, fmt.Sprintf("[%s Mode] run_shell_command is disabled; switch to Full Auto (danger) mode to enable shell access", b.mode)
 		}
 		return b.validateShellCommand(arguments)
+
+	case "approval_list", "approval_decide":
+		// Operator sign-off tools: permitted in every permission mode — the
+		// human operator approving from a read-only light session is the
+		// whole point. The real guard is the operator-session check in the
+		// handler (OPENEXEC_OPERATOR_SESSION read once at server start):
+		// an agent session can name these tools but never use them.
+		return true, ""
 
 	case "ansible_run_playbook", "salt_apply_state", "ssh_run_query", "terraform_plan", "terraform_apply":
 		// Infra tools execute processes against real infrastructure, so —
