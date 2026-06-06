@@ -19,6 +19,7 @@ import (
 	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
+	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/project"
@@ -187,6 +188,21 @@ func New(cfg Config) (*Server, error) {
         coordinator.RegisterTool(tools.NewDeployTool(kStore))
         coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
         coordinator.RegisterTool(tools.NewGeneralChatTool()) // conversational fallback
+
+        // Infra suggestion tools (SRE roadmap Phase 4): when the operator
+        // wrote an infra allowlist, register suggestion-only routing
+        // targets so SRE prompts ("bounce nginx on staging") classify into
+        // structured tool calls. Router output stays an untrusted
+        // proposal — execution happens only via the MCP infra plane.
+        if infraReg, ierr := infra.LoadRegistry(projectsAbs); ierr != nil {
+            log.Printf("[Server] infra allowlist error (DCP routing skipped): %v", ierr)
+        } else if infraReg != nil {
+            suggest := tools.NewInfraSuggestTools(infraReg)
+            for _, t := range suggest {
+                coordinator.RegisterTool(t)
+            }
+            log.Printf("[Server] DCP: registered %d infra suggestion tools", len(suggest))
+        }
         log.Printf("[Server] DCP enabled: BitNet routing active")
     } else {
         log.Printf("[Server] DCP disabled: using Pipeline/Manager only")

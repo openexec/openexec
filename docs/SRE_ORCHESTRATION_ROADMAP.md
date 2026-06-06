@@ -97,7 +97,14 @@ func ExecuteAnsible(ctx context.Context, playbook string, inventory string, limi
 
 ---
 
-## Phase 2: Saved-Plan (TOCTOU-Free) Blueprint & Deterministic JSON Plan Gating
+## Phase 2: Saved-Plan (TOCTOU-Free) Blueprint & Deterministic JSON Plan Gating — ✅ IMPLEMENTED
+
+> **Shipped:** `terraform_plan` with `save=true` writes the fixed per-environment plan file
+> (`openexec-<env>.tfplan`, never caller-suppliable); the new `terraform_apply` tool runs
+> `terraform show -json` on it, detects destructive actions in Go (`internal/infra/tfplan.go` —
+> "delete", with the `["delete","create"]` pair labeled replace), attaches the findings to the
+> approval request, and applies exactly the saved plan. An unverifiable plan is refused, never
+> treated as safe. Terraform itself refuses a stale plan if state drifted — the TOCTOU fix.
 
 ### Purpose
 To eliminate the **Time-of-Check to Time-of-Use (TOCTOU)** vulnerability where cluster/infra state drifts or files are mutated between the planning and applying phases. This phase also replaces fuzzy "LLM code reviews" of deployment plans with deterministic JSON policy gates.
@@ -166,7 +173,19 @@ If the plan verification fails (e.g., a database replacement is detected), the G
 
 ---
 
-## Phase 3: Risk-Tiered Environment Policy, HITL Sign-off & Audit Trails
+## Phase 3: Risk-Tiered Environment Policy, HITL Sign-off & Audit Trails — ✅ IMPLEMENTED
+
+> **Shipped:** `internal/approval.PersistentGate` persists pending requests to
+> `.openexec/approvals.db` (WAL via `sqlitecfg.DSN`) and polls it, so the agent process blocks
+> while ANY other process signs off: `openexec approve list|yes|no <id> --local` from a terminal,
+> or the `approval_list`/`approval_decide` MCP tools in a second mcp-serve session started with
+> `OPENEXEC_OPERATOR_SESSION=1` (agent sessions can name those tools but never use them —
+> self-approval would mean no gate at all). Default wait 30m (`OPENEXEC_APPROVAL_WAIT` override);
+> the seeded policy's 5-minute expiry is extended to the wait window. Environment tiering:
+> `risk_profile: low` environments run apply-class commands autonomously, `high` requires
+> sign-off, and deterministically-detected destructive terraform changes always require a human
+> regardless of tier. Apply-class infra tools are pinned to RiskLevelHigh so the seeded
+> risk-based policy can never auto-approve them.
 
 ### Purpose
 To establish strict operational boundaries between staging and production environments, providing a clean, human-in-the-loop (HITL) manual override system over standard stdio streams, backed by immutable audit histories.
@@ -203,7 +222,17 @@ Every compiled command execution, variable parameter, run stdout/stderr, and hum
 
 ---
 
-## Phase 4: Intent Routing & Optional Local BitNet Router
+## Phase 4: Intent Routing & Optional Local BitNet Router — ✅ IMPLEMENTED (suggest-only)
+
+> **Shipped:** `internal/tools.NewInfraSuggestTools` registers one suggestion-only routing
+> target per configured engine into the DCP coordinator (`internal/server/server.go`, behind
+> `OPENEXEC_ENABLE_DCP`), with verb-rich descriptions for the heuristic selector and the
+> BitNet router scaffold (`internal/router/bitnet.go`). `Execute` on these adapters always
+> refuses — the DCP plane proposes, the MCP plane disposes: execution happens only through the
+> broker → deny-by-default registry → approval gate. **Honest scope:** DCP is a suggest-only
+> endpoint (`POST /api/v1/dcp/query`); `openexec chat` does not route through it today, and a
+> real local 1-bit model remains optional (the router falls back to heuristics when no GGUF is
+> available).
 
 ### Purpose
 To add a natural-language routing layer that translates developer prompts (e.g., *"bounce the nginx servers on staging"*) into the correct, safe, parameter-bounded tool calls from the registry.
