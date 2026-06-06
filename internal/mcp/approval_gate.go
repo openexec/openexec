@@ -89,6 +89,16 @@ func RequiresApprovalForTool(s *Server, toolName string) bool {
 		return false
 	}
 
+	// Infra tools handle approval inside their handlers (infra.go), where
+	// the resolved command is visible: apply-class invocations request
+	// approval regardless of operational mode and FAIL CLOSED without a
+	// gate, while dry-runs (--check, test=True, plan) don't need one.
+	// Gating here as well would double-prompt, and gating by tool name
+	// alone cannot tell a dry-run from a real apply.
+	if isInfraTool(toolName) {
+		return false
+	}
+
 	// Approval only applies in Task mode
 	if !s.currentMode.RequiresApproval() {
 		return false

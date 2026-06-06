@@ -6,48 +6,53 @@ This document provides detailed implementation instructions and technical specif
 
 ---
 
-## Phase 1: Config-Driven SRE Command Registry & Go Executor
+## Phase 1: Config-Driven SRE Command Registry & Go Executor — ✅ IMPLEMENTED
 
 ### Purpose
-To eliminate raw terminal/shell access (`run_shell_command`) and replace it with a **deny-by-default, allowlist-only** registry of specific, parameter-bounded tools. This ensures that the AI cannot execute arbitrary, untested, or destructive command strings.
+To give the SRE lane a **deny-by-default, allowlist-only** registry of specific, parameter-bounded tools instead of raw shell access. This ensures that the AI cannot execute arbitrary, untested, or destructive command strings.
 
-### Proposed Implementation
+### Implementation (shipped)
 
-#### 1. Configuration Schema (`openexec.yaml` / `config.json`)
-Introduce a new `infrastructure_orchestration` section defining allowed playbooks, states, and SSH queries per environment:
+Code lives in `internal/infra/` (config + registry + executor) and `internal/mcp/infra.go` (MCP tools). Tools: `ansible_run_playbook`, `salt_apply_state` (apply-class), `ssh_run_query`, `terraform_plan` (read-class). **There is deliberately no `terraform_apply` in Phase 1** — a safe apply requires the saved-plan pipeline below (Phase 2).
+
+Phase-1 status notes:
+- All infra tools require **danger-full-access** mode, uniformly (read-class included; relax only if real use demands it). Inside that mode, the registry and the approval gate are the shields.
+- Apply-class invocations (a real playbook run / `state.apply`) request approval via `internal/approval` and **fail closed when no gate is wired**. Since nothing in production wires a gate yet, apply-class commands are registered-validated-but-inert until the Phase 3 sign-off channel exists. Dry-runs (`check=true`, `test=true`) and read-class tools execute today.
+- Like `run_shell_command`, infra executions are never idempotency-marked: re-running on resume beats skipping over partial side effects.
+
+#### 1. Configuration Schema (`.openexec/infra.yaml`)
+The allowlist is a **dedicated, operator-owned file** — deliberately NOT the init-generated `openexec.yaml`, so `openexec init` can never overwrite a security policy and reviewers can audit it in isolation. Unknown keys fail the load (a typo like `playboks:` must never silently change policy).
 
 ```yaml
-infrastructure_orchestration:
-  enabled: true
-  environments:
-    staging:
-      risk_profile: low
-      allowlist:
-        terraform:
-          working_dir: "./infra/staging"
-          allowed_variables: ["instance_count", "node_type"]
-        ansible:
-          playbooks: ["deploy_staging.yml", "rolling_restart.yml"]
-        salt:
-          states: ["nginx.setup", "app.deploy"]
-        ssh:
-          allowed_hosts: ["10.0.1.*"]
-          allowed_queries: ["check_disk", "check_service"]
-    production:
-      risk_profile: high  # Forces HITL / approval gate on all apply actions
-      allowlist:
-        terraform:
-          working_dir: "./infra/prod"
-          allowed_variables: ["instance_count"]
-        ansible:
-          playbooks: ["rolling_restart.yml"]
-        ssh:
-          allowed_hosts: ["10.0.2.*"]
-          allowed_queries: ["check_service"]
+enabled: true
+environments:
+  staging:
+    risk_profile: low
+    terraform:
+      working_dir: "./infra/staging"
+      allowed_variables: [instance_count, node_type]
+    ansible:
+      playbook_dir: /etc/openexec/playbooks   # outside the agent-writable workspace!
+      inventory: /etc/openexec/inventory/staging.ini
+      playbooks: [deploy_staging.yml, rolling_restart.yml]
+    salt:
+      targets: ["web*"]                        # callers pick one verbatim
+      states: [nginx.setup, app.deploy]
+    ssh:
+      allowed_hosts: ["10.0.1.*"]
+      queries:                                 # name -> remote argv; callers only pick the name
+        check_disk: [df, -h]
+        check_service: [systemctl, status, nginx, --no-pager]
+  production:
+    risk_profile: high   # Phase 3 ties this to approval policy
+    ansible:
+      playbook_dir: /etc/openexec/playbooks
+      inventory: /etc/openexec/inventory/prod.ini
+      playbooks: [rolling_restart.yml]
 ```
 
-#### 2. The Go Command Executor (`internal/toolset/sre_executor.go`)
-Implement a strict command builder that constructs slice-based argument arrays for `exec.CommandContext`. **Never use shell expansion (`sh -c`).**
+#### 2. The Go Command Executor (`internal/infra/registry.go` + `executor.go`)
+A strict command builder constructs slice-based argument arrays for `exec.CommandContext`. **Never use shell expansion (`sh -c`).** The shipped code follows the shape below (see `Registry.ResolveAnsiblePlaybook` for the real version):
 
 ```go
 package toolset
@@ -85,9 +90,10 @@ func ExecuteAnsible(ctx context.Context, playbook string, inventory string, limi
 }
 ```
 
-#### 3. Dynamic MCP Tool Compiler (`internal/mcp/sre_tools.go`)
-Read the allowlist config at server boot time and dynamically compile allowed commands into specific, parameter-bounded MCP tool schemas.
-*   Instead of `run_shell_command`, the model sees `terraform_plan`, `ansible_run_playbook`, and `ssh_query_status` with strict parameter drop-downs (JSON Enums) mapped directly to your config.
+#### 3. Dynamic MCP Tool Compiler (`internal/mcp/infra.go`)
+`openexec mcp-serve` loads the allowlist at boot (a malformed file fails the server loudly) and compiles allowed commands into specific, parameter-bounded MCP tool schemas.
+*   Instead of `run_shell_command`, the model sees `terraform_plan`, `ansible_run_playbook`, `salt_apply_state`, and `ssh_run_query` with strict parameter drop-downs (JSON Enums) mapped directly to your config. Engines no environment configures are not advertised at all.
+*   Schema↔struct consistency is enforced by `internal/mcp/schema_audit_test.go` like every other tool.
 
 ---
 

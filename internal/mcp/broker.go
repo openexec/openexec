@@ -80,8 +80,12 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 	if b.toolsetRegistry != nil && b.activeToolset != "" {
 		ts, ok := b.toolsetRegistry.Get(b.activeToolset)
 		if ok && b.toolsetRegistry.IsEnabled(b.activeToolset) {
-			// Control plane tools are always allowed
-			if !isControlPlaneTool(toolName) && !ts.HasTool(toolName) {
+			// Control plane tools are always allowed. Infra tools are a
+			// separate capability plane outside the coding-toolset taxonomy:
+			// the toolset filter does not apply to them because their own
+			// registry (.openexec/infra.yaml, deny-by-default) is a stricter
+			// boundary — but they remain mode-gated below.
+			if !isControlPlaneTool(toolName) && !isInfraTool(toolName) && !ts.HasTool(toolName) {
 				return false, fmt.Sprintf("[Toolset %s] tool '%s' is not available in the current toolset", b.activeToolset, toolName)
 			}
 		}
@@ -133,6 +137,19 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 			return false, fmt.Sprintf("[%s Mode] run_shell_command is disabled; switch to Full Auto (danger) mode to enable shell access", b.mode)
 		}
 		return b.validateShellCommand(arguments)
+
+	case "ansible_run_playbook", "salt_apply_state", "ssh_run_query", "terraform_plan":
+		// Infra tools execute processes against real infrastructure, so —
+		// like run_shell_command — all of them require danger-full-access
+		// mode, uniformly (read-class included; relax later only if real use
+		// demands it). Inside that mode the real shields take over: the
+		// deny-by-default infra registry validates every parameter, and
+		// apply-class invocations additionally require the approval gate
+		// (fail-closed when none is wired). See infra.go.
+		if b.mode != ModeFullAuto {
+			return false, fmt.Sprintf("[%s Mode] infra tool '%s' requires danger-full-access mode", b.mode, toolName)
+		}
+		return true, ""
 
 	default:
 		// For safety, restrict unknown tools in all but Full Auto

@@ -18,6 +18,7 @@ import (
     "crypto/sha256"
     "encoding/hex"
 
+    "github.com/openexec/openexec/internal/infra"
     "github.com/openexec/openexec/internal/mode"
     "github.com/openexec/openexec/internal/release"
     "github.com/openexec/openexec/internal/toolset"
@@ -77,6 +78,10 @@ type Server struct {
 	// Backlog tools state (see backlog.go). Lazily opened; guarded by backlogMu.
 	backlogMu  sync.Mutex
 	backlogMgr *release.Manager
+
+	// Infra tools state (see infra.go). Nil registry = no infra tools.
+	infraRegistry *infra.Registry
+	infraRunner   infra.Runner
 }
 
 // SetContext sets the tracing context and run ID for the server.
@@ -279,6 +284,11 @@ func (s *Server) handleToolsList(req Request) {
             WriteFileToolDef(),
             RunShellCommandToolDef(),
         )
+        // Infra tools (see infra.go) exist only when the operator wrote an
+        // allowlist, and are full-auto-only like the other exec tools.
+        if s.infraRegistry != nil {
+            tools = append(tools, InfraToolDefs(s.infraRegistry)...)
+        }
     }
 
     // Add fork tools if fork manager is configured
@@ -493,6 +503,21 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "skill_propose":
 		s.handleSkillPropose(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	// Infra tools (infra.go): like run_shell_command, deliberately NOT
+	// marked applied — infrastructure commands are non-idempotent and must
+	// re-run on resume rather than be skipped over partial side effects.
+	case "ansible_run_playbook":
+		s.handleAnsibleRunPlaybook(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "salt_apply_state":
+		s.handleSaltApplyState(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "ssh_run_query":
+		s.handleSSHRunQuery(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "terraform_plan":
+		s.handleTerraformPlan(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	default:
 		s.writeError(req.ID, -32602, fmt.Sprintf("unknown tool: %s", params.Name))

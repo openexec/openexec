@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/mcp"
 	"github.com/spf13/cobra"
 )
@@ -35,6 +36,18 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 			fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
 			fmt.Fprintf(os.Stderr, "Hint: Set WORKSPACE_ROOT env var or run from a valid project directory\n")
 			return err
+		}
+
+		// Infra tools (SRE command registry): enabled only when the operator
+		// wrote .openexec/infra.yaml. A malformed allowlist fails the server
+		// loudly — a security config must never half-load.
+		infraReg, err := infra.LoadRegistry(workDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "infra allowlist error: %v\n", err)
+			return err
+		}
+		if infraReg != nil {
+			srv.SetInfraRegistry(infraReg)
 		}
 
 		return srv.Serve()

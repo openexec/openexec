@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/openexec/openexec/internal/infra"
 )
 
 // These tests are the durable form of the tool-schema audit: every tool
@@ -33,7 +35,47 @@ func allToolDefs() []map[string]interface{} {
 		BacklogAddTaskToolDef(),
 		MemoryReadToolDef(),
 		SkillProposeToolDef(),
+		// Infra tool schemas are compiled from the operator allowlist;
+		// audit them against a representative config.
+		AnsibleRunPlaybookToolDef(auditInfraRegistry()),
+		SaltApplyStateToolDef(auditInfraRegistry()),
+		SSHRunQueryToolDef(auditInfraRegistry()),
+		TerraformPlanToolDef(auditInfraRegistry()),
 	}
+}
+
+// auditInfraRegistry builds a minimal valid infra registry so the
+// config-compiled tool schemas can be audited like static ones.
+func auditInfraRegistry() *infra.Registry {
+	reg, err := infra.NewRegistry(&infra.Config{
+		Enabled: true,
+		Environments: map[string]*infra.EnvConfig{
+			"staging": {
+				RiskProfile: "low",
+				Ansible: &infra.AnsibleConfig{
+					PlaybookDir: "/etc/openexec/playbooks",
+					Inventory:   "/etc/openexec/inventory.ini",
+					Playbooks:   []string{"deploy.yml"},
+				},
+				Salt: &infra.SaltConfig{
+					Targets: []string{"web*"},
+					States:  []string{"app.deploy"},
+				},
+				SSH: &infra.SSHConfig{
+					AllowedHosts: []string{"10.0.1.*"},
+					Queries:      map[string][]string{"check_disk": {"df", "-h"}},
+				},
+				Terraform: &infra.TerraformConfig{
+					WorkingDir:       "./infra",
+					AllowedVariables: []string{"instance_count"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return reg
 }
 
 func schemaProperties(t *testing.T, def map[string]interface{}) map[string]interface{} {
@@ -118,6 +160,10 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{OpenExecResultToolDef(), OpenExecResultRequest{}},
 		{SkillProposeToolDef(), skillProposeArgs{}},
 		{BacklogAddTaskToolDef(), backlogAddTaskArgs{}},
+		{AnsibleRunPlaybookToolDef(auditInfraRegistry()), AnsibleRunPlaybookRequest{}},
+		{SaltApplyStateToolDef(auditInfraRegistry()), SaltApplyStateRequest{}},
+		{SSHRunQueryToolDef(auditInfraRegistry()), SSHRunQueryRequest{}},
+		{TerraformPlanToolDef(auditInfraRegistry()), TerraformPlanRequest{}},
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}
