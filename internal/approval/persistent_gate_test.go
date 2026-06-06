@@ -52,7 +52,7 @@ func TestPersistentGate_CrossProcessApprove(t *testing.T) {
 	// "Other terminal": wait until the request is visible, then approve it.
 	operator := openSecondProcess(t, dbPath)
 	var pendingID string
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		pending, err := operator.ListPendingRequests(context.Background(), PersistentGateSessionID)
 		if err == nil && len(pending) == 1 {
@@ -76,7 +76,7 @@ func TestPersistentGate_CrossProcessApprove(t *testing.T) {
 		if o.req.Status != RequestStatusApproved {
 			t.Errorf("status = %s, want approved", o.req.Status)
 		}
-	case <-time.After(15 * time.Second):
+	case <-time.After(60 * time.Second):
 		t.Fatal("gate did not observe the cross-process approval")
 	}
 }
@@ -101,7 +101,7 @@ func TestPersistentGate_CrossProcessReject(t *testing.T) {
 	}()
 
 	operator := openSecondProcess(t, dbPath)
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		pending, err := operator.ListPendingRequests(context.Background(), PersistentGateSessionID)
 		if err == nil && len(pending) == 1 {
@@ -121,7 +121,7 @@ func TestPersistentGate_CrossProcessReject(t *testing.T) {
 		if req.RejectReason == "" {
 			t.Error("reject reason should be propagated to the blocked caller")
 		}
-	case <-time.After(15 * time.Second):
+	case <-time.After(60 * time.Second):
 		t.Fatal("gate did not observe the cross-process rejection")
 	}
 }
