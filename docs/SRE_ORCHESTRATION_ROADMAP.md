@@ -58,17 +58,25 @@ import (
 	"os/exec"
 )
 
-// ExecuteAnsible runs a pre-approved playbook with strict argument boundaries
-func ExecuteAnsible(ctx context.Context, playbookPath string, inventory string, limit string) (string, error) {
-	// 1. Validate against allowlist
-	if !isPlaybookAllowed(playbookPath) {
-		return "", fmt.Errorf("playbook %s is not in the active allowlist", playbookPath)
+// ExecuteAnsible runs a pre-approved playbook with strict argument boundaries.
+// The playbook parameter is a BASENAME from the config enum (never a caller-supplied
+// path — that would invite ../ traversal); it is joined against the configured
+// working dir only after the enum check passes.
+func ExecuteAnsible(ctx context.Context, playbook string, inventory string, limit string) (string, error) {
+	// 1. Validate against allowlist (exact enum match on basename)
+	if !isPlaybookAllowed(playbook) {
+		return "", fmt.Errorf("playbook %s is not in the active allowlist", playbook)
 	}
+	playbookPath := filepath.Join(cfg.WorkingDir, playbook)
 
-	// 2. Build argument array strictly — NO string interpolation/shell evaluation
+	// 2. Build argument array strictly — NO string interpolation/shell evaluation.
+	//    Validate-and-REJECT, never sanitize: hostile input is refused, not transformed.
 	args := []string{"-i", inventory, playbookPath}
 	if limit != "" {
-		args = append(args, "--limit", sanitizeInput(limit))
+		if !limitPatternRe.MatchString(limit) { // e.g. ^[a-zA-Z0-9_.:*-]+$
+			return "", fmt.Errorf("limit %q does not match the allowed pattern", limit)
+		}
+		args = append(args, "--limit", limit)
 	}
 
 	cmd := exec.CommandContext(ctx, "/usr/bin/ansible-playbook", args...)
@@ -122,11 +130,19 @@ func VerifyTFPlan(planJSON []byte) (bool, []string) {
 		return false, []string{"malformed plan json"}
 	}
 
+	// NOTE: Terraform's JSON plan never emits a literal "replace" action.
+	// Replacement is encoded as the action PAIR ["delete","create"] (or
+	// ["create","delete"] with create_before_destroy). Checking for "delete"
+	// therefore catches both pure deletions and all replacements.
 	var destructiveChanges []string
 	for _, change := range plan.ResourceChanges {
 		for _, action := range change.Change.Actions {
-			if action == "delete" || action == "replace" {
-				destructiveChanges = append(destructiveChanges, fmt.Sprintf("Destructive action [%s] detected on resource: %s", action, change.Address))
+			if action == "delete" {
+				kind := "delete"
+				if len(change.Change.Actions) > 1 { // delete paired with create = replace
+					kind = "replace"
+				}
+				destructiveChanges = append(destructiveChanges, fmt.Sprintf("Destructive action [%s] detected on resource: %s", kind, change.Address))
 			}
 		}
 	}
@@ -162,8 +178,19 @@ When an apply action is blocked on a production environment:
 2.  The task surfaces as a pending story on the backlog.
 3.  The SRE operator launches Claude Code (light mode) via the stdio `mcp-serve` connection:
     *   Runs `backlog_get_story` to inspect the plan diff and the block reason.
-    *   Signs off on the execution by invoking `backlog_complete_task` (or a dedicated `approve_action` tool).
+    *   Signs off via a **dedicated `approve_action` tool** wired to `internal/approval`.
+        **Never reuse `backlog_complete_task` as the approval signal**: backlog tools are
+        deliberately allowed in *all* permission modes including read-only chat (documented
+        exception — they mutate orchestrator bookkeeping, not the workspace). If completing
+        a task could trigger a production apply, that exception becomes an authorization
+        bypass. `approve_action` must be gated by the permission broker like any
+        high-risk tool.
 4.  The background runner receives the database update, unlocks the state, and applies the saved plan.
+
+> **Prerequisite work item:** `internal/approval` today holds pending requests in memory
+> with a 5-minute `DefaultTimeout` (`gate.go`). Hours-async sign-off requires persisting
+> pending approvals to SQLite (open via `pkg/db/sqlitecfg.DSN`) so a blocked apply
+> survives daemon restarts and waits indefinitely (or until an explicit expiry).
 
 #### 3. Immutable SRE Audit Logging (`pkg/audit/`)
 Every compiled command execution, variable parameter, run stdout/stderr, and human approval signature is written async to the SQLite-backed `audit_entries` table with SHA256 integrity hashes. This ensures full traceability for public-sector and enterprise compliance audits.
@@ -180,7 +207,7 @@ To add a natural-language routing layer that translates developer prompts (e.g.,
 #### 1. The Heuristic Router (DCP Selector)
 Before deploying any complex LLM at the security boundary, utilize OpenExec's deterministic keyword/synonym selector (`internal/dcp/selector.go`):
 *   Map SRE verbs (e.g., "deploy", "restart", "upgrade") and environments to specific tool IDs.
-*   **Safety Guarantee:** If the heuristic classifier falls below a high confidence threshold (0.95), route the task immediately to `general_chat` or raise a `scope-discovery` signal to the user for clarification.
+*   **Safety Guarantee:** If the heuristic classifier falls below the router's `LowConfidenceThreshold` (`internal/dcp/coordinator.go` — configurable; set it high for the SRE lane), route the task immediately to `general_chat` or raise a `scope-discovery` signal to the user for clarification.
 
 #### 2. Local BitNet LLM Integration
 As an optional optimization pass:
