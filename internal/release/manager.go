@@ -15,6 +15,8 @@ import (
 	"github.com/openexec/openexec/internal/git"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // Manager handles release, story, and task management with git integration.
@@ -85,7 +87,7 @@ func NewManager(baseDir string, cfg *Config) (*Manager, error) {
 	}
 
 	dbPath := filepath.Join(baseDir, ".openexec", "openexec.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open state database: %w", err)
 	}

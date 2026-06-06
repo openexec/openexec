@@ -12,35 +12,37 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/openexec/openexec/internal/blueprint"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/openexec/openexec/internal/blueprint"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // Manager handles checkpoint creation and restoration.
 type Manager struct {
-	db        *sql.DB
+	db         *sql.DB
 	projectDir string
 }
 
 // Checkpoint represents a saved execution state.
 type Checkpoint struct {
-	ID            string                 `json:"id"`
-	RunID         string                 `json:"run_id"`
-	BlueprintID   string                 `json:"blueprint_id"`
-	StageName     string                 `json:"stage_name"`
-	StageResults  []blueprint.StageResult `json:"stage_results"`
-	WorkingState  map[string]FileState   `json:"working_state"`
-	Variables     map[string]string      `json:"variables"`
-	CreatedAt     time.Time              `json:"created_at"`
-	Checksum      string                 `json:"checksum"`
-	Status        CheckpointStatus       `json:"status"`
+	ID           string                  `json:"id"`
+	RunID        string                  `json:"run_id"`
+	BlueprintID  string                  `json:"blueprint_id"`
+	StageName    string                  `json:"stage_name"`
+	StageResults []blueprint.StageResult `json:"stage_results"`
+	WorkingState map[string]FileState    `json:"working_state"`
+	Variables    map[string]string       `json:"variables"`
+	CreatedAt    time.Time               `json:"created_at"`
+	Checksum     string                  `json:"checksum"`
+	Status       CheckpointStatus        `json:"status"`
 }
 
 // FileState tracks the state of a file at checkpoint time.
 type FileState struct {
-	Path       string `json:"path"`
-	Hash       string `json:"hash"`
-	Size       int64  `json:"size"`
+	Path       string    `json:"path"`
+	Hash       string    `json:"hash"`
+	Size       int64     `json:"size"`
 	ModifiedAt time.Time `json:"modified_at"`
 }
 
@@ -59,7 +61,7 @@ const (
 // NewManager creates a new checkpoint manager.
 func NewManager(projectDir string) (*Manager, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "checkpoints.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open checkpoint db: %w", err)
 	}

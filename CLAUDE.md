@@ -157,6 +157,7 @@ To prevent thrashing during task execution:
 Follow Conventional Commit prefixes: `fix:`, `feat:`, `docs:`, `release:`, etc. Keep subjects imperative and under one line.
 
 ### Known Quirks
+- **SQLite: always open via `sqlitecfg.DSN(path)`** (`pkg/db/sqlitecfg`). The driver registered as `"sqlite"` is modernc.org/sqlite, which **silently ignores** mattn-style DSN params (`?_journal_mode=WAL`) — connections opened that way ran with journal_mode=delete, foreign_keys=0, busy_timeout=0 (verified empirically; fixed across all open sites). modernc needs `_pragma=journal_mode(WAL)` syntax, which it applies per pooled connection. `TestDSNAppliesPragmas` guards the runtime state.
 - **JSDOM limitations**: Doesn't fully simulate layout events (onMouseEnter). Check if failing tests depend on layout properties
 - **Audit DB**: Source of truth for task progress is `.openexec/data/audit.db`
 - **Go version**: Requires Go 1.25+

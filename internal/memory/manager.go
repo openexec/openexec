@@ -9,6 +9,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // MemoryManager provides high-level memory management with persistence.
@@ -23,7 +25,7 @@ func NewMemoryManager(projectDir string) (*MemoryManager, error) {
 	system := NewMemorySystem(projectDir)
 
 	dbPath := filepath.Join(projectDir, ".openexec", "memory.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open memory db: %w", err)
 	}
@@ -116,7 +118,7 @@ func (m *MemoryManager) GetEntry(category, key string) (*MemoryEntry, error) {
 
 	query := `SELECT category, key, value, source, layer, extracted_at 
 	          FROM memory_entries WHERE category = ? AND key = ?`
-	
+
 	err := m.db.QueryRow(query, category, key).Scan(
 		&entry.Category,
 		&entry.Key,
@@ -157,7 +159,7 @@ func (m *MemoryManager) StoreEntry(entry *MemoryEntry) error {
 	query := `INSERT OR REPLACE INTO memory_entries 
 	          (category, key, value, source, layer, extracted_at)
 	          VALUES (?, ?, ?, ?, ?, ?)`
-	
+
 	_, err := m.db.Exec(query,
 		entry.Category,
 		entry.Key,
@@ -215,14 +217,14 @@ func (m *MemoryManager) Search(query string) ([]*MemoryEntry, error) {
 	defer m.mu.RUnlock()
 
 	searchPattern := "%" + query + "%"
-	
+
 	sqlQuery := `SELECT category, key, value, source, layer, extracted_at 
 	             FROM memory_entries 
 	             WHERE key LIKE ? OR value LIKE ? OR category LIKE ?
 	             ORDER BY 
 	               CASE WHEN key LIKE ? THEN 1 ELSE 2 END,
 	               access_count DESC`
-	
+
 	rows, err := m.db.Query(sqlQuery, searchPattern, searchPattern, searchPattern, searchPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search entries: %w", err)
@@ -265,7 +267,7 @@ func (m *MemoryManager) RecordSession(session *Session) error {
 	query := `INSERT OR REPLACE INTO memory_sessions 
 	          (id, start_time, end_time, summary, decisions, patterns, preferences)
 	          VALUES (?, ?, ?, ?, ?, ?, ?)`
-	
+
 	_, err := m.db.Exec(query,
 		session.ID,
 		session.StartTime,
@@ -288,7 +290,7 @@ func (m *MemoryManager) ExtractFromSession(sessionID string) ([]*MemoryEntry, er
 	defer m.mu.RUnlock()
 
 	var decisionsJSON, patternsJSON, preferencesJSON string
-	
+
 	query := `SELECT decisions, patterns, preferences FROM memory_sessions WHERE id = ?`
 	err := m.db.QueryRow(query, sessionID).Scan(&decisionsJSON, &patternsJSON, &preferencesJSON)
 	if err == sql.ErrNoRows {

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // KnowledgeCache provides persistent caching for knowledge index operations.
@@ -34,7 +36,7 @@ type KnowledgeCacheEntry struct {
 // The cache is stored in SQLite for persistence across sessions.
 func NewKnowledgeCache(projectDir string, ttl time.Duration) (*KnowledgeCache, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "cache.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open cache db: %w", err)
 	}
@@ -87,7 +89,7 @@ func (c *KnowledgeCache) Get(projectPath, filePath string, currentHash string) (
 	query := `SELECT project_path, file_path, file_hash, symbols, indexed_at 
 	          FROM knowledge_cache 
 	          WHERE project_path = ? AND file_path = ?`
-	
+
 	err := c.db.QueryRow(query, projectPath, filePath).Scan(
 		&entry.ProjectPath,
 		&entry.FilePath,
@@ -95,7 +97,7 @@ func (c *KnowledgeCache) Get(projectPath, filePath string, currentHash string) (
 		&symbols,
 		&entry.IndexedAt,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil // Cache miss
 	}
@@ -121,7 +123,7 @@ func (c *KnowledgeCache) Set(projectPath, filePath, fileHash string, symbols []b
 	query := `INSERT OR REPLACE INTO knowledge_cache 
 	          (project_path, file_path, file_hash, symbols, indexed_at) 
 	          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`
-	
+
 	_, err := c.db.Exec(query, projectPath, filePath, fileHash, symbols)
 	if err != nil {
 		return fmt.Errorf("cache set failed: %w", err)

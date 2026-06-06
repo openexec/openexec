@@ -11,6 +11,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // AgentType indicates the role of an agent in the swarm.
@@ -29,27 +31,27 @@ const (
 type AgentStatus string
 
 const (
-	AgentStatusIdle       AgentStatus = "idle"
-	AgentStatusRunning    AgentStatus = "running"
-	AgentStatusCompleted  AgentStatus = "completed"
-	AgentStatusFailed     AgentStatus = "failed"
-	AgentStatusCancelled  AgentStatus = "cancelled"
+	AgentStatusIdle      AgentStatus = "idle"
+	AgentStatusRunning   AgentStatus = "running"
+	AgentStatusCompleted AgentStatus = "completed"
+	AgentStatusFailed    AgentStatus = "failed"
+	AgentStatusCancelled AgentStatus = "cancelled"
 )
 
 // Agent represents a single agent in the swarm.
 type Agent struct {
-	ID          string      `json:"id"`
-	Type        AgentType   `json:"type"`
-	Status      AgentStatus `json:"status"`
-	BlueprintID string      `json:"blueprint_id"`
-	RunID       string      `json:"run_id"`
-	StageName   string      `json:"stage_name,omitempty"`
-	BatchIndex  int         `json:"batch_index,omitempty"`
-	BatchSize   int         `json:"batch_size,omitempty"`
-	StartedAt   time.Time   `json:"started_at"`
-	CompletedAt *time.Time  `json:"completed_at,omitempty"`
+	ID          string       `json:"id"`
+	Type        AgentType    `json:"type"`
+	Status      AgentStatus  `json:"status"`
+	BlueprintID string       `json:"blueprint_id"`
+	RunID       string       `json:"run_id"`
+	StageName   string       `json:"stage_name,omitempty"`
+	BatchIndex  int          `json:"batch_index,omitempty"`
+	BatchSize   int          `json:"batch_size,omitempty"`
+	StartedAt   time.Time    `json:"started_at"`
+	CompletedAt *time.Time   `json:"completed_at,omitempty"`
 	Result      *AgentResult `json:"result,omitempty"`
-	Error       string      `json:"error,omitempty"`
+	Error       string       `json:"error,omitempty"`
 }
 
 // AgentResult contains the output from an agent execution.
@@ -76,7 +78,7 @@ type AgentRegistry struct {
 // NewAgentRegistry creates a new agent registry.
 func NewAgentRegistry(projectDir string) (*AgentRegistry, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "agents.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open agent registry db: %w", err)
 	}
@@ -138,7 +140,7 @@ func (r *AgentRegistry) Register(agent *Agent) error {
 	query := `INSERT INTO agents 
 		(id, type, status, blueprint_id, run_id, stage_name, batch_index, batch_size, started_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	
+
 	_, err := r.db.Exec(query,
 		agent.ID,
 		agent.Type,
@@ -183,7 +185,7 @@ func (r *AgentRegistry) Complete(agentID string, result *AgentResult) error {
 	query := `UPDATE agents 
 		SET status = ?, result = ?, completed_at = ?
 		WHERE id = ?`
-	
+
 	_, err = r.db.Exec(query, AgentStatusCompleted, string(resultJSON), completedAt, agentID)
 	if err != nil {
 		return fmt.Errorf("failed to complete agent: %w", err)
@@ -200,7 +202,7 @@ func (r *AgentRegistry) Fail(agentID string, errMsg string) error {
 	query := `UPDATE agents 
 		SET status = ?, error = ?, completed_at = ?
 		WHERE id = ?`
-	
+
 	_, err := r.db.Exec(query, AgentStatusFailed, errMsg, completedAt, agentID)
 	if err != nil {
 		return fmt.Errorf("failed to mark agent as failed: %w", err)
@@ -220,7 +222,7 @@ func (r *AgentRegistry) Get(agentID string) (*Agent, error) {
 	query := `SELECT id, type, status, blueprint_id, run_id, stage_name, 
 		batch_index, batch_size, started_at, completed_at, result, error
 		FROM agents WHERE id = ?`
-	
+
 	err := r.db.QueryRow(query, agentID).Scan(
 		&agent.ID,
 		&agent.Type,
@@ -267,7 +269,7 @@ func (r *AgentRegistry) ListByRun(blueprintID, runID string) ([]*Agent, error) {
 		batch_index, batch_size, started_at, completed_at, result, error
 		FROM agents WHERE blueprint_id = ? AND run_id = ?
 		ORDER BY started_at`
-	
+
 	rows, err := r.db.Query(query, blueprintID, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list agents: %w", err)
@@ -286,7 +288,7 @@ func (r *AgentRegistry) ListByStatus(status AgentStatus) ([]*Agent, error) {
 		batch_index, batch_size, started_at, completed_at, result, error
 		FROM agents WHERE status = ?
 		ORDER BY started_at`
-	
+
 	rows, err := r.db.Query(query, status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list agents by status: %w", err)
@@ -305,7 +307,7 @@ func (r *AgentRegistry) ListActive() ([]*Agent, error) {
 		batch_index, batch_size, started_at, completed_at, result, error
 		FROM agents WHERE status IN (?, ?)
 		ORDER BY started_at`
-	
+
 	rows, err := r.db.Query(query, AgentStatusRunning, AgentStatusIdle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list active agents: %w", err)
@@ -323,7 +325,7 @@ func (r *AgentRegistry) CountByStatus(blueprintID, runID string) (map[AgentStatu
 	query := `SELECT status, COUNT(*) FROM agents 
 		WHERE blueprint_id = ? AND run_id = ?
 		GROUP BY status`
-	
+
 	rows, err := r.db.Query(query, blueprintID, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count agents: %w", err)
@@ -405,5 +407,3 @@ func (r *AgentRegistry) scanAgents(rows *sql.Rows) ([]*Agent, error) {
 
 	return agents, rows.Err()
 }
-
-

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // ToolResultCache provides caching for tool execution results.
@@ -31,7 +33,7 @@ type ToolResultCacheEntry struct {
 // NewToolResultCache creates a new tool result cache with the specified TTL.
 func NewToolResultCache(projectDir string, ttl time.Duration) (*ToolResultCache, error) {
 	dbPath := filepath.Join(projectDir, ".openexec", "cache.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open tool cache db: %w", err)
 	}
@@ -81,14 +83,14 @@ func (c *ToolResultCache) migrate() error {
 // Returns nil if no valid cache entry exists.
 func (c *ToolResultCache) Get(toolName string, input map[string]interface{}) ([]byte, error) {
 	inputHash := computeInputHash(input)
-	
+
 	var entry ToolResultCacheEntry
 	var result []byte
 
 	query := `SELECT tool_name, input_hash, result, executed_at, execution_ms 
 	          FROM tool_result_cache 
 	          WHERE tool_name = ? AND input_hash = ?`
-	
+
 	err := c.db.QueryRow(query, toolName, inputHash).Scan(
 		&entry.ToolName,
 		&entry.InputHash,
@@ -96,7 +98,7 @@ func (c *ToolResultCache) Get(toolName string, input map[string]interface{}) ([]
 		&entry.ExecutedAt,
 		&entry.ExecutionMs,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil // Cache miss
 	}
@@ -115,14 +117,14 @@ func (c *ToolResultCache) Get(toolName string, input map[string]interface{}) ([]
 // GetWithMetadata retrieves a cached result with execution metadata.
 func (c *ToolResultCache) GetWithMetadata(toolName string, input map[string]interface{}) (*ToolResultCacheEntry, error) {
 	inputHash := computeInputHash(input)
-	
+
 	var entry ToolResultCacheEntry
 	var result []byte
 
 	query := `SELECT tool_name, input_hash, result, executed_at, execution_ms 
 	          FROM tool_result_cache 
 	          WHERE tool_name = ? AND input_hash = ?`
-	
+
 	err := c.db.QueryRow(query, toolName, inputHash).Scan(
 		&entry.ToolName,
 		&entry.InputHash,
@@ -130,7 +132,7 @@ func (c *ToolResultCache) GetWithMetadata(toolName string, input map[string]inte
 		&entry.ExecutedAt,
 		&entry.ExecutionMs,
 	)
-	
+
 	if err == sql.ErrNoRows {
 		return nil, nil // Cache miss
 	}
@@ -150,11 +152,11 @@ func (c *ToolResultCache) GetWithMetadata(toolName string, input map[string]inte
 // Set stores a tool result in the cache.
 func (c *ToolResultCache) Set(toolName string, input map[string]interface{}, result []byte, executionMs int64) error {
 	inputHash := computeInputHash(input)
-	
+
 	query := `INSERT OR REPLACE INTO tool_result_cache 
 	          (tool_name, input_hash, result, executed_at, execution_ms) 
 	          VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)`
-	
+
 	_, err := c.db.Exec(query, toolName, inputHash, result, executionMs)
 	if err != nil {
 		return fmt.Errorf("tool cache set failed: %w", err)
@@ -221,7 +223,7 @@ func (c *ToolResultCache) Close() error {
 func computeInputHash(input map[string]interface{}) string {
 	// Sort keys for consistent hashing
 	h := sha256.New()
-	
+
 	// Marshal to JSON for consistent serialization
 	data, err := json.Marshal(input)
 	if err != nil {
@@ -229,7 +231,7 @@ func computeInputHash(input map[string]interface{}) string {
 		h.Write([]byte(err.Error()))
 		return hex.EncodeToString(h.Sum(nil))
 	}
-	
+
 	h.Write(data)
 	return hex.EncodeToString(h.Sum(nil))
 }
@@ -245,7 +247,7 @@ func ShouldCache(toolName string) bool {
 		"random":        true, // Non-deterministic
 		"network_fetch": true, // External state
 	}
-	
+
 	return !nonCacheable[toolName]
 }
 

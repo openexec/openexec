@@ -11,6 +11,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // Logger defines the interface for audit logging operations.
@@ -54,7 +56,7 @@ func NewLogger(dbPath string) (*AuditLogger, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open audit database: %w", err)
 	}
@@ -443,22 +445,22 @@ func (l *AuditLogger) GetUsageStats(ctx context.Context, filter *QueryFilter) (*
 	for rows.Next() {
 		ps := &ProviderStats{}
 		if err := rows.Scan(
-			&ps.Provider, 
-			&ps.TotalTokensInput, 
-			&ps.TotalTokensOutput, 
+			&ps.Provider,
+			&ps.TotalTokensInput,
+			&ps.TotalTokensOutput,
 			&ps.CachedTokensInput,
-			&ps.TotalCostUSD, 
+			&ps.TotalCostUSD,
 			&ps.TotalRequests,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan provider stats: %w", err)
 		}
-		
+
 		// Calculate savings per provider
 		if ps.TotalTokensInput > 0 && ps.TotalCostUSD > 0 && (ps.TotalTokensInput-ps.CachedTokensInput) > 0 {
 			avgInputPrice := ps.TotalCostUSD / float64(ps.TotalTokensInput-ps.CachedTokensInput)
 			ps.CostSavingsUSD = float64(ps.CachedTokensInput) * avgInputPrice
 		}
-		
+
 		stats.ByProvider[ps.Provider] = ps
 	}
 

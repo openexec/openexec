@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // SymbolRecord represents detailed function/struct metadata (OpenCode)
@@ -69,7 +71,7 @@ type Store struct {
 func NewStore(projectDir string) (*Store, error) {
 	// For standalone usage, default to the unified db path
 	dbPath := filepath.Join(projectDir, ".openexec", "openexec.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open knowledge db: %w", err)
 	}

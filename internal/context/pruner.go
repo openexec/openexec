@@ -17,6 +17,8 @@ import (
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/memory"
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // Pruner intelligently selects relevant files to minimize token usage.
@@ -83,10 +85,10 @@ type FileScore struct {
 
 // ScoreBreakdown shows how the score was calculated.
 type ScoreBreakdown struct {
-	SymbolScore   float64
-	ContentScore  float64
-	PathScore     float64
-	RecencyScore  float64
+	SymbolScore  float64
+	ContentScore float64
+	PathScore    float64
+	RecencyScore float64
 }
 
 // PruneResult contains the result of a pruning operation.
@@ -107,7 +109,7 @@ func NewPruner(projectDir string, knowledgeStore *knowledge.Store, memoryManager
 	}
 
 	dbPath := filepath.Join(projectDir, ".openexec", "pruner.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open pruner db: %w", err)
 	}

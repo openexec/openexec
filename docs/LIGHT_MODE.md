@@ -52,9 +52,16 @@ database is opened lazily on first tool use.
   not workspace files. This is a deliberate, documented exception to "chat
   has no side effects" — managing the backlog is the light client's job.
 - **Claiming is advisory coordination, not a lock.** The backlog database is
-  shared (WAL mode); if the daemon is also executing work, coordinate through
-  story status. The one-story rule is enforced at claim time against current
-  database state.
+  shared (WAL mode with a 5s busy timeout — enforced by a regression test);
+  if the daemon is also executing work, coordinate through story status. The
+  one-story rule is enforced at claim time against current database state.
+- **Do not run heavy and light edits simultaneously on the same working
+  tree.** Backlog state is safe to share (WAL serializes the bookkeeping),
+  but both lanes edit the same source files: concurrent file edits from the
+  daemon and a light client can conflict. The intended lifecycle is
+  sequential — heavy run finishes, then light mode works; heavy parallel
+  runs isolate themselves in git worktrees, interactive light sessions do
+  not.
 - **State is never cached stale.** Every backlog tool call reloads from the
   database, so changes made by the daemon, `openexec run`, or another client
   are visible immediately.

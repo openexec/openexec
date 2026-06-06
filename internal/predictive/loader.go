@@ -14,6 +14,8 @@ import (
 
 	"github.com/openexec/openexec/internal/knowledge"
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 // Loader predicts and pre-loads files based on task analysis.
@@ -89,7 +91,7 @@ func NewLoader(projectDir string, knowledgeStore *knowledge.Store, config *Loade
 	}
 
 	dbPath := filepath.Join(projectDir, ".openexec", "predictive.db")
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open predictive db: %w", err)
 	}
@@ -362,11 +364,11 @@ func (l *Loader) extractSymbols(task string) []string {
 
 	// Common patterns for symbol names
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`\b([A-Z][a-zA-Z0-9]+)\b`),                         // CamelCase
-		regexp.MustCompile(`\b([a-z]+(?:_[a-z]+)+)\b`),                        // snake_case
+		regexp.MustCompile(`\b([A-Z][a-zA-Z0-9]+)\b`),                           // CamelCase
+		regexp.MustCompile(`\b([a-z]+(?:_[a-z]+)+)\b`),                          // snake_case
 		regexp.MustCompile(`(?i)(?:function|method|class|struct|type)\s+(\w+)`), // Definitions
-		regexp.MustCompile(`(?i)(?:call|use|import)\s+(\w+)`),                  // Usage
-		regexp.MustCompile(`\b([a-z]{5,})\b`),                                  // Meaningful lowercase words
+		regexp.MustCompile(`(?i)(?:call|use|import)\s+(\w+)`),                   // Usage
+		regexp.MustCompile(`\b([a-z]{5,})\b`),                                   // Meaningful lowercase words
 	}
 
 	for _, pattern := range patterns {
@@ -558,5 +560,3 @@ func (l *Loader) Cleanup(olderThan time.Time) error {
 func (l *Loader) Close() error {
 	return l.db.Close()
 }
-
-

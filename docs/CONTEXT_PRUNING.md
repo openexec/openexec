@@ -185,6 +185,12 @@ func (h *Harness) LoadContext(task string, allFiles []File) ([]File, error) {
 
 ### Token Savings
 
+> **Note:** the figures below are design projections (full-codebase tokens vs.
+> a pruned context pack), not benchmark measurements. Pruning selects the
+> *initial* context pack — the agent can still read any file on demand via
+> its tools, so a pruned-out file costs a retrieval round-trip, not
+> permanent blindness.
+
 | Project Size | Without Pruning | With Pruning | Savings |
 |--------------|-----------------|--------------|---------|
 | Small (50 files) | 50,000 tokens | 15,000 tokens | 70% |

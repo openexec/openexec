@@ -11,6 +11,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+
+	"github.com/openexec/openexec/pkg/db/sqlitecfg"
 )
 
 const (
@@ -42,19 +44,9 @@ func (s *Store) Path() string {
 // NewStore creates a new state store using the provided SQLite database path.
 func NewStore(dbPath string) (*Store, error) {
 	// Standard OpenExec DB optimization: WAL mode + foreign keys
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open state database: %w", err)
-	}
-	// Apply a busy_timeout via PRAGMA so concurrent writers (e.g. the
-	// symbol indexer running against the same file from a separate
-	// connection) wait politely instead of failing immediately with
-	// SQLITE_BUSY. PRAGMA is more reliable than DSN params across drivers.
-	// Combined with SetMaxOpenConns(1) below, every write goes through a
-	// single connection that has the PRAGMA applied.
-	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("failed to set busy_timeout: %w", err)
 	}
 	db.SetMaxOpenConns(1)
 
@@ -79,109 +71,109 @@ func NewStore(dbPath string) (*Store, error) {
 
 // Init initializes the database schema.
 func (s *Store) Init() error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-    if _, err := s.db.Exec(UnifiedSchema); err != nil {
-        return fmt.Errorf("failed to initialize unified schema: %w", err)
-    }
-    // Apply forward-safe migrations for columns that may be missing on older DBs.
-    // These are idempotent: we check the table schema before attempting ALTERs.
-    // Covers drift between this unified schema and internal/release/schema.go.
-    migrations := [][3]string{
-        // stories columns
-        {"stories", "role", "TEXT DEFAULT ''"},
-        {"stories", "want", "TEXT DEFAULT ''"},
-        {"stories", "benefit", "TEXT DEFAULT ''"},
-        {"stories", "verification_script", "TEXT DEFAULT ''"},
-        {"stories", "contract", "TEXT DEFAULT ''"},
-        {"stories", "tasks", "TEXT DEFAULT '[]'"},
-        {"stories", "story_type", "TEXT DEFAULT 'feature'"},
-        {"stories", "priority", "INTEGER DEFAULT 0"},
-        {"stories", "git_branch", "TEXT DEFAULT ''"},
-        {"stories", "git_base_branch", "TEXT DEFAULT ''"},
-        {"stories", "git_merged_to", "TEXT DEFAULT ''"},
-        {"stories", "git_merge_commit", "TEXT DEFAULT ''"},
-        {"stories", "git_merged_at", "DATETIME DEFAULT NULL"},
-        {"stories", "git_commit_count", "INTEGER DEFAULT 0"},
-        {"stories", "approval_status", "TEXT DEFAULT ''"},
-        {"stories", "approval_approved_by", "TEXT DEFAULT ''"},
-        {"stories", "approval_approved_at", "DATETIME DEFAULT NULL"},
-        {"stories", "approval_comments", "TEXT DEFAULT ''"},
-        {"stories", "approval_rejection_reason", "TEXT DEFAULT ''"},
-        {"stories", "approval_review_cycle", "INTEGER DEFAULT 0"},
-        {"stories", "started_at", "DATETIME DEFAULT NULL"},
-        {"stories", "completed_at", "DATETIME DEFAULT NULL"},
-        // tasks columns
-        {"tasks", "task_type", "TEXT DEFAULT ''"},
-        {"tasks", "priority", "INTEGER DEFAULT 0"},
-        {"tasks", "assigned_agent", "TEXT DEFAULT ''"},
-        {"tasks", "attempt_count", "INTEGER DEFAULT 0"},
-        {"tasks", "max_attempts", "INTEGER DEFAULT 3"},
-        {"tasks", "git_commits", "TEXT DEFAULT '[]'"},
-        {"tasks", "git_branch", "TEXT DEFAULT ''"},
-        {"tasks", "git_pr_number", "INTEGER DEFAULT NULL"},
-        {"tasks", "git_pr_url", "TEXT DEFAULT ''"},
-        {"tasks", "approval_status", "TEXT DEFAULT ''"},
-        {"tasks", "approval_approved_by", "TEXT DEFAULT ''"},
-        {"tasks", "approval_approved_at", "DATETIME DEFAULT NULL"},
-        {"tasks", "approval_comments", "TEXT DEFAULT ''"},
-        {"tasks", "approval_rejection_reason", "TEXT DEFAULT ''"},
-        {"tasks", "approval_review_cycle", "INTEGER DEFAULT 0"},
-        {"tasks", "needs_review", "INTEGER DEFAULT 0"},
-        {"tasks", "review_notes", "TEXT DEFAULT ''"},
-        {"tasks", "started_at", "DATETIME DEFAULT NULL"},
-        {"tasks", "completed_at", "DATETIME DEFAULT NULL"},
-        {"tasks", "error_message", "TEXT DEFAULT ''"},
-        {"tasks", "metadata", "TEXT DEFAULT '{}'"},
-    }
-    for _, m := range migrations {
-        if err := s.ensureColumn(m[0], m[1], m[2]); err != nil {
-            return fmt.Errorf("failed to migrate %s.%s: %w", m[0], m[1], err)
-        }
-    }
-    return nil
+	if _, err := s.db.Exec(UnifiedSchema); err != nil {
+		return fmt.Errorf("failed to initialize unified schema: %w", err)
+	}
+	// Apply forward-safe migrations for columns that may be missing on older DBs.
+	// These are idempotent: we check the table schema before attempting ALTERs.
+	// Covers drift between this unified schema and internal/release/schema.go.
+	migrations := [][3]string{
+		// stories columns
+		{"stories", "role", "TEXT DEFAULT ''"},
+		{"stories", "want", "TEXT DEFAULT ''"},
+		{"stories", "benefit", "TEXT DEFAULT ''"},
+		{"stories", "verification_script", "TEXT DEFAULT ''"},
+		{"stories", "contract", "TEXT DEFAULT ''"},
+		{"stories", "tasks", "TEXT DEFAULT '[]'"},
+		{"stories", "story_type", "TEXT DEFAULT 'feature'"},
+		{"stories", "priority", "INTEGER DEFAULT 0"},
+		{"stories", "git_branch", "TEXT DEFAULT ''"},
+		{"stories", "git_base_branch", "TEXT DEFAULT ''"},
+		{"stories", "git_merged_to", "TEXT DEFAULT ''"},
+		{"stories", "git_merge_commit", "TEXT DEFAULT ''"},
+		{"stories", "git_merged_at", "DATETIME DEFAULT NULL"},
+		{"stories", "git_commit_count", "INTEGER DEFAULT 0"},
+		{"stories", "approval_status", "TEXT DEFAULT ''"},
+		{"stories", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"stories", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"stories", "approval_comments", "TEXT DEFAULT ''"},
+		{"stories", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"stories", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"stories", "started_at", "DATETIME DEFAULT NULL"},
+		{"stories", "completed_at", "DATETIME DEFAULT NULL"},
+		// tasks columns
+		{"tasks", "task_type", "TEXT DEFAULT ''"},
+		{"tasks", "priority", "INTEGER DEFAULT 0"},
+		{"tasks", "assigned_agent", "TEXT DEFAULT ''"},
+		{"tasks", "attempt_count", "INTEGER DEFAULT 0"},
+		{"tasks", "max_attempts", "INTEGER DEFAULT 3"},
+		{"tasks", "git_commits", "TEXT DEFAULT '[]'"},
+		{"tasks", "git_branch", "TEXT DEFAULT ''"},
+		{"tasks", "git_pr_number", "INTEGER DEFAULT NULL"},
+		{"tasks", "git_pr_url", "TEXT DEFAULT ''"},
+		{"tasks", "approval_status", "TEXT DEFAULT ''"},
+		{"tasks", "approval_approved_by", "TEXT DEFAULT ''"},
+		{"tasks", "approval_approved_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "approval_comments", "TEXT DEFAULT ''"},
+		{"tasks", "approval_rejection_reason", "TEXT DEFAULT ''"},
+		{"tasks", "approval_review_cycle", "INTEGER DEFAULT 0"},
+		{"tasks", "needs_review", "INTEGER DEFAULT 0"},
+		{"tasks", "review_notes", "TEXT DEFAULT ''"},
+		{"tasks", "started_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "completed_at", "DATETIME DEFAULT NULL"},
+		{"tasks", "error_message", "TEXT DEFAULT ''"},
+		{"tasks", "metadata", "TEXT DEFAULT '{}'"},
+	}
+	for _, m := range migrations {
+		if err := s.ensureColumn(m[0], m[1], m[2]); err != nil {
+			return fmt.Errorf("failed to migrate %s.%s: %w", m[0], m[1], err)
+		}
+	}
+	return nil
 }
 
 // ensureColumn checks for a column and adds it if missing.
 func (s *Store) ensureColumn(table, column, definition string) error {
-    // Probe table info for existing column
-    query := fmt.Sprintf("PRAGMA table_info(%s)", table)
-    rows, err := s.db.Query(query)
-    if err != nil {
-        return err
-    }
-    defer func() { _ = rows.Close() }()
+	// Probe table info for existing column
+	query := fmt.Sprintf("PRAGMA table_info(%s)", table)
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
 
-    type colInfo struct {
-        cid        int
-        name       string
-        colType    string
-        notnull    int
-        dflt_value any
-        pk         int
-    }
-    for rows.Next() {
-        var info colInfo
-        // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-        // Use Scan into placeholders matching types above
-        if scanErr := rows.Scan(&info.cid, &info.name, &info.colType, &info.notnull, &info.dflt_value, &info.pk); scanErr != nil {
-            return scanErr
-        }
-        if info.name == column {
-            return nil // already exists
-        }
-    }
-    if err := rows.Err(); err != nil {
-        return err
-    }
+	type colInfo struct {
+		cid        int
+		name       string
+		colType    string
+		notnull    int
+		dflt_value any
+		pk         int
+	}
+	for rows.Next() {
+		var info colInfo
+		// PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+		// Use Scan into placeholders matching types above
+		if scanErr := rows.Scan(&info.cid, &info.name, &info.colType, &info.notnull, &info.dflt_value, &info.pk); scanErr != nil {
+			return scanErr
+		}
+		if info.name == column {
+			return nil // already exists
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 
-    // Add the missing column
-    alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)
-    if _, err := s.db.Exec(alter); err != nil {
-        return err
-    }
-    return nil
+	// Add the missing column
+	alter := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)
+	if _, err := s.db.Exec(alter); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetDB returns the underlying database handle.
@@ -241,23 +233,23 @@ func (s *Store) asyncWorker() {
 // CreateRun persists a new execution run.
 // Empty sessionID or taskID are stored as NULL to satisfy foreign key constraints.
 func (s *Store) CreateRun(ctx context.Context, runID, sessionID, taskID, projectPath, mode string) error {
-    query := `INSERT OR IGNORE INTO runs (id, session_id, task_id, project_path, mode, status) VALUES (?, ?, ?, ?, ?, 'starting')`
-    var sessVal, taskVal interface{}
-    if sessionID != "" {
-        sessVal = sessionID
-    }
-    if taskID != "" {
-        taskVal = taskID
-    }
-    _, err := s.db.ExecContext(ctx, query, runID, sessVal, taskVal, projectPath, mode)
-    return err
+	query := `INSERT OR IGNORE INTO runs (id, session_id, task_id, project_path, mode, status) VALUES (?, ?, ?, ?, ?, 'starting')`
+	var sessVal, taskVal interface{}
+	if sessionID != "" {
+		sessVal = sessionID
+	}
+	if taskID != "" {
+		taskVal = taskID
+	}
+	_, err := s.db.ExecContext(ctx, query, runID, sessVal, taskVal, projectPath, mode)
+	return err
 }
 
 // UpdateRunStatus updates the status of an active run.
 func (s *Store) UpdateRunStatus(ctx context.Context, runID, status, errorMessage string) error {
-    query := `UPDATE runs SET status = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-    _, err := s.db.ExecContext(ctx, query, status, errorMessage, runID)
-    return err
+	query := `UPDATE runs SET status = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := s.db.ExecContext(ctx, query, status, errorMessage, runID)
+	return err
 }
 
 // ListResumableRunIDs returns the set of run ids (which, for scheduler-driven
@@ -266,21 +258,21 @@ func (s *Store) UpdateRunStatus(ctx context.Context, runID, status, errorMessage
 // this to prioritise resuming previously-interrupted work over starting fresh
 // tasks when both are ready to dispatch.
 func (s *Store) ListResumableRunIDs(ctx context.Context, projectPath string) (map[string]bool, error) {
-    query := `SELECT id FROM runs WHERE project_path = ? AND status IN ('stopped', 'error')`
-    rows, err := s.db.QueryContext(ctx, query, projectPath)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
-    out := make(map[string]bool)
-    for rows.Next() {
-        var id string
-        if err := rows.Scan(&id); err != nil {
-            return nil, err
-        }
-        out[id] = true
-    }
-    return out, rows.Err()
+	query := `SELECT id FROM runs WHERE project_path = ? AND status IN ('stopped', 'error')`
+	rows, err := s.db.QueryContext(ctx, query, projectPath)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
 }
 
 // CleanupOrphanRuns reconciles run rows left in a non-terminal state by a
@@ -291,7 +283,7 @@ func (s *Store) ListResumableRunIDs(ctx context.Context, projectPath string) (ma
 // 'complete' (the work genuinely finished, only the run-row update was lost);
 // otherwise it's marked 'stopped'. Returns the number of rows updated.
 func (s *Store) CleanupOrphanRuns(ctx context.Context, projectPath string) (int64, error) {
-    query := `
+	query := `
 UPDATE runs
 SET
     status = CASE
@@ -306,235 +298,235 @@ SET
     END,
     updated_at = CURRENT_TIMESTAMP
 WHERE status IN ('starting', 'running', 'paused') AND project_path = ?`
-    res, err := s.db.ExecContext(ctx, query, projectPath)
-    if err != nil {
-        return 0, err
-    }
-    n, _ := res.RowsAffected()
-    return n, nil
+	res, err := s.db.ExecContext(ctx, query, projectPath)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // --- STEP OPERATIONS ---
 
 // AddRunStep records a single iteration step of a run.
 func (s *Store) AddRunStep(ctx context.Context, stepID, runID, traceID, phase string, iteration int, status string) error {
-    query := `INSERT OR IGNORE INTO run_steps (id, run_id, trace_id, phase, iteration, status) VALUES (?, ?, ?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, stepID, runID, traceID, phase, iteration, status)
-    return err
+	query := `INSERT OR IGNORE INTO run_steps (id, run_id, trace_id, phase, iteration, status) VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := s.db.ExecContext(ctx, query, stepID, runID, traceID, phase, iteration, status)
+	return err
 }
 
 // --- ARTIFACT OPERATIONS ---
 
 // RecordArtifact registers a content-addressed artifact pointer.
 func (s *Store) RecordArtifact(ctx context.Context, hash, artifactType, path string, size int64) error {
-    query := `INSERT OR IGNORE INTO artifacts (hash, type, path, size) VALUES (?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, hash, artifactType, path, size)
-    return err
+	query := `INSERT OR IGNORE INTO artifacts (hash, type, path, size) VALUES (?, ?, ?, ?)`
+	_, err := s.db.ExecContext(ctx, query, hash, artifactType, path, size)
+	return err
 }
 
 // RecordArtifactWithMetadata registers an artifact with additional metadata.
 func (s *Store) RecordArtifactWithMetadata(ctx context.Context, hash, artifactType, path string, size int64, metadata string) error {
-    query := `INSERT OR IGNORE INTO artifacts (hash, type, path, size, metadata) VALUES (?, ?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, hash, artifactType, path, size, metadata)
-    return err
+	query := `INSERT OR IGNORE INTO artifacts (hash, type, path, size, metadata) VALUES (?, ?, ?, ?, ?)`
+	_, err := s.db.ExecContext(ctx, query, hash, artifactType, path, size, metadata)
+	return err
 }
 
 // --- TOOL CALL OPERATIONS ---
 
 // RecordToolCall persists a tool invocation with idempotency key support.
 func (s *Store) RecordToolCall(ctx context.Context, id, messageID, sessionID, toolName, toolInput, idempotencyKey string) error {
-    query := `INSERT OR IGNORE INTO tool_calls (id, message_id, session_id, tool_name, tool_input, status, idempotency_key)
+	query := `INSERT OR IGNORE INTO tool_calls (id, message_id, session_id, tool_name, tool_input, status, idempotency_key)
               VALUES (?, ?, ?, ?, ?, 'pending', ?)`
-    _, err := s.db.ExecContext(ctx, query, id, messageID, sessionID, toolName, toolInput, idempotencyKey)
-    return err
+	_, err := s.db.ExecContext(ctx, query, id, messageID, sessionID, toolName, toolInput, idempotencyKey)
+	return err
 }
 
 // UpdateToolCallStatus updates a tool call's status and output.
 func (s *Store) UpdateToolCallStatus(ctx context.Context, id, status, output, errorMsg string) error {
-    query := `UPDATE tool_calls SET status = ?, tool_output = ?, error = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`
-    _, err := s.db.ExecContext(ctx, query, status, output, errorMsg, id)
-    return err
+	query := `UPDATE tool_calls SET status = ?, tool_output = ?, error = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := s.db.ExecContext(ctx, query, status, output, errorMsg, id)
+	return err
 }
 
 // CheckIdempotencyKey returns true if a tool call with this key was already applied.
 func (s *Store) CheckIdempotencyKey(ctx context.Context, idempotencyKey string) (bool, error) {
-    query := `SELECT COUNT(*) FROM tool_calls WHERE idempotency_key = ? AND status = 'completed'`
-    var count int
-    err := s.db.QueryRowContext(ctx, query, idempotencyKey).Scan(&count)
-    if err != nil {
-        return false, err
-    }
-    return count > 0, nil
+	query := `SELECT COUNT(*) FROM tool_calls WHERE idempotency_key = ? AND status = 'completed'`
+	var count int
+	err := s.db.QueryRowContext(ctx, query, idempotencyKey).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // --- CHECKPOINT OPERATIONS ---
 
 // CheckpointData represents a run checkpoint for replay.
 type CheckpointData struct {
-    ID             string
-    RunID          string
-    Phase          string
-    Iteration      int
-    Timestamp      string
-    Artifacts      map[string]string
-    MessageHistory []byte // JSON array of messages for resume
-    ToolCallLog    []byte // JSON array of completed tool call IDs
+	ID             string
+	RunID          string
+	Phase          string
+	Iteration      int
+	Timestamp      string
+	Artifacts      map[string]string
+	MessageHistory []byte // JSON array of messages for resume
+	ToolCallLog    []byte // JSON array of completed tool call IDs
 }
 
 // RecordCheckpoint persists a checkpoint for a run.
 func (s *Store) RecordCheckpoint(ctx context.Context, cp CheckpointData) error {
-    artifactsJSON := "{}"
-    if len(cp.Artifacts) > 0 {
-        if data, err := json.Marshal(cp.Artifacts); err == nil {
-            artifactsJSON = string(data)
-        }
-    }
-    messageHistory := "[]"
-    if len(cp.MessageHistory) > 0 {
-        messageHistory = string(cp.MessageHistory)
-    }
-    toolCallLog := "[]"
-    if len(cp.ToolCallLog) > 0 {
-        toolCallLog = string(cp.ToolCallLog)
-    }
-    query := `INSERT INTO run_checkpoints (id, run_id, phase, iteration, timestamp, artifacts, message_history, tool_call_log)
+	artifactsJSON := "{}"
+	if len(cp.Artifacts) > 0 {
+		if data, err := json.Marshal(cp.Artifacts); err == nil {
+			artifactsJSON = string(data)
+		}
+	}
+	messageHistory := "[]"
+	if len(cp.MessageHistory) > 0 {
+		messageHistory = string(cp.MessageHistory)
+	}
+	toolCallLog := "[]"
+	if len(cp.ToolCallLog) > 0 {
+		toolCallLog = string(cp.ToolCallLog)
+	}
+	query := `INSERT INTO run_checkpoints (id, run_id, phase, iteration, timestamp, artifacts, message_history, tool_call_log)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, cp.ID, cp.RunID, cp.Phase, cp.Iteration, cp.Timestamp, artifactsJSON, messageHistory, toolCallLog)
-    return err
+	_, err := s.db.ExecContext(ctx, query, cp.ID, cp.RunID, cp.Phase, cp.Iteration, cp.Timestamp, artifactsJSON, messageHistory, toolCallLog)
+	return err
 }
 
 // RecordCheckpointWithHistory persists a checkpoint with full message history for resume.
 func (s *Store) RecordCheckpointWithHistory(ctx context.Context, cp CheckpointData, messages []byte, toolCalls []byte) error {
-    cp.MessageHistory = messages
-    cp.ToolCallLog = toolCalls
-    return s.RecordCheckpoint(ctx, cp)
+	cp.MessageHistory = messages
+	cp.ToolCallLog = toolCalls
+	return s.RecordCheckpoint(ctx, cp)
 }
 
 // GetLatestCheckpoint returns the most recent checkpoint for a run.
 func (s *Store) GetLatestCheckpoint(ctx context.Context, runID string) (*CheckpointData, error) {
-    query := `SELECT id, run_id, phase, iteration, timestamp, artifacts,
+	query := `SELECT id, run_id, phase, iteration, timestamp, artifacts,
               COALESCE(message_history, '[]'), COALESCE(tool_call_log, '[]')
               FROM run_checkpoints WHERE run_id = ? ORDER BY timestamp DESC LIMIT 1`
-    row := s.db.QueryRowContext(ctx, query, runID)
+	row := s.db.QueryRowContext(ctx, query, runID)
 
-    var cp CheckpointData
-    var artifactsJSON, messageHistory, toolCallLog string
-    err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp,
-                    &artifactsJSON, &messageHistory, &toolCallLog)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return nil, nil
-        }
-        return nil, err
-    }
+	var cp CheckpointData
+	var artifactsJSON, messageHistory, toolCallLog string
+	err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp,
+		&artifactsJSON, &messageHistory, &toolCallLog)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
 
-    if artifactsJSON != "" {
-        _ = json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts)
-    }
-    cp.MessageHistory = []byte(messageHistory)
-    cp.ToolCallLog = []byte(toolCallLog)
-    return &cp, nil
+	if artifactsJSON != "" {
+		_ = json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts)
+	}
+	cp.MessageHistory = []byte(messageHistory)
+	cp.ToolCallLog = []byte(toolCallLog)
+	return &cp, nil
 }
 
 // GetCheckpointByID retrieves a specific checkpoint by ID.
 func (s *Store) GetCheckpointByID(ctx context.Context, checkpointID string) (*CheckpointData, error) {
-    query := `SELECT id, run_id, phase, iteration, timestamp, artifacts,
+	query := `SELECT id, run_id, phase, iteration, timestamp, artifacts,
               COALESCE(message_history, '[]'), COALESCE(tool_call_log, '[]')
               FROM run_checkpoints WHERE id = ?`
-    row := s.db.QueryRowContext(ctx, query, checkpointID)
+	row := s.db.QueryRowContext(ctx, query, checkpointID)
 
-    var cp CheckpointData
-    var artifactsJSON, messageHistory, toolCallLog string
-    err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp,
-                    &artifactsJSON, &messageHistory, &toolCallLog)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return nil, nil
-        }
-        return nil, err
-    }
+	var cp CheckpointData
+	var artifactsJSON, messageHistory, toolCallLog string
+	err := row.Scan(&cp.ID, &cp.RunID, &cp.Phase, &cp.Iteration, &cp.Timestamp,
+		&artifactsJSON, &messageHistory, &toolCallLog)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
 
-    if artifactsJSON != "" {
-        _ = json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts)
-    }
-    cp.MessageHistory = []byte(messageHistory)
-    cp.ToolCallLog = []byte(toolCallLog)
-    return &cp, nil
+	if artifactsJSON != "" {
+		_ = json.Unmarshal([]byte(artifactsJSON), &cp.Artifacts)
+	}
+	cp.MessageHistory = []byte(messageHistory)
+	cp.ToolCallLog = []byte(toolCallLog)
+	return &cp, nil
 }
 
 // ListAppliedToolCalls returns the idempotency keys of tool calls that have been completed.
 // This is used during resume to skip already-applied tool calls.
 func (s *Store) ListAppliedToolCalls(ctx context.Context, runID string) ([]string, error) {
-    query := `SELECT DISTINCT tc.idempotency_key
+	query := `SELECT DISTINCT tc.idempotency_key
               FROM tool_calls tc
               JOIN messages m ON tc.message_id = m.id
               JOIN sessions s ON m.session_id = s.id
               JOIN runs r ON r.session_id = s.id
               WHERE r.id = ? AND tc.status = 'completed' AND tc.idempotency_key IS NOT NULL`
-    rows, err := s.db.QueryContext(ctx, query, runID)
-    if err != nil {
-        return nil, err
-    }
-    defer func() { _ = rows.Close() }()
+	rows, err := s.db.QueryContext(ctx, query, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
 
-    var keys []string
-    for rows.Next() {
-        var key string
-        if err := rows.Scan(&key); err != nil {
-            return nil, err
-        }
-        keys = append(keys, key)
-    }
-    return keys, rows.Err()
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
 }
 
 // GetToolCallByIdempotencyKey retrieves the result of a previously completed tool call.
 // Returns nil if not found or not completed.
 func (s *Store) GetToolCallByIdempotencyKey(ctx context.Context, idempotencyKey string) (string, error) {
-    query := `SELECT tool_output FROM tool_calls
+	query := `SELECT tool_output FROM tool_calls
               WHERE idempotency_key = ? AND status = 'completed' LIMIT 1`
-    var output sql.NullString
-    err := s.db.QueryRowContext(ctx, query, idempotencyKey).Scan(&output)
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return "", nil
-        }
-        return "", err
-    }
-    return output.String, nil
+	var output sql.NullString
+	err := s.db.QueryRowContext(ctx, query, idempotencyKey).Scan(&output)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return output.String, nil
 }
 
 // --- SESSION OPERATIONS ---
 
 // CreateSession persists a new session.
 func (s *Store) CreateSession(ctx context.Context, id, projectPath, provider, model, title string) error {
-    query := `INSERT INTO sessions (id, project_path, provider, model, title) VALUES (?, ?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, id, projectPath, provider, model, title)
-    return err
+	query := `INSERT INTO sessions (id, project_path, provider, model, title) VALUES (?, ?, ?, ?, ?)`
+	_, err := s.db.ExecContext(ctx, query, id, projectPath, provider, model, title)
+	return err
 }
 
 // UpdateSessionStatus updates the status of a session.
 func (s *Store) UpdateSessionStatus(ctx context.Context, id, status string) error {
-    query := `UPDATE sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-    _, err := s.db.ExecContext(ctx, query, status, id)
-    return err
+	query := `UPDATE sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := s.db.ExecContext(ctx, query, status, id)
+	return err
 }
 
 // --- RUN STEP EXTENDED OPERATIONS ---
 
 // UpdateRunStepCompleted marks a run step as completed with output hash.
 func (s *Store) UpdateRunStepCompleted(ctx context.Context, stepID, outputsHash string) error {
-    query := `UPDATE run_steps SET status = 'completed', outputs_hash = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`
-    _, err := s.db.ExecContext(ctx, query, outputsHash, stepID)
-    return err
+	query := `UPDATE run_steps SET status = 'completed', outputs_hash = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := s.db.ExecContext(ctx, query, outputsHash, stepID)
+	return err
 }
 
 // AddRunStepFull records a run step with all fields.
 func (s *Store) AddRunStepFull(ctx context.Context, stepID, runID, traceID, phase, agent string, iteration int, status, inputsHash, metadata string) error {
-    query := `INSERT OR IGNORE INTO run_steps (id, run_id, trace_id, phase, agent, iteration, status, inputs_hash, metadata)
+	query := `INSERT OR IGNORE INTO run_steps (id, run_id, trace_id, phase, agent, iteration, status, inputs_hash, metadata)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    _, err := s.db.ExecContext(ctx, query, stepID, runID, traceID, phase, agent, iteration, status, inputsHash, metadata)
-    return err
+	_, err := s.db.ExecContext(ctx, query, stepID, runID, traceID, phase, agent, iteration, status, inputsHash, metadata)
+	return err
 }
 
 // --- ASYNC PARALLEL WRITE HELPERS ---
