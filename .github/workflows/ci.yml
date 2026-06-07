@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+# GitHub forces JS actions onto Node 24 on 2026-06-16; opt in now so any
+# breakage (golangci-lint-action@v8 still declares Node 20) surfaces while
+# we're watching, not on the flag day.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
