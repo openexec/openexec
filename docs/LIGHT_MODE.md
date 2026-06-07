@@ -109,3 +109,22 @@ default forever after:
 7. Learned a durable project quirk along the way? `skill_propose` it, then
    review with `openexec skills proposals` and approve or reject. Proposals
    never activate themselves — that is the point.
+
+## Infra approvals: the operator sign-off seam
+
+When the SRE infra tools are enabled (`.openexec/infra.yaml` — see
+`docs/SECURITY_MODEL.md`), apply-class commands triggered from any session block
+on human sign-off. Light mode is the sign-off channel:
+
+- From a terminal: `openexec approve list --local`, then
+  `openexec approve yes|no <id> --local`. No daemon needed — this operates
+  directly on `.openexec/approvals.db`.
+- From a second Claude Code session: start that session's server with
+  `OPENEXEC_OPERATOR_SESSION=1 openexec mcp-serve` and use `approval_list` /
+  `approval_decide`. These tools do not exist in normal agent sessions — an
+  agent must never be able to approve its own requests.
+
+Note the deliberate contrast with backlog tools: backlog writes are allowed in
+every mode because they are orchestrator bookkeeping. Approval is NOT — it
+authorizes infrastructure mutation, so it lives behind its own tools and its
+own broker rule. Never use `backlog_complete_task` as an approval signal.

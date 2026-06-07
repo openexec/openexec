@@ -91,6 +91,7 @@ API mode enables true multi-agent parallel execution with the coordinator patter
 
 **Infrastructure:**
 - **MCP Server**: JSON-RPC tool server with read_file, write_file, git_apply_patch, run_shell_command
+- **SRE Orchestration**: Deny-by-default infra tools (Ansible, Salt, SSH, Terraform) compiled from an operator-owned allowlist; TOCTOU-safe saved-plan terraform applies with deterministic destructive-change detection; persistent human approval gate with cross-process sign-off. See [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md) for how hallucinations, prompt injection, and log poisoning are contained — and [docs/SRE_ORCHESTRATION_ROADMAP.md](docs/SRE_ORCHESTRATION_ROADMAP.md) for the engineering spec
 - **Web UI**: React/Vite dashboard (embedded in binary)
 - **Terminal UI**: Bubble Tea TUI
 

@@ -1,6 +1,6 @@
 # Roadmap: BitNet-Gated SRE & Infrastructure Orchestration (Salt, Ansible, SSH, Terraform)
 
-This document provides detailed implementation instructions and technical specifications for building a non-destructive, bulletproof SRE and deployment orchestration layer inside OpenExec. 
+This document provides detailed implementation instructions and technical specifications for building a non-destructive SRE and deployment orchestration layer inside OpenExec. For the user-facing threat model — how hallucinations, prompt injection, and log poisoning are contained, and the honest limits to understand before production — see [SECURITY_MODEL.md](SECURITY_MODEL.md).
 
 **Core Design Philosophy:** Safety must be absolute, deterministic, and model-independent. The AI's action space is constrained at the schema level so that destructive verbs cannot be hallucinated, and execution bypasses shell expansions entirely.
 
