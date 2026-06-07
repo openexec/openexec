@@ -111,3 +111,5 @@ temp/
 .openexec/data/
 .openexec/engram/cache/
 .openexec/models/
+bin/openexec-compact
+bin/.!*!openexec

@@ -48,6 +48,9 @@ COMMIT=$(git rev-parse --short HEAD)
 # -s: Omit the symbol table and debug information.
 # -w: Omit the DWARF symbol table.
 LDFLAGS="-s -w -X github.com/openexec/openexec/pkg/version.Commit=$COMMIT"
+# -trimpath: reproducible, path-free binaries (compact build, matches install.sh)
+GOFLAGS="-trimpath"
+export GOFLAGS
 
 mkdir -p bin
 
