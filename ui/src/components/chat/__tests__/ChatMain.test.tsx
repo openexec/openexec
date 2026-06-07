@@ -95,15 +95,18 @@ describe('ChatMain', () => {
     expect(screen.queryByText('Loading messages...')).not.toBeInTheDocument()
   })
 
-  it('disables input when no session is selected', () => {
+  it('keeps input enabled without a session but prompts to select one', () => {
     render(<ChatMain messages={[]} />)
 
+    // Current contract (ChatMain passes disabled={isSubmitting}): the input
+    // is only hard-disabled while a submit is physically in flight — the
+    // placeholder carries the "no session" guidance instead.
     const input = screen.getByTestId('chat-input')
-    expect(input).toHaveAttribute('data-disabled', 'true')
+    expect(input).toHaveAttribute('data-disabled', 'false')
     expect(input).toHaveTextContent('Select or create a session to start chatting...')
   })
 
-  it('disables input when loop is running and not paused', () => {
+  it('keeps input enabled while the loop runs; placeholder signals waiting', () => {
     const loopState: AgentLoopState = {
       iteration: 1,
       totalTokens: 100,
@@ -117,8 +120,10 @@ describe('ChatMain', () => {
       <ChatMain session={mockSession} messages={[]} loopState={loopState} />
     )
 
+    // Current contract: typing stays available while the loop runs (only a
+    // submit in flight hard-disables); the placeholder signals the wait.
     const input = screen.getByTestId('chat-input')
-    expect(input).toHaveAttribute('data-disabled', 'true')
+    expect(input).toHaveAttribute('data-disabled', 'false')
     expect(input).toHaveTextContent('Waiting for assistant response...')
   })
 

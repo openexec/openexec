@@ -92,11 +92,14 @@ describe('ChatInput', () => {
     expect(textarea).toBeDisabled()
   })
 
-  it('disables textarea when isSubmitting is true', () => {
+  it('keeps textarea enabled while submitting but blocks the send button', () => {
     render(<ChatInput isSubmitting={true} />)
 
-    const textarea = screen.getByTestId('input-textarea')
-    expect(textarea).toBeDisabled()
+    // Current contract (ChatInput passes disabled={disabled && !isSubmitting}):
+    // a submit in flight must NOT hard-disable typing — the user can keep
+    // composing while waiting; only sending is gated.
+    expect(screen.getByTestId('input-textarea')).not.toBeDisabled()
+    expect(screen.getByTestId('send-button')).toBeDisabled()
   })
 
   it('updates content when typing', async () => {
