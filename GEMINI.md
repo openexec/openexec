@@ -30,6 +30,10 @@ To prevent thrashing and stalling during task execution, agents MUST adhere to t
 - **Manual Promotion**: Code promotion to production or remote branches is a human-only task. This prevents accidental breakages during autonomous execution loops.
 - **Branching**: Agents should create feature branches for their work, but these branches must remain local until manually reviewed and pushed by the Operator.
 
+### 6. Architecture Decision Records (ADR-Driven Development)
+- **ADR Obligation**: For any major refactoring, design pattern introduction, or new subsystem wiring (such as implementing the SRE Command Registry or changing database locking behaviors), the agent **MUST** author an Architectural Decision Record inside `docs/architecture/` using `docs/architecture/ADR_TEMPLATE.md` before making code changes.
+- **Strict Compliance**: All code implementation must strictly adhere to the approved decisions, directory layouts, and API boundaries defined in the active ADR registry.
+
 ---
 
 ## Known Project Quirks

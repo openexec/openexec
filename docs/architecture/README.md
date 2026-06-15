@@ -8,6 +8,14 @@ sidebar_position: 1
 
 This directory contains the foundational specifications and architectural decisions for OpenExec. These documents serve as the authoritative roadmap for the project's transition from a feature-rich prototype to a disciplined, deterministic AI coding runtime.
 
+## 🏛 Architecture Decision Records (ADR) Registry
+OpenExec strictly enforces **ADR-Driven Development**. Every major architectural modification, design choice, or subsystem integration must be documented as an ADR here before implementation begins. 
+
+*   [**ADR Template**](./ADR_TEMPLATE.md) — Standardized template for authoring new Architecture Decision Records.
+*   [**ADR-001: Core Runtime Consolidation**](./ADR-001-CORE-RUNTIME.md) — The official mandate for core runtime consolidation and SQLite migration.
+*   [**ADR-002: Toolset Filtering & Sandboxing**](./ADR-002-TOOLSET-FILTERING.md) — Strict security bounding and capabilities-based access control.
+*   [**ADR-003: Pattern Confidence Gates**](./ADR-003-PATTERN-CONFIDENCE.md) — Deterministic evaluation criteria for semantic matches.
+
 ## 1. Vision & Strategy
 High-level conceptual models and the strategic differentiation of OpenExec.
 
