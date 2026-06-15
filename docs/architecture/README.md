@@ -67,6 +67,9 @@ OpenExec strictly enforces **ADR-Driven Development** (inspired by the decentral
 *   [**ADR-018: Unified State Store & Schema Boundaries**](./ADR-018-UNIFIED-STATE-SCHEMA.md)  
     *Status:* Approved | *Implementation:* Shipped  
     *Summary:* Establishes `.openexec/openexec.db` as the transactional, single source of truth for runs, tasks, and audit logs.
+*   [**ADR-019: Git-Backed Backlog Queues & Trunk-Based Swarm Scaffolding**](./ADR-019-GIT-BACKED-BACKLOG-SCAFFOLDING.md)  
+    *Status:* Proposed | *Implementation:* Aspirational  
+    *Summary:* Decentralized file-backed task backlog and lease-locks to enable distributed multi-agent systems with zero central server infrastructure.
 
 ---
 
@@ -105,4 +108,4 @@ The tactical plan for simplifying and stabilizing the codebase.
 *   [**Elixir/BEAM Orchestrator**](./ELIXIR_BEAM_ORCHESTRATOR.md) — Research on high-scale, supervisor-tree concurrency using the BEAM virtual machine.
 
 ---
-*Last Updated: 2026-06-06 — Registry Expanded to 18 Canonical ADRs*
+*Last Updated: 2026-06-06 — Registry Expanded to 19 Canonical ADRs*
