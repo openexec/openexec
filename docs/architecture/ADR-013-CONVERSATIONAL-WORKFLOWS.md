@@ -16,17 +16,17 @@ When developers interact with AI agents via chat, they frequently want to explor
 *   Track agent performance, token expenditures, and decisions visually.
 
 ## 3. Decided (The Architectural Decision)
-We implement a stateful **Conversational Session & Forking Architecture** mapped directly to the local Git workspace:
-1.  **Conversational Session:** Every interaction is bound to a unique `session_id` persisted in SQLite.
-2.  **Branch-Isolated Forking:** When a user clicks "Fork Conversation" in the Web Console (`openexec-web`), the Go backend dynamically runs `git checkout -b fork/<session_id>` behind the scenes, creating a physical isolation boundary.
-3.  **Visual Diff & Rollback:** The Web Console displays real-time, interactive file diffs using Monaco Editor. If a path fails, the developer can click "Rollback State," and OpenExec runs `git reset --hard` and deletes the active session checkpoints, instantly returning the workspace and DB state to the chosen historical node.
+We implement a stateful **Database-Backed Conversational Session & Forking Architecture**:
+1.  **Conversational Session:** Every interaction is bound to a unique `session_id` persisted in the SQLite `openexec.db` database.
+2.  **DB-Backed Forking:** When a developer forks a conversation in the Web Console, the Go backend copies the active session message records and run checkpoints into a new database row via `SessionRepo.ForkSession`, referencing the parent session. This occurs entirely in memory/SQLite with zero file-system or Git branch overhead.
+3.  **Visual Diff & Local Git Control:** The Web Console displays real-time, interactive file diffs using Monaco Editor. If a code path fails, the developer can manually use Git to discard local workspace modifications or run standard git checkouts, while the conversational database safely maintains both separate message trees.
 
 ## 4. Rejected/Neglected Alternatives
-*   *In-Memory State Copying:* Rejected. Trying to duplicate directory states in-memory or copy files to temp folders is slow, heavy, and drifts from Git's native, highly optimized tree-tracking.
+*   *Git Branch-Backed Forking:* Rejected. Spawning physical Git branches for every conversational fork is heavy, slow, and pollutes the developer's local repository with dozens of transient branches that require constant garbage collection. Keeping the forks inside SQLite is instantaneous and zero-overhead.
 
 ## 5. Consequences & Tradeoffs
-*   *Positives:* Zero-risk requirement exploration; immediate state recovery; beautiful visual audit trails of all file mutations.
-*   *Negatives:* Generates a large collection of local, transient git branches that must be garbage-collected periodically.
+*   *Positives:* Instantaneous, zero-overhead conversation forking; safe exploration of alternative prompts; minimal disk and Git footprint.
+*   *Negatives:* The local file system still has only one active worktree—if a developer wants to compile and run both forks simultaneously, they must manually clone or stash changes to switch workspace states.
 
 ## 6. Dependencies & References
 *   Exposed via REST API `/api/v1/sessions` (documented in `docs/API_REFERENCE.md`).

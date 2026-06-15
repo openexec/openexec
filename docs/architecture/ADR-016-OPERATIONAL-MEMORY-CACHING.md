@@ -17,12 +17,14 @@ Retrieving codebase context during multi-stage runs is the most expensive phase 
 
 ## 3. Decided (The Architectural Decision)
 We implement a stateful, SQLite-backed **Operational Memory & Predictive Loading** architecture:
-1.  **AST Pointer Record Cache:** When OpenExec is initialized, it parses the codebase and stores symbol pointer records (file paths, line numbers, function signatures) in `openexec.db`. On subsequent runs, it only rescans files modified in the Git index, reducing index latency to <5ms.
-2.  **Predictive Loading Daemon (`internal/predictive/`):** The background daemon monitors active workspace file edits and user keystrokes in the Web Console. If a user edits `InvoiceService.ts`, the predictive loader pre-emptively fetches all symbol dependency files (e.g. `PaymentGateway.ts`, `InvoiceTable.tsx`) and loads them into memory *before* the user triggers a run.
-3.  **Context Token-Caching:** Expose pre-loaded context blocks to cloud completion endpoints utilizing provider-level prompt caching (e.g., Anthropic Prompt Caching), resulting in up to 90% cost savings on repetitive multi-turn reasoning steps.
+1.  **AST Pointer Record Cache:** When OpenExec is initialized, it parses the codebase and stores symbol pointer records (file paths, line numbers, function signatures) in the canonical `openexec.db`. On subsequent runs, it only rescans files modified in the Git index, reducing index latency to <5ms.
+2.  **Predictive Loading Store (`internal/predictive/`):** Predictive metadata, file access historical patterns, and predicted files are stored in a dedicated database at `.openexec/predictive.db`.
+3.  **Callable `PredictAndLoad` Framework:** The system exposes a synchronous `PredictAndLoad` function which takes the active task parameters, predicts symbol dependencies, pre-loads the predicted files into an **in-memory file cache**, and serves them instantly to the context assembler, keeping context load times under 50ms.
+4.  **Keystroke-Watching Daemon & Cloud Prompt Caching (Aspirational / Future):** We plan to build a background watcher daemon that monitors active keystrokes in the Web Console to pre-emptively load symbols before the user hits "Run", and integrate cloud-provider-level prompt caching (e.g. Anthropic Prompt Caching) once direct API integrations are completed in production loops.
 
 ## 4. Rejected/Neglected Alternatives
-*   *On-Demand Scanning:* Rejected. Rescanning the filesystem and rebuild AST trees on every single agent step introduces massive I/O bottlenecks on large codebases.
+*   *On-Demand Scanning:* Rejected. Rescanning the filesystem and rebuilding AST trees on every single agent step introduces massive I/O bottlenecks on large codebases.
+*   *Unified Database for Predictions:* Rejected. Separating predictions to `.openexec/predictive.db` prevents high-frequency read/write access logs of file-access statistics from conflicting with transaction locks on the core progress schemas in `openexec.db`.
 
 ## 5. Consequences & Tradeoffs
 *   *Positives:* Ultra-responsive, sub-50ms context assembly; dramatic cloud API cost savings due to prompt cache hits.

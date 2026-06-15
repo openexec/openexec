@@ -2,7 +2,7 @@
 
 *   **ID:** ADR-014  
 *   **Status History:**
-    *   2026-06-06: Created by Systems Architect. Status: Approved. Implementation: Shipped (internal/budget & pkg/telemetry).
+    *   2026-06-06: Created by Systems Architect. Status: Approved. Implementation: Shipped (pkg/telemetry spans & internal/budget libraries) & Partial (Hard cost blocking wired in tests; production loop wiring is planned).
 *   **Decides on:** Financial Guardrails and LLM Observability
 
 ---
@@ -18,7 +18,7 @@ Autonomous AI agent runs can easily consume thousands of API tokens in minutes i
 ## 3. Decided (The Architectural Decision)
 We establish a native **Financial Budget Monitor** and **OpenTelemetry Span Tracking** pipeline:
 1.  **Real-Time Token Accounting:** Every outbound LLM API call is monitored by `internal/budget/`. It records exact input/output token counts and translates them to dollar values based on active provider pricing tables.
-2.  **Hard Cost Limits:** Users configure a hard maximum run cost in `openexec.yaml` (e.g. `max_run_budget_usd: 5.00`). If an active run crosses this budget, the Go pipeline **instantly terminates the LLM session** and marks the run as `paused_budget_exhausted`.
+2.  **Hard Cost Limits (Partial / Aspirational):** Users can configure a hard maximum run cost in `openexec.yaml` (e.g. `max_run_budget_usd: 5.00`). The budget monitor returns `ErrBudgetExceeded` when cost limits are violated. However, `BlockOnExceed` is `false` by default, and the `NewLoopHook` circuit-breaker is currently fully verified in test suites but is awaiting final production wiring into the daemon's primary execution manager.
 3.  **OTel Gen-AI Spans:** All agent actions, tool calls, and LLM completions are wrapped in standard OpenTelemetry Spans (`pkg/telemetry`). They are exported to Prometheus/Jaeger/OTel collectors, allowing SREs to monitor AI execution traces using their existing enterprise monitoring stack.
 
 ## 4. Rejected/Neglected Alternatives

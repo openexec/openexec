@@ -20,8 +20,8 @@ OpenExec strictly enforces **ADR-Driven Development** (inspired by the decentral
     *Status:* Approved | *Implementation:* Shipped  
     *Summary:* Capability-based tool grouping and security bounding inside the execution broker.
 *   [**ADR-003: Pattern Confidence Gates**](./ADR-003-PATTERN-CONFIDENCE.md)  
-    *Status:* Approved | *Implementation:* Shipped  
-    *Summary:* Deterministic evaluation criteria and scores for AST semantic symbol indexing.
+    *Status:* Deferred | *Implementation:* Aspirational  
+    *Summary:* Proposed metadata-driven evaluation framework for checking code pattern stability.
 *   [**ADR-004: Deterministic Orchestration vs. Vibe Coding**](./ADR-004-DETERMINISTIC-ORCHESTRATION.md)  
     *Status:* Approved | *Implementation:* Shipped  
     *Summary:* Replaces open-ended conversational REPLs with a strict 5-stage state-machine pipeline.
