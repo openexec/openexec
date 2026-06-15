@@ -15,6 +15,12 @@ OpenExec strictly enforces **ADR-Driven Development**. Every major architectural
 *   [**ADR-001: Core Runtime Consolidation**](./ADR-001-CORE-RUNTIME.md) — The official mandate for core runtime consolidation and SQLite migration.
 *   [**ADR-002: Toolset Filtering & Sandboxing**](./ADR-002-TOOLSET-FILTERING.md) — Strict security bounding and capabilities-based access control.
 *   [**ADR-003: Pattern Confidence Gates**](./ADR-003-PATTERN-CONFIDENCE.md) — Deterministic evaluation criteria for semantic matches.
+*   [**ADR-004: Deterministic Orchestration vs. Vibe Coding**](./ADR-004-DETERMINISTIC-ORCHESTRATION.md) — Why state machines and strict gates replace open-ended prompting.
+*   [**ADR-005: Intent Decomposition & Task Pipeline**](./ADR-005-INTENT-DECOMPOSITION.md) — Breaking intents into stories, tasks, branch isolation, and the coding loop.
+*   [**ADR-006: Multi-Provider Routing & Pointer Records**](./ADR-006-MULTI-PROVIDER-ROUTING.md) — Agnostic HTTP API adapters (Claude/Codex/Gemini/OpenAI) and AST-based context extraction.
+*   [**ADR-007: Local LLM Intent & Tool Selection**](./ADR-007-LOCAL-LLM-TOOL-SELECTION.md) — Using a frontline local/1-bit classifier (DCP) to assign safe toolsets.
+*   [**ADR-008: PII Data Scrubbing & Privacy Shield**](./ADR-008-PII-DATA-SCRUBBING.md) — Local sanitization of sensitive information before outbound API transmission.
+*   [**ADR-009: Adversarial Code Review Agent**](./ADR-009-CODE-REVIEW-AGENT.md) — Separating implementation and review roles to prevent AI cognitive bias.
 
 ## 1. Vision & Strategy
 High-level conceptual models and the strategic differentiation of OpenExec.
