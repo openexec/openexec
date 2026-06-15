@@ -5,7 +5,7 @@
 <h1 align="center">OpenExec</h1>
 
 <p align="center">
-  <strong>AI orchestration framework: deterministic pipelines around AI CLI tools</strong>
+  <strong>Deterministic execution infrastructure for AI coding tools — reproducible, gated, and auditable</strong>
 </p>
 
 <p align="center">
@@ -19,7 +19,9 @@
 
 ## What Is OpenExec?
 
-OpenExec is a **single-binary orchestration layer** that wraps AI CLI tools (Claude Code, Codex, Gemini CLI) or connects directly to any OpenAI-compatible API (Kimi, Mistral, Ollama, etc.) with deterministic infrastructure: structured pipelines, quality gates, checkpointing, and memory.
+AI coding tools are powerful but **non-deterministic**: the same prompt yields different output, with no built-in checkpoints, quality gates, or audit trail. OpenExec treats the model as *an executor that needs structure* — not a black box you trust — by wrapping any AI CLI (Claude Code, Codex, Gemini CLI) or OpenAI-compatible API (Kimi, Mistral, Ollama, …) in a **single-binary harness** of deterministic infrastructure: structured pipelines, quality gates, checkpointing, and memory. The result is non-deterministic AI made **reliable, reproducible, and reviewable**.
+
+It is the same engineering discipline you would apply to any unreliable dependency — guardrails, a repeatable process, observability — applied to AI execution. The "agent" is the least interesting part; **the harness around it is the point.**
 
 ## How It Works
 
