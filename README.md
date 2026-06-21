@@ -5,7 +5,7 @@
 <h1 align="center">OpenExec</h1>
 
 <p align="center">
-  <strong>Deterministic execution infrastructure for AI coding tools — reproducible, gated, and auditable</strong>
+  <strong>Executable engineering judgment for AI coding tools</strong>
 </p>
 
 <p align="center">
@@ -19,9 +19,50 @@
 
 ## What Is OpenExec?
 
-AI coding tools are powerful but **non-deterministic**: the same prompt yields different output, with no built-in checkpoints, quality gates, or audit trail. OpenExec treats the model as *an executor that needs structure* — not a black box you trust — by wrapping any AI CLI (Claude Code, Codex, Gemini CLI) or OpenAI-compatible API (Kimi, Mistral, Ollama, …) in a **single-binary harness** of deterministic infrastructure: structured pipelines, quality gates, checkpointing, and memory. The result is non-deterministic AI made **reliable, reproducible, and reviewable**.
+Can expert engineering judgment become executable?
 
-It is the same engineering discipline you would apply to any unreliable dependency — guardrails, a repeatable process, observability — applied to AI execution. The "agent" is the least interesting part; **the harness around it is the point.**
+Most engineering expertise is tacit. It lives in senior engineers' heads: where to look first, which files not to touch, which tests actually matter, when a shortcut is acceptable, and when a change must stop for human review.
+
+AI coding tools can generate code, but they do not automatically inherit that judgment. Left alone, an agent can read too much, touch the wrong surface, retry unpredictably, skip implicit checks, or leave behind a confident summary instead of evidence.
+
+OpenExec is a deterministic runtime for AI coding tools. It wraps Claude Code, Codex, Gemini CLI, or any OpenAI-compatible API in executable structure: blueprints, scoped tools, quality gates, checkpoints, memory, policy, approvals, and audit trails.
+
+The model still reasons. OpenExec governs the run.
+
+## The Thesis
+
+OpenExec treats AI work as an engineering process, not a chat session.
+
+Documentation can explain expert judgment. Checklists can remind people to apply it. OpenExec tries to encode more of that judgment as reusable runtime behavior:
+
+- **Blueprints** capture repeatable workflows.
+- **Tool policies** limit what an agent can see or change.
+- **Quality gates** make tests, linting, formatting, and review explicit.
+- **Checkpoints** preserve intermediate state for recovery and inspection.
+- **Memory and skills** carry lessons from previous work into future runs.
+- **Audit trails** record what happened, not just what the agent said happened.
+
+That is the product boundary: OpenExec is not the agent. It is the control plane around the agent.
+
+## Current Scope
+
+OpenExec is intentionally factual about what exists today and what remains architectural direction.
+
+**Shipped or implemented in the repository:**
+- Single-binary Go runtime with CLI, TUI, embedded web UI, and MCP server surfaces.
+- Blueprint execution for staged work such as gather context, implement, lint, test, and review.
+- Provider adapters for local AI CLIs and OpenAI-compatible HTTP APIs.
+- Context assembly, pruning, skills loading, memory, caching, checkpointing, and predictive loading packages.
+- SQLite-backed state, audit, approval, budget, telemetry, and PII scrubbing components.
+- SRE-oriented safety primitives including allowlisted infra tools, Terraform plan inspection, and approval gates.
+
+**Still maturing:**
+- End-to-end replay and durable recovery UX.
+- Production polish for the web console and operator workflows.
+- Organization-wide policy distribution.
+- Large-scale distributed agent and backlog coordination.
+
+The direction is ambitious, but the core idea is narrow: make AI execution inspectable, bounded, repeatable, and easier to improve.
 
 ## How It Works
 
