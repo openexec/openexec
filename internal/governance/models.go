@@ -80,6 +80,12 @@ type DecisionEvent struct {
 	Decision        string // see Decision* constants
 	Comment         string
 	CreatedAt       time.Time
+	// PrevHash and Hash form the tamper-evident chain. Hash =
+	// SHA256(PrevHash || canonical(event)); PrevHash is the Hash of the
+	// immediately preceding event (empty for the first). Set by the store on
+	// insert; read back for verification and export. Not user-writable.
+	PrevHash string
+	Hash     string
 }
 
 // ReviewAuthority defines what a human, AI, verifier, or policy check may do.

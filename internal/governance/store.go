@@ -2,7 +2,9 @@ package governance
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,6 +59,9 @@ type Store interface {
 	// Decision events.
 	CreateDecisionEvent(ctx context.Context, e *DecisionEvent) error
 	ListDecisionEvents(ctx context.Context, changeID string) ([]*DecisionEvent, error)
+	// VerifyAuditChain recomputes the decision-event hash chain and reports the
+	// first break (ok=false with a reason), or ok=true when intact.
+	VerifyAuditChain(ctx context.Context) (ok bool, reason string, count int, err error)
 
 	// Review authorities.
 	GetReviewAuthority(ctx context.Context, id string) (*ReviewAuthority, error)
@@ -146,6 +151,8 @@ func (s *SQLiteStore) initSchema(ctx context.Context) error {
 	migrations := [][3]string{
 		{"change_records", "claimed_by", "TEXT DEFAULT ''"},
 		{"change_records", "claim_expires_at", "DATETIME DEFAULT NULL"},
+		{"decision_events", "prev_hash", "TEXT DEFAULT ''"},
+		{"decision_events", "hash", "TEXT DEFAULT ''"},
 	}
 	for _, m := range migrations {
 		if s.tableExists(ctx, m[0]) && !s.columnExists(ctx, m[0], m[1]) {
@@ -633,13 +640,28 @@ func (s *SQLiteStore) CreateDecisionEvent(ctx context.Context, e *DecisionEvent)
 	if e.CreatedAt.IsZero() {
 		e.CreatedAt = time.Now().UTC()
 	}
+	// Tamper-evident hash chain. Under the write lock, read the hash of the most
+	// recently inserted event (by rowid — insertion order) and link this event to
+	// it. Any later alteration, deletion, or reordering breaks the chain and is
+	// caught by VerifyAuditChain. The lock serialises the read-then-insert within
+	// this process; a cross-process interleaving could fork the chain, which is
+	// still DETECTED at verify time (that is the guarantee — detection, not a
+	// distributed lock).
+	var prev sql.NullString
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT hash FROM decision_events ORDER BY rowid DESC LIMIT 1`).Scan(&prev); err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to read audit chain head: %w", err)
+	}
+	e.PrevHash = prev.String
+	e.Hash = chainHash(e.PrevHash, e)
+
 	// Append-only: decision events are immutable audit rows. A duplicate id must
 	// never silently rewrite history — it returns ErrAlreadyExists instead.
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO decision_events (id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO decision_events (id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at, prev_hash, hash)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		e.ID, e.ReleaseID, e.ChangeID, e.ProposalVersion, e.Actor, e.ActorType, e.Decision, e.Comment, fmtTime(e.CreatedAt),
+		e.ID, e.ReleaseID, e.ChangeID, e.ProposalVersion, e.Actor, e.ActorType, e.Decision, e.Comment, fmtTime(e.CreatedAt), e.PrevHash, e.Hash,
 	)
 	if err != nil {
 		if isConstraintErr(err) {
@@ -650,13 +672,70 @@ func (s *SQLiteStore) CreateDecisionEvent(ctx context.Context, e *DecisionEvent)
 	return nil
 }
 
-func (s *SQLiteStore) ListDecisionEvents(ctx context.Context, changeID string) ([]*DecisionEvent, error) {
+// chainHash computes the tamper-evident hash for a decision event: the SHA-256
+// of the previous event's hash concatenated with a canonical, unit-separated
+// encoding of this event's immutable fields. The unit separator (0x1f) cannot
+// appear in the encoded values, so distinct events cannot collide by field
+// concatenation. created_at is encoded via fmtTime for a stable representation.
+func chainHash(prevHash string, e *DecisionEvent) string {
+	h := sha256.New()
+	fmt.Fprintf(h, "%s\x1f%s\x1f%s\x1f%s\x1f%d\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s",
+		prevHash, e.ID, e.ReleaseID, e.ChangeID, e.ProposalVersion,
+		e.Actor, e.ActorType, e.Decision, e.Comment, fmtTime(e.CreatedAt))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// VerifyAuditChain walks every decision event in insertion order and recomputes
+// the hash chain. It returns ok=true when the chain is intact. On the first
+// break it returns ok=false and a human-readable reason naming the offending
+// event (a mismatched hash => the row was altered; a mismatched prev_hash => a
+// row was inserted out of band, deleted, or reordered). count is the number of
+// events verified up to and including the break.
+func (s *SQLiteStore) VerifyAuditChain(ctx context.Context) (ok bool, reason string, count int, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at
-		FROM decision_events WHERE change_id = ? ORDER BY created_at ASC, id ASC`, changeID)
+		SELECT id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at, prev_hash, hash
+		FROM decision_events ORDER BY rowid ASC`)
+	if err != nil {
+		return false, "", 0, fmt.Errorf("failed to read decision events: %w", err)
+	}
+	defer rows.Close()
+
+	prev := ""
+	for rows.Next() {
+		var e DecisionEvent
+		var createdAt, prevHash, hash sql.NullString
+		if err := rows.Scan(&e.ID, &e.ReleaseID, &e.ChangeID, &e.ProposalVersion, &e.Actor, &e.ActorType, &e.Decision, &e.Comment, &createdAt, &prevHash, &hash); err != nil {
+			return false, "", count, err
+		}
+		e.CreatedAt = parseTime(createdAt)
+		e.PrevHash = prevHash.String
+		e.Hash = hash.String
+		count++
+		if e.PrevHash != prev {
+			return false, fmt.Sprintf("chain break at event %q: prev_hash does not match the preceding event (a row was deleted, reordered, or inserted out of band)", e.ID), count, nil
+		}
+		if want := chainHash(prev, &e); want != e.Hash {
+			return false, fmt.Sprintf("tampered event %q: recomputed hash does not match stored hash (a field was altered)", e.ID), count, nil
+		}
+		prev = e.Hash
+	}
+	return true, "", count, rows.Err()
+}
+
+func (s *SQLiteStore) ListDecisionEvents(ctx context.Context, changeID string) ([]*DecisionEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Order by rowid (insertion order) — the reliable audit ordering. created_at
+	// is second-precision and id is a random UUID, so ORDER BY created_at,id could
+	// reorder same-second events; rowid is monotonic and, because the table is
+	// append-only (no deletes), never reused.
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at, prev_hash, hash
+		FROM decision_events WHERE change_id = ? ORDER BY rowid ASC`, changeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list decision events: %w", err)
 	}
@@ -665,11 +744,13 @@ func (s *SQLiteStore) ListDecisionEvents(ctx context.Context, changeID string) (
 	out := []*DecisionEvent{}
 	for rows.Next() {
 		var e DecisionEvent
-		var createdAt sql.NullString
-		if err := rows.Scan(&e.ID, &e.ReleaseID, &e.ChangeID, &e.ProposalVersion, &e.Actor, &e.ActorType, &e.Decision, &e.Comment, &createdAt); err != nil {
+		var createdAt, prevHash, hash sql.NullString
+		if err := rows.Scan(&e.ID, &e.ReleaseID, &e.ChangeID, &e.ProposalVersion, &e.Actor, &e.ActorType, &e.Decision, &e.Comment, &createdAt, &prevHash, &hash); err != nil {
 			return nil, err
 		}
 		e.CreatedAt = parseTime(createdAt)
+		e.PrevHash = prevHash.String
+		e.Hash = hash.String
 		out = append(out, &e)
 	}
 	return out, rows.Err()

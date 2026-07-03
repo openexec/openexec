@@ -83,7 +83,13 @@ CREATE TABLE IF NOT EXISTS decision_events (
 	actor_type TEXT DEFAULT '',
 	decision TEXT DEFAULT '',
 	comment TEXT DEFAULT '',
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	-- Tamper-evident hash chain: hash = SHA256(prev_hash || canonical(event)).
+	-- Altering, deleting, or reordering any event breaks the chain, detected by
+	-- VerifyAuditChain. Ordering for audit is by rowid (insertion order), which
+	-- the append-only triggers below keep monotonic (no delete => no reuse).
+	prev_hash TEXT DEFAULT '',
+	hash TEXT DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_decision_events_release_id ON decision_events(release_id);
@@ -165,4 +171,19 @@ CREATE TABLE IF NOT EXISTS change_operability (
 	report_json TEXT NOT NULL DEFAULT '{}',
 	created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Append-only enforcement. decision_events and evidence are the audit trail;
+-- once written a row must never change or vanish. These BEFORE triggers reject
+-- any UPDATE or DELETE at the database level — a defence below the application
+-- (which itself only ever INSERTs). The hash chain (decision_events.prev_hash/
+-- hash) provides tamper DETECTION even if an attacker with direct DB access drops
+-- these triggers; the triggers provide tamper PREVENTION for ordinary access.
+CREATE TRIGGER IF NOT EXISTS decision_events_no_update BEFORE UPDATE ON decision_events
+BEGIN SELECT RAISE(ABORT, 'decision_events are append-only: UPDATE is forbidden'); END;
+CREATE TRIGGER IF NOT EXISTS decision_events_no_delete BEFORE DELETE ON decision_events
+BEGIN SELECT RAISE(ABORT, 'decision_events are append-only: DELETE is forbidden'); END;
+CREATE TRIGGER IF NOT EXISTS evidence_no_update BEFORE UPDATE ON evidence
+BEGIN SELECT RAISE(ABORT, 'evidence is append-only: UPDATE is forbidden'); END;
+CREATE TRIGGER IF NOT EXISTS evidence_no_delete BEFORE DELETE ON evidence
+BEGIN SELECT RAISE(ABORT, 'evidence is append-only: DELETE is forbidden'); END;
 `
