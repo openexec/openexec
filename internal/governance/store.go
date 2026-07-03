@@ -59,6 +59,9 @@ type Store interface {
 	// Decision events.
 	CreateDecisionEvent(ctx context.Context, e *DecisionEvent) error
 	ListDecisionEvents(ctx context.Context, changeID string) ([]*DecisionEvent, error)
+	// ListAllDecisionEvents returns every event in insertion order (for export /
+	// whole-trail verification), including release-level events with no change_id.
+	ListAllDecisionEvents(ctx context.Context) ([]*DecisionEvent, error)
 	// VerifyAuditChain recomputes the decision-event hash chain and reports the
 	// first break (ok=false with a reason), or ok=true when intact.
 	VerifyAuditChain(ctx context.Context) (ok bool, reason string, count int, err error)
@@ -741,6 +744,30 @@ func (s *SQLiteStore) ListDecisionEvents(ctx context.Context, changeID string) (
 	}
 	defer rows.Close()
 
+	return scanDecisionRows(rows)
+}
+
+// ListAllDecisionEvents returns every decision event in the store in insertion
+// order (rowid). It underpins the whole-trail audit export and chain
+// verification: release-level events (empty change_id) are invisible to
+// ListDecisionEvents' per-change filter, so an export must not rely on that.
+func (s *SQLiteStore) ListAllDecisionEvents(ctx context.Context) ([]*DecisionEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at, prev_hash, hash
+		FROM decision_events ORDER BY rowid ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list decision events: %w", err)
+	}
+	defer rows.Close()
+	return scanDecisionRows(rows)
+}
+
+// scanDecisionRows materializes decision-event rows selected in the canonical
+// column order (id..hash). Shared by the per-change and whole-store listers.
+func scanDecisionRows(rows *sql.Rows) ([]*DecisionEvent, error) {
 	out := []*DecisionEvent{}
 	for rows.Next() {
 		var e DecisionEvent

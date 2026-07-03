@@ -17,6 +17,18 @@ import (
 // (which only consider proposed/approved/marked_done).
 const decisionClaimed = "claimed"
 
+// Service-local audit tokens for system-driven status advances that the
+// governance Decision* vocabulary (propose/review/approve/done) does not name.
+// These transitions are performed by the orchestrator as part of the governed
+// workflow, so they are attributed to "system" — recording them keeps the audit
+// trail continuous (no status changes without a corresponding event).
+const (
+	decisionPROpened       = "pr_opened"
+	decisionReadyForTest   = "ready_for_test"
+	decisionReleasePlanned = "release_planned"
+	decisionReleaseStarted = "release_started"
+)
+
 // ListApprovedWork returns the change records an executor may pick up: approved
 // for AI, belonging to a release in approved/implementing status, and not
 // actively claimed. The store enforces these invariants; this method is a thin,
@@ -135,6 +147,9 @@ func (s *Service) RecordPR(ctx context.Context, changeID, url, branch string) er
 	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
 		return fmt.Errorf("record PR for change %q: %w", changeID, err)
 	}
+	if err := s.recordSystemTransition(ctx, ch.ReleaseID, ch.ID, ch.ProposalVersion, decisionPROpened, fmt.Sprintf("PR opened: %s", url)); err != nil {
+		return fmt.Errorf("record PR-opened event for change %q: %w", changeID, err)
+	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
 }
@@ -182,6 +197,9 @@ func (s *Service) ReadyForTest(ctx context.Context, changeID string) error {
 	ch.Status = governance.ChangeStatusReadyForTest
 	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
 		return fmt.Errorf("mark change %q ready for test: %w", changeID, err)
+	}
+	if err := s.recordSystemTransition(ctx, ch.ReleaseID, ch.ID, ch.ProposalVersion, decisionReadyForTest, "Advanced to ready_for_test"); err != nil {
+		return fmt.Errorf("record ready-for-test event for change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil

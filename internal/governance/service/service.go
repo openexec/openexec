@@ -139,6 +139,25 @@ var (
 // (decision events, evidence, communication artifacts).
 func newID() string { return uuid.New().String() }
 
+// recordSystemTransition appends a "system"-attributed decision event for a
+// status advance the orchestrator performs as part of the governed workflow
+// (e.g. pr_open, ready_for_test, release planned/started). It exists so no
+// governed status change is invisible in the audit trail. releaseID and/or
+// changeID may be set; either identifies the subject.
+func (s *Service) recordSystemTransition(ctx context.Context, releaseID, changeID string, proposalVersion int, decision, comment string) error {
+	ev := &governance.DecisionEvent{
+		ID:              newID(),
+		ReleaseID:       releaseID,
+		ChangeID:        changeID,
+		ProposalVersion: proposalVersion,
+		Actor:           "system",
+		ActorType:       governance.ActorTypeSystem,
+		Decision:        decision,
+		Comment:         comment,
+	}
+	return s.store.CreateDecisionEvent(ctx, ev)
+}
+
 // getRelease loads a release, translating the store's ErrNotFound sentinel into
 // an actionable message naming the missing id.
 func (s *Service) getRelease(ctx context.Context, id string) (*governance.GovernanceRelease, error) {

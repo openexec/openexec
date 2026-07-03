@@ -76,6 +76,9 @@ func (s *Service) AttachChange(ctx context.Context, releaseID, changeID string, 
 		if err := s.store.UpdateRelease(ctx, rel); err != nil {
 			return fmt.Errorf("move release %q to planned: %w", releaseID, err)
 		}
+		if err := s.recordSystemTransition(ctx, releaseID, "", 0, decisionReleasePlanned, fmt.Sprintf("Release %s moved to planned on first attach", releaseID)); err != nil {
+			return fmt.Errorf("record planned event for release %q: %w", releaseID, err)
+		}
 	}
 
 	// Scope-add into an approved release invalidates the approval.
@@ -173,6 +176,9 @@ func (s *Service) PlanRelease(ctx context.Context, releaseID string) error {
 	if err := s.store.UpdateRelease(ctx, rel); err != nil {
 		return fmt.Errorf("plan release %q: %w", releaseID, err)
 	}
+	if err := s.recordSystemTransition(ctx, releaseID, "", 0, decisionReleasePlanned, fmt.Sprintf("Release %s planned", releaseID)); err != nil {
+		return fmt.Errorf("record planned event for release %q: %w", releaseID, err)
+	}
 	return nil
 }
 
@@ -189,6 +195,9 @@ func (s *Service) StartRelease(ctx context.Context, releaseID string) error {
 	rel.Status = governance.ReleaseStatusImplementing
 	if err := s.store.UpdateRelease(ctx, rel); err != nil {
 		return fmt.Errorf("start release %q: %w", releaseID, err)
+	}
+	if err := s.recordSystemTransition(ctx, releaseID, "", 0, decisionReleaseStarted, fmt.Sprintf("Release %s started (implementing)", releaseID)); err != nil {
+		return fmt.Errorf("record started event for release %q: %w", releaseID, err)
 	}
 	return nil
 }
