@@ -175,9 +175,6 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 
 	ch.ApprovedVersion = ch.ProposalVersion
 	ch.Status = governance.ChangeStatusApprovedForAI
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-		return fmt.Errorf("approve change %q: %w", changeID, err)
-	}
 
 	approvalComment := fmt.Sprintf("Plan v%d approved by %s%s", ch.ProposalVersion, authority.Name, s.operatorSuffix())
 	if s.lightApprovalWaivesReview(ch) {
@@ -193,8 +190,8 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 		Decision:        governance.DecisionApproved,
 		Comment:         approvalComment,
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
-		return fmt.Errorf("record approval for change %q: %w", changeID, err)
+	if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+		return fmt.Errorf("approve change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
@@ -236,9 +233,6 @@ func (s *Service) terminateChange(ctx context.Context, changeID, authorityID, re
 		return err
 	}
 	ch.Status = targetStatus
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-		return fmt.Errorf("%s change %q: %w", verb, changeID, err)
-	}
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -247,10 +241,10 @@ func (s *Service) terminateChange(ctx context.Context, changeID, authorityID, re
 		Actor:           authority.ID,
 		ActorType:       authority.Type,
 		Decision:        decision,
-		Comment:         fmt.Sprintf("%s by %s: %s", verb, authority.Name, reason),
+		Comment:         fmt.Sprintf("%s by %s%s: %s", verb, authority.Name, s.operatorSuffix(), reason),
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
-		return fmt.Errorf("record %s for change %q: %w", verb, changeID, err)
+	if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+		return fmt.Errorf("%s change %q: %w", verb, changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
@@ -288,9 +282,6 @@ func (s *Service) RequestRevision(ctx context.Context, changeID, authorityID, co
 		return err
 	}
 	ch.Status = governance.ChangeStatusChangesRequested
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-		return fmt.Errorf("request revision on change %q: %w", changeID, err)
-	}
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -299,10 +290,10 @@ func (s *Service) RequestRevision(ctx context.Context, changeID, authorityID, co
 		Actor:           authority.ID,
 		ActorType:       authority.Type,
 		Decision:        governance.DecisionChangesRequested,
-		Comment:         fmt.Sprintf("Revision requested by %s: %s", authority.Name, comment),
+		Comment:         fmt.Sprintf("Revision requested by %s%s: %s", authority.Name, s.operatorSuffix(), comment),
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
-		return fmt.Errorf("record revision request for change %q: %w", changeID, err)
+	if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+		return fmt.Errorf("request revision on change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil

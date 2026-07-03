@@ -88,6 +88,43 @@ func TestAuditTriggers_BlockUpdateAndDelete(t *testing.T) {
 	}
 }
 
+// TestTransitionChange_AtomicStateAndEvent proves the state update and its
+// decision event commit together — and that a failing event rolls the state
+// change back, so the audit trail can never miss a transition.
+func TestTransitionChange_AtomicStateAndEvent(t *testing.T) {
+	_, store := newTestStore(t)
+	ctx := context.Background()
+	if err := store.CreateChangeRecord(ctx, &ChangeRecord{ID: "C-1", Status: ChangeStatusPlanReady}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	ch, _ := store.GetChangeRecord(ctx, "C-1")
+	ch.Status = ChangeStatusApprovedForAI
+	if err := store.TransitionChange(ctx, ch, &DecisionEvent{ID: "E-1", ChangeID: "C-1", Decision: "approved", Actor: "pm", ActorType: "human"}); err != nil {
+		t.Fatalf("TransitionChange: %v", err)
+	}
+	if got, _ := store.GetChangeRecord(ctx, "C-1"); got.Status != ChangeStatusApprovedForAI {
+		t.Fatalf("state not advanced, got %s", got.Status)
+	}
+	if evs, _ := store.ListDecisionEvents(ctx, "C-1"); len(evs) != 1 {
+		t.Fatalf("want 1 event, got %d", len(evs))
+	}
+
+	// A duplicate event id fails the insert — the whole transition must roll back,
+	// so the status change does NOT land.
+	ch2, _ := store.GetChangeRecord(ctx, "C-1")
+	ch2.Status = ChangeStatusImplementing
+	if err := store.TransitionChange(ctx, ch2, &DecisionEvent{ID: "E-1", ChangeID: "C-1", Decision: "approved"}); err == nil {
+		t.Fatalf("expected duplicate-event transition to fail")
+	}
+	if after, _ := store.GetChangeRecord(ctx, "C-1"); after.Status != ChangeStatusApprovedForAI {
+		t.Fatalf("failed transition must roll back the state change; status=%s", after.Status)
+	}
+	if ok, reason, _, _ := store.VerifyAuditChain(ctx); !ok {
+		t.Fatalf("chain broken: %s", reason)
+	}
+}
+
 // TestAuditChain_DetectsTampering drops the guard trigger, alters a row directly
 // (simulating an attacker with raw DB access), and confirms the hash chain still
 // DETECTS the change — tamper evidence independent of the triggers.

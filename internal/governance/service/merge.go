@@ -11,9 +11,29 @@ import (
 	"github.com/openexec/openexec/internal/governance/validation"
 )
 
-// decisionMerged is the service-local audit token for a merge (the governance
-// Decision* vocabulary has no merge verb).
-const decisionMerged = "merged"
+// Service-local audit tokens for a merge (the governance Decision* vocabulary
+// has no merge verb). merge_authorized is recorded BEFORE the external gh call
+// so a crash mid-merge still leaves a trace; merged / merge_failed record the
+// outcome after.
+const (
+	decisionMerged          = "merged"
+	decisionMergeAuthorized = "merge_authorized"
+	decisionMergeFailed     = "merge_failed"
+)
+
+// mergeEvent builds a merge-related decision event for a change.
+func (s *Service) mergeEvent(ch *governance.ChangeRecord, actor, actorType, decision, comment string) *governance.DecisionEvent {
+	return &governance.DecisionEvent{
+		ID:              newID(),
+		ReleaseID:       ch.ReleaseID,
+		ChangeID:        ch.ID,
+		ProposalVersion: ch.ProposalVersion,
+		Actor:           actor,
+		ActorType:       actorType,
+		Decision:        decision,
+		Comment:         comment,
+	}
+}
 
 // MergeChange merges a change's pull request — THE safety gate. It never merges
 // unless explicitly authorized, one of:
@@ -46,30 +66,36 @@ func (s *Service) MergeChange(ctx context.Context, changeID, authorityID, method
 		return fmt.Errorf("merge refused: %s", reason)
 	}
 
-	if err := github.MergePR(ctx, s.runner, repo, number, method); err != nil {
-		return err
-	}
-
-	// A merged change is done: move it there if the transition is legal.
-	if validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusDone) == nil {
-		ch.Status = governance.ChangeStatusDone
-		_ = s.store.UpdateChangeRecord(ctx, ch)
-	}
 	actorType := governance.ActorTypeSystem
 	if a, aErr := s.getAuthority(ctx, authorityID); aErr == nil {
 		actorType = a.Type
 	}
-	ev := &governance.DecisionEvent{
-		ID:              newID(),
-		ReleaseID:       ch.ReleaseID,
-		ChangeID:        ch.ID,
-		ProposalVersion: ch.ProposalVersion,
-		Actor:           authorityID,
-		ActorType:       actorType,
-		Decision:        decisionMerged,
-		Comment:         fmt.Sprintf("Merged PR %s via %s", ch.PRURL, mergeAuthLabel(s.operatorSession)),
+
+	// Record the authorization BEFORE the external merge, so even a crash between
+	// the gh call and the outcome event leaves an audit trace that a merge was
+	// authorized and attempted (no silent external side effect).
+	if err := s.store.CreateDecisionEvent(ctx, s.mergeEvent(ch, authorityID, actorType, decisionMergeAuthorized,
+		fmt.Sprintf("Merge authorized for PR %s via %s%s", ch.PRURL, mergeAuthLabel(s.operatorSession), s.operatorSuffix()))); err != nil {
+		return fmt.Errorf("record merge authorization for change %q: %w", changeID, err)
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
+
+	if err := github.MergePR(ctx, s.runner, repo, number, method); err != nil {
+		_ = s.store.CreateDecisionEvent(ctx, s.mergeEvent(ch, authorityID, actorType, decisionMergeFailed,
+			fmt.Sprintf("Merge FAILED for PR %s: %v", ch.PRURL, err)))
+		return err
+	}
+
+	// Success. A merged change is done: advance status + record the merge
+	// atomically so the two never diverge. If the transition is illegal, record
+	// the merge event on its own.
+	merged := s.mergeEvent(ch, authorityID, actorType, decisionMerged,
+		fmt.Sprintf("Merged PR %s via %s%s", ch.PRURL, mergeAuthLabel(s.operatorSession), s.operatorSuffix()))
+	if validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusDone) == nil {
+		ch.Status = governance.ChangeStatusDone
+		if err := s.store.TransitionChange(ctx, ch, merged); err != nil {
+			return fmt.Errorf("record merge for change %q: %w", changeID, err)
+		}
+	} else if err := s.store.CreateDecisionEvent(ctx, merged); err != nil {
 		return fmt.Errorf("record merge for change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)

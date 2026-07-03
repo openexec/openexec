@@ -144,11 +144,8 @@ func (s *Service) RecordPR(ctx context.Context, changeID, url, branch string) er
 		ch.Branch = branch
 	}
 	ch.Status = governance.ChangeStatusPROpen
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
+	if err := s.transitionChangeSystem(ctx, ch, decisionPROpened, fmt.Sprintf("PR opened: %s", url)); err != nil {
 		return fmt.Errorf("record PR for change %q: %w", changeID, err)
-	}
-	if err := s.recordSystemTransition(ctx, ch.ReleaseID, ch.ID, ch.ProposalVersion, decisionPROpened, fmt.Sprintf("PR opened: %s", url)); err != nil {
-		return fmt.Errorf("record PR-opened event for change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
@@ -204,11 +201,8 @@ func (s *Service) ReadyForTest(ctx context.Context, changeID string) error {
 		return err
 	}
 	ch.Status = governance.ChangeStatusReadyForTest
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
+	if err := s.transitionChangeSystem(ctx, ch, decisionReadyForTest, "Advanced to ready_for_test"); err != nil {
 		return fmt.Errorf("mark change %q ready for test: %w", changeID, err)
-	}
-	if err := s.recordSystemTransition(ctx, ch.ReleaseID, ch.ID, ch.ProposalVersion, decisionReadyForTest, "Advanced to ready_for_test"); err != nil {
-		return fmt.Errorf("record ready-for-test event for change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
@@ -272,10 +266,6 @@ func (s *Service) MarkDone(ctx context.Context, changeID, authorityID string) er
 		return err
 	}
 	ch.Status = governance.ChangeStatusDone
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-		return fmt.Errorf("mark change %q done: %w", changeID, err)
-	}
-
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -284,10 +274,10 @@ func (s *Service) MarkDone(ctx context.Context, changeID, authorityID string) er
 		Actor:           authority.ID,
 		ActorType:       authority.Type,
 		Decision:        governance.DecisionMarkedDone,
-		Comment:         fmt.Sprintf("Marked done by %s", authority.Name),
+		Comment:         fmt.Sprintf("Marked done by %s%s", authority.Name, s.operatorSuffix()),
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
-		return fmt.Errorf("record done for change %q: %w", changeID, err)
+	if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+		return fmt.Errorf("mark change %q done: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil

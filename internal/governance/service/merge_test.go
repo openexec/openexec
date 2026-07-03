@@ -3,12 +3,54 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/openexec/openexec/internal/governance"
 	"github.com/openexec/openexec/internal/governance/policy"
 )
+
+// failMergeRunner authorizes everything but fails the actual `pr merge` call.
+type failMergeRunner struct{}
+
+func (failMergeRunner) Run(_ context.Context, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "pr" && args[1] == "merge" {
+		return nil, errors.New("gh merge failed")
+	}
+	return []byte("{}"), nil
+}
+
+func TestMerge_FailureRecordsAuthorizedAndFailed(t *testing.T) {
+	store := newTestStore(t)
+	svc := NewService(store, Options{Runner: failMergeRunner{}, OperatorSession: true})
+	ctx := context.Background()
+	mergeChange(t, store, "C-1", governance.RiskHigh)
+
+	if err := svc.MergeChange(ctx, "C-1", "pm", "squash"); err == nil {
+		t.Fatalf("expected the merge to fail")
+	}
+	// The trail must show the authorization AND the failure (external side effect
+	// is never silent), and the change must not have advanced to done.
+	evs, _ := store.ListDecisionEvents(ctx, "C-1")
+	var sawAuth, sawFail, sawMerged bool
+	for _, e := range evs {
+		switch e.Decision {
+		case decisionMergeAuthorized:
+			sawAuth = true
+		case decisionMergeFailed:
+			sawFail = true
+		case decisionMerged:
+			sawMerged = true
+		}
+	}
+	if !sawAuth || !sawFail || sawMerged {
+		t.Fatalf("want authorized+failed, no merged; got auth=%v fail=%v merged=%v", sawAuth, sawFail, sawMerged)
+	}
+	if ch, _ := store.GetChangeRecord(ctx, "C-1"); ch.Status == governance.ChangeStatusDone {
+		t.Fatalf("a failed merge must not mark the change done")
+	}
+}
 
 // setOperability seeds a stored operability report for a change.
 func setOperability(t *testing.T, store governance.Store, changeID, rollback, dbmig, risk string) {

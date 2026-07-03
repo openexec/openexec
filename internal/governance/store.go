@@ -48,6 +48,9 @@ type Store interface {
 	CreateChangeRecord(ctx context.Context, c *ChangeRecord) error
 	GetChangeRecord(ctx context.Context, id string) (*ChangeRecord, error)
 	UpdateChangeRecord(ctx context.Context, c *ChangeRecord) error
+	// TransitionChange atomically updates a change record and appends its
+	// decision event in one transaction (state + audit event never diverge).
+	TransitionChange(ctx context.Context, c *ChangeRecord, e *DecisionEvent) error
 	ListChangeRecords(ctx context.Context) ([]*ChangeRecord, error)
 	ListChangeRecordsByRelease(ctx context.Context, releaseID string) ([]*ChangeRecord, error)
 	ListChangeRecordsByStatus(ctx context.Context, status string) ([]*ChangeRecord, error)
@@ -368,6 +371,14 @@ type rowScanner interface {
 	Scan(dest ...interface{}) error
 }
 
+// execer is satisfied by both *sql.DB and *sql.Tx, so a write helper can run
+// standalone or inside a transaction (see TransitionChange, which pairs a state
+// update and its decision event atomically).
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
 func scanRelease(sc rowScanner) (*GovernanceRelease, error) {
 	var r GovernanceRelease
 	var mustHaveJSON, outOfScopeJSON string
@@ -444,7 +455,7 @@ func (s *SQLiteStore) CreateChangeRecord(ctx context.Context, c *ChangeRecord) e
 	}
 	// Create is INSERT-only: a second CreateChangeRecord with the same id must
 	// fail loudly rather than silently reset an existing change record.
-	return s.writeChangeRecord(ctx, c, true)
+	return s.writeChangeRecord(ctx, s.db, c, true)
 }
 
 func (s *SQLiteStore) UpdateChangeRecord(ctx context.Context, c *ChangeRecord) error {
@@ -458,12 +469,14 @@ func (s *SQLiteStore) UpdateChangeRecord(ctx context.Context, c *ChangeRecord) e
 	if c.CreatedAt.IsZero() {
 		c.CreatedAt = c.UpdatedAt
 	}
-	return s.writeChangeRecord(ctx, c, false)
+	return s.writeChangeRecord(ctx, s.db, c, false)
 }
 
 // writeChangeRecord inserts a change record, upserting on id conflict unless
-// insertOnly is set (in which case a duplicate id returns ErrAlreadyExists).
-func (s *SQLiteStore) writeChangeRecord(ctx context.Context, c *ChangeRecord, insertOnly bool) error {
+// insertOnly is set (in which case a duplicate id returns ErrAlreadyExists). ex
+// is the DB or a transaction, so the same write runs standalone or inside
+// TransitionChange's atomic state+event transaction.
+func (s *SQLiteStore) writeChangeRecord(ctx context.Context, ex execer, c *ChangeRecord, insertOnly bool) error {
 	query := `
 		INSERT INTO change_records (
 			id, release_id, project_id, source_type, source_id, source_url, title, raw_text,
@@ -485,7 +498,7 @@ func (s *SQLiteStore) writeChangeRecord(ctx context.Context, c *ChangeRecord, in
 			claim_expires_at = excluded.claim_expires_at, light = excluded.light,
 			updated_at = excluded.updated_at`
 	}
-	_, err := s.db.ExecContext(ctx, query,
+	_, err := ex.ExecContext(ctx, query,
 		c.ID, c.ReleaseID, c.ProjectID, c.SourceType, c.SourceID, c.SourceURL, c.Title, c.RawText,
 		c.Summary, c.Kind, c.Risk, c.Status, c.ProposalVersion, c.ApprovedVersion, c.Plan,
 		c.AcceptanceCriteria, c.VerificationPlan, c.Branch, c.PRURL, c.ClaimedBy, nullTime(c.ClaimExpiresAt),
@@ -646,19 +659,22 @@ func (s *SQLiteStore) CreateDecisionEvent(ctx context.Context, e *DecisionEvent)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return insertDecisionEvent(ctx, s.db, e)
+}
 
+// insertDecisionEvent appends a hash-chained decision event using ex (the DB or
+// a transaction). It reads the current chain head, links the new event, and
+// inserts it. The caller holds s.mu so the read-then-insert is serialised within
+// this process; a cross-process fork is still DETECTED by VerifyAuditChain.
+func insertDecisionEvent(ctx context.Context, ex execer, e *DecisionEvent) error {
+	if e == nil || e.ID == "" {
+		return ErrInvalidData
+	}
 	if e.CreatedAt.IsZero() {
 		e.CreatedAt = time.Now().UTC()
 	}
-	// Tamper-evident hash chain. Under the write lock, read the hash of the most
-	// recently inserted event (by rowid — insertion order) and link this event to
-	// it. Any later alteration, deletion, or reordering breaks the chain and is
-	// caught by VerifyAuditChain. The lock serialises the read-then-insert within
-	// this process; a cross-process interleaving could fork the chain, which is
-	// still DETECTED at verify time (that is the guarantee — detection, not a
-	// distributed lock).
 	var prev sql.NullString
-	if err := s.db.QueryRowContext(ctx,
+	if err := ex.QueryRowContext(ctx,
 		`SELECT hash FROM decision_events ORDER BY rowid DESC LIMIT 1`).Scan(&prev); err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to read audit chain head: %w", err)
 	}
@@ -667,7 +683,7 @@ func (s *SQLiteStore) CreateDecisionEvent(ctx context.Context, e *DecisionEvent)
 
 	// Append-only: decision events are immutable audit rows. A duplicate id must
 	// never silently rewrite history — it returns ErrAlreadyExists instead.
-	_, err := s.db.ExecContext(ctx, `
+	_, err := ex.ExecContext(ctx, `
 		INSERT INTO decision_events (id, release_id, change_id, proposal_version, actor, actor_type, decision, comment, created_at, prev_hash, hash)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
@@ -680,6 +696,37 @@ func (s *SQLiteStore) CreateDecisionEvent(ctx context.Context, e *DecisionEvent)
 		return fmt.Errorf("failed to insert decision event: %w", err)
 	}
 	return nil
+}
+
+// TransitionChange atomically upserts a change record AND appends its decision
+// event in one transaction, so a state change can never land in the audit trail
+// without its event (or vice versa) — either both commit or neither does. Use it
+// for every "advance status + record why" operation.
+func (s *SQLiteStore) TransitionChange(ctx context.Context, c *ChangeRecord, e *DecisionEvent) error {
+	if c == nil || c.ID == "" || e == nil || e.ID == "" {
+		return ErrInvalidData
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	c.UpdatedAt = time.Now().UTC()
+	if c.CreatedAt.IsZero() {
+		c.CreatedAt = c.UpdatedAt
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transition tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := s.writeChangeRecord(ctx, tx, c, false); err != nil {
+		return err
+	}
+	if err := insertDecisionEvent(ctx, tx, e); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // chainHash computes the tamper-evident hash for a decision event: the SHA-256

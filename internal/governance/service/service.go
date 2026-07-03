@@ -177,6 +177,24 @@ func (s *Service) recordSystemTransition(ctx context.Context, releaseID, changeI
 	return s.store.CreateDecisionEvent(ctx, ev)
 }
 
+// transitionChangeSystem atomically persists a change's status advance and a
+// "system"-attributed decision event for it, so the state change and its audit
+// event land together or not at all. Used by the workflow status advances
+// (pr_open, ready_for_test) where no human/AI authority is the actor.
+func (s *Service) transitionChangeSystem(ctx context.Context, ch *governance.ChangeRecord, decision, comment string) error {
+	ev := &governance.DecisionEvent{
+		ID:              newID(),
+		ReleaseID:       ch.ReleaseID,
+		ChangeID:        ch.ID,
+		ProposalVersion: ch.ProposalVersion,
+		Actor:           "system",
+		ActorType:       governance.ActorTypeSystem,
+		Decision:        decision,
+		Comment:         comment,
+	}
+	return s.store.TransitionChange(ctx, ch, ev)
+}
+
 // getRelease loads a release, translating the store's ErrNotFound sentinel into
 // an actionable message naming the missing id.
 func (s *Service) getRelease(ctx context.Context, id string) (*governance.GovernanceRelease, error) {
