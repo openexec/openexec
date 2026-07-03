@@ -321,6 +321,57 @@ var govReleaseStartCmd = &cobra.Command{
 	},
 }
 
+var govReleaseExecuteCmd = &cobra.Command{
+	Use:   "execute <release-id>",
+	Short: "Build all approved work in a release in one go (or a --changes subset)",
+	Long: `Run every approved change in the release through the execution engine in one
+batch (or restrict to --changes a,b,c). Non-approved items are skipped. The
+release is advanced to implementing.
+
+Trunk-based: bundle a small set of fixes, execute, open one short-lived release
+PR, merge to trunk, delete the branch — keep the batch small and frequent
+rather than accumulating a long-lived branch.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		var only []string
+		if csv, _ := cmd.Flags().GetString("changes"); csv != "" {
+			for _, id := range strings.Split(csv, ",") {
+				if id = strings.TrimSpace(id); id != "" {
+					only = append(only, id)
+				}
+			}
+		}
+		agent, _ := cmd.Flags().GetString("agent")
+		mode, _ := cmd.Flags().GetString("mode")
+
+		rep, err := svc.ExecuteRelease(cmd.Context(), args[0], only, agent, mode)
+		if err != nil {
+			return err
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			return printJSON(cmd, rep)
+		}
+		cmd.Printf("Release %s: executed %d change(s), skipped %d, %d error(s)\n",
+			rep.ReleaseID, len(rep.Executed), len(rep.Skipped), len(rep.Errors))
+		for _, r := range rep.Executed {
+			cmd.Printf("  built %s (%d task(s))\n", r.ChangeID, len(r.DispatchedTasks))
+		}
+		for _, s := range rep.Skipped {
+			cmd.Printf("  skip  %s\n", s)
+		}
+		for id, msg := range rep.Errors {
+			cmd.Printf("  error %s: %s\n", id, msg)
+		}
+		return nil
+	},
+}
+
 var govReleaseStatusCmd = &cobra.Command{
 	Use:   "status <release-id>",
 	Short: "Show a release and its change records",
@@ -433,6 +484,13 @@ func init() {
 
 	// release start
 	governanceReleaseCmd.AddCommand(govReleaseStartCmd)
+
+	// release execute (batch)
+	governanceReleaseCmd.AddCommand(govReleaseExecuteCmd)
+	govReleaseExecuteCmd.Flags().String("changes", "", "Comma-separated change ids to build (default: all approved in the release)")
+	govReleaseExecuteCmd.Flags().String("agent", "openexec-executor", "Executor name recorded on claims")
+	govReleaseExecuteCmd.Flags().String("mode", "workspace-write", "Execution mode")
+	govReleaseExecuteCmd.Flags().Bool("json", false, "Output as JSON")
 
 	// release status
 	governanceReleaseCmd.AddCommand(govReleaseStatusCmd)

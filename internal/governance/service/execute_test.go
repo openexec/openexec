@@ -96,6 +96,60 @@ func TestExecuteChange_RefusesUnapprovedWork(t *testing.T) {
 	}
 }
 
+func TestExecuteRelease_BuildsAllApprovedAndSkipsRest(t *testing.T) {
+	store := newTestStore(t)
+	ps := newFakePlanStore()
+	exec := &fakeExecutor{}
+	svc := NewService(store, Options{PlanStore: ps, Executor: exec})
+	ctx := context.Background()
+
+	seedRelease(t, store, &governance.GovernanceRelease{ID: "R-1", Status: governance.ReleaseStatusApproved, ApprovedForAI: true})
+	// Two approved changes (each one story/one task) + one still plan_ready.
+	for _, c := range []struct{ id, task, status string }{
+		{"C-1", "T-1", governance.ChangeStatusApprovedForAI},
+		{"C-2", "T-2", governance.ChangeStatusApprovedForAI},
+		{"C-3", "T-3", governance.ChangeStatusPlanReady},
+	} {
+		seedChange(t, store, &governance.ChangeRecord{
+			ID: c.id, ReleaseID: "R-1", Status: c.status,
+			ProposalVersion: 1, ApprovedVersion: 1,
+			SourceType: governance.SourceManual, SourceID: c.id,
+		})
+		if err := store.CreateReleaseItem(ctx, &governance.ReleaseItem{ReleaseID: "R-1", ChangeID: c.id}); err != nil {
+			t.Fatalf("release item: %v", err)
+		}
+		ps.stories["US-"+c.id] = releaseStory("US-"+c.id, []string{c.task})
+		_ = store.LinkChangeStory(ctx, c.id, "US-"+c.id)
+	}
+
+	rep, err := svc.ExecuteRelease(ctx, "R-1", nil, "codex", "workspace-write")
+	if err != nil {
+		t.Fatalf("ExecuteRelease: %v", err)
+	}
+	if len(rep.Executed) != 2 {
+		t.Fatalf("expected 2 built changes, got %d", len(rep.Executed))
+	}
+	if len(rep.Skipped) != 1 {
+		t.Fatalf("expected 1 skipped (plan_ready), got %+v", rep.Skipped)
+	}
+	// The release advanced to implementing.
+	rel, _ := store.GetRelease(ctx, "R-1")
+	if rel.Status != governance.ReleaseStatusImplementing {
+		t.Fatalf("expected release implementing, got %q", rel.Status)
+	}
+
+	// Subset selection: only C-1.
+	exec2 := &fakeExecutor{}
+	svc2 := NewService(store, Options{PlanStore: ps, Executor: exec2})
+	rep2, err := svc2.ExecuteRelease(ctx, "R-1", []string{"C-1"}, "codex", "")
+	if err != nil {
+		t.Fatalf("ExecuteRelease subset: %v", err)
+	}
+	if len(rep2.Executed) != 1 || rep2.Executed[0].ChangeID != "C-1" {
+		t.Fatalf("expected only C-1 built, got %+v", rep2.Executed)
+	}
+}
+
 func TestExecuteChange_RequiresExecutor(t *testing.T) {
 	store := newTestStore(t)
 	svc := NewService(store, Options{PlanStore: newFakePlanStore()}) // no Executor
