@@ -65,9 +65,6 @@ undecided:
 baseline:
   # 2026-07-03: harness/parallel/predictive deleted (unwired); 6 edges removed.
   - "internal/context -> internal/memory"
-  - "internal/mcp -> internal/governance"
-  - "internal/mcp -> internal/governance/ai"
-  - "internal/mcp -> internal/governance/service"
   - "internal/pipeline -> internal/router"
   - "internal/server -> internal/dcp"
   - "internal/server -> internal/infra"

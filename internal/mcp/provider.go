@@ -56,3 +56,11 @@ func (h *toolHost) Context() context.Context        { return h.s.toolCtx() }
 func (h *toolHost) WorkspaceRoots() []string        { return h.s.workspaceRoots }
 
 var _ mcptool.Host = (*toolHost)(nil)
+
+// toolCtx returns the server's tracing context or a background context.
+func (s *Server) toolCtx() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return context.Background()
+}

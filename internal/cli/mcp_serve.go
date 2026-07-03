@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/approval"
+	"github.com/openexec/openexec/internal/governance/mcpgov"
 	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/mcp"
 	"github.com/openexec/openexec/internal/memory"
@@ -47,6 +48,10 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 		srv.SetMemoryLoader(func(root string) (string, error) {
 			return memory.NewMemorySystem(root).LoadMerged()
 		})
+
+		// Governance MCP tools ship with the governance module; register them so
+		// core exposes them without importing governance.
+		srv.RegisterProvider(mcpgov.New())
 
 		// Infra tools (SRE command registry): enabled only when the operator
 		// wrote .openexec/infra.yaml. A malformed allowlist fails the server

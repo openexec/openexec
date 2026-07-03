@@ -81,11 +81,9 @@ type Server struct {
 	backlogMu  sync.Mutex
 	backlogMgr *release.Manager
 
-	// Governance tools state (see governance.go). Lazily opened; guarded by
-	// govMu. The store reads live from SQLite, so caching the handle is safe —
-	// handlers never cache results across calls.
-	govMu     sync.Mutex
-	govHandle *govHandle
+	// Governance MCP tools now live in the governance module (internal/governance/
+	// mcpgov) and are registered as a provider by the composition root, so core
+	// does not import governance. See internal/mcptool.
 
 	// Infra tools state (see infra.go). Nil registry = no infra tools.
 	infraRegistry infracontract.Registry
@@ -299,20 +297,8 @@ func (s *Server) handleToolsList(req Request) {
 		BacklogAddTaskToolDef(),
 		MemoryReadToolDef(),
 		SkillProposeToolDef(),
-
-		// Release-governance tools for executor handoff (see governance.go).
-		// Like backlog tools, they mutate orchestrator bookkeeping (not
-		// workspace files) and are available in every mode.
-		ListReleasesToolDef(),
-		ListApprovedWorkToolDef(),
-		GetWorkBriefToolDef(),
-		ClaimWorkToolDef(),
-		RecordPlanToolDef(),
-		RequestRevisionToolDef(),
-		RecordPRToolDef(),
-		RecordTestEvidenceToolDef(),
-		GenerateHandoffToolDef(),
-		RequestDoneToolDef(),
+		// Release-governance tools are now contributed by the governance provider
+		// (see providerToolDefs, appended below) — no longer built into core.
 	}
 
 	// Dangerous tools only advertised in danger-full-access mode
@@ -565,39 +551,8 @@ func (s *Server) handleToolsCall(req Request) {
 	case "skill_propose":
 		s.handleSkillPropose(req, params)
 		telemetry.RecordToolSuccess(span, "")
-	// Release-governance executor-handoff tools (governance.go). Like backlog
-	// tools, they mutate orchestrator bookkeeping, not workspace files, so they
-	// are not idempotency-marked.
-	case "openexec_list_releases":
-		s.handleListReleases(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_list_approved_work":
-		s.handleListApprovedWork(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_get_work_brief":
-		s.handleGetWorkBrief(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_claim_work":
-		s.handleClaimWork(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_record_plan":
-		s.handleRecordPlan(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_request_revision":
-		s.handleRequestRevision(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_record_pr":
-		s.handleRecordPR(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_record_test_evidence":
-		s.handleRecordTestEvidence(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_generate_handoff":
-		s.handleGenerateHandoff(req, params)
-		telemetry.RecordToolSuccess(span, "")
-	case "openexec_request_done":
-		s.handleRequestDone(req, params)
-		telemetry.RecordToolSuccess(span, "")
+	// Release-governance executor-handoff tools now come from the governance
+	// provider (dispatched above via dispatchProvider), not this switch.
 	// Infra tools (infra.go): like run_shell_command, deliberately NOT
 	// marked applied — infrastructure commands are non-idempotent and must
 	// re-run on resume rather than be skipped over partial side effects.

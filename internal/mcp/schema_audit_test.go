@@ -44,17 +44,7 @@ func allToolDefs() []map[string]interface{} {
 		TerraformApplyToolDef(auditInfraRegistry()),
 		ApprovalListToolDef(),
 		ApprovalDecideToolDef(),
-		// Release-governance executor-handoff tools (governance.go).
-		ListReleasesToolDef(),
-		ListApprovedWorkToolDef(),
-		GetWorkBriefToolDef(),
-		ClaimWorkToolDef(),
-		RecordPlanToolDef(),
-		RequestRevisionToolDef(),
-		RecordPRToolDef(),
-		RecordTestEvidenceToolDef(),
-		GenerateHandoffToolDef(),
-		RequestDoneToolDef(),
+		// Release-governance tools moved to internal/governance/mcpgov (audited there).
 	}
 }
 
@@ -199,17 +189,8 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{TerraformPlanToolDef(auditInfraRegistry()), TerraformPlanRequest{}},
 		{TerraformApplyToolDef(auditInfraRegistry()), TerraformApplyRequest{}},
 		{ApprovalDecideToolDef(), ApprovalDecideRequest{}},
-		// Release-governance executor-handoff tools (governance.go).
-		{ListReleasesToolDef(), ListReleasesRequest{}},
-		{ListApprovedWorkToolDef(), ListApprovedWorkRequest{}},
-		{GetWorkBriefToolDef(), GetWorkBriefRequest{}},
-		{ClaimWorkToolDef(), ClaimWorkRequest{}},
-		{RecordPlanToolDef(), RecordPlanRequest{}},
-		{RequestRevisionToolDef(), RequestRevisionRequest{}},
-		{RecordPRToolDef(), RecordPRRequest{}},
-		{RecordTestEvidenceToolDef(), RecordTestEvidenceRequest{}},
-		{GenerateHandoffToolDef(), GenerateHandoffRequest{}},
-		{RequestDoneToolDef(), RequestDoneRequest{}},
+		// Release-governance tools moved to internal/governance/mcpgov and are
+		// audited by that package's own schema test.
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}
