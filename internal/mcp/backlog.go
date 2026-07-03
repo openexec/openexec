@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/release"
 )
 
@@ -607,8 +606,11 @@ func (s *Server) handleMemoryRead(req Request, params toolsCallParams) {
 		return
 	}
 
-	ms := memory.NewMemorySystem(s.workspaceRoots[0])
-	merged, err := ms.LoadMerged()
+	if s.memoryLoader == nil {
+		s.writeToolError(req.ID, "memory_read is not available in this server")
+		return
+	}
+	merged, err := s.memoryLoader(s.workspaceRoots[0])
 	if err != nil {
 		s.writeToolError(req.ID, fmt.Sprintf("failed to load memory: %v", err))
 		return

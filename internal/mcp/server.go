@@ -90,6 +90,10 @@ type Server struct {
 	infraRegistry infracontract.Registry
 	infraRunner   infracontract.Runner
 
+	// memoryLoader loads the merged project memory for the memory_read tool.
+	// Injected by the composition root so mcp does not import internal/memory.
+	memoryLoader func(workspaceRoot string) (string, error)
+
 	// Operator-session approval tools (see approvals.go). operatorSession
 	// is read once from OPENEXEC_OPERATOR_SESSION at construction — agent
 	// sessions must never gain self-approval at runtime.

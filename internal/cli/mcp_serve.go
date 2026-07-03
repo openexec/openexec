@@ -9,6 +9,7 @@ import (
 	"github.com/openexec/openexec/internal/approval"
 	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/mcp"
+	"github.com/openexec/openexec/internal/memory"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +41,12 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 			fmt.Fprintf(os.Stderr, "Hint: Set WORKSPACE_ROOT env var or run from a valid project directory\n")
 			return err
 		}
+
+		// Wire the memory_read loader (composition root injects it so the MCP
+		// server does not import internal/memory).
+		srv.SetMemoryLoader(func(root string) (string, error) {
+			return memory.NewMemorySystem(root).LoadMerged()
+		})
 
 		// Infra tools (SRE command registry): enabled only when the operator
 		// wrote .openexec/infra.yaml. A malformed allowlist fails the server
