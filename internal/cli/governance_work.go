@@ -5,14 +5,18 @@ package cli
 // Service method, and renders the result.
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/openexec/openexec/internal/git"
 	"github.com/openexec/openexec/internal/governance"
 	"github.com/openexec/openexec/internal/governance/service"
+	"github.com/openexec/openexec/internal/project"
 )
 
 var governanceWorkCmd = &cobra.Command{
@@ -602,6 +606,90 @@ var govWorkRecordPRCmd = &cobra.Command{
 	},
 }
 
+// govWorkOpenPRCmd is the create-side counterpart to record-pr: it pushes the
+// change's feature branch and opens a real PR (git push + gh pr create), then
+// records it and posts the governance assessment. record-pr links an
+// externally-opened PR; open-pr opens one. This is the trunk-based GitHub path
+// (one governed change → one PR); story-level bundling for Jira is planned
+// (docs/GOVERNED_PR_CREATION_PLAN.md).
+var govWorkOpenPRCmd = &cobra.Command{
+	Use:   "open-pr <change-id>",
+	Short: "Push the change's branch and open a real PR (git push + gh pr create), then record it and post the assessment",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, store, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		changeID := args[0]
+		baseDir, _ := govBaseDir(cmd)
+		branch, _ := cmd.Flags().GetString("branch")
+		base, _ := cmd.Flags().GetString("base")
+
+		ch, err := store.GetChangeRecord(cmd.Context(), changeID)
+		if err != nil {
+			return err
+		}
+
+		gc := git.NewClient(git.Config{Enabled: true, RepoPath: baseDir})
+		if branch == "" {
+			branch, err = gc.CurrentBranch()
+			if err != nil {
+				return fmt.Errorf("could not determine current branch (use --branch): %w", err)
+			}
+		}
+		if base == "" {
+			if pc, _ := project.LoadProjectConfig(baseDir); pc != nil && pc.BaseBranch != "" {
+				base = pc.BaseBranch
+			} else {
+				base = "main"
+			}
+		}
+		if branch == base {
+			return fmt.Errorf("refusing to open a PR from base branch %q — check out a feature branch first", base)
+		}
+
+		// 1. Push the feature branch to origin.
+		cmd.Printf("Pushing %s to origin...\n", branch)
+		if err := gc.PushBranch(branch); err != nil {
+			return fmt.Errorf("git push failed: %w", err)
+		}
+
+		// 2. Open the PR via gh, run inside the project dir so gh resolves the repo
+		//    from its remote (same auth/repo a human `gh pr create` would use).
+		title := ch.Title
+		body := fmt.Sprintf("Governed change **%s**\n\nSource: %s\n\n_Opened by OpenExec governance; the risk assessment follows in a comment._", changeID, ch.SourceURL)
+		out, err := runGH(cmd.Context(), baseDir, "pr", "create", "--base", base, "--head", branch, "--title", title, "--body", body)
+		if err != nil {
+			return fmt.Errorf("gh pr create failed: %w — %s", err, strings.TrimSpace(string(out)))
+		}
+		url := strings.TrimSpace(string(out))
+		cmd.Printf("Opened PR: %s\n", url)
+
+		// 3. Record it and post the governance assessment (same tail as record-pr).
+		if err := svc.RecordPR(cmd.Context(), changeID, url, branch); err != nil {
+			return err
+		}
+		cmd.Println("Assessing risk (impact + operability) and posting to the PR...")
+		if err := assessAndPostToPR(cmd, svc, store, changeID); err != nil {
+			cmd.Printf("  warning: assessment not posted: %v\n", err)
+		} else {
+			cmd.Println("  posted governance assessment to the PR")
+		}
+		return nil
+	},
+}
+
+// runGH runs a gh invocation inside dir so gh auto-detects the target repo from
+// the working directory's git remote. argv array, never a shell string.
+func runGH(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	c := exec.CommandContext(ctx, "gh", args...)
+	c.Dir = dir
+	return c.CombinedOutput()
+}
+
 var govWorkRiskAcceptCmd = &cobra.Command{
 	Use:   "risk-accept <change-id>",
 	Short: "Record an explicit human risk-acceptance (required to approve/merge critical changes)",
@@ -892,6 +980,10 @@ func init() {
 	governanceWorkCmd.AddCommand(govWorkRecordPRCmd)
 	govWorkRecordPRCmd.Flags().String("url", "", "Pull request URL")
 	govWorkRecordPRCmd.Flags().String("branch", "", "Branch name")
+
+	governanceWorkCmd.AddCommand(govWorkOpenPRCmd)
+	govWorkOpenPRCmd.Flags().String("branch", "", "Feature branch to push and open the PR from (default: current branch)")
+	govWorkOpenPRCmd.Flags().String("base", "", "Base branch for the PR (default: project base_branch, else main)")
 
 	// work risk-accept
 	governanceWorkCmd.AddCommand(govWorkRiskAcceptCmd)
