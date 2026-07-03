@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -17,15 +18,10 @@ import (
 	"time"
 
 	"github.com/openexec/openexec"
-	"github.com/openexec/openexec/internal/dcp"
 	"github.com/openexec/openexec/internal/execution/health"
-	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/knowledge"
-	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/project"
-	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/runner"
-	"github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/pkg/api"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/session"
@@ -41,7 +37,7 @@ type Server struct {
 	Mgr         *manager.Manager
 	SessionRepo session.Repository
 	AuditLogger audit.Logger
-	Coordinator *dcp.Coordinator
+	Coordinator DCPCoordinator
 	Checker     *health.Checker
 	ProjectsDir string
 	Mux         *http.ServeMux
@@ -56,6 +52,24 @@ type Server struct {
 	skipPreflight bool // For testing: skip preflight checks
 }
 
+// DCPCoordinator is the core seam for the optional Deterministic Control Plane.
+// The concrete implementation lives in internal/dcp (a routing module); core
+// holds only this interface so the daemon never imports it. Nil means DCP is off.
+type DCPCoordinator interface {
+	// AllowsExecution reports whether the coordinator executes tools directly
+	// (must be false in production — the HTTP layer refuses otherwise).
+	AllowsExecution() bool
+	// SyncKnowledge performs a best-effort full re-index of the project.
+	SyncKnowledge(projectDir string)
+	// ProcessQuery parses intent and returns a suggestion (or result).
+	ProcessQuery(ctx context.Context, query string) (any, error)
+}
+
+// CoordinatorFactory builds a DCPCoordinator from the daemon-owned database and
+// resolved project directory. Supplied by the composition root (internal/cli),
+// which is the only layer allowed to import internal/dcp and the DCP tools.
+type CoordinatorFactory func(db *sql.DB, projectsDir string) (DCPCoordinator, error)
+
 // Config defines settings for the unified server
 type Config struct {
 	Port          int
@@ -65,6 +79,9 @@ type Config struct {
 	ProjectsDir   string
 	SkipPreflight bool // For testing: skip preflight checks that require real runner
 	EnableDCP     bool // Feature flag: enable Deterministic Control Plane (default: false)
+	// NewCoordinator, when set and EnableDCP resolves true, builds the DCP
+	// coordinator. Left nil by default so core needs no DCP dependency.
+	NewCoordinator CoordinatorFactory
 }
 
 // New creates a new unified OpenExec server
@@ -175,35 +192,18 @@ func New(cfg Config) (*Server, error) {
 			enableDCP = (lower == "1" || lower == "true" || lower == "yes")
 		}
 	}
-	var coordinator *dcp.Coordinator
-	if enableDCP {
-		// Error ignored: knowledge store is optional; DCP tools handle nil/empty store
-		kStore, _ := knowledge.NewStoreWithDB(db)
-		bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
-		// In enabled mode, do not skip availability by default
-		bRouter.SetSkipAvailabilityCheck(false)
-		pEngine := policy.NewEngine(kStore)
-		coordinator = dcp.NewCoordinator(bRouter, kStore)
-		coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
-		coordinator.RegisterTool(tools.NewDeployTool(kStore))
-		coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
-		coordinator.RegisterTool(tools.NewGeneralChatTool()) // conversational fallback
-
-		// Infra suggestion tools (SRE roadmap Phase 4): when the operator
-		// wrote an infra allowlist, register suggestion-only routing
-		// targets so SRE prompts ("bounce nginx on staging") classify into
-		// structured tool calls. Router output stays an untrusted
-		// proposal — execution happens only via the MCP infra plane.
-		if infraReg, ierr := infra.LoadRegistry(projectsAbs); ierr != nil {
-			log.Printf("[Server] infra allowlist error (DCP routing skipped): %v", ierr)
-		} else if infraReg != nil {
-			suggest := tools.NewInfraSuggestTools(infraReg)
-			for _, t := range suggest {
-				coordinator.RegisterTool(t)
-			}
-			log.Printf("[Server] DCP: registered %d infra suggestion tools", len(suggest))
+	// The coordinator (internal/dcp) is a routing module; core holds only the
+	// DCPCoordinator seam and never imports it. When enabled, the composition
+	// root's factory (cfg.NewCoordinator) builds and wires it, sharing the
+	// daemon-owned db and resolved project dir.
+	var coordinator DCPCoordinator
+	if enableDCP && cfg.NewCoordinator != nil {
+		c, cerr := cfg.NewCoordinator(db, projectsAbs)
+		if cerr != nil {
+			return nil, fmt.Errorf("DCP coordinator init failed: %w", cerr)
 		}
-		log.Printf("[Server] DCP enabled: BitNet routing active")
+		coordinator = c
+		log.Printf("[Server] DCP enabled: coordinator wired by composition root")
 	} else {
 		log.Printf("[Server] DCP disabled: using Pipeline/Manager only")
 	}
@@ -335,7 +335,7 @@ func (s *Server) handleDCPQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extra guard: ensure coordinator is in suggest-only mode
-	if s.Coordinator.AllowExecution {
+	if s.Coordinator.AllowsExecution() {
 		log.Printf("[DCP] BLOCKED: coordinator has AllowExecution=true (should never happen in production)")
 		s.respondJSON(w, http.StatusForbidden, map[string]interface{}{
 			"error": "DCP is misconfigured; execution is disabled at the HTTP layer",

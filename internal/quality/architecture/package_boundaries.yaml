@@ -64,9 +64,17 @@ undecided:
 #     "modules" that are woven into core execution. Either decouple behind a core
 #     interface, or (Step 2) delete if the experimental path is unwired.
 #   - server/tools -> infra : SRE reached from core; must be cut before SRE extracts.
-baseline:
-  # 2026-07-03: harness/parallel/predictive deleted (unwired); 6 edges removed.
-  - "internal/context -> internal/memory"
-  - "internal/server -> internal/dcp"
-  - "internal/server -> internal/infra"
-  - "internal/tools -> internal/infra"
+baseline: []
+  # 2026-07-03: boundary is CLEAN — every recorded edge decoupled or deleted.
+  # History (see git): 17 initial edges → 0.
+  #   - harness/parallel/predictive deleted as unwired dead code.
+  #   - mcp -> infra/memory/governance inverted via internal/infracontract,
+  #     the injected memoryLoader, and the internal/mcptool provider seam
+  #     (governance MCP adapter extracted to internal/governance/mcpgov).
+  #   - router reclassified as core (load-bearing, imports only core).
+  #   - context -> memory removed (dead pruner recency scoring deleted).
+  #   - tools -> infra inverted onto the infracontract.Registry seam.
+  #   - server -> dcp/infra cut: the DCP coordinator is now built by the
+  #     composition root (internal/cli.newDCPCoordinator) and injected behind
+  #     the core server.DCPCoordinator interface / CoordinatorFactory seam.
+  # Keep it empty: any new cross-tier import now FAILS the ratchet.

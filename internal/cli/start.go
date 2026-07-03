@@ -3,9 +3,11 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -17,15 +19,57 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
+	"github.com/openexec/openexec/internal/dcp"
+	"github.com/openexec/openexec/internal/infra"
+	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/runner"
 	"github.com/openexec/openexec/internal/server"
+	"github.com/openexec/openexec/internal/tools"
 	"github.com/spf13/cobra"
 )
 
 // Legacy FWU flow removed in Phase Four. All orchestration is daemon-owned.
+
+// newDCPCoordinator builds the optional Deterministic Control Plane coordinator
+// (a routing module) for the daemon. It lives in the composition root so core
+// (internal/server) never imports internal/dcp, internal/infra, or the DCP
+// tools — the server holds only the server.DCPCoordinator seam. Passed as
+// server.Config.NewCoordinator and invoked by the daemon only when DCP is on.
+func newDCPCoordinator(db *sql.DB, projectsDir string) (server.DCPCoordinator, error) {
+	// Error ignored: knowledge store is optional; DCP tools handle nil/empty store.
+	kStore, _ := knowledge.NewStoreWithDB(db)
+	bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
+	// In enabled mode, do not skip availability by default.
+	bRouter.SetSkipAvailabilityCheck(false)
+	pEngine := policy.NewEngine(kStore)
+	coordinator := dcp.NewCoordinator(bRouter, kStore)
+	coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
+	coordinator.RegisterTool(tools.NewDeployTool(kStore))
+	coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
+	coordinator.RegisterTool(tools.NewGeneralChatTool()) // conversational fallback
+
+	// Infra suggestion tools (SRE roadmap Phase 4): when the operator wrote an
+	// infra allowlist, register suggestion-only routing targets so SRE prompts
+	// ("bounce nginx on staging") classify into structured tool calls. Router
+	// output stays an untrusted proposal — execution happens only via the MCP
+	// infra plane.
+	if infraReg, ierr := infra.LoadRegistry(projectsDir); ierr != nil {
+		log.Printf("[Server] infra allowlist error (DCP routing skipped): %v", ierr)
+	} else if infraReg != nil {
+		suggest := tools.NewInfraSuggestTools(infraReg)
+		for _, t := range suggest {
+			coordinator.RegisterTool(t)
+		}
+		log.Printf("[Server] DCP: registered %d infra suggestion tools", len(suggest))
+	}
+	log.Printf("[Server] DCP enabled: BitNet routing active")
+	return coordinator, nil
+}
 
 var (
 	startPort        int
@@ -162,11 +206,12 @@ WebSocket events are available at /ws for real-time monitoring.`,
 		}
 
 		srv, err := server.New(server.Config{
-			Port:        startPort,
-			UnifiedDB:   auditDB,
-			DataDir:     dataDir,
-			ProjectsDir: config.ProjectDir,
-			EnableDCP:   enableDCP,
+			Port:           startPort,
+			UnifiedDB:      auditDB,
+			DataDir:        dataDir,
+			ProjectsDir:    config.ProjectDir,
+			EnableDCP:      enableDCP,
+			NewCoordinator: newDCPCoordinator,
 		})
 		if err != nil {
 			return err
