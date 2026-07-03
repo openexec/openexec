@@ -296,6 +296,20 @@ func PostComment(ctx context.Context, runner Runner, repo string, number int, bo
 	return nil
 }
 
+// PostPRComment posts a comment to a pull request via `gh pr comment`. body is a
+// single argv element, never interpolated into a shell string.
+func PostPRComment(ctx context.Context, runner Runner, repo string, number int, body string) error {
+	_, err := runner.Run(ctx,
+		"pr", "comment", strconv.Itoa(number),
+		"--repo", repo,
+		"--body", body,
+	)
+	if err != nil {
+		return fmt.Errorf("github: post comment to PR %d: %w", number, err)
+	}
+	return nil
+}
+
 // knownCommands is the set of /openexec slash commands ParseCommentCommand
 // recognizes. The value reports whether the command takes a free-text argument.
 var knownCommands = map[string]bool{

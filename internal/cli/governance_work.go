@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/openexec/openexec/internal/governance"
+	"github.com/openexec/openexec/internal/governance/service"
 )
 
 var governanceWorkCmd = &cobra.Command{
@@ -525,12 +528,30 @@ var govWorkBriefCmd = &cobra.Command{
 	},
 }
 
+// assessAndPostToPR generates the governance risk assessment (file-level impact
+// + operability) for a change, records it in the audit trail, and posts it to
+// the change's PR. Repo context is gathered from the project dir by the change's
+// intent so the model reads real files. Shared by record-pr (automatic, so every
+// PR carries the assessment) and the standalone pr-assess command.
+func assessAndPostToPR(cmd *cobra.Command, svc *service.Service, store governance.Store, changeID string) error {
+	ch, err := store.GetChangeRecord(cmd.Context(), changeID)
+	if err != nil {
+		return err
+	}
+	baseDir, _ := govBaseDir(cmd)
+	repoCtx := gatherRelevantFiles(baseDir, ch.Title+" "+ch.RawText, 10, 16000)
+	if _, _, err := svc.AssessChange(cmd.Context(), changeID, repoCtx); err != nil {
+		return err
+	}
+	return svc.PostPRAssessment(cmd.Context(), changeID)
+}
+
 var govWorkRecordPRCmd = &cobra.Command{
 	Use:   "record-pr <change-id>",
-	Short: "Record the pull request opened for a change",
+	Short: "Record the pull request opened for a change (auto-posts the governance assessment)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		svc, _, db, err := newGovService(cmd)
+		svc, store, db, err := newGovService(cmd)
 		if err != nil {
 			return err
 		}
@@ -545,6 +566,52 @@ var govWorkRecordPRCmd = &cobra.Command{
 			return err
 		}
 		cmd.Printf("Recorded PR for change %s: %s\n", args[0], url)
+
+		// Every PR carries the AI risk assessment (impact + operability), recorded
+		// in the audit trail and posted to the PR. Best-effort: a missing completer
+		// or gh must not undo a recorded PR — warn and continue.
+		cmd.Println("Assessing risk (impact + operability) and posting to the PR...")
+		if err := assessAndPostToPR(cmd, svc, store, args[0]); err != nil {
+			cmd.Printf("  warning: assessment not posted: %v\n", err)
+		} else {
+			cmd.Println("  posted governance assessment to the PR")
+		}
+		return nil
+	},
+}
+
+var govWorkPRAssessCmd = &cobra.Command{
+	Use:   "pr-assess <change-id>",
+	Short: "Generate the governance impact + operability assessment, record it, and post it to the PR",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, store, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		if printOnly, _ := cmd.Flags().GetBool("print"); printOnly {
+			ch, err := store.GetChangeRecord(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			baseDir, _ := govBaseDir(cmd)
+			repoCtx := gatherRelevantFiles(baseDir, ch.Title+" "+ch.RawText, 10, 16000)
+			if _, _, err := svc.AssessChange(cmd.Context(), args[0], repoCtx); err != nil {
+				return err
+			}
+			md, err := svc.PRAssessmentMarkdown(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			cmd.Println(md)
+			return nil
+		}
+		if err := assessAndPostToPR(cmd, svc, store, args[0]); err != nil {
+			return err
+		}
+		cmd.Printf("Posted governance assessment to the PR for change %s\n", args[0])
 		return nil
 	},
 }
@@ -757,6 +824,10 @@ func init() {
 	governanceWorkCmd.AddCommand(govWorkRecordPRCmd)
 	govWorkRecordPRCmd.Flags().String("url", "", "Pull request URL")
 	govWorkRecordPRCmd.Flags().String("branch", "", "Branch name")
+
+	// work pr-assess
+	governanceWorkCmd.AddCommand(govWorkPRAssessCmd)
+	govWorkPRAssessCmd.Flags().Bool("print", false, "Print the assessment markdown instead of posting to the PR")
 
 	// work record-evidence
 	governanceWorkCmd.AddCommand(govWorkRecordEvidenceCmd)
