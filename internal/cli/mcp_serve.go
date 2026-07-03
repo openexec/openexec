@@ -11,6 +11,7 @@ import (
 	"github.com/openexec/openexec/internal/infra"
 	"github.com/openexec/openexec/internal/mcp"
 	"github.com/openexec/openexec/internal/memory"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/spf13/cobra"
 )
 
@@ -49,17 +50,39 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 			return memory.NewMemorySystem(root).LoadMerged()
 		})
 
+		// Module gates (H1): the composition root decides which optional modules
+		// register, so core stays module-free and paid modules can be turned off
+		// by config / entitlement. A missing project config (light-mode on an
+		// uninitialized dir) leaves the zero value — every module enabled.
+		var modules project.ModulesConfig
+		if pc, perr := project.LoadProjectConfig(workDir); perr == nil && pc != nil {
+			modules = pc.Modules
+		}
+
 		// Governance MCP tools ship with the governance module; register them so
 		// core exposes them without importing governance.
-		srv.RegisterProvider(mcpgov.New())
+		if ok, reason := modules.ShouldLoad("governance"); ok {
+			if rerr := srv.RegisterProvider(mcpgov.New()); rerr != nil {
+				fmt.Fprintf(os.Stderr, "governance module registration failed: %v\n", rerr)
+				return rerr
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "governance module not loaded: %s\n", reason)
+		}
 
-		// Infra tools (SRE command registry): enabled only when the operator
-		// wrote .openexec/infra.yaml. A malformed allowlist fails the server
-		// loudly — a security config must never half-load.
-		infraReg, err := infra.LoadRegistry(workDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "infra allowlist error: %v\n", err)
-			return err
+		// Infra tools (SRE command registry): gated by the module config AND, when
+		// enabled, by the presence of an operator-written .openexec/infra.yaml. A
+		// malformed allowlist fails the server loudly — a security config must
+		// never half-load.
+		var infraReg *infra.Registry
+		if sreEnabled, sreReason := modules.ShouldLoad("sre"); !sreEnabled {
+			fmt.Fprintf(os.Stderr, "sre module not loaded: %s\n", sreReason)
+		} else {
+			infraReg, err = infra.LoadRegistry(workDir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "infra allowlist error: %v\n", err)
+				return err
+			}
 		}
 		if infraReg != nil {
 			srv.SetInfraRegistry(infraReg)

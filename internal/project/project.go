@@ -24,6 +24,63 @@ type ProjectConfig struct {
 	// Fields are additive and backwards compatible: missing values leave
 	// gates enabled with default severities.
 	QualityGates QualityGatesConfig `json:"quality_gates,omitempty"`
+
+	// Modules gates optional (mostly proprietary) modules. Missing/unset means
+	// enabled — existing projects keep every module — so the composition root
+	// can turn a module off explicitly without changing default behavior.
+	Modules ModulesConfig `json:"modules,omitempty"`
+}
+
+// ModulesConfig gates the optional modules layered on the MIT core. Each toggle
+// is nil-default-true: an absent entry means the module loads, so this is a
+// backwards-compatible opt-OUT, not an opt-in.
+type ModulesConfig struct {
+	Governance *ModuleToggle `json:"governance,omitempty"`
+	SRE        *ModuleToggle `json:"sre,omitempty"`
+}
+
+// ModuleToggle configures a single module.
+type ModuleToggle struct {
+	// Enabled: nil (unset) = enabled; explicit false disables the module.
+	Enabled *bool `json:"enabled,omitempty"`
+	// License is an opaque entitlement reference passed to EntitlementCheck.
+	// Empty in open-core; a proprietary build reads it to verify a purchase.
+	License string `json:"license,omitempty"`
+}
+
+// EntitlementCheck is the licensing seam. The open-core default permits every
+// module; a proprietary build overrides this var to enforce entitlements. It
+// runs AFTER the enabled flag, so "disabled by config" and "not licensed" stay
+// distinct outcomes. Returning an error prevents the module from loading.
+var EntitlementCheck = func(module, license string) error { return nil }
+
+func (m ModulesConfig) toggle(module string) *ModuleToggle {
+	switch module {
+	case "governance":
+		return m.Governance
+	case "sre":
+		return m.SRE
+	default:
+		return nil
+	}
+}
+
+// ShouldLoad reports whether the composition root should register a module:
+// enabled by config (nil-default-true) AND permitted by EntitlementCheck. The
+// returned reason is non-empty only when the module should NOT load.
+func (m ModulesConfig) ShouldLoad(module string) (bool, string) {
+	t := m.toggle(module)
+	if t != nil && t.Enabled != nil && !*t.Enabled {
+		return false, "disabled by config"
+	}
+	license := ""
+	if t != nil {
+		license = t.License
+	}
+	if err := EntitlementCheck(module, license); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
 }
 
 // QualityGatesConfig configures the project-level quality gates that run

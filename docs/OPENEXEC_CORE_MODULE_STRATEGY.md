@@ -402,6 +402,61 @@ The simplification is successful when:
 - Documentation clearly separates open-source core from optional modules.
 - Commercial modules add value without making the core harder to reason about.
 
+## Status And Next: Product-Boundary Hardening
+
+**Architecture separation is real; commercial separation is emerging but not
+complete.** The hard part — removing core imports of module internals — is
+largely done: the boundary ratchet baseline is empty (`package_boundaries.yaml`),
+governance's MCP adapter is extracted to `internal/governance/mcpgov` behind the
+`mcptool` provider seam, and core `internal/mcp` imports no module. Core is
+shippable without module code.
+
+What remains is **not another refactor** — it is small product-boundary
+hardening. Two gaps block calling this a clean commercial separation:
+
+### H1. Module enable/disable + license gates
+
+Modules are wired implicitly today:
+
+- Governance is **always** registered in `mcp-serve`
+  (`cli/mcp_serve.go` calls `srv.RegisterProvider(mcpgov.New())` unconditionally).
+- SRE is enabled by mere **presence** of `.openexec/infra.yaml`.
+
+That is fine functionally, but a paid module needs an explicit gate. Add module
+config (e.g. an `openexec.yaml` `modules:` block or per-module enable flags) that
+the composition root reads before registering a provider, and a place for a
+license/entitlement check to hook in. Acceptance: a module can be turned off by
+config and its tools then do not appear in `tools/list`; core behavior is
+unchanged with all modules off.
+
+### H2. Reserved core tool names + provider collision checks
+
+`RegisterProvider` is last-write-wins with no checks
+(`internal/mcp/provider.go`: `s.providerTools[name] = t`), and `dispatchProvider`
+runs **before** the core `backlog_*`/`memory_read` switch — so a module tool can
+**shadow a core tool at call time**, and two modules can silently clobber each
+other's names. Before treating the module API as stable:
+
+- Maintain a reserved set of core tool names; reject registration of a provider
+  tool that collides with a core name.
+- Reject cross-module duplicate names (fail loud at registration, not silently
+  last-write-wins).
+- Optionally namespace module tools (e.g. `gov.*`) to make collisions
+  structurally impossible.
+
+Acceptance: registering a colliding tool fails at startup with a clear error;
+`schema_audit`-style test asserts no provider name intersects the core set.
+
+### H3. License/packaging decisions
+
+Decide how proprietary modules are distributed (build tag, separate repo/module,
+or runtime license key) and how the MIT core is packaged without them. This is a
+product decision, not a code change — record it before the first paid release.
+
+Sequence: H1 and H2 are small, self-contained hardening tasks that can land any
+time; H3 gates the first commercial release. None require reopening the boundary
+work.
+
 ## Business Model
 
 Recommended product split:

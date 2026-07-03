@@ -33,7 +33,9 @@ func newBacklogTestServer(t *testing.T, projDir string) (*Server, *bytes.Buffer)
 	srv.SetMemoryLoader(func(root string) (string, error) {
 		return memory.NewMemorySystem(root).LoadMerged()
 	})
-	srv.RegisterProvider(mcpgov.New())
+	if err := srv.RegisterProvider(mcpgov.New()); err != nil {
+		t.Fatalf("RegisterProvider(governance): %v", err)
+	}
 	return srv, out
 }
 
