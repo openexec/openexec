@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/release"
 )
 
@@ -26,6 +27,10 @@ func newBacklogTestServer(t *testing.T, projDir string) (*Server, *bytes.Buffer)
 		t.Fatalf("NewServerWithConfig: %v", err)
 	}
 	srv.workspaceRoots = []string{projDir}
+	// The composition root injects this in production; tests do the same.
+	srv.SetMemoryLoader(func(root string) (string, error) {
+		return memory.NewMemorySystem(root).LoadMerged()
+	})
 	return srv, out
 }
 
