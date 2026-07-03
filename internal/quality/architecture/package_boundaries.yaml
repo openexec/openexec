@@ -1,0 +1,82 @@
+# Package boundary manifest — the machine-readable source the boundary check reads.
+#
+# It classifies every OpenExec package into a tier, so the dependency rule from
+# docs/OPENEXEC_CORE_MODULE_STRATEGY.md is enforceable rather than aspirational:
+#
+#   composition-root  may import core AND modules   (wiring the binary is its job)
+#   core              may import neither modules nor the composition root
+#   modules           may import core, never each other or the composition root
+#   undecided         exempt for now (genuinely ambiguous; decide before extracting)
+#
+# Classification is by longest-prefix match on the import path (below the module
+# path github.com/openexec/openexec/). Anything not matched is "core".
+#
+# The check runs as a ratchet: the current real violations are recorded in
+# `baseline` below; the check FAILS on any violation NOT in the baseline (no new
+# coupling), and reports baseline entries that are no longer violations (so the
+# list can be tightened as Steps 2-4 of the strategy decouple/extract/delete).
+
+composition_root:
+  - internal/cli
+  - cmd/openexec
+
+# Each module is a name -> list of package-path prefixes it owns. Sub-packages
+# match by prefix (internal/governance also covers internal/governance/service).
+modules:
+  governance:
+    - internal/governance
+  sre:
+    - internal/infra
+  mcp:
+    - internal/mcp
+  tui:
+    - internal/tui
+  integrations:
+    - internal/telegram
+    - internal/twilio
+    - internal/botseed
+  memory:
+    - internal/memory
+    - internal/predictive
+  multiagent:
+    - internal/parallel
+  routing:
+    - internal/dcp
+    - internal/router
+
+# Genuinely ambiguous packages — exempt from the check until the strategy decides
+# their home (see the "undecided" bucket in the doc).
+undecided:
+  - pkg/manager   # pipeline orchestrator, pending a clearer home
+  - pkg/api       # HTTP/WebSocket: part core run-transport, part future web module
+
+# Current coupling debt. Format: "importer -> imported". The check allows exactly
+# these and fails on anything new. Drive this list DOWN as the migration proceeds;
+# an empty list means the boundary is clean.
+#
+# Reading the debt (2026-07-03 baseline):
+#   - mcp -> governance/infra/memory : MCP is a hub reaching into modules to expose
+#     their tools. Fix by moving each module's MCP adapter INTO that module (the
+#     SRE/MCP decision in the strategy doc); mcp becomes transport-only.
+#   - pipeline/harness/server/context -> memory/parallel/predictive/router/dcp :
+#     "modules" that are woven into core execution. Either decouple behind a core
+#     interface, or (Step 2) delete if the experimental path is unwired.
+#   - server/tools -> infra : SRE reached from core; must be cut before SRE extracts.
+baseline:
+  - "internal/context -> internal/memory"
+  - "internal/harness -> internal/memory"
+  - "internal/harness -> internal/parallel"
+  - "internal/harness -> internal/predictive"
+  - "internal/mcp -> internal/governance"
+  - "internal/mcp -> internal/governance/ai"
+  - "internal/mcp -> internal/governance/service"
+  - "internal/mcp -> internal/infra"
+  - "internal/mcp -> internal/memory"
+  - "internal/pipeline -> internal/memory"
+  - "internal/pipeline -> internal/parallel"
+  - "internal/pipeline -> internal/predictive"
+  - "internal/pipeline -> internal/router"
+  - "internal/server -> internal/dcp"
+  - "internal/server -> internal/infra"
+  - "internal/server -> internal/router"
+  - "internal/tools -> internal/infra"
