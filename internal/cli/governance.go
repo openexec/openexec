@@ -32,6 +32,7 @@ import (
 	"github.com/openexec/openexec/internal/governance/service"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/internal/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -156,26 +157,58 @@ func buildGovCompleter(baseDir string) ai.Completer {
 	if err != nil || cfg == nil {
 		return nil
 	}
+	// Prefer an explicitly-configured OpenAI-compatible API.
 	name, baseURL, apiKey, model := cfg.Execution.ActiveAPI()
-	if model == "" {
-		return nil
+	if model != "" {
+		if strings.HasPrefix(apiKey, "$") {
+			apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
+		}
+		if apiKey != "" {
+			if prov, err := pagent.NewOpenAIProvider(pagent.OpenAIProviderConfig{
+				APIKey:  apiKey,
+				BaseURL: baseURL,
+				Name:    name,
+				Models:  append(pagent.DefaultOpenAIModels(), model),
+			}); err == nil {
+				return &providerCompleter{provider: prov, model: model}
+			}
+		}
 	}
-	if strings.HasPrefix(apiKey, "$") {
-		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
+	// Fall back to the CLI-runner path the planner uses (claude/codex/gemini),
+	// so governance triage works on the same config as `openexec run` — a
+	// project configured with planner_model/executor_model (no API section)
+	// drives triage through the resolved runner CLI.
+	plannerModel := cfg.Execution.PlannerModel
+	if plannerModel == "" {
+		plannerModel = "sonnet"
 	}
-	if apiKey == "" {
-		return nil
-	}
-	prov, err := pagent.NewOpenAIProvider(pagent.OpenAIProviderConfig{
-		APIKey:  apiKey,
-		BaseURL: baseURL,
-		Name:    name,
-		Models:  append(pagent.DefaultOpenAIModels(), model),
-	})
+	return &cliCompleter{model: plannerModel}
+}
+
+// cliCompleter drives governance triage through the same runner CLI the planner
+// uses (mirrors pkg/manager.cliLLMProvider): it resolves the model to a CLI
+// (claude/codex/gemini) and feeds the prompt on stdin.
+type cliCompleter struct{ model string }
+
+func (c *cliCompleter) Complete(ctx context.Context, prompt string) (string, error) {
+	cliCmd, cmdArgs, err := runner.Resolve(
+		c.model,
+		os.Getenv("OPENEXEC_PLANNER_CLI"),
+		strings.Fields(os.Getenv("OPENEXEC_PLANNER_ARGS")),
+	)
 	if err != nil {
-		return nil
+		return "", err
 	}
-	return &providerCompleter{provider: prov, model: model}
+	if strings.Contains(strings.ToLower(cliCmd), "claude") {
+		cmdArgs = []string{"--print"}
+	}
+	cmd := exec.CommandContext(ctx, cliCmd, cmdArgs...)
+	cmd.Stdin = strings.NewReader(prompt)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("governance planner CLI (%s) failed: %w\n%s", cliCmd, err, string(out))
+	}
+	return string(out), nil
 }
 
 // providerCompleter adapts a pkg/agent ProviderAdapter to the ai.Completer
