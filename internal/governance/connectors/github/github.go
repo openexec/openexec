@@ -356,3 +356,21 @@ func ListOpenIssues(ctx context.Context, runner Runner, repo, label string) ([]i
 	}
 	return nums, nil
 }
+
+// MergePR merges a pull request via `gh pr merge`. method is squash|merge|rebase
+// (default squash — trunk-friendly). The branch is deleted after merge to keep a
+// trunk-based flow clean. This is the one destructive connector op; the caller
+// (the governance merge gate) must have authorized it.
+func MergePR(ctx context.Context, runner Runner, repo string, number int, method string) error {
+	flag := "--squash"
+	switch method {
+	case "merge":
+		flag = "--merge"
+	case "rebase":
+		flag = "--rebase"
+	}
+	if _, err := runner.Run(ctx, "pr", "merge", strconv.Itoa(number), "--repo", repo, flag, "--delete-branch"); err != nil {
+		return fmt.Errorf("github: merge PR %d in %s: %w", number, repo, err)
+	}
+	return nil
+}

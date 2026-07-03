@@ -145,6 +145,18 @@ func (e *PolicyEvaluator) CanAutoApprove(ch *governance.ChangeRecord) bool {
 	return tier.AIApprovalAllowed && !tier.HumanApprovalRequired && !tier.SecurityReviewRequired
 }
 
+// CanAutoMerge reports whether a change of this risk tier may be merged WITHOUT
+// a human operator (the caller must separately confirm verification evidence is
+// present). False for every tier under DefaultPolicy — the merge gate fails
+// closed, so a change never auto-merges unless an operator explicitly opts its
+// tier in. This is the last line before a CI/CD production deploy.
+func (e *PolicyEvaluator) CanAutoMerge(ch *governance.ChangeRecord) bool {
+	if ch == nil {
+		return false
+	}
+	return e.tierFor(ch.Risk).AutoMergeAllowed
+}
+
 // CanRiskAccept reports whether authority may accept the risk of change ch. It
 // requires the Perm_risk_accept permission and, on tiers that set
 // risk_acceptance_requires_human (critical by default), a human authority. The

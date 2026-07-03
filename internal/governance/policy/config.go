@@ -54,6 +54,13 @@ type TierPolicy struct {
 	SecurityReviewRequired bool `yaml:"security_review_required" json:"security_review_required"`
 	// RiskAcceptanceRequiresHuman restricts risk acceptance to humans.
 	RiskAcceptanceRequiresHuman bool `yaml:"risk_acceptance_requires_human" json:"risk_acceptance_requires_human"`
+	// AutoMergeAllowed permits merging a change of this risk tier WITHOUT a human
+	// operator, when verification evidence is present. Default false for every
+	// tier (DefaultPolicy leaves it unset): the safety gate is that nothing
+	// auto-merges — and thus nothing can accidentally trigger a production
+	// deploy — unless an operator explicitly opts a tier in. A workspace policy
+	// can never enable it (clampNoRelax ANDs it with the default).
+	AutoMergeAllowed bool `yaml:"auto_merge_allowed" json:"auto_merge_allowed"`
 }
 
 // Policy is the loaded release-governance policy. RiskTiers is keyed by the
@@ -163,6 +170,7 @@ func clampNoRelax(p *Policy) *Policy {
 		t := dt
 		if pt, ok := p.RiskTiers[risk]; ok {
 			t.AIApprovalAllowed = pt.AIApprovalAllowed && dt.AIApprovalAllowed
+			t.AutoMergeAllowed = pt.AutoMergeAllowed && dt.AutoMergeAllowed
 			t.AIReviewRequired = pt.AIReviewRequired || dt.AIReviewRequired
 			t.HumanApprovalRequired = pt.HumanApprovalRequired || dt.HumanApprovalRequired
 			t.SecurityReviewRequired = pt.SecurityReviewRequired || dt.SecurityReviewRequired

@@ -207,6 +207,32 @@ with 'work record-pr' and move to 'work ready-for-test'.`,
 	},
 }
 
+var govWorkMergeCmd = &cobra.Command{
+	Use:   "merge <change-id>",
+	Short: "Merge a change's PR (the safety gate — never auto-merges by default)",
+	Long: `Merge the pull request for a change. This is the safety gate: it refuses unless
+either a human operator session (OPENEXEC_OPERATOR_SESSION=1) with an approve
+authority runs it, or policy explicitly opts the change's risk tier into
+auto-merge AND verification evidence exists. By default NOTHING auto-merges, so
+a change can never accidentally trigger a CI/CD production deploy.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		by, _ := cmd.Flags().GetString("by")
+		method, _ := cmd.Flags().GetString("method")
+		if err := svc.MergeChange(cmd.Context(), args[0], by, method); err != nil {
+			return err
+		}
+		cmd.Printf("Merged change %s (%s)\n", args[0], method)
+		return nil
+	},
+}
+
 var govWorkImpactCmd = &cobra.Command{
 	Use:   "impact <change-id>",
 	Short: "Show the file-level impact analysis (which files the change touches)",
@@ -602,6 +628,11 @@ func init() {
 	// work impact
 	governanceWorkCmd.AddCommand(govWorkImpactCmd)
 	govWorkImpactCmd.Flags().Bool("json", false, "Output as JSON")
+
+	// work merge (safety gate)
+	governanceWorkCmd.AddCommand(govWorkMergeCmd)
+	govWorkMergeCmd.Flags().String("by", "", "Approving authority ID (e.g. pm); required in an operator session")
+	govWorkMergeCmd.Flags().String("method", "squash", "Merge method: squash | merge | rebase")
 
 	// work execute
 	governanceWorkCmd.AddCommand(govWorkExecuteCmd)
