@@ -580,6 +580,29 @@ var govWorkRecordPRCmd = &cobra.Command{
 	},
 }
 
+var govWorkRiskAcceptCmd = &cobra.Command{
+	Use:   "risk-accept <change-id>",
+	Short: "Record an explicit human risk-acceptance (required to approve/merge critical changes)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		by, _ := cmd.Flags().GetString("by")
+		note, _ := cmd.Flags().GetString("note")
+		if by == "" {
+			return fmt.Errorf("--by <authorityID> is required (a human authority holding risk_accept, e.g. pm)")
+		}
+		if err := svc.AcceptRisk(cmd.Context(), args[0], by, note); err != nil {
+			return err
+		}
+		cmd.Printf("Recorded risk acceptance for change %s by %s\n", args[0], by)
+		return nil
+	},
+}
+
 var govWorkPRAssessCmd = &cobra.Command{
 	Use:   "pr-assess <change-id>",
 	Short: "Generate the governance impact + operability assessment, record it, and post it to the PR",
@@ -847,6 +870,11 @@ func init() {
 	governanceWorkCmd.AddCommand(govWorkRecordPRCmd)
 	govWorkRecordPRCmd.Flags().String("url", "", "Pull request URL")
 	govWorkRecordPRCmd.Flags().String("branch", "", "Branch name")
+
+	// work risk-accept
+	governanceWorkCmd.AddCommand(govWorkRiskAcceptCmd)
+	govWorkRiskAcceptCmd.Flags().String("by", "", "Human authority accepting the risk (e.g. pm)")
+	govWorkRiskAcceptCmd.Flags().String("note", "", "Why the risk is accepted")
 
 	// work pr-assess
 	governanceWorkCmd.AddCommand(govWorkPRAssessCmd)

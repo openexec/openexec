@@ -169,6 +169,11 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 			return err
 		}
 	}
+	// A critical-tier change needs an explicit, current human risk-acceptance on
+	// record before it can be approved.
+	if err := s.ensureRiskAccepted(ctx, ch); err != nil {
+		return err
+	}
 	if err := validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusApprovedForAI); err != nil {
 		return err
 	}

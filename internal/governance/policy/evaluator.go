@@ -185,6 +185,16 @@ func (e *PolicyEvaluator) CanRiskAccept(authority *governance.ReviewAuthority, c
 	return true, ""
 }
 
+// RequiresRiskAcceptance reports whether a change's risk tier demands an explicit
+// human risk-acceptance before it may be approved or merged (critical by
+// default). The service enforces that a current acceptance is on record.
+func (e *PolicyEvaluator) RequiresRiskAcceptance(ch *governance.ChangeRecord) bool {
+	if ch == nil {
+		return false
+	}
+	return e.tierFor(ch.Risk).RiskAcceptanceRequiresHuman
+}
+
 // CanApproveRelease reports whether authority may approve a release's scope.
 // Release scope approval is the PM/delivery-lead boundary, so it is stricter
 // than per-change approval: it requires the full approve permission (NOT

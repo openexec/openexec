@@ -65,6 +65,11 @@ func (s *Service) MergeChange(ctx context.Context, changeID, authorityID, method
 	if !authorized {
 		return fmt.Errorf("merge refused: %s", reason)
 	}
+	// A critical-tier change needs a current human risk-acceptance before merge,
+	// independent of who authorizes the merge.
+	if err := s.ensureRiskAccepted(ctx, ch); err != nil {
+		return fmt.Errorf("merge refused: %w", err)
+	}
 
 	actorType := governance.ActorTypeSystem
 	if a, aErr := s.getAuthority(ctx, authorityID); aErr == nil {
