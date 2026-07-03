@@ -101,9 +101,38 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
 		return nil, fmt.Errorf("record deep-triage proposal for change %q: %w", changeID, err)
 	}
-	s.mirrorGitHubLabel(ctx, ch)
 
+	// File-level impact analysis (best-effort, review-only): when real repo
+	// excerpts were supplied, ask the model which exact files the change touches
+	// so a human reviews "affects this and that" before approval. A failure here
+	// never fails triage — the decomposition already succeeded.
+	if strings.TrimSpace(repoContext) != "" {
+		if imp, iErr := ai.AnalyzeImpact(ctx, s.completer, composeIntent(ch, ""), repoContext); iErr == nil {
+			if raw, mErr := json.Marshal(imp); mErr == nil {
+				_ = s.store.SetChangeImpact(ctx, ch.ID, string(raw))
+			}
+		}
+	}
+
+	s.mirrorGitHubLabel(ctx, ch)
 	return &DeepTriageResult{Plan: plan, StoryIDs: storyIDs}, nil
+}
+
+// ChangeImpact returns the stored file-level impact analysis for a change (nil
+// if none was produced, e.g. triage ran without repo context).
+func (s *Service) ChangeImpact(ctx context.Context, changeID string) (*ai.ImpactReport, error) {
+	raw, err := s.store.GetChangeImpact(ctx, changeID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(raw) == "" || raw == "{}" {
+		return nil, nil
+	}
+	rep := &ai.ImpactReport{}
+	if err := json.Unmarshal([]byte(raw), rep); err != nil {
+		return nil, fmt.Errorf("parse impact for change %q: %w", changeID, err)
+	}
+	return rep, nil
 }
 
 // ChangeStories returns the release stories a change owns (via deep triage),

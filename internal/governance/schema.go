@@ -147,4 +147,13 @@ CREATE TABLE IF NOT EXISTS change_story_links (
 	PRIMARY KEY (change_id, story_id)
 );
 CREATE INDEX IF NOT EXISTS idx_change_story_links_change_id ON change_story_links(change_id);
+
+-- change_impact stores the file-level "affects this and that" analysis (a JSON
+-- ImpactReport) produced by deep triage, so a human reviews the exact files a
+-- change will touch before approval.
+CREATE TABLE IF NOT EXISTS change_impact (
+	change_id   TEXT PRIMARY KEY,
+	report_json TEXT NOT NULL DEFAULT '{}',
+	created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `

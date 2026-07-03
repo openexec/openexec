@@ -60,20 +60,29 @@ const deepPlanJSON = `{
 type routingCompleter struct {
 	plan   string
 	classi string
+	impact string
 }
 
 func (r routingCompleter) Complete(_ context.Context, prompt string) (string, error) {
-	if strings.Contains(prompt, "classifier") {
+	switch {
+	case strings.Contains(prompt, "classifier"):
 		return r.classi, nil
+	case strings.Contains(prompt, "which files a change will touch"):
+		return r.impact, nil
+	default:
+		return r.plan, nil
 	}
-	return r.plan, nil
 }
 
 func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 	store := newTestStore(t)
 	ps := newFakePlanStore()
 	svc := NewService(store, Options{
-		Completer: routingCompleter{plan: deepPlanJSON, classi: "kind: security\nrisk: high\n"},
+		Completer: routingCompleter{
+			plan:   deepPlanJSON,
+			classi: "kind: security\nrisk: high\n",
+			impact: "files:\n  - path: src/login.ts\n    action: modify\n    reason: add validation\n",
+		},
 		PlanStore: ps,
 	})
 	ctx := context.Background()
@@ -84,7 +93,8 @@ func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 		Status: governance.ChangeStatusCandidate,
 	})
 
-	res, err := svc.TriageDeep(ctx, "C-1", "repo: acme/web", "planner_ai")
+	// Non-empty repo context triggers the impact analysis.
+	res, err := svc.TriageDeep(ctx, "C-1", "== src/login.ts ==\ncode", "planner_ai")
 	if err != nil {
 		t.Fatalf("TriageDeep: %v", err)
 	}
@@ -128,6 +138,14 @@ func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 	}
 	if ch.Kind != governance.KindSecurity {
 		t.Fatalf("expected classified kind security, got %q", ch.Kind)
+	}
+	// File-level impact was analyzed and stored (repo context was provided).
+	imp, err := svc.ChangeImpact(ctx, "C-1")
+	if err != nil {
+		t.Fatalf("ChangeImpact: %v", err)
+	}
+	if imp == nil || len(imp.Files) != 1 || imp.Files[0].Path != "src/login.ts" {
+		t.Fatalf("expected impact with src/login.ts, got %+v", imp)
 	}
 }
 

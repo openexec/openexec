@@ -100,7 +100,7 @@ var govWorkTriageCmd = &cobra.Command{
 	Short: "Run the planner AI over a change and apply the resulting plan",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		svc, _, db, err := newGovService(cmd)
+		svc, store, db, err := newGovService(cmd)
 		if err != nil {
 			return err
 		}
@@ -109,19 +109,23 @@ var govWorkTriageCmd = &cobra.Command{
 		repoContext, _ := cmd.Flags().GetString("context")
 		actor, _ := cmd.Flags().GetString("actor")
 
-		// When no explicit context is given, auto-gather a repo map so deep
-		// triage references real files ("affects this and that"). --repo-context
-		// scans a code repo separate from the governance project dir (so the
-		// governance state can live elsewhere and not pollute the code repo's
-		// backlog); it defaults to the project dir. Best-effort: empty if the
-		// target is not a git repo.
+		// When no explicit context is given, gather relevant code so deep triage
+		// references real files ("affects this and that"): rank the repo's files
+		// by the change's intent and feed the top files' contents to the planner
+		// and the impact analysis. --repo-context scans a code repo separate from
+		// the governance project dir (so governance state stays isolated from the
+		// code repo's backlog); it defaults to the project dir. Best-effort.
 		if repoContext == "" {
 			codeDir, _ := cmd.Flags().GetString("repo-context")
 			if codeDir == "" {
 				codeDir, _ = govBaseDir(cmd)
 			}
 			if codeDir != "" {
-				repoContext = gatherRepoContext(codeDir, 12000)
+				intent := ""
+				if ch, e := store.GetChangeRecord(cmd.Context(), args[0]); e == nil {
+					intent = ch.Title + " " + ch.RawText
+				}
+				repoContext = gatherRelevantFiles(codeDir, intent, 10, 16000)
 			}
 		}
 
@@ -199,6 +203,39 @@ with 'work record-pr' and move to 'work ready-for-test'.`,
 			cmd.Printf("  fail %s: %s\n", tid, msg)
 		}
 		cmd.Printf("Next: link the PR (work record-pr %s --url ...) then work ready-for-test %s\n", args[0], args[0])
+		return nil
+	},
+}
+
+var govWorkImpactCmd = &cobra.Command{
+	Use:   "impact <change-id>",
+	Short: "Show the file-level impact analysis (which files the change touches)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		rep, err := svc.ChangeImpact(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			return printJSON(cmd, rep)
+		}
+		if rep == nil || len(rep.Files) == 0 {
+			cmd.Printf("No file-level impact recorded for %s (re-run: work triage %s --deep --repo-context <path>)\n", args[0], args[0])
+			return nil
+		}
+		cmd.Printf("Change %s affects %d file(s):\n", args[0], len(rep.Files))
+		for _, f := range rep.Files {
+			cmd.Printf("  [%s] %s\n        %s\n", f.Action, f.Path, f.Reason)
+		}
+		if rep.Notes != "" {
+			cmd.Printf("Notes: %s\n", rep.Notes)
+		}
 		return nil
 	},
 }
@@ -561,6 +598,10 @@ func init() {
 	// work stories
 	governanceWorkCmd.AddCommand(govWorkStoriesCmd)
 	govWorkStoriesCmd.Flags().Bool("json", false, "Output as JSON")
+
+	// work impact
+	governanceWorkCmd.AddCommand(govWorkImpactCmd)
+	govWorkImpactCmd.Flags().Bool("json", false, "Output as JSON")
 
 	// work execute
 	governanceWorkCmd.AddCommand(govWorkExecuteCmd)

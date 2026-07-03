@@ -83,6 +83,10 @@ type Store interface {
 	LinkChangeStory(ctx context.Context, changeID, storyID string) error
 	ListChangeStories(ctx context.Context, changeID string) ([]string, error)
 
+	// File-level impact analysis (JSON ImpactReport) per change.
+	SetChangeImpact(ctx context.Context, changeID, reportJSON string) error
+	GetChangeImpact(ctx context.Context, changeID string) (string, error)
+
 	Close() error
 }
 
@@ -1074,4 +1078,40 @@ func (s *SQLiteStore) ListChangeStories(ctx context.Context, changeID string) ([
 		out = append(out, id)
 	}
 	return out, rows.Err()
+}
+
+// SetChangeImpact stores (or replaces) the file-level impact report for a change.
+func (s *SQLiteStore) SetChangeImpact(ctx context.Context, changeID, reportJSON string) error {
+	if changeID == "" {
+		return ErrInvalidData
+	}
+	if reportJSON == "" {
+		reportJSON = "{}"
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO change_impact (change_id, report_json) VALUES (?, ?)
+		 ON CONFLICT(change_id) DO UPDATE SET report_json = excluded.report_json`,
+		changeID, reportJSON)
+	if err != nil {
+		return fmt.Errorf("set impact for change %q: %w", changeID, err)
+	}
+	return nil
+}
+
+// GetChangeImpact returns the stored impact report JSON for a change ("" if none).
+func (s *SQLiteStore) GetChangeImpact(ctx context.Context, changeID string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var j string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT report_json FROM change_impact WHERE change_id = ?`, changeID).Scan(&j)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get impact for change %q: %w", changeID, err)
+	}
+	return j, nil
 }
