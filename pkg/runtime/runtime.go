@@ -73,6 +73,13 @@ func (p *Planner) GeneratePlan(ctx context.Context, intent string) (*ProjectPlan
 	return p.inner.GeneratePlan(ctx, intent, nil)
 }
 
+// LintPlanVerification flags false-green verification scripts in a plan
+// (patterns that report success even when the real check failed), keyed by the
+// owning story/task id — surfaced for human review before approval.
+func LintPlanVerification(plan *ProjectPlan) map[string][]string {
+	return planner.LintPlanVerification(plan)
+}
+
 // RemapPlanIDs re-numbers colliding ids so a generated plan appends to an
 // existing backlog instead of clashing with it. Returns the count remapped.
 func RemapPlanIDs(plan *ProjectPlan, look ExistingLookup) int {

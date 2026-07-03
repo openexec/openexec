@@ -56,10 +56,11 @@ The governance layer is a **control system**, not just a control plane: triaged 
 
 ### Change status machine
 
-`candidate → plan_ready → approved_for_ai → implementing → pr_open → ready_for_test → done`
-plus `changes_requested` (from a reviewer; only exits back to `plan_ready` via revision), `rejected`, `deferred`, `blocked`.
+`candidate → (planned) → plan_ready → approved_for_ai → implementing → pr_open → ready_for_test → done`
 
-**There is no operator-override from `changes_requested` to approval.** An AI reviewer's `request_changes` is binding: the plan must be revised. (This is a deliberate strictness we want reviewed — see [Open questions](#8-open-questions-for-the-reviewer).)
+Triage advances a change to `plan_ready` (deep triage sets it directly; `planned` is an intermediate the validator permits). Off the happy path: `changes_requested` (from a reviewer; only exits back to `plan_ready` via revision), `rejected`, `deferred` (terminal). `blocked` is a defined status with an `ai:blocked` label but no wired change-level transition today (reserved).
+
+**There is no operator-override from `changes_requested` to approval.** An AI reviewer's `request_changes` is binding: the plan must be revised. (A deliberate strictness; an auditable human override remains a possible future addition.)
 
 ---
 
@@ -74,16 +75,18 @@ A one-line change should not incur an 8-story plan plus a round of planner-outpu
 | Review | Required reviews per risk tier (see below) | **Operator approval waives AI review** — the operator is the reviewer; the waiver is recorded in the audit trail |
 | For | Non-trivial features | Trivial low/medium changes |
 
-Both lanes produce the impact + operability assessment (§6) and both stop at the human approval gate.
+Both lanes produce the impact + operability assessment (§6) before the human approval gate — deep triage generates it during triage; the lightweight lane generates it at `quickplan` time — and **both stop at a human approval gate** (there is no AI/auto approval; see §4 note).
 
 ### Risk tiers → required reviews (default policy)
 
 | Tier | AI review | Security review | Human approval | Auto-merge |
 |------|-----------|-----------------|----------------|------------|
-| low | – | – | – | policy opt-in only |
+| low | – | – | **required** | policy opt-in only |
 | medium | required | – | required | policy opt-in only |
 | high | required | required | required | never (destructive → human) |
-| critical | required | required | required + risk acceptance | never |
+| critical | required | required | required + explicit risk acceptance | never |
+
+**Every change stops at a human approval gate** — `ApproveChange` always requires an operator session, at every tier. The policy's per-tier `AIApprovalAllowed`/`CanAutoApprove` flags are **not wired**: no code path auto-approves a change. (This is the intentional product truth; low-risk auto-approval would be a separate, explicit path if ever added.)
 
 Workspace policy is **clamped, never relaxed**: an operator-owned `~/.openexec/governance-policy.yaml` may tighten tiers; a workspace file can only be at least as strict.
 
@@ -94,10 +97,11 @@ Workspace policy is **clamped, never relaxed**: an operator-owned `~/.openexec/g
 These are the load-bearing invariants — the main thing to review.
 
 - **Human vs AI attribution.** Seeded authorities: `pm` (human), `developer` (human), `bugbot` (ai), `tester_ai` (ai), `security_ai` (ai), `ci_verifier` (verifier). A human-typed authority can only be attributed in an **operator session** (`OPENEXEC_OPERATOR_SESSION=1`); an agent session cannot forge a human-attributed audit record.
-- **Operator session gate.** Approvals (change + release) and merges require an operator session. The MCP plane never sets it, so an agent driving governance over MCP cannot self-approve or merge. *(Caveat: a shell-capable agent could set the env var itself — the real boundary is "agents don't get shell to this CLI." Called out for review.)*
+- **Operator session gate, GitHub-identity bound.** Approvals (change + release), merges, and risk-acceptance require an operator session. When an operator allowlist (`~/.openexec/operators.yaml`) is configured, the session is bound to the current `gh`-authenticated login (OAuth-backed) — the spoofable `OPENEXEC_OPERATOR_SESSION=1` env var is ignored, and survives only as a dev/pilot shortcut when no allowlist exists. The resolved identity (`github:<login>`) is stamped into approval/merge/risk-accept audit events. The MCP plane never sets an operator session, so an agent over MCP cannot self-approve or merge.
 - **Governance is the sole un-holder.** Triaged tasks are `hitl`; only `ExecuteChange` flips a change's approved+claimed tasks to `afk`. Unapproved work is never auto-built by `openexec run`/the scheduler/backlog tools.
-- **Append-only, tamper-evident audit.** `decision_events` and `evidence` are append-only (DB triggers reject UPDATE/DELETE). Decision events form a SHA-256 **hash chain** (`hash = SHA256(prev_hash ‖ canonical(event))`); `VerifyAuditChain` detects any alteration/deletion/reorder. Ordering is by rowid (monotonic, never reused).
-- **Merge gate fails closed.** No tier auto-merges under default policy. Auto-merge requires: policy opt-in for the tier **AND** status `done` **AND** operability clear (rollback-safe, no destructive migration, low deploy risk) **AND** externally-verified evidence (source `github`/`webhook`, not agent self-reported). Otherwise a human operator with an approve authority must authorize the merge. Draft-PR-by-default embodies "never accidentally merge."
+- **Critical risk acceptance is enforced.** A critical-tier change cannot be approved or merged without a **current** human risk-acceptance on record (`work risk-accept`, operator + human authority holding `risk_accept`). A plan revision bumps the proposal version and invalidates a stale acceptance.
+- **Append-only, tamper-evident, atomic audit.** `decision_events` and `evidence` are append-only (DB triggers reject UPDATE/DELETE). Decision events form a SHA-256 **hash chain** (`hash = SHA256(prev_hash ‖ canonical(event))`); `VerifyAuditChain` detects any alteration/deletion/reorder; ordering is by rowid. A status change and its decision event are written in **one transaction** (`TransitionChange`) — either both land or neither. Merge records `merge_authorized` before the `gh` call and `merged`/`merge_failed` after, so an external side effect is never silent.
+- **Merge gate fails closed, on fetched evidence.** No tier auto-merges under default policy. Auto-merge requires: policy opt-in **AND** status `done` **AND** operability clear (rollback-safe, no destructive migration, low deploy risk) **AND** externally-verified evidence. Trusted (`github`) evidence can **only** be produced by `SyncGitHubChecks`, which fetches the PR head commit's check-runs from the GitHub API and records provenance (SHA + payload hash) when green — manual `record-evidence` refuses a trusted source, so the signal cannot be asserted by hand. Otherwise a human operator with an approve authority must authorize the merge. Draft-PR-by-default embodies "never accidentally merge."
 - **Skill/lesson proposals are propose-then-approve.** Agents may propose durable lessons; only a human activates them.
 
 ---
@@ -166,13 +170,21 @@ Jira is the more natural fit for the target buyer: **development work, not defec
 
 ---
 
-## 10. Open questions for the reviewer
+## 10. Review response (findings closed)
 
-1. **No operator-override on `changes_requested`.** Today an AI reviewer's `request_changes` is binding — revision is mandatory, a human cannot approve over it. Is that the right strictness, or should there be an *auditable* human risk-acceptance override (recorded, human-only)?
-2. **Operator-session env var.** `OPENEXEC_OPERATOR_SESSION=1` is a plain env var; the real boundary is "agents don't get shell to this CLI." Is that acceptable, or should operator identity be cryptographic (signed session)?
-3. **Lightweight-lane review waiver.** A trivial low/medium change can be operator-approved with no AI review (waiver recorded). Is the low/medium ceiling + audit record sufficient, or should even trivial changes require a lightweight automated check?
-4. **Planner verification quality.** Generated verification scripts have masked failures (`… || fallback`, `2>/dev/null`, `grep -q | head`). We strengthened the planner prompt (mitigation) and the AI reviewers catch residuals. Should there also be a *deterministic* post-generation linter that rejects false-green scripts?
-5. **Auto-merge criteria.** Auto-merge requires policy opt-in + `done` + operability-clear + externally-verified evidence. Is "externally-verified" (source `github`/`webhook`) a strong enough evidence-provenance bar?
+A design/code review (see git history around this doc) raised seven findings. Status:
+
+| # | Finding | Resolution |
+|---|---------|------------|
+| 1 | Critical risk acceptance documented but not enforced | **Fixed** — `work risk-accept` records a version-stamped `risk_accepted` event; `ApproveChange`/`MergeChange` require a current one for critical. |
+| 2 | Trusted evidence provenance spoofable from the CLI | **Fixed** — manual `record-evidence` refuses `github`/`webhook`; only `SyncGitHubChecks` (fetches real check-runs + records SHA/payload-hash) produces trusted evidence. |
+| 3 | Assessment produced after execution, not before approval | **Fixed** — `quickplan` now generates impact + operability before the gate; deep triage already did. Doc §4/§6 aligned. |
+| 4 | State transition and audit event not atomic | **Fixed** — `TransitionChange` commits state + event in one transaction; merge records authorized-before / result-after. |
+| 5 | `OPENEXEC_OPERATOR_SESSION` not a defensible identity | **Fixed (pragmatic)** — operator sessions bind to the `gh` OAuth login via an operator allowlist; env var demoted to dev fallback. Full device-flow/token-signing can layer on later. |
+| 6 | Docs/policy ambiguity on low-risk approval | **Fixed** — product truth is "every change stops at a human gate"; doc table updated; `AIApprovalAllowed` documented as not-wired. |
+| 7 | Status-machine doc mismatch | **Fixed** — §3 aligned with the validator (`candidate → planned → plan_ready`; `blocked` reserved). |
+
+Remaining open (reviewer's own recommendations, lower priority): a deterministic planner-verification linter now **exists** (`planner.LintVerificationScript`, surfaced as triage warnings) but is advisory, not a hard reject; per-story execute scoping and a full cryptographic operator-identity model are still future work.
 
 ---
 
@@ -192,7 +204,9 @@ openexec governance work impact  <change>               # file-level impact (rev
 # Review (required by risk tier) + human approval (operator session)
 openexec governance work review-plan <change> --reviewer bugbot
 openexec governance work review-plan <change> --reviewer security_ai
-OPENEXEC_OPERATOR_SESSION=1 openexec governance work approve <change> --by pm
+openexec governance work risk-accept <change> --by pm --note "..."   # critical only
+#   operator session = a gh login listed in ~/.openexec/operators.yaml
+openexec governance work approve <change> --by pm
 
 # Release scope + execute
 openexec governance release create R-1 && \
@@ -203,10 +217,11 @@ openexec governance work execute <change>               # isolated branch, draft
 # PR lifecycle (record-pr AUTO-posts the assessment to the PR + audit trail)
 openexec governance work record-pr <change> --url <pr-url> --branch <branch>
 openexec governance work pr-assess <change> --print     # re-run / preview assessment
+openexec governance work sync-checks <change>           # fetch CI checks → trusted evidence
 openexec governance work ready-for-test <change>
 
 # Merge gate (fails closed) + write-back
-OPENEXEC_OPERATOR_SESSION=1 openexec governance work merge <change> --by pm --method squash
+openexec governance work merge <change> --by pm --method squash   # operator session required
 openexec governance work sync-github <change>           # mirror status to the issue
 
 # Audit

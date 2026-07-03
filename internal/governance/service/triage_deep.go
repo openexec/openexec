@@ -13,11 +13,13 @@ import (
 	"github.com/openexec/openexec/pkg/runtime"
 )
 
-// DeepTriageResult is what TriageDeep returns: the generated plan and the ids of
-// the release stories now linked to the change.
+// DeepTriageResult is what TriageDeep returns: the generated plan, the ids of
+// the release stories now linked to the change, and any false-green
+// verification-script warnings for human review before approval.
 type DeepTriageResult struct {
-	Plan     *runtime.ProjectPlan
-	StoryIDs []string
+	Plan         *runtime.ProjectPlan
+	StoryIDs     []string
+	LintWarnings map[string][]string
 }
 
 // TriageDeep is the intent-extraction bridge: it runs the EXISTING planner over
@@ -121,7 +123,11 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 	}
 
 	s.mirrorGitHubLabel(ctx, ch)
-	return &DeepTriageResult{Plan: plan, StoryIDs: storyIDs}, nil
+	return &DeepTriageResult{
+		Plan:         plan,
+		StoryIDs:     storyIDs,
+		LintWarnings: runtime.LintPlanVerification(plan),
+	}, nil
 }
 
 // ChangeImpact returns the stored file-level impact analysis for a change (nil

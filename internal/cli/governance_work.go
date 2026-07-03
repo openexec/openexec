@@ -143,6 +143,14 @@ var govWorkTriageCmd = &cobra.Command{
 				return printJSON(cmd, res)
 			}
 			cmd.Printf("Deep-triaged change %s into %d stor(ies): %s\n", args[0], len(res.StoryIDs), strings.Join(res.StoryIDs, ", "))
+			if len(res.LintWarnings) > 0 {
+				cmd.Printf("\n⚠ Verification-script warnings (review before approving — a false-green test can hide a real failure):\n")
+				for id, issues := range res.LintWarnings {
+					for _, issue := range issues {
+						cmd.Printf("  [%s] %s\n", id, issue)
+					}
+				}
+			}
 			cmd.Printf("Review the decomposition: openexec governance work stories %s\n", args[0])
 			return nil
 		}
@@ -184,7 +192,7 @@ the AI review its risk tier would otherwise require — the operator is the
 reviewer. Refused for high/critical risk; use 'work triage --deep' for those.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		svc, _, db, err := newGovService(cmd)
+		svc, store, db, err := newGovService(cmd)
 		if err != nil {
 			return err
 		}
@@ -199,7 +207,21 @@ reviewer. Refused for high/critical risk; use 'work triage --deep' for those.`,
 			return printJSON(cmd, res)
 		}
 		cmd.Printf("Light-triaged change %s into a single task (%d stor(y): %s)\n", args[0], len(res.StoryIDs), strings.Join(res.StoryIDs, ", "))
-		cmd.Printf("Next: openexec governance work approve %s --by <operator> (OPERATOR_SESSION), then work execute %s\n", args[0], args[0])
+
+		// The lightweight lane skips the planner, but the risk assessment (impact +
+		// operability) must still exist BEFORE the human approval gate — the
+		// operator is the reviewer, so they need it to judge. Best-effort: a missing
+		// completer must not fail quickplan.
+		if ch, gErr := store.GetChangeRecord(cmd.Context(), args[0]); gErr == nil {
+			baseDir, _ := govBaseDir(cmd)
+			repoCtx := gatherRelevantFiles(baseDir, ch.Title+" "+ch.RawText, 10, 16000)
+			if _, _, aErr := svc.AssessChange(cmd.Context(), args[0], repoCtx); aErr != nil {
+				cmd.Printf("  warning: pre-approval assessment not generated: %v\n", aErr)
+			} else {
+				cmd.Printf("  recorded impact + operability assessment (review: openexec governance work impact %s / work operability %s)\n", args[0], args[0])
+			}
+		}
+		cmd.Printf("Next: openexec governance work approve %s --by <operator>, then work execute %s\n", args[0], args[0])
 		return nil
 	},
 }
