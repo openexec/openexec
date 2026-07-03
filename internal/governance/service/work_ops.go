@@ -210,6 +210,9 @@ func (s *Service) MarkDone(ctx context.Context, changeID, authorityID string) er
 	if err != nil {
 		return err
 	}
+	if err := s.guardHumanAuthority(authority); err != nil {
+		return err
+	}
 	if ok, reason := s.evaluator.CanMarkDone(authority, ch); !ok {
 		return fmt.Errorf("mark done refused: %s", reason)
 	}

@@ -112,6 +112,20 @@ func NewService(store governance.Store, opts Options) *Service {
 // operator session.
 var errNotOperator = errors.New("governance/service: approval requires a human operator session (set OPENEXEC_OPERATOR_SESSION=1); an agent session cannot approve its own work")
 
+// guardHumanAuthority refuses to attribute an action to a HUMAN-typed authority
+// unless this is an operator session. Without it, an unattended agent could pass
+// authority=pm to (e.g.) MarkDone and forge a decision event stamped
+// actor_type=human — poisoning the audit trail's attribution, which is the
+// foundation of its trustworthiness. AI/verifier authorities are unaffected
+// (they legitimately act in agent sessions). This is the identity binding: a
+// human-attributed audit record can only be produced in a human session.
+func (s *Service) guardHumanAuthority(a *governance.ReviewAuthority) error {
+	if a != nil && a.Type == governance.AuthorityHuman && !s.operatorSession {
+		return fmt.Errorf("attributing this action to human authority %q requires an operator session (OPENEXEC_OPERATOR_SESSION=1); an agent session cannot forge a human-attributed audit record", a.Name)
+	}
+	return nil
+}
+
 // errMissingCompleter / errMissingRunner are returned when an operation needs an
 // optional dependency that was not injected.
 var (

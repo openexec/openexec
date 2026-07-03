@@ -119,6 +119,9 @@ func (s *Service) ReviewPlan(ctx context.Context, changeID, authorityID, actor s
 	if err != nil {
 		return nil, err
 	}
+	if err := s.guardHumanAuthority(authority); err != nil {
+		return nil, err
+	}
 	_ = actor // attribution is by review authority, not a free-form actor
 	// Record the review against the authority ID so RequiredReviews can later
 	// verify that the specific required review (e.g. security) actually occurred.
@@ -214,6 +217,9 @@ func (s *Service) terminateChange(ctx context.Context, changeID, authorityID, re
 	if err != nil {
 		return err
 	}
+	if err := s.guardHumanAuthority(authority); err != nil {
+		return err
+	}
 	if !authorityHasPerm(authority, governance.PermRequestChanges) {
 		return fmt.Errorf("%s refused: authority %q lacks the request_changes permission", verb, authority.Name)
 	}
@@ -261,6 +267,9 @@ func (s *Service) RequestRevision(ctx context.Context, changeID, authorityID, co
 	}
 	authority, err := s.getAuthority(ctx, authorityID)
 	if err != nil {
+		return err
+	}
+	if err := s.guardHumanAuthority(authority); err != nil {
 		return err
 	}
 	if !authorityHasPerm(authority, governance.PermRequestChanges) {

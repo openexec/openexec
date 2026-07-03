@@ -375,7 +375,8 @@ func TestMarkDone_RefusedWithoutPermission(t *testing.T) {
 
 func TestMarkDone_RefusedSeparationOfDuties(t *testing.T) {
 	store := newTestStore(t)
-	svc := NewService(store, Options{})
+	// Operator session so the human-authority guard passes and SoD is what fires.
+	svc := NewService(store, Options{OperatorSession: true})
 	ctx := context.Background()
 
 	seedChange(t, store, &governance.ChangeRecord{
@@ -402,6 +403,27 @@ func TestMarkDone_RefusedSeparationOfDuties(t *testing.T) {
 	got, _ := store.GetChangeRecord(ctx, "C-1")
 	if got.Status != governance.ChangeStatusReadyForTest {
 		t.Fatalf("status must be unchanged after SoD refusal, got %q", got.Status)
+	}
+}
+
+func TestMarkDone_HumanAuthorityRequiresOperatorSession(t *testing.T) {
+	store := newTestStore(t)
+	svc := NewService(store, Options{}) // NOT an operator session
+	ctx := context.Background()
+
+	seedChange(t, store, &governance.ChangeRecord{
+		ID: "C-1", Status: governance.ChangeStatusReadyForTest, Risk: governance.RiskLow,
+	})
+	_ = svc.RecordEvidence(ctx, "C-1", governance.EvidenceKindTest, governance.EvidenceSourceCLI, "t", "", "")
+
+	// An agent session attributing "done" to a HUMAN authority (pm) must be
+	// refused — otherwise it could forge a human-attributed audit record.
+	if err := svc.MarkDone(ctx, "C-1", "pm"); err == nil || !strings.Contains(err.Error(), "operator session") {
+		t.Fatalf("expected human-authority forgery guard, got %v", err)
+	}
+	// An AI/verifier authority may still mark done in an agent session.
+	if err := svc.MarkDone(ctx, "C-1", "ci_verifier"); err != nil {
+		t.Fatalf("verifier should be allowed to mark done, got %v", err)
 	}
 }
 
