@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/governance"
+	"github.com/openexec/openexec/internal/governance/ai"
 	"github.com/openexec/openexec/internal/governance/validation"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/release"
@@ -67,9 +68,17 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 	if raw, mErr := json.Marshal(plan); mErr == nil {
 		ch.Plan = string(raw)
 	}
-	// The planner does not classify risk; default conservatively to medium so a
-	// deep-triaged change requires human approval unless an operator lowers it.
-	if strings.TrimSpace(ch.Risk) == "" {
+	// Classify kind + risk from the intent (the planner does not). This is the
+	// AI's assessment, subject to human review before approval. Best-effort: on
+	// classifier failure, fall back to a conservative medium so a deep-triaged
+	// change still requires human approval. ClassifyIntent already clamps an
+	// unrecognized risk to medium, so it can never downgrade to auto-approvable.
+	if cls, cErr := ai.ClassifyIntent(ctx, s.completer, ch.Title, intentBody(ch)); cErr == nil {
+		if cls.Kind != "" {
+			ch.Kind = cls.Kind
+		}
+		ch.Risk = cls.Risk
+	} else if strings.TrimSpace(ch.Risk) == "" {
 		ch.Risk = governance.RiskMedium
 	}
 	ch.ProposalVersion++
@@ -209,6 +218,15 @@ func composeIntent(ch *governance.ChangeRecord, repoContext string) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// intentBody returns the free text used to classify a change (raw source text,
+// else the summary).
+func intentBody(ch *governance.ChangeRecord) string {
+	if strings.TrimSpace(ch.RawText) != "" {
+		return ch.RawText
+	}
+	return ch.Summary
 }
 
 func planSummary(plan *planner.ProjectPlan, ch *governance.ChangeRecord) string {

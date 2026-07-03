@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -119,9 +120,29 @@ func newGovService(cmd *cobra.Command) (*service.Service, governance.Store, io.C
 		Runner:          &github.ExecRunner{},
 		Completer:       buildGovCompleter(baseDir),
 		PlanStore:       planStore,
+		Executor:        &shellExecutor{baseDir: baseDir},
 		OperatorSession: os.Getenv("OPENEXEC_OPERATOR_SESSION") == "1",
 	})
 	return svc, store, multiCloser(closers), nil
+}
+
+// shellExecutor runs an approved task through the EXISTING engine by invoking
+// `openexec run <taskID>` as a subprocess in the project dir. It reuses the full
+// execution stack (daemon, blueprint loop, git/PR) rather than reimplementing
+// it — governance decides what runs, `openexec run` does the code work.
+type shellExecutor struct{ baseDir string }
+
+func (e *shellExecutor) RunTask(ctx context.Context, taskID, mode string) error {
+	args := []string{"run", taskID}
+	if mode != "" {
+		args = append(args, "--mode", mode)
+	}
+	cmd := exec.CommandContext(ctx, os.Args[0], args...)
+	cmd.Dir = e.baseDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
 }
 
 // buildGovCompleter constructs an ai.Completer from the project's active API

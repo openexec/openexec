@@ -47,10 +47,28 @@ const deepPlanJSON = `{
   }]
 }`
 
+// routingCompleter returns a classification response for the classifier prompt
+// (which contains "classifier") and the plan JSON for the planner prompt, so a
+// single completer serves both of TriageDeep's LLM calls.
+type routingCompleter struct {
+	plan   string
+	classi string
+}
+
+func (r routingCompleter) Complete(_ context.Context, prompt string) (string, error) {
+	if strings.Contains(prompt, "classifier") {
+		return r.classi, nil
+	}
+	return r.plan, nil
+}
+
 func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 	store := newTestStore(t)
 	ps := newFakePlanStore()
-	svc := NewService(store, Options{Completer: fakeCompleter{reply: deepPlanJSON}, PlanStore: ps})
+	svc := NewService(store, Options{
+		Completer: routingCompleter{plan: deepPlanJSON, classi: "kind: security\nrisk: high\n"},
+		PlanStore: ps,
+	})
 	ctx := context.Background()
 
 	seedChange(t, store, &governance.ChangeRecord{
@@ -92,8 +110,36 @@ func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 	if !strings.Contains(ch.Plan, "US-001") {
 		t.Fatalf("full plan JSON not stored on change")
 	}
+	// Risk + kind come from the classifier, not a flat default.
+	if ch.Risk != governance.RiskHigh {
+		t.Fatalf("expected classified risk high, got %q", ch.Risk)
+	}
+	if ch.Kind != governance.KindSecurity {
+		t.Fatalf("expected classified kind security, got %q", ch.Kind)
+	}
+}
+
+func TestTriageDeep_RiskFallsBackConservatively(t *testing.T) {
+	store := newTestStore(t)
+	ps := newFakePlanStore()
+	// Classifier returns garbage; risk must clamp to medium (never a low that
+	// would be auto-approvable).
+	svc := NewService(store, Options{
+		Completer: routingCompleter{plan: deepPlanJSON, classi: "not valid yaml at all"},
+		PlanStore: ps,
+	})
+	ctx := context.Background()
+	seedChange(t, store, &governance.ChangeRecord{
+		ID: "C-9", Title: "x", RawText: "y",
+		SourceType: governance.SourceManual, SourceID: "C-9",
+		Status: governance.ChangeStatusCandidate,
+	})
+	if _, err := svc.TriageDeep(ctx, "C-9", "", "planner_ai"); err != nil {
+		t.Fatalf("TriageDeep: %v", err)
+	}
+	ch, _ := store.GetChangeRecord(ctx, "C-9")
 	if ch.Risk != governance.RiskMedium {
-		t.Fatalf("expected conservative medium risk default, got %q", ch.Risk)
+		t.Fatalf("expected conservative medium on garbled classification, got %q", ch.Risk)
 	}
 }
 

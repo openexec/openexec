@@ -124,6 +124,43 @@ var govWorkTriageCmd = &cobra.Command{
 	},
 }
 
+var govWorkExecuteCmd = &cobra.Command{
+	Use:   "execute <change-id>",
+	Short: "Run an approved change's tasks through the execution engine",
+	Long: `Claim an approved change and run each of its tasks through the existing
+execution engine (openexec run), producing commits/PRs. Refused unless the
+change is approved for AI in an approved release. After execution, link the PR
+with 'work record-pr' and move to 'work ready-for-test'.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		agent, _ := cmd.Flags().GetString("agent")
+		mode, _ := cmd.Flags().GetString("mode")
+		rep, err := svc.ExecuteChange(cmd.Context(), args[0], agent, mode)
+		if err != nil {
+			return err
+		}
+		cmd.Printf("Executed change %s: %d task(s) dispatched", rep.ChangeID, len(rep.DispatchedTasks))
+		if len(rep.Failures) > 0 {
+			cmd.Printf(", %d failed", len(rep.Failures))
+		}
+		cmd.Println()
+		for _, tid := range rep.DispatchedTasks {
+			cmd.Printf("  ok   %s\n", tid)
+		}
+		for tid, msg := range rep.Failures {
+			cmd.Printf("  fail %s: %s\n", tid, msg)
+		}
+		cmd.Printf("Next: link the PR (work record-pr %s --url ...) then work ready-for-test %s\n", args[0], args[0])
+		return nil
+	},
+}
+
 var govWorkStoriesCmd = &cobra.Command{
 	Use:   "stories <change-id>",
 	Short: "Show the stories/tasks a change was decomposed into (deep triage)",
@@ -475,6 +512,11 @@ func init() {
 	// work stories
 	governanceWorkCmd.AddCommand(govWorkStoriesCmd)
 	govWorkStoriesCmd.Flags().Bool("json", false, "Output as JSON")
+
+	// work execute
+	governanceWorkCmd.AddCommand(govWorkExecuteCmd)
+	govWorkExecuteCmd.Flags().String("agent", "openexec-executor", "Executor name recorded on the claim")
+	govWorkExecuteCmd.Flags().String("mode", "workspace-write", "Execution mode (read-only|workspace-write|danger-full-access)")
 
 	// work review-plan
 	governanceWorkCmd.AddCommand(govWorkReviewPlanCmd)

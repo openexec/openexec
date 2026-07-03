@@ -43,7 +43,16 @@ type Service struct {
 	completer       ai.Completer  // optional; nil in a chat-only context
 	runner          github.Runner // optional; nil when gh is unavailable
 	planStore       PlanStore     // optional; nil disables deep triage
+	executor        Executor      // optional; nil disables the execute hop
 	operatorSession bool          // true only in a human operator session
+}
+
+// Executor runs a single approved task through the execution engine (producing
+// commits / a PR). The governance layer decides WHAT may run; the Executor does
+// the code work — OpenExec never reimplements execution here. The CLI wires an
+// implementation that drives the existing `openexec run`; tests inject a fake.
+type Executor interface {
+	RunTask(ctx context.Context, taskID, mode string) error
 }
 
 // PlanStore is the subset of the release manager the deep-triage bridge needs to
@@ -69,6 +78,8 @@ type Options struct {
 	// PlanStore persists planner-generated stories/tasks for deep triage. Nil
 	// disables TriageDeep (the operation returns a clear error).
 	PlanStore PlanStore
+	// Executor runs approved tasks. Nil disables ExecuteChange.
+	Executor Executor
 	// OperatorSession marks this Service as running under a human operator
 	// (e.g. OPENEXEC_OPERATOR_SESSION=1). Approval operations (ApproveChange,
 	// ApproveRelease) refuse when it is false, so an unattended agent session —
@@ -90,6 +101,7 @@ func NewService(store governance.Store, opts Options) *Service {
 		completer:       opts.Completer,
 		runner:          opts.Runner,
 		planStore:       opts.PlanStore,
+		executor:        opts.Executor,
 		operatorSession: opts.OperatorSession,
 	}
 }
@@ -104,6 +116,7 @@ var (
 	errMissingCompleter = errors.New("governance/service: AI completer not configured (this operation needs an AI provider)")
 	errMissingRunner    = errors.New("governance/service: GitHub runner not configured (this operation needs the gh CLI)")
 	errMissingPlanStore = errors.New("governance/service: plan store not configured (deep triage needs the release store)")
+	errMissingExecutor  = errors.New("governance/service: executor not configured (the execute hop needs an execution engine)")
 )
 
 // newID returns a fresh identifier for store records the service creates
