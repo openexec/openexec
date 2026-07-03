@@ -7,34 +7,34 @@ import (
 	"testing"
 
 	"github.com/openexec/openexec/internal/governance"
-	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/runtime"
 )
 
 // fakePlanStore is an in-memory PlanStore for exercising the deep-triage bridge
 // without booting a real release.Manager.
 type fakePlanStore struct {
-	goals   map[string]*release.Goal
-	stories map[string]*release.Story
-	tasks   map[string]*release.Task
+	goals   map[string]*runtime.Goal
+	stories map[string]*runtime.Story
+	tasks   map[string]*runtime.Task
 }
 
 func newFakePlanStore() *fakePlanStore {
 	return &fakePlanStore{
-		goals:   map[string]*release.Goal{},
-		stories: map[string]*release.Story{},
-		tasks:   map[string]*release.Task{},
+		goals:   map[string]*runtime.Goal{},
+		stories: map[string]*runtime.Story{},
+		tasks:   map[string]*runtime.Task{},
 	}
 }
 
-func (f *fakePlanStore) GetGoal(id string) *release.Goal   { return f.goals[id] }
-func (f *fakePlanStore) GetStory(id string) *release.Story { return f.stories[id] }
-func (f *fakePlanStore) GetTask(id string) *release.Task   { return f.tasks[id] }
-func (f *fakePlanStore) CreateGoal(g *release.Goal) error  { f.goals[g.ID] = g; return nil }
-func (f *fakePlanStore) CreateStory(s *release.Story) error {
+func (f *fakePlanStore) GetGoal(id string) *runtime.Goal   { return f.goals[id] }
+func (f *fakePlanStore) GetStory(id string) *runtime.Story { return f.stories[id] }
+func (f *fakePlanStore) GetTask(id string) *runtime.Task   { return f.tasks[id] }
+func (f *fakePlanStore) CreateGoal(g *runtime.Goal) error  { f.goals[g.ID] = g; return nil }
+func (f *fakePlanStore) CreateStory(s *runtime.Story) error {
 	f.stories[s.ID] = s
 	return nil
 }
-func (f *fakePlanStore) CreateTask(t *release.Task) error {
+func (f *fakePlanStore) CreateTask(t *runtime.Task) error {
 	f.tasks[t.ID] = t
 	// Mirror release.Manager.CreateTask: append the task to its parent story.
 	if st := f.stories[t.StoryID]; st != nil {

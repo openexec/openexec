@@ -10,14 +10,13 @@ import (
 	"github.com/openexec/openexec/internal/governance"
 	"github.com/openexec/openexec/internal/governance/ai"
 	"github.com/openexec/openexec/internal/governance/validation"
-	"github.com/openexec/openexec/internal/planner"
-	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/runtime"
 )
 
 // DeepTriageResult is what TriageDeep returns: the generated plan and the ids of
 // the release stories now linked to the change.
 type DeepTriageResult struct {
-	Plan     *planner.ProjectPlan
+	Plan     *runtime.ProjectPlan
 	StoryIDs []string
 }
 
@@ -48,8 +47,8 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 		return nil, err
 	}
 
-	p := planner.New(s.completer)
-	plan, err := p.GeneratePlan(ctx, composeIntent(ch, repoContext), nil)
+	p := runtime.NewPlanner(s.completer)
+	plan, err := p.GeneratePlan(ctx, composeIntent(ch, repoContext))
 	if err != nil {
 		return nil, fmt.Errorf("deep triage planning for change %q: %w", changeID, err)
 	}
@@ -161,7 +160,7 @@ func (s *Service) ChangeOperability(ctx context.Context, changeID string) (*ai.O
 
 // ChangeStories returns the release stories a change owns (via deep triage),
 // for review/display. Requires a PlanStore.
-func (s *Service) ChangeStories(ctx context.Context, changeID string) ([]*release.Story, error) {
+func (s *Service) ChangeStories(ctx context.Context, changeID string) ([]*runtime.Story, error) {
 	if s.planStore == nil {
 		return nil, errMissingPlanStore
 	}
@@ -169,7 +168,7 @@ func (s *Service) ChangeStories(ctx context.Context, changeID string) ([]*releas
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*release.Story, 0, len(ids))
+	out := make([]*runtime.Story, 0, len(ids))
 	for _, id := range ids {
 		if st := s.planStore.GetStory(id); st != nil {
 			out = append(out, st)
@@ -183,8 +182,8 @@ func (s *Service) ChangeStories(ctx context.Context, changeID string) ([]*releas
 // pkg/manager.importPlan (including RemapPlanIDs so a plan generated from
 // US-001 does not collide with an existing backlog) but targets the injected
 // PlanStore and records the change<->story links.
-func (s *Service) importPlanForChange(ctx context.Context, ch *governance.ChangeRecord, plan *planner.ProjectPlan) ([]string, error) {
-	planner.RemapPlanIDs(plan, planner.ExistingLookup{
+func (s *Service) importPlanForChange(ctx context.Context, ch *governance.ChangeRecord, plan *runtime.ProjectPlan) ([]string, error) {
+	runtime.RemapPlanIDs(plan, runtime.ExistingLookup{
 		GoalTitle:  func(id string) (string, bool) { g := s.planStore.GetGoal(id); return titleOf(g), g != nil },
 		StoryTitle: func(id string) (string, bool) { st := s.planStore.GetStory(id); return storyTitleOf(st), st != nil },
 		TaskExists: func(id string) bool { return s.planStore.GetTask(id) != nil },
@@ -197,7 +196,7 @@ func (s *Service) importPlanForChange(ctx context.Context, ch *governance.Change
 		if s.planStore.GetGoal(g.ID) != nil {
 			continue
 		}
-		if err := s.planStore.CreateGoal(&release.Goal{
+		if err := s.planStore.CreateGoal(&runtime.Goal{
 			ID: g.ID, Title: g.Title, Description: g.Description,
 			SuccessCriteria: g.SuccessCriteria, VerificationMethod: g.VerificationMethod,
 		}); err != nil {
@@ -215,12 +214,12 @@ func (s *Service) importPlanForChange(ctx context.Context, ch *governance.Change
 			// Create the story with an EMPTY task list: the store's CreateTask
 			// appends each task to its parent story, so pre-populating Tasks here
 			// would double every task id in the story.
-			if err := s.planStore.CreateStory(&release.Story{
+			if err := s.planStore.CreateStory(&runtime.Story{
 				ID: st.ID, GoalID: goalID, Title: st.Title, Description: st.Description,
 				AcceptanceCriteria: st.AcceptanceCriteria, VerificationScript: st.VerificationScript,
 				DependsOn: st.DependsOn,
-				StoryType: release.StoryTypeFeature, Priority: i,
-				Status: release.StoryStatusPending, CreatedAt: now,
+				StoryType: runtime.StoryTypeFeature, Priority: i,
+				Status: runtime.StoryStatusPending, CreatedAt: now,
 			}); err != nil {
 				return nil, fmt.Errorf("import story %s: %w", st.ID, err)
 			}
@@ -229,14 +228,14 @@ func (s *Service) importPlanForChange(ctx context.Context, ch *governance.Change
 			if s.planStore.GetTask(t.ID) != nil {
 				continue
 			}
-			task := &release.Task{
+			task := &runtime.Task{
 				ID: t.ID, Title: t.Title, Description: t.Description,
 				VerificationScript: t.VerificationScript, StoryID: st.ID,
 				DependsOn: t.DependsOn, Priority: j, MaxAttempts: 3,
-				Status: release.TaskStatusPending, CreatedAt: now,
+				Status: runtime.TaskStatusPending, CreatedAt: now,
 			}
-			if t.Mode == planner.TaskModeHITL {
-				task.Metadata = map[string]interface{}{"mode": release.TaskModeHITL}
+			if t.Mode == runtime.PlanTaskModeHITL {
+				task.Metadata = map[string]interface{}{"mode": runtime.TaskModeHITL}
 			}
 			if err := s.planStore.CreateTask(task); err != nil {
 				return nil, fmt.Errorf("import task %s: %w", t.ID, err)
@@ -281,7 +280,7 @@ func intentBody(ch *governance.ChangeRecord) string {
 	return ch.Summary
 }
 
-func planSummary(plan *planner.ProjectPlan, ch *governance.ChangeRecord) string {
+func planSummary(plan *runtime.ProjectPlan, ch *governance.ChangeRecord) string {
 	if len(plan.Goals) > 0 && plan.Goals[0].Description != "" {
 		return plan.Goals[0].Description
 	}
@@ -291,7 +290,7 @@ func planSummary(plan *planner.ProjectPlan, ch *governance.ChangeRecord) string 
 	return ch.Title
 }
 
-func aggregateAcceptance(plan *planner.ProjectPlan) string {
+func aggregateAcceptance(plan *runtime.ProjectPlan) string {
 	var lines []string
 	for _, st := range plan.Stories {
 		for _, ac := range st.AcceptanceCriteria {
@@ -301,7 +300,7 @@ func aggregateAcceptance(plan *planner.ProjectPlan) string {
 	return strings.Join(lines, "\n")
 }
 
-func aggregateVerification(plan *planner.ProjectPlan) string {
+func aggregateVerification(plan *runtime.ProjectPlan) string {
 	var lines []string
 	for _, st := range plan.Stories {
 		if st.VerificationScript != "" {
@@ -316,14 +315,14 @@ func aggregateVerification(plan *planner.ProjectPlan) string {
 	return strings.Join(lines, "\n")
 }
 
-func titleOf(g *release.Goal) string {
+func titleOf(g *runtime.Goal) string {
 	if g == nil {
 		return ""
 	}
 	return g.Title
 }
 
-func storyTitleOf(s *release.Story) string {
+func storyTitleOf(s *runtime.Story) string {
 	if s == nil {
 		return ""
 	}

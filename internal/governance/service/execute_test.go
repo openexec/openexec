@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/openexec/openexec/internal/governance"
-	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/runtime"
 )
 
-func releaseStory(id string, tasks []string) *release.Story {
-	return &release.Story{ID: id, Title: id, Status: release.StoryStatusPending, Tasks: tasks}
+func releaseStory(id string, tasks []string) *runtime.Story {
+	return &runtime.Story{ID: id, Title: id, Status: runtime.StoryStatusPending, Tasks: tasks}
 }
 
 // fakeExecutor records dispatched task ids.

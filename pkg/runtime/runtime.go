@@ -1,0 +1,80 @@
+// Package runtime is the PUBLIC seam between the open-source OpenExec runtime and
+// a higher-layer delivery-governance product. It re-exports exactly the runtime
+// capabilities the governance layer needs — intent planning and the story/task
+// backlog types — through a stable public API, so the governance layer can
+// depend on this package instead of reaching into internal/planner and
+// internal/release.
+//
+// This is what makes the two-layer split real: the runtime (this module's
+// internals) stays MIT and self-contained, while a governance layer — which may
+// live in a separate module or be licensed differently — consumes only this
+// facade. Keep this surface small and stable; it is the contract.
+package runtime
+
+import (
+	"context"
+
+	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/internal/release"
+)
+
+// Backlog types. These aliases expose the runtime's story/task/goal types under
+// stable public names so external code can construct and read them without
+// importing internal packages.
+type (
+	Story = release.Story
+	Task  = release.Task
+	Goal  = release.Goal
+)
+
+// Backlog constants used when persisting planner output.
+const (
+	StoryTypeFeature   = release.StoryTypeFeature
+	StoryStatusPending = release.StoryStatusPending
+	TaskStatusPending  = release.TaskStatusPending
+	// TaskModeHITL marks a release task as human-in-the-loop.
+	TaskModeHITL = release.TaskModeHITL
+)
+
+// Planning types.
+type (
+	// ProjectPlan is a generated intent decomposition (goals -> stories -> tasks).
+	ProjectPlan = planner.ProjectPlan
+	// ExistingLookup lets RemapPlanIDs detect id collisions with an existing backlog.
+	ExistingLookup = planner.ExistingLookup
+	// LLMProvider is the single-shot completion interface the planner needs; any
+	// value with Complete(ctx, prompt) (string, error) satisfies it.
+	LLMProvider = planner.LLMProvider
+)
+
+// PlanTaskModeHITL is the planner's human-in-the-loop task mode (distinct from
+// the release backlog's TaskModeHITL).
+const PlanTaskModeHITL = planner.TaskModeHITL
+
+// Planner wraps the runtime planner behind the public seam.
+type Planner struct{ inner *planner.Planner }
+
+// NewPlanner builds a Planner over an LLM provider.
+func NewPlanner(p LLMProvider) *Planner { return &Planner{inner: planner.New(p)} }
+
+// GeneratePlan turns intent text into a ProjectPlan.
+func (p *Planner) GeneratePlan(ctx context.Context, intent string) (*ProjectPlan, error) {
+	return p.inner.GeneratePlan(ctx, intent, nil)
+}
+
+// RemapPlanIDs re-numbers colliding ids so a generated plan appends to an
+// existing backlog instead of clashing with it. Returns the count remapped.
+func RemapPlanIDs(plan *ProjectPlan, look ExistingLookup) int {
+	return planner.RemapPlanIDs(plan, look)
+}
+
+// BacklogManager is the runtime's story/task backlog manager (persists to
+// .openexec/openexec.db). It satisfies the governance layer's PlanStore.
+type BacklogManager = release.Manager
+
+// NewBacklogManager opens the backlog manager for a project directory with git
+// integration disabled — appropriate for governance-side persistence, where
+// branch/PR side effects belong to execution, not planning.
+func NewBacklogManager(baseDir string) (*BacklogManager, error) {
+	return release.NewManager(baseDir, nil)
+}

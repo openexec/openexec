@@ -31,8 +31,8 @@ import (
 	"github.com/openexec/openexec/internal/governance/policy"
 	"github.com/openexec/openexec/internal/governance/service"
 	"github.com/openexec/openexec/internal/project"
-	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/runner"
+	oxruntime "github.com/openexec/openexec/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -112,7 +112,7 @@ func newGovService(cmd *cobra.Command) (*service.Service, governance.Store, io.C
 	// commands are unaffected.
 	var planStore service.PlanStore
 	closers := []io.Closer{db}
-	if relMgr, rErr := release.NewManager(baseDir, nil); rErr == nil {
+	if relMgr, rErr := oxruntime.NewBacklogManager(baseDir); rErr == nil {
 		planStore = relMgr
 		closers = append([]io.Closer{relMgr}, closers...) // close release mgr before governance db
 	}

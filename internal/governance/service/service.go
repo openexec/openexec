@@ -32,7 +32,7 @@ import (
 	"github.com/openexec/openexec/internal/governance/ai"
 	"github.com/openexec/openexec/internal/governance/connectors/github"
 	"github.com/openexec/openexec/internal/governance/policy"
-	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/runtime"
 )
 
 // Service sequences every governance workflow operation. It holds injected
@@ -55,17 +55,18 @@ type Executor interface {
 	RunTask(ctx context.Context, taskID, mode string) error
 }
 
-// PlanStore is the subset of the release manager the deep-triage bridge needs to
-// persist planner-generated goals/stories/tasks. *release.Manager satisfies it.
-// Injecting a narrow interface keeps the service testable and avoids the release
-// layer depending on governance.
+// PlanStore is the subset of the runtime backlog the deep-triage bridge needs to
+// persist planner-generated goals/stories/tasks. The runtime's release manager
+// satisfies it. Injecting a narrow interface keeps the service testable and
+// avoids the runtime depending on governance. Types come from the public
+// pkg/runtime seam, not internal runtime packages.
 type PlanStore interface {
-	GetGoal(id string) *release.Goal
-	GetStory(id string) *release.Story
-	GetTask(id string) *release.Task
-	CreateGoal(*release.Goal) error
-	CreateStory(*release.Story) error
-	CreateTask(*release.Task) error
+	GetGoal(id string) *runtime.Goal
+	GetStory(id string) *runtime.Story
+	GetTask(id string) *runtime.Task
+	CreateGoal(*runtime.Goal) error
+	CreateStory(*runtime.Story) error
+	CreateTask(*runtime.Task) error
 }
 
 // Options carries the optional dependencies for NewService. A nil Completer or
