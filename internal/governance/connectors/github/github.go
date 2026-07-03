@@ -331,3 +331,28 @@ func ListIssueComments(ctx context.Context, runner Runner, repo string, number i
 	}
 	return comments, nil
 }
+
+// ListOpenIssues returns the numbers of open issues in a repo, optionally
+// filtered to a single label, via `gh issue list`. Used by the automation
+// sync-in to discover flagged work (e.g. label "ai:triage").
+func ListOpenIssues(ctx context.Context, runner Runner, repo, label string) ([]int, error) {
+	args := []string{"issue", "list", "--repo", repo, "--state", "open", "--json", "number", "--limit", "200"}
+	if label != "" {
+		args = append(args, "--label", label)
+	}
+	out, err := runner.Run(ctx, args...)
+	if err != nil {
+		return nil, fmt.Errorf("gh issue list for %s: %w", repo, err)
+	}
+	var raw []struct {
+		Number int `json:"number"`
+	}
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("parse issue list: %w", err)
+	}
+	nums := make([]int, 0, len(raw))
+	for _, r := range raw {
+		nums = append(nums, r.Number)
+	}
+	return nums, nil
+}
