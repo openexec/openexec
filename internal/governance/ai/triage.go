@@ -124,18 +124,19 @@ func ReviewPlan(ctx context.Context, completer Completer, store governance.Store
 		Decision:        decision,
 		Comment:         reviewComment(out),
 	}
-	if err := store.CreateDecisionEvent(ctx, ev); err != nil {
-		return nil, fmt.Errorf("governance/ai: record review decision: %w", err)
-	}
 
 	// Move to changes_requested only when the (permission-checked) decision is
 	// changes_requested — an unauthorized reviewer downgraded above cannot move
-	// the change's status.
+	// the change's status. When it does move, the status change and its event are
+	// written atomically so the two never diverge; other decisions just record
+	// the review event.
 	if decision == governance.DecisionChangesRequested {
 		ch.Status = governance.ChangeStatusChangesRequested
-		if err := store.UpdateChangeRecord(ctx, ch); err != nil {
-			return nil, fmt.Errorf("governance/ai: persist changes-requested status: %w", err)
+		if err := store.TransitionChange(ctx, ch, ev); err != nil {
+			return nil, fmt.Errorf("governance/ai: persist changes-requested review: %w", err)
 		}
+	} else if err := store.CreateDecisionEvent(ctx, ev); err != nil {
+		return nil, fmt.Errorf("governance/ai: record review decision: %w", err)
 	}
 
 	return out, nil

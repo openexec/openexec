@@ -92,10 +92,6 @@ func (s *Service) TriageLight(ctx context.Context, changeID, actor string) (*Dee
 	ch.ProposalVersion++
 	ch.ApprovedVersion = 0
 	ch.Status = governance.ChangeStatusPlanReady
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-		return nil, fmt.Errorf("persist light-triaged change %q: %w", changeID, err)
-	}
-
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -106,8 +102,8 @@ func (s *Service) TriageLight(ctx context.Context, changeID, actor string) (*Dee
 		Decision:        governance.DecisionProposed,
 		Comment:         "Lightweight lane: single-task plan (no deep decomposition); AI review waived at approval",
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
-		return nil, fmt.Errorf("record light-triage for change %q: %w", changeID, err)
+	if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+		return nil, fmt.Errorf("persist light-triaged change %q: %w", changeID, err)
 	}
 
 	s.mirrorGitHubLabel(ctx, ch)

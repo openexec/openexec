@@ -81,18 +81,6 @@ func (s *Service) ClaimWork(ctx context.Context, changeID, agent string, lease t
 	if err != nil {
 		return err
 	}
-	// Advance approved_for_ai -> implementing on the first claim. A renewal by
-	// the same agent (already implementing) skips the transition.
-	if ch.Status == governance.ChangeStatusApprovedForAI {
-		if err := validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusImplementing); err != nil {
-			return err
-		}
-		ch.Status = governance.ChangeStatusImplementing
-		if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-			return fmt.Errorf("advance change %q to implementing: %w", changeID, err)
-		}
-	}
-
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -103,7 +91,18 @@ func (s *Service) ClaimWork(ctx context.Context, changeID, agent string, lease t
 		Decision:        decisionClaimed,
 		Comment:         fmt.Sprintf("Claimed by %s (lease %s)", agent, lease),
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
+	// Advance approved_for_ai -> implementing on the first claim, atomically with
+	// the claim event. A renewal by the same agent (already implementing) skips
+	// the transition and just records the claim event.
+	if ch.Status == governance.ChangeStatusApprovedForAI {
+		if err := validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusImplementing); err != nil {
+			return err
+		}
+		ch.Status = governance.ChangeStatusImplementing
+		if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+			return fmt.Errorf("advance change %q to implementing: %w", changeID, err)
+		}
+	} else if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
 		return fmt.Errorf("record claim for change %q: %w", changeID, err)
 	}
 	s.mirrorGitHubLabel(ctx, ch)

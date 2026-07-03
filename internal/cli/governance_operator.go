@@ -25,25 +25,28 @@ type operatorConfig struct {
 	Operators []string `yaml:"operators"`
 }
 
-// loadOperators reads ~/.openexec/operators.yaml. A missing file yields nil
-// (no allowlist configured → env-var dev fallback applies).
-func loadOperators() ([]string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return nil, nil
+// loadOperators reads ~/.openexec/operators.yaml. configured reports whether the
+// file EXISTS (regardless of whether it parses), so the caller can tell a missing
+// allowlist (→ env-var dev fallback) from a present-but-invalid one (→ fail
+// closed). A missing file returns (nil, false, nil); an unreadable/invalid file
+// returns (nil, true, err).
+func loadOperators() (operators []string, configured bool, err error) {
+	home, herr := os.UserHomeDir()
+	if herr != nil || home == "" {
+		return nil, false, nil
 	}
-	data, err := os.ReadFile(filepath.Join(home, ".openexec", "operators.yaml"))
-	if os.IsNotExist(err) {
-		return nil, nil
+	data, rerr := os.ReadFile(filepath.Join(home, ".openexec", "operators.yaml"))
+	if os.IsNotExist(rerr) {
+		return nil, false, nil
 	}
-	if err != nil {
-		return nil, err
+	if rerr != nil {
+		return nil, true, rerr
 	}
 	var cfg operatorConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+	if uerr := yaml.Unmarshal(data, &cfg); uerr != nil {
+		return nil, true, uerr
 	}
-	return cfg.Operators, nil
+	return cfg.Operators, true, nil
 }
 
 // resolveOperatorSession decides whether this invocation is a human operator
@@ -53,8 +56,16 @@ func loadOperators() ([]string, error) {
 // dev/pilot shortcut. The returned identity string is stamped into the audit
 // trail on approval/merge/risk-accept.
 func resolveOperatorSession(ctx context.Context) (isOperator bool, identity string) {
-	operators, err := loadOperators()
-	if err == nil && len(operators) > 0 {
+	operators, configured, err := loadOperators()
+	if err != nil {
+		// The allowlist is present but unreadable/invalid. FAIL CLOSED — do not
+		// fall back to the env var, or a misconfigured policy would weaken the
+		// boundary exactly when it is broken.
+		return false, "operator allowlist present but unreadable/invalid (failing closed): " + err.Error()
+	}
+	if configured {
+		// Allowlist present (even if empty = deny-all): bind to the gh identity;
+		// the env var is ignored.
 		login := currentGitHubLogin(ctx)
 		if login == "" {
 			return false, "no gh identity (run `gh auth login`); operator allowlist is configured"
@@ -66,6 +77,7 @@ func resolveOperatorSession(ctx context.Context) (isOperator bool, identity stri
 		}
 		return false, "github:" + login + " (not in operator allowlist)"
 	}
+	// No allowlist configured: env var is the documented dev/pilot shortcut.
 	if os.Getenv("OPENEXEC_OPERATOR_SESSION") == "1" {
 		return true, "dev:env-var"
 	}

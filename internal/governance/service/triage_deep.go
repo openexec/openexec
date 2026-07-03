@@ -85,10 +85,6 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 	ch.ProposalVersion++
 	ch.ApprovedVersion = 0 // a new proposal supersedes any prior approval
 	ch.Status = governance.ChangeStatusPlanReady
-	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
-		return nil, fmt.Errorf("persist deep-triaged change %q: %w", changeID, err)
-	}
-
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -99,8 +95,8 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 		Decision:        governance.DecisionProposed,
 		Comment:         fmt.Sprintf("Deep triage: decomposed into %d stor(ies)", len(storyIDs)),
 	}
-	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
-		return nil, fmt.Errorf("record deep-triage proposal for change %q: %w", changeID, err)
+	if err := s.store.TransitionChange(ctx, ch, ev); err != nil {
+		return nil, fmt.Errorf("persist deep-triaged change %q: %w", changeID, err)
 	}
 
 	// File-level impact analysis (best-effort, review-only): when real repo

@@ -38,18 +38,7 @@ func (s *Service) SyncGitHubChecks(ctx context.Context, changeID string) error {
 		return err
 	}
 
-	total, passed, failed, pending := 0, 0, 0, 0
-	for _, c := range checks {
-		total++
-		switch {
-		case c.Status != "completed":
-			pending++
-		case c.Conclusion == "success" || c.Conclusion == "neutral" || c.Conclusion == "skipped":
-			passed++
-		default:
-			failed++
-		}
-	}
+	total, passed, failed, pending := classifyChecks(checks)
 	if total == 0 {
 		return fmt.Errorf("no check-runs found for %s@%s; nothing to verify", repo, sha)
 	}
@@ -79,4 +68,50 @@ func firstN(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+// classifyChecks tallies check-runs into total/passed/failed/pending. neutral
+// and skipped count as passed (they do not block); anything not completed is
+// pending; any other completed conclusion is a failure.
+func classifyChecks(checks []github.CheckRun) (total, passed, failed, pending int) {
+	for _, c := range checks {
+		total++
+		switch {
+		case c.Status != "completed":
+			pending++
+		case c.Conclusion == "success" || c.Conclusion == "neutral" || c.Conclusion == "skipped":
+			passed++
+		default:
+			failed++
+		}
+	}
+	return total, passed, failed, pending
+}
+
+// currentChecksGreen re-fetches the check-runs for a change's CURRENT PR head
+// commit and reports whether they are all green. Auto-merge uses this instead of
+// trusting stored evidence, so a green result recorded before a later push
+// cannot satisfy the gate — the checks that matter are the ones on the commit
+// about to be merged.
+func (s *Service) currentChecksGreen(ctx context.Context, ch *governance.ChangeRecord) (bool, string) {
+	repo, number, ok := repoFromPRURL(ch.PRURL)
+	if !ok {
+		return false, "cannot derive repo/PR from the change's PR URL"
+	}
+	sha, err := github.PRHeadSHA(ctx, s.runner, repo, number)
+	if err != nil {
+		return false, fmt.Sprintf("cannot read current PR head: %v", err)
+	}
+	checks, _, err := github.FetchCommitChecks(ctx, s.runner, repo, sha)
+	if err != nil {
+		return false, fmt.Sprintf("cannot fetch checks for current PR head %s: %v", firstN(sha, 12), err)
+	}
+	total, passed, failed, pending := classifyChecks(checks)
+	if total == 0 {
+		return false, fmt.Sprintf("no CI checks on the current PR head %s", firstN(sha, 12))
+	}
+	if failed > 0 || pending > 0 {
+		return false, fmt.Sprintf("current PR head %s checks not green: %d passed, %d failed, %d pending", firstN(sha, 12), passed, failed, pending)
+	}
+	return true, ""
 }

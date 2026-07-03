@@ -128,8 +128,10 @@ func (s *Service) canMerge(ctx context.Context, ch *governance.ChangeRecord, aut
 	//      evidence gate already ran (closes the "merge at pr_open" bypass);
 	//   c. the operability review clears it (rollback-safe, non-destructive
 	//      migration, low/medium deploy risk);
-	//   d. verification evidence is EXTERNALLY observed (CI/GitHub), never
-	//      agent-self-reported — an agent cannot manufacture a passing CI run.
+	//   d. CI checks on the CURRENT PR head are green, re-fetched live from GitHub
+	//      — an agent cannot manufacture a passing CI run, and stale evidence from
+	//      before a later push cannot satisfy the gate (the checks that matter are
+	//      the ones on the exact commit about to merge).
 	if s.evaluator.CanAutoMerge(ch) {
 		if ch.Status != governance.ChangeStatusDone {
 			return false, fmt.Sprintf("auto-merge requires the change to be done (fully verified); it is %q — a human operator must merge earlier states", ch.Status)
@@ -138,9 +140,8 @@ func (s *Service) canMerge(ctx context.Context, ch *governance.ChangeRecord, aut
 		if !op.AutoMergeSafe() {
 			return false, "auto-merge blocked by the operability review (rollback safety / DB migration / deploy risk not cleared); a human operator must merge this deploy"
 		}
-		evidence, _ := s.store.ListEvidence(ctx, ch.ID)
-		if !hasTrustedVerification(evidence) {
-			return false, "auto-merge requires externally-verified evidence (CI/GitHub); agent-self-reported evidence does not qualify — a human operator must merge"
+		if ok, reason := s.currentChecksGreen(ctx, ch); !ok {
+			return false, "auto-merge requires green CI on the current PR head: " + reason + " — a human operator must merge"
 		}
 		return true, ""
 	}
@@ -157,24 +158,6 @@ func (s *Service) canMerge(ctx context.Context, ch *governance.ChangeRecord, aut
 var trustedVerificationSources = map[string]bool{
 	governance.EvidenceSourceGitHub:  true,
 	governance.EvidenceSourceWebhook: true,
-}
-
-// verifyingEvidenceKinds are the kinds that attest a change is correct.
-var verifyingEvidenceKinds = map[string]bool{
-	governance.EvidenceKindTest:   true,
-	governance.EvidenceKindCI:     true,
-	governance.EvidenceKindReview: true,
-}
-
-// hasTrustedVerification reports whether any evidence is a verifying kind from an
-// externally-observed source — the bar for auto-merge (auto-deploy).
-func hasTrustedVerification(evidence []*governance.Evidence) bool {
-	for _, e := range evidence {
-		if e != nil && verifyingEvidenceKinds[e.Kind] && trustedVerificationSources[e.Source] {
-			return true
-		}
-	}
-	return false
 }
 
 func mergeAuthLabel(operator bool) string {
