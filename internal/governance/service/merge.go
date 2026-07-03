@@ -90,14 +90,22 @@ func (s *Service) canMerge(ctx context.Context, ch *governance.ChangeRecord, aut
 		}
 		return true, ""
 	}
-	// Path 2: auto-merge — ONLY if policy opts this tier in AND verification
-	// evidence exists. Both must hold; either missing fails closed.
+	// Path 2: auto-merge — ONLY if policy opts this tier in AND the operability
+	// review clears it AND verification evidence exists. All three must hold; any
+	// one missing fails closed. Operability is the hard SRE gate: a change that
+	// can't be cleanly rolled back, needs a destructive DB migration, or is high
+	// deploy risk can NEVER auto-merge even when its risk tier is opted in — a
+	// human operator must own that deploy.
 	if s.evaluator.CanAutoMerge(ch) {
+		op, _ := s.ChangeOperability(ctx, ch.ID)
+		if !op.AutoMergeSafe() {
+			return false, "auto-merge blocked by the operability review (rollback safety / DB migration / deploy risk not cleared); a human operator must merge this deploy"
+		}
 		evidence, _ := s.store.ListEvidence(ctx, ch.ID)
 		if validation.ValidateMarkDone(evidence) == nil {
 			return true, ""
 		}
-		return false, fmt.Sprintf("auto-merge is policy-allowed for %s-risk work but no verification evidence is recorded", riskOrUnknown(ch.Risk))
+		return false, fmt.Sprintf("auto-merge is policy-allowed and operability-clear for %s-risk work but no verification evidence is recorded", riskOrUnknown(ch.Risk))
 	}
 	return false, fmt.Sprintf(
 		"auto-merge is not allowed for %s-risk work; merge requires a human operator session (OPENEXEC_OPERATOR_SESSION=1) with an approve authority",

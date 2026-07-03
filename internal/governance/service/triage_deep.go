@@ -112,6 +112,13 @@ func (s *Service) TriageDeep(ctx context.Context, changeID, repoContext, actor s
 				_ = s.store.SetChangeImpact(ctx, ch.ID, string(raw))
 			}
 		}
+		// Operability / production-readiness review (rollback, DB migration,
+		// deploy risk) — feeds both human review and the merge gate.
+		if op, oErr := ai.AnalyzeOperability(ctx, s.completer, composeIntent(ch, ""), repoContext); oErr == nil {
+			if raw, mErr := json.Marshal(op); mErr == nil {
+				_ = s.store.SetChangeOperability(ctx, ch.ID, string(raw))
+			}
+		}
 	}
 
 	s.mirrorGitHubLabel(ctx, ch)
@@ -131,6 +138,23 @@ func (s *Service) ChangeImpact(ctx context.Context, changeID string) (*ai.Impact
 	rep := &ai.ImpactReport{}
 	if err := json.Unmarshal([]byte(raw), rep); err != nil {
 		return nil, fmt.Errorf("parse impact for change %q: %w", changeID, err)
+	}
+	return rep, nil
+}
+
+// ChangeOperability returns the stored operability / production-readiness report
+// for a change (nil if none was produced).
+func (s *Service) ChangeOperability(ctx context.Context, changeID string) (*ai.OperabilityReport, error) {
+	raw, err := s.store.GetChangeOperability(ctx, changeID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(raw) == "" || raw == "{}" {
+		return nil, nil
+	}
+	rep := &ai.OperabilityReport{}
+	if err := json.Unmarshal([]byte(raw), rep); err != nil {
+		return nil, fmt.Errorf("parse operability for change %q: %w", changeID, err)
 	}
 	return rep, nil
 }

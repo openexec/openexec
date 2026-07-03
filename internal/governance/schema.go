@@ -156,4 +156,13 @@ CREATE TABLE IF NOT EXISTS change_impact (
 	report_json TEXT NOT NULL DEFAULT '{}',
 	created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- change_operability stores the production-readiness / SRE review (a JSON
+-- OperabilityReport: rollback safety, DB migration, deploy risk, mitigations) so
+-- the merge gate and human reviewers can judge whether a change is safe to ship.
+CREATE TABLE IF NOT EXISTS change_operability (
+	change_id   TEXT PRIMARY KEY,
+	report_json TEXT NOT NULL DEFAULT '{}',
+	created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `

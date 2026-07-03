@@ -207,6 +207,56 @@ with 'work record-pr' and move to 'work ready-for-test'.`,
 	},
 }
 
+var govWorkOperabilityCmd = &cobra.Command{
+	Use:   "operability <change-id>",
+	Short: "Show the operability review (rollback, DB migration, deploy risk)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		rep, err := svc.ChangeOperability(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			return printJSON(cmd, rep)
+		}
+		if rep == nil {
+			cmd.Printf("No operability review for %s (re-run: work triage %s --deep --repo-context <path>)\n", args[0], args[0])
+			return nil
+		}
+		cmd.Printf("Operability review for %s:\n", args[0])
+		cmd.Printf("  rollback safe: %s\n", rep.RollbackSafe)
+		cmd.Printf("  db migration:  %s\n", rep.DBMigration)
+		cmd.Printf("  deploy risk:   %s\n", rep.DeployRisk)
+		if len(rep.Mitigations) > 0 {
+			cmd.Println("  mitigations:")
+			for _, m := range rep.Mitigations {
+				cmd.Printf("    - %s\n", m)
+			}
+		}
+		if len(rep.Monitoring) > 0 {
+			cmd.Println("  monitor after deploy:")
+			for _, m := range rep.Monitoring {
+				cmd.Printf("    - %s\n", m)
+			}
+		}
+		if rep.Notes != "" {
+			cmd.Printf("  notes: %s\n", rep.Notes)
+		}
+		safe := "NO — a human operator must merge"
+		if rep.AutoMergeSafe() {
+			safe = "yes (rollback-safe, non-destructive, low/medium risk)"
+		}
+		cmd.Printf("  auto-merge safe: %s\n", safe)
+		return nil
+	},
+}
+
 var govWorkMergeCmd = &cobra.Command{
 	Use:   "merge <change-id>",
 	Short: "Merge a change's PR (the safety gate — never auto-merges by default)",
@@ -628,6 +678,10 @@ func init() {
 	// work impact
 	governanceWorkCmd.AddCommand(govWorkImpactCmd)
 	govWorkImpactCmd.Flags().Bool("json", false, "Output as JSON")
+
+	// work operability
+	governanceWorkCmd.AddCommand(govWorkOperabilityCmd)
+	govWorkOperabilityCmd.Flags().Bool("json", false, "Output as JSON")
 
 	// work merge (safety gate)
 	governanceWorkCmd.AddCommand(govWorkMergeCmd)

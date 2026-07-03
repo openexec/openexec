@@ -87,6 +87,10 @@ type Store interface {
 	SetChangeImpact(ctx context.Context, changeID, reportJSON string) error
 	GetChangeImpact(ctx context.Context, changeID string) (string, error)
 
+	// Operability / production-readiness report (JSON) per change.
+	SetChangeOperability(ctx context.Context, changeID, reportJSON string) error
+	GetChangeOperability(ctx context.Context, changeID string) (string, error)
+
 	Close() error
 }
 
@@ -1112,6 +1116,42 @@ func (s *SQLiteStore) GetChangeImpact(ctx context.Context, changeID string) (str
 	}
 	if err != nil {
 		return "", fmt.Errorf("get impact for change %q: %w", changeID, err)
+	}
+	return j, nil
+}
+
+// SetChangeOperability stores (or replaces) the operability report for a change.
+func (s *SQLiteStore) SetChangeOperability(ctx context.Context, changeID, reportJSON string) error {
+	if changeID == "" {
+		return ErrInvalidData
+	}
+	if reportJSON == "" {
+		reportJSON = "{}"
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO change_operability (change_id, report_json) VALUES (?, ?)
+		 ON CONFLICT(change_id) DO UPDATE SET report_json = excluded.report_json`,
+		changeID, reportJSON)
+	if err != nil {
+		return fmt.Errorf("set operability for change %q: %w", changeID, err)
+	}
+	return nil
+}
+
+// GetChangeOperability returns the stored operability report JSON ("" if none).
+func (s *SQLiteStore) GetChangeOperability(ctx context.Context, changeID string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var j string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT report_json FROM change_operability WHERE change_id = ?`, changeID).Scan(&j)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("get operability for change %q: %w", changeID, err)
 	}
 	return j, nil
 }
