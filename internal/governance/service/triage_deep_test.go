@@ -34,7 +34,14 @@ func (f *fakePlanStore) CreateStory(s *release.Story) error {
 	f.stories[s.ID] = s
 	return nil
 }
-func (f *fakePlanStore) CreateTask(t *release.Task) error { f.tasks[t.ID] = t; return nil }
+func (f *fakePlanStore) CreateTask(t *release.Task) error {
+	f.tasks[t.ID] = t
+	// Mirror release.Manager.CreateTask: append the task to its parent story.
+	if st := f.stories[t.StoryID]; st != nil {
+		st.Tasks = append(st.Tasks, t.ID)
+	}
+	return nil
+}
 
 const deepPlanJSON = `{
   "schema_version": "1.0.0",
@@ -90,6 +97,11 @@ func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 	}
 	if ps.GetTask("T-US-001-001") == nil {
 		t.Fatalf("task T-US-001-001 not persisted")
+	}
+	// Regression: the story's task list must contain each task exactly once
+	// (CreateTask appends; the bridge must not also pre-populate).
+	if got := ps.GetStory("US-001").Tasks; len(got) != 1 || got[0] != "T-US-001-001" {
+		t.Fatalf("expected story tasks [T-US-001-001] exactly once, got %+v", got)
 	}
 	// The change now OWNS the story via the link.
 	linked, _ := store.ListChangeStories(ctx, "C-1")

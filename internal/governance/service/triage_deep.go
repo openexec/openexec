@@ -154,19 +154,18 @@ func (s *Service) importPlanForChange(ctx context.Context, ch *governance.Change
 
 	storyIDs := make([]string, 0, len(plan.Stories))
 	for i, st := range plan.Stories {
-		taskIDs := make([]string, len(st.Tasks))
-		for j, t := range st.Tasks {
-			taskIDs[j] = t.ID
-		}
 		goalID := st.GoalID
 		if goalID != "" && !goalExists[goalID] && s.planStore.GetGoal(goalID) == nil {
 			goalID = ""
 		}
 		if s.planStore.GetStory(st.ID) == nil {
+			// Create the story with an EMPTY task list: the store's CreateTask
+			// appends each task to its parent story, so pre-populating Tasks here
+			// would double every task id in the story.
 			if err := s.planStore.CreateStory(&release.Story{
 				ID: st.ID, GoalID: goalID, Title: st.Title, Description: st.Description,
 				AcceptanceCriteria: st.AcceptanceCriteria, VerificationScript: st.VerificationScript,
-				Tasks: taskIDs, DependsOn: st.DependsOn,
+				DependsOn: st.DependsOn,
 				StoryType: release.StoryTypeFeature, Priority: i,
 				Status: release.StoryStatusPending, CreatedAt: now,
 			}); err != nil {
