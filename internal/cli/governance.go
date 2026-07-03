@@ -140,7 +140,17 @@ func (e *shellExecutor) RunTask(ctx context.Context, taskID, mode string) error 
 	if mode != "" {
 		args = append(args, "--mode", mode)
 	}
-	cmd := exec.CommandContext(ctx, os.Args[0], args...)
+	// Resolve the absolute path to this binary. os.Args[0] can be relative
+	// (e.g. "./bin/openexec") and cmd.Dir below is the PROJECT dir, so a
+	// relative argv[0] would be looked up against the wrong working directory
+	// and fail with "no such file or directory". os.Executable() is always
+	// absolute; exec'ing it also gives the child an absolute argv[0], so any
+	// further self-invocation downstream inherits a resolvable path.
+	self, err := os.Executable()
+	if err != nil || self == "" {
+		self = os.Args[0]
+	}
+	cmd := exec.CommandContext(ctx, self, args...)
 	cmd.Dir = e.baseDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
