@@ -220,10 +220,47 @@ func kindFromLabels(labels []ghLabel) string {
 // status's ai:* label and removes every other governance label, so the issue
 // carries exactly one governance label matching OpenExec state. It returns an
 // error for an unrecognized status (no gh call is made in that case).
+// EnsureLabels idempotently provisions the governance ai:* labels on the repo.
+// `gh issue edit` fails outright when a referenced label does not exist in the
+// repo — for BOTH --add-label and --remove-label — so on a repo that was never
+// provisioned (the common case), SyncLabels would hard-fail and take the whole
+// write-back down with it. This lists existing labels once and creates only the
+// missing ones, so the first sync self-provisions and later syncs are cheap.
+func EnsureLabels(ctx context.Context, runner Runner, repo string) error {
+	out, err := runner.Run(ctx, "label", "list", "--repo", repo, "--json", "name", "--limit", "500")
+	if err != nil {
+		return fmt.Errorf("github: list labels for %s: %w", repo, err)
+	}
+	var existing []struct {
+		Name string `json:"name"`
+	}
+	_ = json.Unmarshal(out, &existing)
+	have := make(map[string]bool, len(existing))
+	for _, l := range existing {
+		have[l.Name] = true
+	}
+	for _, l := range GovernanceLabels {
+		if have[l] {
+			continue
+		}
+		if _, err := runner.Run(ctx, "label", "create", l,
+			"--repo", repo, "--color", "ededed",
+			"--description", "OpenExec governance state", "--force"); err != nil {
+			return fmt.Errorf("github: create label %q on %s: %w", l, repo, err)
+		}
+	}
+	return nil
+}
+
 func SyncLabels(ctx context.Context, runner Runner, repo string, number int, status string) error {
 	target, ok := LabelForStatus(status)
 	if !ok {
 		return fmt.Errorf("github: no governance label for status %q", status)
+	}
+
+	// Provision the ai:* labels first, or gh errors on any label it doesn't know.
+	if err := EnsureLabels(ctx, runner, repo); err != nil {
+		return err
 	}
 
 	remove := make([]string, 0, len(GovernanceLabels)-1)

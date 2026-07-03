@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,27 @@ import (
 
 	"github.com/openexec/openexec/internal/governance"
 )
+
+func TestEnsureLabels_CreatesOnlyMissing(t *testing.T) {
+	// The repo already has ai:triage (and an unrelated label); every other
+	// governance label must be created, and the existing one must not be.
+	runner := &fakeRunner{out: []byte(`[{"name":"ai:triage"},{"name":"enhancement"}]`)}
+	if err := EnsureLabels(context.Background(), runner, "o/r"); err != nil {
+		t.Fatalf("EnsureLabels: %v", err)
+	}
+	creates := 0
+	for _, c := range runner.calls {
+		if len(c) >= 3 && c[0] == "label" && c[1] == "create" {
+			creates++
+			if c[2] == "ai:triage" {
+				t.Errorf("must not recreate the existing label ai:triage")
+			}
+		}
+	}
+	if creates != len(GovernanceLabels)-1 {
+		t.Fatalf("expected %d label creates, got %d", len(GovernanceLabels)-1, creates)
+	}
+}
 
 // fakeRunner returns canned output per invocation and records the argv it saw.
 // It never spawns real gh.
@@ -178,16 +200,31 @@ func TestSyncLabelsMapping(t *testing.T) {
 		{governance.ChangeStatusDeferred, "ai:deferred"},
 	}
 
+	// The fake `gh label list` returns every governance label as already
+	// present, so EnsureLabels creates none and only the edit call remains.
+	labelObjs := make([]map[string]string, 0, len(GovernanceLabels))
+	for _, l := range GovernanceLabels {
+		labelObjs = append(labelObjs, map[string]string{"name": l})
+	}
+	allLabelsJSON, _ := json.Marshal(labelObjs)
+
 	ctx := context.Background()
 	for _, tc := range cases {
-		runner := &fakeRunner{}
+		runner := &fakeRunner{out: allLabelsJSON}
 		if err := SyncLabels(ctx, runner, "agenticsnz/unsorry", 7, tc.status); err != nil {
 			t.Fatalf("SyncLabels(%s): %v", tc.status, err)
 		}
-		if len(runner.calls) != 1 {
-			t.Fatalf("status %s: expected 1 gh call, got %d", tc.status, len(runner.calls))
+		// EnsureLabels first lists labels; the edit is a separate call. Find it
+		// rather than assuming it is the only one.
+		var argv []string
+		for _, c := range runner.calls {
+			if len(c) >= 2 && c[0] == "issue" && c[1] == "edit" {
+				argv = c
+			}
 		}
-		argv := runner.calls[0]
+		if argv == nil {
+			t.Fatalf("status %s: no `issue edit` call was made", tc.status)
+		}
 		joined := strings.Join(argv, " ")
 
 		// Must add exactly the mapped label.
