@@ -170,6 +170,37 @@ var govWorkTriageCmd = &cobra.Command{
 	},
 }
 
+var govWorkQuickplanCmd = &cobra.Command{
+	Use:   "quickplan <change-id>",
+	Short: "Lightweight lane: prepare a TRIVIAL change as a single task, no planner",
+	Long: `Prepare a trivial change for approval without running the planner. Instead of
+decomposing intent into a full story/task tree (and a round of planner-output
+review), it builds one story with one task whose description is the change's
+intent. The change is marked light, so a human operator can approve it without
+the AI review its risk tier would otherwise require — the operator is the
+reviewer. Refused for high/critical risk; use 'work triage --deep' for those.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		actor, _ := cmd.Flags().GetString("actor")
+		res, err := svc.TriageLight(cmd.Context(), args[0], actor)
+		if err != nil {
+			return err
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			return printJSON(cmd, res)
+		}
+		cmd.Printf("Light-triaged change %s into a single task (%d stor(y): %s)\n", args[0], len(res.StoryIDs), strings.Join(res.StoryIDs, ", "))
+		cmd.Printf("Next: openexec governance work approve %s --by <operator> (OPERATOR_SESSION), then work execute %s\n", args[0], args[0])
+		return nil
+	},
+}
+
 var govWorkExecuteCmd = &cobra.Command{
 	Use:   "execute <change-id>",
 	Short: "Run an approved change's tasks through the execution engine",
@@ -670,6 +701,11 @@ func init() {
 	govWorkTriageCmd.Flags().String("actor", "planner_ai", "Actor recorded as the proposer")
 	govWorkTriageCmd.Flags().Bool("deep", false, "Decompose intent into real stories + tasks via the planner (owned by this change)")
 	govWorkTriageCmd.Flags().Bool("json", false, "Output as JSON")
+
+	// work quickplan (lightweight lane)
+	governanceWorkCmd.AddCommand(govWorkQuickplanCmd)
+	govWorkQuickplanCmd.Flags().String("actor", "operator", "Actor recorded as the proposer")
+	govWorkQuickplanCmd.Flags().Bool("json", false, "Output as JSON")
 
 	// work stories
 	governanceWorkCmd.AddCommand(govWorkStoriesCmd)

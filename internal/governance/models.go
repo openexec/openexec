@@ -52,6 +52,14 @@ type ChangeRecord struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 
+	// Light marks a change filed through the lightweight lane (quickplan): a
+	// trivial change whose plan is a single hand-built task rather than a full
+	// planner decomposition. A light change may be approved by a human operator
+	// without the AI review its risk tier would otherwise require — the operator
+	// is the reviewer. It is refused for high/critical risk (those need full
+	// triage + review). See Service.TriageLight / ApproveChange.
+	Light bool
+
 	// Claim fields for executor handoff (lease-based concurrency control).
 	ClaimedBy      string
 	ClaimExpiresAt *time.Time

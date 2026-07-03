@@ -44,6 +44,13 @@ const (
 type (
 	// ProjectPlan is a generated intent decomposition (goals -> stories -> tasks).
 	ProjectPlan = planner.ProjectPlan
+	// PlanGoal, PlanStory, and PlanTask are the elements of a ProjectPlan (the
+	// planner's own types, distinct from the release backlog's Goal/Story/Task).
+	// Exposed so callers can hand-build a small plan without importing the
+	// internal planner package.
+	PlanGoal  = planner.Goal
+	PlanStory = planner.Story
+	PlanTask  = planner.Task
 	// ExistingLookup lets RemapPlanIDs detect id collisions with an existing backlog.
 	ExistingLookup = planner.ExistingLookup
 	// LLMProvider is the single-shot completion interface the planner needs; any

@@ -161,8 +161,13 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 	if ok, reason := s.evaluator.CanApprove(authority, ch); !ok {
 		return fmt.Errorf("approval refused: %s", reason)
 	}
-	if err := s.ensureRequiredReviews(ctx, ch); err != nil {
-		return err
+	// The lightweight lane lets a human operator approve a trivial low/medium
+	// change without the AI review its tier requires — the operator is the
+	// reviewer. Every other change still needs its required reviews on record.
+	if !s.lightApprovalWaivesReview(ch) {
+		if err := s.ensureRequiredReviews(ctx, ch); err != nil {
+			return err
+		}
 	}
 	if err := validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusApprovedForAI); err != nil {
 		return err
@@ -174,6 +179,10 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 		return fmt.Errorf("approve change %q: %w", changeID, err)
 	}
 
+	approvalComment := fmt.Sprintf("Plan v%d approved by %s", ch.ProposalVersion, authority.Name)
+	if s.lightApprovalWaivesReview(ch) {
+		approvalComment += " (lightweight lane: operator approval, AI review waived)"
+	}
 	ev := &governance.DecisionEvent{
 		ID:              newID(),
 		ReleaseID:       ch.ReleaseID,
@@ -182,7 +191,7 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 		Actor:           authority.ID,
 		ActorType:       authority.Type,
 		Decision:        governance.DecisionApproved,
-		Comment:         fmt.Sprintf("Plan v%d approved by %s", ch.ProposalVersion, authority.Name),
+		Comment:         approvalComment,
 	}
 	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
 		return fmt.Errorf("record approval for change %q: %w", changeID, err)

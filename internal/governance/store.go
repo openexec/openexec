@@ -154,6 +154,7 @@ func (s *SQLiteStore) initSchema(ctx context.Context) error {
 	migrations := [][3]string{
 		{"change_records", "claimed_by", "TEXT DEFAULT ''"},
 		{"change_records", "claim_expires_at", "DATETIME DEFAULT NULL"},
+		{"change_records", "light", "INTEGER DEFAULT 0"},
 		{"decision_events", "prev_hash", "TEXT DEFAULT ''"},
 		{"decision_events", "hash", "TEXT DEFAULT ''"},
 	}
@@ -465,8 +466,8 @@ func (s *SQLiteStore) writeChangeRecord(ctx context.Context, c *ChangeRecord, in
 			id, release_id, project_id, source_type, source_id, source_url, title, raw_text,
 			summary, kind, risk, status, proposal_version, approved_version, plan,
 			acceptance_criteria, verification_plan, branch, pr_url, claimed_by, claim_expires_at,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			light, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	if !insertOnly {
 		query += `
 		ON CONFLICT(id) DO UPDATE SET
@@ -478,13 +479,14 @@ func (s *SQLiteStore) writeChangeRecord(ctx context.Context, c *ChangeRecord, in
 			approved_version = excluded.approved_version, plan = excluded.plan,
 			acceptance_criteria = excluded.acceptance_criteria, verification_plan = excluded.verification_plan,
 			branch = excluded.branch, pr_url = excluded.pr_url, claimed_by = excluded.claimed_by,
-			claim_expires_at = excluded.claim_expires_at, updated_at = excluded.updated_at`
+			claim_expires_at = excluded.claim_expires_at, light = excluded.light,
+			updated_at = excluded.updated_at`
 	}
 	_, err := s.db.ExecContext(ctx, query,
 		c.ID, c.ReleaseID, c.ProjectID, c.SourceType, c.SourceID, c.SourceURL, c.Title, c.RawText,
 		c.Summary, c.Kind, c.Risk, c.Status, c.ProposalVersion, c.ApprovedVersion, c.Plan,
 		c.AcceptanceCriteria, c.VerificationPlan, c.Branch, c.PRURL, c.ClaimedBy, nullTime(c.ClaimExpiresAt),
-		fmtTime(c.CreatedAt), fmtTime(c.UpdatedAt),
+		boolToInt(c.Light), fmtTime(c.CreatedAt), fmtTime(c.UpdatedAt),
 	)
 	if err != nil {
 		if insertOnly && isConstraintErr(err) {
@@ -514,20 +516,22 @@ const changeRecordSelect = `
 	SELECT id, release_id, project_id, source_type, source_id, source_url, title, raw_text,
 		summary, kind, risk, status, proposal_version, approved_version, plan,
 		acceptance_criteria, verification_plan, branch, pr_url, claimed_by, claim_expires_at,
-		created_at, updated_at
+		light, created_at, updated_at
 	FROM change_records`
 
 func scanChangeRecord(sc rowScanner) (*ChangeRecord, error) {
 	var c ChangeRecord
 	var claimExpiresAt, createdAt, updatedAt sql.NullString
+	var light sql.NullInt64
 	if err := sc.Scan(
 		&c.ID, &c.ReleaseID, &c.ProjectID, &c.SourceType, &c.SourceID, &c.SourceURL, &c.Title, &c.RawText,
 		&c.Summary, &c.Kind, &c.Risk, &c.Status, &c.ProposalVersion, &c.ApprovedVersion, &c.Plan,
 		&c.AcceptanceCriteria, &c.VerificationPlan, &c.Branch, &c.PRURL, &c.ClaimedBy, &claimExpiresAt,
-		&createdAt, &updatedAt,
+		&light, &createdAt, &updatedAt,
 	); err != nil {
 		return nil, err
 	}
+	c.Light = light.Int64 != 0
 	c.ClaimExpiresAt = parseNullTime(claimExpiresAt)
 	c.CreatedAt = parseTime(createdAt)
 	c.UpdatedAt = parseTime(updatedAt)
