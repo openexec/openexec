@@ -178,18 +178,13 @@ func clampNoRelax(p *Policy) *Policy {
 		}
 		out.RiskTiers[risk] = t
 	}
-	// Any extra tier a workspace file defines is clamped against the strictest
-	// (critical) default so it cannot become a permissive back door.
-	crit := def.RiskTiers[governance.RiskCritical]
-	for risk, pt := range p.RiskTiers {
-		if _, ok := out.RiskTiers[risk]; ok {
-			continue
-		}
-		t := pt
-		t.AIApprovalAllowed = pt.AIApprovalAllowed && crit.AIApprovalAllowed
-		t.HumanApprovalRequired = pt.HumanApprovalRequired || crit.HumanApprovalRequired
-		out.RiskTiers[risk] = t
-	}
+	// Unknown tier names defined by a workspace file are DROPPED, not preserved:
+	// the risk vocabulary is closed (low/medium/high/critical), and an evaluator
+	// lookup for any other risk falls back to the critical tier (the strictest).
+	// Preserving workspace-defined extra tiers was a back door — their permission
+	// flags (e.g. AutoMergeAllowed) passed through unclamped — so we simply do not
+	// carry them over. Result: a change whose risk isn't a known tier is treated
+	// as critical, never as a permissive custom tier.
 	return out
 }
 

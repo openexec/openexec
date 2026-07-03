@@ -43,3 +43,14 @@ notes: backend schema path still unknown
 type fixedCompleter struct{ reply string }
 
 func (f fixedCompleter) Complete(_ context.Context, _ string) (string, error) { return f.reply, nil }
+
+func TestClampRisk(t *testing.T) {
+	for in, want := range map[string]string{
+		"low": "low", "medium": "medium", "high": "high", "critical": "critical",
+		"funky": "medium", "": "medium", "LOW": "low",
+	} {
+		if got := clampRisk(in); got != want {
+			t.Fatalf("clampRisk(%q)=%q want %q", in, got, want)
+		}
+	}
+}

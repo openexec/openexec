@@ -90,27 +90,60 @@ func (s *Service) canMerge(ctx context.Context, ch *governance.ChangeRecord, aut
 		}
 		return true, ""
 	}
-	// Path 2: auto-merge — ONLY if policy opts this tier in AND the operability
-	// review clears it AND verification evidence exists. All three must hold; any
-	// one missing fails closed. Operability is the hard SRE gate: a change that
-	// can't be cleanly rolled back, needs a destructive DB migration, or is high
-	// deploy risk can NEVER auto-merge even when its risk tier is opted in — a
-	// human operator must own that deploy.
+	// Path 2: auto-merge (no human). This is the deploy hop, so it is gated the
+	// hardest — all of the following must hold, each fails closed:
+	//   a. policy opts this risk tier into auto-merge (default: no tier does);
+	//   b. the change is DONE — so MarkDone's authority + separation-of-duties +
+	//      evidence gate already ran (closes the "merge at pr_open" bypass);
+	//   c. the operability review clears it (rollback-safe, non-destructive
+	//      migration, low/medium deploy risk);
+	//   d. verification evidence is EXTERNALLY observed (CI/GitHub), never
+	//      agent-self-reported — an agent cannot manufacture a passing CI run.
 	if s.evaluator.CanAutoMerge(ch) {
+		if ch.Status != governance.ChangeStatusDone {
+			return false, fmt.Sprintf("auto-merge requires the change to be done (fully verified); it is %q — a human operator must merge earlier states", ch.Status)
+		}
 		op, _ := s.ChangeOperability(ctx, ch.ID)
 		if !op.AutoMergeSafe() {
 			return false, "auto-merge blocked by the operability review (rollback safety / DB migration / deploy risk not cleared); a human operator must merge this deploy"
 		}
 		evidence, _ := s.store.ListEvidence(ctx, ch.ID)
-		if validation.ValidateMarkDone(evidence) == nil {
-			return true, ""
+		if !hasTrustedVerification(evidence) {
+			return false, "auto-merge requires externally-verified evidence (CI/GitHub); agent-self-reported evidence does not qualify — a human operator must merge"
 		}
-		return false, fmt.Sprintf("auto-merge is policy-allowed and operability-clear for %s-risk work but no verification evidence is recorded", riskOrUnknown(ch.Risk))
+		return true, ""
 	}
 	return false, fmt.Sprintf(
 		"auto-merge is not allowed for %s-risk work; merge requires a human operator session (OPENEXEC_OPERATOR_SESSION=1) with an approve authority",
 		riskOrUnknown(ch.Risk),
 	)
+}
+
+// trustedVerificationSources are evidence sources an agent cannot manufacture:
+// they come from an external system (a CI run, a GitHub check) rather than
+// self-report. Agent/cli/human sources are all reachable by a shell-capable
+// agent and so do not qualify for an UNattended auto-merge.
+var trustedVerificationSources = map[string]bool{
+	governance.EvidenceSourceGitHub:  true,
+	governance.EvidenceSourceWebhook: true,
+}
+
+// verifyingEvidenceKinds are the kinds that attest a change is correct.
+var verifyingEvidenceKinds = map[string]bool{
+	governance.EvidenceKindTest:   true,
+	governance.EvidenceKindCI:     true,
+	governance.EvidenceKindReview: true,
+}
+
+// hasTrustedVerification reports whether any evidence is a verifying kind from an
+// externally-observed source — the bar for auto-merge (auto-deploy).
+func hasTrustedVerification(evidence []*governance.Evidence) bool {
+	for _, e := range evidence {
+		if e != nil && verifyingEvidenceKinds[e.Kind] && trustedVerificationSources[e.Source] {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeAuthLabel(operator bool) string {

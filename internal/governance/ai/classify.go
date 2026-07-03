@@ -45,6 +45,14 @@ var knownKinds = map[string]bool{
 	governance.KindOps: true, governance.KindSupportQuestion: true,
 	governance.KindSecurity: true, governance.KindReliability: true,
 }
+
+// clampRisk clamps a risk value to the known tier vocabulary; anything
+// unrecognized (including a caller-invented tier name) becomes medium — never a
+// low that would be auto-approvable/auto-mergeable, and never a custom tier.
+func clampRisk(v string) string {
+	return clamp(v, knownRisks, governance.RiskMedium)
+}
+
 var knownRisks = map[string]bool{
 	governance.RiskLow: true, governance.RiskMedium: true,
 	governance.RiskHigh: true, governance.RiskCritical: true,

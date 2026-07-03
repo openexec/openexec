@@ -38,6 +38,19 @@ func mergeChange(t *testing.T, store governance.Store, id, risk string) {
 	})
 }
 
+// markDone advances a change to done (as MarkDone would), for auto-merge tests.
+func markDone(t *testing.T, store governance.Store, id string) {
+	t.Helper()
+	ch, err := store.GetChangeRecord(context.Background(), id)
+	if err != nil {
+		t.Fatalf("get change: %v", err)
+	}
+	ch.Status = governance.ChangeStatusDone
+	if err := store.UpdateChangeRecord(context.Background(), ch); err != nil {
+		t.Fatalf("mark done: %v", err)
+	}
+}
+
 func TestMerge_RefusedByDefault(t *testing.T) {
 	store := newTestStore(t)
 	r := &mergeRunner{}
@@ -98,18 +111,19 @@ func TestMerge_AutoMergeOnlyWithPolicyAndEvidence(t *testing.T) {
 		t.Fatalf("must not merge without operability + evidence")
 	}
 
-	// Add verification evidence, but operability review not yet cleared →
-	// still blocked (operability is a hard gate).
-	if err := svc.RecordEvidence(ctx, "C-1", governance.EvidenceKindCI, governance.EvidenceSourceCLI, "ci green", "", ""); err != nil {
+	// Move to done + record EXTERNALLY-verified (github) evidence, but operability
+	// not yet cleared → still blocked (operability is a hard gate).
+	markDone(t, store, "C-1")
+	if err := svc.RecordEvidence(ctx, "C-1", governance.EvidenceKindCI, governance.EvidenceSourceGitHub, "ci green", "", ""); err != nil {
 		t.Fatalf("record evidence: %v", err)
 	}
 	if err := svc.MergeChange(ctx, "C-1", "", "squash"); err == nil || !strings.Contains(err.Error(), "operability") {
 		t.Fatalf("expected operability block without a cleared review, got %v", err)
 	}
-	// Clear operability (rollback-safe, no migration, low risk) → auto-merge now allowed.
+	// Clear operability → auto-merge now allowed (policy + done + github evidence + operability).
 	setOperability(t, store, "C-1", "yes", "none", "low")
 	if err := svc.MergeChange(ctx, "C-1", "", "squash"); err != nil {
-		t.Fatalf("expected auto-merge with policy+evidence+operability, got %v", err)
+		t.Fatalf("expected auto-merge, got %v", err)
 	}
 	if !r.merged {
 		t.Fatalf("expected the PR to be merged")
@@ -117,9 +131,44 @@ func TestMerge_AutoMergeOnlyWithPolicyAndEvidence(t *testing.T) {
 
 	// A HIGH-risk change is still refused (policy only opted low in).
 	mergeChange(t, store, "C-2", governance.RiskHigh)
-	_ = svc.RecordEvidence(ctx, "C-2", governance.EvidenceKindCI, governance.EvidenceSourceCLI, "ci green", "", "")
+	markDone(t, store, "C-2")
+	_ = svc.RecordEvidence(ctx, "C-2", governance.EvidenceKindCI, governance.EvidenceSourceGitHub, "ci green", "", "")
 	if err := svc.MergeChange(ctx, "C-2", "", "squash"); err == nil {
 		t.Fatalf("expected high-risk auto-merge to remain refused")
+	}
+}
+
+func TestMerge_AutoMergeRequiresDoneAndExternalEvidence(t *testing.T) {
+	store := newTestStore(t)
+	r := &mergeRunner{}
+	p := policy.DefaultPolicy()
+	low := p.RiskTiers[governance.RiskLow]
+	low.AutoMergeAllowed = true
+	p.RiskTiers[governance.RiskLow] = low
+	svc := NewService(store, Options{Runner: r, Policy: p}) // no operator session
+	ctx := context.Background()
+
+	// Operability clear, evidence present, but status is only ready_for_test (not
+	// done) → auto-merge refused (the full MarkDone gate hasn't run).
+	mergeChange(t, store, "C-1", governance.RiskLow)
+	setOperability(t, store, "C-1", "yes", "none", "low")
+	_ = svc.RecordEvidence(ctx, "C-1", governance.EvidenceKindCI, governance.EvidenceSourceGitHub, "ci", "", "")
+	if err := svc.MergeChange(ctx, "C-1", "", "squash"); err == nil || !strings.Contains(err.Error(), "done") {
+		t.Fatalf("expected refusal because change is not done, got %v", err)
+	}
+
+	// Done + operability clear, but only AGENT-self-reported evidence → refused.
+	markDone(t, store, "C-1")
+	// (C-1 already has a github evidence row above; use a fresh change with only agent evidence)
+	mergeChange(t, store, "C-2", governance.RiskLow)
+	markDone(t, store, "C-2")
+	setOperability(t, store, "C-2", "yes", "none", "low")
+	_ = svc.RecordEvidence(ctx, "C-2", governance.EvidenceKindTest, governance.EvidenceSourceAgent, "self-reported", "", "")
+	if err := svc.MergeChange(ctx, "C-2", "", "squash"); err == nil || !strings.Contains(err.Error(), "externally-verified") {
+		t.Fatalf("expected refusal on agent-self-reported evidence, got %v", err)
+	}
+	if r.merged {
+		t.Fatalf("neither change should have merged")
 	}
 }
 
@@ -134,9 +183,10 @@ func TestMerge_OperabilityBlocksAutoMergeEvenWithEvidence(t *testing.T) {
 	ctx := context.Background()
 
 	mergeChange(t, store, "C-1", governance.RiskLow)
-	_ = svc.RecordEvidence(ctx, "C-1", governance.EvidenceKindCI, governance.EvidenceSourceCLI, "ci green", "", "")
-	// Policy + evidence present, but a DESTRUCTIVE migration → operability blocks
-	// auto-merge; a human operator must own this deploy.
+	markDone(t, store, "C-1")
+	_ = svc.RecordEvidence(ctx, "C-1", governance.EvidenceKindCI, governance.EvidenceSourceGitHub, "ci green", "", "")
+	// Policy + done + external evidence present, but a DESTRUCTIVE migration →
+	// operability blocks auto-merge; a human operator must own this deploy.
 	setOperability(t, store, "C-1", "no", "destructive", "high")
 
 	if err := svc.MergeChange(ctx, "C-1", "", "squash"); err == nil || !strings.Contains(err.Error(), "operability") {

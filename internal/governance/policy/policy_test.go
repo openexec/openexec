@@ -550,3 +550,23 @@ func TestClampNoRelaxFromWorkspace(t *testing.T) {
 		t.Fatalf("workspace policy must be able to add a human-approval requirement")
 	}
 }
+
+func TestClampNoRelaxDropsUnknownTiers(t *testing.T) {
+	// A workspace policy inventing a tier and opting it into auto-merge must NOT
+	// survive the clamp — unknown tiers are dropped (evaluator falls back to the
+	// critical tier for unknown risk).
+	p := &Policy{
+		RiskTiers: map[string]TierPolicy{
+			"funky": {AutoMergeAllowed: true, HumanApprovalRequired: false},
+		},
+	}
+	clamped := clampNoRelax(p)
+	if _, ok := clamped.RiskTiers["funky"]; ok {
+		t.Fatalf("unknown tier 'funky' must be dropped, not preserved")
+	}
+	// A change with an unknown risk therefore evaluates against the critical tier.
+	e := NewEvaluator(clamped)
+	if e.CanAutoMerge(&governance.ChangeRecord{Risk: "funky"}) {
+		t.Fatalf("unknown-risk change must not be auto-mergeable")
+	}
+}

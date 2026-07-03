@@ -38,9 +38,11 @@ func Triage(ctx context.Context, completer Completer, store governance.Store, ch
 	if out.Kind != "" {
 		ch.Kind = out.Kind
 	}
-	if out.Risk != "" {
-		ch.Risk = out.Risk
-	}
+	// Clamp risk to the known vocabulary (unknown/blank -> medium), so a
+	// caller-supplied plan (MCP record_plan / CLI work triage) cannot mint an
+	// arbitrary tier name that would bypass the policy tiers or the workspace
+	// no-relax clamp. Same conservative discipline as ClassifyIntent.
+	ch.Risk = clampRisk(out.Risk)
 	ch.AcceptanceCriteria = strings.Join(out.AcceptanceCriteria, "\n")
 	ch.VerificationPlan = strings.Join(out.VerificationPlan, "\n")
 	ch.Plan = out.ImplementationNotes
