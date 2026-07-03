@@ -179,7 +179,7 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 		return fmt.Errorf("approve change %q: %w", changeID, err)
 	}
 
-	approvalComment := fmt.Sprintf("Plan v%d approved by %s", ch.ProposalVersion, authority.Name)
+	approvalComment := fmt.Sprintf("Plan v%d approved by %s%s", ch.ProposalVersion, authority.Name, s.operatorSuffix())
 	if s.lightApprovalWaivesReview(ch) {
 		approvalComment += " (lightweight lane: operator approval, AI review waived)"
 	}

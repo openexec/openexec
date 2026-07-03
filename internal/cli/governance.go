@@ -116,13 +116,15 @@ func newGovService(cmd *cobra.Command) (*service.Service, governance.Store, io.C
 		planStore = relMgr
 		closers = append([]io.Closer{relMgr}, closers...) // close release mgr before governance db
 	}
+	isOperator, operatorIdentity := resolveOperatorSession(context.Background())
 	svc := service.NewService(store, service.Options{
-		Policy:          pol,
-		Runner:          &github.ExecRunner{},
-		Completer:       buildGovCompleter(baseDir),
-		PlanStore:       planStore,
-		Executor:        &shellExecutor{baseDir: baseDir},
-		OperatorSession: os.Getenv("OPENEXEC_OPERATOR_SESSION") == "1",
+		Policy:           pol,
+		Runner:           &github.ExecRunner{},
+		Completer:        buildGovCompleter(baseDir),
+		PlanStore:        planStore,
+		Executor:         &shellExecutor{baseDir: baseDir},
+		OperatorSession:  isOperator,
+		OperatorIdentity: operatorIdentity,
 	})
 	return svc, store, multiCloser(closers), nil
 }

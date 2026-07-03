@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -38,13 +39,23 @@ import (
 // Service sequences every governance workflow operation. It holds injected
 // dependencies and no mutable state of its own, so it is safe to share.
 type Service struct {
-	store           governance.Store
-	evaluator       *policy.PolicyEvaluator
-	completer       ai.Completer  // optional; nil in a chat-only context
-	runner          github.Runner // optional; nil when gh is unavailable
-	planStore       PlanStore     // optional; nil disables deep triage
-	executor        Executor      // optional; nil disables the execute hop
-	operatorSession bool          // true only in a human operator session
+	store            governance.Store
+	evaluator        *policy.PolicyEvaluator
+	completer        ai.Completer  // optional; nil in a chat-only context
+	runner           github.Runner // optional; nil when gh is unavailable
+	planStore        PlanStore     // optional; nil disables deep triage
+	executor         Executor      // optional; nil disables the execute hop
+	operatorSession  bool          // true only in a human operator session
+	operatorIdentity string        // how the session was established (e.g. github:alice)
+}
+
+// operatorSuffix renders the authenticated operator identity for a decision-event
+// comment, e.g. " (operator github:alice)". Empty when no identity was supplied.
+func (s *Service) operatorSuffix() string {
+	if strings.TrimSpace(s.operatorIdentity) == "" {
+		return ""
+	}
+	return " (operator " + s.operatorIdentity + ")"
 }
 
 // Executor runs a single approved task through the execution engine (producing
@@ -85,12 +96,16 @@ type Options struct {
 	PlanStore PlanStore
 	// Executor runs approved tasks. Nil disables ExecuteChange.
 	Executor Executor
-	// OperatorSession marks this Service as running under a human operator
-	// (e.g. OPENEXEC_OPERATOR_SESSION=1). Approval operations (ApproveChange,
-	// ApproveRelease) refuse when it is false, so an unattended agent session —
-	// which never sets this — cannot self-approve, independent of which surface
-	// (CLI/MCP) it uses. Mirrors the infra approval plane's operator gate.
+	// OperatorSession marks this Service as running under a human operator.
+	// Approval operations (ApproveChange, ApproveRelease, merge, risk-accept)
+	// refuse when it is false, so an unattended agent session cannot self-approve,
+	// independent of which surface (CLI/MCP) it uses.
 	OperatorSession bool
+	// OperatorIdentity records HOW the operator session was established, e.g.
+	// "github:alice" (identity-bound) or "dev:env-var" (unbound pilot shortcut).
+	// It is stamped into approval/merge/risk-accept decision events so the audit
+	// trail names the verifiable human behind each human-attributed action.
+	OperatorIdentity string
 }
 
 // NewService wires a Service over a store and the given options. The store is
@@ -101,19 +116,20 @@ func NewService(store governance.Store, opts Options) *Service {
 		p = policy.DefaultPolicy()
 	}
 	return &Service{
-		store:           store,
-		evaluator:       policy.NewEvaluator(p),
-		completer:       opts.Completer,
-		runner:          opts.Runner,
-		planStore:       opts.PlanStore,
-		executor:        opts.Executor,
-		operatorSession: opts.OperatorSession,
+		store:            store,
+		evaluator:        policy.NewEvaluator(p),
+		completer:        opts.Completer,
+		runner:           opts.Runner,
+		planStore:        opts.PlanStore,
+		executor:         opts.Executor,
+		operatorSession:  opts.OperatorSession,
+		operatorIdentity: opts.OperatorIdentity,
 	}
 }
 
 // errNotOperator is returned by approval operations invoked outside a human
 // operator session.
-var errNotOperator = errors.New("governance/service: approval requires a human operator session (set OPENEXEC_OPERATOR_SESSION=1); an agent session cannot approve its own work")
+var errNotOperator = errors.New("governance/service: approval requires a human operator session — authenticate with `gh` as a login listed in ~/.openexec/operators.yaml (or OPENEXEC_OPERATOR_SESSION=1 in dev, when no allowlist is configured); an agent session cannot approve its own work")
 
 // guardHumanAuthority refuses to attribute an action to a HUMAN-typed authority
 // unless this is an operator session. Without it, an unattended agent could pass
