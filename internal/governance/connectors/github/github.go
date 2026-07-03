@@ -310,6 +310,45 @@ func PostPRComment(ctx context.Context, runner Runner, repo string, number int, 
 	return nil
 }
 
+// PRHeadSHA returns a pull request's head commit SHA via `gh pr view`.
+func PRHeadSHA(ctx context.Context, runner Runner, repo string, number int) (string, error) {
+	out, err := runner.Run(ctx,
+		"pr", "view", strconv.Itoa(number), "--repo", repo,
+		"--json", "headRefOid", "--jq", ".headRefOid",
+	)
+	if err != nil {
+		return "", fmt.Errorf("github: read PR %d head sha: %w", number, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// CheckRun is one CI check-run reported by the GitHub API for a commit.
+type CheckRun struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`     // queued | in_progress | completed
+	Conclusion string `json:"conclusion"` // success | failure | neutral | skipped | ... (when completed)
+	HTMLURL    string `json:"html_url"`
+}
+
+// FetchCommitChecks returns the check-runs for a commit via the GitHub API,
+// together with the raw payload (so a caller can hash it for provenance). The
+// api call returns HTTP 200 (exit 0) regardless of check outcomes, so a red
+// build is data, not an error — the caller decides what a green build means.
+func FetchCommitChecks(ctx context.Context, runner Runner, repo, sha string) ([]CheckRun, []byte, error) {
+	out, err := runner.Run(ctx, "api", fmt.Sprintf("repos/%s/commits/%s/check-runs", repo, sha))
+	if err != nil {
+		return nil, nil, fmt.Errorf("github: fetch check-runs for %s@%s: %w", repo, sha, err)
+	}
+	var resp struct {
+		CheckRuns []CheckRun `json:"check_runs"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return nil, out, fmt.Errorf("github: parse check-runs for %s@%s: %w", repo, sha, err)
+	}
+	return resp.CheckRuns, out, nil
+}
+
 // knownCommands is the set of /openexec slash commands ParseCommentCommand
 // recognizes. The value reports whether the command takes a free-text argument.
 var knownCommands = map[string]bool{

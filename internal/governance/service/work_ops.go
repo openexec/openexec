@@ -154,10 +154,19 @@ func (s *Service) RecordPR(ctx context.Context, changeID, url, branch string) er
 	return nil
 }
 
-// RecordEvidence attaches a structured evidence record to a change (test, CI,
-// review, deploy, monitoring, or manual proof). The change must exist; evidence
-// itself imposes no status change.
+// RecordEvidence attaches a MANUALLY-asserted evidence record to a change (test,
+// CI, review, deploy, monitoring, or manual proof). The change must exist;
+// evidence itself imposes no status change.
+//
+// It refuses a TRUSTED source (github/webhook): those are the provenance signal
+// the auto-merge gate relies on, and an externally-observed check cannot be
+// asserted by hand — it must be fetched from the source by connector code
+// (SyncGitHubChecks). Without this guard a shell-capable agent or user could
+// record `--source github` and fabricate the auto-merge trust signal.
 func (s *Service) RecordEvidence(ctx context.Context, changeID, kind, source, summary, url, raw string) error {
+	if trustedVerificationSources[source] {
+		return fmt.Errorf("evidence source %q is reserved for connector-fetched external checks and cannot be recorded manually; use `governance work sync-checks` to record verified GitHub checks", source)
+	}
 	if _, err := s.getChange(ctx, changeID); err != nil {
 		return err
 	}

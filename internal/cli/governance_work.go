@@ -616,9 +616,32 @@ var govWorkPRAssessCmd = &cobra.Command{
 	},
 }
 
+var govWorkSyncChecksCmd = &cobra.Command{
+	Use:   "sync-checks <change-id>",
+	Short: "Fetch the PR's GitHub CI checks and record them as trusted evidence when green",
+	Long: `Fetch the check-runs for the change's PR head commit from GitHub and, when they
+are all green, record a TRUSTED verification evidence row (source github) with
+the commit SHA and a hash of the fetched payload. This is the only way to create
+trusted evidence — manual record-evidence cannot claim a github/webhook source —
+so the auto-merge trust signal is always grounded in a real external check.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		if err := svc.SyncGitHubChecks(cmd.Context(), args[0]); err != nil {
+			return err
+		}
+		cmd.Printf("Recorded verified GitHub checks as trusted evidence for change %s\n", args[0])
+		return nil
+	},
+}
+
 var govWorkRecordEvidenceCmd = &cobra.Command{
 	Use:   "record-evidence <change-id>",
-	Short: "Attach a structured evidence record to a change",
+	Short: "Attach a manually-asserted evidence record (test/review/manual; NOT github/webhook)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		svc, _, db, err := newGovService(cmd)
@@ -830,9 +853,11 @@ func init() {
 	govWorkPRAssessCmd.Flags().Bool("print", false, "Print the assessment markdown instead of posting to the PR")
 
 	// work record-evidence
+	governanceWorkCmd.AddCommand(govWorkSyncChecksCmd)
+
 	governanceWorkCmd.AddCommand(govWorkRecordEvidenceCmd)
-	govWorkRecordEvidenceCmd.Flags().String("kind", "", "Evidence kind (test|ci|review|deploy|monitoring|manual)")
-	govWorkRecordEvidenceCmd.Flags().String("source", "", "Evidence source (cli|github|jira|webhook|human)")
+	govWorkRecordEvidenceCmd.Flags().String("kind", "", "Evidence kind (test|review|deploy|monitoring|manual)")
+	govWorkRecordEvidenceCmd.Flags().String("source", "", "Evidence source (cli|agent|human|manual; github/webhook are connector-only, use sync-checks)")
 	govWorkRecordEvidenceCmd.Flags().String("summary", "", "Evidence summary")
 	govWorkRecordEvidenceCmd.Flags().String("url", "", "Evidence URL")
 	govWorkRecordEvidenceCmd.Flags().String("raw", "", "Raw evidence pointer/output")
