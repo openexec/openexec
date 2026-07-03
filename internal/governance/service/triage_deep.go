@@ -228,14 +228,20 @@ func (s *Service) importPlanForChange(ctx context.Context, ch *governance.Change
 			if s.planStore.GetTask(t.ID) != nil {
 				continue
 			}
+			// GOVERNANCE HOLD (the binding that makes approval mean something):
+			// every triaged task is created hitl, so the ungoverned runtime
+			// scheduler / `openexec run` / backlog tools hold it (and its
+			// dependents) and NEVER auto-build unapproved work. Only the
+			// governance ExecuteChange path un-holds a change's tasks (hitl->afk)
+			// after the change is approved and claimed. Governance is the sole
+			// un-holder — this is what turns the control plane into a control
+			// system.
 			task := &runtime.Task{
 				ID: t.ID, Title: t.Title, Description: t.Description,
 				VerificationScript: t.VerificationScript, StoryID: st.ID,
 				DependsOn: t.DependsOn, Priority: j, MaxAttempts: 3,
 				Status: runtime.TaskStatusPending, CreatedAt: now,
-			}
-			if t.Mode == runtime.PlanTaskModeHITL {
-				task.Metadata = map[string]interface{}{"mode": runtime.TaskModeHITL}
+				Metadata: map[string]interface{}{"mode": runtime.TaskModeHITL},
 			}
 			if err := s.planStore.CreateTask(task); err != nil {
 				return nil, fmt.Errorf("import task %s: %w", t.ID, err)

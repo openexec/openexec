@@ -76,6 +76,35 @@ func TestExecuteChange_DispatchesApprovedTasks(t *testing.T) {
 	}
 }
 
+func TestExecuteChange_UnholdsOnlyApprovedTasks(t *testing.T) {
+	store := newTestStore(t)
+	ps := newFakePlanStore()
+	svc := NewService(store, Options{PlanStore: ps, Executor: &fakeExecutor{}})
+	ctx := context.Background()
+
+	seedRelease(t, store, &governance.GovernanceRelease{ID: "R-1", Status: governance.ReleaseStatusApproved, ApprovedForAI: true})
+	seedChange(t, store, &governance.ChangeRecord{
+		ID: "C-1", ReleaseID: "R-1", Status: governance.ChangeStatusApprovedForAI,
+		ProposalVersion: 1, ApprovedVersion: 1, SourceType: governance.SourceManual, SourceID: "C-1",
+	})
+	ps.stories["US-1"] = releaseStory("US-1", []string{"T-1"})
+	// The task starts HELD (hitl) — as deep triage would create it.
+	ps.tasks["T-1"] = &runtime.Task{ID: "T-1", StoryID: "US-1", Metadata: map[string]interface{}{"mode": runtime.TaskModeHITL}}
+	_ = store.LinkChangeStory(ctx, "C-1", "US-1")
+
+	if ps.tasks["T-1"].ExecutionMode() != runtime.TaskModeHITL {
+		t.Fatalf("precondition: task should be held (hitl)")
+	}
+	if _, err := svc.ExecuteChange(ctx, "C-1", "codex", "workspace-write"); err != nil {
+		t.Fatalf("ExecuteChange: %v", err)
+	}
+	// After governance execute, the approved change's task is un-held (afk) so the
+	// runtime may build it. This is the ONLY path that un-holds.
+	if got := ps.tasks["T-1"].ExecutionMode(); got != runtime.TaskModeAFK {
+		t.Fatalf("governance did not un-hold the approved task, mode=%q", got)
+	}
+}
+
 func TestExecuteChange_RefusesUnapprovedWork(t *testing.T) {
 	store := newTestStore(t)
 	ps := newFakePlanStore()

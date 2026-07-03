@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/governance"
+	"github.com/openexec/openexec/pkg/runtime"
 )
 
 // executeLease is the claim lease taken while a change's tasks are executed.
@@ -56,6 +57,14 @@ func (s *Service) ExecuteChange(ctx context.Context, changeID, agent, mode strin
 	}
 	if len(taskIDs) == 0 {
 		return nil, fmt.Errorf("change %s has no tasks to execute (run deep triage first: work triage %s --deep)", changeID, changeID)
+	}
+
+	// Un-hold this approved+claimed change's tasks (hitl->afk) so the runtime
+	// may build them. Triaged tasks are held hitl by default (see
+	// importPlanForChange), so unapproved work is never auto-built; governance
+	// is the ONLY place that un-holds, and only after ClaimWork's gate passed.
+	if err := s.unholdTasks(ctx, taskIDs); err != nil {
+		return nil, err
 	}
 
 	report := &ExecuteReport{ChangeID: changeID, Failures: map[string]string{}}
@@ -134,6 +143,30 @@ func releaseExecutable(status string) bool {
 
 func changeExecutable(status string) bool {
 	return status == governance.ChangeStatusApprovedForAI || status == governance.ChangeStatusImplementing
+}
+
+// unholdTasks flips the given tasks from the governance hold (hitl) to afk so
+// the runtime scheduler will build them. Called only from ExecuteChange, after
+// the change has passed ClaimWork's approval gate. A task the plan store no
+// longer knows is skipped.
+func (s *Service) unholdTasks(ctx context.Context, taskIDs []string) error {
+	if s.planStore == nil {
+		return errMissingPlanStore
+	}
+	for _, tid := range taskIDs {
+		t := s.planStore.GetTask(tid)
+		if t == nil {
+			continue
+		}
+		if t.Metadata == nil {
+			t.Metadata = map[string]interface{}{}
+		}
+		t.Metadata["mode"] = runtime.TaskModeAFK
+		if err := s.planStore.UpdateTask(t); err != nil {
+			return fmt.Errorf("un-hold task %s: %w", tid, err)
+		}
+	}
+	return nil
 }
 
 // changeTaskIDs resolves the task ids belonging to a change, via its linked

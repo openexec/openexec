@@ -32,8 +32,12 @@ const (
 	StoryTypeFeature   = release.StoryTypeFeature
 	StoryStatusPending = release.StoryStatusPending
 	TaskStatusPending  = release.TaskStatusPending
-	// TaskModeHITL marks a release task as human-in-the-loop.
+	// TaskModeHITL marks a release task as human-in-the-loop; the runtime
+	// scheduler never auto-dispatches it (and holds its dependents). The
+	// governance layer uses it as a "held until approved" gate.
 	TaskModeHITL = release.TaskModeHITL
+	// TaskModeAFK marks a task the runtime may auto-run.
+	TaskModeAFK = release.TaskModeAFK
 )
 
 // Planning types.

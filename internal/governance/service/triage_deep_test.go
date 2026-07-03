@@ -42,6 +42,7 @@ func (f *fakePlanStore) CreateTask(t *runtime.Task) error {
 	}
 	return nil
 }
+func (f *fakePlanStore) UpdateTask(t *runtime.Task) error { f.tasks[t.ID] = t; return nil }
 
 const deepPlanJSON = `{
   "schema_version": "1.0.0",
@@ -107,6 +108,11 @@ func TestTriageDeep_DecomposesAndLinks(t *testing.T) {
 	}
 	if ps.GetTask("T-US-001-001") == nil {
 		t.Fatalf("task T-US-001-001 not persisted")
+	}
+	// GOVERNANCE HOLD: triaged tasks are created hitl (held) so the ungoverned
+	// runtime scheduler cannot auto-build unapproved work.
+	if got := ps.GetTask("T-US-001-001").ExecutionMode(); got != runtime.TaskModeHITL {
+		t.Fatalf("triaged task must be held (hitl) until approved+executed, got mode %q", got)
 	}
 	// Regression: the story's task list must contain each task exactly once
 	// (CreateTask appends; the bridge must not also pre-populate).

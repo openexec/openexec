@@ -67,6 +67,7 @@ type PlanStore interface {
 	CreateGoal(*runtime.Goal) error
 	CreateStory(*runtime.Story) error
 	CreateTask(*runtime.Task) error
+	UpdateTask(*runtime.Task) error
 }
 
 // Options carries the optional dependencies for NewService. A nil Completer or
