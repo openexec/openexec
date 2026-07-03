@@ -1,0 +1,219 @@
+# GitHub / Jira Delivery-Governance Flow
+
+**Status:** implemented and live-verified for GitHub; Jira is a designed extension (not yet built).
+**Branch:** `feat/release-governance` (proprietary layer — see [Two-layer model](#two-layer-model)).
+**Audience:** external reviewer. This document describes the flow *as built*, marks what has been proven live, and lists the open questions we want reviewed.
+
+---
+
+## 1. Purpose
+
+OpenExec turns a tracked work item (a GitHub issue today, a Jira issue tomorrow) into a reviewed, governed, audited code change — without letting an AI agent ship unapproved work. The governance layer decides **what may be built, by whom, and whether it may merge**; the execution engine does the code work. Every decision and every AI risk evaluation is recorded in a tamper-evident audit trail.
+
+The design goal is a delivery pipeline a regulated org can defend: **audit trail + Jira-native governance + operability/merge gate**, compatible with trunk-based development and ISO 27001-style change control.
+
+---
+
+## 2. Two-layer model
+
+| Layer | License | Role |
+|-------|---------|------|
+| **Runtime** (`internal/planner`, `internal/loop`, `internal/blueprint`, backlog, `openexec run`) | Open (MIT) | Plans and executes code changes. Knows nothing about governance. |
+| **Governance** (`internal/governance/*`, `pkg/runtime` facade) | Proprietary | Decides what may run, records evidence + decisions, gates the merge, writes back to the tracker. Imports the runtime only through the `pkg/runtime` facade — no `internal/planner`/`internal/release` imports. |
+
+The governance layer is a **control system**, not just a control plane: triaged tasks are created `hitl` (human-in-the-loop) so the ungoverned runtime scheduler never auto-builds them. Only the governance execute path un-holds a change's tasks, and only after the approval gate has passed.
+
+---
+
+## 3. The end-to-end flow
+
+```
+ Tracker item (GitHub issue / Jira issue)
+        │  import  (idempotent)
+        ▼
+ ChangeRecord (candidate)              kind = feature|bug|ops|... derived from labels
+        │  triage
+        ├─ deep triage ─────► planner decomposition (vertical-slice stories/tasks, held hitl)
+        └─ lightweight lane ► single task, no planner            } → plan_ready
+        │  assessment  (impact + operability)   ── recorded in audit trail
+        │  review (required by risk tier)       ── AI reviewers: bugbot, security_ai
+        ▼
+ human approval gate  (operator session)         changes_requested ⇄ plan_ready
+        │  approve                                └─ no operator-override; revision is mandatory
+        ▼
+ approved_for_ai → claim → execute (openexec run) → commits on an isolated branch
+        │  open PR (draft by default)
+        ▼
+ pr_open  ── record-pr AUTO-posts the governance assessment to the PR
+        │  evidence (CI/test), ready_for_test
+        ▼
+ merge gate  ── never auto-merges by default; operator + approve-authority, or policy opt-in
+        ▼
+ done   ── every transition + decision is a hash-chained audit event
+        │
+        └─ write-back: the tracker item's status label + comment mirror OpenExec state
+```
+
+### Change status machine
+
+`candidate → plan_ready → approved_for_ai → implementing → pr_open → ready_for_test → done`
+plus `changes_requested` (from a reviewer; only exits back to `plan_ready` via revision), `rejected`, `deferred`, `blocked`.
+
+**There is no operator-override from `changes_requested` to approval.** An AI reviewer's `request_changes` is binding: the plan must be revised. (This is a deliberate strictness we want reviewed — see [Open questions](#8-open-questions-for-the-reviewer).)
+
+---
+
+## 4. Two triage lanes
+
+A one-line change should not incur an 8-story plan plus a round of planner-output review. Two lanes:
+
+| | **Deep triage** (`work triage --deep`) | **Lightweight lane** (`work quickplan`) |
+|---|---|---|
+| Decomposition | Full planner: goals → vertical-slice stories → tasks | One story, one task, from the intent — no planner |
+| Risk | AI-classified | AI-classified; **high/critical refused** (must use deep triage) |
+| Review | Required reviews per risk tier (see below) | **Operator approval waives AI review** — the operator is the reviewer; the waiver is recorded in the audit trail |
+| For | Non-trivial features | Trivial low/medium changes |
+
+Both lanes produce the impact + operability assessment (§6) and both stop at the human approval gate.
+
+### Risk tiers → required reviews (default policy)
+
+| Tier | AI review | Security review | Human approval | Auto-merge |
+|------|-----------|-----------------|----------------|------------|
+| low | – | – | – | policy opt-in only |
+| medium | required | – | required | policy opt-in only |
+| high | required | required | required | never (destructive → human) |
+| critical | required | required | required + risk acceptance | never |
+
+Workspace policy is **clamped, never relaxed**: an operator-owned `~/.openexec/governance-policy.yaml` may tighten tiers; a workspace file can only be at least as strict.
+
+---
+
+## 5. Trust & security boundaries
+
+These are the load-bearing invariants — the main thing to review.
+
+- **Human vs AI attribution.** Seeded authorities: `pm` (human), `developer` (human), `bugbot` (ai), `tester_ai` (ai), `security_ai` (ai), `ci_verifier` (verifier). A human-typed authority can only be attributed in an **operator session** (`OPENEXEC_OPERATOR_SESSION=1`); an agent session cannot forge a human-attributed audit record.
+- **Operator session gate.** Approvals (change + release) and merges require an operator session. The MCP plane never sets it, so an agent driving governance over MCP cannot self-approve or merge. *(Caveat: a shell-capable agent could set the env var itself — the real boundary is "agents don't get shell to this CLI." Called out for review.)*
+- **Governance is the sole un-holder.** Triaged tasks are `hitl`; only `ExecuteChange` flips a change's approved+claimed tasks to `afk`. Unapproved work is never auto-built by `openexec run`/the scheduler/backlog tools.
+- **Append-only, tamper-evident audit.** `decision_events` and `evidence` are append-only (DB triggers reject UPDATE/DELETE). Decision events form a SHA-256 **hash chain** (`hash = SHA256(prev_hash ‖ canonical(event))`); `VerifyAuditChain` detects any alteration/deletion/reorder. Ordering is by rowid (monotonic, never reused).
+- **Merge gate fails closed.** No tier auto-merges under default policy. Auto-merge requires: policy opt-in for the tier **AND** status `done` **AND** operability clear (rollback-safe, no destructive migration, low deploy risk) **AND** externally-verified evidence (source `github`/`webhook`, not agent self-reported). Otherwise a human operator with an approve authority must authorize the merge. Draft-PR-by-default embodies "never accidentally merge."
+- **Skill/lesson proposals are propose-then-approve.** Agents may propose durable lessons; only a human activates them.
+
+---
+
+## 6. AI risk assessment (impact + operability) — recorded in the audit trail
+
+Every change is assessed and the assessment is **both** posted to the PR **and** recorded as a hash-chained decision event, so a reviewer can later see *how the AI evaluated the risk*.
+
+- **Impact** (`ai.AnalyzeImpact`): the exact files the change will create/modify, each with a reason. The model is forbidden to invent paths; unknowns are stated as notes.
+- **Operability** (`ai.AnalyzeOperability`): `rollback_safe` (yes/conditional/no), `db_migration` (none/additive/destructive), `deploy_risk` (low/…/critical), mitigations, monitoring.
+
+`work record-pr` auto-generates the assessment, records an `assessed` decision event (actor `risk_assessor`/ai), and posts a "🔒 OpenExec governance assessment" comment to the PR. `work pr-assess [--print]` re-runs or previews it. Sections that were not produced render as **"not assessed"** (so absence is visible, never silently omitted).
+
+The merge gate consumes the operability report: an operationally-risky change (destructive migration, not rollback-safe, high deploy risk) can never auto-merge even if the risk tier would otherwise allow it.
+
+---
+
+## 7. The GitHub connector (implemented)
+
+All GitHub interaction goes through a `Runner` abstraction that shells to the `gh` CLI (reusing the operator's existing auth). No GitHub App is required (that is [future work](#9-what-is-not-built)).
+
+**Intake**
+- `governance work import-github --repo owner/repo --issue N` — import one issue (idempotent; a partial unique index prevents duplicates). Kind is derived from labels: `enhancement`/`feature` → feature, `bug`/`defect` → bug, etc.
+- `governance github sync --repo owner/repo --project P [--label ai:triage] [--no-triage]` — discover open issues (optionally by label), import each, and (unless `--no-triage`) deep-triage freshly-imported ones into stories/tasks awaiting approval. Idempotent; safe to schedule (cron / `/loop`).
+
+**Inbound commands (steer from GitHub)**
+- `governance github poll --repo owner/repo --project P` — process new `/openexec` slash-commands (review, approve, reject, defer, revise, ready-for-test) in issue comments. Author-gated by an operator-owned approver map (`~/.openexec/github-approvers.yaml`, login → authority); approve also requires an operator session. Unmapped commenters are ignored.
+
+**Write-back (mirror OpenExec state to the tracker)**
+- `governance work sync-github <change>` and best-effort mirroring on status changes: sets exactly one `ai:*` status label (`ai:triage`, `ai:plan-ready`, `ai:approved`, `ai:pr-open`, `ai:done`, …) and posts a status + next-action comment on the issue. The `ai:*` labels are **self-provisioned** on first sync (created idempotently), so write-back works on a repo that was never set up.
+
+**Assessment on the PR** — see §6.
+
+---
+
+## 8. Jira mapping (designed, not yet built)
+
+The pipeline is **source-agnostic after intake**: everything downstream of `ChangeRecord` (triage, assessment, review, approval, execute, merge gate, audit) is independent of where the item came from. `ChangeRecord.SourceType` already distinguishes sources (`github_issue` today). Adding Jira means:
+
+| GitHub (built) | Jira (planned) |
+|----------------|----------------|
+| `import-github` / `github sync` (gh CLI) | `import-jira` / `jira sync` (Jira REST API, connector mirroring `connectors/github`) |
+| Kind from labels | Kind from Jira issue type (Story/Bug/Task/Improvement) |
+| `ai:*` status labels | Jira workflow status transitions (governance status → Jira status) |
+| Issue comment write-back | Jira comment + field write-back |
+| `/openexec` slash-commands in comments | Jira comment commands or a Jira automation webhook |
+
+Jira is the more natural fit for the target buyer: **development work, not defects** — governance's `feature` kind and Story/Improvement mapping reflect that. No Jira code exists yet; this table is the contract we intend to implement.
+
+---
+
+## 9. What is / isn't built
+
+**Implemented & live-verified (on `perttu/fotoyks-app`, a real Medusa storefront):**
+- GitHub intake (`enhancement` → `feature` ChangeRecord), deep triage (8 vertical slices, risk auto-classified), file-level impact, two required AI reviews (bugbot + security_ai) that **blocked** a risky plan with senior-level findings.
+- Lightweight lane end-to-end: quickplan → operator approval (AI review waived, recorded) → execute → **draft PR #3** → merge gate correctly **refused** an unauthorized merge → audit chain intact.
+- Write-back: issue got the `ai:pr-open` label + status comment (labels self-provisioned).
+- AI risk assessment posted to PR #3 and recorded as an `assessed` audit event (`rollback=yes, db_migration=none, deploy_risk=low`; the AI also flagged the reverse-proxy body-size coupling).
+- Inbound `github sync` discovery + idempotency.
+
+**Not built:**
+- Jira connector (§8).
+- GitHub App (uses `gh` CLI / personal auth; no org-installable App).
+- Per-story/slice execute scoping (execute is change-level; the lightweight lane sidesteps it).
+- Auto-ingest webhook (inbound is scheduled `sync` / comment `poll`, not event-driven).
+
+---
+
+## 10. Open questions for the reviewer
+
+1. **No operator-override on `changes_requested`.** Today an AI reviewer's `request_changes` is binding — revision is mandatory, a human cannot approve over it. Is that the right strictness, or should there be an *auditable* human risk-acceptance override (recorded, human-only)?
+2. **Operator-session env var.** `OPENEXEC_OPERATOR_SESSION=1` is a plain env var; the real boundary is "agents don't get shell to this CLI." Is that acceptable, or should operator identity be cryptographic (signed session)?
+3. **Lightweight-lane review waiver.** A trivial low/medium change can be operator-approved with no AI review (waiver recorded). Is the low/medium ceiling + audit record sufficient, or should even trivial changes require a lightweight automated check?
+4. **Planner verification quality.** Generated verification scripts have masked failures (`… || fallback`, `2>/dev/null`, `grep -q | head`). We strengthened the planner prompt (mitigation) and the AI reviewers catch residuals. Should there also be a *deterministic* post-generation linter that rejects false-green scripts?
+5. **Auto-merge criteria.** Auto-merge requires policy opt-in + `done` + operability-clear + externally-verified evidence. Is "externally-verified" (source `github`/`webhook`) a strong enough evidence-provenance bar?
+
+---
+
+## 11. Command reference (worked example)
+
+```bash
+# Intake (GitHub issue → governed change)
+openexec governance work import-github --project P --repo owner/repo --issue 2
+#   or, scheduled discovery:
+openexec governance github sync --project P --repo owner/repo --label ai:triage
+
+# Triage
+openexec governance work triage  <change> --deep        # full decomposition
+openexec governance work quickplan <change>             # lightweight lane (trivial)
+openexec governance work impact  <change>               # file-level impact (review)
+
+# Review (required by risk tier) + human approval (operator session)
+openexec governance work review-plan <change> --reviewer bugbot
+openexec governance work review-plan <change> --reviewer security_ai
+OPENEXEC_OPERATOR_SESSION=1 openexec governance work approve <change> --by pm
+
+# Release scope + execute
+openexec governance release create R-1 && \
+  openexec governance release add R-1 <change> && \
+  OPENEXEC_OPERATOR_SESSION=1 openexec governance release approve R-1 --by pm
+openexec governance work execute <change>               # isolated branch, draft PR
+
+# PR lifecycle (record-pr AUTO-posts the assessment to the PR + audit trail)
+openexec governance work record-pr <change> --url <pr-url> --branch <branch>
+openexec governance work pr-assess <change> --print     # re-run / preview assessment
+openexec governance work ready-for-test <change>
+
+# Merge gate (fails closed) + write-back
+OPENEXEC_OPERATOR_SESSION=1 openexec governance work merge <change> --by pm --method squash
+openexec governance work sync-github <change>           # mirror status to the issue
+
+# Audit
+openexec governance audit verify                        # re-verify the hash chain
+openexec governance audit export --out audit.json       # sealed, optionally HMAC-signed
+```
+
+---
+
+*Generated 2026-07-03 from the `feat/release-governance` implementation. Live evidence: `perttu/fotoyks-app` issues #1–#2, PR #3.*
