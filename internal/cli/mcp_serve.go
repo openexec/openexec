@@ -51,6 +51,9 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 		}
 		if infraReg != nil {
 			srv.SetInfraRegistry(infraReg)
+			// The composition root injects the production runner (the MCP server
+			// no longer imports internal/infra to construct one).
+			srv.SetInfraRunner(&infra.ExecRunner{})
 
 			// Persistent approval gate (Phase 3): apply-class infra commands
 			// block on the shared approvals DB until an operator signs off

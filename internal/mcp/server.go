@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/approval"
-	"github.com/openexec/openexec/internal/infra"
+	"github.com/openexec/openexec/internal/infracontract"
 	"github.com/openexec/openexec/internal/mode"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/toolset"
@@ -87,8 +87,8 @@ type Server struct {
 	govHandle *govHandle
 
 	// Infra tools state (see infra.go). Nil registry = no infra tools.
-	infraRegistry *infra.Registry
-	infraRunner   infra.Runner
+	infraRegistry infracontract.Registry
+	infraRunner   infracontract.Runner
 
 	// Operator-session approval tools (see approvals.go). operatorSession
 	// is read once from OPENEXEC_OPERATOR_SESSION at construction — agent

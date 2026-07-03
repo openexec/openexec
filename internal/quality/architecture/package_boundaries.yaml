@@ -68,7 +68,6 @@ baseline:
   - "internal/mcp -> internal/governance"
   - "internal/mcp -> internal/governance/ai"
   - "internal/mcp -> internal/governance/service"
-  - "internal/mcp -> internal/infra"
   - "internal/mcp -> internal/memory"
   - "internal/pipeline -> internal/router"
   - "internal/server -> internal/dcp"
