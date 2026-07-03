@@ -68,6 +68,9 @@ type PlanStore interface {
 	CreateStory(*runtime.Story) error
 	CreateTask(*runtime.Task) error
 	UpdateTask(*runtime.Task) error
+	// DeleteStory removes a story and its tasks from the backlog (used by
+	// re-triage to supersede a change's prior decomposition).
+	DeleteStory(id string) error
 }
 
 // Options carries the optional dependencies for NewService. A nil Completer or

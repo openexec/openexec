@@ -6,46 +6,11 @@ import (
 	"testing"
 
 	"github.com/openexec/openexec/internal/governance"
-	"github.com/openexec/openexec/pkg/runtime"
 )
-
-// planStoreStub is a minimal in-memory PlanStore for light-lane tests. CreateTask
-// appends the task id to its parent story (mirroring the real backlog manager),
-// so changeTaskIDs resolves the linked story's tasks.
-type planStoreStub struct {
-	goals   map[string]*runtime.Goal
-	stories map[string]*runtime.Story
-	tasks   map[string]*runtime.Task
-}
-
-func newPlanStoreStub() *planStoreStub {
-	return &planStoreStub{
-		goals:   map[string]*runtime.Goal{},
-		stories: map[string]*runtime.Story{},
-		tasks:   map[string]*runtime.Task{},
-	}
-}
-
-func (p *planStoreStub) GetGoal(id string) *runtime.Goal   { return p.goals[id] }
-func (p *planStoreStub) GetStory(id string) *runtime.Story { return p.stories[id] }
-func (p *planStoreStub) GetTask(id string) *runtime.Task   { return p.tasks[id] }
-func (p *planStoreStub) CreateGoal(g *runtime.Goal) error  { p.goals[g.ID] = g; return nil }
-func (p *planStoreStub) CreateStory(s *runtime.Story) error {
-	p.stories[s.ID] = s
-	return nil
-}
-func (p *planStoreStub) CreateTask(t *runtime.Task) error {
-	p.tasks[t.ID] = t
-	if st := p.stories[t.StoryID]; st != nil {
-		st.Tasks = append(st.Tasks, t.ID)
-	}
-	return nil
-}
-func (p *planStoreStub) UpdateTask(t *runtime.Task) error { p.tasks[t.ID] = t; return nil }
 
 func TestTriageLight_SingleTaskAndOperatorApprovalWaivesReview(t *testing.T) {
 	store := newTestStore(t)
-	ps := newPlanStoreStub()
+	ps := newFakePlanStore()
 	// No completer => risk defaults to low; operator session so approval is allowed.
 	svc := NewService(store, Options{PlanStore: ps, OperatorSession: true})
 	ctx := context.Background()
@@ -91,9 +56,42 @@ func TestTriageLight_SingleTaskAndOperatorApprovalWaivesReview(t *testing.T) {
 	}
 }
 
+func TestTriage_RetriageSupersedesPriorDecomposition(t *testing.T) {
+	store := newTestStore(t)
+	ps := newFakePlanStore()
+	svc := NewService(store, Options{PlanStore: ps})
+	ctx := context.Background()
+
+	seedChange(t, store, &governance.ChangeRecord{
+		ID: "C-1", Status: governance.ChangeStatusCandidate, Title: "Trivial", RawText: "do x",
+	})
+
+	if _, err := svc.TriageLight(ctx, "C-1", "operator"); err != nil {
+		t.Fatalf("first quickplan: %v", err)
+	}
+
+	// Re-triage (e.g. after a revision). The change must end up owning ONLY the
+	// new decomposition — the prior one is superseded, not accumulated.
+	second, err := svc.TriageLight(ctx, "C-1", "operator")
+	if err != nil {
+		t.Fatalf("re-quickplan: %v", err)
+	}
+	links, _ := store.ListChangeStories(ctx, "C-1")
+	if len(links) != 1 {
+		t.Fatalf("re-triage must leave exactly 1 linked story, got %d: %v", len(links), links)
+	}
+	// The backlog must not accumulate the prior story: exactly one story total.
+	if len(ps.stories) != 1 {
+		t.Fatalf("backlog accumulated stories: want 1, got %d", len(ps.stories))
+	}
+	if ps.GetStory(second.StoryIDs[0]) == nil {
+		t.Fatalf("new story %s should exist", second.StoryIDs[0])
+	}
+}
+
 func TestTriageLight_RefusesHighRisk(t *testing.T) {
 	store := newTestStore(t)
-	ps := newPlanStoreStub()
+	ps := newFakePlanStore()
 	// Completer classifies the change as critical → light lane must refuse.
 	svc := NewService(store, Options{
 		PlanStore: ps,

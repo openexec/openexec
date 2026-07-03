@@ -90,6 +90,9 @@ type Store interface {
 	// Change -> planner-story links (deep-triage decomposition).
 	LinkChangeStory(ctx context.Context, changeID, storyID string) error
 	ListChangeStories(ctx context.Context, changeID string) ([]string, error)
+	// ClearChangeStories removes all of a change's story links (used by
+	// re-triage to supersede the prior decomposition).
+	ClearChangeStories(ctx context.Context, changeID string) error
 
 	// File-level impact analysis (JSON ImpactReport) per change.
 	SetChangeImpact(ctx context.Context, changeID, reportJSON string) error
@@ -1171,6 +1174,24 @@ func (s *SQLiteStore) LinkChangeStory(ctx context.Context, changeID, storyID str
 		changeID, storyID)
 	if err != nil {
 		return fmt.Errorf("link change %q to story %q: %w", changeID, storyID, err)
+	}
+	return nil
+}
+
+// ClearChangeStories removes all story links for a change (not the stories
+// themselves — the caller deletes those from the backlog). Governance re-triage
+// calls it so a re-triaged change owns only its new decomposition instead of
+// accumulating the prior one. Idempotent.
+func (s *SQLiteStore) ClearChangeStories(ctx context.Context, changeID string) error {
+	if changeID == "" {
+		return ErrInvalidData
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM change_story_links WHERE change_id = ?`, changeID)
+	if err != nil {
+		return fmt.Errorf("clear story links for change %q: %w", changeID, err)
 	}
 	return nil
 }

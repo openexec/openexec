@@ -43,6 +43,15 @@ func (f *fakePlanStore) CreateTask(t *runtime.Task) error {
 	return nil
 }
 func (f *fakePlanStore) UpdateTask(t *runtime.Task) error { f.tasks[t.ID] = t; return nil }
+func (f *fakePlanStore) DeleteStory(id string) error {
+	if st := f.stories[id]; st != nil {
+		for _, tid := range st.Tasks {
+			delete(f.tasks, tid)
+		}
+		delete(f.stories, id)
+	}
+	return nil
+}
 
 const deepPlanJSON = `{
   "schema_version": "1.0.0",

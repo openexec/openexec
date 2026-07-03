@@ -183,6 +183,16 @@ func (s *Service) ChangeStories(ctx context.Context, changeID string) ([]*runtim
 // US-001 does not collide with an existing backlog) but targets the injected
 // PlanStore and records the change<->story links.
 func (s *Service) importPlanForChange(ctx context.Context, ch *governance.ChangeRecord, plan *runtime.ProjectPlan) ([]string, error) {
+	// Supersede any prior decomposition this change owns. Re-triage used to LINK
+	// the new stories alongside the old ones, so a re-triaged change accumulated
+	// duplicate stories and ExecuteChange would build both. Delete the old
+	// stories (and their tasks) from the backlog and drop the links first, so the
+	// change ends up owning ONLY the new plan — and so RemapPlanIDs below no
+	// longer sees the just-removed ids as collisions.
+	if err := s.supersedeChangeDecomposition(ctx, ch.ID); err != nil {
+		return nil, err
+	}
+
 	runtime.RemapPlanIDs(plan, runtime.ExistingLookup{
 		GoalTitle:  func(id string) (string, bool) { g := s.planStore.GetGoal(id); return titleOf(g), g != nil },
 		StoryTitle: func(id string) (string, bool) { st := s.planStore.GetStory(id); return storyTitleOf(st), st != nil },
@@ -253,6 +263,25 @@ func (s *Service) importPlanForChange(ctx context.Context, ch *governance.Change
 		storyIDs = append(storyIDs, st.ID)
 	}
 	return storyIDs, nil
+}
+
+// supersedeChangeDecomposition removes a change's currently-linked stories (and
+// their tasks) from the backlog and clears the links, so a re-triage replaces
+// the prior decomposition instead of accumulating it. A no-op on first triage.
+func (s *Service) supersedeChangeDecomposition(ctx context.Context, changeID string) error {
+	old, err := s.store.ListChangeStories(ctx, changeID)
+	if err != nil {
+		return fmt.Errorf("list prior stories for change %q: %w", changeID, err)
+	}
+	if len(old) == 0 {
+		return nil
+	}
+	for _, sid := range old {
+		if err := s.planStore.DeleteStory(sid); err != nil {
+			return fmt.Errorf("supersede prior story %q of change %q: %w", sid, changeID, err)
+		}
+	}
+	return s.store.ClearChangeStories(ctx, changeID)
 }
 
 // composeIntent builds the intent markdown fed to the planner from the change's
