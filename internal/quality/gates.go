@@ -42,38 +42,38 @@ const (
 
 // Gate represents a single quality gate.
 type Gate struct {
-	Name        string            `json:"name"`
-	Type        GateType          `json:"type"`
-	Command     string            `json:"command"`
-	Args        []string          `json:"args"`
-	Mode        GateMode          `json:"mode"`
-	Timeout     time.Duration     `json:"timeout"`
-	AutoFix     bool              `json:"auto_fix"`
-	FixCommand  string            `json:"fix_command,omitempty"`
-	FixArgs     []string          `json:"fix_args,omitempty"`
-	Patterns    []string          `json:"patterns,omitempty"` // File patterns to check
-	Env         map[string]string `json:"env,omitempty"`
-	WorkingDir  string            `json:"working_dir,omitempty"`
+	Name       string            `json:"name"`
+	Type       GateType          `json:"type"`
+	Command    string            `json:"command"`
+	Args       []string          `json:"args"`
+	Mode       GateMode          `json:"mode"`
+	Timeout    time.Duration     `json:"timeout"`
+	AutoFix    bool              `json:"auto_fix"`
+	FixCommand string            `json:"fix_command,omitempty"`
+	FixArgs    []string          `json:"fix_args,omitempty"`
+	Patterns   []string          `json:"patterns,omitempty"` // File patterns to check
+	Env        map[string]string `json:"env,omitempty"`
+	WorkingDir string            `json:"working_dir,omitempty"`
 }
 
 // GateResult represents the result of running a gate.
 type GateResult struct {
-	GateName    string        `json:"gate_name"`
-	Passed      bool          `json:"passed"`
-	Output      string        `json:"output"`
-	Error       string        `json:"error,omitempty"`
-	Duration    time.Duration `json:"duration"`
-	Fixed       bool          `json:"fixed"`
-	FixOutput   string        `json:"fix_output,omitempty"`
+	GateName  string        `json:"gate_name"`
+	Passed    bool          `json:"passed"`
+	Output    string        `json:"output"`
+	Error     string        `json:"error,omitempty"`
+	Duration  time.Duration `json:"duration"`
+	Fixed     bool          `json:"fixed"`
+	FixOutput string        `json:"fix_output,omitempty"`
 }
 
 // GateSummary represents the summary of all gate results.
 type GateSummary struct {
-	Results      []GateResult  `json:"results"`
-	TotalGates   int           `json:"total_gates"`
-	PassedGates  int           `json:"passed_gates"`
-	FailedGates  int           `json:"failed_gates"`
-	Blocked      bool          `json:"blocked"`
+	Results       []GateResult  `json:"results"`
+	TotalGates    int           `json:"total_gates"`
+	PassedGates   int           `json:"passed_gates"`
+	FailedGates   int           `json:"failed_gates"`
+	Blocked       bool          `json:"blocked"`
 	TotalDuration time.Duration `json:"total_duration"`
 }
 
@@ -110,15 +110,15 @@ func DefaultGates(projectType string) []Gate {
 				Timeout: 5 * time.Minute,
 			},
 			{
-				Name:    "gofmt",
-				Type:    GateTypeFormat,
-				Command: "gofmt",
-				Args:    []string{"-l", "."},
-				Mode:    GateModeWarn,
-				Timeout: 30 * time.Second,
-				AutoFix: true,
+				Name:       "gofmt",
+				Type:       GateTypeFormat,
+				Command:    "gofmt",
+				Args:       []string{"-l", "."},
+				Mode:       GateModeWarn,
+				Timeout:    30 * time.Second,
+				AutoFix:    true,
 				FixCommand: "gofmt",
-				FixArgs: []string{"-w", "."},
+				FixArgs:    []string{"-w", "."},
 			},
 			{
 				Name:    "golangci-lint",
@@ -148,15 +148,15 @@ func DefaultGates(projectType string) []Gate {
 				Timeout: 5 * time.Minute,
 			},
 			{
-				Name:    "black",
-				Type:    GateTypeFormat,
-				Command: "black",
-				Args:    []string{"--check", "."},
-				Mode:    GateModeWarn,
-				Timeout: 1 * time.Minute,
-				AutoFix: true,
+				Name:       "black",
+				Type:       GateTypeFormat,
+				Command:    "black",
+				Args:       []string{"--check", "."},
+				Mode:       GateModeWarn,
+				Timeout:    1 * time.Minute,
+				AutoFix:    true,
 				FixCommand: "black",
-				FixArgs: []string{"."},
+				FixArgs:    []string{"."},
 			},
 			{
 				Name:    "mypy",
@@ -170,15 +170,15 @@ func DefaultGates(projectType string) []Gate {
 	case "typescript", "javascript":
 		return []Gate{
 			{
-				Name:    "eslint",
-				Type:    GateTypeLint,
-				Command: "eslint",
-				Args:    []string{".", "--ext", ".ts,.tsx,.js,.jsx"},
-				Mode:    GateModeBlock,
-				Timeout: 2 * time.Minute,
-				AutoFix: true,
+				Name:       "eslint",
+				Type:       GateTypeLint,
+				Command:    "eslint",
+				Args:       []string{".", "--ext", ".ts,.tsx,.js,.jsx"},
+				Mode:       GateModeBlock,
+				Timeout:    2 * time.Minute,
+				AutoFix:    true,
 				FixCommand: "eslint",
-				FixArgs: []string{".", "--fix", "--ext", ".ts,.tsx,.js,.jsx"},
+				FixArgs:    []string{".", "--fix", "--ext", ".ts,.tsx,.js,.jsx"},
 			},
 			{
 				Name:    "jest",
@@ -189,15 +189,15 @@ func DefaultGates(projectType string) []Gate {
 				Timeout: 5 * time.Minute,
 			},
 			{
-				Name:    "prettier",
-				Type:    GateTypeFormat,
-				Command: "prettier",
-				Args:    []string{"--check", "."},
-				Mode:    GateModeWarn,
-				Timeout: 1 * time.Minute,
-				AutoFix: true,
+				Name:       "prettier",
+				Type:       GateTypeFormat,
+				Command:    "prettier",
+				Args:       []string{"--check", "."},
+				Mode:       GateModeWarn,
+				Timeout:    1 * time.Minute,
+				AutoFix:    true,
 				FixCommand: "prettier",
-				FixArgs: []string{"--write", "."},
+				FixArgs:    []string{"--write", "."},
 			},
 			{
 				Name:    "tsc",
@@ -227,26 +227,26 @@ func DefaultGates(projectType string) []Gate {
 				Timeout: 5 * time.Minute,
 			},
 			{
-				Name:    "cargo-clippy",
-				Type:    GateTypeLint,
-				Command: "cargo",
-				Args:    []string{"clippy", "--", "-D", "warnings"},
-				Mode:    GateModeWarn,
-				Timeout: 3 * time.Minute,
-				AutoFix: true,
+				Name:       "cargo-clippy",
+				Type:       GateTypeLint,
+				Command:    "cargo",
+				Args:       []string{"clippy", "--", "-D", "warnings"},
+				Mode:       GateModeWarn,
+				Timeout:    3 * time.Minute,
+				AutoFix:    true,
 				FixCommand: "cargo",
-				FixArgs: []string{"clippy", "--fix", "--allow-dirty"},
+				FixArgs:    []string{"clippy", "--fix", "--allow-dirty"},
 			},
 			{
-				Name:    "cargo-fmt",
-				Type:    GateTypeFormat,
-				Command: "cargo",
-				Args:    []string{"fmt", "--", "--check"},
-				Mode:    GateModeWarn,
-				Timeout: 30 * time.Second,
-				AutoFix: true,
+				Name:       "cargo-fmt",
+				Type:       GateTypeFormat,
+				Command:    "cargo",
+				Args:       []string{"fmt", "--", "--check"},
+				Mode:       GateModeWarn,
+				Timeout:    30 * time.Second,
+				AutoFix:    true,
 				FixCommand: "cargo",
-				FixArgs: []string{"fmt"},
+				FixArgs:    []string{"fmt"},
 			},
 		}
 	default:
@@ -265,7 +265,7 @@ func NewManager(workingDir string, gates []Gate) *Manager {
 // RunAll runs all quality gates and returns a summary.
 func (m *Manager) RunAll(ctx context.Context) (*GateSummary, error) {
 	summary := &GateSummary{
-		Results: make([]GateResult, 0, len(m.gates)),
+		Results:    make([]GateResult, 0, len(m.gates)),
 		TotalGates: len(m.gates),
 	}
 

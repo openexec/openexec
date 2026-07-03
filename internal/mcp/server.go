@@ -1,29 +1,29 @@
 package mcp
 
 import (
-    "bufio"
-    "bytes"
-    "context"
-    "encoding/base64"
-    "encoding/json"
-    "fmt"
-    "io"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "sync"
-    "syscall"
-    "time"
-    "crypto/sha256"
-    "encoding/hex"
+	"bufio"
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
 
-    "github.com/openexec/openexec/internal/approval"
-    "github.com/openexec/openexec/internal/infra"
-    "github.com/openexec/openexec/internal/mode"
-    "github.com/openexec/openexec/internal/release"
-    "github.com/openexec/openexec/internal/toolset"
-    "github.com/openexec/openexec/pkg/telemetry"
+	"github.com/openexec/openexec/internal/approval"
+	"github.com/openexec/openexec/internal/infra"
+	"github.com/openexec/openexec/internal/mode"
+	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/internal/toolset"
+	"github.com/openexec/openexec/pkg/telemetry"
 )
 
 const protocolVersion = "2024-11-05"
@@ -62,19 +62,19 @@ type ServerConfig struct {
 
 // Server is a minimal MCP server that exposes the openexec_signal tool.
 type Server struct {
-	in                  io.Reader
-	out                 io.Writer
-	pythonValidator     *PythonValidator
-	forkManager         *SessionForkManager
-	broker              *ToolBroker
-	workspaceRoots      []string
-	ctx                 context.Context     // Tracing context
-	runID               string              // Current run ID for tracing
-	idempotencyChecker  IdempotencyChecker  // Resume support
-	resumeMode          bool                // True when resuming a prior run
-	toolsetRegistry     *toolset.Registry   // Toolset-based tool filtering
-	currentMode         mode.Mode           // Current operational mode (chat/task/run)
-	activeToolset       string              // Currently active toolset name
+	in                 io.Reader
+	out                io.Writer
+	pythonValidator    *PythonValidator
+	forkManager        *SessionForkManager
+	broker             *ToolBroker
+	workspaceRoots     []string
+	ctx                context.Context    // Tracing context
+	runID              string             // Current run ID for tracing
+	idempotencyChecker IdempotencyChecker // Resume support
+	resumeMode         bool               // True when resuming a prior run
+	toolsetRegistry    *toolset.Registry  // Toolset-based tool filtering
+	currentMode        mode.Mode          // Current operational mode (chat/task/run)
+	activeToolset      string             // Currently active toolset name
 
 	// Backlog tools state (see backlog.go). Lazily opened; guarded by backlogMu.
 	backlogMu  sync.Mutex
@@ -187,7 +187,7 @@ func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) (*Server
 		operatorSession: os.Getenv("OPENEXEC_OPERATOR_SESSION") == "1",
 		workspaceRoots:  roots,
 		toolsetRegistry: toolset.NewRegistry(),
-		currentMode:     mode.ModeChat, // Start in chat mode
+		currentMode:     mode.ModeChat,   // Start in chat mode
 		activeToolset:   "repo_readonly", // Default to read-only toolset
 		pythonValidator: NewPythonValidatorWithConfig(&PythonValidatorConfig{
 			PythonPath:     "python3",
@@ -272,89 +272,89 @@ func (s *Server) handleInitialize(req Request) {
 }
 
 func (s *Server) handleToolsList(req Request) {
-    // Core tools always available in all modes
-    tools := []interface{}{
-        axonSignalToolDef(),        // Always available (control plane)
-        ReadFileToolDef(),          // Read is always allowed
-        GitApplyPatchToolDef(),     // Patch tool available (with mode restrictions in Authorize)
-        OpenExecResultToolDef(),    // Typed step results
-        OpenExecActionToolDef(),    // Unified action envelope
+	// Core tools always available in all modes
+	tools := []interface{}{
+		axonSignalToolDef(),     // Always available (control plane)
+		ReadFileToolDef(),       // Read is always allowed
+		GitApplyPatchToolDef(),  // Patch tool available (with mode restrictions in Authorize)
+		OpenExecResultToolDef(), // Typed step results
+		OpenExecActionToolDef(), // Unified action envelope
 
-        // Backlog + memory tools for lightweight external clients (see backlog.go).
-        BacklogListStoriesToolDef(),
-        BacklogGetStoryToolDef(),
-        BacklogClaimStoryToolDef(),
-        BacklogCompleteTaskToolDef(),
-        BacklogCompleteStoryToolDef(),
-        BacklogAddTaskToolDef(),
-        MemoryReadToolDef(),
-        SkillProposeToolDef(),
+		// Backlog + memory tools for lightweight external clients (see backlog.go).
+		BacklogListStoriesToolDef(),
+		BacklogGetStoryToolDef(),
+		BacklogClaimStoryToolDef(),
+		BacklogCompleteTaskToolDef(),
+		BacklogCompleteStoryToolDef(),
+		BacklogAddTaskToolDef(),
+		MemoryReadToolDef(),
+		SkillProposeToolDef(),
 
-        // Release-governance tools for executor handoff (see governance.go).
-        // Like backlog tools, they mutate orchestrator bookkeeping (not
-        // workspace files) and are available in every mode.
-        ListReleasesToolDef(),
-        ListApprovedWorkToolDef(),
-        GetWorkBriefToolDef(),
-        ClaimWorkToolDef(),
-        RecordPlanToolDef(),
-        RequestRevisionToolDef(),
-        RecordPRToolDef(),
-        RecordTestEvidenceToolDef(),
-        GenerateHandoffToolDef(),
-        RequestDoneToolDef(),
-    }
+		// Release-governance tools for executor handoff (see governance.go).
+		// Like backlog tools, they mutate orchestrator bookkeeping (not
+		// workspace files) and are available in every mode.
+		ListReleasesToolDef(),
+		ListApprovedWorkToolDef(),
+		GetWorkBriefToolDef(),
+		ClaimWorkToolDef(),
+		RecordPlanToolDef(),
+		RequestRevisionToolDef(),
+		RecordPRToolDef(),
+		RecordTestEvidenceToolDef(),
+		GenerateHandoffToolDef(),
+		RequestDoneToolDef(),
+	}
 
-    // Dangerous tools only advertised in danger-full-access mode
-    // This prevents clients from seeing tools they can't use
-    if s.broker.Mode() == ModeFullAuto {
-        tools = append(tools,
-            WriteFileToolDef(),
-            RunShellCommandToolDef(),
-        )
-        // Infra tools (see infra.go) exist only when the operator wrote an
-        // allowlist, and are full-auto-only like the other exec tools.
-        if s.infraRegistry != nil {
-            tools = append(tools, InfraToolDefs(s.infraRegistry)...)
-        }
-    }
+	// Dangerous tools only advertised in danger-full-access mode
+	// This prevents clients from seeing tools they can't use
+	if s.broker.Mode() == ModeFullAuto {
+		tools = append(tools,
+			WriteFileToolDef(),
+			RunShellCommandToolDef(),
+		)
+		// Infra tools (see infra.go) exist only when the operator wrote an
+		// allowlist, and are full-auto-only like the other exec tools.
+		if s.infraRegistry != nil {
+			tools = append(tools, InfraToolDefs(s.infraRegistry)...)
+		}
+	}
 
-    // Operator-session sign-off tools (see approvals.go): only advertised
-    // when this server was explicitly started as an operator session.
-    if s.operatorSession && s.approvalMgr != nil {
-        tools = append(tools,
-            ApprovalListToolDef(),
-            ApprovalDecideToolDef(),
-        )
-    }
+	// Operator-session sign-off tools (see approvals.go): only advertised
+	// when this server was explicitly started as an operator session.
+	if s.operatorSession && s.approvalMgr != nil {
+		tools = append(tools,
+			ApprovalListToolDef(),
+			ApprovalDecideToolDef(),
+		)
+	}
 
-    // Add fork tools if fork manager is configured
-    if s.forkManager != nil {
-        tools = append(tools,
-            ForkSessionToolDef(),
-            GetForkInfoToolDef(),
-            ListSessionForksToolDef(),
-        )
-    }
+	// Add fork tools if fork manager is configured
+	if s.forkManager != nil {
+		tools = append(tools,
+			ForkSessionToolDef(),
+			GetForkInfoToolDef(),
+			ListSessionForksToolDef(),
+		)
+	}
 
-    // Include toolset info in response for clients that support it
-    result := map[string]interface{}{
-        "tools": tools,
-    }
+	// Include toolset info in response for clients that support it
+	result := map[string]interface{}{
+		"tools": tools,
+	}
 
-    // Add toolset metadata if configured
-    if s.toolsetRegistry != nil && s.activeToolset != "" {
-        result["active_toolset"] = s.activeToolset
-        result["mode"] = string(s.currentMode)
+	// Add toolset metadata if configured
+	if s.toolsetRegistry != nil && s.activeToolset != "" {
+		result["active_toolset"] = s.activeToolset
+		result["mode"] = string(s.currentMode)
 
-        // Include list of tools in active toolset for client filtering
-        if ts, ok := s.toolsetRegistry.Get(s.activeToolset); ok {
-            result["toolset_tools"] = ts.Tools
-            result["toolset_risk"] = string(ts.RiskLevel)
-        }
-    }
+		// Include list of tools in active toolset for client filtering
+		if ts, ok := s.toolsetRegistry.Get(s.activeToolset); ok {
+			result["toolset_tools"] = ts.Tools
+			result["toolset_risk"] = string(ts.RiskLevel)
+		}
+	}
 
-    s.writeResult(req.ID, result)
+	s.writeResult(req.ID, result)
 }
 
 func axonSignalToolDef() map[string]interface{} {
@@ -426,33 +426,37 @@ func (s *Server) handleToolsCall(req Request) {
 	}
 
 	// Resume support: Check if this tool call was already applied
-    var idempotencyKey string
-    // Determine idempotency eligibility (tool-specific)
-    eligible := false
-    switch params.Name {
-    case "write_file", "git_apply_patch":
-        eligible = true
-    case "run_shell_command":
-        // Best-effort: consider idempotent only for safe, read-only commands
-        // Extract command/args
-        var shellArgs struct{ Command string `json:"command"` }
-        _ = json.Unmarshal(params.Arguments, &shellArgs)
-        fields := strings.Fields(shellArgs.Command)
-        if len(fields) > 0 {
-            cmd := fields[0]
-            args := []string{}
-            if len(fields) > 1 { args = fields[1:] }
-            if IsShellIdempotent(cmd, args) {
-                eligible = true
-            }
-        }
-    }
+	var idempotencyKey string
+	// Determine idempotency eligibility (tool-specific)
+	eligible := false
+	switch params.Name {
+	case "write_file", "git_apply_patch":
+		eligible = true
+	case "run_shell_command":
+		// Best-effort: consider idempotent only for safe, read-only commands
+		// Extract command/args
+		var shellArgs struct {
+			Command string `json:"command"`
+		}
+		_ = json.Unmarshal(params.Arguments, &shellArgs)
+		fields := strings.Fields(shellArgs.Command)
+		if len(fields) > 0 {
+			cmd := fields[0]
+			args := []string{}
+			if len(fields) > 1 {
+				args = fields[1:]
+			}
+			if IsShellIdempotent(cmd, args) {
+				eligible = true
+			}
+		}
+	}
 
-    if s.resumeMode && s.idempotencyChecker != nil && eligible {
-        // Per-run scoped key to avoid global deduplication
-        idempotencyKey = GenerateIdempotencyKey(s.runID, params.Name, argsMap)
-        wasApplied, err := s.idempotencyChecker.WasApplied(idempotencyKey)
-        if err == nil && wasApplied {
+	if s.resumeMode && s.idempotencyChecker != nil && eligible {
+		// Per-run scoped key to avoid global deduplication
+		idempotencyKey = GenerateIdempotencyKey(s.runID, params.Name, argsMap)
+		wasApplied, err := s.idempotencyChecker.WasApplied(idempotencyKey)
+		if err == nil && wasApplied {
 			// Skip execution and return cached result indicator
 			s.writeResult(req.ID, map[string]interface{}{
 				"content": []interface{}{
@@ -608,12 +612,12 @@ func (s *Server) handleToolsCall(req Request) {
 // Shell commands are explicitly NOT idempotent - they should always re-run on resume
 // to avoid issues with partial side effects from previous runs.
 func isIdempotentTool(name string) bool {
-    switch name {
-    case "write_file", "git_apply_patch":
-        return true
-    default:
-        return false
-    }
+	switch name {
+	case "write_file", "git_apply_patch":
+		return true
+	default:
+		return false
+	}
 }
 
 // markToolApplied records that a tool was successfully applied.
@@ -659,13 +663,13 @@ func (s *Server) handleReadFile(req Request, params toolsCallParams) {
 		return
 	}
 
-    // Validate path security against workspace root (centralized in server config)
-    allowed := s.workspaceRoots
-    if len(allowed) == 0 {
-        s.writeToolError(req.ID, "no workspace root configured; cannot validate path")
-        return
-    }
-    validPath, err := ValidatePathForRead(rfReq.Path, allowed)
+	// Validate path security against workspace root (centralized in server config)
+	allowed := s.workspaceRoots
+	if len(allowed) == 0 {
+		s.writeToolError(req.ID, "no workspace root configured; cannot validate path")
+		return
+	}
+	validPath, err := ValidatePathForRead(rfReq.Path, allowed)
 	if err != nil {
 		s.writeToolError(req.ID, fmt.Sprintf("path error: %v", err))
 		return
@@ -737,17 +741,17 @@ func (s *Server) handleWriteFile(req Request, params toolsCallParams) {
 		return
 	}
 
-    // Enforce workspace-scoped writes (centralized in server config)
-    if os.Getenv("OPENEXEC_MODE") == "read-only" {
-        s.writeToolError(req.ID, "write is not allowed in read-only mode")
-        return
-    }
-    allowed := s.workspaceRoots
-    if len(allowed) == 0 {
-        s.writeToolError(req.ID, "no workspace root configured; cannot validate path")
-        return
-    }
-    validPath, err := ValidatePathForWrite(wfReq.Path, allowed)
+	// Enforce workspace-scoped writes (centralized in server config)
+	if os.Getenv("OPENEXEC_MODE") == "read-only" {
+		s.writeToolError(req.ID, "write is not allowed in read-only mode")
+		return
+	}
+	allowed := s.workspaceRoots
+	if len(allowed) == 0 {
+		s.writeToolError(req.ID, "no workspace root configured; cannot validate path")
+		return
+	}
+	validPath, err := ValidatePathForWrite(wfReq.Path, allowed)
 	if err != nil {
 		s.writeToolError(req.ID, fmt.Sprintf("path error: %v", err))
 		return
@@ -1074,78 +1078,78 @@ func (s *Server) handleGitApplyPatch(req Request, params toolsCallParams) {
 
 	err := cmd.Run()
 
-    // Build result and persist patch artifact
-    stdoutStr := stdout.String()
-    stderrStr := stderr.String()
+	// Build result and persist patch artifact
+	stdoutStr := stdout.String()
+	stderrStr := stderr.String()
 
-    // Persist patch artifact under .openexec/artifacts/patches
-    workspace := workDir
-    if len(s.workspaceRoots) > 0 && s.workspaceRoots[0] != "" {
-        workspace = s.workspaceRoots[0]
-    }
-    artHash := ""
-    artPath := ""
-    if workspace != "" {
-        sum := sha256.Sum256([]byte(gapReq.Patch))
-        artHash = hex.EncodeToString(sum[:])
-        dir := filepath.Join(workspace, ".openexec", "artifacts", "patches")
-        _ = os.MkdirAll(dir, 0o755)
-        p := filepath.Join(dir, artHash+".patch")
-        _ = os.WriteFile(p, []byte(gapReq.Patch), 0o644)
-        artPath = p
-    }
+	// Persist patch artifact under .openexec/artifacts/patches
+	workspace := workDir
+	if len(s.workspaceRoots) > 0 && s.workspaceRoots[0] != "" {
+		workspace = s.workspaceRoots[0]
+	}
+	artHash := ""
+	artPath := ""
+	if workspace != "" {
+		sum := sha256.Sum256([]byte(gapReq.Patch))
+		artHash = hex.EncodeToString(sum[:])
+		dir := filepath.Join(workspace, ".openexec", "artifacts", "patches")
+		_ = os.MkdirAll(dir, 0o755)
+		p := filepath.Join(dir, artHash+".patch")
+		_ = os.WriteFile(p, []byte(gapReq.Patch), 0o644)
+		artPath = p
+	}
 
-    var resultText string
-    if gapReq.CheckOnly {
-        if err == nil {
-            resultText = fmt.Sprintf("Patch can be applied cleanly (%d file(s), +%d/-%d lines)",
-                patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
-        } else {
-            resultText = fmt.Sprintf("Patch cannot be applied cleanly:\n%s", stderrStr)
-        }
-    } else {
-        if err == nil {
-            if gapReq.Reverse {
-                resultText = fmt.Sprintf("Patch unapplied successfully (%d file(s), +%d/-%d lines)",
-                    patchStats.FilesChanged, patchStats.Deletions, patchStats.Additions)
-            } else {
-                resultText = fmt.Sprintf("Patch applied successfully (%d file(s), +%d/-%d lines)",
-                    patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
-            }
-            if stdoutStr != "" {
-                resultText += "\n" + stdoutStr
-            }
-        } else {
-            resultText = fmt.Sprintf("Failed to apply patch:\n%s", stderrStr)
-        }
-    }
-    if gapReq.Recount && err == nil {
-        resultText += "\nWarning: hunk line counts in the patch header did not match the content; applied with --recount. Emit exact line counts in hunk headers next time."
-    }
-    if artHash != "" {
-        resultText += "\nARTIFACT:patch " + artHash + " " + artPath
-    }
+	var resultText string
+	if gapReq.CheckOnly {
+		if err == nil {
+			resultText = fmt.Sprintf("Patch can be applied cleanly (%d file(s), +%d/-%d lines)",
+				patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
+		} else {
+			resultText = fmt.Sprintf("Patch cannot be applied cleanly:\n%s", stderrStr)
+		}
+	} else {
+		if err == nil {
+			if gapReq.Reverse {
+				resultText = fmt.Sprintf("Patch unapplied successfully (%d file(s), +%d/-%d lines)",
+					patchStats.FilesChanged, patchStats.Deletions, patchStats.Additions)
+			} else {
+				resultText = fmt.Sprintf("Patch applied successfully (%d file(s), +%d/-%d lines)",
+					patchStats.FilesChanged, patchStats.Additions, patchStats.Deletions)
+			}
+			if stdoutStr != "" {
+				resultText += "\n" + stdoutStr
+			}
+		} else {
+			resultText = fmt.Sprintf("Failed to apply patch:\n%s", stderrStr)
+		}
+	}
+	if gapReq.Recount && err == nil {
+		resultText += "\nWarning: hunk line counts in the patch header did not match the content; applied with --recount. Emit exact line counts in hunk headers next time."
+	}
+	if artHash != "" {
+		resultText += "\nARTIFACT:patch " + artHash + " " + artPath
+	}
 
-    result := map[string]interface{}{
-        "content": []interface{}{
-            map[string]interface{}{
-                "type": "text",
-                "text": resultText,
-            },
-        },
-        "stats": map[string]interface{}{
-            "files_changed": patchStats.FilesChanged,
-            "additions":     patchStats.Additions,
-            "deletions":     patchStats.Deletions,
-            "hunks":         patchStats.Hunks,
-        },
-        "affected_files": affectedFiles,
-        "artifact": map[string]interface{}{
-            "type": "patch",
-            "hash": artHash,
-            "path": artPath,
-        },
-    }
+	result := map[string]interface{}{
+		"content": []interface{}{
+			map[string]interface{}{
+				"type": "text",
+				"text": resultText,
+			},
+		},
+		"stats": map[string]interface{}{
+			"files_changed": patchStats.FilesChanged,
+			"additions":     patchStats.Additions,
+			"deletions":     patchStats.Deletions,
+			"hunks":         patchStats.Hunks,
+		},
+		"affected_files": affectedFiles,
+		"artifact": map[string]interface{}{
+			"type": "patch",
+			"hash": artHash,
+			"path": artPath,
+		},
+	}
 
 	if err != nil {
 		result["isError"] = true

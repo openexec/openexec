@@ -71,10 +71,10 @@ func TestPruner(t *testing.T) {
 	t.Run("Respects Token Budget", func(t *testing.T) {
 		// Create files with known token counts
 		files := []FileInfo{
-			{Path: "file1.go", Content: strings.Repeat("a", 400)},  // ~100 tokens
-			{Path: "file2.go", Content: strings.Repeat("b", 400)},  // ~100 tokens
-			{Path: "file3.go", Content: strings.Repeat("c", 400)},  // ~100 tokens
-			{Path: "file4.go", Content: strings.Repeat("d", 400)},  // ~100 tokens
+			{Path: "file1.go", Content: strings.Repeat("a", 400)}, // ~100 tokens
+			{Path: "file2.go", Content: strings.Repeat("b", 400)}, // ~100 tokens
+			{Path: "file3.go", Content: strings.Repeat("c", 400)}, // ~100 tokens
+			{Path: "file4.go", Content: strings.Repeat("d", 400)}, // ~100 tokens
 		}
 
 		config := &PrunerConfig{
@@ -270,10 +270,10 @@ func TestTokenEstimation(t *testing.T) {
 		expected int
 	}{
 		{"", 0},
-		{"abcd", 1},           // 4 chars / 4 = 1
-		{"abcdefghij", 2},     // 10 chars / 4 = 2
-		{"a b c d", 1},        // 4 non-space chars / 4 = 1
-		{"    ", 0},           // Only spaces
+		{"abcd", 1},       // 4 chars / 4 = 1
+		{"abcdefghij", 2}, // 10 chars / 4 = 2
+		{"a b c d", 1},    // 4 non-space chars / 4 = 1
+		{"    ", 0},       // Only spaces
 	}
 
 	for _, tt := range tests {

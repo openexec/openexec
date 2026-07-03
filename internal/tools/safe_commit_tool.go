@@ -45,7 +45,7 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 	// 0. Initial validation
 	message, _ := args["message"].(string)
 	storyID, _ := args["story_id"].(string)
-	
+
 	projCfg, err := project.LoadProjectConfig(".")
 	if err != nil {
 		// In test environments or unstructured dirs, fallback to restrictive defaults
@@ -58,12 +58,18 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 
 	// 1. Resolve Branch Names
 	relPrefix := projCfg.ReleaseBranchPrefix
-	if relPrefix == "" { relPrefix = "release/" }
+	if relPrefix == "" {
+		relPrefix = "release/"
+	}
 	featPrefix := projCfg.FeatureBranchPrefix
-	if featPrefix == "" { featPrefix = "feature/" }
-	
+	if featPrefix == "" {
+		featPrefix = "feature/"
+	}
+
 	baseBranch := projCfg.BaseBranch
-	if baseBranch == "" { baseBranch = "main" }
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
 
 	// Resolve release branch name (e.g. release/v0.2.8)
 	releaseBranch := relPrefix + "current" // Default to 'current' or we could use project version
@@ -81,7 +87,7 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 	}
 
 	// 3. Prepare Branches (Local Only)
-	
+
 	// Ensure Release Branch exists (branching off baseBranch)
 	// We don't error if it exists, just ensure it's there.
 	_ = exec.CommandContext(ctx, "git", "branch", releaseBranch, baseBranch).Run()

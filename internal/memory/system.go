@@ -360,19 +360,19 @@ func (ms *MemorySystem) formatSection(file *MemoryFile) string {
 // parseEntries parses memory entries from a file.
 func (ms *MemorySystem) parseEntries(file *MemoryFile) []*MemoryEntry {
 	var entries []*MemoryEntry
-	
+
 	// Simple parsing: look for ## Category and ### Key patterns
 	categoryPattern := regexp.MustCompile(`^##\s+(.+)$`)
 	keyPattern := regexp.MustCompile(`^###\s+(.+)$`)
-	
+
 	var currentCategory string
 	var currentKey string
 	var currentValue []string
-	
+
 	scanner := bufio.NewScanner(strings.NewReader(file.Content))
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Check for category
 		if matches := categoryPattern.FindStringSubmatch(line); matches != nil {
 			// Save previous entry if exists
@@ -391,7 +391,7 @@ func (ms *MemorySystem) parseEntries(file *MemoryFile) []*MemoryEntry {
 			currentValue = nil
 			continue
 		}
-		
+
 		// Check for key
 		if matches := keyPattern.FindStringSubmatch(line); matches != nil {
 			// Save previous entry if exists
@@ -409,13 +409,13 @@ func (ms *MemorySystem) parseEntries(file *MemoryFile) []*MemoryEntry {
 			currentValue = nil
 			continue
 		}
-		
+
 		// Accumulate value
 		if currentKey != "" {
 			currentValue = append(currentValue, line)
 		}
 	}
-	
+
 	// Save last entry
 	if currentKey != "" && len(currentValue) > 0 {
 		entries = append(entries, &MemoryEntry{
@@ -427,7 +427,7 @@ func (ms *MemorySystem) parseEntries(file *MemoryFile) []*MemoryEntry {
 			ExtractedAt: time.Now().UTC(),
 		})
 	}
-	
+
 	return entries
 }
 

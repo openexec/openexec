@@ -45,26 +45,26 @@ type Server struct {
 	Checker     *health.Checker
 	ProjectsDir string
 	Mux         *http.ServeMux
-    HttpServer  *http.Server
-    mu          sync.RWMutex
-    axonBridge  *api.Server
-    StateStore  *state.Store
+	HttpServer  *http.Server
+	mu          sync.RWMutex
+	axonBridge  *api.Server
+	StateStore  *state.Store
 	// Observability
-	runnerCommand  string
-	runnerArgs     []string
-	runnerModel    string
-	skipPreflight  bool // For testing: skip preflight checks
+	runnerCommand string
+	runnerArgs    []string
+	runnerModel   string
+	skipPreflight bool // For testing: skip preflight checks
 }
 
 // Config defines settings for the unified server
 type Config struct {
-    Port          int
-    DataDir       string
-    UnifiedDB     string
-    ModelsPath    string
-    ProjectsDir   string
-    SkipPreflight bool // For testing: skip preflight checks that require real runner
-    EnableDCP     bool // Feature flag: enable Deterministic Control Plane (default: false)
+	Port          int
+	DataDir       string
+	UnifiedDB     string
+	ModelsPath    string
+	ProjectsDir   string
+	SkipPreflight bool // For testing: skip preflight checks that require real runner
+	EnableDCP     bool // Feature flag: enable Deterministic Control Plane (default: false)
 }
 
 // New creates a new unified OpenExec server
@@ -130,11 +130,11 @@ func New(cfg Config) (*Server, error) {
 		loopArgs = nil
 	}
 
-    mgr, err := manager.New(manager.Config{
-        WorkDir:       projectsAbs,
-        AgentsFS:      agentsFS,
-        LogDir:        logDir,
-        ExecutorModel: modelUsed,
+	mgr, err := manager.New(manager.Config{
+		WorkDir:       projectsAbs,
+		AgentsFS:      agentsFS,
+		LogDir:        logDir,
+		ExecutorModel: modelUsed,
 		RunnerCommand: func() string {
 			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
 				return pc.Execution.RunnerCommand
@@ -147,153 +147,153 @@ func New(cfg Config) (*Server, error) {
 			}
 			return nil
 		}(),
-        CommandName: loopCmd,
-        CommandArgs: loopArgs,
-        StateStore:  stateStore,
-        TaskTimeout: func() time.Duration {
-            if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.TimeoutSeconds > 0 {
-                return time.Duration(pc.Execution.TimeoutSeconds) * time.Second
-            }
-            return 0
-        }(),
-        ExecMode: func() string {
-            if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ExecMode != "" {
-                return pc.Execution.ExecMode
-            }
-            return "workspace-write"
-        }(),
-    })
-    if err != nil {
-        return nil, fmt.Errorf("manager initialization failed: %w", err)
-    }
-    // 3. Initialize Deterministic Control Plane (DCP) — optional
-    // Controlled via Config.EnableDCP or OPENEXEC_ENABLE_DCP env var.
-    enableDCP := cfg.EnableDCP
-    if !enableDCP {
-        if v := os.Getenv("OPENEXEC_ENABLE_DCP"); v != "" {
-            lower := strings.ToLower(v)
-            enableDCP = (lower == "1" || lower == "true" || lower == "yes")
-        }
-    }
-    var coordinator *dcp.Coordinator
-    if enableDCP {
-        // Error ignored: knowledge store is optional; DCP tools handle nil/empty store
-        kStore, _ := knowledge.NewStoreWithDB(db)
-        bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
-        // In enabled mode, do not skip availability by default
-        bRouter.SetSkipAvailabilityCheck(false)
-        pEngine := policy.NewEngine(kStore)
-        coordinator = dcp.NewCoordinator(bRouter, kStore)
-        coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
-        coordinator.RegisterTool(tools.NewDeployTool(kStore))
-        coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
-        coordinator.RegisterTool(tools.NewGeneralChatTool()) // conversational fallback
+		CommandName: loopCmd,
+		CommandArgs: loopArgs,
+		StateStore:  stateStore,
+		TaskTimeout: func() time.Duration {
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.TimeoutSeconds > 0 {
+				return time.Duration(pc.Execution.TimeoutSeconds) * time.Second
+			}
+			return 0
+		}(),
+		ExecMode: func() string {
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ExecMode != "" {
+				return pc.Execution.ExecMode
+			}
+			return "workspace-write"
+		}(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("manager initialization failed: %w", err)
+	}
+	// 3. Initialize Deterministic Control Plane (DCP) — optional
+	// Controlled via Config.EnableDCP or OPENEXEC_ENABLE_DCP env var.
+	enableDCP := cfg.EnableDCP
+	if !enableDCP {
+		if v := os.Getenv("OPENEXEC_ENABLE_DCP"); v != "" {
+			lower := strings.ToLower(v)
+			enableDCP = (lower == "1" || lower == "true" || lower == "yes")
+		}
+	}
+	var coordinator *dcp.Coordinator
+	if enableDCP {
+		// Error ignored: knowledge store is optional; DCP tools handle nil/empty store
+		kStore, _ := knowledge.NewStoreWithDB(db)
+		bRouter := router.NewBitNetRouter("/models/bitnet-2b.gguf")
+		// In enabled mode, do not skip availability by default
+		bRouter.SetSkipAvailabilityCheck(false)
+		pEngine := policy.NewEngine(kStore)
+		coordinator = dcp.NewCoordinator(bRouter, kStore)
+		coordinator.RegisterTool(tools.NewSymbolReaderTool(kStore))
+		coordinator.RegisterTool(tools.NewDeployTool(kStore))
+		coordinator.RegisterTool(tools.NewSafeCommitTool(pEngine, coordinator))
+		coordinator.RegisterTool(tools.NewGeneralChatTool()) // conversational fallback
 
-        // Infra suggestion tools (SRE roadmap Phase 4): when the operator
-        // wrote an infra allowlist, register suggestion-only routing
-        // targets so SRE prompts ("bounce nginx on staging") classify into
-        // structured tool calls. Router output stays an untrusted
-        // proposal — execution happens only via the MCP infra plane.
-        if infraReg, ierr := infra.LoadRegistry(projectsAbs); ierr != nil {
-            log.Printf("[Server] infra allowlist error (DCP routing skipped): %v", ierr)
-        } else if infraReg != nil {
-            suggest := tools.NewInfraSuggestTools(infraReg)
-            for _, t := range suggest {
-                coordinator.RegisterTool(t)
-            }
-            log.Printf("[Server] DCP: registered %d infra suggestion tools", len(suggest))
-        }
-        log.Printf("[Server] DCP enabled: BitNet routing active")
-    } else {
-        log.Printf("[Server] DCP disabled: using Pipeline/Manager only")
-    }
+		// Infra suggestion tools (SRE roadmap Phase 4): when the operator
+		// wrote an infra allowlist, register suggestion-only routing
+		// targets so SRE prompts ("bounce nginx on staging") classify into
+		// structured tool calls. Router output stays an untrusted
+		// proposal — execution happens only via the MCP infra plane.
+		if infraReg, ierr := infra.LoadRegistry(projectsAbs); ierr != nil {
+			log.Printf("[Server] infra allowlist error (DCP routing skipped): %v", ierr)
+		} else if infraReg != nil {
+			suggest := tools.NewInfraSuggestTools(infraReg)
+			for _, t := range suggest {
+				coordinator.RegisterTool(t)
+			}
+			log.Printf("[Server] DCP: registered %d infra suggestion tools", len(suggest))
+		}
+		log.Printf("[Server] DCP enabled: BitNet routing active")
+	} else {
+		log.Printf("[Server] DCP disabled: using Pipeline/Manager only")
+	}
 
-    // 4. Initialize API Layer
-    mux := http.NewServeMux()
-    s := &Server{
-        Mgr:         mgr,
-        SessionRepo: sessionRepo,
-        AuditLogger: auditLogger,
-        Coordinator: coordinator,
-        Checker:     health.NewChecker(),
-        ProjectsDir: cfg.ProjectsDir,
-        Mux:         mux,
-        axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, "", api.WithStateStore(stateStore)),
-        HttpServer: &http.Server{
-            Addr:    fmt.Sprintf(":%d", cfg.Port),
-            Handler: mux,
-        },
-        runnerCommand: runnerCmd,
-        runnerArgs:    runnerArgs,
-        runnerModel:   modelUsed,
-        skipPreflight: cfg.SkipPreflight,
-        StateStore:    stateStore,
-    }
+	// 4. Initialize API Layer
+	mux := http.NewServeMux()
+	s := &Server{
+		Mgr:         mgr,
+		SessionRepo: sessionRepo,
+		AuditLogger: auditLogger,
+		Coordinator: coordinator,
+		Checker:     health.NewChecker(),
+		ProjectsDir: cfg.ProjectsDir,
+		Mux:         mux,
+		axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, "", api.WithStateStore(stateStore)),
+		HttpServer: &http.Server{
+			Addr:    fmt.Sprintf(":%d", cfg.Port),
+			Handler: mux,
+		},
+		runnerCommand: runnerCmd,
+		runnerArgs:    runnerArgs,
+		runnerModel:   modelUsed,
+		skipPreflight: cfg.SkipPreflight,
+		StateStore:    stateStore,
+	}
 
-    s.registerRoutes()
+	s.registerRoutes()
 
-    if s.Coordinator != nil {
-        // Start background indexing only when DCP is enabled
-        go s.Coordinator.SyncKnowledge(".")
-    }
+	if s.Coordinator != nil {
+		// Start background indexing only when DCP is enabled
+		go s.Coordinator.SyncKnowledge(".")
+	}
 
-    // Log active feature flags for operators
-    logFeatureFlags()
+	// Log active feature flags for operators
+	logFeatureFlags()
 
 	return s, nil
 }
 
 // logFeatureFlags logs the state of all feature flags on startup.
 func logFeatureFlags() {
-    flags := []struct {
-        name    string
-        envVar  string
-        enabled bool
-    }{
-        {"DCP", "OPENEXEC_ENABLE_DCP", isEnvTrue("OPENEXEC_ENABLE_DCP")},
-        {"UnifiedReads", "OPENEXEC_USE_UNIFIED_READS", !isEnvFalse("OPENEXEC_USE_UNIFIED_READS")}, // default true
-        {"LegacyFWU", "OPENEXEC_ENABLE_LEGACY_FWU", isEnvTrue("OPENEXEC_ENABLE_LEGACY_FWU")},
-    }
+	flags := []struct {
+		name    string
+		envVar  string
+		enabled bool
+	}{
+		{"DCP", "OPENEXEC_ENABLE_DCP", isEnvTrue("OPENEXEC_ENABLE_DCP")},
+		{"UnifiedReads", "OPENEXEC_USE_UNIFIED_READS", !isEnvFalse("OPENEXEC_USE_UNIFIED_READS")}, // default true
+		{"LegacyFWU", "OPENEXEC_ENABLE_LEGACY_FWU", isEnvTrue("OPENEXEC_ENABLE_LEGACY_FWU")},
+	}
 
-    var enabled, disabled []string
-    for _, f := range flags {
-        if f.enabled {
-            enabled = append(enabled, f.name)
-        } else {
-            disabled = append(disabled, f.name)
-        }
-    }
+	var enabled, disabled []string
+	for _, f := range flags {
+		if f.enabled {
+			enabled = append(enabled, f.name)
+		} else {
+			disabled = append(disabled, f.name)
+		}
+	}
 
-    if len(enabled) > 0 {
-        log.Printf("[Server] Feature flags enabled: %s", strings.Join(enabled, ", "))
-    }
-    if len(disabled) > 0 {
-        log.Printf("[Server] Feature flags disabled: %s", strings.Join(disabled, ", "))
-    }
+	if len(enabled) > 0 {
+		log.Printf("[Server] Feature flags enabled: %s", strings.Join(enabled, ", "))
+	}
+	if len(disabled) > 0 {
+		log.Printf("[Server] Feature flags disabled: %s", strings.Join(disabled, ", "))
+	}
 }
 
 // isEnvTrue returns true if the environment variable is set to a truthy value.
 func isEnvTrue(key string) bool {
-    v := strings.ToLower(os.Getenv(key))
-    return v == "1" || v == "true" || v == "yes"
+	v := strings.ToLower(os.Getenv(key))
+	return v == "1" || v == "true" || v == "yes"
 }
 
 // isEnvFalse returns true if the environment variable is explicitly set to a falsy value.
 func isEnvFalse(key string) bool {
-    v := strings.ToLower(os.Getenv(key))
-    return v == "0" || v == "false" || v == "no"
+	v := strings.ToLower(os.Getenv(key))
+	return v == "0" || v == "false" || v == "no"
 }
 
 func (s *Server) registerRoutes() {
-    // --- Legacy/High-Level OpenExec Routes (pkg/api bridge) ---
-    s.axonBridge.RegisterRoutes(s.Mux)
+	// --- Legacy/High-Level OpenExec Routes (pkg/api bridge) ---
+	s.axonBridge.RegisterRoutes(s.Mux)
 
-    // --- DCP Surgical Routes ---
-    if s.Coordinator != nil {
-        s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)
-        s.Mux.HandleFunc("GET /api/v1/knowledge/symbols", s.handleKnowledgeSymbols)
-        s.Mux.HandleFunc("GET /api/v1/knowledge/envs", s.handleKnowledgeEnvs)
-    }
+	// --- DCP Surgical Routes ---
+	if s.Coordinator != nil {
+		s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)
+		s.Mux.HandleFunc("GET /api/v1/knowledge/symbols", s.handleKnowledgeSymbols)
+		s.Mux.HandleFunc("GET /api/v1/knowledge/envs", s.handleKnowledgeEnvs)
+	}
 
 	// --- Health & System Routes ---
 	s.Mux.HandleFunc("GET /api/health", s.handleHealth)
@@ -543,7 +543,7 @@ func (s *Server) Start(ctx context.Context) error {
 			logDir := filepath.Join(s.ProjectsDir, ".openexec")
 			_ = os.MkdirAll(logDir, 0750)
 			crashLog := filepath.Join(logDir, "crash.log")
-			
+
 			f, err := os.OpenFile(crashLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err == nil {
 				fmt.Fprintf(f, "\n=== DAEMON CRASH AT %s ===\n", time.Now().Format(time.RFC3339))
@@ -555,7 +555,7 @@ func (s *Server) Start(ctx context.Context) error {
 				fmt.Fprintf(f, "\n=== END CRASH LOG ===\n")
 				f.Close()
 			}
-			
+
 			log.Printf("[Server] 🚨 CRITICAL ERROR: Daemon panicked! Details written to %s", crashLog)
 			// Re-panic to ensure process exits (we want it to restart, not stay in broken state)
 			panic(r)
@@ -593,15 +593,19 @@ func (s *Server) Start(ctx context.Context) error {
 		errCh <- s.HttpServer.ListenAndServe()
 	}()
 
-    select {
-    case err := <-errCh:
-        // Server terminated (error or closed). Flush state store and return.
-        if s.StateStore != nil { _ = s.StateStore.Close() }
-        return err
-    case <-ctx.Done():
-        // Graceful shutdown path
-        _ = s.HttpServer.Shutdown(context.Background())
-        if s.StateStore != nil { _ = s.StateStore.Close() }
-        return nil
-    }
+	select {
+	case err := <-errCh:
+		// Server terminated (error or closed). Flush state store and return.
+		if s.StateStore != nil {
+			_ = s.StateStore.Close()
+		}
+		return err
+	case <-ctx.Done():
+		// Graceful shutdown path
+		_ = s.HttpServer.Shutdown(context.Background())
+		if s.StateStore != nil {
+			_ = s.StateStore.Close()
+		}
+		return nil
+	}
 }

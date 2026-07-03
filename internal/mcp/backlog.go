@@ -75,7 +75,7 @@ func (s *Server) loadedBacklog() (*release.Manager, error) {
 
 func BacklogListStoriesToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "backlog_list_stories",
+		"name":        "backlog_list_stories",
 		"description": "List stories in the OpenExec backlog with id, title, status, dependencies, and per-status task counts. Use this to see what work exists and what to pick up next. An empty list means no plan has been generated for this project yet.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
@@ -92,7 +92,7 @@ func BacklogListStoriesToolDef() map[string]interface{} {
 
 func BacklogGetStoryToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "backlog_get_story",
+		"name":        "backlog_get_story",
 		"description": "Get one story in full: description, acceptance criteria, verification script, dependencies, and every task with its status, execution mode (afk = agent-runnable, hitl = needs a human), and verification script. Call this before starting work on a story.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
@@ -109,7 +109,7 @@ func BacklogGetStoryToolDef() map[string]interface{} {
 
 func BacklogClaimStoryToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "backlog_claim_story",
+		"name":        "backlog_claim_story",
 		"description": "Claim a story to work on: marks it in_progress. Enforces one story in progress at a time — the call is refused if a different story is already in_progress. Claiming is advisory coordination over the shared backlog database, not a lock; if the OpenExec daemon is also executing work, coordinate through story status. Re-claiming the story you already hold is a no-op.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
@@ -126,7 +126,7 @@ func BacklogClaimStoryToolDef() map[string]interface{} {
 
 func BacklogCompleteTaskToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "backlog_complete_task",
+		"name":        "backlog_complete_task",
 		"description": "Mark one task as done after its work is finished and its verification script (if any) passes. Complete tasks individually as you finish them so progress is visible to the orchestrator and other clients.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
@@ -143,7 +143,7 @@ func BacklogCompleteTaskToolDef() map[string]interface{} {
 
 func BacklogCompleteStoryToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "backlog_complete_story",
+		"name":        "backlog_complete_story",
 		"description": "Mark a story as done. Refused unless every task in the story is done or approved — complete the remaining tasks first (the error lists them). Call this when the story's acceptance criteria are met.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
@@ -165,7 +165,7 @@ const maintenanceStoryID = "US-MAINT"
 
 func BacklogAddTaskToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "backlog_add_task",
+		"name":        "backlog_add_task",
 		"description": "File a new task into the rolling maintenance story (created automatically on first use). Use this so surgical fixes and small follow-ups done in light mode leave a record in the backlog instead of happening off the books. Maintenance tasks never change the project phase. Default mode is hitl (you do the work); pass mode=afk only for tasks the heavy pipeline should pick up on its next run.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",
@@ -281,7 +281,7 @@ func (s *Server) handleBacklogAddTask(req Request, params toolsCallParams) {
 
 func MemoryReadToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "memory_read",
+		"name":        "memory_read",
 		"description": "Read OpenExec's merged layered memory for this project (managed → user → project → local, later layers override earlier ones). Contains decisions, patterns, and preferences learned in previous runs. Returns empty content when no memory exists yet.",
 		"inputSchema": map[string]interface{}{
 			"type":       "object",

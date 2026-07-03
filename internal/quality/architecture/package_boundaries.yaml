@@ -63,18 +63,13 @@ undecided:
 #     interface, or (Step 2) delete if the experimental path is unwired.
 #   - server/tools -> infra : SRE reached from core; must be cut before SRE extracts.
 baseline:
+  # 2026-07-03: harness/parallel/predictive deleted (unwired); 6 edges removed.
   - "internal/context -> internal/memory"
-  - "internal/harness -> internal/memory"
-  - "internal/harness -> internal/parallel"
-  - "internal/harness -> internal/predictive"
   - "internal/mcp -> internal/governance"
   - "internal/mcp -> internal/governance/ai"
   - "internal/mcp -> internal/governance/service"
   - "internal/mcp -> internal/infra"
   - "internal/mcp -> internal/memory"
-  - "internal/pipeline -> internal/memory"
-  - "internal/pipeline -> internal/parallel"
-  - "internal/pipeline -> internal/predictive"
   - "internal/pipeline -> internal/router"
   - "internal/server -> internal/dcp"
   - "internal/server -> internal/infra"

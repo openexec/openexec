@@ -8,13 +8,13 @@ import (
 
 // CLI default argument templates
 var (
-    ClaudeDefaultArgs = []string{
-        "--output-format", "stream-json",
-        "--verbose",
-        "--max-turns", "50",
-    }
-    CodexDefaultArgs  = []string{"--prompt", "-"}
-    GeminiDefaultArgs = []string{"--prompt", "-"}
+	ClaudeDefaultArgs = []string{
+		"--output-format", "stream-json",
+		"--verbose",
+		"--max-turns", "50",
+	}
+	CodexDefaultArgs  = []string{"--prompt", "-"}
+	GeminiDefaultArgs = []string{"--prompt", "-"}
 )
 
 // Resolve maps a model name to a local CLI command and its default arguments.

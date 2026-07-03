@@ -37,10 +37,10 @@ import (
 // DCP routes queries to tools without orchestration logic.
 func TestG001_SingleOrchestrationPlane(t *testing.T) {
 	testCases := []struct {
-		name        string
-		query       string
-		expectTool  string // Expected tool category
-		allowError  bool   // Allow tool execution errors (but not routing errors)
+		name       string
+		query      string
+		expectTool string // Expected tool category
+		allowError bool   // Allow tool execution errors (but not routing errors)
 	}{
 		// DCP routes queries to tools (thin adapter behavior)
 		{"help_routes_to_chat", "help", "general_chat", false},

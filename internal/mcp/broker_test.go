@@ -128,8 +128,8 @@ func TestBrokerModeGetter(t *testing.T) {
 		{"suggest", ModeSuggest},
 		{"auto-edit", ModeAutoEdit},
 		{"danger-full-access", ModeFullAuto},
-		{"", ModeAutoEdit},          // default
-		{"unknown", ModeAutoEdit},   // invalid defaults to auto-edit
+		{"", ModeAutoEdit},        // default
+		{"unknown", ModeAutoEdit}, // invalid defaults to auto-edit
 	}
 
 	for _, tt := range tests {

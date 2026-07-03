@@ -98,11 +98,11 @@ type ExecutionConfig struct {
 	TestCommands []string `json:"test_commands,omitempty"`
 
 	// Feature flags for V2 subsystems
-	QualityGatesV2    bool `json:"quality_gates_v2,omitempty"`
-	CacheEnabled      bool `json:"cache_enabled,omitempty"`
-	PredictiveLoad    bool `json:"predictive_load,omitempty"`
-	MemoryEnabled     bool `json:"memory_enabled,omitempty"`
-	CheckpointEnabled bool `json:"checkpoint_enabled,omitempty"`
+	QualityGatesV2    bool   `json:"quality_gates_v2,omitempty"`
+	CacheEnabled      bool   `json:"cache_enabled,omitempty"`
+	PredictiveLoad    bool   `json:"predictive_load,omitempty"`
+	MemoryEnabled     bool   `json:"memory_enabled,omitempty"`
+	CheckpointEnabled bool   `json:"checkpoint_enabled,omitempty"`
 	BitNetRouting     bool   `json:"bitnet_routing,omitempty"`
 	BitNetModel       string `json:"bitnet_model,omitempty"`
 	// ToolsetFiltering, when true, restricts the tool definitions sent to the

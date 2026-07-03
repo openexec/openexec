@@ -16,17 +16,17 @@ import (
 type PermissionMode string
 
 const (
-	ModeSuggest           PermissionMode = "suggest"             // Read-only + Propose Patch
-	ModeAutoEdit          PermissionMode = "auto-edit"           // Apply Patch + Read-only
-	ModeFullAuto          PermissionMode = "danger-full-access"  // Command allowlist + write_file
+	ModeSuggest  PermissionMode = "suggest"            // Read-only + Propose Patch
+	ModeAutoEdit PermissionMode = "auto-edit"          // Apply Patch + Read-only
+	ModeFullAuto PermissionMode = "danger-full-access" // Command allowlist + write_file
 )
 
 // ToolBroker enforces tiered permissions across all MCP tools.
 type ToolBroker struct {
 	mode            PermissionMode
-	runID           string              // Current run ID for tracing
-	toolsetRegistry *toolset.Registry   // Optional toolset-based filtering
-	activeToolset   string              // Currently active toolset
+	runID           string            // Current run ID for tracing
+	toolsetRegistry *toolset.Registry // Optional toolset-based filtering
+	activeToolset   string            // Currently active toolset
 }
 
 // SetRunID sets the current run ID for tracing context.
@@ -62,7 +62,7 @@ func NewToolBroker(modeOverride string) *ToolBroker {
 		modeStr = os.Getenv("OPENEXEC_MODE")
 	}
 	mode := PermissionMode(modeStr)
-	
+
 	// Normalize and apply secure default
 	switch mode {
 	case ModeSuggest, ModeAutoEdit, ModeFullAuto:
@@ -70,7 +70,7 @@ func NewToolBroker(modeOverride string) *ToolBroker {
 	default:
 		mode = ModeAutoEdit // Secure default: Allow patches but no shell/write_file
 	}
-	
+
 	return &ToolBroker{mode: mode}
 }
 

@@ -61,7 +61,7 @@ Note: 'openexec run' now performs this step automatically if your plan is missin
 		// 2. Execute Plan
 		cmd.Printf("Generating plan from: %s\n", intentFile)
 		cmd.Println("  Planning...")
-		
+
 		res, err := mgr.Plan(cmd.Context(), manager.PlanRequest{
 			IntentFile: intentFile,
 			NoValidate: planNoValidate,

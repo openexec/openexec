@@ -769,10 +769,10 @@ func (m *mockErrorRouter) ParseIntent(ctx context.Context, query string) (*route
 
 func TestDCPQueryErrorIntegration(t *testing.T) {
 	cfg := Config{
-		Port:        0,
-		ProjectsDir: t.TempDir(),
-		DataDir:     t.TempDir(),
-		EnableDCP:   true,
+		Port:          0,
+		ProjectsDir:   t.TempDir(),
+		DataDir:       t.TempDir(),
+		EnableDCP:     true,
 		SkipPreflight: true,
 	}
 

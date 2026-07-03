@@ -35,10 +35,10 @@ func TestBlueprintExecutor_InvokesQualityGates(t *testing.T) {
 	// Since Pipeline currently doesn't accept a GateRunner, we expect
 	// this to require modifications to the New() function or a new
 	// WithGateRunner option.
-	
+
 	// For Stage 2, we will try to use a hypothetical WithGateRunner option.
 	// This will fail to compile initially.
-	
+
 	cfg := Config{
 		FWUID:           "test-gate-wiring",
 		WorkDir:         t.TempDir(),

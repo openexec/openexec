@@ -106,10 +106,10 @@ func TestPlan_RejectsFileConflicts(t *testing.T) {
 	defer server.Close()
 
 	coord := NewTaskCoordinator(CoordinatorConfig{
-		Provider: provider,
+		Provider:   provider,
 		MaxWorkers: 2,
-		WorkDir:  t.TempDir(),
-		Model:    "gpt-4o",
+		WorkDir:    t.TempDir(),
+		Model:      "gpt-4o",
 	})
 
 	_, err := coord.Plan(context.Background(), "update shared", []string{"shared.go"})
@@ -135,10 +135,10 @@ func TestPlan_HandlesCodeFences(t *testing.T) {
 	defer server.Close()
 
 	coord := NewTaskCoordinator(CoordinatorConfig{
-		Provider: provider,
+		Provider:   provider,
 		MaxWorkers: 2,
-		WorkDir:  t.TempDir(),
-		Model:    "gpt-4o",
+		WorkDir:    t.TempDir(),
+		Model:      "gpt-4o",
 	})
 
 	plan, err := coord.Plan(context.Background(), "do thing", []string{"a.go"})

@@ -22,41 +22,41 @@ const (
 
 // Rule represents a single policy rule.
 type Rule struct {
-	ID          string       `json:"id"`
-	Name        string       `json:"name"`
-	Description string       `json:"description,omitempty"`
-	Decision    Decision     `json:"decision"`
-	Priority    int          `json:"priority,omitempty"`    // Higher priority rules evaluated first
-	Conditions  []Condition  `json:"conditions,omitempty"`  // All must match (AND)
-	Exceptions  []Condition  `json:"exceptions,omitempty"`  // If any match, rule doesn't apply
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Decision    Decision    `json:"decision"`
+	Priority    int         `json:"priority,omitempty"`   // Higher priority rules evaluated first
+	Conditions  []Condition `json:"conditions,omitempty"` // All must match (AND)
+	Exceptions  []Condition `json:"exceptions,omitempty"` // If any match, rule doesn't apply
 }
 
 // Condition represents a single condition in a rule.
 type Condition struct {
-	Type     string `json:"type"`                // tool, path, tier, user, pattern, env
-	Operator string `json:"operator,omitempty"`  // eq, ne, contains, matches, in, prefix, suffix
-	Value    string `json:"value"`               // value to compare against
-	Values   []string `json:"values,omitempty"`  // for "in" operator
+	Type     string   `json:"type"`               // tool, path, tier, user, pattern, env
+	Operator string   `json:"operator,omitempty"` // eq, ne, contains, matches, in, prefix, suffix
+	Value    string   `json:"value"`              // value to compare against
+	Values   []string `json:"values,omitempty"`   // for "in" operator
 }
 
 // RuleSet is a collection of rules with metadata.
 type RuleSet struct {
-	Version     string `json:"version"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Rules       []Rule `json:"rules"`
+	Version         string   `json:"version"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description,omitempty"`
+	Rules           []Rule   `json:"rules"`
 	DefaultDecision Decision `json:"default_decision,omitempty"` // defaults to "allow"
 }
 
 // EvaluationContext contains all information needed to evaluate a rule.
 type EvaluationContext struct {
-	Tool       string            // Tool name being invoked
-	Path       string            // File path being accessed (if applicable)
-	Action     string            // Action being performed
-	Tier       string            // Permission tier (read-only, workspace-write, danger-full-access)
-	User       string            // User identifier (optional)
-	Env        map[string]string // Environment variables
-	Args       map[string]interface{} // Tool arguments
+	Tool   string                 // Tool name being invoked
+	Path   string                 // File path being accessed (if applicable)
+	Action string                 // Action being performed
+	Tier   string                 // Permission tier (read-only, workspace-write, danger-full-access)
+	User   string                 // User identifier (optional)
+	Env    map[string]string      // Environment variables
+	Args   map[string]interface{} // Tool arguments
 }
 
 // EvaluationResult contains the result of policy evaluation.
@@ -68,7 +68,7 @@ type EvaluationResult struct {
 
 // RulesEngine evaluates tool actions against policy rules.
 type RulesEngine struct {
-	ruleSet *RuleSet
+	ruleSet  *RuleSet
 	compiled map[string]*regexp.Regexp // Cache for compiled patterns
 }
 

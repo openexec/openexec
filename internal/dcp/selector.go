@@ -11,8 +11,8 @@ import (
 // ToolScore represents a tool's relevance score for a given intent.
 type ToolScore struct {
 	Tool       tools.Tool
-	Score      float64 // 0.0 to 1.0
-	Reason     string  // Why this tool was ranked this way
+	Score      float64  // 0.0 to 1.0
+	Reason     string   // Why this tool was ranked this way
 	Categories []string // Categories this tool belongs to
 }
 

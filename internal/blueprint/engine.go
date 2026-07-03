@@ -205,7 +205,6 @@ var QuickFixBlueprint = &Blueprint{
 			OnSuccess:       "complete",
 			RunQualityGates: true,
 		},
-
 	},
 	InitialStage: "implement",
 }

@@ -16,11 +16,11 @@ import (
 
 // Worktree represents an active git worktree.
 type Worktree struct {
-	Path       string    // Absolute path to the worktree
-	Branch     string    // Branch name (can be same as run ID)
-	RunID      string    // Associated run ID
+	Path       string // Absolute path to the worktree
+	Branch     string // Branch name (can be same as run ID)
+	RunID      string // Associated run ID
 	CreatedAt  time.Time
-	SourcePath string    // Original repository path
+	SourcePath string // Original repository path
 }
 
 // Manager handles git worktree lifecycle for parallel runs.

@@ -23,7 +23,7 @@ func (a *ApplyPatchAction) Execute(ctx context.Context, req ActionRequest) (Acti
 	// In a real implementation, this would parse a diff or implementation result
 	// and apply it safely to the workspace.
 	// For v0.7.0, we provide the native boundary.
-	
+
 	implementation, ok := req.Inputs["implementation"].(string)
 	if !ok || implementation == "" {
 		return ActionResponse{

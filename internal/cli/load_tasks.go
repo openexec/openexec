@@ -14,7 +14,7 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 
 	relTasks := mgr.GetTasks()
 	relStories := mgr.GetStories()
-	
+
 	// Pre-map everything for dependency resolution
 	storyTaskIDs := make(map[string][]string)
 	storyDeps := make(map[string][]string)
@@ -77,11 +77,11 @@ func loadPendingTasks(projectDir string, mgr *release.Manager, isInitial bool) (
 				})
 			}
 		}
-		
+
 		if len(tasks) == 0 {
 			return nil, nil // No tasks left to do
 		}
-		
+
 		return tasks, nil
 	}
 

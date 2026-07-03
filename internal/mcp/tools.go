@@ -89,7 +89,7 @@ func ValidateReadFileRequest(req *ReadFileRequest) error {
 		return &ValidationError{Field: "length", Message: "length must be positive"}
 	}
 
-    return nil
+	return nil
 }
 
 // ValidationError represents a validation error for tool inputs.
@@ -189,7 +189,7 @@ func ValidateWriteFileRequest(req *WriteFileRequest) error {
 		return &ValidationError{Field: "mode", Message: "invalid mode: must be one of overwrite, append"}
 	}
 
-    return nil
+	return nil
 }
 
 // RunShellCommandToolDef returns the MCP tool definition for the run_shell_command tool.

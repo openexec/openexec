@@ -154,20 +154,20 @@ WebSocket events are available at /ws for real-time monitoring.`,
 		}
 		defer func() { _ = removePIDFile(config.ProjectDir) }()
 
-        // Enable DCP only when explicitly requested via env
-        enableDCP := false
-        if v := os.Getenv("OPENEXEC_ENABLE_DCP"); v != "" {
-            lv := strings.ToLower(v)
-            enableDCP = (lv == "1" || lv == "true" || lv == "yes")
-        }
+		// Enable DCP only when explicitly requested via env
+		enableDCP := false
+		if v := os.Getenv("OPENEXEC_ENABLE_DCP"); v != "" {
+			lv := strings.ToLower(v)
+			enableDCP = (lv == "1" || lv == "true" || lv == "yes")
+		}
 
-        srv, err := server.New(server.Config{
-            Port:        startPort,
-            UnifiedDB:   auditDB,
-            DataDir:     dataDir,
-            ProjectsDir: config.ProjectDir,
-            EnableDCP:   enableDCP,
-        })
+		srv, err := server.New(server.Config{
+			Port:        startPort,
+			UnifiedDB:   auditDB,
+			DataDir:     dataDir,
+			ProjectsDir: config.ProjectDir,
+			EnableDCP:   enableDCP,
+		})
 		if err != nil {
 			return err
 		}
@@ -241,7 +241,7 @@ Examples:
 
 		// 2. TRIGGER SERVER-SIDE EXECUTION
 		// Thin client: CLI only initiates and monitors.
-		
+
 		// Plan first if needed
 		if !runNoAutoPlan {
 			planReq := map[string]any{
@@ -263,7 +263,7 @@ Examples:
 		if len(args) > 0 {
 			runOpts["task_ids"] = []string{args[0]}
 		}
-		
+
 		body, _ := json.Marshal(runOpts)
 		resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs:execute", startPort), "application/json", bytes.NewReader(body))
 		if err != nil {
@@ -762,14 +762,14 @@ func waitForLoop(cmd *cobra.Command, loopID string, prefix string, timeout time.
 			time.Sleep(2 * time.Second)
 			continue
 		}
-        var loopResp struct{
-            Status string `json:"status"`
-            Iteration int `json:"iteration"`
-            Error string `json:"error"`
-            Phase string `json:"phase"`
-            Agent string `json:"agent"`
-            LastActivity time.Time `json:"last_activity"`
-        }
+		var loopResp struct {
+			Status       string    `json:"status"`
+			Iteration    int       `json:"iteration"`
+			Error        string    `json:"error"`
+			Phase        string    `json:"phase"`
+			Agent        string    `json:"agent"`
+			LastActivity time.Time `json:"last_activity"`
+		}
 		if err := json.NewDecoder(resp.Body).Decode(&loopResp); err != nil {
 			resp.Body.Close()
 			time.Sleep(2 * time.Second)
@@ -884,12 +884,12 @@ func init() {
 
 	runCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 10, "Max iterations")
-    runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
-    runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
-    runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
-    runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Execute a single deterministic quickfix without planning (task title)")
-    runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
-    runCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
+	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
+	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
+	runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
+	runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Execute a single deterministic quickfix without planning (task title)")
+	runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
+	runCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	blueprintCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
 	blueprintCmd.Flags().StringVar(&blueprintID, "blueprint-id", "standard_task", "Blueprint to execute (standard_task, quick_fix)")
@@ -922,7 +922,7 @@ func runMiniInterview(cmd *cobra.Command, initialIntent string, config *project.
 
 	// Initial message
 	message := initialIntent
-	
+
 	for {
 		if message != "" {
 			cmd.Print(color.CyanString("Thinking... "))
@@ -977,79 +977,97 @@ func runMiniInterview(cmd *cobra.Command, initialIntent string, config *project.
 // This is NOT a runtime data source - it's a migration path for legacy projects.
 // Returns true if an import was performed (regardless of success), false otherwise.
 func tryAutoImportStories(projectDir string, mgr *release.Manager, cmd *cobra.Command) bool {
-    storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
-    data, err := os.ReadFile(storiesPath)
-    if err != nil { return false }
+	storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
+	data, err := os.ReadFile(storiesPath)
+	if err != nil {
+		return false
+	}
 
-    // Log import operation for drift tracking
-    fmt.Fprintf(os.Stderr, "[IMPORT] Loading from JSON (%s) for one-time migration. SQLite is the canonical store.\n", storiesPath)
-    var sf struct {
-        Stories []GeneratedStory `json:"stories"`
-    }
-    if err := json.Unmarshal(data, &sf); err != nil {
-        // try legacy array-only format
-        var bare []GeneratedStory
-        if err2 := json.Unmarshal(data, &bare); err2 == nil {
-            sf.Stories = bare
-        } else {
-            return false
-        }
-    }
-    if len(sf.Stories) == 0 { return false }
+	// Log import operation for drift tracking
+	fmt.Fprintf(os.Stderr, "[IMPORT] Loading from JSON (%s) for one-time migration. SQLite is the canonical store.\n", storiesPath)
+	var sf struct {
+		Stories []GeneratedStory `json:"stories"`
+	}
+	if err := json.Unmarshal(data, &sf); err != nil {
+		// try legacy array-only format
+		var bare []GeneratedStory
+		if err2 := json.Unmarshal(data, &bare); err2 == nil {
+			sf.Stories = bare
+		} else {
+			return false
+		}
+	}
+	if len(sf.Stories) == 0 {
+		return false
+	}
 
-    // Import minimal story/task records
-    created := 0
-    for _, s := range sf.Stories {
-        if mgr.GetStory(s.ID) == nil {
-            st := &release.Story{
-                ID:                 s.ID,
-                GoalID:             s.GoalID,
-                Title:              s.Title,
-                Description:        s.Description,
-                AcceptanceCriteria: s.AcceptanceCriteria,
-                VerificationScript: s.VerificationScript,
-                DependsOn:          s.DependsOn,
-                Status:             "pending",
-                CreatedAt:          time.Now(),
-            }
-            _ = mgr.CreateStory(st)
-        }
-        // Create tasks under story
-        var prevTaskID string
-        for _, tRaw := range s.Tasks {
-            var id, title, desc string
-            var deps []string
-            switch v := tRaw.(type) {
-            case string:
-                id = v
-            case map[string]any:
-                if v["id"] != nil { id, _ = v["id"].(string) }
-                if v["title"] != nil { title, _ = v["title"].(string) }
-                if v["description"] != nil { desc, _ = v["description"].(string) }
-                if arr, ok := v["depends_on"].([]any); ok {
-                    for _, a := range arr { if s, ok := a.(string); ok { deps = append(deps, s) } }
-                }
-            }
-            if id == "" { continue }
-            if mgr.GetTask(id) == nil {
-                if prevTaskID != "" { deps = append(deps, prevTaskID) }
-                task := &release.Task{
-                    ID:          id,
-                    Title:       title,
-                    Description: desc,
-                    StoryID:     s.ID,
-                    DependsOn:   deps,
-                    Status:      "pending",
-                    CreatedAt:   time.Now(),
-                }
-                _ = mgr.CreateTask(task)
-                prevTaskID = id
-                created++
-            }
-        }
-    }
-    if created > 0 && cmd != nil {
-        cmd.Printf("Imported %d tasks from %s (auto)\n", created, storiesPath)
-    }
-    return true
+	// Import minimal story/task records
+	created := 0
+	for _, s := range sf.Stories {
+		if mgr.GetStory(s.ID) == nil {
+			st := &release.Story{
+				ID:                 s.ID,
+				GoalID:             s.GoalID,
+				Title:              s.Title,
+				Description:        s.Description,
+				AcceptanceCriteria: s.AcceptanceCriteria,
+				VerificationScript: s.VerificationScript,
+				DependsOn:          s.DependsOn,
+				Status:             "pending",
+				CreatedAt:          time.Now(),
+			}
+			_ = mgr.CreateStory(st)
+		}
+		// Create tasks under story
+		var prevTaskID string
+		for _, tRaw := range s.Tasks {
+			var id, title, desc string
+			var deps []string
+			switch v := tRaw.(type) {
+			case string:
+				id = v
+			case map[string]any:
+				if v["id"] != nil {
+					id, _ = v["id"].(string)
+				}
+				if v["title"] != nil {
+					title, _ = v["title"].(string)
+				}
+				if v["description"] != nil {
+					desc, _ = v["description"].(string)
+				}
+				if arr, ok := v["depends_on"].([]any); ok {
+					for _, a := range arr {
+						if s, ok := a.(string); ok {
+							deps = append(deps, s)
+						}
+					}
+				}
+			}
+			if id == "" {
+				continue
+			}
+			if mgr.GetTask(id) == nil {
+				if prevTaskID != "" {
+					deps = append(deps, prevTaskID)
+				}
+				task := &release.Task{
+					ID:          id,
+					Title:       title,
+					Description: desc,
+					StoryID:     s.ID,
+					DependsOn:   deps,
+					Status:      "pending",
+					CreatedAt:   time.Now(),
+				}
+				_ = mgr.CreateTask(task)
+				prevTaskID = id
+				created++
+			}
+		}
+	}
+	if created > 0 && cmd != nil {
+		cmd.Printf("Imported %d tasks from %s (auto)\n", created, storiesPath)
+	}
+	return true
 }

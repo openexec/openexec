@@ -152,13 +152,13 @@ func (v *Validator) initPatterns() {
 		// API Keys and Tokens
 		`(?i)(api[_-]?key|apikey)\s*[=:]\s*['"]?[a-zA-Z0-9_-]{20,}`,
 		`(?i)(secret|token)\s*[=:]\s*['"]?[a-zA-Z0-9_-]{20,}`,
-		`sk-[a-zA-Z0-9]{48}`,                      // OpenAI keys
-		`anthropic-[a-zA-Z0-9]{32,}`,              // Anthropic keys
-		`AIza[a-zA-Z0-9_-]{35}`,                   // Google API keys
-		`ghp_[a-zA-Z0-9]{36}`,                     // GitHub PAT
-		`glpat-[a-zA-Z0-9_-]{20}`,                 // GitLab PAT
+		`sk-[a-zA-Z0-9]{48}`,         // OpenAI keys
+		`anthropic-[a-zA-Z0-9]{32,}`, // Anthropic keys
+		`AIza[a-zA-Z0-9_-]{35}`,      // Google API keys
+		`ghp_[a-zA-Z0-9]{36}`,        // GitHub PAT
+		`glpat-[a-zA-Z0-9_-]{20}`,    // GitLab PAT
 		// AWS
-		`AKIA[A-Z0-9]{16}`,                        // AWS Access Key ID
+		`AKIA[A-Z0-9]{16}`, // AWS Access Key ID
 		`(?i)aws_secret_access_key\s*[=:]\s*['"]?[a-zA-Z0-9/+=]{40}`,
 		// Private Keys
 		`-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----`,
@@ -306,12 +306,12 @@ func (v *Validator) ValidateToolCall(toolName string, args map[string]interface{
 
 	// LLM07: Check for dangerous tool patterns
 	dangerousTools := map[string]string{
-		"bash":    "Shell command execution",
-		"shell":   "Shell command execution",
-		"exec":    "Command execution",
-		"eval":    "Code evaluation",
-		"system":  "System command",
-		"popen":   "Process spawning",
+		"bash":   "Shell command execution",
+		"shell":  "Shell command execution",
+		"exec":   "Command execution",
+		"eval":   "Code evaluation",
+		"system": "System command",
+		"popen":  "Process spawning",
 	}
 
 	toolLower := strings.ToLower(toolName)

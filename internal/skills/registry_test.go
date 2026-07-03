@@ -228,10 +228,10 @@ func TestSelectForTask_MaxThree(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		name := "skill-" + string(rune('a'+i))
 		r.skills[name] = &Skill{
-			Name:       name,
-			Tags:       []string{"common"},
-			WhenToUse:  "always useful for common tasks",
-			Enabled:    true,
+			Name:      name,
+			Tags:      []string{"common"},
+			WhenToUse: "always useful for common tasks",
+			Enabled:   true,
 		}
 	}
 	r.mu.Unlock()

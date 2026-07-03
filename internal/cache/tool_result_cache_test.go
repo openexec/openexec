@@ -182,12 +182,12 @@ func TestToolResultCache(t *testing.T) {
 
 	t.Run("InvalidateTool", func(t *testing.T) {
 		toolName := "multi_invalidate_tool"
-		
+
 		// Set multiple entries for same tool
 		for i := 0; i < 3; i++ {
 			input := map[string]interface{}{"id": i}
 			result := []byte(`{"result": i}`)
-			
+
 			err := cache.Set(toolName, input, result, 100)
 			if err != nil {
 				t.Fatalf("Set failed: %v", err)
@@ -203,7 +203,7 @@ func TestToolResultCache(t *testing.T) {
 		// Verify all entries are gone
 		for i := 0; i < 3; i++ {
 			input := map[string]interface{}{"id": i}
-			
+
 			result, err := cache.Get(toolName, input)
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)
@@ -220,7 +220,7 @@ func TestToolResultCache(t *testing.T) {
 			toolName := filepath.Join("tool", string(rune('a'+i)))
 			input := map[string]interface{}{"id": i}
 			result := []byte(`{"result": i}`)
-			
+
 			err := cache.Set(toolName, input, result, 100)
 			if err != nil {
 				t.Fatalf("Set failed: %v", err)
@@ -253,7 +253,7 @@ func TestToolResultCache(t *testing.T) {
 			toolName := filepath.Join("cleanup", string(rune('a'+i)))
 			input := map[string]interface{}{"id": i}
 			result := []byte(`{"result": i}`)
-			
+
 			err := cleanupCache.Set(toolName, input, result, 100)
 			if err != nil {
 				t.Fatalf("Set failed: %v", err)
@@ -283,14 +283,14 @@ func TestToolResultCache(t *testing.T) {
 	t.Run("Deterministic Hash", func(t *testing.T) {
 		// Same input should produce same hash
 		input1 := map[string]interface{}{
-			"path": "/project/main.go",
+			"path":   "/project/main.go",
 			"offset": 0,
-			"limit": 100,
+			"limit":  100,
 		}
 		input2 := map[string]interface{}{
-			"path": "/project/main.go",
+			"path":   "/project/main.go",
 			"offset": 0,
-			"limit": 100,
+			"limit":  100,
 		}
 
 		hash1 := computeInputHash(input1)
@@ -302,9 +302,9 @@ func TestToolResultCache(t *testing.T) {
 
 		// Different input should produce different hash
 		input3 := map[string]interface{}{
-			"path": "/project/other.go",
+			"path":   "/project/other.go",
 			"offset": 0,
-			"limit": 100,
+			"limit":  100,
 		}
 
 		hash3 := computeInputHash(input3)
