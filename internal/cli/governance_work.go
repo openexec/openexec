@@ -43,6 +43,32 @@ var govWorkImportGitHubCmd = &cobra.Command{
 	},
 }
 
+var govWorkCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "File a change record from free text (no GitHub issue needed)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		projectID, _ := cmd.Flags().GetString("project")
+		title, _ := cmd.Flags().GetString("title")
+		body, _ := cmd.Flags().GetString("body")
+		if title == "" {
+			return fmt.Errorf("--title is required")
+		}
+		ch, err := svc.CreateManualChange(cmd.Context(), projectID, title, body)
+		if err != nil {
+			return err
+		}
+		cmd.Printf("Created change %s [%s]: %s\n", ch.ID, ch.Status, ch.Title)
+		cmd.Printf("Next: openexec governance work triage %s --deep\n", ch.ID)
+		return nil
+	},
+}
+
 var govWorkAttachCmd = &cobra.Command{
 	Use:   "attach <change-id>",
 	Short: "Attach a change record to a release",
@@ -82,6 +108,22 @@ var govWorkTriageCmd = &cobra.Command{
 
 		repoContext, _ := cmd.Flags().GetString("context")
 		actor, _ := cmd.Flags().GetString("actor")
+
+		// When no explicit context is given, auto-gather a repo map so deep
+		// triage references real files ("affects this and that"). --repo-context
+		// scans a code repo separate from the governance project dir (so the
+		// governance state can live elsewhere and not pollute the code repo's
+		// backlog); it defaults to the project dir. Best-effort: empty if the
+		// target is not a git repo.
+		if repoContext == "" {
+			codeDir, _ := cmd.Flags().GetString("repo-context")
+			if codeDir == "" {
+				codeDir, _ = govBaseDir(cmd)
+			}
+			if codeDir != "" {
+				repoContext = gatherRepoContext(codeDir, 12000)
+			}
+		}
 
 		// Deep triage: run the real planner to decompose intent into stories +
 		// vertical-slice tasks (owned by this change), instead of a flat plan.
@@ -496,6 +538,12 @@ func init() {
 	// work sync-github
 	governanceWorkCmd.AddCommand(govWorkSyncGitHubCmd)
 
+	// work create (manual)
+	governanceWorkCmd.AddCommand(govWorkCreateCmd)
+	govWorkCreateCmd.Flags().String("project", "", "Project ID")
+	govWorkCreateCmd.Flags().String("title", "", "Change title (required)")
+	govWorkCreateCmd.Flags().String("body", "", "Change description / intent")
+
 	// work attach
 	governanceWorkCmd.AddCommand(govWorkAttachCmd)
 	govWorkAttachCmd.Flags().String("release", "", "Release ID to attach to")
@@ -505,6 +553,7 @@ func init() {
 	// work triage
 	governanceWorkCmd.AddCommand(govWorkTriageCmd)
 	govWorkTriageCmd.Flags().String("context", "", "Repo context to give the planner")
+	govWorkTriageCmd.Flags().String("repo-context", "", "Path to a code repo to scan for context (default: project dir)")
 	govWorkTriageCmd.Flags().String("actor", "planner_ai", "Actor recorded as the proposer")
 	govWorkTriageCmd.Flags().Bool("deep", false, "Decompose intent into real stories + tasks via the planner (owned by this change)")
 	govWorkTriageCmd.Flags().Bool("json", false, "Output as JSON")
