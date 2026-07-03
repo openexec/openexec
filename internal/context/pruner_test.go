@@ -30,7 +30,7 @@ func TestPruner(t *testing.T) {
 	defer memoryManager.Close()
 
 	config := DefaultPrunerConfig()
-	pruner, err := NewPruner(tmpDir, knowledgeStore, memoryManager, config)
+	pruner, err := NewPruner(tmpDir, knowledgeStore, config)
 	if err != nil {
 		t.Fatalf("failed to create pruner: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestPruner(t *testing.T) {
 			MinRelevanceScore: 0,
 		}
 
-		pruner, _ := NewPruner(tmpDir, nil, nil, config)
+		pruner, _ := NewPruner(tmpDir, nil, config)
 		defer pruner.Close()
 
 		result, err := pruner.Prune(files, "test query")
@@ -111,7 +111,7 @@ func TestPruner(t *testing.T) {
 			MinRelevanceScore: 0,
 		}
 
-		pruner, _ := NewPruner(tmpDir, nil, nil, config)
+		pruner, _ := NewPruner(tmpDir, nil, config)
 		defer pruner.Close()
 
 		result, err := pruner.Prune(files, "test")
@@ -136,7 +136,7 @@ func TestPruner(t *testing.T) {
 			MinRelevanceScore: 5.0,
 		}
 
-		pruner, _ := NewPruner(tmpDir, nil, nil, config)
+		pruner, _ := NewPruner(tmpDir, nil, config)
 		defer pruner.Close()
 
 		result, err := pruner.Prune(files, "auth")
@@ -157,7 +157,7 @@ func TestScoreCalculation(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 
-	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
+	pruner, _ := NewPruner(tmpDir, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
 	t.Run("Content Scoring", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestScoreCalculation(t *testing.T) {
 func TestTermExtraction(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
+	pruner, _ := NewPruner(tmpDir, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
 	tests := []struct {
@@ -262,7 +262,7 @@ func TestTermExtraction(t *testing.T) {
 func TestTokenEstimation(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
+	pruner, _ := NewPruner(tmpDir, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
 	tests := []struct {

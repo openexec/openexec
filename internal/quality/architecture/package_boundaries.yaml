@@ -42,7 +42,9 @@ modules:
     - internal/parallel
   routing:
     - internal/dcp
-    - internal/router
+    # internal/router is CORE, not a module: it is load-bearing (pkg/manager
+    # always injects router.NewDeterministicRouter and the pipeline routes
+    # through it on the default path) and imports only core (mode, toolset).
 
 # Genuinely ambiguous packages — exempt from the check until the strategy decides
 # their home (see the "undecided" bucket in the doc).
@@ -65,8 +67,6 @@ undecided:
 baseline:
   # 2026-07-03: harness/parallel/predictive deleted (unwired); 6 edges removed.
   - "internal/context -> internal/memory"
-  - "internal/pipeline -> internal/router"
   - "internal/server -> internal/dcp"
   - "internal/server -> internal/infra"
-  - "internal/server -> internal/router"
   - "internal/tools -> internal/infra"
