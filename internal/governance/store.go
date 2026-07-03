@@ -75,6 +75,10 @@ type Store interface {
 	ClaimWork(ctx context.Context, changeID, agent string, lease time.Duration) error
 	ReleaseClaim(ctx context.Context, changeID string) error
 
+	// GitHub comment-ingestion cursor (highest processed comment id per change).
+	GetIngestCursor(ctx context.Context, changeID string) (int64, error)
+	SetIngestCursor(ctx context.Context, changeID string, lastCommentID int64) error
+
 	Close() error
 }
 
@@ -993,4 +997,38 @@ func parseNullTime(s sql.NullString) *time.Time {
 	}
 	t, _ := time.Parse(time.RFC3339, s.String)
 	return &t
+}
+
+// GetIngestCursor returns the highest GitHub comment id already processed for a
+// change (0 if none recorded yet).
+func (s *SQLiteStore) GetIngestCursor(ctx context.Context, changeID string) (int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var last int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT last_comment_id FROM github_ingest_cursor WHERE change_id = ?`, changeID).Scan(&last)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("get ingest cursor for %q: %w", changeID, err)
+	}
+	return last, nil
+}
+
+// SetIngestCursor records the highest GitHub comment id processed for a change.
+func (s *SQLiteStore) SetIngestCursor(ctx context.Context, changeID string, lastCommentID int64) error {
+	if changeID == "" {
+		return ErrInvalidData
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO github_ingest_cursor (change_id, last_comment_id) VALUES (?, ?)
+		 ON CONFLICT(change_id) DO UPDATE SET last_comment_id = excluded.last_comment_id`,
+		changeID, lastCommentID)
+	if err != nil {
+		return fmt.Errorf("set ingest cursor for %q: %w", changeID, err)
+	}
+	return nil
 }

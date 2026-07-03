@@ -187,3 +187,105 @@ func (s *Service) ApproveChange(ctx context.Context, changeID, authorityID strin
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
 }
+
+// RejectChange rejects a change's plan (terminal). It requires an authority
+// holding the request_changes permission (reviewers/PMs), a legal transition to
+// rejected, and records a rejected DecisionEvent with the reason.
+func (s *Service) RejectChange(ctx context.Context, changeID, authorityID, reason string) error {
+	return s.terminateChange(ctx, changeID, authorityID, reason,
+		governance.ChangeStatusRejected, governance.DecisionRejected, "rejected")
+}
+
+// DeferChange defers a change's plan (terminal for this release). Same authority
+// requirement as RejectChange.
+func (s *Service) DeferChange(ctx context.Context, changeID, authorityID, reason string) error {
+	return s.terminateChange(ctx, changeID, authorityID, reason,
+		governance.ChangeStatusDeferred, governance.DecisionDeferred, "deferred")
+}
+
+// terminateChange is the shared body of RejectChange/DeferChange: authorize,
+// validate the transition, write status, record the decision, mirror to GitHub.
+func (s *Service) terminateChange(ctx context.Context, changeID, authorityID, reason, targetStatus, decision, verb string) error {
+	ch, err := s.getChange(ctx, changeID)
+	if err != nil {
+		return err
+	}
+	authority, err := s.getAuthority(ctx, authorityID)
+	if err != nil {
+		return err
+	}
+	if !authorityHasPerm(authority, governance.PermRequestChanges) {
+		return fmt.Errorf("%s refused: authority %q lacks the request_changes permission", verb, authority.Name)
+	}
+	if err := validation.ValidateChangeTransition(ch.Status, targetStatus); err != nil {
+		return err
+	}
+	ch.Status = targetStatus
+	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
+		return fmt.Errorf("%s change %q: %w", verb, changeID, err)
+	}
+	ev := &governance.DecisionEvent{
+		ID:              newID(),
+		ReleaseID:       ch.ReleaseID,
+		ChangeID:        ch.ID,
+		ProposalVersion: ch.ProposalVersion,
+		Actor:           authority.ID,
+		ActorType:       authority.Type,
+		Decision:        decision,
+		Comment:         fmt.Sprintf("%s by %s: %s", verb, authority.Name, reason),
+	}
+	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
+		return fmt.Errorf("record %s for change %q: %w", verb, changeID, err)
+	}
+	s.mirrorGitHubLabel(ctx, ch)
+	return nil
+}
+
+// authorityHasPerm reports whether the authority holds the given permission.
+func authorityHasPerm(a *governance.ReviewAuthority, perm string) bool {
+	for _, p := range a.Permissions {
+		if p == perm {
+			return true
+		}
+	}
+	return false
+}
+
+// RequestRevision moves a plan_ready change back to changes_requested with a
+// human's note. Gated on the request_changes permission. Unlike ReviewPlan it
+// needs no AI completer — the human's comment IS the revision request.
+func (s *Service) RequestRevision(ctx context.Context, changeID, authorityID, comment string) error {
+	ch, err := s.getChange(ctx, changeID)
+	if err != nil {
+		return err
+	}
+	authority, err := s.getAuthority(ctx, authorityID)
+	if err != nil {
+		return err
+	}
+	if !authorityHasPerm(authority, governance.PermRequestChanges) {
+		return fmt.Errorf("revise refused: authority %q lacks the request_changes permission", authority.Name)
+	}
+	if err := validation.ValidateChangeTransition(ch.Status, governance.ChangeStatusChangesRequested); err != nil {
+		return err
+	}
+	ch.Status = governance.ChangeStatusChangesRequested
+	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
+		return fmt.Errorf("request revision on change %q: %w", changeID, err)
+	}
+	ev := &governance.DecisionEvent{
+		ID:              newID(),
+		ReleaseID:       ch.ReleaseID,
+		ChangeID:        ch.ID,
+		ProposalVersion: ch.ProposalVersion,
+		Actor:           authority.ID,
+		ActorType:       authority.Type,
+		Decision:        governance.DecisionChangesRequested,
+		Comment:         fmt.Sprintf("Revision requested by %s: %s", authority.Name, comment),
+	}
+	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
+		return fmt.Errorf("record revision request for change %q: %w", changeID, err)
+	}
+	s.mirrorGitHubLabel(ctx, ch)
+	return nil
+}

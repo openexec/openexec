@@ -127,4 +127,12 @@ CREATE TABLE IF NOT EXISTS communication_artifacts (
 
 CREATE INDEX IF NOT EXISTS idx_communication_artifacts_release_id ON communication_artifacts(release_id);
 CREATE INDEX IF NOT EXISTS idx_communication_artifacts_change_id ON communication_artifacts(change_id);
+
+-- github_ingest_cursor tracks the highest GitHub issue-comment id already
+-- processed for a change, so inbound /openexec command ingestion is idempotent
+-- (a comment is never executed twice across polls).
+CREATE TABLE IF NOT EXISTS github_ingest_cursor (
+	change_id       TEXT PRIMARY KEY,
+	last_comment_id INTEGER NOT NULL DEFAULT 0
+);
 `

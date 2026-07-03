@@ -296,3 +296,38 @@ func ParseCommentCommand(body string) (cmd string, arg string, ok bool) {
 	}
 	return "", "", false
 }
+
+// IssueComment is a single GitHub issue comment, the unit of command ingestion.
+type IssueComment struct {
+	ID        int64
+	Author    string // GitHub login of the comment author
+	Body      string
+	CreatedAt time.Time
+}
+
+// ListIssueComments returns an issue's comments (oldest first) via
+// `gh api repos/<repo>/issues/<number>/comments`. The numeric comment ID is a
+// stable cursor for idempotent ingestion; the author login drives authorization.
+func ListIssueComments(ctx context.Context, runner Runner, repo string, number int) ([]IssueComment, error) {
+	out, err := runner.Run(ctx, "api", fmt.Sprintf("repos/%s/issues/%d/comments", repo, number), "--paginate")
+	if err != nil {
+		return nil, fmt.Errorf("gh api list comments for %s#%d: %w", repo, number, err)
+	}
+	var raw []struct {
+		ID        int64  `json:"id"`
+		Body      string `json:"body"`
+		CreatedAt string `json:"created_at"`
+		User      struct {
+			Login string `json:"login"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("parse issue comments: %w", err)
+	}
+	comments := make([]IssueComment, 0, len(raw))
+	for _, r := range raw {
+		t, _ := time.Parse(time.RFC3339, r.CreatedAt)
+		comments = append(comments, IssueComment{ID: r.ID, Author: r.User.Login, Body: r.Body, CreatedAt: t})
+	}
+	return comments, nil
+}
