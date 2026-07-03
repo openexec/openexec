@@ -32,6 +32,7 @@ import (
 	"github.com/openexec/openexec/internal/governance/ai"
 	"github.com/openexec/openexec/internal/governance/connectors/github"
 	"github.com/openexec/openexec/internal/governance/policy"
+	"github.com/openexec/openexec/internal/release"
 )
 
 // Service sequences every governance workflow operation. It holds injected
@@ -41,7 +42,21 @@ type Service struct {
 	evaluator       *policy.PolicyEvaluator
 	completer       ai.Completer  // optional; nil in a chat-only context
 	runner          github.Runner // optional; nil when gh is unavailable
+	planStore       PlanStore     // optional; nil disables deep triage
 	operatorSession bool          // true only in a human operator session
+}
+
+// PlanStore is the subset of the release manager the deep-triage bridge needs to
+// persist planner-generated goals/stories/tasks. *release.Manager satisfies it.
+// Injecting a narrow interface keeps the service testable and avoids the release
+// layer depending on governance.
+type PlanStore interface {
+	GetGoal(id string) *release.Goal
+	GetStory(id string) *release.Story
+	GetTask(id string) *release.Task
+	CreateGoal(*release.Goal) error
+	CreateStory(*release.Story) error
+	CreateTask(*release.Task) error
 }
 
 // Options carries the optional dependencies for NewService. A nil Completer or
@@ -51,6 +66,9 @@ type Options struct {
 	Completer ai.Completer
 	Runner    github.Runner
 	Policy    *policy.Policy
+	// PlanStore persists planner-generated stories/tasks for deep triage. Nil
+	// disables TriageDeep (the operation returns a clear error).
+	PlanStore PlanStore
 	// OperatorSession marks this Service as running under a human operator
 	// (e.g. OPENEXEC_OPERATOR_SESSION=1). Approval operations (ApproveChange,
 	// ApproveRelease) refuse when it is false, so an unattended agent session —
@@ -71,6 +89,7 @@ func NewService(store governance.Store, opts Options) *Service {
 		evaluator:       policy.NewEvaluator(p),
 		completer:       opts.Completer,
 		runner:          opts.Runner,
+		planStore:       opts.PlanStore,
 		operatorSession: opts.OperatorSession,
 	}
 }
@@ -84,6 +103,7 @@ var errNotOperator = errors.New("governance/service: approval requires a human o
 var (
 	errMissingCompleter = errors.New("governance/service: AI completer not configured (this operation needs an AI provider)")
 	errMissingRunner    = errors.New("governance/service: GitHub runner not configured (this operation needs the gh CLI)")
+	errMissingPlanStore = errors.New("governance/service: plan store not configured (deep triage needs the release store)")
 )
 
 // newID returns a fresh identifier for store records the service creates

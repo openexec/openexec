@@ -79,6 +79,10 @@ type Store interface {
 	GetIngestCursor(ctx context.Context, changeID string) (int64, error)
 	SetIngestCursor(ctx context.Context, changeID string, lastCommentID int64) error
 
+	// Change -> planner-story links (deep-triage decomposition).
+	LinkChangeStory(ctx context.Context, changeID, storyID string) error
+	ListChangeStories(ctx context.Context, changeID string) ([]string, error)
+
 	Close() error
 }
 
@@ -1031,4 +1035,43 @@ func (s *SQLiteStore) SetIngestCursor(ctx context.Context, changeID string, last
 		return fmt.Errorf("set ingest cursor for %q: %w", changeID, err)
 	}
 	return nil
+}
+
+// LinkChangeStory records that a planner-generated story decomposes a change's
+// intent. Idempotent on (change_id, story_id).
+func (s *SQLiteStore) LinkChangeStory(ctx context.Context, changeID, storyID string) error {
+	if changeID == "" || storyID == "" {
+		return ErrInvalidData
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO change_story_links (change_id, story_id) VALUES (?, ?)
+		 ON CONFLICT(change_id, story_id) DO NOTHING`,
+		changeID, storyID)
+	if err != nil {
+		return fmt.Errorf("link change %q to story %q: %w", changeID, storyID, err)
+	}
+	return nil
+}
+
+// ListChangeStories returns the story ids linked to a change, oldest first.
+func (s *SQLiteStore) ListChangeStories(ctx context.Context, changeID string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT story_id FROM change_story_links WHERE change_id = ? ORDER BY created_at ASC, story_id ASC`, changeID)
+	if err != nil {
+		return nil, fmt.Errorf("list stories for change %q: %w", changeID, err)
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }

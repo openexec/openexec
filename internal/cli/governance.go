@@ -14,10 +14,10 @@ package cli
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,8 +30,22 @@ import (
 	"github.com/openexec/openexec/internal/governance/policy"
 	"github.com/openexec/openexec/internal/governance/service"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/release"
 	"github.com/spf13/cobra"
 )
+
+// multiCloser closes several resources, returning the first error.
+type multiCloser []io.Closer
+
+func (m multiCloser) Close() error {
+	var err error
+	for _, c := range m {
+		if e := c.Close(); e != nil && err == nil {
+			err = e
+		}
+	}
+	return err
+}
 
 var governanceCmd = &cobra.Command{
 	Use:     "governance",
@@ -76,7 +90,7 @@ func govBaseDir(cmd *cobra.Command) (string, error) {
 // the real gh runner, and a best-effort AI completer. The caller MUST close the
 // returned *sql.DB. The store is returned too for read-only display commands
 // (status), which read records directly rather than re-implementing logic.
-func newGovService(cmd *cobra.Command) (*service.Service, governance.Store, *sql.DB, error) {
+func newGovService(cmd *cobra.Command) (*service.Service, governance.Store, io.Closer, error) {
 	baseDir, err := govBaseDir(cmd)
 	if err != nil {
 		return nil, nil, nil, err
@@ -90,13 +104,24 @@ func newGovService(cmd *cobra.Command) (*service.Service, governance.Store, *sql
 		db.Close()
 		return nil, nil, nil, fmt.Errorf("load policy: %w", err)
 	}
+	// PlanStore for deep triage: a git-disabled release manager persists the
+	// planner-generated stories/tasks into the same .openexec/openexec.db. A
+	// failure here is non-fatal — deep triage returns a clear error, other
+	// commands are unaffected.
+	var planStore service.PlanStore
+	closers := []io.Closer{db}
+	if relMgr, rErr := release.NewManager(baseDir, nil); rErr == nil {
+		planStore = relMgr
+		closers = append([]io.Closer{relMgr}, closers...) // close release mgr before governance db
+	}
 	svc := service.NewService(store, service.Options{
 		Policy:          pol,
 		Runner:          &github.ExecRunner{},
 		Completer:       buildGovCompleter(baseDir),
+		PlanStore:       planStore,
 		OperatorSession: os.Getenv("OPENEXEC_OPERATOR_SESSION") == "1",
 	})
-	return svc, store, db, nil
+	return svc, store, multiCloser(closers), nil
 }
 
 // buildGovCompleter constructs an ai.Completer from the project's active API

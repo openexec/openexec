@@ -6,6 +6,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -82,6 +83,21 @@ var govWorkTriageCmd = &cobra.Command{
 		repoContext, _ := cmd.Flags().GetString("context")
 		actor, _ := cmd.Flags().GetString("actor")
 
+		// Deep triage: run the real planner to decompose intent into stories +
+		// vertical-slice tasks (owned by this change), instead of a flat plan.
+		if deep, _ := cmd.Flags().GetBool("deep"); deep {
+			res, err := svc.TriageDeep(cmd.Context(), args[0], repoContext, actor)
+			if err != nil {
+				return err
+			}
+			if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+				return printJSON(cmd, res)
+			}
+			cmd.Printf("Deep-triaged change %s into %d stor(ies): %s\n", args[0], len(res.StoryIDs), strings.Join(res.StoryIDs, ", "))
+			cmd.Printf("Review the decomposition: openexec governance work stories %s\n", args[0])
+			return nil
+		}
+
 		out, err := svc.Triage(cmd.Context(), args[0], repoContext, actor)
 		if err != nil {
 			return err
@@ -102,6 +118,39 @@ var govWorkTriageCmd = &cobra.Command{
 			cmd.Println("  Verification plan:")
 			for _, v := range out.VerificationPlan {
 				cmd.Printf("    - %s\n", v)
+			}
+		}
+		return nil
+	},
+}
+
+var govWorkStoriesCmd = &cobra.Command{
+	Use:   "stories <change-id>",
+	Short: "Show the stories/tasks a change was decomposed into (deep triage)",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		stories, err := svc.ChangeStories(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if jsonOut, _ := cmd.Flags().GetBool("json"); jsonOut {
+			return printJSON(cmd, stories)
+		}
+		if len(stories) == 0 {
+			cmd.Printf("Change %s has no linked stories (run: work triage %s --deep)\n", args[0], args[0])
+			return nil
+		}
+		cmd.Printf("Change %s decomposes into %d stor(ies):\n", args[0], len(stories))
+		for _, st := range stories {
+			cmd.Printf("  - %s [%s] %s\n", st.ID, st.Status, st.Title)
+			for _, taskID := range st.Tasks {
+				cmd.Printf("      task %s\n", taskID)
 			}
 		}
 		return nil
@@ -420,7 +469,12 @@ func init() {
 	governanceWorkCmd.AddCommand(govWorkTriageCmd)
 	govWorkTriageCmd.Flags().String("context", "", "Repo context to give the planner")
 	govWorkTriageCmd.Flags().String("actor", "planner_ai", "Actor recorded as the proposer")
+	govWorkTriageCmd.Flags().Bool("deep", false, "Decompose intent into real stories + tasks via the planner (owned by this change)")
 	govWorkTriageCmd.Flags().Bool("json", false, "Output as JSON")
+
+	// work stories
+	governanceWorkCmd.AddCommand(govWorkStoriesCmd)
+	govWorkStoriesCmd.Flags().Bool("json", false, "Output as JSON")
 
 	// work review-plan
 	governanceWorkCmd.AddCommand(govWorkReviewPlanCmd)

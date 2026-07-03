@@ -135,4 +135,16 @@ CREATE TABLE IF NOT EXISTS github_ingest_cursor (
 	change_id       TEXT PRIMARY KEY,
 	last_comment_id INTEGER NOT NULL DEFAULT 0
 );
+
+-- change_story_links associates a change record with the planner-generated
+-- release stories that decompose its intent (the deep-triage bridge). A change
+-- OWNS its stories; the story/task rows themselves live in the release tables
+-- in the same database.
+CREATE TABLE IF NOT EXISTS change_story_links (
+	change_id  TEXT NOT NULL,
+	story_id   TEXT NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (change_id, story_id)
+);
+CREATE INDEX IF NOT EXISTS idx_change_story_links_change_id ON change_story_links(change_id);
 `
