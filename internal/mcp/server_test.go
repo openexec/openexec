@@ -101,10 +101,11 @@ func TestToolsList(t *testing.T) {
 
 	result, _ := resps[0].Result.(map[string]interface{})
 	tools, _ := result["tools"].([]interface{})
-	// In danger-full-access mode (set in TestMain), we expect 15 tools:
-	// 5 core + 7 backlog/memory + skill_propose + write_file + run_shell_command
-	if len(tools) != 15 {
-		t.Fatalf("expected 15 tools in danger-full-access mode, got %d", len(tools))
+	// In danger-full-access mode (set in TestMain), we expect 25 tools:
+	// 5 core + 7 backlog/memory + skill_propose + 10 governance + write_file +
+	// run_shell_command
+	if len(tools) != 25 {
+		t.Fatalf("expected 25 tools in danger-full-access mode, got %d", len(tools))
 	}
 
 	// Index-independent lookup: adding tools must not break these assertions.

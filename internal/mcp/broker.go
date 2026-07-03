@@ -114,6 +114,19 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 		// human approves it — proposing carries no execution-time risk.
 		return true, ""
 
+	case "openexec_list_releases", "openexec_list_approved_work", "openexec_get_work_brief",
+		"openexec_claim_work", "openexec_record_plan", "openexec_request_revision",
+		"openexec_record_pr", "openexec_record_test_evidence", "openexec_generate_handoff",
+		"openexec_request_done":
+		// Release-governance executor-handoff tools (governance.go): allowed in
+		// every mode, exactly like the backlog_* writes above. They mutate
+		// orchestrator bookkeeping (the .openexec governance database) — claims,
+		// plan/evidence/PR records, decision events — not workspace files. This
+		// is the SAME documented light-mode exception. Note: human approval is
+		// NOT in this set — sign-off stays behind approval_decide in an operator
+		// session, so an agent session can record work but never self-approve it.
+		return true, ""
+
 	case "git_apply_patch":
 		if b.mode == ModeSuggest {
 			// In suggest mode, only allow dry-run (check_only=true)
@@ -188,6 +201,18 @@ func isControlPlaneTool(toolName string) bool {
 		"backlog_add_task":       true,
 		"memory_read":            true,
 		"skill_propose":          true,
+		// Release-governance tools manage orchestrator state, not workspace
+		// files, so toolset filtering never blocks them (see governance.go).
+		"openexec_list_releases":        true,
+		"openexec_list_approved_work":   true,
+		"openexec_get_work_brief":       true,
+		"openexec_claim_work":           true,
+		"openexec_record_plan":          true,
+		"openexec_request_revision":     true,
+		"openexec_record_pr":            true,
+		"openexec_record_test_evidence": true,
+		"openexec_generate_handoff":     true,
+		"openexec_request_done":         true,
 	}
 	return controlPlaneTools[toolName]
 }

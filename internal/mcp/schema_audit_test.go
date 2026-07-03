@@ -44,6 +44,17 @@ func allToolDefs() []map[string]interface{} {
 		TerraformApplyToolDef(auditInfraRegistry()),
 		ApprovalListToolDef(),
 		ApprovalDecideToolDef(),
+		// Release-governance executor-handoff tools (governance.go).
+		ListReleasesToolDef(),
+		ListApprovedWorkToolDef(),
+		GetWorkBriefToolDef(),
+		ClaimWorkToolDef(),
+		RecordPlanToolDef(),
+		RequestRevisionToolDef(),
+		RecordPRToolDef(),
+		RecordTestEvidenceToolDef(),
+		GenerateHandoffToolDef(),
+		RequestDoneToolDef(),
 	}
 }
 
@@ -188,6 +199,17 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{TerraformPlanToolDef(auditInfraRegistry()), TerraformPlanRequest{}},
 		{TerraformApplyToolDef(auditInfraRegistry()), TerraformApplyRequest{}},
 		{ApprovalDecideToolDef(), ApprovalDecideRequest{}},
+		// Release-governance executor-handoff tools (governance.go).
+		{ListReleasesToolDef(), ListReleasesRequest{}},
+		{ListApprovedWorkToolDef(), ListApprovedWorkRequest{}},
+		{GetWorkBriefToolDef(), GetWorkBriefRequest{}},
+		{ClaimWorkToolDef(), ClaimWorkRequest{}},
+		{RecordPlanToolDef(), RecordPlanRequest{}},
+		{RequestRevisionToolDef(), RequestRevisionRequest{}},
+		{RecordPRToolDef(), RecordPRRequest{}},
+		{RecordTestEvidenceToolDef(), RecordTestEvidenceRequest{}},
+		{GenerateHandoffToolDef(), GenerateHandoffRequest{}},
+		{RequestDoneToolDef(), RequestDoneRequest{}},
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}
