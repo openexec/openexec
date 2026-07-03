@@ -52,10 +52,6 @@ func Triage(ctx context.Context, completer Completer, store governance.Store, ch
 	ch.ApprovedVersion = 0
 	ch.Status = governance.ChangeStatusPlanReady
 
-	if err := store.UpdateChangeRecord(ctx, ch); err != nil {
-		return nil, fmt.Errorf("governance/ai: persist triaged change: %w", err)
-	}
-
 	ev := &governance.DecisionEvent{
 		ID:              uuid.New().String(),
 		ReleaseID:       ch.ReleaseID,
@@ -66,8 +62,9 @@ func Triage(ctx context.Context, completer Completer, store governance.Store, ch
 		Decision:        governance.DecisionProposed,
 		Comment:         out.Summary,
 	}
-	if err := store.CreateDecisionEvent(ctx, ev); err != nil {
-		return nil, fmt.Errorf("governance/ai: record proposed decision: %w", err)
+	// State change + its event in one transaction, matching deep triage/quickplan.
+	if err := store.TransitionChange(ctx, ch, ev); err != nil {
+		return nil, fmt.Errorf("governance/ai: persist triaged change: %w", err)
 	}
 
 	return out, nil
