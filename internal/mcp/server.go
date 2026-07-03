@@ -20,6 +20,7 @@ import (
 
 	"github.com/openexec/openexec/internal/approval"
 	"github.com/openexec/openexec/internal/infracontract"
+	"github.com/openexec/openexec/internal/mcptool"
 	"github.com/openexec/openexec/internal/mode"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/toolset"
@@ -93,6 +94,11 @@ type Server struct {
 	// memoryLoader loads the merged project memory for the memory_read tool.
 	// Injected by the composition root so mcp does not import internal/memory.
 	memoryLoader func(workspaceRoot string) (string, error)
+
+	// providerTools holds MCP tools contributed by MODULE providers (registered
+	// by the composition root), keyed by tool name. This is how a separable
+	// module like governance ships its tools without core importing it.
+	providerTools map[string]mcptool.Tool
 
 	// Operator-session approval tools (see approvals.go). operatorSession
 	// is read once from OPENEXEC_OPERATOR_SESSION at construction — agent
@@ -341,6 +347,9 @@ func (s *Server) handleToolsList(req Request) {
 		)
 	}
 
+	// Module-provided tools (registered providers, e.g. governance when enabled).
+	tools = append(tools, s.providerToolDefs()...)
+
 	// Include toolset info in response for clients that support it
 	result := map[string]interface{}{
 		"tools": tools,
@@ -486,6 +495,13 @@ func (s *Server) handleToolsCall(req Request) {
 	}
 	_, span := telemetry.StartToolSpan(ctx, s.runID, params.Name, argsMap)
 	defer span.End()
+
+	// Module-provided tools (registered by the composition root) — a separable
+	// module like governance ships its tools this way, so core does not import it.
+	if s.dispatchProvider(req, params) {
+		telemetry.RecordToolSuccess(span, "")
+		return
+	}
 
 	// Execute the tool
 	switch params.Name {
