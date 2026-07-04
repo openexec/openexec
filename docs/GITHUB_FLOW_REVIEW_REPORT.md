@@ -22,7 +22,9 @@ Human labels a GitHub issue "AI Fix" (+ optional clarifying comments)
   → deep triage into vertical-slice stories/tasks
   → AI plan review (separation of duties)
        → if the plan has genuine unknowns: post questions on the issue, PARK
-  → approve (low-risk auto-approves; medium/high need a human)
+  → approve (an OPERATOR-AUTHENTICATED autopilot auto-approves low-risk;
+    medium/high need an explicit human /openexec approve — approval always
+    requires an operator session, so labelling alone never approves)
   → execute the tasks (AI agent writes code)
   → commit + open a PR
   → human reviews / merges the PR (never auto-merged)
@@ -143,9 +145,11 @@ single-task execution mode).
 2. **Commit ownership (P2):** deterministic post-run commit vs a pipeline commit
    stage vs enforcing the agent to commit. Also: what git identity should
    autonomous commits use? (We used `openexec@local` as a placeholder.)
-3. **Approval policy:** we auto-approve only `risk_profile: low`; medium/high
-   stay human. Is risk-tier the right axis, given the human already authorised by
-   labelling and still gates at merge?
+3. **Approval policy:** an operator-authenticated autopilot auto-approves only
+   `risk_profile: low` (the shelled `work approve` requires an operator session —
+   labelling alone never approves); medium/high stay human. Is risk-tier the
+   right axis, given the operator opted in by running the autopilot and a human
+   still gates at merge?
 4. **AI review non-determinism:** the reviewer sometimes approves, sometimes
    requests changes on similar inputs. Acceptable variance, or does the reviewer
    prompt need tightening/temperature control?
@@ -168,3 +172,29 @@ agent-commit, a relative-path fork, no PR-creation, and a state-machine mismatch
 remaining judgement calls (P1/P2 architecture, daemon lifecycle, approval policy)
 are where an external opinion would be most valuable before this runs unattended
 across many repositories.
+
+---
+
+## 6. External review — findings addressed (2026-07-04)
+
+An external reviewer raised four findings; all four are resolved:
+
+1. **High — failed runs could still produce a PR.** `waitRunTerminal` treated
+   `failed`/`error`/`paused` as proceed-able terminal states and the code
+   committed regardless. **Fixed:** only `complete`/`completed` proceeds; any
+   other terminal status aborts the change **before** commit/PR. (Follow-up:
+   record a structured failure event + block the change from immediate re-pickup —
+   today a failed change stays approved and may retry next tick; the critical
+   "no PR from a broken run" is fixed.)
+2. **Medium — "labeling authorizes implementation" was inaccurate.** The autopilot
+   shells `work approve`, which requires an operator session (`ApproveChange` →
+   `errNotOperator`). **Fixed (doc/comment):** it is an *operator-authenticated
+   autopilot auto-approving low-risk*; labelling alone never approves.
+3. **Medium — clarification comment gave the wrong recovery path.** It said "reply
+   here" / `/openexec revise`; only `/openexec answer <text>` is ingested (a plain
+   reply is ignored). **Fixed:** the posted comment now explicitly instructs
+   `/openexec answer <your decisions>`.
+4. **Medium/strategic — "single-slot" only meant one *executing* change.** Open AI
+   PRs did not count. **Fixed:** added `--max-open-prs` (default 3) — the tick
+   pauses new work when that many `pr_open` AI changes exist, so an unattended
+   cron cannot pile up unreviewed PRs.

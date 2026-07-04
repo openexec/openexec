@@ -27,7 +27,7 @@ func TestRenderClarificationComment(t *testing.T) {
 		"Approved TikTok/Instagram profile URLs",
 		"A render test asserting the footer links",
 		"Require human approval",
-		"/openexec revise",
+		"/openexec answer",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("clarification comment missing %q\n---\n%s", want, body)

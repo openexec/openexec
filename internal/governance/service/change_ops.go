@@ -181,7 +181,9 @@ func renderClarificationComment(ch *governance.ChangeRecord, out *ai.ReviewerOut
 	if out.RecommendedPolicy != "" {
 		fmt.Fprintf(&b, "\n**Recommended policy:** %s\n", out.RecommendedPolicy)
 	}
-	b.WriteString("\n_Reply here with the decisions, then re-run the review — or comment_ `/openexec revise` _once the plan is updated._")
+	b.WriteString("\n---\n**To respond, comment** `/openexec answer <your decisions>` — e.g. `/openexec answer Use a placeholder privacy policy for the demo; keep the Facebook link`. " +
+		"A plain reply is **not** read. OpenExec records your answer, folds it into the plan, and re-reviews. " +
+		"(To reject the change instead: `/openexec reject <reason>`.)")
 	return b.String()
 }
 

@@ -66,6 +66,11 @@ func autopilotExecuteToPR(cmd *cobra.Command, self, baseDir, changeID string, sv
 		if err != nil {
 			return fmt.Errorf("run %s: %w", tid, err)
 		}
+		// Only a successful run may proceed to commit+PR. A failed/errored/paused
+		// task aborts the whole change — we must never open a PR from a broken run.
+		if st != "complete" && st != "completed" {
+			return fmt.Errorf("task %s did not complete (status %q); aborting %s without commit or PR", tid, st, changeID)
+		}
 		cmd.Printf("[autopilot]   %s → %s\n", tid, st)
 	}
 
@@ -93,6 +98,21 @@ func autopilotExecuteToPR(cmd *cobra.Command, self, baseDir, changeID string, sv
 	}
 	cmd.Print(pout)
 	return nil
+}
+
+// countChangesInStatus counts a project's change records currently in a status.
+func countChangesInStatus(ctx context.Context, store governance.Store, project, status string) (int, error) {
+	all, err := store.ListChangeRecords(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, ch := range all {
+		if (project == "" || ch.ProjectID == project) && ch.Status == status {
+			n++
+		}
+	}
+	return n, nil
 }
 
 func daemonHealthy(port int) bool {
@@ -185,6 +205,7 @@ var govAutopilotCmd = &cobra.Command{
 		autoApproveLow, _ := cmd.Flags().GetBool("auto-approve-low-risk")
 		autoExecute, _ := cmd.Flags().GetBool("auto-execute")
 		maxSteps, _ := cmd.Flags().GetInt("max-steps")
+		maxOpenPRs, _ := cmd.Flags().GetInt("max-open-prs")
 		if project == "" || repo == "" {
 			return fmt.Errorf("--project and --repo are required")
 		}
@@ -201,6 +222,20 @@ var govAutopilotCmd = &cobra.Command{
 			"governance", "github", "sync", "--project", project, "--repo", repo,
 			"--label", label, "--no-triage", "--project-dir", baseDir); serr != nil {
 			return fmt.Errorf("sync failed: %w — %s", serr, out)
+		}
+
+		// Back-pressure: NextActionable's single slot only blocks on an *executing*
+		// change, not on already-open AI PRs. Cap the number of open (pr_open) AI
+		// changes so an unattended cron cannot pile up unreviewed PRs. 0 disables.
+		if maxOpenPRs > 0 {
+			openPRs, cerr := countChangesInStatus(cmd.Context(), store, project, governance.ChangeStatusPROpen)
+			if cerr != nil {
+				return cerr
+			}
+			if openPRs >= maxOpenPRs {
+				cmd.Printf("[autopilot] %d open AI PR(s) >= --max-open-prs %d; pausing new work until some are reviewed.\n", openPRs, maxOpenPRs)
+				return nil
+			}
 		}
 
 		// 2. Drive the next actionable change, one step at a time, until it parks,
@@ -240,10 +275,13 @@ var govAutopilotCmd = &cobra.Command{
 					cmd.Printf("[autopilot] %s parked — clarification posted to the issue; awaiting your answer.\n", ch.ID)
 					return nil
 				}
-				// plan_ready. Labeling the issue is the authorization to IMPLEMENT
-				// (the human still approves at the PR/merge, not here), so auto-
-				// approve within the risk ceiling; higher-risk plans park for a
-				// human `/openexec approve`.
+				// plan_ready. Auto-approve within the risk ceiling. Note: this is
+				// an OPERATOR-AUTHENTICATED autopilot approving low-risk work — the
+				// shelled `work approve` requires an operator session
+				// (ApproveChange -> errNotOperator otherwise), so the autopilot must
+				// run as an operator. It is NOT "the label authorizes anything by
+				// itself"; the human still gates at PR/merge. Higher-risk plans park
+				// for an explicit human `/openexec approve`.
 				if autoApproveLow && ch2.Risk == governance.RiskLow {
 					if out, ae := runSelf(cmd.Context(), self, baseDir,
 						"governance", "work", "approve", ch.ID, "--by", "pm", "--project-dir", baseDir); ae != nil {
@@ -292,4 +330,5 @@ func init() {
 	govAutopilotCmd.Flags().Bool("auto-approve-low-risk", false, "Auto-approve low-risk plans in-loop (labeling is the authorization; you still approve at the PR)")
 	govAutopilotCmd.Flags().Bool("auto-execute", false, "Allow the tick to run execution on an approved change (default: park for a human)")
 	govAutopilotCmd.Flags().Int("max-steps", 6, "Max steps to advance in one tick")
+	govAutopilotCmd.Flags().Int("max-open-prs", 3, "Pause new work when this many AI PRs are already open (0 = no limit)")
 }
