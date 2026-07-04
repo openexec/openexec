@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/openexec/openexec/internal/cli"
+	"github.com/openexec/openexec/pkg/openexec"
 )
 
 func main() {
-	cli.Execute()
+	openexec.Main()
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/openexec/openexec/internal/mcptool"
+	"github.com/openexec/openexec/pkg/mcptool"
 )
 
 // fakeProvider is a minimal mcptool.Provider for collision tests.

@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/openexec/openexec/internal/config"
+	"github.com/openexec/openexec/pkg/plugin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,6 +42,13 @@ managing projects, kicking off intents, and verifying system statuses.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Attach CLI commands contributed by modules (pkg/plugin). A module in its
+	// own build registers via plugin.RegisterCommand from an init(); the
+	// open-source core registers none.
+	for _, c := range plugin.Commands() {
+		rootCmd.AddCommand(c)
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 

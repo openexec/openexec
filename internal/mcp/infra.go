@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openexec/openexec/internal/infracontract"
+	"github.com/openexec/openexec/pkg/infracontract"
 )
 
 // infraConfigFileName is the operator allowlist path, surfaced in "not enabled"
