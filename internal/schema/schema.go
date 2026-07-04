@@ -54,11 +54,11 @@ func (s *StepResult) Validate() error {
 
 // ToolCallRequest is the schema for requesting a tool execution.
 type ToolCallRequest struct {
-	Tool       string                 `json:"tool"`                  // tool name
-	Input      map[string]interface{} `json:"input"`                 // tool parameters
-	Idempotent bool                   `json:"idempotent,omitempty"`  // safe to retry
-	Priority   string                 `json:"priority,omitempty"`    // low, normal, high
-	Timeout    int                    `json:"timeout_ms,omitempty"`  // max execution time
+	Tool       string                 `json:"tool"`                 // tool name
+	Input      map[string]interface{} `json:"input"`                // tool parameters
+	Idempotent bool                   `json:"idempotent,omitempty"` // safe to retry
+	Priority   string                 `json:"priority,omitempty"`   // low, normal, high
+	Timeout    int                    `json:"timeout_ms,omitempty"` // max execution time
 }
 
 // Validate checks the ToolCallRequest against schema constraints.

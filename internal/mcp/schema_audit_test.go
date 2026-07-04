@@ -44,6 +44,7 @@ func allToolDefs() []map[string]interface{} {
 		TerraformApplyToolDef(auditInfraRegistry()),
 		ApprovalListToolDef(),
 		ApprovalDecideToolDef(),
+		// Module tools are audited by their own module package.
 	}
 }
 
@@ -188,6 +189,7 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{TerraformPlanToolDef(auditInfraRegistry()), TerraformPlanRequest{}},
 		{TerraformApplyToolDef(auditInfraRegistry()), TerraformApplyRequest{}},
 		{ApprovalDecideToolDef(), ApprovalDecideRequest{}},
+		// Module tools are audited by their own module's schema test.
 		// openexec_signal / openexec_action / backlog list are handled via
 		// dynamic maps or inline structs; covered by TestToolDefsAreDocumented.
 	}

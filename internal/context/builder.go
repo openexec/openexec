@@ -442,7 +442,7 @@ func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderO
 			atomic.AddUint64(&cacheHits, 1)
 			return cached.(*BuilderResult), nil
 		}
-		
+
 		// Try disk cache
 		if result, err := loadContextPack(projectPath, cacheKey); err == nil {
 			atomic.AddUint64(&cacheHits, 1)
@@ -492,7 +492,7 @@ func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderO
 		result.Timestamp = time.Now()
 		if cacheKey != "" {
 			globalContextCache.Store(cacheKey, result)
-			
+
 			// V5: Persist to artifact store for cross-process reuse
 			persistContextPack(projectPath, cacheKey, result)
 		}
@@ -503,12 +503,12 @@ func BuildContext(ctx context.Context, projectPath string, opts *ContextBuilderO
 func persistContextPack(projectPath, key string, result *BuilderResult) {
 	dir := filepath.Join(projectPath, ".openexec", "artifacts", "context")
 	_ = os.MkdirAll(dir, 0750)
-	
+
 	// Create content-addressed hash of the key
 	h := sha256.Sum256([]byte(key))
 	hashStr := hex.EncodeToString(h[:])
-	
-	path := filepath.Join(dir, "context_" + hashStr + ".json")
+
+	path := filepath.Join(dir, "context_"+hashStr+".json")
 	data, _ := json.Marshal(result)
 	_ = os.WriteFile(path, data, 0644)
 }
@@ -516,13 +516,13 @@ func persistContextPack(projectPath, key string, result *BuilderResult) {
 func loadContextPack(projectPath, key string) (*BuilderResult, error) {
 	h := sha256.Sum256([]byte(key))
 	hashStr := hex.EncodeToString(h[:])
-	path := filepath.Join(projectPath, ".openexec", "artifacts", "context", "context_" + hashStr + ".json")
-	
+	path := filepath.Join(projectPath, ".openexec", "artifacts", "context", "context_"+hashStr+".json")
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var result BuilderResult
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, err
@@ -694,9 +694,9 @@ type DeterministicContext struct {
 
 // RoutingAwareBuilder builds context using a routing plan.
 type RoutingAwareBuilder struct {
-	builder     *ContextBuilder
-	projectPath string
-	maxTokens   int
+	builder      *ContextBuilder
+	projectPath  string
+	maxTokens    int
 	sensitiveKws []string
 }
 

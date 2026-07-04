@@ -93,10 +93,10 @@ func TestBuildAPIToolDefinitionsFor_MultipleTools(t *testing.T) {
 // yet implemented; the filter must degrade gracefully rather than error.
 func TestBuildAPIToolDefinitionsFor_UnknownNamesSkipped(t *testing.T) {
 	requested := []string{
-		"read_file",       // known
-		"glob",            // unknown (declared in toolset.repo_readonly)
-		"grep",            // unknown
-		"git_status",      // unknown
+		"read_file",         // known
+		"glob",              // unknown (declared in toolset.repo_readonly)
+		"grep",              // unknown
+		"git_status",        // unknown
 		"run_shell_command", // known
 	}
 	tools := BuildAPIToolDefinitionsFor(requested)

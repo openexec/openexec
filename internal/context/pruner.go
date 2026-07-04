@@ -15,7 +15,6 @@ import (
 	"unicode"
 
 	"github.com/openexec/openexec/internal/knowledge"
-	"github.com/openexec/openexec/internal/memory"
 	_ "modernc.org/sqlite"
 
 	"github.com/openexec/openexec/pkg/db/sqlitecfg"
@@ -24,7 +23,6 @@ import (
 // Pruner intelligently selects relevant files to minimize token usage.
 type Pruner struct {
 	knowledgeStore *knowledge.Store
-	memoryManager  *memory.MemoryManager
 	db             *sql.DB
 	config         *PrunerConfig
 }
@@ -103,7 +101,7 @@ type PruneResult struct {
 }
 
 // NewPruner creates a new context pruner.
-func NewPruner(projectDir string, knowledgeStore *knowledge.Store, memoryManager *memory.MemoryManager, config *PrunerConfig) (*Pruner, error) {
+func NewPruner(projectDir string, knowledgeStore *knowledge.Store, config *PrunerConfig) (*Pruner, error) {
 	if config == nil {
 		config = DefaultPrunerConfig()
 	}
@@ -116,7 +114,6 @@ func NewPruner(projectDir string, knowledgeStore *knowledge.Store, memoryManager
 
 	pruner := &Pruner{
 		knowledgeStore: knowledgeStore,
-		memoryManager:  memoryManager,
 		db:             db,
 		config:         config,
 	}
@@ -352,29 +349,11 @@ func (p *Pruner) scorePath(file FileInfo, query string, queryTerms []string) flo
 	return score
 }
 
-// scoreRecency scores based on recent access.
+// scoreRecency scored files by recent access via the memory subsystem, but the
+// Pruner was never constructed with a memory manager on any real path, so this
+// always returned 0. Kept as a no-op to preserve the scoring interface without
+// the dead core->module coupling.
 func (p *Pruner) scoreRecency(file FileInfo) float64 {
-	if p.memoryManager == nil {
-		return 0
-	}
-
-	// Check if file is in recent memory
-	entries, err := p.memoryManager.Search(file.Path)
-	if err != nil || len(entries) == 0 {
-		return 0
-	}
-
-	// Score based on how recently accessed
-	for _, entry := range entries {
-		if time.Since(entry.ExtractedAt) < 1*time.Hour {
-			return 10.0
-		} else if time.Since(entry.ExtractedAt) < 24*time.Hour {
-			return 5.0
-		} else if time.Since(entry.ExtractedAt) < 7*24*time.Hour {
-			return 2.0
-		}
-	}
-
 	return 0
 }
 

@@ -1,20 +1,20 @@
 package cli
 
 import (
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
-    "time"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-    "github.com/chzyer/readline"
-    "github.com/fatih/color"
-    "github.com/openexec/openexec/internal/project"
-    "github.com/openexec/openexec/internal/release"
-    "github.com/spf13/cobra"
+	"github.com/chzyer/readline"
+	"github.com/fatih/color"
+	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/internal/release"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -161,8 +161,8 @@ func runChatREPL(cmd *cobra.Command, projectName string) error {
 	}
 	fmt.Printf("   ℹ️ Session: %s\n\n", sessionID)
 
-    for {
-        line, err := l.Readline()
+	for {
+		line, err := l.Readline()
 		if err == readline.ErrInterrupt {
 			if len(line) == 0 {
 				break
@@ -181,38 +181,38 @@ func runChatREPL(cmd *cobra.Command, projectName string) error {
 			break
 		}
 
-        // Conversational V5: Create a run for the message
-        // When chat escalates to task execution, use task mode
-        chatMode := os.Getenv("OPENEXEC_MODE")
-        if chatMode == "" {
-            chatMode = "task" // Default to task mode for chat-initiated runs
-        }
-        runReq := map[string]any{
-            "session_id":     sessionID,
-            "quickfix_title": line,
-            "mode":           chatMode,
-        }
-        body, _ := json.Marshal(runReq)
-        resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs", startPort), "application/json", strings.NewReader(string(body)))
-        if err != nil {
-            fmt.Printf("Error: %v\n", err)
-            continue
-        }
-        
-        var runResp struct {
-            RunID string `json:"run_id"`
-        }
-        _ = json.NewDecoder(resp.Body).Decode(&runResp)
-        resp.Body.Close()
+		// Conversational V5: Create a run for the message
+		// When chat escalates to task execution, use task mode
+		chatMode := os.Getenv("OPENEXEC_MODE")
+		if chatMode == "" {
+			chatMode = "task" // Default to task mode for chat-initiated runs
+		}
+		runReq := map[string]any{
+			"session_id":     sessionID,
+			"quickfix_title": line,
+			"mode":           chatMode,
+		}
+		body, _ := json.Marshal(runReq)
+		resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs", startPort), "application/json", strings.NewReader(string(body)))
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			continue
+		}
 
-        // Start the run
-        http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", startPort, runResp.RunID), "application/json", nil)
+		var runResp struct {
+			RunID string `json:"run_id"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&runResp)
+		resp.Body.Close()
 
-        // Monitor the run
-        fmt.Print(color.GreenString("Agent: "))
-        _ = waitForLoop(cmd, runResp.RunID, "[Chat]", 5*time.Minute, false)
-        fmt.Println()
-    }
+		// Start the run
+		http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", startPort, runResp.RunID), "application/json", nil)
+
+		// Monitor the run
+		fmt.Print(color.GreenString("Agent: "))
+		_ = waitForLoop(cmd, runResp.RunID, "[Chat]", 5*time.Minute, false)
+		fmt.Println()
+	}
 
 	return nil
 }

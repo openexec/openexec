@@ -783,6 +783,25 @@ func (m *Manager) DeleteTask(taskID string) error {
 	return m.saveUnlocked()
 }
 
+// DeleteStory removes a story and all of its tasks from the backlog. It is
+// idempotent (a missing story is a no-op). Re-triage uses it to
+// supersede a change's prior decomposition instead of accumulating stale
+// stories alongside the new plan.
+func (m *Manager) DeleteStory(storyID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	story, ok := m.stories[storyID]
+	if !ok {
+		return nil
+	}
+	for _, taskID := range story.Tasks {
+		delete(m.tasks, taskID)
+	}
+	delete(m.stories, storyID)
+	return m.saveUnlocked()
+}
+
 // LinkCommitToTask links a commit hash to a task.
 func (m *Manager) LinkCommitToTask(taskID, commitHash string) error {
 	m.mu.Lock()

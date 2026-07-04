@@ -37,8 +37,8 @@ type testProviderWrapper struct {
 	model string
 }
 
-func (w *testProviderWrapper) GetName() string       { return w.inner.GetName() }
-func (w *testProviderWrapper) GetModels() []string    { return []string{w.model} }
+func (w *testProviderWrapper) GetName() string     { return w.inner.GetName() }
+func (w *testProviderWrapper) GetModels() []string { return []string{w.model} }
 func (w *testProviderWrapper) GetModelInfo(modelID string) (*agent.ModelInfo, error) {
 	return &agent.ModelInfo{ID: modelID, Name: modelID}, nil
 }
@@ -46,7 +46,7 @@ func (w *testProviderWrapper) GetCapabilities(modelID string) (*agent.ProviderCa
 	return &agent.ProviderCapabilities{Streaming: true, ToolUse: true}, nil
 }
 func (w *testProviderWrapper) ValidateRequest(req agent.Request) error { return nil }
-func (w *testProviderWrapper) EstimateTokens(content string) int      { return len(content) / 4 }
+func (w *testProviderWrapper) EstimateTokens(content string) int       { return len(content) / 4 }
 func (w *testProviderWrapper) Stream(ctx context.Context, req agent.Request) (<-chan agent.StreamEvent, error) {
 	return w.inner.Stream(ctx, req)
 }
@@ -526,7 +526,7 @@ func newSimpleTestProvider(baseURL string) *simpleTestProvider {
 	}
 }
 
-func (p *simpleTestProvider) GetName() string    { return "test" }
+func (p *simpleTestProvider) GetName() string     { return "test" }
 func (p *simpleTestProvider) GetModels() []string { return []string{"test-model"} }
 func (p *simpleTestProvider) GetModelInfo(modelID string) (*agent.ModelInfo, error) {
 	return &agent.ModelInfo{ID: modelID}, nil
@@ -535,7 +535,7 @@ func (p *simpleTestProvider) GetCapabilities(modelID string) (*agent.ProviderCap
 	return &agent.ProviderCapabilities{ToolUse: true}, nil
 }
 func (p *simpleTestProvider) ValidateRequest(req agent.Request) error { return nil }
-func (p *simpleTestProvider) EstimateTokens(content string) int      { return len(content) / 4 }
+func (p *simpleTestProvider) EstimateTokens(content string) int       { return len(content) / 4 }
 func (p *simpleTestProvider) Stream(ctx context.Context, req agent.Request) (<-chan agent.StreamEvent, error) {
 	return nil, fmt.Errorf("not implemented")
 }

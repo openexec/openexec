@@ -24,6 +24,11 @@ type ProjectConfig struct {
 	// Fields are additive and backwards compatible: missing values leave
 	// gates enabled with default severities.
 	QualityGates QualityGatesConfig `json:"quality_gates,omitempty"`
+
+	// Modules gates optional (mostly proprietary) modules. Missing/unset means
+	// enabled — existing projects keep every module — so the composition root
+	// can turn a module off explicitly without changing default behavior.
+	Modules ModulesConfig `json:"modules,omitempty"`
 }
 
 // IsGitCommitEnabled reports whether autonomous local commits are allowed. The
@@ -32,6 +37,53 @@ type ProjectConfig struct {
 // are safe — they never push or open a PR; those are separate, gated steps.)
 func (c *ProjectConfig) IsGitCommitEnabled() bool {
 	return c.GitCommitEnabled == nil || *c.GitCommitEnabled
+}
+
+// ModulesConfig gates the optional modules layered on the MIT core, keyed by
+// module name (e.g. `{"sre": {"enabled": false}}`). Each toggle is
+// nil-default-true: an absent entry means the module loads, so this is a
+// backwards-compatible opt-OUT, not an opt-in. Being a map, core hardcodes no
+// module names — any module a build ships can be gated here.
+type ModulesConfig map[string]ModuleToggle
+
+// ModuleToggle configures a single module.
+type ModuleToggle struct {
+	// Enabled: nil (unset) = enabled; explicit false disables the module.
+	Enabled *bool `json:"enabled,omitempty"`
+	// License is an opaque entitlement reference passed to EntitlementCheck.
+	// Empty in open-core; a proprietary build reads it to verify a purchase.
+	License string `json:"license,omitempty"`
+}
+
+// EntitlementCheck is the licensing seam. The open-core default permits every
+// module; a proprietary build overrides this var to enforce entitlements. It
+// runs AFTER the enabled flag, so "disabled by config" and "not licensed" stay
+// distinct outcomes. Returning an error prevents the module from loading.
+var EntitlementCheck = func(module, license string) error { return nil }
+
+func (m ModulesConfig) toggle(module string) *ModuleToggle {
+	if t, ok := m[module]; ok {
+		return &t
+	}
+	return nil
+}
+
+// ShouldLoad reports whether the composition root should register a module:
+// enabled by config (nil-default-true) AND permitted by EntitlementCheck. The
+// returned reason is non-empty only when the module should NOT load.
+func (m ModulesConfig) ShouldLoad(module string) (bool, string) {
+	t := m.toggle(module)
+	if t != nil && t.Enabled != nil && !*t.Enabled {
+		return false, "disabled by config"
+	}
+	license := ""
+	if t != nil {
+		license = t.License
+	}
+	if err := EntitlementCheck(module, license); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
 }
 
 // QualityGatesConfig configures the project-level quality gates that run
@@ -106,11 +158,11 @@ type ExecutionConfig struct {
 	TestCommands []string `json:"test_commands,omitempty"`
 
 	// Feature flags for V2 subsystems
-	QualityGatesV2    bool `json:"quality_gates_v2,omitempty"`
-	CacheEnabled      bool `json:"cache_enabled,omitempty"`
-	PredictiveLoad    bool `json:"predictive_load,omitempty"`
-	MemoryEnabled     bool `json:"memory_enabled,omitempty"`
-	CheckpointEnabled bool `json:"checkpoint_enabled,omitempty"`
+	QualityGatesV2    bool   `json:"quality_gates_v2,omitempty"`
+	CacheEnabled      bool   `json:"cache_enabled,omitempty"`
+	PredictiveLoad    bool   `json:"predictive_load,omitempty"`
+	MemoryEnabled     bool   `json:"memory_enabled,omitempty"`
+	CheckpointEnabled bool   `json:"checkpoint_enabled,omitempty"`
 	BitNetRouting     bool   `json:"bitnet_routing,omitempty"`
 	BitNetModel       string `json:"bitnet_model,omitempty"`
 	// ToolsetFiltering, when true, restricts the tool definitions sent to the

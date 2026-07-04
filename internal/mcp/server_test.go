@@ -101,10 +101,12 @@ func TestToolsList(t *testing.T) {
 
 	result, _ := resps[0].Result.(map[string]interface{})
 	tools, _ := result["tools"].([]interface{})
-	// In danger-full-access mode (set in TestMain), we expect 15 tools:
-	// 5 core + 7 backlog/memory + skill_propose + write_file + run_shell_command
+	// In danger-full-access mode (set in TestMain), a plain server (no module
+	// providers registered) exposes 15 CORE tools: 5 core + 7 backlog/memory +
+	// skill_propose + write_file + run_shell_command. Module tools come from a
+	// registered provider, so their absence here proves core is module-free.
 	if len(tools) != 15 {
-		t.Fatalf("expected 15 tools in danger-full-access mode, got %d", len(tools))
+		t.Fatalf("expected 15 core tools (module tools are provider-contributed), got %d", len(tools))
 	}
 
 	// Index-independent lookup: adding tools must not break these assertions.

@@ -15,10 +15,10 @@ import (
 
 // TestProjectEnv encapsulates a test project environment.
 type TestProjectEnv struct {
-	Dir        string
-	DataDir    string
+	Dir         string
+	DataDir     string
 	OpenExecDir string
-	t          *testing.T
+	t           *testing.T
 }
 
 // NewTestProjectEnv creates a fresh test project environment.
@@ -132,4 +132,3 @@ type RunnerStatus struct {
 	Args    []string `json:"args"`
 	Model   string   `json:"model"`
 }
-

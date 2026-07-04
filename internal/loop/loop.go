@@ -16,12 +16,12 @@ import (
 // Loop handles the iterative execution of a blueprint.
 // It coordinates with the blueprint engine to execute stages and emit events.
 type Loop struct {
-	cfg     Config
-	events  chan Event
-	
+	cfg    Config
+	events chan Event
+
 	blueprintEngine *blueprint.Engine
 	blueprintRun    *blueprint.Run
-	
+
 	iteration int
 	paused    atomic.Bool
 	stopped   atomic.Bool
@@ -40,7 +40,7 @@ type LoopHealth struct {
 // New creates a new execution Loop.
 func New(cfg Config) (*Loop, <-chan Event) {
 	ch := make(chan Event, 100)
-	
+
 	// Create engine from config if enabled
 	var engine *blueprint.Engine
 	if cfg.BlueprintEnabled {
@@ -48,7 +48,7 @@ func New(cfg Config) (*Loop, <-chan Event) {
 		if bp == nil {
 			bp = blueprint.DefaultBlueprint
 		}
-		
+
 		engineCfg := blueprint.DefaultEngineConfig()
 		if cfg.BlueprintCallbacks != nil {
 			if cfg.BlueprintCallbacks.OnStageStart != nil {
@@ -67,7 +67,7 @@ func New(cfg Config) (*Loop, <-chan Event) {
 				engineCfg.OnRunComplete = cfg.BlueprintCallbacks.OnRunComplete
 			}
 		}
-		
+
 		var err error
 		engine, err = blueprint.NewEngine(bp, cfg.BlueprintExecutor, engineCfg)
 		if err != nil {
@@ -133,7 +133,7 @@ func (l *Loop) runStandalone(ctx context.Context) error {
 // runBlueprint executes the configured blueprint.
 func (l *Loop) runBlueprint(ctx context.Context) error {
 	bp := l.blueprintEngine.GetBlueprint()
-	
+
 	l.emit(Event{
 		Type:        EventBlueprintStart,
 		BlueprintID: bp.ID,
@@ -143,7 +143,7 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 	// Start the run
 	input := blueprint.NewStageInput(l.cfg.FwuID, l.cfg.VolatilePrompt, l.cfg.WorkDir)
 	input.Briefing = l.cfg.VolatilePrompt
-	
+
 	run, err := l.blueprintEngine.StartRun(ctx, l.cfg.FwuID, input)
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func (l *Loop) runBlueprint(ctx context.Context) error {
 			run.Cancel()
 			return nil
 		}
-		
+
 		for l.paused.Load() {
 			select {
 			case <-ctx.Done():

@@ -148,8 +148,8 @@ func (t *Transition) WithTriggeredBy(triggeredBy string) *Transition {
 // ValidTransitions defines the allowed mode transitions.
 // Key is the current mode, value is the list of modes it can transition to.
 var ValidTransitions = map[Mode][]Mode{
-	ModeChat: {ModeTask, ModeRun}, // Chat can escalate to Task or Run
-	ModeTask: {ModeChat, ModeRun}, // Task can return to Chat or escalate to Run
+	ModeChat: {ModeTask, ModeRun},  // Chat can escalate to Task or Run
+	ModeTask: {ModeChat, ModeRun},  // Task can return to Chat or escalate to Run
 	ModeRun:  {ModeChat, ModeTask}, // Run can return to Chat or Task (on checkpoint/completion)
 }
 

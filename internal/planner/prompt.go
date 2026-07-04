@@ -41,7 +41,6 @@ func CompletionContractSection(feature string, ops []contracts.Operation) string
 	return sb.String()
 }
 
-
 const StoryGenerationPrompt = `You are a software architect generating user stories from an intent document.
 
 Analyze the intent document below and generate a JSON array of user stories.
@@ -63,7 +62,11 @@ RULES:
    - The FIRST slice of a story must be the thinnest possible end-to-end path through the feature (a tracer bullet). Later slices add depth to that already-working path.
 6. PARALLELISM: Maximize parallelism where possible. Only add depends_on between stories when there is a true data or artifact dependency (e.g., Story B needs files created by Story A). Stories that are orthogonal (touching different files/modules) MUST NOT depend on each other.
 7. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
-8. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command). This script must specifically verify the GOAL it is linked to.
+8. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command) that specifically verifies the GOAL it is linked to and FAILS LOUDLY when the goal is not met. The script MUST exit non-zero on any failure. Do NOT write false-green scripts:
+   - NEVER append '|| <fallback>' to a test/assertion command — the fallback can pass while the real check failed. For the same reason never chain assertions as 'A && B || C' (that reports success when C passes even if A failed).
+   - NEVER redirect the checked command's stderr to /dev/null to "clean up" output; a hidden error is a hidden failure.
+   - Do not pipe an assertion like 'grep -q' into another command (e.g. '| head') — the pipe discards grep's exit status, so the check can never fail.
+   - Make assertions specific: match the exact expected token or line (e.g. verify 'MAX_BYTES = 40', not a bare '40' that matches unrelated content).
 9. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
 10. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories. The terminus MUST include a task that writes or updates docs/ARCHITECTURE.md (module map, key APIs, conventions) so later lightweight sessions inherit this build's understanding.
 11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.

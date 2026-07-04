@@ -33,9 +33,9 @@ Git integration and approval workflows can be enabled via configuration.`,
 //
 // The exported JSON is NOT the source of truth - SQLite is canonical.
 var storyExportCmd = &cobra.Command{
-    Use:   "export",
-    Short: "Export stories and tasks from DB to .openexec/stories.json (read-only export)",
-    Long: `Export stories and tasks from SQLite to JSON format.
+	Use:   "export",
+	Short: "Export stories and tasks from DB to .openexec/stories.json (read-only export)",
+	Long: `Export stories and tasks from SQLite to JSON format.
 
 This is an EXPORT-ONLY operation. The JSON file is generated for:
   - Backup/archival
@@ -44,57 +44,59 @@ This is an EXPORT-ONLY operation. The JSON file is generated for:
 
 SQLite (.openexec/openexec.db) remains the canonical source of truth.
 The exported JSON should NOT be used as runtime state.`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        mgr, err := getReleaseManager(cmd)
-        if err != nil { return err }
+	RunE: func(cmd *cobra.Command, args []string) error {
+		mgr, err := getReleaseManager(cmd)
+		if err != nil {
+			return err
+		}
 
-        stories := mgr.GetStories()
-        tasks := mgr.GetTasks()
-        // build map from story ID to task summaries
-        byStory := make(map[string][]map[string]interface{})
-        for _, t := range tasks {
-            byStory[t.StoryID] = append(byStory[t.StoryID], map[string]interface{}{
-                "id":                 t.ID,
-                "title":              t.Title,
-                "description":        t.Description,
-                "depends_on":         t.DependsOn,
-                "verification_script": t.VerificationScript,
-            })
-        }
+		stories := mgr.GetStories()
+		tasks := mgr.GetTasks()
+		// build map from story ID to task summaries
+		byStory := make(map[string][]map[string]interface{})
+		for _, t := range tasks {
+			byStory[t.StoryID] = append(byStory[t.StoryID], map[string]interface{}{
+				"id":                  t.ID,
+				"title":               t.Title,
+				"description":         t.Description,
+				"depends_on":          t.DependsOn,
+				"verification_script": t.VerificationScript,
+			})
+		}
 
-        export := map[string]interface{}{
-            "schema_version": "1.1",
-            "goals":          []interface{}{}, // goals not persisted here; export stories/tasks only
-            "stories":        []interface{}{},
-        }
-        for _, s := range stories {
-            export["stories"] = append(export["stories"].([]interface{}), map[string]interface{}{
-                "id":                 s.ID,
-                "goal_id":            s.GoalID,
-                "title":              s.Title,
-                "description":        s.Description,
-                "acceptance_criteria": s.AcceptanceCriteria,
-                "verification_script": s.VerificationScript,
-                "depends_on":         s.DependsOn,
-                "tasks":              byStory[s.ID],
-                "story_type":         s.StoryType,
-                "priority":           s.Priority,
-                "status":             s.Status,
-            })
-        }
+		export := map[string]interface{}{
+			"schema_version": "1.1",
+			"goals":          []interface{}{}, // goals not persisted here; export stories/tasks only
+			"stories":        []interface{}{},
+		}
+		for _, s := range stories {
+			export["stories"] = append(export["stories"].([]interface{}), map[string]interface{}{
+				"id":                  s.ID,
+				"goal_id":             s.GoalID,
+				"title":               s.Title,
+				"description":         s.Description,
+				"acceptance_criteria": s.AcceptanceCriteria,
+				"verification_script": s.VerificationScript,
+				"depends_on":          s.DependsOn,
+				"tasks":               byStory[s.ID],
+				"story_type":          s.StoryType,
+				"priority":            s.Priority,
+				"status":              s.Status,
+			})
+		}
 
-        outPath := filepath.Join(".openexec", "stories.json")
-        _ = os.MkdirAll(filepath.Dir(outPath), 0750)
-        data, _ := json.MarshalIndent(export, "", "  ")
-        // Log export for drift tracking
-        fmt.Fprintf(os.Stderr, "[EXPORT] Writing to %s (export-only, not source of truth)\n", outPath)
-        cmd.Println(color.YellowString("Note: Exporting to %s. SQLite is the canonical store.", outPath))
-        if err := os.WriteFile(outPath, data, 0644); err != nil {
-            return fmt.Errorf("failed to write %s: %w", outPath, err)
-        }
-        cmd.Printf("✓ Exported %d stories to %s\n", len(stories), outPath)
-        return nil
-    },
+		outPath := filepath.Join(".openexec", "stories.json")
+		_ = os.MkdirAll(filepath.Dir(outPath), 0750)
+		data, _ := json.MarshalIndent(export, "", "  ")
+		// Log export for drift tracking
+		fmt.Fprintf(os.Stderr, "[EXPORT] Writing to %s (export-only, not source of truth)\n", outPath)
+		cmd.Println(color.YellowString("Note: Exporting to %s. SQLite is the canonical store.", outPath))
+		if err := os.WriteFile(outPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", outPath, err)
+		}
+		cmd.Printf("✓ Exported %d stories to %s\n", len(stories), outPath)
+		return nil
+	},
 }
 
 var releaseCreateCmd = &cobra.Command{
@@ -1676,10 +1678,10 @@ func init() {
 
 	releaseCmd.AddCommand(releaseResetCmd)
 
-    releaseCmd.AddCommand(releaseChangelogCmd)
-    // story subcommands
-    storyCmd.AddCommand(storyExportCmd)
-    rootCmd.AddCommand(storyCmd)
+	releaseCmd.AddCommand(releaseChangelogCmd)
+	// story subcommands
+	storyCmd.AddCommand(storyExportCmd)
+	rootCmd.AddCommand(storyCmd)
 	releaseChangelogCmd.Flags().Bool("json", false, "Output as JSON")
 	releaseChangelogCmd.Flags().String("output", "", "Write to file instead of stdout")
 	releaseChangelogCmd.Flags().String("repo-url", "", "Repository URL for commit links")

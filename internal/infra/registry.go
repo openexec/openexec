@@ -2,6 +2,7 @@ package infra
 
 import (
 	"fmt"
+	"github.com/openexec/openexec/internal/infracontract"
 	"path"
 	"path/filepath"
 	"sort"
@@ -10,24 +11,26 @@ import (
 // Command is a fully-resolved, validated infra command: an argv array for
 // exec.CommandContext. There is deliberately no way to construct one except
 // through Registry resolution.
-type Command struct {
-	// Binary is the executable name (resolved via PATH at execution time).
-	Binary string
-	// Args is the strict argument array. Never joined into a shell string.
-	Args []string
-	// ApplyClass is true for commands that mutate infrastructure. These
-	// require human approval before execution; dry-runs (--check, test=True,
-	// plan) are not apply-class.
-	ApplyClass bool
-	// Environment and RiskProfile are recorded for audit output.
-	Environment string
-	RiskProfile string
-}
+// Command is the resolved, argv-bounded infra command. It is the core
+// infracontract.Command, aliased here so *Registry's resolvers satisfy the
+// core infracontract.Registry seam that the MCP server depends on (mcp must not
+// import this module directly).
+type Command = infracontract.Command
 
 // Registry resolves tool calls into Commands, deny-by-default: anything not
 // explicitly enumerated in the validated Config is refused.
 type Registry struct {
 	cfg *Config
+}
+
+// Registry satisfies the core infracontract.Registry seam.
+var _ infracontract.Registry = (*Registry)(nil)
+
+// DestructiveChanges parses a terraform plan JSON and returns the resources it
+// would delete/replace. A thin method over the package function so *Registry
+// satisfies infracontract.Registry.
+func (r *Registry) DestructiveChanges(planJSON []byte) ([]string, error) {
+	return DestructiveChanges(planJSON)
 }
 
 // NewRegistry wraps a validated config. Returns an error for nil/disabled

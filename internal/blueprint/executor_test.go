@@ -128,7 +128,7 @@ func TestDefaultExecutor_DeterministicStage_MultipleCommands_StopsOnFailure(t *t
 		Type: types.StageTypeDeterministic,
 		Commands: []string{
 			"echo marker > marker.txt",
-			"exit 1",          // This should fail
+			"exit 1",                 // This should fail
 			"echo never > never.txt", // This should not run
 		},
 	}

@@ -20,9 +20,9 @@ type Cache struct {
 
 // CacheEntry holds metadata about a cached context bundle.
 type CacheEntry struct {
-	Hash      string    `json:"hash"`
-	Size      int64     `json:"size"`
-	CreatedAt time.Time `json:"created_at"`
+	Hash       string    `json:"hash"`
+	Size       int64     `json:"size"`
+	CreatedAt  time.Time `json:"created_at"`
 	AccessedAt time.Time `json:"accessed_at"`
 }
 
@@ -77,9 +77,9 @@ func (c *Cache) Put(ctx context.Context, bundle []byte) (string, error) {
 
 	// Write metadata
 	meta := CacheEntry{
-		Hash:      hash,
-		Size:      int64(len(bundle)),
-		CreatedAt: time.Now(),
+		Hash:       hash,
+		Size:       int64(len(bundle)),
+		CreatedAt:  time.Now(),
 		AccessedAt: time.Now(),
 	}
 	if err := c.writeMeta(hash, &meta); err != nil {

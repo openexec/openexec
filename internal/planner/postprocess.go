@@ -58,7 +58,10 @@ func EnforceFastTrack(plan *ProjectPlan, scope string, flow string) {
 			for i := 1; i < len(plan.Stories); i++ {
 				found := false
 				for _, d := range plan.Stories[i].DependsOn {
-					if d == "US-000" { found = true; break }
+					if d == "US-000" {
+						found = true
+						break
+					}
 				}
 				if !found {
 					plan.Stories[i].DependsOn = append(plan.Stories[i].DependsOn, "US-000")

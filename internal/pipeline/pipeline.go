@@ -14,16 +14,12 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/actions"
-	"github.com/openexec/openexec/internal/agent"
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/cache"
 	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
 	"github.com/openexec/openexec/internal/loop"
-	"github.com/openexec/openexec/internal/memory"
-	"github.com/openexec/openexec/internal/parallel"
-	"github.com/openexec/openexec/internal/predictive"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
 	"github.com/openexec/openexec/internal/router"
@@ -155,18 +151,11 @@ type Pipeline struct {
 
 	intentRouter router.Router
 
-	agentRegistry  *agent.AgentRegistry
-	parallelConfig *parallel.ParallelConfig
-
 	skillRegistry *skills.Registry
 
-	memoryManager    *memory.MemoryManager
-	knowledgeCache   *cache.KnowledgeCache
-	toolResultCache  *cache.ToolResultCache
-	predictiveLoader *predictive.Loader
-	contextPruner    *ocontext.Pruner
-
-	coordinator *agent.TaskCoordinator
+	knowledgeCache  *cache.KnowledgeCache
+	toolResultCache *cache.ToolResultCache
+	contextPruner   *ocontext.Pruner
 
 	currentLoop *loop.Loop
 	mu          sync.Mutex
@@ -236,16 +225,6 @@ func WithToolResultCache(c *cache.ToolResultCache) Option {
 	return func(p *Pipeline) { p.toolResultCache = c }
 }
 
-// WithPredictiveLoader sets the predictive file loader for the pipeline.
-func WithPredictiveLoader(l *predictive.Loader) Option {
-	return func(p *Pipeline) { p.predictiveLoader = l }
-}
-
-// WithMemoryManager sets the memory manager for learning persistence across sessions.
-func WithMemoryManager(m *memory.MemoryManager) Option {
-	return func(p *Pipeline) { p.memoryManager = m }
-}
-
 // WithContextPruner sets the context pruner for reducing token usage by selecting
 // only the most relevant context items for a given task.
 func WithContextPruner(cp *ocontext.Pruner) Option {
@@ -260,24 +239,6 @@ func WithSkillRegistry(r *skills.Registry) Option {
 // WithRouter sets the intent router for deterministic task routing.
 func WithRouter(r router.Router) Option {
 	return func(p *Pipeline) { p.intentRouter = r }
-}
-
-// WithParallelExecution enables multi-agent parallel execution for agentic stages.
-// When worker_count > 1 in config, agentic stages are split across parallel agents.
-func WithParallelExecution(registry *agent.AgentRegistry, config *parallel.ParallelConfig) Option {
-	return func(p *Pipeline) {
-		p.agentRegistry = registry
-		p.parallelConfig = config
-	}
-}
-
-// WithCoordinator sets the coordinator for multi-agent task decomposition.
-// When set and API mode is active, the coordinator decomposes tasks into subtasks,
-// runs worker agents in parallel, and merges results.
-func WithCoordinator(c *agent.TaskCoordinator) Option {
-	return func(p *Pipeline) {
-		p.coordinator = c
-	}
 }
 
 // NewWithFactory creates a Pipeline using a pre-configured factory.
@@ -353,12 +314,6 @@ func (p *Pipeline) Stop() {
 func (p *Pipeline) Close() {
 	if p.checkpointMgr != nil {
 		p.checkpointMgr.Close()
-	}
-	if p.memoryManager != nil {
-		p.memoryManager.Close()
-	}
-	if p.predictiveLoader != nil {
-		p.predictiveLoader.Close()
 	}
 	if p.knowledgeCache != nil {
 		p.knowledgeCache.Close()
@@ -458,24 +413,6 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			})
 		} else {
 			contextPack = pack
-		}
-	}
-
-	// Predictive file pre-loading
-	if p.predictiveLoader != nil && p.cfg.TaskDescription != "" {
-		if predicted, err := p.predictiveLoader.PredictAndLoad(ctx, p.cfg.TaskDescription, nil); err == nil && predicted != nil {
-			for _, pf := range predicted.LoadedFiles {
-				if pf.Content != "" {
-					if contextPack == nil {
-						contextPack = &ocontext.ContextPack{}
-					}
-					contextPack.Items = append(contextPack.Items, &ocontext.ContextItem{
-						Type:    ocontext.ContextTypeRecentFiles,
-						Source:  fmt.Sprintf("predicted:%s", pf.Path),
-						Content: pf.Content,
-					})
-				}
-			}
 		}
 	}
 
@@ -624,10 +561,6 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			}()
 		}
 
-		// Extract learning patterns from completed stages for memory persistence
-		if p.memoryManager != nil && result.Status == types.StageStatusCompleted {
-			go p.extractMemory(run, result)
-		}
 	}
 	engineConfig.OnCheckpoint = func(run *blueprint.Run, stageName string) {
 		p.emit(loop.Event{
@@ -702,14 +635,6 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		input.SetContextFromPack(items)
 	}
 
-	// Inject prior learning context from memory system
-	if p.memoryManager != nil {
-		memCtx := p.loadMemoryContext(p.cfg.TaskDescription)
-		if memCtx != "" {
-			input.Briefing += memCtx
-		}
-	}
-
 	// Inject relevant skills into briefing
 	if p.skillRegistry != nil && p.cfg.TaskDescription != "" {
 		selected := p.skillRegistry.SelectForTask(p.cfg.TaskDescription)
@@ -735,74 +660,8 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 	}
 
-	// Execute blueprint: use coordinator, parallel engine, or standard
-	var execErr error
-	if p.coordinator != nil && p.cfg.APIProvider != "" {
-		// Coordinator-based multi-agent execution (Phase C)
-		// Gather workspace files for task decomposition
-		var files []string
-		_ = filepath.Walk(p.cfg.WorkDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return nil
-			}
-			rel, _ := filepath.Rel(p.cfg.WorkDir, path)
-			if rel != "" && rel[0] != '.' {
-				files = append(files, rel)
-			}
-			return nil
-		})
-
-		// Use coordinator for the implement stage, standard engine for the rest
-		parallelEngine, pErr := parallel.NewParallelEngine(bp, executor, p.agentRegistry, p.parallelConfig)
-		if pErr != nil {
-			log.Printf("[Pipeline] Coordinator: parallel engine init failed, using coordinator directly")
-		}
-
-		// Run blueprint normally but intercept the implement stage with coordinator
-		if parallelEngine != nil {
-			// Wire coordinator into parallel engine for the implement stage
-			impl, hasImpl := bp.Stages["implement"]
-			if hasImpl && len(files) > 0 {
-				coordResult, err := parallelEngine.ExecuteWithCoordinator(ctx, run, impl, input, files, p.coordinator)
-				if err != nil {
-					log.Printf("[Pipeline] Coordinator execution failed, falling back to standard: %v", err)
-					execErr = engine.Execute(ctx, run, input)
-				} else {
-					run.AddResult(coordResult)
-					input.AddPreviousResult(coordResult)
-					// Skip to post-implement stages by adjusting the run
-					run.CurrentStage = impl.OnSuccess
-					execErr = engine.Execute(ctx, run, input)
-				}
-			} else {
-				execErr = engine.Execute(ctx, run, input)
-			}
-		} else {
-			execErr = engine.Execute(ctx, run, input)
-		}
-	} else if p.agentRegistry != nil && p.parallelConfig != nil && p.parallelConfig.EnableParallelism {
-		parallelEngine, err := parallel.NewParallelEngine(bp, executor, p.agentRegistry, p.parallelConfig)
-		if err != nil {
-			log.Printf("[Pipeline] Parallel engine init failed, falling back to sequential: %v", err)
-			execErr = engine.Execute(ctx, run, input)
-		} else {
-			// Gather workspace files for batch splitting
-			var files []string
-			_ = filepath.Walk(p.cfg.WorkDir, func(path string, info os.FileInfo, err error) error {
-				if err != nil || info.IsDir() {
-					return nil
-				}
-				rel, _ := filepath.Rel(p.cfg.WorkDir, path)
-				if rel != "" && rel[0] != '.' {
-					files = append(files, rel)
-				}
-				return nil
-			})
-			execErr = parallelEngine.ExecuteBlueprint(ctx, run, input, files)
-		}
-	} else {
-		execErr = engine.Execute(ctx, run, input)
-	}
+	// Execute the blueprint through the deterministic engine.
+	execErr := engine.Execute(ctx, run, input)
 
 	if execErr != nil {
 		p.emit(loop.Event{

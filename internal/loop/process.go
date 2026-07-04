@@ -32,22 +32,22 @@ type Process struct {
 // Optional writers can be provided to tee stdout and stderr.
 // Middleware wraps stdin/stdout/stderr for Deep-Trace interception if provided.
 func StartProcess(ctx context.Context, cfg Config, stdoutW, stderrW io.Writer, m Middleware) (*Process, error) {
-    name, args := buildCommand(cfg)
-    // name is either "claude" or a test-controlled override
-    cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
-    cmd.Dir = cfg.WorkDir
-    // Propagate execution mode and workspace root to the child process
-    env := os.Environ()
-    // Prefer typed Mode over legacy ExecMode string
-    if cfg.Mode != "" {
-        env = append(env, "OPENEXEC_MODE="+string(cfg.Mode))
-    } else if cfg.ExecMode != "" {
-        env = append(env, "OPENEXEC_MODE="+cfg.ExecMode)
-    }
-    if cfg.WorkDir != "" {
-        env = append(env, "WORKSPACE_ROOT="+cfg.WorkDir)
-    }
-    cmd.Env = env
+	name, args := buildCommand(cfg)
+	// name is either "claude" or a test-controlled override
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
+	cmd.Dir = cfg.WorkDir
+	// Propagate execution mode and workspace root to the child process
+	env := os.Environ()
+	// Prefer typed Mode over legacy ExecMode string
+	if cfg.Mode != "" {
+		env = append(env, "OPENEXEC_MODE="+string(cfg.Mode))
+	} else if cfg.ExecMode != "" {
+		env = append(env, "OPENEXEC_MODE="+cfg.ExecMode)
+	}
+	if cfg.WorkDir != "" {
+		env = append(env, "WORKSPACE_ROOT="+cfg.WorkDir)
+	}
+	cmd.Env = env
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
@@ -175,11 +175,11 @@ func (b *stderrTailBuffer) String() string {
 // deliberately encourages reasoning before edits — suppressing think-first
 // behavior measurably degrades edit precision.
 const autonomousPreamble = `IMPORTANT: You are running autonomously in a non-interactive pipeline. ` +
-    `There is no human operator present: do not enter plan mode and do not ask questions — no approval or answer will ever come. ` +
-    `Do reason through your approach and the files involved before editing, then proceed directly with implementation. ` +
-    `Work independently and make reasonable decisions. ` +
-    `For code edits, prefer the git_apply_patch MCP tool for unified diffs, but you may use your built-in Write and Edit tools when creating new files or when patches are impractical. ` +
-    `If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
+	`There is no human operator present: do not enter plan mode and do not ask questions — no approval or answer will ever come. ` +
+	`Do reason through your approach and the files involved before editing, then proceed directly with implementation. ` +
+	`Work independently and make reasonable decisions. ` +
+	`For code edits, prefer the git_apply_patch MCP tool for unified diffs, but you may use your built-in Write and Edit tools when creating new files or when patches are impractical. ` +
+	`If you are genuinely blocked, use the openexec_signal tool with type "blocked" or "decision-point".
 
 ` + `If the project does not yet have a .gitignore file, create an appropriate one for the tech stack before writing other code.
 
@@ -215,21 +215,30 @@ func buildCommand(cfg Config) (string, []string) {
 		return cliCmd, buildClaudeArgs(cfg)
 	}
 
-    // For Gemini, gate --yolo by execution mode (danger only)
-    if strings.Contains(strings.ToLower(cliCmd), "gemini") {
-        danger := cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access"
-        if danger {
-            hasYolo := false
-            for _, a := range cmdArgs {
-                if a == "--yolo" { hasYolo = true; break }
-            }
-            if !hasYolo { cmdArgs = append(cmdArgs, "--yolo") }
-        } else {
-            filtered := make([]string, 0, len(cmdArgs))
-            for _, a := range cmdArgs { if a != "--yolo" { filtered = append(filtered, a) } }
-            cmdArgs = filtered
-        }
-    }
+	// For Gemini, gate --yolo by execution mode (danger only)
+	if strings.Contains(strings.ToLower(cliCmd), "gemini") {
+		danger := cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access"
+		if danger {
+			hasYolo := false
+			for _, a := range cmdArgs {
+				if a == "--yolo" {
+					hasYolo = true
+					break
+				}
+			}
+			if !hasYolo {
+				cmdArgs = append(cmdArgs, "--yolo")
+			}
+		} else {
+			filtered := make([]string, 0, len(cmdArgs))
+			for _, a := range cmdArgs {
+				if a != "--yolo" {
+					filtered = append(filtered, a)
+				}
+			}
+			cmdArgs = filtered
+		}
+	}
 
 	return cliCmd, cmdArgs
 }
@@ -237,22 +246,22 @@ func buildCommand(cfg Config) (string, []string) {
 func buildClaudeArgs(cfg Config) []string {
 	prompt := autonomousPreamble + cfg.Prompt
 
-    args := []string{
-        "-p", prompt,
-        "--output-format", "stream-json",
-        "--verbose",
-        "--max-turns", "50",
-        "--disallowedTools", strings.Join(disabledTools, ","),
-    }
-    // Skip permission prompts for non-interactive execution.
-    // In -p mode, there is no user to approve tool calls, so the agent
-    // would block forever on Write/Edit/Bash permission prompts.
-    // Safety is enforced by the MCP toolset and execution mode constraints.
-    danger := cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access"
-    workspace := cfg.ExecMode == "workspace-write" || os.Getenv("OPENEXEC_MODE") == "workspace-write"
-    if danger || workspace {
-        args = append([]string{"--dangerously-skip-permissions"}, args...)
-    }
+	args := []string{
+		"-p", prompt,
+		"--output-format", "stream-json",
+		"--verbose",
+		"--max-turns", "50",
+		"--disallowedTools", strings.Join(disabledTools, ","),
+	}
+	// Skip permission prompts for non-interactive execution.
+	// In -p mode, there is no user to approve tool calls, so the agent
+	// would block forever on Write/Edit/Bash permission prompts.
+	// Safety is enforced by the MCP toolset and execution mode constraints.
+	danger := cfg.ExecMode == "danger-full-access" || os.Getenv("OPENEXEC_MODE") == "danger-full-access"
+	workspace := cfg.ExecMode == "workspace-write" || os.Getenv("OPENEXEC_MODE") == "workspace-write"
+	if danger || workspace {
+		args = append([]string{"--dangerously-skip-permissions"}, args...)
+	}
 	if cfg.MCPConfigPath != "" {
 		args = append(args, "--mcp-config", cfg.MCPConfigPath)
 	}

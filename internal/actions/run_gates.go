@@ -29,7 +29,7 @@ func (a *RunGatesAction) Execute(ctx context.Context, req ActionRequest) (Action
 	}
 
 	report := runner.RunAll(ctx)
-	
+
 	status := types.StageStatusCompleted
 	if !report.Passed {
 		status = types.StageStatusFailed

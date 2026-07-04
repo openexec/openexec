@@ -215,52 +215,54 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 }
 
 func (p *Parser) parseToolResult(data json.RawMessage) {
-    if data == nil {
-        return
-    }
+	if data == nil {
+		return
+	}
 
 	// Emit activity heartbeat
 	p.emit(Event{Type: EventProgress, Iteration: p.iteration})
 
-    // Content can be an array of items or a simple string.
-    // Prefer array parsing to extract structured text and artifact markers.
-    // Use standard json.Unmarshal here — tool results are well-formed JSON from the stream,
-    // not LLM-generated text that needs sanitization.
-    var items []contentItem
-    if err := json.Unmarshal(data, &items); err == nil && len(items) > 0 {
-        var b strings.Builder
-        artifacts := map[string]string{}
-        for _, it := range items {
-            if it.Type == "text" && it.Text != "" {
-                if b.Len() > 0 { b.WriteString("\n") }
-                b.WriteString(it.Text)
-                // Detect artifact markers like: ARTIFACT:patch <hash> <path>
-                for _, line := range strings.Split(it.Text, "\n") {
-                    line = strings.TrimSpace(line)
-                    if strings.HasPrefix(line, "ARTIFACT:patch ") {
-                        parts := strings.SplitN(line, " ", 3)
-                        if len(parts) >= 3 {
-                            artifacts["patch_hash"] = parts[1]
-                            artifacts["patch_path"] = parts[2]
-                        }
-                    }
-                }
-            }
-        }
-        p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: b.String(), Artifacts: artifacts})
-        p.trackToolFailure(b.String())
-        return
-    }
+	// Content can be an array of items or a simple string.
+	// Prefer array parsing to extract structured text and artifact markers.
+	// Use standard json.Unmarshal here — tool results are well-formed JSON from the stream,
+	// not LLM-generated text that needs sanitization.
+	var items []contentItem
+	if err := json.Unmarshal(data, &items); err == nil && len(items) > 0 {
+		var b strings.Builder
+		artifacts := map[string]string{}
+		for _, it := range items {
+			if it.Type == "text" && it.Text != "" {
+				if b.Len() > 0 {
+					b.WriteString("\n")
+				}
+				b.WriteString(it.Text)
+				// Detect artifact markers like: ARTIFACT:patch <hash> <path>
+				for _, line := range strings.Split(it.Text, "\n") {
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "ARTIFACT:patch ") {
+						parts := strings.SplitN(line, " ", 3)
+						if len(parts) >= 3 {
+							artifacts["patch_hash"] = parts[1]
+							artifacts["patch_path"] = parts[2]
+						}
+					}
+				}
+			}
+		}
+		p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: b.String(), Artifacts: artifacts})
+		p.trackToolFailure(b.String())
+		return
+	}
 
-    // Fallback to plain string
-    var s string
-    if err := json.Unmarshal(data, &s); err == nil {
-        p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: s})
-        p.trackToolFailure(s)
-        return
-    }
-    // Last resort: raw JSON string
-    p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: string(data)})
+	// Fallback to plain string
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: s})
+		p.trackToolFailure(s)
+		return
+	}
+	// Last resort: raw JSON string
+	p.emit(Event{Type: EventToolResult, Iteration: p.iteration, Text: string(data)})
 }
 
 // trackToolFailure detects cognitive thrashing: an agent repeating the same

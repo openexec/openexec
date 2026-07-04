@@ -1,0 +1,54 @@
+# Package boundary manifest — the machine-readable source the boundary check reads.
+#
+# It classifies every OpenExec package into a tier so the dependency rule is
+# enforceable rather than aspirational:
+#
+#   composition-root  may import core AND modules   (wiring the binary is its job)
+#   core              may import neither modules nor the composition root
+#   modules           may import core, never each other or the composition root
+#   undecided         exempt for now (genuinely ambiguous; decide before extracting)
+#
+# Classification is by longest-prefix match on the import path (below the module
+# path github.com/openexec/openexec/). Anything not matched is "core".
+#
+# The check runs as a ratchet: known violations are recorded in `baseline` below;
+# the check FAILS on any violation NOT in the baseline (no new coupling) and
+# reports baseline entries that are no longer violations (so the list can be
+# tightened as packages are decoupled).
+
+composition_root:
+  - internal/cli
+  - cmd/openexec
+
+# Each module is a name -> list of package-path prefixes it owns. Sub-packages
+# match by prefix.
+modules:
+  sre:
+    - internal/infra
+  mcp:
+    - internal/mcp
+  tui:
+    - internal/tui
+  integrations:
+    - internal/telegram
+    - internal/twilio
+    - internal/botseed
+  memory:
+    - internal/memory
+  routing:
+    - internal/dcp
+    # internal/router is CORE, not a module: it is load-bearing (pkg/manager
+    # always injects router.NewDeterministicRouter and the pipeline routes
+    # through it on the default path) and imports only core (mode, toolset).
+
+# Genuinely ambiguous packages — exempt from the check until their home is decided.
+undecided:
+  - pkg/manager   # pipeline orchestrator, pending a clearer home
+  - pkg/api       # HTTP/WebSocket: part core run-transport, part future web module
+
+# Current coupling debt. Format: "importer -> imported". The check allows exactly
+# these and fails on anything new. Drive this list DOWN as decoupling proceeds;
+# an empty list means the boundary is clean.
+baseline: []
+  # The boundary is CLEAN — no core package imports a module. Keep it empty: any
+  # new cross-tier import now FAILS the ratchet.

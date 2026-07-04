@@ -16,7 +16,7 @@ import (
 // SkillProposeToolDef returns the MCP tool definition for skill_propose.
 func SkillProposeToolDef() map[string]interface{} {
 	return map[string]interface{}{
-		"name": "skill_propose",
+		"name":        "skill_propose",
 		"description": "Propose a project-specific skill capturing a durable lesson learned during this session (a framework quirk, a recurring fix, a project convention). The proposal is written as a CANDIDATE for human review — it does NOT become active until a human approves it with `openexec skills approve <name>`. Propose a skill when the lesson would apply to future sessions, not for one-time fixes.",
 		"inputSchema": map[string]interface{}{
 			"type": "object",

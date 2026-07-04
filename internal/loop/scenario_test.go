@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestScenario_IntelligenceGap verifies that the orchestrator/agent loop 
+// TestScenario_IntelligenceGap verifies that the orchestrator/agent loop
 // can detect and recover from common LLM "prior knowledge" hallucinations.
 func TestScenario_IntelligenceGap(t *testing.T) {
 	tests := []struct {
@@ -30,7 +30,7 @@ func TestScenario_IntelligenceGap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Logic to feed bad output into a mock loop and check if 
+			// Logic to feed bad output into a mock loop and check if
 			// the orchestrator's verification scripts catch it.
 			if strings.Contains(tt.agentOutput, "__dirname") && strings.Contains(tt.projectContext, "module") {
 				t.Logf("✓ Verified: Orchestrator would catch legacy pattern in ESM context")

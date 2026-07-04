@@ -95,7 +95,7 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 	ts := httptest.NewServer(s.Mux)
 	defer ts.Close()
 
-    resp, err := http.Post(ts.URL+"/api/fwu/T-001/start", "application/json", strings.NewReader("{}"))
+	resp, err := http.Post(ts.URL+"/api/fwu/T-001/start", "application/json", strings.NewReader("{}"))
 	if err != nil {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestGeminiProviderBackedExecution(t *testing.T) {
 	}
 
 	// Verify status
-    statusResp, err := http.Get(ts.URL + "/api/fwu/" + taskID + "/status")
+	statusResp, err := http.Get(ts.URL + "/api/fwu/" + taskID + "/status")
 	if err != nil {
 		t.Fatalf("Failed to get status: %v", err)
 	}

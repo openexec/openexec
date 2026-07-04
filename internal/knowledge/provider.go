@@ -61,16 +61,16 @@ type LanguageProvider interface {
 
 // ProviderRegistry manages language providers.
 type ProviderRegistry struct {
-	providers       []LanguageProvider
-	extensionMap    map[string]LanguageProvider
+	providers        []LanguageProvider
+	extensionMap     map[string]LanguageProvider
 	enabledLanguages map[string]bool
 }
 
 // NewProviderRegistry creates a new registry with default providers.
 func NewProviderRegistry() *ProviderRegistry {
 	registry := &ProviderRegistry{
-		providers:       make([]LanguageProvider, 0),
-		extensionMap:    make(map[string]LanguageProvider),
+		providers:        make([]LanguageProvider, 0),
+		extensionMap:     make(map[string]LanguageProvider),
 		enabledLanguages: make(map[string]bool),
 	}
 
