@@ -21,19 +21,20 @@ func TestNextActionable(t *testing.T) {
 		})
 	}
 
-	// Terminal + parked are never actionable; an actionable candidate exists.
+	// Terminal + changes_requested are never actionable; candidate/plan_ready/
+	// approved_for_ai are. plan_ready maps to "review" (deep triage lands there).
 	seed("CH-done", governance.ChangeStatusDone, 0)
-	seed("CH-parked", governance.ChangeStatusChangesRequested, 1)
-	seed("CH-planready", governance.ChangeStatusPlanReady, 2) // awaits approval → parked
+	seed("CH-parked", governance.ChangeStatusChangesRequested, 1) // parked → skip
+	seed("CH-candidate", governance.ChangeStatusCandidate, 3)
+	seed("CH-planready", governance.ChangeStatusPlanReady, 2) // actionable → review (oldest actionable)
 	seed("CH-approved", governance.ChangeStatusApprovedForAI, 4)
-	seed("CH-candidate", governance.ChangeStatusCandidate, 3) // older than approved
 
 	ch, action, err := svc.NextActionable(ctx, "p")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ch == nil || ch.ID != "CH-candidate" || action != "triage" {
-		t.Fatalf("expected FIFO pick CH-candidate/triage, got %+v action=%q", ch, action)
+	if ch == nil || ch.ID != "CH-planready" || action != "review" {
+		t.Fatalf("expected FIFO pick CH-planready/review, got %+v action=%q", ch, action)
 	}
 
 	// Single slot: an implementing change occupies it — nothing new starts.
