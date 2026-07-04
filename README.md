@@ -29,6 +29,8 @@ OpenExec is a deterministic runtime for AI coding tools. It wraps Claude Code, C
 
 The model still reasons. OpenExec governs the run.
 
+In practice, you connect a repo, label a GitHub or Jira issue, and OpenExec triages, plans, builds, and verifies the change unattended — then opens a pull request for you to review. The trail from issue → task → PR → merge is recorded automatically, so the team sees what shipped without anyone updating a board by hand. The bottleneck was never coding speed; it was keeping the team in sync and knowing what a change actually did. The same engine scales from a single task to an entire greenfield project, and governance is an optional module you enable when a change needs sign-off.
+
 ## The Thesis
 
 OpenExec treats AI work as an engineering process, not a chat session.
