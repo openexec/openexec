@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/openexec/openexec/internal/governance"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ var govAutopilotCmd = &cobra.Command{
 	Use:   "autopilot",
 	Short: "One autonomous tick: sync AI-Fix issues, then advance the next actionable change (safe by default)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		svc, _, db, err := newGovService(cmd)
+		svc, store, db, err := newGovService(cmd)
 		if err != nil {
 			return err
 		}
@@ -37,6 +38,7 @@ var govAutopilotCmd = &cobra.Command{
 		project, _ := cmd.Flags().GetString("project")
 		repo, _ := cmd.Flags().GetString("repo")
 		label, _ := cmd.Flags().GetString("label")
+		autoApproveLow, _ := cmd.Flags().GetBool("auto-approve-low-risk")
 		autoExecute, _ := cmd.Flags().GetBool("auto-execute")
 		maxSteps, _ := cmd.Flags().GetInt("max-steps")
 		if project == "" || repo == "" {
@@ -85,8 +87,29 @@ var govAutopilotCmd = &cobra.Command{
 					"governance", "work", "review-plan", ch.ID, "--reviewer", "bugbot", "--project-dir", baseDir); e != nil {
 					return fmt.Errorf("review %s: %w — %s", ch.ID, e, out)
 				}
-				cmd.Printf("[autopilot] reviewed %s; parked for human approval or clarification.\n", ch.ID)
-				return nil // review always parks (plan_ready or changes_requested)
+				// Re-read: review left the change plan_ready or changes_requested.
+				ch2, e := store.GetChangeRecord(cmd.Context(), ch.ID)
+				if e != nil {
+					return e
+				}
+				if ch2.Status == governance.ChangeStatusChangesRequested {
+					cmd.Printf("[autopilot] %s parked — clarification posted to the issue; awaiting your answer.\n", ch.ID)
+					return nil
+				}
+				// plan_ready. Labeling the issue is the authorization to IMPLEMENT
+				// (the human still approves at the PR/merge, not here), so auto-
+				// approve within the risk ceiling; higher-risk plans park for a
+				// human `/openexec approve`.
+				if autoApproveLow && ch2.Risk == governance.RiskLow {
+					if out, ae := runSelf(cmd.Context(), self, baseDir,
+						"governance", "work", "approve", ch.ID, "--by", "pm", "--project-dir", baseDir); ae != nil {
+						return fmt.Errorf("auto-approve %s: %w — %s", ch.ID, ae, out)
+					}
+					cmd.Printf("[autopilot] %s reviewed + auto-approved (low risk); queued for execution.\n", ch.ID)
+					continue // NextActionable returns it as "execute" next
+				}
+				cmd.Printf("[autopilot] %s reviewed → plan_ready (%s risk); parked for your approval.\n", ch.ID, ch2.Risk)
+				return nil
 			case "execute":
 				if !autoExecute {
 					cmd.Printf("[autopilot] %s is approved; parked (execution needs --auto-execute).\n", ch.ID)
@@ -122,6 +145,7 @@ func init() {
 	govAutopilotCmd.Flags().String("project", "", "Project ID")
 	govAutopilotCmd.Flags().String("repo", "", "GitHub repo (owner/repo)")
 	govAutopilotCmd.Flags().String("label", "AI Fix", "Control label — only issues with it are worked (deny-by-default)")
+	govAutopilotCmd.Flags().Bool("auto-approve-low-risk", false, "Auto-approve low-risk plans in-loop (labeling is the authorization; you still approve at the PR)")
 	govAutopilotCmd.Flags().Bool("auto-execute", false, "Allow the tick to run execution on an approved change (default: park for a human)")
 	govAutopilotCmd.Flags().Int("max-steps", 6, "Max steps to advance in one tick")
 }
