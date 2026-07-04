@@ -218,6 +218,9 @@ const (
 	DecisionDeferred            = "deferred"
 	DecisionRiskAccepted        = "risk_accepted"
 	DecisionMarkedDone          = "marked_done"
+	// DecisionClarificationAnswered records a human's answer to a clarification
+	// request on a change (the reply half of the clarification loop).
+	DecisionClarificationAnswered = "clarification_answered"
 )
 
 // Review authority types.

@@ -358,6 +358,7 @@ var knownCommands = map[string]bool{
 	"revise":         true,
 	"reject":         true,
 	"defer":          true,
+	"answer":         true, // answer a clarification: /openexec answer <text>
 }
 
 // ParseCommentCommand parses the first `/openexec <cmd> [arg]` line in a GitHub

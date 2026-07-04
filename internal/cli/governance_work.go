@@ -690,6 +690,34 @@ func runGH(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	return c.CombinedOutput()
 }
 
+// govWorkNextActionableCmd surfaces what the autonomous loop would pick next:
+// the single next change it can advance without a human, honoring the single
+// work slot. Parked (changes_requested/blocked/plan_ready) and terminal changes
+// are skipped. It is read-only — the autopilot command (planned) will act on it.
+var govWorkNextActionableCmd = &cobra.Command{
+	Use:   "next-actionable",
+	Short: "Show the next change the autonomous loop would advance (single slot; parked/terminal skipped)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		svc, _, db, err := newGovService(cmd)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		projectID, _ := cmd.Flags().GetString("project")
+		ch, action, err := svc.NextActionable(cmd.Context(), projectID)
+		if err != nil {
+			return err
+		}
+		if ch == nil {
+			cmd.Println("No actionable work.")
+			return nil
+		}
+		cmd.Printf("%s  [%s]  %s  → %s\n", ch.ID, ch.Status, ch.Title, action)
+		return nil
+	},
+}
+
 var govWorkRiskAcceptCmd = &cobra.Command{
 	Use:   "risk-accept <change-id>",
 	Short: "Record an explicit human risk-acceptance (required to approve/merge critical changes)",
@@ -984,6 +1012,9 @@ func init() {
 	governanceWorkCmd.AddCommand(govWorkOpenPRCmd)
 	govWorkOpenPRCmd.Flags().String("branch", "", "Feature branch to push and open the PR from (default: current branch)")
 	govWorkOpenPRCmd.Flags().String("base", "", "Base branch for the PR (default: project base_branch, else main)")
+
+	governanceWorkCmd.AddCommand(govWorkNextActionableCmd)
+	govWorkNextActionableCmd.Flags().String("project", "", "Project ID to scope selection (default: all)")
 
 	// work risk-accept
 	governanceWorkCmd.AddCommand(govWorkRiskAcceptCmd)

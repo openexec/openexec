@@ -356,3 +356,47 @@ func (s *Service) RequestRevision(ctx context.Context, changeID, authorityID, co
 	s.mirrorGitHubLabel(ctx, ch)
 	return nil
 }
+
+// AnswerClarification records a human's answer to an open clarification and folds
+// it into the change brief so the next re-triage/re-review re-plans WITH it. It
+// does not re-plan itself — that is a later (autopilot or manual) step; here the
+// answer is captured, audited (a clarification_answered decision event), and
+// appended to the change's context. The change must be in changes_requested (an
+// open clarification must exist).
+func (s *Service) AnswerClarification(ctx context.Context, changeID, authorityID, answer string) error {
+	answer = strings.TrimSpace(answer)
+	if answer == "" {
+		return fmt.Errorf("an answer text is required: /openexec answer <text>")
+	}
+	ch, err := s.getChange(ctx, changeID)
+	if err != nil {
+		return err
+	}
+	if ch.Status != governance.ChangeStatusChangesRequested {
+		return fmt.Errorf("change %s has no open clarification (status %s)", changeID, ch.Status)
+	}
+	authority, err := s.getAuthority(ctx, authorityID)
+	if err != nil {
+		return err
+	}
+	// Fold the answer into the change brief so a re-triage re-plans WITH it.
+	ch.RawText = strings.TrimRight(ch.RawText, "\n") +
+		fmt.Sprintf("\n\n## Clarification answer (%s%s)\n%s", authority.Name, s.operatorSuffix(), answer)
+	if err := s.store.UpdateChangeRecord(ctx, ch); err != nil {
+		return fmt.Errorf("record clarification answer: %w", err)
+	}
+	ev := &governance.DecisionEvent{
+		ID:              newID(),
+		ReleaseID:       ch.ReleaseID,
+		ChangeID:        ch.ID,
+		ProposalVersion: ch.ProposalVersion,
+		Actor:           authority.ID,
+		ActorType:       authority.Type,
+		Decision:        governance.DecisionClarificationAnswered,
+		Comment:         answer,
+	}
+	if err := s.store.CreateDecisionEvent(ctx, ev); err != nil {
+		return fmt.Errorf("record clarification decision: %w", err)
+	}
+	return nil
+}

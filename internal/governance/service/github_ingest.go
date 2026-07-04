@@ -122,6 +122,8 @@ func (s *Service) dispatchCommentCommand(ctx context.Context, ch *governance.Cha
 		err = s.DeferChange(ctx, ch.ID, authorityID, arg)
 	case "revise":
 		err = s.RequestRevision(ctx, ch.ID, authorityID, arg)
+	case "answer":
+		err = s.AnswerClarification(ctx, ch.ID, authorityID, arg)
 	case "ready-for-test":
 		err = s.ReadyForTest(ctx, ch.ID)
 	default:
