@@ -52,8 +52,8 @@ func (t *SafeCommitTool) Execute(ctx context.Context, args map[string]interface{
 		return nil, fmt.Errorf("ABORTING COMMIT: failed to load project config: %v", err)
 	}
 
-	if !projCfg.GitCommitEnabled {
-		return nil, fmt.Errorf("ABORTING COMMIT: Autonomous git committing is disabled. Set 'git_commit_enabled: true' in openexec.yaml to enable.")
+	if !projCfg.IsGitCommitEnabled() {
+		return nil, fmt.Errorf("ABORTING COMMIT: autonomous committing is disabled for this project (git_commit_enabled: false). It is on by default — remove that setting to re-enable.")
 	}
 
 	// 1. Resolve Branch Names

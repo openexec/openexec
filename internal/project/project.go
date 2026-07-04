@@ -12,7 +12,7 @@ type ProjectConfig struct {
 	Name                string `json:"name"`
 	ProjectDir          string `json:"project_dir,omitempty"`
 	GitEnabled          bool   `json:"git_enabled,omitempty"`
-	GitCommitEnabled    bool   `json:"git_commit_enabled,omitempty"` // Allow autonomous local commits
+	GitCommitEnabled    *bool  `json:"git_commit_enabled,omitempty"` // Autonomous local commits; nil-default-true (set false to disable)
 	BaseBranch          string `json:"base_branch,omitempty"`
 	ReleaseBranchPrefix string `json:"release_branch_prefix,omitempty"` // e.g. "release/"
 	FeatureBranchPrefix string `json:"feature_branch_prefix,omitempty"` // e.g. "feature/"
@@ -24,6 +24,14 @@ type ProjectConfig struct {
 	// Fields are additive and backwards compatible: missing values leave
 	// gates enabled with default severities.
 	QualityGates QualityGatesConfig `json:"quality_gates,omitempty"`
+}
+
+// IsGitCommitEnabled reports whether autonomous local commits are allowed. The
+// flag is nil-default-TRUE: an absent value enables committing, and only an
+// explicit `"git_commit_enabled": false` disables it. (Autonomous local commits
+// are safe — they never push or open a PR; those are separate, gated steps.)
+func (c *ProjectConfig) IsGitCommitEnabled() bool {
+	return c.GitCommitEnabled == nil || *c.GitCommitEnabled
 }
 
 // QualityGatesConfig configures the project-level quality gates that run
