@@ -20,6 +20,7 @@ import (
 var autonomousActions = map[string]string{
 	governance.ChangeStatusCandidate:     "triage",
 	governance.ChangeStatusPlanned:       "review",
+	governance.ChangeStatusPlanReady:     "review", // deep triage lands here; review-then-approve
 	governance.ChangeStatusApprovedForAI: "execute",
 }
 
