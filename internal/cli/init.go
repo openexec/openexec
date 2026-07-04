@@ -201,7 +201,7 @@ The project name defaults to the current directory name if not provided.`,
 		}
 
 		// Set execution config
-		cfg.GitCommitEnabled = gitCommitEnabled
+		cfg.GitCommitEnabled = &gitCommitEnabled
 		cfg.Execution = project.ExecutionConfig{
 			PlannerModel:      plannerModel,
 			ExecutorModel:     executorModel,
@@ -300,13 +300,13 @@ func promptExecutionConfig(cmd *cobra.Command) (plannerModel string, executorMod
 		reviewerModel = selectModelInteractively(reader, "reviewer", initReviewerModel)
 	}
 
-	// Git configuration
-	fmt.Printf("\nEnable autonomous local commits? [y/N]: ")
+	// Git configuration (autonomous local commits default ON — they never push or PR)
+	fmt.Printf("\nEnable autonomous local commits? [Y/n]: ")
 	answer, _ = reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
-	gitCommitEnabled = false
-	if answer == "y" || answer == "yes" {
-		gitCommitEnabled = true
+	gitCommitEnabled = true
+	if answer == "n" || answer == "no" {
+		gitCommitEnabled = false
 	}
 
 	gitPushEnabled = false
