@@ -94,10 +94,15 @@ unanswered.
 Config for the control label (default `AI Fix`); a selector that returns the next
 actionable change honoring the label and the single in-flight lease.
 
-### P4 — `autopilot` command
-Wire connect → select → drive → park/finish into one command; parking moves to
-the next actionable job. Add the low-risk auto-approve policy; everything else
-parks for `/openexec approve`.
+### P4 — `autopilot` command (DONE, safe-by-default)
+`governance autopilot --repo --project --label "AI Fix"` runs one tick: connect
+(sync label-gated issues) → `NextActionable` → advance the change through the
+non-destructive steps (triage, review) and PARK at approval and execution.
+Review still posts a clarification comment when it blocks. Execution is gated
+behind `--auto-execute`; the loop never merges. Single-slot verified live (an
+implementing change reports "slot busy" and nothing new starts).
+**Remaining P4:** the low-risk auto-approve policy (approve `risk_profile: low`
+plan_ready changes in-loop; everything else parks for `/openexec approve`).
 
 ### P5 — schedule it
 Run `autopilot` on a cron. Idempotent per tick (lease prevents double-pick);
