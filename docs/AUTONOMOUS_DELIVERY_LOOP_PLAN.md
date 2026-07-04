@@ -108,6 +108,45 @@ plan_ready changes in-loop; everything else parks for `/openexec approve`).
 Run `autopilot` on a cron. Idempotent per tick (lease prevents double-pick);
 observable (each tick logs what it advanced/parked).
 
+## BLOCKER: autonomous execution produces no commits (must solve before any PR cron)
+
+Verified empirically (2026-07-04): `openexec run <taskID>` and `governance work
+execute` both POST to the daemon's **batch** executor (`/api/v1/runs:execute` →
+`ExecuteTasks`), which **holds back every hitl task and its dependents**. The
+planner always injects a **hitl study story** that the afk implement tasks depend
+on, so the whole change is held ("22 task(s) held back … requires a human"). Every
+execution attempt this session produced **0 commits**. Autonomous execution is
+therefore not achievable through the current CLI/daemon path — this is the single
+blocker for "ticket → PR while I sleep".
+
+Options (a real engineering task, not a quick patch — pick one):
+1. **Ungated single-task path in the autopilot** — execute a specific afk task via
+   `Manager.Start` (documented as ungated) instead of the daemon batch API, in
+   dependency order, then `open-pr`. Closest to the current design.
+2. **All-afk plans for autopilot-labeled work** — the planner omits the hitl study
+   story for `AI Fix` changes (the PR review IS the human checkpoint), so nothing
+   is held back. Surface the skipped study/QA as a PR checklist.
+3. **Run the study task first, autonomously** — but it is hitl and the daemon
+   holds it too, so this needs option 1's ungated path anyway.
+
+Recommended: **option 1** (ungated single-task execution in the autopilot, hitl
+study/QA tasks surfaced as a PR review checklist). Then verify ONE real
+autonomous PR before any cron.
+
+Operational note: the CLI spawns a daemon per run and does not reuse one cleanly
+(3 daemons accreted this session on 8080/8081/8765). The autopilot must manage a
+single daemon (or run gate-free without one) — otherwise cron ticks will spawn a
+daemon pile-up.
+
+## Enhancement: PR review-comment loop (when external/bot reviewers exist)
+
+Once a PR is open it will accrue review comments (bugbot, CI, human/external
+reviewers). The autopilot should read PR review comments and iterate — the same
+clarification loop, one level up: read the PR review → if actionable, revise +
+push; if it needs a human decision, park. Reuses `PostPRComment` +
+`ListIssueComments`-style plumbing on the PR. Deferred until external reviewers
+are wired; flagged by the user as "will most likely happen."
+
 ## Safety envelope (must hold)
 
 - **Deny-by-default**: no `AI Fix` label → never touched.
