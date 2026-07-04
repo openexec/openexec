@@ -78,9 +78,9 @@ func (r *APIRunner) Run(ctx context.Context) error {
 		})
 
 		req := agent.Request{
-			Model:    r.config.Model,
-			Messages: messages,
-			Tools:    r.config.Tools,
+			Model:     r.config.Model,
+			Messages:  messages,
+			Tools:     r.config.Tools,
 			MaxTokens: 16384,
 		}
 
@@ -163,8 +163,8 @@ func (r *APIRunner) Run(ctx context.Context) error {
 
 	// Max turns reached
 	r.emit(Event{
-		Type:    EventMaxIterationsReached,
-		Text:    fmt.Sprintf("Reached maximum of %d turns", r.config.MaxTurns),
+		Type: EventMaxIterationsReached,
+		Text: fmt.Sprintf("Reached maximum of %d turns", r.config.MaxTurns),
 	})
 	r.emit(Event{
 		Type:      EventComplete,

@@ -627,9 +627,9 @@ func (s *SQLiteStore) getStoryInternal(ctx context.Context, id string) (*Story, 
 			return nil, ErrStoryNotFound
 		}
 		return nil, fmt.Errorf("failed to get story: %w", err)
-		}
+	}
 
-		if epicID.Valid {
+	if epicID.Valid {
 
 		story.EpicID = &epicID.String
 	}

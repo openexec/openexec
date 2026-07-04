@@ -178,7 +178,6 @@ func outputStatusText(cmd *cobra.Command, daemonRunning bool, pid, port int, con
 
 	cmd.Println()
 
-
 	// Recent completed runs (last 5)
 	cmd.Println("Recent Runs:")
 	if len(completedRuns) == 0 {
@@ -306,7 +305,7 @@ func runStatusWatch(cmd *cobra.Command, config *project.ProjectConfig) error {
 	for {
 		// Clear screen
 		cmd.Print("\033[H\033[2J")
-		
+
 		pid, port, pidErr := readPID(config.ProjectDir)
 		daemonRunning := false
 		if pidErr == nil {
@@ -317,9 +316,9 @@ func runStatusWatch(cmd *cobra.Command, config *project.ProjectConfig) error {
 		}
 
 		_ = outputStatusText(cmd, daemonRunning, pid, port, config)
-		
+
 		cmd.Println("\n(Press Ctrl+C to stop watching)")
-		
+
 		time.Sleep(2 * time.Second)
 	}
 }

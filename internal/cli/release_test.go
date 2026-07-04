@@ -190,7 +190,7 @@ func TestGetReleaseManager(t *testing.T) {
 	tmpDir := t.TempDir()
 	// Release manager expects .openexec dir
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-	
+
 	cmd := &cobra.Command{}
 	cmd.Flags().String("project-dir", tmpDir, "")
 	cmd.Flags().Set("project-dir", tmpDir)

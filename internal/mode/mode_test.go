@@ -92,7 +92,7 @@ func TestValidateTransition(t *testing.T) {
 		{ModeRun, ModeTask, ConditionFailed, false},
 
 		// Invalid transitions
-		{ModeChat, ModeTask, ConditionCompleted, true}, // Wrong condition
+		{ModeChat, ModeTask, ConditionCompleted, true},    // Wrong condition
 		{ModeChat, ModeChat, ConditionUserApproved, true}, // Same mode
 	}
 

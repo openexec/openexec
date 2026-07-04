@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -138,7 +139,69 @@ func RemapPlanIDs(plan *ProjectPlan, look ExistingLookup) int {
 		}
 	}
 
+	// 5. Rewrite ID references embedded in PROSE fields (description,
+	// technical_strategy, acceptance criteria, verification scripts, contract).
+	// The structured IDs were remapped above, but the model also names IDs inside
+	// free text ("commit under T-US-001-001", "validates goal G-001"). Left
+	// unrewritten, that prose points at the OLD ids — which mis-binds commits and
+	// corrupts the audit attribution the pipeline exists to produce.
+	// Only whole ID tokens are rewritten (US-001 never partially matches US-0010).
+	if len(goalMap)+len(storyMap)+len(taskMap) > 0 {
+		refs := make(map[string]string, len(goalMap)+len(storyMap)+len(taskMap))
+		for k, v := range goalMap {
+			refs[k] = v
+		}
+		for k, v := range storyMap {
+			refs[k] = v
+		}
+		for k, v := range taskMap {
+			refs[k] = v
+		}
+		rw := func(s string) string { return rewriteIDRefs(s, refs) }
+		for i := range plan.Goals {
+			g := &plan.Goals[i]
+			g.Description = rw(g.Description)
+			g.SuccessCriteria = rw(g.SuccessCriteria)
+			g.VerificationMethod = rw(g.VerificationMethod)
+		}
+		for i := range plan.Stories {
+			s := &plan.Stories[i]
+			s.Description = rw(s.Description)
+			s.Contract = rw(s.Contract)
+			s.VerificationScript = rw(s.VerificationScript)
+			for j := range s.AcceptanceCriteria {
+				s.AcceptanceCriteria[j] = rw(s.AcceptanceCriteria[j])
+			}
+			for j := range s.Tasks {
+				t := &s.Tasks[j]
+				t.Description = rw(t.Description)
+				t.TechnicalStrategy = rw(t.TechnicalStrategy)
+				t.VerificationScript = rw(t.VerificationScript)
+			}
+		}
+	}
+
 	return remapped
+}
+
+// idRefTokenRe matches a WHOLE planner ID token (goal G-NNN, story US-NNN, or
+// task T-US-NNN-NNN). The task alternative is listed first and the digit runs
+// are greedy, so "T-US-001-002" matches as one task token (not an inner US-001)
+// and "US-0010" matches wholly (so a US-001 remap never corrupts it).
+var idRefTokenRe = regexp.MustCompile(`T-US-[0-9]+-[0-9]+|US-[0-9]+|G-[0-9]+`)
+
+// rewriteIDRefs replaces whole ID tokens in s according to refs (old->new),
+// leaving any token not in refs untouched.
+func rewriteIDRefs(s string, refs map[string]string) string {
+	if s == "" {
+		return s
+	}
+	return idRefTokenRe.ReplaceAllStringFunc(s, func(tok string) string {
+		if nid, ok := refs[tok]; ok {
+			return nid
+		}
+		return tok
+	})
 }
 
 // nextFreeID returns the first "<prefix>-NNN" not reported taken.

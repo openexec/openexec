@@ -147,13 +147,13 @@ func TestKnowledgeCache(t *testing.T) {
 
 	t.Run("Invalidate Project", func(t *testing.T) {
 		projectPath := "/invalidate-project"
-		
+
 		// Set multiple files
 		for i := 0; i < 3; i++ {
 			filePath := filepath.Join("src", string(rune('a'+i))+".go")
 			fileHash := ComputeFileHashString("content" + string(rune('0'+i)))
 			symbols := []byte(`[{"name": "test"}]`)
-			
+
 			err := cache.Set(projectPath, filePath, fileHash, symbols)
 			if err != nil {
 				t.Fatalf("Set failed: %v", err)
@@ -170,7 +170,7 @@ func TestKnowledgeCache(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			filePath := filepath.Join("src", string(rune('a'+i))+".go")
 			fileHash := ComputeFileHashString("content" + string(rune('0'+i)))
-			
+
 			result, err := cache.Get(projectPath, filePath, fileHash)
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)
@@ -187,7 +187,7 @@ func TestKnowledgeCache(t *testing.T) {
 			filePath := filepath.Join("src", string(rune('a'+i))+".go")
 			fileHash := ComputeFileHashString("content" + string(rune('0'+i)))
 			symbols := []byte(`[{"name": "test"}]`)
-			
+
 			err := cache.Set("/stats-project", filePath, fileHash, symbols)
 			if err != nil {
 				t.Fatalf("Set failed: %v", err)
@@ -220,7 +220,7 @@ func TestKnowledgeCache(t *testing.T) {
 			filePath := filepath.Join("cleanup", string(rune('a'+i))+".go")
 			fileHash := ComputeFileHashString("content" + string(rune('0'+i)))
 			symbols := []byte(`[{"name": "test"}]`)
-			
+
 			err := cleanupCache.Set("/cleanup-project", filePath, fileHash, symbols)
 			if err != nil {
 				t.Fatalf("Set failed: %v", err)

@@ -238,7 +238,7 @@ func ValidatePathAccess(tier PermissionTier, workspace, path string, isWrite boo
 
 		// Check containment
 		rel, err := filepath.Rel(realWorkspace, realPath)
-		if err != nil || len(rel) > 2 && rel[:3] == ".." + string(filepath.Separator) || rel == ".." {
+		if err != nil || len(rel) > 2 && rel[:3] == ".."+string(filepath.Separator) || rel == ".." {
 			return fmt.Errorf("path %q is outside workspace %q", path, workspace)
 		}
 	}

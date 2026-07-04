@@ -21,12 +21,31 @@ import (
 	"strings"
 	"testing"
 
+	"database/sql"
+
 	"github.com/openexec/openexec/internal/dcp"
+	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/internal/policy"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/server"
+	"github.com/openexec/openexec/internal/tools"
 	"github.com/openexec/openexec/pkg/version"
 )
+
+// newTestCoordinator mirrors production DCP wiring with the BitNet router in
+// skip-availability mode (simulateInference), injected via server.Config.
+func newTestCoordinator(db *sql.DB, projectsDir string) (server.DCPCoordinator, error) {
+	kStore, _ := knowledge.NewStoreWithDB(db)
+	br := router.NewBitNetRouter("/models/bitnet-2b.gguf")
+	br.SetSkipAvailabilityCheck(true)
+	c := dcp.NewCoordinator(br, kStore)
+	c.RegisterTool(tools.NewSymbolReaderTool(kStore))
+	c.RegisterTool(tools.NewDeployTool(kStore))
+	c.RegisterTool(tools.NewSafeCommitTool(policy.NewEngine(kStore), c))
+	c.RegisterTool(tools.NewGeneralChatTool())
+	return c, nil
+}
 
 // =============================================================================
 // Goal G-001: Single Orchestration Plane
@@ -37,10 +56,10 @@ import (
 // DCP routes queries to tools without orchestration logic.
 func TestG001_SingleOrchestrationPlane(t *testing.T) {
 	testCases := []struct {
-		name        string
-		query       string
-		expectTool  string // Expected tool category
-		allowError  bool   // Allow tool execution errors (but not routing errors)
+		name       string
+		query      string
+		expectTool string // Expected tool category
+		allowError bool   // Allow tool execution errors (but not routing errors)
 	}{
 		// DCP routes queries to tools (thin adapter behavior)
 		{"help_routes_to_chat", "help", "general_chat", false},
@@ -62,20 +81,14 @@ func TestG001_SingleOrchestrationPlane(t *testing.T) {
 		Port:          0,
 		ProjectsDir:   t.TempDir(),
 		DataDir:       t.TempDir(),
-		EnableDCP:     true,
-		SkipPreflight: true,
+		EnableDCP:      true,
+		SkipPreflight:  true,
+		NewCoordinator: newTestCoordinator,
 	}
 
 	srv, err := server.New(cfg)
 	if err != nil {
 		t.Fatalf("failed to create test server: %v", err)
-	}
-
-	// Skip BitNet availability check
-	if srv.Coordinator != nil {
-		if br, ok := srv.Coordinator.GetRouter().(*router.BitNetRouter); ok {
-			br.SetSkipAvailabilityCheck(true)
-		}
 	}
 
 	for _, tc := range testCases {

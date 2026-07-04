@@ -16,7 +16,7 @@ func TestMemorySystem(t *testing.T) {
 
 	t.Run("Write and Get Layer", func(t *testing.T) {
 		content := "# Project Memory\n\nThis is project-specific context."
-		
+
 		err := system.Write(LayerProject, content)
 		if err != nil {
 			t.Fatalf("Write failed: %v", err)

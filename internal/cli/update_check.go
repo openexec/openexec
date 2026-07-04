@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	updateCheckURL     = "https://openexec.io/version.txt"
-	updateCheckTimeout = 3 * time.Second
-	updateCheckFile    = ".last_update_check"
+	updateCheckURL      = "https://openexec.io/version.txt"
+	updateCheckTimeout  = 3 * time.Second
+	updateCheckFile     = ".last_update_check"
 	updateCheckInterval = 24 * time.Hour
 )
 

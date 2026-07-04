@@ -14,10 +14,10 @@ import (
 type StallState string
 
 const (
-	StateNormal      StallState = "normal"
-	StateWarning     StallState = "warning"
-	StateStalled     StallState = "stalled"
-	StateRecovering  StallState = "recovering"
+	StateNormal     StallState = "normal"
+	StateWarning    StallState = "warning"
+	StateStalled    StallState = "stalled"
+	StateRecovering StallState = "recovering"
 )
 
 // StallConfig configures stall detection behavior.
@@ -71,17 +71,17 @@ func DefaultStallConfig() StallConfig {
 
 // StallDetector monitors execution for stalls and manages recovery.
 type StallDetector struct {
-	config      StallConfig
-	mu          sync.RWMutex
-	lastActivity time.Time
-	state       StallState
-	stallCount  int
+	config         StallConfig
+	mu             sync.RWMutex
+	lastActivity   time.Time
+	state          StallState
+	stallCount     int
 	warningEmitted bool
 
 	// Callbacks
-	onWarning   func(duration time.Duration)
-	onStall     func(count int, duration time.Duration)
-	onRecovery  func(count int)
+	onWarning    func(duration time.Duration)
+	onStall      func(count int, duration time.Duration)
+	onRecovery   func(count int)
 	onFatalStall func(count int)
 }
 

@@ -264,5 +264,3 @@ func TestParallelBlueprint(t *testing.T) {
 		t.Errorf("expected 2 stages, got %d", len(parallelBp.Stages))
 	}
 }
-
-

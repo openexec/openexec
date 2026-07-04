@@ -16,20 +16,20 @@ func TestPathValidationError(t *testing.T) {
 }
 
 func TestDefaultPathValidatorConfig(t *testing.T) {
-    // Ensure deterministic root via env, but restore original value after
-    wd, _ := os.Getwd()
-    oldRoot := os.Getenv("WORKSPACE_ROOT")
-    os.Setenv("WORKSPACE_ROOT", wd)
-    defer os.Setenv("WORKSPACE_ROOT", oldRoot)
+	// Ensure deterministic root via env, but restore original value after
+	wd, _ := os.Getwd()
+	oldRoot := os.Getenv("WORKSPACE_ROOT")
+	os.Setenv("WORKSPACE_ROOT", wd)
+	defer os.Setenv("WORKSPACE_ROOT", oldRoot)
 
-    config := DefaultPathValidatorConfig()
+	config := DefaultPathValidatorConfig()
 
-    if config.AllowedRoots == nil || len(config.AllowedRoots) == 0 {
-        t.Fatal("AllowedRoots should default to workspace root")
-    }
-    if config.AllowedRoots[0] != wd {
-        t.Errorf("AllowedRoots[0] = %q, want %q", config.AllowedRoots[0], wd)
-    }
+	if config.AllowedRoots == nil || len(config.AllowedRoots) == 0 {
+		t.Fatal("AllowedRoots should default to workspace root")
+	}
+	if config.AllowedRoots[0] != wd {
+		t.Errorf("AllowedRoots[0] = %q, want %q", config.AllowedRoots[0], wd)
+	}
 	if config.AllowSymlinks {
 		t.Error("AllowSymlinks should be false by default")
 	}

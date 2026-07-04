@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/openexec/openexec/internal/infra"
+	"github.com/openexec/openexec/internal/infracontract"
 )
 
 // Infra suggestion tools (Phase 4 of the SRE roadmap): typed routing
@@ -58,7 +58,7 @@ func suggestEnum(desc string, values []string) map[string]interface{} {
 // Descriptions deliberately carry the operational verbs operators use
 // (deploy, restart, bounce, check, provision) — the heuristic selector
 // scores word overlap and action verbs against the user's prompt.
-func NewInfraSuggestTools(reg *infra.Registry) []Tool {
+func NewInfraSuggestTools(reg infracontract.Registry) []Tool {
 	envs := reg.Environments()
 	var out []Tool
 	if reg.HasEngine("ansible") {

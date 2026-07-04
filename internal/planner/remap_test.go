@@ -1,6 +1,64 @@
 package planner
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestRemapPlanIDs_RewritesProseIDReferences(t *testing.T) {
+	// G-001 and US-001 already exist under DIFFERENT titles, so both remap:
+	// G-001->G-002, US-001->US-002, T-US-001-001->T-US-002-001. Prose fields that
+	// name the old IDs must be rewritten to match, or commits mis-bind.
+	plan := &ProjectPlan{
+		Goals: []Goal{{ID: "G-001", Title: "New goal", Description: "Fulfils G-001"}},
+		Stories: []Story{{
+			ID: "US-001", Title: "New story", GoalID: "G-001",
+			Description:        "Story US-001 under goal G-001; unrelated US-0011 stays",
+			AcceptanceCriteria: []string{"Verified for US-001"},
+			Tasks: []Task{{
+				ID:                "T-US-001-001",
+				TechnicalStrategy: "Commit under T-US-001-001 for story US-001 and goal G-001",
+			}},
+		}},
+	}
+	look := ExistingLookup{
+		GoalTitle: func(id string) (string, bool) {
+			if id == "G-001" {
+				return "Old goal", true
+			}
+			return "", false
+		},
+		StoryTitle: func(id string) (string, bool) {
+			if id == "US-001" {
+				return "Old story", true
+			}
+			return "", false
+		},
+		TaskExists: func(string) bool { return false },
+	}
+	RemapPlanIDs(plan, look)
+
+	g, s, task := plan.Goals[0], plan.Stories[0], plan.Stories[0].Tasks[0]
+	if g.ID != "G-002" || s.ID != "US-002" || task.ID != "T-US-002-001" {
+		t.Fatalf("structured remap wrong: G=%s US=%s T=%s", g.ID, s.ID, task.ID)
+	}
+	if g.Description != "Fulfils G-002" {
+		t.Errorf("goal prose not rewritten: %q", g.Description)
+	}
+	if task.TechnicalStrategy != "Commit under T-US-002-001 for story US-002 and goal G-002" {
+		t.Errorf("task prose not rewritten: %q", task.TechnicalStrategy)
+	}
+	if s.AcceptanceCriteria[0] != "Verified for US-002" {
+		t.Errorf("acceptance criteria not rewritten: %q", s.AcceptanceCriteria[0])
+	}
+	// US-0011 is a different token and must NOT be corrupted by the US-001 remap.
+	if !strings.Contains(s.Description, "US-0011 stays") {
+		t.Errorf("unrelated token US-0011 was corrupted: %q", s.Description)
+	}
+	if !strings.Contains(s.Description, "Story US-002 under goal G-002") {
+		t.Errorf("story prose not rewritten: %q", s.Description)
+	}
+}
 
 func noExisting() ExistingLookup {
 	return ExistingLookup{

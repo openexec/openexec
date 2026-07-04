@@ -173,6 +173,12 @@ func (c *Coordinator) GetRouter() router.Router {
 	return c.router
 }
 
+// AllowsExecution reports whether the coordinator would execute tools directly
+// (rather than suggest-only). Exposes the AllowExecution field as a method so
+// core (internal/server) can hold this coordinator behind an interface without
+// importing internal/dcp. Production daemons keep this false.
+func (c *Coordinator) AllowsExecution() bool { return c.AllowExecution }
+
 // SyncKnowledge performs a full project re-index.
 // Error is intentionally ignored: indexing is best-effort and the DCP
 // continues to function with stale or empty knowledge when indexing fails.

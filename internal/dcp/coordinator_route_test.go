@@ -266,11 +266,11 @@ func TestCoordinator_Route_RepoZones(t *testing.T) {
 
 func TestCoordinator_Route_NeedsFrontier(t *testing.T) {
 	tests := []struct {
-		name           string
-		query          string
-		toolName       string
-		confidence     float64
-		needsFrontier  bool
+		name          string
+		query         string
+		toolName      string
+		confidence    float64
+		needsFrontier bool
 	}{
 		{
 			name:          "run mode always needs frontier",

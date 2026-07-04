@@ -32,14 +32,14 @@ type Config struct {
 	// If nil, no uploader is used.
 	UploaderFactory UploaderFactory `json:"-"`
 
-    // Prompt is the system prompt passed to Claude Code via -p flag.
-    Prompt string
+	// Prompt is the system prompt passed to Claude Code via -p flag.
+	Prompt string
 
-    // StablePrompt is the cached, byte-identical stable prefix for provider caching.
-    StablePrompt string
+	// StablePrompt is the cached, byte-identical stable prefix for provider caching.
+	StablePrompt string
 
-    // VolatilePrompt is the dynamic tail (e.g., briefing) appended after the stable prefix.
-    VolatilePrompt string
+	// VolatilePrompt is the dynamic tail (e.g., briefing) appended after the stable prefix.
+	VolatilePrompt string
 
 	// WorkDir is the working directory for the Claude Code process.
 	WorkDir string
@@ -98,11 +98,11 @@ type Config struct {
 	// EvidencePrefix is the key prefix for uploaded files.
 	EvidencePrefix string
 
-    // DeepTraceCfg configures the Deep-Trace middleware for ISO 27001 compliance.
-    // If nil, middleware is disabled.
-    DeepTraceCfg *DeepTraceConfig
+	// DeepTraceCfg configures the Deep-Trace middleware for ISO 27001 compliance.
+	// If nil, middleware is disabled.
+	DeepTraceCfg *DeepTraceConfig
 
-    // QualityGates enables quality gate validation after task completion.
+	// QualityGates enables quality gate validation after task completion.
 	// When enabled, gates from openexec.yaml are run after each phase-complete signal.
 	QualityGates bool
 
@@ -127,90 +127,90 @@ type Config struct {
 	// RunnerArgs optionally overrides the CLI arguments.
 	RunnerArgs []string
 
-    // Summarizer is the session history summarizer (optional).
-    // If nil, no summarization is performed.
-    Summarizer Summarizer `json:"-"`
+	// Summarizer is the session history summarizer (optional).
+	// If nil, no summarization is performed.
+	Summarizer Summarizer `json:"-"`
 
-    // ExecMode controls write permissions for the spawned process.
-    // Accepted: "read-only", "workspace-write", "danger-full-access".
-    // Propagated via environment variables to the runner.
-    // DEPRECATED: Use Mode instead for typed mode handling.
-    ExecMode string
+	// ExecMode controls write permissions for the spawned process.
+	// Accepted: "read-only", "workspace-write", "danger-full-access".
+	// Propagated via environment variables to the runner.
+	// DEPRECATED: Use Mode instead for typed mode handling.
+	ExecMode string
 
-    // Mode is the typed operational mode (chat/task/run).
-    // When set, this takes precedence over ExecMode for MCP server configuration.
-    // The mode is propagated to child processes via OPENEXEC_MODE env var.
-    Mode mode.Mode
+	// Mode is the typed operational mode (chat/task/run).
+	// When set, this takes precedence over ExecMode for MCP server configuration.
+	// The mode is propagated to child processes via OPENEXEC_MODE env var.
+	Mode mode.Mode
 
-    // PromptHash is the SHA-256 (hex) of the composed prompt for observability.
-    PromptHash string
+	// PromptHash is the SHA-256 (hex) of the composed prompt for observability.
+	PromptHash string
 
-    // StablePromptHash is the SHA-256 (hex) of the stable prefix for cache keying.
-    StablePromptHash string
+	// StablePromptHash is the SHA-256 (hex) of the stable prefix for cache keying.
+	StablePromptHash string
 
-    // RunSpecID links to the immutable RunSpec for deterministic replay.
-    // When set, this run can be resumed or replayed using the same inputs.
-    RunSpecID string
+	// RunSpecID links to the immutable RunSpec for deterministic replay.
+	// When set, this run can be resumed or replayed using the same inputs.
+	RunSpecID string
 
-    // ContextCachePath is the directory for caching gathered context bundles.
-    // If empty, context caching is disabled.
-    // Typically set to .openexec/cache/context.
-    ContextCachePath string
+	// ContextCachePath is the directory for caching gathered context bundles.
+	// If empty, context caching is disabled.
+	// Typically set to .openexec/cache/context.
+	ContextCachePath string
 
-    // ResumeFromCheckpoint enables resuming from a specific checkpoint.
-    // When set, the loop will:
-    // 1. Restore message history from the checkpoint
-    // 2. Skip tool calls with existing idempotency keys
-    // 3. Continue from the checkpoint's phase and iteration
-    ResumeFromCheckpoint *ResumeConfig
+	// ResumeFromCheckpoint enables resuming from a specific checkpoint.
+	// When set, the loop will:
+	// 1. Restore message history from the checkpoint
+	// 2. Skip tool calls with existing idempotency keys
+	// 3. Continue from the checkpoint's phase and iteration
+	ResumeFromCheckpoint *ResumeConfig
 
-    // StallDetection configures stall detection with provider timeouts and backoff.
-    // If nil, default stall detection settings are used.
-    StallDetection *StallConfig
+	// StallDetection configures stall detection with provider timeouts and backoff.
+	// If nil, default stall detection settings are used.
+	StallDetection *StallConfig
 
-    // BlueprintEnabled enables blueprint-driven execution mode.
-    // When enabled, the loop uses blueprint stages instead of linear iteration.
-    BlueprintEnabled bool
+	// BlueprintEnabled enables blueprint-driven execution mode.
+	// When enabled, the loop uses blueprint stages instead of linear iteration.
+	BlueprintEnabled bool
 
-    // Blueprint is the blueprint to execute.
-    // If BlueprintEnabled is true and this is nil, DefaultBlueprint is used.
-    Blueprint *blueprint.Blueprint
+	// Blueprint is the blueprint to execute.
+	// If BlueprintEnabled is true and this is nil, DefaultBlueprint is used.
+	Blueprint *blueprint.Blueprint
 
-    // BlueprintExecutor is the stage executor for blueprint execution.
-    // Required when BlueprintEnabled is true.
-    BlueprintExecutor blueprint.StageExecutor `json:"-"`
+	// BlueprintExecutor is the stage executor for blueprint execution.
+	// Required when BlueprintEnabled is true.
+	BlueprintExecutor blueprint.StageExecutor `json:"-"`
 
-    // BlueprintCallbacks contains callbacks for blueprint events.
-    BlueprintCallbacks *BlueprintCallbacks `json:"-"`
+	// BlueprintCallbacks contains callbacks for blueprint events.
+	BlueprintCallbacks *BlueprintCallbacks `json:"-"`
 
-    // PIIScrubLevel controls PII scrubbing before sending to LLM providers.
-    // Valid values: "low", "medium", "high", "" (disabled)
-    // When enabled, all message content is scrubbed before being sent to the provider.
-    PIIScrubLevel string
+	// PIIScrubLevel controls PII scrubbing before sending to LLM providers.
+	// Valid values: "low", "medium", "high", "" (disabled)
+	// When enabled, all message content is scrubbed before being sent to the provider.
+	PIIScrubLevel string
 }
 
 // BlueprintCallbacks contains callbacks for blueprint stage events.
 type BlueprintCallbacks struct {
-    // OnStageStart is called when a stage begins.
-    OnStageStart func(run *blueprint.Run, stage *blueprint.Stage)
+	// OnStageStart is called when a stage begins.
+	OnStageStart func(run *blueprint.Run, stage *blueprint.Stage)
 
-    // OnStageComplete is called when a stage completes.
-    OnStageComplete func(run *blueprint.Run, result *blueprint.StageResult)
+	// OnStageComplete is called when a stage completes.
+	OnStageComplete func(run *blueprint.Run, result *blueprint.StageResult)
 
-    // OnCheckpoint is called when a checkpoint is created.
-    OnCheckpoint func(run *blueprint.Run, stageName string)
+	// OnCheckpoint is called when a checkpoint is created.
+	OnCheckpoint func(run *blueprint.Run, stageName string)
 
-    // OnRunComplete is called when the run completes.
-    OnRunComplete func(run *blueprint.Run)
+	// OnRunComplete is called when the run completes.
+	OnRunComplete func(run *blueprint.Run)
 }
 
 // ResumeConfig holds configuration for resuming from a checkpoint.
 type ResumeConfig struct {
-    CheckpointID     string   // ID of the checkpoint to resume from
-    MessageHistory   []byte   // JSON-encoded message history
-    AppliedToolCalls []string // Idempotency keys of already-applied tool calls
-    Phase            string   // Phase to resume from
-    Iteration        int      // Iteration to resume from
+	CheckpointID     string   // ID of the checkpoint to resume from
+	MessageHistory   []byte   // JSON-encoded message history
+	AppliedToolCalls []string // Idempotency keys of already-applied tool calls
+	Phase            string   // Phase to resume from
+	Iteration        int      // Iteration to resume from
 }
 
 // Summarizer defines the interface for session history summarization.

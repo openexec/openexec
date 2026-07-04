@@ -30,7 +30,7 @@ func TestPruner(t *testing.T) {
 	defer memoryManager.Close()
 
 	config := DefaultPrunerConfig()
-	pruner, err := NewPruner(tmpDir, knowledgeStore, memoryManager, config)
+	pruner, err := NewPruner(tmpDir, knowledgeStore, config)
 	if err != nil {
 		t.Fatalf("failed to create pruner: %v", err)
 	}
@@ -71,10 +71,10 @@ func TestPruner(t *testing.T) {
 	t.Run("Respects Token Budget", func(t *testing.T) {
 		// Create files with known token counts
 		files := []FileInfo{
-			{Path: "file1.go", Content: strings.Repeat("a", 400)},  // ~100 tokens
-			{Path: "file2.go", Content: strings.Repeat("b", 400)},  // ~100 tokens
-			{Path: "file3.go", Content: strings.Repeat("c", 400)},  // ~100 tokens
-			{Path: "file4.go", Content: strings.Repeat("d", 400)},  // ~100 tokens
+			{Path: "file1.go", Content: strings.Repeat("a", 400)}, // ~100 tokens
+			{Path: "file2.go", Content: strings.Repeat("b", 400)}, // ~100 tokens
+			{Path: "file3.go", Content: strings.Repeat("c", 400)}, // ~100 tokens
+			{Path: "file4.go", Content: strings.Repeat("d", 400)}, // ~100 tokens
 		}
 
 		config := &PrunerConfig{
@@ -83,7 +83,7 @@ func TestPruner(t *testing.T) {
 			MinRelevanceScore: 0,
 		}
 
-		pruner, _ := NewPruner(tmpDir, nil, nil, config)
+		pruner, _ := NewPruner(tmpDir, nil, config)
 		defer pruner.Close()
 
 		result, err := pruner.Prune(files, "test query")
@@ -111,7 +111,7 @@ func TestPruner(t *testing.T) {
 			MinRelevanceScore: 0,
 		}
 
-		pruner, _ := NewPruner(tmpDir, nil, nil, config)
+		pruner, _ := NewPruner(tmpDir, nil, config)
 		defer pruner.Close()
 
 		result, err := pruner.Prune(files, "test")
@@ -136,7 +136,7 @@ func TestPruner(t *testing.T) {
 			MinRelevanceScore: 5.0,
 		}
 
-		pruner, _ := NewPruner(tmpDir, nil, nil, config)
+		pruner, _ := NewPruner(tmpDir, nil, config)
 		defer pruner.Close()
 
 		result, err := pruner.Prune(files, "auth")
@@ -157,7 +157,7 @@ func TestScoreCalculation(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 
-	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
+	pruner, _ := NewPruner(tmpDir, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
 	t.Run("Content Scoring", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestScoreCalculation(t *testing.T) {
 func TestTermExtraction(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
+	pruner, _ := NewPruner(tmpDir, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
 	tests := []struct {
@@ -262,7 +262,7 @@ func TestTermExtraction(t *testing.T) {
 func TestTokenEstimation(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
-	pruner, _ := NewPruner(tmpDir, nil, nil, DefaultPrunerConfig())
+	pruner, _ := NewPruner(tmpDir, nil, DefaultPrunerConfig())
 	defer pruner.Close()
 
 	tests := []struct {
@@ -270,10 +270,10 @@ func TestTokenEstimation(t *testing.T) {
 		expected int
 	}{
 		{"", 0},
-		{"abcd", 1},           // 4 chars / 4 = 1
-		{"abcdefghij", 2},     // 10 chars / 4 = 2
-		{"a b c d", 1},        // 4 non-space chars / 4 = 1
-		{"    ", 0},           // Only spaces
+		{"abcd", 1},       // 4 chars / 4 = 1
+		{"abcdefghij", 2}, // 10 chars / 4 = 2
+		{"a b c d", 1},    // 4 non-space chars / 4 = 1
+		{"    ", 0},       // Only spaces
 	}
 
 	for _, tt := range tests {

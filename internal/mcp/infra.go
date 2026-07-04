@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openexec/openexec/internal/infra"
+	"github.com/openexec/openexec/internal/infracontract"
 )
+
+// infraConfigFileName is the operator allowlist path, surfaced in "not enabled"
+// errors. Mirrors infra.ConfigFileName without importing the module.
+const infraConfigFileName = ".openexec/infra.yaml"
 
 // Infra tools expose the deny-by-default SRE command registry
 // (internal/infra, configured via .openexec/infra.yaml) as parameter-bounded
@@ -43,15 +47,12 @@ func isInfraTool(name string) bool {
 
 // SetInfraRegistry enables the infra tools, backed by the given registry.
 // A nil runner gets the production ExecRunner.
-func (s *Server) SetInfraRegistry(reg *infra.Registry) {
+func (s *Server) SetInfraRegistry(reg infracontract.Registry) {
 	s.infraRegistry = reg
-	if s.infraRunner == nil {
-		s.infraRunner = &infra.ExecRunner{}
-	}
 }
 
 // SetInfraRunner overrides the command runner (tests).
-func (s *Server) SetInfraRunner(r infra.Runner) {
+func (s *Server) SetInfraRunner(r infracontract.Runner) {
 	s.infraRunner = r
 }
 
@@ -100,7 +101,7 @@ func enumProp(desc string, values []string) map[string]interface{} {
 	return p
 }
 
-func AnsibleRunPlaybookToolDef(reg *infra.Registry) map[string]interface{} {
+func AnsibleRunPlaybookToolDef(reg infracontract.Registry) map[string]interface{} {
 	return map[string]interface{}{
 		"name":        "ansible_run_playbook",
 		"description": "Run a pre-approved Ansible playbook from the operator allowlist against a configured environment. Apply-class: a real run requires human approval through the approval gate; set check=true for a --check dry-run that needs no approval. Playbooks outside the allowlist do not exist as far as this tool is concerned.",
@@ -123,7 +124,7 @@ func AnsibleRunPlaybookToolDef(reg *infra.Registry) map[string]interface{} {
 	}
 }
 
-func SaltApplyStateToolDef(reg *infra.Registry) map[string]interface{} {
+func SaltApplyStateToolDef(reg infracontract.Registry) map[string]interface{} {
 	return map[string]interface{}{
 		"name":        "salt_apply_state",
 		"description": "Apply a pre-approved Salt state to an allowlisted target in a configured environment. Apply-class: a real run requires human approval through the approval gate; set test=true for a test=True dry-run that needs no approval. Targets and states outside the allowlist are refused.",
@@ -143,7 +144,7 @@ func SaltApplyStateToolDef(reg *infra.Registry) map[string]interface{} {
 	}
 }
 
-func SSHRunQueryToolDef(reg *infra.Registry) map[string]interface{} {
+func SSHRunQueryToolDef(reg infracontract.Registry) map[string]interface{} {
 	return map[string]interface{}{
 		"name":        "ssh_run_query",
 		"description": "Run a pre-approved read-only diagnostic query (e.g. disk or service status) over SSH on a host matching the environment's allowed host patterns. The remote command comes from operator config — only the query name and host are selectable, so this tool cannot execute arbitrary commands.",
@@ -162,7 +163,7 @@ func SSHRunQueryToolDef(reg *infra.Registry) map[string]interface{} {
 	}
 }
 
-func TerraformPlanToolDef(reg *infra.Registry) map[string]interface{} {
+func TerraformPlanToolDef(reg infracontract.Registry) map[string]interface{} {
 	return map[string]interface{}{
 		"name":        "terraform_plan",
 		"description": "Run terraform plan in the environment's configured working directory with optional allowlisted variables. Read-class: plan renders pending changes without mutating infrastructure. Set save=true to write the per-environment saved plan file that terraform_apply consumes — apply can only ever run a saved plan.",
@@ -185,7 +186,7 @@ func TerraformPlanToolDef(reg *infra.Registry) map[string]interface{} {
 	}
 }
 
-func TerraformApplyToolDef(reg *infra.Registry) map[string]interface{} {
+func TerraformApplyToolDef(reg infracontract.Registry) map[string]interface{} {
 	return map[string]interface{}{
 		"name":        "terraform_apply",
 		"description": "Apply the previously saved terraform plan for an environment (created by terraform_plan with save=true). TOCTOU-safe: only the fixed saved plan file can be applied — no variables, targets, or paths are accepted, and terraform refuses a stale plan if state drifted. The saved plan is first inspected via `terraform show -json` and destructive actions (delete/replace) are detected deterministically in Go and surfaced to the approver. Apply-class: requires human approval through the approval gate.",
@@ -201,7 +202,7 @@ func TerraformApplyToolDef(reg *infra.Registry) map[string]interface{} {
 
 // InfraToolDefs returns the tool definitions for every engine the operator
 // configured (engines with no config in any environment are not advertised).
-func InfraToolDefs(reg *infra.Registry) []interface{} {
+func InfraToolDefs(reg infracontract.Registry) []interface{} {
 	var defs []interface{}
 	if reg.HasEngine("ansible") {
 		defs = append(defs, AnsibleRunPlaybookToolDef(reg))
@@ -225,7 +226,7 @@ func InfraToolDefs(reg *infra.Registry) []interface{} {
 // rather than dereference a nil registry.
 func (s *Server) infraEnabled(req Request) bool {
 	if s.infraRegistry == nil || s.infraRunner == nil {
-		s.writeToolError(req.ID, "infra tools are not enabled: no "+infra.ConfigFileName+" allowlist is loaded in this workspace")
+		s.writeToolError(req.ID, "infra tools are not enabled: no "+infraConfigFileName+" allowlist is loaded in this workspace")
 		return false
 	}
 	return true
@@ -236,7 +237,7 @@ func (s *Server) infraEnabled(req Request) bool {
 // destructive carries deterministically-detected destructive changes (the
 // Phase-2 terraform plan gate) so the approver sees exactly what would be
 // deleted or replaced.
-func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMessage, cmd *infra.Command, destructive []string) {
+func (s *Server) runInfraCommand(req Request, toolName string, args json.RawMessage, cmd *infracontract.Command, destructive []string) {
 	// Phase-3 environment tiering: an environment the operator explicitly
 	// marked risk_profile=low (e.g. staging) runs apply-class commands
 	// autonomously — EXCEPT when the deterministic plan gate found
@@ -416,7 +417,7 @@ func (s *Server) handleTerraformApply(req Request, params toolsCallParams) {
 		return
 	}
 	// An unverifiable plan must never reach apply.
-	destructive, err := infra.DestructiveChanges([]byte(planJSON))
+	destructive, err := s.infraRegistry.DestructiveChanges([]byte(planJSON))
 	if err != nil {
 		s.writeToolError(req.ID, fmt.Sprintf(
 			"refusing to apply: the saved plan for %q could not be verified deterministically: %v", r.Environment, err))

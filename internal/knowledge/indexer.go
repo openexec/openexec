@@ -17,10 +17,10 @@ type Indexer struct {
 
 // IndexStats tracks indexing statistics.
 type IndexStats struct {
-	FilesProcessed  int
+	FilesProcessed   int
 	SymbolsExtracted int
-	ErrorCount      int
-	ByLanguage      map[string]int
+	ErrorCount       int
+	ByLanguage       map[string]int
 }
 
 // Syncer defines the interface for triggering file re-indexing
@@ -75,10 +75,10 @@ func (idx *Indexer) IndexProject(projectDir string) error {
 		if info.IsDir() {
 			name := info.Name()
 			if strings.HasPrefix(name, ".") ||
-			   name == "node_modules" ||
-			   name == "vendor" ||
-			   name == "__pycache__" ||
-			   name == ".git" {
+				name == "node_modules" ||
+				name == "vendor" ||
+				name == "__pycache__" ||
+				name == ".git" {
 				return filepath.SkipDir
 			}
 			return nil
