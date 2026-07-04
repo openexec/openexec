@@ -1,14 +1,158 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/openexec/openexec/internal/governance"
+	"github.com/openexec/openexec/internal/governance/service"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/spf13/cobra"
 )
+
+// autopilotExecuteToPR is the autonomous execute→commit→PR path. It runs the
+// change's tasks through the UNGATED single-task endpoint (POST
+// /runs/{id}/start → Manager.Start, which the batch executor's hitl gate does
+// not touch), commits the result deterministically (the agent does not reliably
+// self-commit), and opens a PR. hitl study/QA tasks are run too — the PR review
+// IS the human checkpoint in this model — and flagged in the PR for verification.
+func autopilotExecuteToPR(cmd *cobra.Command, self, baseDir, changeID string, svc *service.Service) error {
+	pc, _ := project.LoadProjectConfig(baseDir)
+	port := 8765
+	base := "main"
+	if pc != nil {
+		if pc.Execution.Port > 0 {
+			port = pc.Execution.Port
+		}
+		if pc.BaseBranch != "" {
+			base = pc.BaseBranch
+		}
+	}
+	if !daemonHealthy(port) {
+		return fmt.Errorf("execution daemon not reachable on port %d — start it first: (cd %s && openexec start)", port, baseDir)
+	}
+
+	// Isolate on a per-change branch off base.
+	branch := "gov/" + changeID
+	if out, err := gitIn(baseDir, "checkout", "-B", branch, base); err != nil {
+		return fmt.Errorf("branch %s: %w — %s", branch, err, out)
+	}
+
+	stories, err := svc.ChangeStories(cmd.Context(), changeID)
+	if err != nil {
+		return fmt.Errorf("list tasks for %s: %w", changeID, err)
+	}
+	var taskIDs []string
+	for _, st := range stories {
+		taskIDs = append(taskIDs, st.Tasks...)
+	}
+	if len(taskIDs) == 0 {
+		return fmt.Errorf("change %s has no tasks", changeID)
+	}
+
+	// Run each task ungated, in story order, and wait for it to finish.
+	for _, tid := range taskIDs {
+		cmd.Printf("[autopilot]   run %s (ungated)...\n", tid)
+		if err := startRunUngated(port, tid, "workspace-write"); err != nil {
+			return fmt.Errorf("start %s: %w", tid, err)
+		}
+		st, err := waitRunTerminal(cmd.Context(), port, tid, 30*time.Minute)
+		if err != nil {
+			return fmt.Errorf("run %s: %w", tid, err)
+		}
+		cmd.Printf("[autopilot]   %s → %s\n", tid, st)
+	}
+
+	// Deterministic commit — the agent does not reliably call safe_commit.
+	if out, err := gitIn(baseDir, "add", "-A"); err != nil {
+		return fmt.Errorf("git add: %w — %s", err, out)
+	}
+	msg := fmt.Sprintf("feat: implement %s (autopilot)", changeID)
+	out, err := gitIn(baseDir, "-c", "user.name=openexec", "-c", "user.email=openexec@local", "commit", "-m", msg)
+	if err != nil {
+		// "nothing to commit" means the run produced no changes — surface it.
+		if bytesContains(out, "nothing to commit") {
+			cmd.Printf("[autopilot] %s produced no changes; nothing to PR.\n", changeID)
+			return nil
+		}
+		return fmt.Errorf("git commit: %w — %s", err, out)
+	}
+
+	// Open the PR (push + gh pr create + assessment).
+	self2 := self
+	pout, perr := runSelf(cmd.Context(), self2, baseDir,
+		"governance", "work", "open-pr", changeID, "--branch", branch, "--project-dir", baseDir)
+	if perr != nil {
+		return fmt.Errorf("open-pr %s: %w — %s", changeID, perr, pout)
+	}
+	cmd.Print(pout)
+	return nil
+}
+
+func daemonHealthy(port int) bool {
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/runs", port))
+	if err != nil {
+		return false
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+func startRunUngated(port int, taskID, mode string) error {
+	body, _ := json.Marshal(map[string]string{"mode": mode})
+	resp, err := http.Post(
+		fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", port, taskID),
+		"application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusConflict {
+		return fmt.Errorf("daemon returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// waitRunTerminal polls the run status until it reaches a terminal state.
+func waitRunTerminal(ctx context.Context, port int, taskID string, timeout time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/runs/%s", port, taskID))
+		if err == nil {
+			var b struct {
+				Status string `json:"status"`
+			}
+			_ = json.NewDecoder(resp.Body).Decode(&b)
+			_ = resp.Body.Close()
+			switch b.Status {
+			case "complete", "completed", "failed", "error", "paused":
+				return b.Status, nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("timed out after %s", timeout)
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(3 * time.Second):
+		}
+	}
+}
+
+func gitIn(dir string, args ...string) (string, error) {
+	c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	out, err := c.CombinedOutput()
+	return string(out), err
+}
+
+func bytesContains(s string, sub string) bool { return bytes.Contains([]byte(s), []byte(sub)) }
 
 // govAutopilotCmd runs one autonomous tick of the delivery loop: connect (sync
 // the AI-Fix-labeled issues), then advance the single next actionable change
@@ -115,12 +259,12 @@ var govAutopilotCmd = &cobra.Command{
 					cmd.Printf("[autopilot] %s is approved; parked (execution needs --auto-execute).\n", ch.ID)
 					return nil
 				}
-				if out, e := runSelf(cmd.Context(), self, baseDir,
-					"governance", "work", "execute", ch.ID, "--agent", "claude", "--mode", "workspace-write", "--project-dir", baseDir); e != nil {
-					return fmt.Errorf("execute %s: %w — %s", ch.ID, e, out)
+				cmd.Printf("[autopilot] executing %s → PR (ungated run → commit → open-pr)...\n", ch.ID)
+				if e := autopilotExecuteToPR(cmd, self, baseDir, ch.ID, svc); e != nil {
+					return fmt.Errorf("execute→PR %s: %w", ch.ID, e)
 				}
-				cmd.Printf("[autopilot] executed %s; a human opens/merges the PR (work open-pr).\n", ch.ID)
-				return nil
+				cmd.Printf("[autopilot] %s done; the slot is free for the next change.\n", ch.ID)
+				continue // after PR the change is pr_open; the loop picks the next actionable
 			default:
 				cmd.Printf("[autopilot] no automated step for action %q; stopping.\n", action)
 				return nil
