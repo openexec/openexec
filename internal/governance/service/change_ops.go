@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/openexec/openexec/internal/governance"
 	"github.com/openexec/openexec/internal/governance/ai"
@@ -129,7 +130,59 @@ func (s *Service) ReviewPlan(ctx context.Context, changeID, authorityID, actor s
 	if err != nil {
 		return nil, err
 	}
+	// When the reviewer requests changes on a GitHub-sourced change, post the
+	// specific concerns on the issue so the human answers where the work lives
+	// (the clarification loop). Best-effort: the review is already recorded in
+	// the audit trail; a gh failure must never undo it.
+	if out != nil && out.Decision == ai.ReviewerRequestChanges {
+		s.postGitHubClarification(ctx, changeID, out)
+	}
 	return out, nil
+}
+
+// postGitHubClarification posts the reviewer's blocking concerns as a comment on
+// the source GitHub issue and applies the changes-requested label. Best-effort
+// and GitHub-only: a non-github change or a gh failure is silently skipped — the
+// concerns already live in the decision history regardless.
+func (s *Service) postGitHubClarification(ctx context.Context, changeID string, out *ai.ReviewerOutput) {
+	ch, err := s.getChange(ctx, changeID)
+	if err != nil || ch == nil || s.runner == nil || ch.SourceType != governance.SourceGitHubIssue {
+		return
+	}
+	repo, number, ok := repoFromIssueURL(ch.SourceURL)
+	if !ok {
+		return
+	}
+	_ = github.SyncLabels(ctx, s.runner, repo, number, ch.Status)
+	_ = github.PostComment(ctx, s.runner, repo, number, renderClarificationComment(ch, out))
+}
+
+// renderClarificationComment turns a reviewer's blocking output into a specific,
+// answerable clarification comment for the issue.
+func renderClarificationComment(ch *governance.ChangeRecord, out *ai.ReviewerOutput) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "**OpenExec governance** — change `%s` needs your input before it can proceed (status: **%s**).\n\n", ch.ID, ch.Status)
+	b.WriteString("The plan review flagged the following for a human to resolve:\n\n")
+	for _, c := range out.Concerns {
+		fmt.Fprintf(&b, "- %s\n", c)
+	}
+	if len(out.MissingAcceptanceCriteria) > 0 {
+		b.WriteString("\n**Missing acceptance criteria:**\n")
+		for _, m := range out.MissingAcceptanceCriteria {
+			fmt.Fprintf(&b, "- %s\n", m)
+		}
+	}
+	if len(out.MissingTests) > 0 {
+		b.WriteString("\n**Missing tests:**\n")
+		for _, m := range out.MissingTests {
+			fmt.Fprintf(&b, "- %s\n", m)
+		}
+	}
+	if out.RecommendedPolicy != "" {
+		fmt.Fprintf(&b, "\n**Recommended policy:** %s\n", out.RecommendedPolicy)
+	}
+	b.WriteString("\n_Reply here with the decisions, then re-run the review — or comment_ `/openexec revise` _once the plan is updated._")
+	return b.String()
 }
 
 // ApproveChange approves a change's plan for AI execution. The full gate runs in
