@@ -100,11 +100,9 @@ Detailed contracts for the runtime subsystems.
 The tactical plan for simplifying and stabilizing the codebase.
 
 *   [**V1 Simplification Pass**](./SIMPLIFICATION-PASS.md) — The "7 Deletions" required to eliminate architecture bloat.
-*   [**V1 Cut List & Migration Board**](./V1-CUT-LIST-MIGRATION-BOARD.md) — Status tracking for component removal, migration, and stabilization.
 
 ## 5. Research & Future
 *   [**Self-Healing & Self-Upgrade**](./SELF-HEALING-UPGRADE.md) — Future architecture for autonomous runtime diagnosis and repair.
-*   [**Runtime Evolution Interface (REI)**](./RUNTIME-EVOLUTION-INTERFACE.md) — Boundary between the active runtime and evolution workflows (copied from docs).
 *   [**Elixir/BEAM Orchestrator**](./ELIXIR_BEAM_ORCHESTRATOR.md) — Research on high-scale, supervisor-tree concurrency using the BEAM virtual machine.
 
 ---
