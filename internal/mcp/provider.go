@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/openexec/openexec/internal/mcptool"
+	"github.com/openexec/openexec/pkg/mcptool"
 )
 
 // reservedCoreToolNames returns every tool name core may advertise, across all

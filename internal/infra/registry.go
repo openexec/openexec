@@ -2,7 +2,7 @@ package infra
 
 import (
 	"fmt"
-	"github.com/openexec/openexec/internal/infracontract"
+	"github.com/openexec/openexec/pkg/infracontract"
 	"path"
 	"path/filepath"
 	"sort"

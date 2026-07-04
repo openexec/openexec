@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/approval"
-	"github.com/openexec/openexec/internal/infracontract"
-	"github.com/openexec/openexec/internal/mcptool"
+	"github.com/openexec/openexec/pkg/infracontract"
+	"github.com/openexec/openexec/pkg/mcptool"
 	"github.com/openexec/openexec/internal/mode"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/toolset"

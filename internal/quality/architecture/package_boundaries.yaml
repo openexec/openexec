@@ -19,6 +19,7 @@
 composition_root:
   - internal/cli
   - cmd/openexec
+  - pkg/openexec   # public entrypoint that runs internal/cli (wires the binary)
 
 # Each module is a name -> list of package-path prefixes it owns. Sub-packages
 # match by prefix.

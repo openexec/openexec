@@ -11,6 +11,7 @@ import (
 	"github.com/openexec/openexec/internal/mcp"
 	"github.com/openexec/openexec/internal/memory"
 	"github.com/openexec/openexec/internal/project"
+	"github.com/openexec/openexec/pkg/plugin"
 	"github.com/spf13/cobra"
 )
 
@@ -58,11 +59,20 @@ a time, without booting the OpenExec daemon. See docs/LIGHT_MODE.md.`,
 			modules = pc.Modules
 		}
 
-		// Proprietary MCP tool providers register
-		// themselves here via srv.RegisterProvider(...) in a build that includes
-		// them, gated by modules.ShouldLoad(<name>). The open-source core ships
-		// none — the mcptool.Provider seam keeps core module-free.
-		_ = modules
+		// Register MCP tool providers contributed by modules (pkg/plugin). A
+		// module in its own build registers via plugin.RegisterMCPProvider from an
+		// init(); each is gated by the project's `modules:` config. The
+		// open-source core registers none — the seam keeps core module-free.
+		for _, p := range plugin.MCPProviders() {
+			if ok, reason := modules.ShouldLoad(p.Name); !ok {
+				fmt.Fprintf(os.Stderr, "module %q not loaded: %s\n", p.Name, reason)
+				continue
+			}
+			if rerr := srv.RegisterProvider(p.New()); rerr != nil {
+				fmt.Fprintf(os.Stderr, "module %q registration failed: %v\n", p.Name, rerr)
+				return rerr
+			}
+		}
 
 		// Infra tools (SRE command registry): gated by the module config AND, when
 		// enabled, by the presence of an operator-written .openexec/infra.yaml. A

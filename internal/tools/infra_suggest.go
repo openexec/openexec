@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/openexec/openexec/internal/infracontract"
+	"github.com/openexec/openexec/pkg/infracontract"
 )
 
 // Infra suggestion tools (Phase 4 of the SRE roadmap): typed routing
