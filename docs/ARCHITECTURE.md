@@ -293,25 +293,7 @@ stages:
 
 ---
 
-### 9. Multi-Agent Coordination (`internal/agent/`, `internal/parallel/`)
-
-**Status: Opt-in** — Enabled via `worker_count > 1` in config.json.
-
-**Purpose:** Run multiple agents in parallel.
-
-**Key Files:**
-- `internal/agent/registry.go` - Agent management
-- `internal/parallel/engine.go` - Parallel execution
-
-**Features:**
-- Parallel stage execution
-- Dependency-aware scheduling
-- Agent pooling
-- Result aggregation
-
----
-
-### 10. Caching (`internal/cache/`)
+### 9. Caching (`internal/cache/`)
 
 **Status: Opt-in** — Enabled via `cache_enabled` in config.json.
 
