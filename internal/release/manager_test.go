@@ -424,3 +424,44 @@ func TestManager_ExportJSON(t *testing.T) {
 		}
 	})
 }
+
+func TestManager_UpdateStoryPersistsAcceptanceCriteria(t *testing.T) {
+	tmpDir := testDir(t)
+	cfg := DefaultConfig()
+	cfg.GitEnabled = false
+
+	manager, err := NewManager(tmpDir, cfg)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+	defer manager.Close()
+
+	story := &Story{
+		ID: "US-UPD", Title: "Story", AcceptanceCriteria: []string{"original"},
+		Status: StoryStatusPending, StoryType: StoryTypeFeature, CreatedAt: time.Now(),
+	}
+	if err := manager.CreateStory(story); err != nil {
+		t.Fatalf("CreateStory: %v", err)
+	}
+
+	// Updating an unknown story is an error.
+	if err := manager.UpdateStory(&Story{ID: "US-NOPE"}); err == nil {
+		t.Fatal("expected error updating a missing story")
+	}
+
+	story.AcceptanceCriteria = []string{"original", "added by review"}
+	if err := manager.UpdateStory(story); err != nil {
+		t.Fatalf("UpdateStory: %v", err)
+	}
+
+	// Re-open from SQLite to prove the change persisted.
+	m2, err := NewManager(tmpDir, cfg)
+	if err != nil {
+		t.Fatalf("re-open: %v", err)
+	}
+	defer m2.Close()
+	got := m2.GetStory("US-UPD")
+	if got == nil || len(got.AcceptanceCriteria) != 2 || got.AcceptanceCriteria[1] != "added by review" {
+		t.Fatalf("acceptance criteria not persisted, got %+v", got)
+	}
+}

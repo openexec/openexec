@@ -466,6 +466,20 @@ func (m *Manager) GetStories() []*Story {
 	return stories
 }
 
+// UpdateStory replaces an existing story's fields and persists the change,
+// symmetric with UpdateTask. Used by higher layers that edit story-level fields
+// (e.g. acceptance criteria) after creation.
+func (m *Manager) UpdateStory(updated *Story) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.stories[updated.ID]; !ok {
+		return fmt.Errorf("story %s not found", updated.ID)
+	}
+	m.stories[updated.ID] = updated
+	return m.saveUnlocked()
+}
+
 // CreateStory creates a new story.
 func (m *Manager) CreateStory(story *Story) error {
 	m.mu.Lock()
