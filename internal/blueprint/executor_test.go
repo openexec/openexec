@@ -425,3 +425,40 @@ func TestReviewStagePromptNoSkills(t *testing.T) {
 		t.Fatal("conventions section must be absent when no project skills exist")
 	}
 }
+
+func TestDefaultExecutor_SmartZone_HardStopFailsStage(t *testing.T) {
+	executor := NewDefaultExecutor(t.TempDir())
+	executor.SmartZoneHardStop = true
+	executor.SmartZoneTokens = 1000
+	executor.AgenticRunner = &SimpleAgenticRunner{
+		RunFunc: func(ctx context.Context, stage *Stage, input *StageInput) (string, map[string]string, error) {
+			return "done", map[string]string{ArtifactPeakContextTokens: "5000"}, nil
+		},
+	}
+	stage := &Stage{Name: "implement", Type: types.StageTypeAgentic}
+	result, err := executor.Execute(context.Background(), stage, &StageInput{})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	// Hard stop: the overrun FAILS the stage; work/artifacts are kept and the
+	// diagnostic carries the split-this-task signal.
+	if result.Status != types.StageStatusFailed {
+		t.Fatalf("hard stop must fail the stage, got %s", result.Status)
+	}
+	if result.Artifacts[ArtifactSmartZoneExceeded] != "true" {
+		t.Fatalf("overrun artifact must be preserved")
+	}
+	if !strings.Contains(result.Diagnostics, "split it") {
+		t.Fatalf("diagnostics must carry the re-scope signal: %q", result.Diagnostics)
+	}
+
+	// Without hard stop the same overrun only flags (historical behavior).
+	executor.SmartZoneHardStop = false
+	result2, err := executor.Execute(context.Background(), stage, &StageInput{})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result2.Status == types.StageStatusFailed {
+		t.Fatalf("flag-only mode must not fail the stage")
+	}
+}

@@ -54,6 +54,14 @@ type DefaultExecutor struct {
 	// stages. Zero means DefaultSmartZoneTokens; negative disables the check.
 	SmartZoneTokens int64
 
+	// SmartZoneHardStop promotes a smart-zone overrun from a flag to a stage
+	// FAILURE: the stage's work is kept but the result fails with the
+	// split-this-task diagnostic, so an orchestrator can stop and re-scope
+	// instead of shipping a stage that ran over its context budget. Off by
+	// default (flag-only, the historical behavior); NewDefaultExecutor also
+	// honors OPENEXEC_SMART_ZONE_HARD_STOP=1.
+	SmartZoneHardStop bool
+
 	// OnCommandStart is called when a command starts.
 	OnCommandStart func(stage *Stage, cmd string)
 
@@ -69,9 +77,11 @@ type AgenticRunner interface {
 
 // NewDefaultExecutor creates a new default executor.
 func NewDefaultExecutor(workDir string) *DefaultExecutor {
+	v := strings.TrimSpace(os.Getenv("OPENEXEC_SMART_ZONE_HARD_STOP"))
 	return &DefaultExecutor{
-		WorkDir: workDir,
-		Timeout: 5 * time.Minute,
+		WorkDir:           workDir,
+		Timeout:           5 * time.Minute,
+		SmartZoneHardStop: v == "1" || strings.EqualFold(v, "true"),
 	}
 }
 
@@ -265,8 +275,13 @@ func (e *DefaultExecutor) executeAgentic(ctx context.Context, stage *Stage, inpu
 	result.Complete(output)
 
 	// Flag smart-zone overruns so oversized tasks surface as a task-sizing
-	// signal ("split this task") instead of degrading silently.
-	e.flagSmartZoneOverrun(result)
+	// signal ("split this task") instead of degrading silently. With
+	// SmartZoneHardStop the overrun FAILS the stage (work and artifacts are
+	// kept — the failure is the re-scope signal, not a discard).
+	if e.flagSmartZoneOverrun(result) && e.SmartZoneHardStop {
+		result.Fail(result.Diagnostics)
+		return result, nil
+	}
 
 	// Run Quality Gates after agentic stage succeeds
 	e.runQualityGates(ctx, stage, input, result)
@@ -275,12 +290,13 @@ func (e *DefaultExecutor) executeAgentic(ctx context.Context, stage *Stage, inpu
 }
 
 // flagSmartZoneOverrun checks the stage's reported peak context size against
-// the smart-zone budget and flags the result when the budget was exceeded.
-// Stages whose runner did not report usage are left unflagged.
-func (e *DefaultExecutor) flagSmartZoneOverrun(result *StageResult) {
+// the smart-zone budget and flags the result when the budget was exceeded,
+// reporting whether it did. Stages whose runner did not report usage are left
+// unflagged.
+func (e *DefaultExecutor) flagSmartZoneOverrun(result *StageResult) bool {
 	budget := e.SmartZoneTokens
 	if budget < 0 {
-		return
+		return false
 	}
 	if budget == 0 {
 		budget = DefaultSmartZoneTokens
@@ -288,11 +304,11 @@ func (e *DefaultExecutor) flagSmartZoneOverrun(result *StageResult) {
 
 	raw, ok := result.Artifacts[ArtifactPeakContextTokens]
 	if !ok {
-		return
+		return false
 	}
 	peak, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || peak <= budget {
-		return
+		return false
 	}
 
 	result.AddArtifact(ArtifactSmartZoneExceeded, "true")
@@ -302,6 +318,7 @@ func (e *DefaultExecutor) flagSmartZoneOverrun(result *StageResult) {
 	}
 	result.Diagnostics += msg
 	log.Printf("[SmartZone] Stage %q: %s", result.StageName, msg)
+	return true
 }
 
 // SimpleAgenticRunner is a basic agentic runner that uses a callback function.
