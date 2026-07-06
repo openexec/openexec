@@ -120,6 +120,18 @@ func (p *Planner) GeneratePlan(ctx context.Context, intent string, prdContext ma
 	return p.parseResponse(response)
 }
 
+// GenerateCompactPlan turns intent text into a single-story plan (1-3 tasks)
+// using CompactStoryGenerationPrompt — no Study story, no terminus. For
+// callers that have already sized the change as small; GeneratePlan remains
+// the full-shape path.
+func (p *Planner) GenerateCompactPlan(ctx context.Context, intent string) (*ProjectPlan, error) {
+	response, err := p.provider.Complete(ctx, fmt.Sprintf(CompactStoryGenerationPrompt, intent))
+	if err != nil {
+		return nil, fmt.Errorf("LLM completion failed: %w", err)
+	}
+	return p.parseResponse(response)
+}
+
 func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 	// Extract JSON if it's wrapped in markdown blocks
 	jsonText := response

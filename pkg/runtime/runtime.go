@@ -73,6 +73,13 @@ func (p *Planner) GeneratePlan(ctx context.Context, intent string) (*ProjectPlan
 	return p.inner.GeneratePlan(ctx, intent, nil)
 }
 
+// GenerateCompactPlan turns intent text into a single-story plan (1-3 tasks,
+// no Study story, no terminus) for changes the caller has already sized as
+// small. GeneratePlan remains the full-shape path.
+func (p *Planner) GenerateCompactPlan(ctx context.Context, intent string) (*ProjectPlan, error) {
+	return p.inner.GenerateCompactPlan(ctx, intent)
+}
+
 // LintPlanVerification flags false-green verification scripts in a plan
 // (patterns that report success even when the real check failed), keyed by the
 // owning story/task id — surfaced for human review before approval.

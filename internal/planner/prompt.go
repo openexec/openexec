@@ -131,6 +131,39 @@ INTENT DOCUMENT:
 
 Generate the JSON object containing goals and stories. Output ONLY valid JSON, no markdown or explanations.`
 
+// CompactStoryGenerationPrompt is the small-change variant of
+// StoryGenerationPrompt: exactly one story, one to three vertical tasks, and
+// NONE of the full plan's structural stories (no Study story, no Goal
+// Validation terminus, no docs/ARCHITECTURE.md task). Callers choose it when
+// they already know the change is small — the full prompt's mandatory shape
+// (rules 3/10) would inflate a one-file fix into a 3-4 story plan.
+const CompactStoryGenerationPrompt = `You are a software architect planning a SMALL, well-scoped change from an intent document.
+
+Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
+1. The single story carries 1-3 tasks, no more. Prefer ONE "Chassis" task that diagnoses, implements, and verifies in a single cohesive unit; use 2-3 tasks only when the change genuinely crosses layers that must land separately.
+2. Each task is a VERTICAL slice: it crosses every layer it needs and ends in something runnable/verifiable. No Diagnose/Implement/Verify phase tasks.
+3. Do NOT create a Codebase Study story, a Goal Validation/terminus story, or any docs/ARCHITECTURE.md task — this is a small change to an existing project, not a build-out.
+4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok').
+5. Tag each task "mode": "afk" when an agent can complete and verify it alone; "hitl" when a human must act (credentials, approvals, physical/manual steps).
+6. Acceptance criteria state observable behavior, not implementation steps.
+
+Return ONLY valid JSON, no markdown, in this exact shape:
+{
+  "schema_version": "1.0.0",
+  "goals": [{"id":"G-001","title":"...","description":"..."}],
+  "stories": [{
+    "id":"US-001","title":"...","goal_id":"G-001",
+    "description":"...",
+    "acceptance_criteria":["..."],
+    "verification_script":"...",
+    "tasks":[{"id":"T-US-001-001","title":"...","description":"...","technical_strategy":"...","mode":"afk","verification_script":"..."}]
+  }]
+}
+
+INTENT DOCUMENT:
+%s
+`
+
 const StoryReviewPrompt = `You are a senior software architect reviewing generated user stories for
 implementation readiness.
 

@@ -90,6 +90,35 @@ func TestPlanner_GeneratePlan(t *testing.T) {
 	})
 }
 
+func TestPlanner_GenerateCompactPlan(t *testing.T) {
+	single := `{
+	  "schema_version": "1.0.0",
+	  "goals": [{"id":"G-001","title":"Fix","description":"fix it"}],
+	  "stories": [{
+	    "id":"US-001","title":"Fix the bug","goal_id":"G-001",
+	    "acceptance_criteria":["works"],
+	    "verification_script":"go test ./...",
+	    "tasks":[{"id":"T-US-001-001","title":"Fix","verification_script":"go test ./..."}]
+	  }]
+	}`
+	mp := &mockProvider{response: single}
+	plan, err := New(mp).GenerateCompactPlan(context.Background(), "fix the off-by-one in parser")
+	if err != nil {
+		t.Fatalf("GenerateCompactPlan: %v", err)
+	}
+	if len(plan.Stories) != 1 || len(plan.Stories[0].Tasks) != 1 {
+		t.Fatalf("want 1 story / 1 task, got %d stories", len(plan.Stories))
+	}
+	// The compact prompt (not the full-shape one) must have been used: it
+	// forbids the Study story and terminus the full prompt mandates.
+	if !strings.Contains(mp.lastPrompt, "EXACTLY ONE story") {
+		t.Fatalf("compact prompt not used; prompt starts: %.120s", mp.lastPrompt)
+	}
+	if !strings.Contains(mp.lastPrompt, "fix the off-by-one in parser") {
+		t.Fatalf("intent missing from prompt")
+	}
+}
+
 func TestPlanner_ParseResponse(t *testing.T) {
 	p := &Planner{}
 
