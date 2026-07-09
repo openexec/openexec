@@ -44,23 +44,6 @@ var AllRules = []Rule{
 	{RuleNotImplementedThrow, SeverityHigh, "Detects 'not implemented' panics/throws/raises.", nil},
 }
 
-// ruleIDSet returns a set of active rule IDs from the config. If cfg.RuleIDs
-// is empty, all rules are active.
-func ruleIDSet(cfg Config) map[string]bool {
-	if len(cfg.RuleIDs) == 0 {
-		all := map[string]bool{}
-		for _, r := range AllRules {
-			all[r.ID] = true
-		}
-		return all
-	}
-	set := map[string]bool{}
-	for _, id := range cfg.RuleIDs {
-		set[id] = true
-	}
-	return set
-}
-
 // severityFor returns the effective severity for a rule, applying overrides.
 func severityFor(cfg Config, rule string, defaultSev Severity) Severity {
 	if sev, ok := cfg.RuleOverrides[rule]; ok {
@@ -101,7 +84,6 @@ var (
 
 	// Rule 5: hardcoded literal returns from handlers.
 	reHardcodedReturnJS = regexp.MustCompile(`return\s+(?:new\s+)?(?:Response\.)?(?:json|NextResponse\.json)?\s*\(?\s*\{[^{}]*(?::\s*['"][^'"]*['"]|:\s*\d)[^{}]*\}`)
-	reHardcodedReturnGo = regexp.MustCompile(`return\s+(?:&?\w+\s*)?\{[^{}]*(?::\s*"[^"]*"|:\s*\d)`)
 	reHardcodedReturnPy = regexp.MustCompile(`return\s+\{[^{}]*(?::\s*['"][^'"]*['"]|:\s*\d)`)
 
 	// Rule 7: Promise.resolve with literal object.

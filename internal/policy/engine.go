@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/openexec/openexec/internal/knowledge"
 )
@@ -137,29 +136,6 @@ func getEnvMap() map[string]string {
 		}
 	}
 	return env
-}
-
-// Legacy keyword-based validation (kept for backward compatibility)
-func (e *Engine) validateLegacy(ctx context.Context, toolName string, action string) (bool, string) {
-	if e.store == nil {
-		return true, ""
-	}
-
-	policyKey := fmt.Sprintf("tool_%s", toolName)
-	record, err := e.store.GetPolicy(policyKey)
-	if err != nil {
-		return false, fmt.Sprintf("failed to fetch policy: %v", err)
-	}
-
-	if record == nil {
-		return true, ""
-	}
-
-	if strings.Contains(record.Value, "deny") && strings.Contains(action, "force") {
-		return false, "Policy violation: 'force' operations are denied for this tool."
-	}
-
-	return true, ""
 }
 
 // ValidateCompliance runs mandatory quality gates for the project type.

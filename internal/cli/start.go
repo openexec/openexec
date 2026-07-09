@@ -73,14 +73,10 @@ func newDCPCoordinator(db *sql.DB, projectsDir string) (server.DCPCoordinator, e
 
 var (
 	startPort        int
-	startWorkers     int
 	startTimeout     int
-	startExecutor    string
 	startReviewer    string
 	startDaemon      bool
 	startUI          bool
-	executionBinary  string
-	runNoReview      bool
 	runMaxIterations int
 	runTimeout       int
 	runVerbose       bool
@@ -499,12 +495,6 @@ Examples:
 	},
 }
 
-// isStudyTask returns true if the task title indicates a study/research task.
-func isStudyTask(title string) bool {
-	lower := strings.ToLower(title)
-	return strings.Contains(lower, "study") || strings.Contains(lower, "research") || strings.Contains(lower, "investigate")
-}
-
 func findAvailablePort(basePort int) (int, error) {
 	for port := basePort; port < basePort+100; port++ {
 		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
@@ -639,74 +629,6 @@ func isServerRunning(projectDir string, port int) bool {
 
 // upsertTaskStatus removed: SQLite is now the canonical state store.
 // Task status updates go through release.Manager which persists to SQLite.
-
-func integrateStoryBranch(cmd *cobra.Command, projectDir string, storyID string, workerID int) {
-	relPrefix := "release/"
-	featPrefix := "feature/"
-	baseBranch := "main"
-	if projCfg, err := project.LoadProjectConfig(projectDir); err == nil {
-		if projCfg.ReleaseBranchPrefix != "" {
-			relPrefix = projCfg.ReleaseBranchPrefix
-		}
-		if projCfg.FeatureBranchPrefix != "" {
-			featPrefix = projCfg.FeatureBranchPrefix
-		}
-		if projCfg.BaseBranch != "" {
-			baseBranch = projCfg.BaseBranch
-		}
-	}
-
-	releaseBranch := relPrefix + "current"
-	fromVersion, _ := exec.Command("openexec", "version", "--short").Output()
-	if v := strings.TrimSpace(string(fromVersion)); v != "" {
-		releaseBranch = relPrefix + v
-	}
-
-	storyBranch := featPrefix + storyID
-
-	_ = exec.Command("git", "checkout", releaseBranch).Run()
-	mergeCmd := exec.Command("git", "merge", "--no-ff", "-m", fmt.Sprintf("Integrate story %s", storyID), storyBranch)
-	if out, err := mergeCmd.CombinedOutput(); err != nil {
-		cmd.Printf("[Worker %d] ⚠ Integration failed for story %s: %v\n%s\n", workerID, storyID, err, string(out))
-	} else {
-		cmd.Printf("[Worker %d] ✓ Integrated %s into %s\n", workerID, storyBranch, releaseBranch)
-		_ = exec.Command("git", "branch", "-d", storyBranch).Run()
-	}
-	_ = exec.Command("git", "checkout", baseBranch).Run()
-}
-
-// createExecutionLoopWithRetry triggers a task execution via daemon using /api/v1/runs endpoints.
-func createExecutionLoopWithRetry(projectDir string, task Task, mgr *release.Manager, lastError string) (string, error) {
-	isStudy := isStudyTask(task.Title)
-
-	// Determine operational mode - default to "run" for task execution
-	execMode := runMode
-	if execMode == "" {
-		execMode = "run"
-	}
-
-	payload := map[string]any{
-		"mode": execMode,
-	}
-	if isStudy {
-		payload["is_study"] = true
-	}
-	body, _ := json.Marshal(payload)
-
-	endpoint := fmt.Sprintf("http://localhost:%d/api/v1/runs/%s/start", startPort, task.ID)
-	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	return task.ID, nil
-}
 
 func buildTaskPromptWithRetry(task Task, mgr *release.Manager, lastError string) string {
 	var sb strings.Builder
@@ -1010,109 +932,4 @@ func runMiniInterview(cmd *cobra.Command, initialIntent string, config *project.
 			continue
 		}
 	}
-}
-
-// tryAutoImportStories attempts to import stories from .openexec/stories.json into the DB
-//
-// JSON IMPORT GUARD:
-// This function performs a ONE-TIME IMPORT from JSON to SQLite.
-// It is ONLY called when SQLite has no stories (legacy project migration).
-// After import, JSON is NEVER read again - SQLite is the canonical source.
-//
-// This is NOT a runtime data source - it's a migration path for legacy projects.
-// Returns true if an import was performed (regardless of success), false otherwise.
-func tryAutoImportStories(projectDir string, mgr *release.Manager, cmd *cobra.Command) bool {
-	storiesPath := filepath.Join(projectDir, ".openexec", "stories.json")
-	data, err := os.ReadFile(storiesPath)
-	if err != nil {
-		return false
-	}
-
-	// Log import operation for drift tracking
-	fmt.Fprintf(os.Stderr, "[IMPORT] Loading from JSON (%s) for one-time migration. SQLite is the canonical store.\n", storiesPath)
-	var sf struct {
-		Stories []GeneratedStory `json:"stories"`
-	}
-	if err := json.Unmarshal(data, &sf); err != nil {
-		// try legacy array-only format
-		var bare []GeneratedStory
-		if err2 := json.Unmarshal(data, &bare); err2 == nil {
-			sf.Stories = bare
-		} else {
-			return false
-		}
-	}
-	if len(sf.Stories) == 0 {
-		return false
-	}
-
-	// Import minimal story/task records
-	created := 0
-	for _, s := range sf.Stories {
-		if mgr.GetStory(s.ID) == nil {
-			st := &release.Story{
-				ID:                 s.ID,
-				GoalID:             s.GoalID,
-				Title:              s.Title,
-				Description:        s.Description,
-				AcceptanceCriteria: s.AcceptanceCriteria,
-				VerificationScript: s.VerificationScript,
-				DependsOn:          s.DependsOn,
-				Status:             "pending",
-				CreatedAt:          time.Now(),
-			}
-			_ = mgr.CreateStory(st)
-		}
-		// Create tasks under story
-		var prevTaskID string
-		for _, tRaw := range s.Tasks {
-			var id, title, desc string
-			var deps []string
-			switch v := tRaw.(type) {
-			case string:
-				id = v
-			case map[string]any:
-				if v["id"] != nil {
-					id, _ = v["id"].(string)
-				}
-				if v["title"] != nil {
-					title, _ = v["title"].(string)
-				}
-				if v["description"] != nil {
-					desc, _ = v["description"].(string)
-				}
-				if arr, ok := v["depends_on"].([]any); ok {
-					for _, a := range arr {
-						if s, ok := a.(string); ok {
-							deps = append(deps, s)
-						}
-					}
-				}
-			}
-			if id == "" {
-				continue
-			}
-			if mgr.GetTask(id) == nil {
-				if prevTaskID != "" {
-					deps = append(deps, prevTaskID)
-				}
-				task := &release.Task{
-					ID:          id,
-					Title:       title,
-					Description: desc,
-					StoryID:     s.ID,
-					DependsOn:   deps,
-					Status:      "pending",
-					CreatedAt:   time.Now(),
-				}
-				_ = mgr.CreateTask(task)
-				prevTaskID = id
-				created++
-			}
-		}
-	}
-	if created > 0 && cmd != nil {
-		cmd.Printf("Imported %d tasks from %s (auto)\n", created, storiesPath)
-	}
-	return true
 }

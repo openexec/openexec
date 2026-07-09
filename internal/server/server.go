@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/openexec/openexec"
@@ -42,7 +41,6 @@ type Server struct {
 	ProjectsDir string
 	Mux         *http.ServeMux
 	HttpServer  *http.Server
-	mu          sync.RWMutex
 	axonBridge  *api.Server
 	StateStore  *state.Store
 	// Observability

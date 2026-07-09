@@ -291,11 +291,6 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 	return nil
 }
 
-// getLLMProvider returns a provider for the given model.
-func (m *Manager) getLLMProvider(model string) planner.LLMProvider {
-	return &cliLLMProvider{model: model}
-}
-
 type cliLLMProvider struct {
 	model string
 }

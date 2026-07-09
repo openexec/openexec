@@ -21,7 +21,6 @@ import (
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/internal/router"
 	"github.com/openexec/openexec/internal/skills"
-	pagent "github.com/openexec/openexec/pkg/agent"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -596,12 +595,4 @@ func (c *compositeGateRunner) RunAll(ctx context.Context) error {
 		return nil
 	}
 	return fmt.Errorf("quality gates failed: %s", strings.Join(errs, "; "))
-}
-
-func (m *Manager) createAPIProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
-	return nil // Implementation stub
-}
-
-func (m *Manager) createWorkerProvider(projCfg *project.ProjectConfig) pagent.ProviderAdapter {
-	return nil // Implementation stub
 }

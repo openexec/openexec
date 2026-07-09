@@ -204,14 +204,6 @@ func NewServerWithConfig(in io.Reader, out io.Writer, cfg ServerConfig) (*Server
 	}, nil
 }
 
-// ValidateConfig checks that the server has valid workspace configuration.
-// DEPRECATED: NewServerWithConfig now fails fast if workspace root is missing.
-// This method is kept for backward compatibility but always returns nil.
-func (s *Server) ValidateConfig() error {
-	// Validation now happens in constructor (fail-fast)
-	return nil
-}
-
 // WorkspaceRoots returns the configured workspace roots for path scoping.
 func (s *Server) WorkspaceRoots() []string {
 	return s.workspaceRoots

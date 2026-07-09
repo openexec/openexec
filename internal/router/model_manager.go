@@ -22,9 +22,6 @@ const (
 
 	// globalModelsSubdir is the subdirectory under ~/.openexec/ for models.
 	globalModelsSubdir = "models"
-
-	// projectModelsSubdir is the subdirectory under .openexec/ for per-project models.
-	projectModelsSubdir = ".openexec/models"
 )
 
 // ModelManager handles GGUF model file discovery and auto-download.
