@@ -17,7 +17,7 @@ By default, `openexec chat` starts in Chat mode, while `openexec run` uses Run m
 ## 1. Local Setup
 
 ### Prerequisites
-- **Go 1.21+**: [Install Go](https://go.dev/doc/install)
+- **Go 1.25+**: [Install Go](https://go.dev/doc/install)
 - **Node.js 18+ & npm**: (Only for UI development) [Install Node.js](https://nodejs.org/)
 - **Git**: Required for version control integration.
 
@@ -137,7 +137,7 @@ For continuous background execution, use the `--daemon` flag:
 ./openexec start --daemon
 ```
 
-OpenExec v0.1.6 includes **Automated PID Tracking**:
+OpenExec includes **Automated PID Tracking**:
 - It writes a process ID file to `.openexec/openexec.pid`.
 - It redirects all background output to `.openexec/daemon.log`.
 - `openexec run` and `openexec stop` automatically use this file to manage the background engine.
@@ -234,14 +234,14 @@ To update to the latest version, simply run:
 ./openexec update
 ```
 
-This will check the latest version on openexec.io and replace your current binary with the latest one for your platform.
+This checks the latest version on openexec.io and replaces your current binary with the latest one for your platform. As of v0.11.0 the updater handles both raw binaries and compressed `.tar.gz`/`.zip` release archives, so it keeps working as releases move to compressed artifacts.
 
 ## 8. Troubleshooting
 
 - **Logs:** Check `.openexec/daemon.log` for background process output.
 - **State Database:** The canonical task progress, stories, and execution state are stored in `.openexec/openexec.db`.
 - **Audit Database:** Raw tool decisions, LLM costs, and audit trails are logged to `.openexec/data/audit.db`. You can inspect both with any SQLite browser.
-- **Missing Directory Error:** If the server fails to start, ensure `.openexec/data` exists (this is fixed in v0.1.1+).
+- **Missing Directory Error:** If the server fails to start, ensure `.openexec/data` exists (handled automatically in all current releases).
 
 ---
 Next: [Read the Architecture Guide](docs/KNOWLEDGE_BASE.md)

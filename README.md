@@ -29,7 +29,9 @@ OpenExec is a deterministic runtime for AI coding tools. It wraps Claude Code, C
 
 The model still reasons. OpenExec governs the run.
 
-In practice, you connect a repo, label a GitHub issue, and OpenExec triages, plans, builds, and verifies the change unattended — then opens a pull request for you to review. The trail from issue → task → PR → merge is recorded automatically, so the team sees what shipped without anyone updating a board by hand. The bottleneck was never coding speed; it was keeping the team in sync and knowing what a change actually did. The same engine scales from a single task to an entire greenfield project, and governance is an optional module you enable when a change needs sign-off.
+In practice, you give OpenExec a scoped task or a higher-level intent, and it plans the change, builds it through a blueprint (gather context → implement → lint → test → review), runs your quality gates, and leaves you on a branch with a recorded audit trail to open a pull request from. The bottleneck was never coding speed; it was trusting what a change actually did — so OpenExec optimizes for evidence, not just output. The same engine scales from a single task to an entire greenfield project.
+
+Turning tracked GitHub (and, on the roadmap, Jira) issues into PRs *automatically* — issue intake, unattended triage, opening the pull request for you, per-PR risk and operability review, and release-governance sign-off — is a **separate commercial product built on this core**, not part of the open-source engine. This repository is the engine; it pushes branches and records PR metadata, but it does not connect to your issue tracker or open PRs on its own.
 
 ## The Thesis
 
