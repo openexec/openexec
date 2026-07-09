@@ -97,6 +97,11 @@ func TestDeterministicRouter_ParseIntent_DiffWordBoundary(t *testing.T) {
 		{"git diff HEAD~1", "git_diff"},
 		// "diff" embedded in another word must NOT route to git_diff.
 		{"what is the difference between these two approaches?", GeneralChatTool},
+		// Contract AC #1: the literal example query must NOT route to git_diff.
+		// It resolves to list_directory (the "list" keyword precedes the diff
+		// rule), which is the honest actual result; the invariant this change
+		// delivers is only that "difference" no longer reaches git_diff.
+		{"what is the difference between a list and a tuple?", "list_directory"},
 	}
 	for _, tc := range cases {
 		intent, err := r.ParseIntent(context.Background(), tc.query)
