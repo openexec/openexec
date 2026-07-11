@@ -36,9 +36,8 @@ jobs:
         cache: 'npm'
         cache-dependency-path: ui/package-lock.json
 
-    # The binary embeds the React UI (//go:embed all:ui/dist in assets.go)
-    # and ui/dist is gitignored, so the UI must be built before any Go
-    # compile step or the embed fails with "no matching files found".
+    # Release-style builds explicitly embed the generated UI. Ordinary module
+    # consumers use the tracked fallback and do not need Node artifacts.
     - name: Build UI (embedded in binary)
       run: npm ci && npm run build
       working-directory: ui
@@ -47,7 +46,7 @@ jobs:
       run: go mod download
 
     - name: Build
-      run: go build -v -o bin/openexec ./cmd/openexec
+      run: go build -tags ui_dist -v -o bin/openexec ./cmd/openexec
 
     - name: Test
       run: go test -v ./...

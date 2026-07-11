@@ -1,7 +1,7 @@
 VERSION ?= $(shell grep "const Version =" pkg/version/version.go | cut -d'"' -f2)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 
-.PHONY: all build build-all clean lint test compat-test type-check ui-lint ui-test ui-type-check help
+.PHONY: all build build-all clean lint test compat-test type-check ui-build ui-lint ui-test ui-type-check help
 
 # Default target
 help:
@@ -17,9 +17,12 @@ help:
 	@echo "  make ui-type-check Run tsc for the UI"
 	@echo "  make clean        Remove build artifacts"
 
-build:
+build: ui-build
 	@echo "🚀 Building OpenExec binary..."
-	go build -o bin/openexec ./cmd/openexec
+	go build -tags ui_dist -o bin/openexec ./cmd/openexec
+
+ui-build:
+	cd ui && npm run build
 
 build-all:
 	@echo "🚀 Building multi-platform binaries v$(VERSION) ($(COMMIT)) via Docker..."

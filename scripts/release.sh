@@ -55,22 +55,22 @@ export GOFLAGS
 mkdir -p bin
 
 echo "   - Building local binary..."
-go build -ldflags "$LDFLAGS" -o openexec ./cmd/openexec
+go build -tags ui_dist -ldflags "$LDFLAGS" -o openexec ./cmd/openexec
 
 echo "   - Building darwin/arm64..."
-GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/openexec-darwin-arm64 ./cmd/openexec
+GOOS=darwin GOARCH=arm64 go build -tags ui_dist -ldflags "$LDFLAGS" -o bin/openexec-darwin-arm64 ./cmd/openexec
 
 echo "   - Building darwin/amd64..."
-GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-darwin-amd64 ./cmd/openexec
+GOOS=darwin GOARCH=amd64 go build -tags ui_dist -ldflags "$LDFLAGS" -o bin/openexec-darwin-amd64 ./cmd/openexec
 
 echo "   - Building linux/amd64..."
-GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-linux-amd64 ./cmd/openexec
+GOOS=linux GOARCH=amd64 go build -tags ui_dist -ldflags "$LDFLAGS" -o bin/openexec-linux-amd64 ./cmd/openexec
 
 echo "   - Building linux/arm64..."
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o bin/openexec-linux-arm64 ./cmd/openexec
+GOOS=linux GOARCH=arm64 go build -tags ui_dist -ldflags "$LDFLAGS" -o bin/openexec-linux-arm64 ./cmd/openexec
 
 echo "   - Building windows/amd64..."
-GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o bin/openexec-windows-amd64.exe ./cmd/openexec
+GOOS=windows GOARCH=amd64 go build -tags ui_dist -ldflags "$LDFLAGS" -o bin/openexec-windows-amd64.exe ./cmd/openexec
 
 echo "3. Copying binaries to openexec-web..."
 cp "$OPENEXEC_DIR/bin/openexec-darwin-arm64" "$PROJECTS_DIR/openexec-web/public/downloads/"
