@@ -14,6 +14,8 @@ type View struct {
 	Port int
 	// PlannerModel is the model used for the planning phase.
 	PlannerModel string
+	// ExecutorModel is the model used for task execution.
+	ExecutorModel string
 
 	apiName, apiBaseURL, apiKey, apiModel string
 }
@@ -36,12 +38,13 @@ func Load(projectDir string) (*View, error) {
 	}
 	name, baseURL, apiKey, model := cfg.Execution.ActiveAPI()
 	return &View{
-		BaseBranch:   cfg.BaseBranch,
-		Port:         cfg.Execution.Port,
-		PlannerModel: cfg.Execution.PlannerModel,
-		apiName:      name,
-		apiBaseURL:   baseURL,
-		apiKey:       apiKey,
-		apiModel:     model,
+		BaseBranch:    cfg.BaseBranch,
+		Port:          cfg.Execution.Port,
+		PlannerModel:  cfg.Execution.PlannerModel,
+		ExecutorModel: cfg.Execution.ExecutorModel,
+		apiName:       name,
+		apiBaseURL:    baseURL,
+		apiKey:        apiKey,
+		apiModel:      model,
 	}, nil
 }
