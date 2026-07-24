@@ -44,7 +44,10 @@ func NewAgentCLIProvider(config AgentCLIConfig) (*AgentCLIProvider, error) {
 func (p *AgentCLIProvider) Descriptor() ProviderDescriptor {
 	return ProviderDescriptor{
 		ID: p.config.Kind, Runtime: "cli", Models: append([]string(nil), p.config.Models...),
-		Capabilities: Capability{Streaming: true, Resume: true, Cancellation: true, ReadOnly: true, WorkspaceWrite: true, ToolCalling: true},
+		Capabilities: Capability{
+			Streaming: true, Resume: true, Cancellation: true, ReadOnly: true,
+			WorkspaceWrite: true, CommandNetwork: p.config.Kind == "codex", ToolCalling: true,
+		},
 	}
 }
 
@@ -192,6 +195,9 @@ func (p *AgentCLIProvider) arguments(req Request) []string {
 		}
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots=["+strings.Join(quoted, ",")+"]")
 	}
+	if req.Sandbox.Mode == "workspace-write" {
+		args = append(args, "-c", "sandbox_workspace_write.network_access="+strconv.FormatBool(req.NetworkAccess))
+	}
 	args = append(args, "--json")
 	if req.Model != "" && req.Model != "default" {
 		args = append(args, "--model", req.Model)
@@ -208,6 +214,9 @@ func validateProviderRequest(req Request) error {
 	}
 	if req.Sandbox.Mode == "read-only" && len(req.WritableRoots) != 0 {
 		return errors.New("read-only execution cannot declare writable roots")
+	}
+	if req.NetworkAccess && req.Sandbox.Mode != "workspace-write" {
+		return errors.New("network access requires workspace-write mode")
 	}
 	for _, root := range req.WritableRoots {
 		if !filepath.IsAbs(root) {

@@ -26,6 +26,7 @@ type Request struct {
 	Model           string
 	Sandbox         Sandbox
 	WritableRoots   []string
+	NetworkAccess   bool
 	NativeSessionID string
 }
 
@@ -65,6 +66,7 @@ type Capability struct {
 	Cancellation   bool `json:"cancellation"`
 	ReadOnly       bool `json:"read_only"`
 	WorkspaceWrite bool `json:"workspace_write"`
+	CommandNetwork bool `json:"command_network"`
 	ToolCalling    bool `json:"tool_calling"`
 }
 

@@ -23,7 +23,7 @@ printf '%s\n' '{"type":"item.completed","thread_id":"native-1","item":{"type":"a
 	var events []Event
 	result, err := provider.Execute(context.Background(), Request{
 		ID: "request-1", WorkingDir: dir, Prompt: "work", Model: "default",
-		Sandbox: Sandbox{Mode: "workspace-write"}, WritableRoots: []string{dir},
+		Sandbox: Sandbox{Mode: "workspace-write"}, WritableRoots: []string{dir}, NetworkAccess: true,
 	}, func(event Event) error {
 		events = append(events, event)
 		return nil
@@ -35,11 +35,31 @@ printf '%s\n' '{"type":"item.completed","thread_id":"native-1","item":{"type":"a
 		t.Fatalf("result = %+v", result)
 	}
 	args, _ := os.ReadFile(capture)
-	if !strings.Contains(string(args), "--sandbox workspace-write") || !strings.Contains(string(args), "sandbox_workspace_write.writable_roots") {
-		t.Fatalf("arguments do not enforce workspace-write roots: %s", args)
+	if !strings.Contains(string(args), "--sandbox workspace-write") ||
+		!strings.Contains(string(args), "sandbox_workspace_write.writable_roots") ||
+		!strings.Contains(string(args), "sandbox_workspace_write.network_access=true") {
+		t.Fatalf("arguments do not enforce workspace-write roots and network policy: %s", args)
 	}
 	if len(events) != 3 || events[0].Type != EventStarted || events[1].Type != EventAssistantDelta || events[2].Type != EventCompleted {
 		t.Fatalf("events = %#v", events)
+	}
+}
+
+func TestAgentCLIProviderAdvertisesOnlyEnforceableCommandNetworking(t *testing.T) {
+	for _, test := range []struct {
+		kind string
+		want bool
+	}{
+		{kind: "codex", want: true},
+		{kind: "claude", want: false},
+	} {
+		provider, err := NewAgentCLIProvider(AgentCLIConfig{Kind: test.kind})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := provider.Descriptor().Capabilities.CommandNetwork; got != test.want {
+			t.Errorf("%s command network capability = %v, want %v", test.kind, got, test.want)
+		}
 	}
 }
 
