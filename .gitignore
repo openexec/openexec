@@ -113,3 +113,7 @@ temp/
 .openexec/models/
 bin/openexec-compact
 bin/.!*!openexec
+
+# local tooling noise
+GOPATH_DIR/
+.claude/
