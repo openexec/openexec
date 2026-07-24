@@ -22,6 +22,9 @@ var rootCmd = &cobra.Command{
 	Long: `OpenExec CLI is a command-line tool for interacting with the orchestration plane,
 managing projects, kicking off intents, and verifying system statuses.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Name() == "execution-stdio" {
+			return nil
+		}
 		return config.InitializeConfig(cfgFile)
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
