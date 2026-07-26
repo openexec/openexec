@@ -37,6 +37,38 @@ Before reporting a request done:
   message. Do not hand back a half-built request as if it were whole, and do
   not ask permission for the remaining half instead of doing it.
 
+## Long-running work
+
+A command that may run for more than a few minutes must not be run inline. The
+session that started it will end — you will be compacted, the chat will close,
+the ssh connection will drop — and the work dies with it, silently, with no
+record that it was ever started.
+
+Hand it to the runner instead, then end your turn:
+
+    python3 /mnt/data1/projects/owner-model/job_runner.py start \
+        --name "arabia harvest" --project arabia --cwd "$PWD" -- <command>
+
+It returns immediately. The job outlives this session, reports itself into the
+owner's attention inbox while it runs, and reports again when it finishes or
+fails. A run whose process disappears is reported as lost rather than staying
+"running" forever.
+
+Build the flow yourself — the runner has no job definitions and needs none.
+Write whatever script the work requires, and give it this exit contract so the
+runner can drive it one chunk at a time:
+
+    exit 0  -> finished, nothing left to do
+    exit 3  -> did one chunk, call me again
+    other   -> failed, stop and report
+
+Chunks matter for anything long: each one is a place to resume from, so an
+interrupted job keeps its progress instead of starting over. A command with no
+chunking still works — it just runs once.
+
+Say in your reply that the job was started and that its result will arrive in
+the inbox. Do not poll it, and do not keep the session alive waiting for it.
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
