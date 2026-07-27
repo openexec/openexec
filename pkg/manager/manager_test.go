@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +28,21 @@ func buildMockClaude(t *testing.T) string {
 }
 
 
+// writeGateCommands gives a fixture's project config real lint and test commands.
+// Deterministic gate stages fail closed when nothing resolves, so a test that
+// runs a pipeline has to configure them the way a real project does.
+func writeGateCommands(t *testing.T, workDir string) {
+	t.Helper()
+	dir := filepath.Join(workDir, ".openexec")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const projectConfig = `{"execution":{"lint_commands":["true"],"test_commands":["true"]}}`
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(projectConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func managerConfig(t *testing.T, bin string) Config {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -34,6 +50,7 @@ func managerConfig(t *testing.T, bin string) Config {
 	if err != nil {
 		t.Fatal(err)
 	}
+	writeGateCommands(t, tmpDir)
 	return Config{
 		WorkDir:              tmpDir,
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
@@ -302,4 +319,61 @@ func TestSubscribeNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for nonexistent pipeline")
 	}
+}
+
+// Status copied its info snapshot after releasing the read lock, so it raced the
+// event goroutine writing the same fields. Only -race can observe this: without
+// it the test passes even with the bug restored. Readers run while a real
+// pipeline is progressing, which is what the API's run listing does.
+func TestConcurrentReadersDoNotRaceRunningPipeline(t *testing.T) {
+	bin := buildMockClaude(t)
+	m, err := New(managerConfig(t, bin))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+
+	if err := m.Start(context.Background(), "FWU-RACE"); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	stop := make(chan struct{})
+	var readers sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					if _, err := m.Status("FWU-RACE"); err != nil {
+						return
+					}
+					_ = m.List()
+				}
+			}
+		}()
+	}
+
+	deadline := time.After(30 * time.Second)
+	for {
+		info, err := m.Status("FWU-RACE")
+		if err != nil {
+			t.Fatalf("Status: %v", err)
+		}
+		if isTerminal(info.Status) {
+			break
+		}
+		select {
+		case <-deadline:
+			close(stop)
+			readers.Wait()
+			t.Fatalf("timeout waiting for completion, last status: %s", info.Status)
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	close(stop)
+	readers.Wait()
 }

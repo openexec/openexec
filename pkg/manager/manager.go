@@ -107,6 +107,14 @@ type Config struct {
 	ReviewerModel        string
 	AuditLogger          audit.Logger
 	PIIScrubLevel        string
+
+// WatchdogStallThreshold overrides how long a pipeline may be inactive before
+// the watchdog treats it as stalled. Zero keeps the default.
+	WatchdogStallThreshold time.Duration
+
+// WatchdogCheckInterval overrides how often the watchdog scans pipelines.
+// Zero keeps the default.
+	WatchdogCheckInterval time.Duration
 }
 
 // ErrNoWorkDir is returned when Manager is created without a WorkDir.
@@ -494,13 +502,14 @@ func (m *Manager) GetInternalReleaseManager() (*release.Manager, error) {
 func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 	m.mu.RLock()
 	e, ok := m.pipelines[fwuID]
-	m.mu.RUnlock()
-
 	if !ok {
+		m.mu.RUnlock()
 		return PipelineInfo{}, fmt.Errorf("pipeline %s not found", fwuID)
 	}
-
+	// Copy under the read lock: updateInfo writes these fields from the event
+	// goroutine, so releasing first would race the copy rather than the lookup.
 	info := e.info
+	m.mu.RUnlock()
 	info.Elapsed = time.Since(info.StartedAt).Truncate(time.Second).String()
 
 	if rel, err := m.GetInternalReleaseManager(); err == nil {

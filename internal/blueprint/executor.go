@@ -164,9 +164,17 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 		}
 		result.Output = strings.Join(outputs, "\n---\n")
 		result.Complete("all commands succeeded")
+	} else if stage.Action != "" {
+		// The stage names an action the registry does not provide. Passing here
+		// would report a gate as satisfied because its implementation is absent.
+		result.Fail(fmt.Sprintf("stage %q declares action %q, which is not registered", stage.Name, stage.Action))
+		return result, nil
 	} else {
-		// No commands = automatic success
-		result.Complete("no commands to execute")
+		// Nothing to run means nothing was verified, so this cannot be a pass.
+		// The standard blueprint's lint and test stages ship with no commands and
+		// take them from project config; when that is empty they arrive here.
+		result.Fail(fmt.Sprintf("stage %q has no commands to run; set execution.%s_commands in .openexec/config.json, or remove the stage from the blueprint", stage.Name, stage.Name))
+		return result, nil
 	}
 
 	// 3. Run Quality Gates (if configured and Action Registry available)

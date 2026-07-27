@@ -28,10 +28,11 @@ func writeCheckpointJSONL(workDir, runID string, event loop.Event) {
     _ = os.MkdirAll(dir, 0o755)
     path := filepath.Join(dir, runID+".jsonl")
 
-    // Build artifacts map, including stage name for blueprint checkpoints
-    artifacts := event.Artifacts
-    if artifacts == nil {
-        artifacts = make(map[string]string)
+    // Copy first: this map belongs to the pipeline goroutine, which is still
+    // reading it. Inserting stage_name in place raced that reader.
+    artifacts := make(map[string]string, len(event.Artifacts)+1)
+    for k, v := range event.Artifacts {
+        artifacts[k] = v
     }
     if event.StageName != "" {
         artifacts["stage_name"] = event.StageName
@@ -62,10 +63,11 @@ func writeCheckpointSQLite(db *sql.DB, runID string, event loop.Event) {
         return
     }
 
-    // Build artifacts map, including stage name for blueprint checkpoints
-    artifacts := event.Artifacts
-    if artifacts == nil {
-        artifacts = make(map[string]string)
+    // Copy first: this map belongs to the pipeline goroutine, which is still
+    // reading it. Inserting stage_name in place raced that reader.
+    artifacts := make(map[string]string, len(event.Artifacts)+1)
+    for k, v := range event.Artifacts {
+        artifacts[k] = v
     }
     if event.StageName != "" {
         artifacts["stage_name"] = event.StageName

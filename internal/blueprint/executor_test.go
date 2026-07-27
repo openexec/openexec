@@ -110,8 +110,15 @@ func TestDefaultExecutor_DeterministicStage_NoCommands(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if result.Status != types.StageStatusCompleted {
-		t.Errorf("Expected status %s, got %s", types.StageStatusCompleted, result.Status)
+	// A deterministic stage with nothing to run verified nothing, so it cannot
+	// report success. This test previously asserted the opposite, which is what
+	// allowed the standard blueprint's lint and test stages to pass without
+	// executing anything.
+	if result.Status == types.StageStatusCompleted {
+		t.Errorf("a stage with no commands passed: %q", result.Output)
+	}
+	if !strings.Contains(result.Error, "no commands to run") {
+		t.Errorf("error should say why it failed, got %q", result.Error)
 	}
 }
 

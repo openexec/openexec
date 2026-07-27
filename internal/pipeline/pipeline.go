@@ -464,6 +464,10 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	// Override implement stage timeout if configured
+	// The built-in blueprints are shared package-level values, and the block
+	// below writes this run's timeout and commands into the stages.
+	bp = bp.Clone()
+
 	if p.cfg.TaskTimeout > 0 {
 		if impl, ok := bp.Stages["implement"]; ok {
 			impl.Timeout = p.cfg.TaskTimeout

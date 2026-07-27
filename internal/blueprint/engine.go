@@ -45,6 +45,35 @@ type Blueprint struct {
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
+// Clone returns a deep copy so a caller can apply run-specific configuration
+// without mutating a shared blueprint. Stage holds two reference fields,
+// Commands and Inputs; everything else is a value.
+func (b *Blueprint) Clone() *Blueprint {
+	if b == nil {
+		return nil
+	}
+	copied := *b
+	copied.Stages = make(map[string]*Stage, len(b.Stages))
+	for name, stage := range b.Stages {
+		if stage == nil {
+			copied.Stages[name] = nil
+			continue
+		}
+		copiedStage := *stage
+		if stage.Commands != nil {
+			copiedStage.Commands = append([]string(nil), stage.Commands...)
+		}
+		if stage.Inputs != nil {
+			copiedStage.Inputs = make(map[string]string, len(stage.Inputs))
+			for k, v := range stage.Inputs {
+				copiedStage.Inputs[k] = v
+			}
+		}
+		copied.Stages[name] = &copiedStage
+	}
+	return &copied
+}
+
 // GetStage retrieves a stage by name.
 func (b *Blueprint) GetStage(name string) (*Stage, bool) {
 	stage, ok := b.Stages[name]

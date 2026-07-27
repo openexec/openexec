@@ -50,6 +50,7 @@ func newSchedulerTestEnv(t *testing.T) *schedulerTestEnv {
 	}
 	t.Cleanup(func() { stateStore.Close() })
 
+	writeGateCommands(t, tmpDir)
 	cfg := Config{
 		WorkDir:              tmpDir,
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),
@@ -515,6 +516,7 @@ func main() {
 	}
 	t.Cleanup(func() { stateStore.Close() })
 
+	writeGateCommands(t, tmpDir)
 	cfg := Config{
 		WorkDir:              tmpDir,
 		AgentsFS:             os.DirFS(filepath.Join("..", "..", "internal", "pipeline", "testdata")),

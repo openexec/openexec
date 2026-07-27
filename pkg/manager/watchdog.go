@@ -20,11 +20,20 @@ type Watchdog struct {
 
 // NewWatchdog creates a new Watchdog for the given manager.
 func NewWatchdog(m *Manager) *Watchdog {
-	return &Watchdog{
+	w := &Watchdog{
 		manager:        m,
 		StallThreshold: 5 * time.Minute,
 		CheckInterval:  30 * time.Second,
 	}
+	// Set before Run's goroutine starts. Writing these afterwards raced the
+	// goroutine that reads them on every tick.
+	if m.cfg.WatchdogStallThreshold > 0 {
+		w.StallThreshold = m.cfg.WatchdogStallThreshold
+	}
+	if m.cfg.WatchdogCheckInterval > 0 {
+		w.CheckInterval = m.cfg.WatchdogCheckInterval
+	}
+	return w
 }
 
 // Run starts the watchdog monitoring loop.

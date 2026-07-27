@@ -15,14 +15,17 @@ func TestWatchdogDetection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(Config{WorkDir: tmpDir, StateStore: stateStore})
+	// Through Config, not by writing the fields afterwards: New starts the
+	// watchdog goroutine, which reads them.
+	m, err := New(Config{
+		WorkDir:                tmpDir,
+		StateStore:             stateStore,
+		WatchdogStallThreshold: 100 * time.Millisecond,
+		WatchdogCheckInterval:  50 * time.Millisecond,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Set very short stall threshold for testing
-	m.watchdog.StallThreshold = 100 * time.Millisecond
-	m.watchdog.CheckInterval = 50 * time.Millisecond
 
 	// Create a dummy pipeline
 	fwuID := "STALL-01"
