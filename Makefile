@@ -1,4 +1,4 @@
-VERSION ?= $(shell grep "const Version =" pkg/version/version.go | cut -d'"' -f2)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed "s/^v//" || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 
 .PHONY: all build build-all clean lint test compat-test type-check ui-build ui-lint ui-test ui-type-check help
@@ -17,9 +17,12 @@ help:
 	@echo "  make ui-type-check Run tsc for the UI"
 	@echo "  make clean        Remove build artifacts"
 
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -ldflags "-X github.com/openexec/openexec/pkg/version.Version=$(VERSION) -X github.com/openexec/openexec/pkg/version.Commit=$(COMMIT) -X github.com/openexec/openexec/internal/cli.BuildDate=$(BUILD_DATE)"
+
 build: ui-build
 	@echo "🚀 Building OpenExec binary..."
-	go build -tags ui_dist -o bin/openexec ./cmd/openexec
+	go build -tags ui_dist $(LDFLAGS) -o bin/openexec ./cmd/openexec
 
 ui-build:
 	cd ui && npm run build
