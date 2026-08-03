@@ -203,31 +203,41 @@ func gitListedFiles(root string) ([]string, bool) {
 			files = append(files, filepath.ToSlash(rel))
 		}
 	}
-	return files, len(files) > 0
+	// A successful empty result is still authoritative. Falling back to the
+	// directory walk here would re-include ignored source in an otherwise empty
+	// Git repository.
+	return files, true
 }
 
-// structuralCandidates loads (and caches) the history pool for one
-// language|kind pair, preserving the per-symbol query's candidate order.
-func (p *priorSymbols) structuralCandidates(ctx context.Context, tx *sql.Tx, repositoryID, language, kind, generationID string) ([]structuralCandidate, error) {
+// structuralCandidates loads and indexes the history pool for one language and
+// kind. Indexing by normalized structure avoids re-scanning a large pool for
+// every moved or renamed symbol.
+func (p *priorSymbols) structuralCandidates(ctx context.Context, tx *sql.Tx, repositoryID, language, kind, generationID, structure string) ([]structuralCandidate, error) {
 	key := language + "\x00" + kind
-	if pool, ok := p.structuralPool[key]; ok {
-		return pool, nil
+	if index, ok := p.structuralIndex[key]; ok {
+		return index[structure], nil
 	}
 	rows, err := tx.QueryContext(ctx, `SELECT s.id, s.display_name, o.file_path, o.signature FROM repository_symbols s JOIN symbol_occurrences o ON o.symbol_id = s.id JOIN graph_generations g ON g.id = o.generation_id WHERE s.repository_id = ? AND s.retired_at IS NULL AND s.language = ? AND s.kind = ? AND o.generation_id <> ? AND g.status IN ('current','superseded','partial') ORDER BY CASE g.status WHEN 'current' THEN 0 ELSE 1 END, g.created_at DESC`, repositoryID, language, kind, generationID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var pool []structuralCandidate
+	index := make(map[string][]structuralCandidate)
 	for rows.Next() {
 		var candidate structuralCandidate
 		if err := rows.Scan(&candidate.id, &candidate.display, &candidate.file, &candidate.signature); err != nil {
 			return nil, err
 		}
-		pool = append(pool, candidate)
+		candidateStructure := normalizedSymbolStructure(candidate.display, candidate.signature)
+		if candidateStructure != "" {
+			index[candidateStructure] = append(index[candidateStructure], candidate)
+		}
 	}
-	p.structuralPool[key] = pool
-	return pool, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	p.structuralIndex[key] = index
+	return index[structure], nil
 }
 
 func finishScanManifest(inputs []ScanInput) ScanManifest {
@@ -295,7 +305,7 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 	var limitations []string
 	// A cancelled or crashed scan must not leave generations parked in
 	// "building" forever - they read as running work that never existed.
-	if _, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'failed', error_message = 'abandoned: superseded by a newer scan', completed_at = CURRENT_TIMESTAMP WHERE repository_id = ? AND status = 'building'`, identity.RepositoryID); err != nil {
+	if _, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'failed', error_message = 'abandoned: superseded by a newer scan', completed_at = CURRENT_TIMESTAMP WHERE worktree_id = ? AND status = 'building'`, identity.WorktreeID); err != nil {
 		return ScanResult{}, err
 	}
 	generation, err := s.BeginGeneration(ctx, identity, manifest, capabilities, limitations)
@@ -305,7 +315,7 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 
 	files, tsMethod, extractionLimitations, incomplete, err := extractManifestFiles(ctx, identity.RootPath, manifest)
 	if err != nil {
-		_ = s.FailGeneration(ctx, generation.ID, GraphFailed, err.Error())
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 		return ScanResult{}, err
 	}
 	capabilities["typescript.definitions"] = tsMethod
@@ -314,12 +324,12 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 	generation.Capabilities = capabilities
 	generation.Limitations = append(generation.Limitations, extractionLimitations...)
 	if err := s.updateGenerationMetadata(ctx, generation.ID, capabilities, generation.Limitations); err != nil {
-		_ = s.FailGeneration(ctx, generation.ID, GraphFailed, err.Error())
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 		return ScanResult{}, err
 	}
 	filesCount, symbolsCount, edgesCount, err := s.storeExtractedGraph(ctx, identity, generation, manifest, files)
 	if err != nil {
-		_ = s.FailGeneration(ctx, generation.ID, GraphFailed, err.Error())
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 		return ScanResult{}, err
 	}
 
@@ -328,21 +338,23 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 	}
 	after, err := BuildScanManifest(identity.RootPath)
 	if err != nil {
-		_ = s.FailGeneration(ctx, generation.ID, GraphInconsistent, err.Error())
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphInconsistent, err.Error())
 		return ScanResult{}, fmt.Errorf("revalidate scan manifest: %w", err)
 	}
 	if manifest.ManifestHash != after.ManifestHash || manifest.ConfigurationDigest != after.ConfigurationDigest {
 		message := "repository inputs changed while graph generation was building"
-		_ = s.FailGeneration(ctx, generation.ID, GraphInconsistent, message)
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphInconsistent, message)
 		return ScanResult{}, fmt.Errorf("%s", message)
 	}
 	if incomplete {
 		if err := s.completePartialGeneration(ctx, generation.ID, generation.Limitations); err != nil {
+			_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 			return ScanResult{}, err
 		}
 		generation.Status = GraphPartial
 	} else {
 		if err := s.PromoteGeneration(ctx, generation.ID); err != nil {
+			_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 			return ScanResult{}, err
 		}
 		generation.Status = GraphCurrent
@@ -351,13 +363,25 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 }
 
 func (s *Store) updateGenerationMetadata(ctx context.Context, generationID string, capabilities map[string]string, limitations []string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET capabilities = ?, limitations = ? WHERE id = ? AND status = 'building'`, jsonText(capabilities, "{}"), jsonText(limitations, "[]"), generationID)
-	return err
+	result, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET capabilities = ?, limitations = ? WHERE id = ? AND status = 'building'`, jsonText(capabilities, "{}"), jsonText(limitations, "[]"), generationID)
+	if err != nil {
+		return err
+	}
+	if changed, _ := result.RowsAffected(); changed != 1 {
+		return fmt.Errorf("generation %s is no longer building", generationID)
+	}
+	return nil
 }
 
 func (s *Store) completePartialGeneration(ctx context.Context, generationID string, limitations []string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'partial', limitations = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'building'`, jsonText(limitations, "[]"), generationID)
-	return err
+	result, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'partial', limitations = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'building'`, jsonText(limitations, "[]"), generationID)
+	if err != nil {
+		return err
+	}
+	if changed, _ := result.RowsAffected(); changed != 1 {
+		return fmt.Errorf("generation %s is no longer building", generationID)
+	}
+	return nil
 }
 
 func extractManifestFiles(ctx context.Context, root string, manifest ScanManifest) ([]ExtractedFile, string, []string, bool, error) {
@@ -579,6 +603,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 	packageNodes := make(map[string]string)
 	moduleNodes := make(map[string]string)
 	filePackageKeys := make(map[string]string)
+	edgeCount := 0
 	for _, file := range files {
 		packageKey := packageKeyForFile(file)
 		filePackageKeys[file.Path] = packageKey
@@ -589,8 +614,12 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 			if _, err := tx.ExecContext(ctx, `INSERT INTO graph_nodes (id, generation_id, repository_id, node_type, language, display_name, qualified_name) VALUES (?, ?, ?, 'package', ?, ?, ?)`, packageNode, generation.ID, identity.RepositoryID, file.Language, packageKey, packageKey); err != nil {
 				return 0, 0, 0, err
 			}
-			if err := insertEdge(ctx, tx, generation.ID, repositoryNode, packageNode, "contains", ResolutionConfigurationDerived, "", 0, 0, nil); err != nil {
+			inserted, err := insertEdge(ctx, tx, generation.ID, repositoryNode, packageNode, "contains", ResolutionConfigurationDerived, "", 0, 0, nil)
+			if err != nil {
 				return 0, 0, 0, err
+			}
+			if inserted {
+				edgeCount++
 			}
 		}
 		moduleNode := stableID("node", generation.ID, "module", file.Path)
@@ -598,8 +627,12 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 		if _, err := tx.ExecContext(ctx, `INSERT INTO graph_nodes (id, generation_id, repository_id, node_type, language, display_name, qualified_name, metadata) VALUES (?, ?, ?, 'module', ?, ?, ?, ?)`, moduleNode, generation.ID, identity.RepositoryID, file.Language, filepath.Base(file.Path), file.Path, jsonText(map[string]string{"package_name": file.PackageName}, "{}")); err != nil {
 			return 0, 0, 0, err
 		}
-		if err := insertEdge(ctx, tx, generation.ID, packageNode, moduleNode, "contains", ResolutionConfigurationDerived, file.Path, 0, 0, nil); err != nil {
+		inserted, err := insertEdge(ctx, tx, generation.ID, packageNode, moduleNode, "contains", ResolutionConfigurationDerived, file.Path, 0, 0, nil)
+		if err != nil {
 			return 0, 0, 0, err
+		}
+		if inserted {
+			edgeCount++
 		}
 	}
 
@@ -617,7 +650,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 	symbolsByName := make(map[string][]storedSymbol)
 	symbolsByFileName := make(map[string][]storedSymbol)
 	symbolsByFile := make(map[string][]storedSymbol)
-	symbolCount, edgeCount := 0, len(packageNodes)+len(files)
+	symbolCount := 0
 	for _, file := range files {
 		moduleNode := moduleNodes[file.Path]
 		input := inputByPath[file.Path]
@@ -651,15 +684,21 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 					return 0, 0, 0, err
 				}
 			}
-			if err := insertEdge(ctx, tx, generation.ID, moduleNode, nodeID, "contains", extracted.Resolution, file.Path, extracted.StartByte, extracted.EndByte, nil); err != nil {
+			inserted, err := insertEdge(ctx, tx, generation.ID, moduleNode, nodeID, "contains", extracted.Resolution, file.Path, extracted.StartByte, extracted.EndByte, nil)
+			if err != nil {
 				return 0, 0, 0, err
 			}
-			edgeCount++
+			if inserted {
+				edgeCount++
+			}
 			if extracted.Exported {
-				if err := insertEdge(ctx, tx, generation.ID, moduleNode, nodeID, "exports", extracted.Resolution, file.Path, extracted.StartByte, extracted.EndByte, nil); err != nil {
+				inserted, err := insertEdge(ctx, tx, generation.ID, moduleNode, nodeID, "exports", extracted.Resolution, file.Path, extracted.StartByte, extracted.EndByte, nil)
+				if err != nil {
 					return 0, 0, 0, err
 				}
-				edgeCount++
+				if inserted {
+					edgeCount++
+				}
 			}
 			stored := storedSymbol{nodeID: nodeID, file: file.Path, name: extracted.Name, start: extracted.StartByte, end: extracted.EndByte}
 			symbolsByName[extracted.Name] = append(symbolsByName[extracted.Name], stored)
@@ -685,15 +724,21 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				}
 				resolution = ResolutionUnresolved
 			}
-			if err := insertEdge(ctx, tx, generation.ID, from, to, "imports", resolution, file.Path, imp.StartByte, imp.EndByte, map[string]string{"specifier": imp.Target}); err != nil {
+			inserted, err := insertEdge(ctx, tx, generation.ID, from, to, "imports", resolution, file.Path, imp.StartByte, imp.EndByte, map[string]string{"specifier": imp.Target})
+			if err != nil {
 				return 0, 0, 0, err
 			}
-			edgeCount++
+			if inserted {
+				edgeCount++
+			}
 			if isTestFile(file.Path) && moduleNodesByID(moduleNodes, to) {
-				if err := insertEdge(ctx, tx, generation.ID, to, from, "tested_by", resolution, file.Path, imp.StartByte, imp.EndByte, map[string]string{"reason": "test module imports module", "test_file": file.Path}); err != nil {
+				inserted, err := insertEdge(ctx, tx, generation.ID, to, from, "tested_by", resolution, file.Path, imp.StartByte, imp.EndByte, map[string]string{"reason": "test module imports module", "test_file": file.Path})
+				if err != nil {
 					return 0, 0, 0, err
 				}
-				edgeCount++
+				if inserted {
+					edgeCount++
+				}
 			}
 		}
 	}
@@ -706,10 +751,13 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 			if productionFile.Path == testFile.Path || isTestFile(productionFile.Path) || filePackageKeys[productionFile.Path] != filePackageKeys[testFile.Path] {
 				continue
 			}
-			if err := insertEdge(ctx, tx, generation.ID, moduleNodes[productionFile.Path], testNode, "tested_by", ResolutionConfigurationDerived, testFile.Path, 0, 0, map[string]string{"reason": "test module shares package", "test_file": testFile.Path}); err != nil {
+			inserted, err := insertEdge(ctx, tx, generation.ID, moduleNodes[productionFile.Path], testNode, "tested_by", ResolutionConfigurationDerived, testFile.Path, 0, 0, map[string]string{"reason": "test module shares package", "test_file": testFile.Path})
+			if err != nil {
 				return 0, 0, 0, err
 			}
-			edgeCount++
+			if inserted {
+				edgeCount++
+			}
 		}
 	}
 	for _, file := range files {
@@ -736,10 +784,13 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 			if edgeType == "" {
 				edgeType = "references"
 			}
-			if err := insertEdge(ctx, tx, generation.ID, from, candidates[0].nodeID, edgeType, reference.Resolution, file.Path, reference.StartByte, reference.EndByte, map[string]string{"target_name": reference.TargetName}); err != nil {
+			inserted, err := insertEdge(ctx, tx, generation.ID, from, candidates[0].nodeID, edgeType, reference.Resolution, file.Path, reference.StartByte, reference.EndByte, map[string]string{"target_name": reference.TargetName})
+			if err != nil {
 				return 0, 0, 0, err
 			}
-			edgeCount++
+			if inserted {
+				edgeCount++
+			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -797,12 +848,11 @@ type symbolIdentityMatch struct {
 type structuralCandidate struct{ id, display, file, signature string }
 
 type priorSymbols struct {
-	exact   map[string]string
+	exact   map[string][]string
 	claimed map[string]bool
-	// structuralPool caches history candidates per language|kind so a scan
-	// with thousands of exact-misses (e.g. migrated legacy symbols) runs one
-	// pool query per pair instead of one heavy join per symbol.
-	structuralPool map[string][]structuralCandidate
+	// structuralIndex caches history candidates by language|kind and normalized
+	// structure so mass moves and renames remain linear rather than quadratic.
+	structuralIndex map[string]map[string][]structuralCandidate
 }
 
 func priorKey(language, kind, qualified, file string) string {
@@ -817,15 +867,16 @@ func loadPriorSymbols(ctx context.Context, tx *sql.Tx, repositoryID, generationI
 		return nil, err
 	}
 	defer rows.Close()
-	prior := &priorSymbols{exact: map[string]string{}, claimed: map[string]bool{}, structuralPool: map[string][]structuralCandidate{}}
+	prior := &priorSymbols{exact: map[string][]string{}, claimed: map[string]bool{}, structuralIndex: map[string]map[string][]structuralCandidate{}}
 	for rows.Next() {
 		var id, language, kind, qualified, file string
 		if err := rows.Scan(&id, &language, &kind, &qualified, &file); err != nil {
 			return nil, err
 		}
 		key := priorKey(language, kind, qualified, file)
-		if _, exists := prior.exact[key]; !exists {
-			prior.exact[key] = id
+		ids := prior.exact[key]
+		if len(ids) == 0 || ids[len(ids)-1] != id {
+			prior.exact[key] = append(ids, id)
 		}
 	}
 	if len(prior.exact) == 0 {
@@ -836,9 +887,11 @@ func loadPriorSymbols(ctx context.Context, tx *sql.Tx, repositoryID, generationI
 
 func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositoryID, language, kind, name, qualified, file, signature string, prior *priorSymbols) (symbolIdentityMatch, error) {
 	if prior != nil {
-		if id := prior.exact[priorKey(language, kind, qualified, file)]; id != "" && !prior.claimed[id] {
-			prior.claimed[id] = true
-			return symbolIdentityMatch{SymbolID: id, Continuity: "preserved", Method: "exact"}, nil
+		for _, id := range prior.exact[priorKey(language, kind, qualified, file)] {
+			if !prior.claimed[id] {
+				prior.claimed[id] = true
+				return symbolIdentityMatch{SymbolID: id, Continuity: "preserved", Method: "exact"}, nil
+			}
 		}
 	}
 	if prior == nil {
@@ -848,21 +901,10 @@ func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositor
 		}
 		return symbolIdentityMatch{SymbolID: newID, Continuity: "new", Method: "structural"}, nil
 	}
-	var symbolID string
-	err := tx.QueryRowContext(ctx, `SELECT s.id FROM repository_symbols s JOIN symbol_occurrences o ON o.symbol_id = s.id JOIN graph_generations g ON g.id = o.generation_id WHERE s.repository_id = ? AND s.retired_at IS NULL AND s.language = ? AND s.kind = ? AND s.qualified_name = ? AND o.file_path = ? AND o.generation_id <> ? AND NOT EXISTS (SELECT 1 FROM symbol_occurrences current WHERE current.generation_id = ? AND current.symbol_id = s.id) ORDER BY CASE g.status WHEN 'current' THEN 0 ELSE 1 END, g.created_at DESC LIMIT 1`, repositoryID, language, kind, qualified, file, generationID, generationID).Scan(&symbolID)
-	if err == nil {
-		if prior != nil {
-			prior.claimed[symbolID] = true
-		}
-		return symbolIdentityMatch{SymbolID: symbolID, Continuity: "preserved", Method: "exact"}, nil
-	}
-	if err != sql.ErrNoRows {
-		return symbolIdentityMatch{}, err
-	}
 	structure := normalizedSymbolStructure(name, signature)
 	var candidates []structuralCandidate
 	if structure != "" {
-		pool, err := prior.structuralCandidates(ctx, tx, repositoryID, language, kind, generationID)
+		pool, err := prior.structuralCandidates(ctx, tx, repositoryID, language, kind, generationID, structure)
 		if err != nil {
 			return symbolIdentityMatch{}, err
 		}
@@ -873,10 +915,8 @@ func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositor
 			if prior.claimed[candidate.id] || seen[candidate.id] {
 				continue
 			}
-			if normalizedSymbolStructure(candidate.display, candidate.signature) == structure {
-				seen[candidate.id] = true
-				candidates = append(candidates, candidate)
-			}
+			seen[candidate.id] = true
+			candidates = append(candidates, candidate)
 		}
 	}
 	if len(candidates) == 1 {
@@ -893,8 +933,8 @@ func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositor
 		}
 		return symbolIdentityMatch{SymbolID: candidate.id, Continuity: continuity, Method: "structural", PreviousSymbolIDs: []string{candidate.id}}, nil
 	}
-	symbolID = "sym_" + uuid.NewString()
-	_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO repository_symbols (id, repository_id, language, kind, display_name, qualified_name) VALUES (?, ?, ?, ?, ?, ?)`, symbolID, repositoryID, language, kind, name, qualified)
+	symbolID := "sym_" + uuid.NewString()
+	_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO repository_symbols (id, repository_id, language, kind, display_name, qualified_name) VALUES (?, ?, ?, ?, ?, ?)`, symbolID, repositoryID, language, kind, name, qualified)
 	if err != nil {
 		return symbolIdentityMatch{}, err
 	}
@@ -919,14 +959,18 @@ func normalizedSymbolStructure(name, signature string) string {
 	return strings.Join(strings.Fields(signature), " ")
 }
 
-func insertEdge(ctx context.Context, tx *sql.Tx, generationID, from, to, edgeType string, resolution ResolutionStatus, source string, start, end int, metadata map[string]string) error {
+func insertEdge(ctx context.Context, tx *sql.Tx, generationID, from, to, edgeType string, resolution ResolutionStatus, source string, start, end int, metadata map[string]string) (bool, error) {
 	id := stableID("edge", generationID, from, to, edgeType, source, strconv.Itoa(start))
 	// OR IGNORE: the ID is deterministic over the edge's full identity, so a
 	// duplicate is the same logical edge emitted twice (e.g. repeated calls
 	// from one site), not a conflict. Real repositories hit this; fixtures
 	// did not.
-	_, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO graph_edges (id, generation_id, from_node_id, to_node_id, edge_type, resolution_status, source_file_path, source_start_byte, source_end_byte, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, generationID, from, to, edgeType, resolution, source, start, end, jsonText(metadata, "{}"))
-	return err
+	result, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO graph_edges (id, generation_id, from_node_id, to_node_id, edge_type, resolution_status, source_file_path, source_start_byte, source_end_byte, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, generationID, from, to, edgeType, resolution, source, start, end, jsonText(metadata, "{}"))
+	if err != nil {
+		return false, err
+	}
+	inserted, err := result.RowsAffected()
+	return inserted == 1, err
 }
 
 func resolveImportNode(generationID string, file ExtractedFile, target string, modules map[string]string) (string, ResolutionStatus) {

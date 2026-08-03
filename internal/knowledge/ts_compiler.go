@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -60,9 +61,9 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	if len(files) == 0 {
 		return map[string]ExtractedFile{}, "compiler_exact", nil, nil
 	}
-	node, err := exec.LookPath("node")
+	node, err := findCompatibleNode(ctx)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("node runtime unavailable: %w", err)
+		return nil, "", nil, err
 	}
 	compiler := findTypeScriptCompiler(root, files)
 	if compiler == "" {
@@ -122,6 +123,55 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 		}
 	}
 	return result, response.Configuration, limitations, nil
+}
+
+func findCompatibleNode(ctx context.Context) (string, error) {
+	var candidates []string
+	for _, directory := range filepath.SplitList(os.Getenv("PATH")) {
+		if directory != "" {
+			candidates = append(candidates, filepath.Join(directory, "node"), filepath.Join(directory, "node.exe"))
+		}
+	}
+	for _, directory := range []string{os.Getenv("NVM_BIN"), filepath.Join(os.Getenv("VOLTA_HOME"), "bin"), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"} {
+		if directory != "" && directory != "bin" {
+			candidates = append(candidates, filepath.Join(directory, "node"), filepath.Join(directory, "node.exe"))
+		}
+	}
+	if nvmRoot := os.Getenv("NVM_DIR"); nvmRoot != "" {
+		matches, _ := filepath.Glob(filepath.Join(nvmRoot, "versions", "node", "*", "bin", "node"))
+		candidates = append(candidates, matches...)
+	}
+
+	seen := make(map[string]bool)
+	var found []string
+	for _, candidate := range candidates {
+		candidate = filepath.Clean(candidate)
+		if seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		if info, err := os.Stat(candidate); err != nil || info.IsDir() {
+			continue
+		}
+		probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		output, err := exec.CommandContext(probeCtx, candidate, "-e", `process.stdout.write(process.versions.node.split('.')[0])`).CombinedOutput()
+		cancel()
+		if err != nil {
+			continue
+		}
+		major, err := strconv.Atoi(strings.TrimSpace(string(output)))
+		if err != nil {
+			continue
+		}
+		if major >= 18 {
+			return candidate, nil
+		}
+		found = append(found, fmt.Sprintf("%s (v%d)", candidate, major))
+	}
+	if len(found) > 0 {
+		return "", fmt.Errorf("Node.js 18+ runtime unavailable; incompatible runtimes: %s", strings.Join(found, ", "))
+	}
+	return "", fmt.Errorf("Node.js 18+ runtime unavailable")
 }
 
 func findTypeScriptCompiler(root string, files []string) string {

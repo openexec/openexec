@@ -217,17 +217,13 @@ var knowledgeGraphStatusCmd = &cobra.Command{
 
 var knowledgeGraphPublishCmd = &cobra.Command{
 	Use:   "publish",
-	Short: "Publish the current lossy repository read model to Agent Console",
+	Short: "Refresh the graph and publish its lossy repository read model to Agent Console",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
 		if err != nil {
 			return err
 		}
 		defer store.Close()
-		projection, err := store.BuildRepositoryContext(cmd.Context(), identity, graphSymbols, graphTaskID, graphRunID, graphPlanID, nil)
-		if err != nil {
-			return err
-		}
 		token := strings.TrimSpace(os.Getenv("AGENT_CONSOLE_TOKEN"))
 		if graphConsoleTokenFile != "" {
 			contents, readErr := os.ReadFile(graphConsoleTokenFile)
@@ -239,12 +235,31 @@ var knowledgeGraphPublishCmd = &cobra.Command{
 			}
 			token = strings.TrimSpace(string(contents))
 		}
-		if err := (knowledge.RepositoryContextPublisher{}).Publish(cmd.Context(), graphConsoleURL, graphConsoleProject, token, projection); err != nil {
+		projection, err := refreshAndPublishRepositoryContext(cmd.Context(), store, identity, graphConsoleURL, graphConsoleProject, token, graphSymbols, graphTaskID, graphRunID, graphPlanID, knowledge.RepositoryContextPublisher{})
+		if err != nil {
 			return err
 		}
 		cmd.Printf("Published graph %s (%s) to Agent Console project %s\n", projection.GraphVersion, projection.Freshness, graphConsoleProject)
 		return nil
 	},
+}
+
+type repositoryContextPublisher interface {
+	Publish(context.Context, string, string, string, knowledge.RepositoryContextProjection) error
+}
+
+func refreshAndPublishRepositoryContext(ctx context.Context, store *knowledge.Store, identity knowledge.RepositoryIdentity, consoleURL, consoleProject, token string, symbols []string, taskID, runID, planID string, publisher repositoryContextPublisher) (knowledge.RepositoryContextProjection, error) {
+	if _, err := store.RefreshRepository(ctx, identity.RootPath); err != nil {
+		return knowledge.RepositoryContextProjection{}, fmt.Errorf("refresh repository graph: %w", err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, symbols, taskID, runID, planID, nil)
+	if err != nil {
+		return knowledge.RepositoryContextProjection{}, err
+	}
+	if err := publisher.Publish(ctx, consoleURL, consoleProject, token, projection); err != nil {
+		return knowledge.RepositoryContextProjection{}, err
+	}
+	return projection, nil
 }
 
 func openGraphStore(ctx context.Context, directory string) (*knowledge.Store, knowledge.RepositoryIdentity, error) {

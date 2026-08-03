@@ -37,3 +37,26 @@ func TestManifestHonorsGitignore(t *testing.T) {
 		t.Fatalf("manifest inputs = %#v", manifest.Inputs)
 	}
 }
+
+func TestManifestDoesNotWalkIgnoredFilesInEmptyGitRepository(t *testing.T) {
+	root := t.TempDir()
+	if out, err := exec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
+		t.Skipf("git unavailable: %v %s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("cache/\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "cache"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "cache", "ignored.go"), []byte("package ignored\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := BuildScanManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.Inputs) != 0 {
+		t.Fatalf("empty Git manifest included ignored inputs: %#v", manifest.Inputs)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -60,5 +61,16 @@ func TestRepositoryContextPublisherTreatsMissingProjectionAsFirstPublish(t *test
 	})}
 	if err := (RepositoryContextPublisher{Client: client}).Publish(context.Background(), "http://localhost:8080", "project-1", "", RepositoryContextProjection{}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRepositoryContextPublisherTimesOutDefaultClient(t *testing.T) {
+	client := (RepositoryContextPublisher{Timeout: 25 * time.Millisecond}).httpClient()
+	if client.Timeout != 25*time.Millisecond {
+		t.Fatalf("client timeout = %s", client.Timeout)
+	}
+	client = (RepositoryContextPublisher{}).httpClient()
+	if client.Timeout != 30*time.Second {
+		t.Fatalf("default client timeout = %s", client.Timeout)
 	}
 }

@@ -112,6 +112,15 @@ func (s *Store) FailGeneration(ctx context.Context, generationID string, status 
 	return err
 }
 
+// failGenerationAfterError persists terminal state even when the operation's
+// context was cancelled. Without a detached, bounded cleanup context, Ctrl-C
+// left generations in "building" until another scan happened to sweep them.
+func (s *Store) failGenerationAfterError(ctx context.Context, generationID string, status GraphStatus, message string) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return s.FailGeneration(cleanupCtx, generationID, status, message)
+}
+
 // PromoteGeneration atomically supersedes the prior active graph and promotes
 // a fully built generation. Partial generations remain diagnostic only.
 func (s *Store) PromoteGeneration(ctx context.Context, generationID string) error {

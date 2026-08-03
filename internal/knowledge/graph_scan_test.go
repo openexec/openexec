@@ -114,15 +114,21 @@ func TestScanRepositoryPromotesDeterministicGoAndTypeScriptGraph(t *testing.T) {
 	if err != nil || main.Result.Candidate == nil || main.Result.Candidate.Symbol.ID != firstMainID {
 		t.Fatalf("stable symbol identity was not preserved: %#v %v", main, err)
 	}
-	var current, importEdges int
+	var current, importEdges, persistedEdges int
 	if err := store.db.QueryRow(`SELECT COUNT(*) FROM graph_generations WHERE worktree_id = ? AND status = 'current'`, identity.WorktreeID).Scan(&current); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.db.QueryRow(`SELECT COUNT(*) FROM graph_edges WHERE generation_id = ? AND edge_type = 'imports'`, second.Generation.ID).Scan(&importEdges); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.db.QueryRow(`SELECT COUNT(*) FROM graph_edges WHERE generation_id = ?`, second.Generation.ID).Scan(&persistedEdges); err != nil {
+		t.Fatal(err)
+	}
 	if current != 1 || importEdges < 2 {
 		t.Fatalf("graph publication missing current/import contracts: current=%d imports=%d", current, importEdges)
+	}
+	if second.Edges != persistedEdges {
+		t.Fatalf("reported edge count %d does not match persisted count %d", second.Edges, persistedEdges)
 	}
 	dependencies, err := store.FindModuleDependencies(ctx, identity, "ui/main.ts", false, 1, DefaultGraphLimits())
 	if err != nil {
@@ -176,6 +182,9 @@ func TestScanRepositoryDoesNotPromoteMixedInputs(t *testing.T) {
 }
 
 func TestScanRepositoryUsesTypeScriptCompilerWhenProjectProvidesIt(t *testing.T) {
+	if _, err := findCompatibleNode(context.Background()); err != nil {
+		t.Skipf("Node.js 18+ unavailable: %v", err)
+	}
 	compilerPackage := filepath.Join("..", "..", "ui", "node_modules", "typescript")
 	compilerPackage, err := filepath.Abs(compilerPackage)
 	if err != nil {
@@ -191,9 +200,13 @@ func TestScanRepositoryUsesTypeScriptCompilerWhenProjectProvidesIt(t *testing.T)
 	if err := os.Symlink(compilerPackage, filepath.Join(root, "node_modules", "typescript")); err != nil {
 		t.Skipf("cannot link TypeScript compiler: %v", err)
 	}
-	writeTestFile(t, root, "tsconfig.json", `{"compilerOptions":{"strict":true,"moduleResolution":"node"},"include":["src"]}`)
-	writeTestFile(t, root, "src/dep.ts", "export function dependency(): number { return 1 }\n")
-	writeTestFile(t, root, "src/main.ts", "import { dependency } from './dep'\nexport const main = (): number => {\n  return dependency()\n}\n")
+	writeTestFile(t, root, "ui/tsconfig.json", `{"files":[],"references":[{"path":"./tsconfig.app.json"}]}`)
+	writeTestFile(t, root, "ui/tsconfig.app.json", `{"compilerOptions":{"strict":true,"target":"ES2022","module":"ESNext","moduleResolution":"Bundler"},"include":["src"]}`)
+	writeTestFile(t, root, "ui/src/dep.ts", "export function dependency(): number { return 1 }\n")
+	writeTestFile(t, root, "ui/src/main.ts", "import { dependency } from './dep'\nexport const source = import.meta.url\nexport const main = (): number => {\n  return dependency()\n}\n")
+	writeTestFile(t, root, "ui/src/vite-env.d.ts", "declare interface ImportMetaEnv { readonly PROD: boolean }\n")
+	writeTestFile(t, root, "template/tsconfig.json", `{"extends":"./generated/tsconfig.json","compilerOptions":{"module":"ESNext","target":"ES2022"},"include":["src"]}`)
+	writeTestFile(t, root, "template/src/example.ts", "export const example = 1\n")
 	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -209,17 +222,112 @@ func TestScanRepositoryUsesTypeScriptCompilerWhenProjectProvidesIt(t *testing.T)
 	if result.Generation.Capabilities["typescript.definitions"] != "compiler_exact" {
 		t.Fatalf("compiler-backed capability was not published: %#v", result.Generation.Capabilities)
 	}
+	if result.Generation.Status != GraphCurrent || result.Files != 4 {
+		t.Fatalf("nested-config/declaration scan was incomplete: %#v", result)
+	}
+	for _, limitation := range result.Limitations {
+		if strings.Contains(limitation, "import.meta") || strings.Contains(limitation, "compiler omitted") || strings.Contains(limitation, "compiler extraction unavailable") {
+			t.Fatalf("nested TypeScript configuration was not applied: %s", limitation)
+		}
+	}
 	identity, err := store.EnsureRepositoryIdentity(context.Background(), root, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolved, err := store.ResolveGraphSymbol(context.Background(), identity, "main", "src/main.ts", "function", 20)
+	resolved, err := store.ResolveGraphSymbol(context.Background(), identity, "main", "ui/src/main.ts", "function", 20)
 	if err != nil || resolved.Result.Candidate == nil {
 		t.Fatalf("compiler symbol did not resolve: %#v %v", resolved, err)
 	}
 	occurrence := resolved.Result.Candidate.Occurrence
 	if occurrence.Resolution != ResolutionCompilerExact || occurrence.EndLine < 4 {
 		t.Fatalf("compiler range was not preserved: %#v", occurrence)
+	}
+}
+
+func TestCancelledScanPersistsFailedGeneration(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "main.go", "package main\nfunc main() {}\n")
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	_, err = store.scanRepository(ctx, root, cancel)
+	if err == nil {
+		t.Fatal("cancelled scan unexpectedly succeeded")
+	}
+	var building, failed int
+	if err := store.db.QueryRow(`SELECT COUNT(*) FROM graph_generations WHERE status = 'building'`).Scan(&building); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRow(`SELECT COUNT(*) FROM graph_generations WHERE status = 'failed'`).Scan(&failed); err != nil {
+		t.Fatal(err)
+	}
+	if building != 0 || failed != 1 {
+		t.Fatalf("cancelled generation state: building=%d failed=%d", building, failed)
+	}
+}
+
+func TestScanOnlySweepsAbandonedGenerationForItsWorktree(t *testing.T) {
+	ctx := context.Background()
+	base := t.TempDir()
+	storeRoot := filepath.Join(base, "state")
+	if err := os.MkdirAll(storeRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(storeRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	primaryRoot := filepath.Join(base, "primary")
+	initGitFixture(t, primaryRoot, "")
+	writeTestFile(t, primaryRoot, "main.go", "package main\nfunc main() {}\n")
+	runGitFixture(t, primaryRoot, "add", "main.go")
+	runGitFixture(t, primaryRoot, "-c", "user.name=OpenExec Test", "-c", "user.email=test@example.test", "commit", "-m", "source")
+	linkedRoot := filepath.Join(base, "linked")
+	runGitFixture(t, primaryRoot, "worktree", "add", "-b", "linked-scan", linkedRoot)
+
+	primary, err := store.EnsureRepositoryIdentity(ctx, primaryRoot, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	linked, err := store.EnsureRepositoryIdentity(ctx, linkedRoot, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	primaryManifest, err := BuildScanManifest(primaryRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedManifest, err := BuildScanManifest(linkedRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	primaryBuilding, err := store.BeginGeneration(ctx, primary, primaryManifest, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedBuilding, err := store.BeginGeneration(ctx, linked, linkedManifest, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.ScanRepository(ctx, primaryRoot); err != nil {
+		t.Fatal(err)
+	}
+	var primaryStatus, linkedStatus string
+	if err := store.db.QueryRow(`SELECT status FROM graph_generations WHERE id = ?`, primaryBuilding.ID).Scan(&primaryStatus); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRow(`SELECT status FROM graph_generations WHERE id = ?`, linkedBuilding.ID).Scan(&linkedStatus); err != nil {
+		t.Fatal(err)
+	}
+	if primaryStatus != string(GraphFailed) || linkedStatus != string(GraphBuilding) {
+		t.Fatalf("abandoned sweep crossed worktrees: primary=%s linked=%s", primaryStatus, linkedStatus)
 	}
 }
 

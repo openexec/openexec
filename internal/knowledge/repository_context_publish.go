@@ -16,7 +16,8 @@ import (
 // It first observes Agent Console's cached version and uses If-Match so a
 // delayed process cannot overwrite a context published after it started.
 type RepositoryContextPublisher struct {
-	Client *http.Client
+	Client  *http.Client
+	Timeout time.Duration
 }
 
 func (p RepositoryContextPublisher) Publish(ctx context.Context, consoleURL, projectID, token string, projection RepositoryContextProjection) error {
@@ -27,12 +28,7 @@ func (p RepositoryContextPublisher) Publish(ctx context.Context, consoleURL, pro
 	if strings.TrimSpace(projectID) == "" || strings.Contains(projectID, "/") {
 		return fmt.Errorf("agent console project ID is required")
 	}
-	client := p.Client
-	if client == nil {
-		// Never the zero-timeout default: a hung Agent Console must fail the
-		// publish, not park it forever.
-		client = &http.Client{Timeout: 30 * time.Second}
-	}
+	client := p.httpClient()
 	endpoint := strings.TrimRight(base.String(), "/") + "/api/projects/" + url.PathEscape(projectID) + "/repository-context"
 	current, err := p.currentVersion(ctx, client, endpoint, token)
 	if err != nil {
@@ -62,6 +58,19 @@ func (p RepositoryContextPublisher) Publish(ctx context.Context, consoleURL, pro
 		return repositoryContextHTTPError("publish repository context", response)
 	}
 	return nil
+}
+
+func (p RepositoryContextPublisher) httpClient() *http.Client {
+	if p.Client != nil {
+		return p.Client
+	}
+	// Never the zero-timeout default: a hung Agent Console must fail the
+	// publish, not park it forever.
+	timeout := p.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	return &http.Client{Timeout: timeout}
 }
 
 func (p RepositoryContextPublisher) currentVersion(ctx context.Context, client *http.Client, endpoint, token string) (string, error) {

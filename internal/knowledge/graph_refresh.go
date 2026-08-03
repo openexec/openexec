@@ -171,7 +171,7 @@ func (s *Store) RefreshRepository(ctx context.Context, root string) (RefreshResu
 	}
 	fileCount, symbolCount, edgeCount, err := s.storeExtractedGraph(ctx, identity, generation, currentManifest, files)
 	if err != nil {
-		_ = s.FailGeneration(ctx, generation.ID, GraphFailed, err.Error())
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 		return RefreshResult{}, err
 	}
 	after, err := BuildScanManifest(identity.RootPath)
@@ -180,16 +180,18 @@ func (s *Store) RefreshRepository(ctx context.Context, root string) (RefreshResu
 		if err != nil {
 			message = err.Error()
 		}
-		_ = s.FailGeneration(ctx, generation.ID, GraphInconsistent, message)
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphInconsistent, message)
 		return RefreshResult{}, fmt.Errorf("%s", message)
 	}
 	if incomplete {
 		if err := s.completePartialGeneration(ctx, generation.ID, limitations); err != nil {
+			_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 			return RefreshResult{}, err
 		}
 		generation.Status = GraphPartial
 	} else {
 		if err := s.PromoteGeneration(ctx, generation.ID); err != nil {
+			_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 			return RefreshResult{}, err
 		}
 		generation.Status = GraphCurrent
