@@ -503,7 +503,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 		}
 	}
 
-	hasHistory, err := repositoryHasSymbolHistory(ctx, tx, identity.RepositoryID, generation.ID)
+	prior, err := loadPriorSymbols(ctx, tx, identity.RepositoryID, generation.ID)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -530,7 +530,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				return 0, 0, 0, fmt.Errorf("invalid source range for %s in %s", extracted.Name, file.Path)
 			}
 			qualified := qualifySymbol(file, extracted)
-			match, err := findOrCreateSymbol(ctx, tx, generation.ID, identity.RepositoryID, file.Language, extracted.Kind, extracted.Name, qualified, file.Path, extracted.Signature, hasHistory)
+			match, err := findOrCreateSymbol(ctx, tx, generation.ID, identity.RepositoryID, file.Language, extracted.Kind, extracted.Name, qualified, file.Path, extracted.Signature, prior)
 			if err != nil {
 				return 0, 0, 0, err
 			}
@@ -689,18 +689,53 @@ type symbolIdentityMatch struct {
 	PreviousSymbolIDs []string
 }
 
-// repositoryHasSymbolHistory reports whether any prior-generation occurrences
-// exist. A first scan has none, and without this check every symbol paid two
-// heavy identity queries against empty history - the dominant cost of a
-// fresh scan (68% of runtime on a 6k-file repository).
-func repositoryHasSymbolHistory(ctx context.Context, tx *sql.Tx, repositoryID, generationID string) (bool, error) {
-	var exists int
-	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM symbol_occurrences o JOIN repository_symbols s ON s.id = o.symbol_id WHERE s.repository_id = ? AND o.generation_id <> ?)`, repositoryID, generationID).Scan(&exists)
-	return exists == 1, err
+// priorSymbols is the exact-identity read model for one scan: every live
+// symbol keyed by its prior location, loaded in one query instead of one
+// query per symbol. Claimed tracks symbols already re-used this generation
+// so a duplicate key falls back to the full SQL path, which preserves the
+// original NOT EXISTS semantics.
+type priorSymbols struct {
+	exact   map[string]string
+	claimed map[string]bool
 }
 
-func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositoryID, language, kind, name, qualified, file, signature string, hasHistory bool) (symbolIdentityMatch, error) {
-	if !hasHistory {
+func priorKey(language, kind, qualified, file string) string {
+	return language + "\x00" + kind + "\x00" + qualified + "\x00" + file
+}
+
+// loadPriorSymbols builds the exact-match map with the same candidate
+// preference as the per-symbol query: current generation first, then newest.
+func loadPriorSymbols(ctx context.Context, tx *sql.Tx, repositoryID, generationID string) (*priorSymbols, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT s.id, s.language, s.kind, s.qualified_name, o.file_path FROM repository_symbols s JOIN symbol_occurrences o ON o.symbol_id = s.id JOIN graph_generations g ON g.id = o.generation_id WHERE s.repository_id = ? AND s.retired_at IS NULL AND o.generation_id <> ? ORDER BY CASE g.status WHEN 'current' THEN 0 ELSE 1 END, g.created_at DESC`, repositoryID, generationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	prior := &priorSymbols{exact: map[string]string{}, claimed: map[string]bool{}}
+	for rows.Next() {
+		var id, language, kind, qualified, file string
+		if err := rows.Scan(&id, &language, &kind, &qualified, &file); err != nil {
+			return nil, err
+		}
+		key := priorKey(language, kind, qualified, file)
+		if _, exists := prior.exact[key]; !exists {
+			prior.exact[key] = id
+		}
+	}
+	if len(prior.exact) == 0 {
+		return nil, rows.Err() // no history: callers take the fast create path
+	}
+	return prior, rows.Err()
+}
+
+func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositoryID, language, kind, name, qualified, file, signature string, prior *priorSymbols) (symbolIdentityMatch, error) {
+	if prior != nil {
+		if id := prior.exact[priorKey(language, kind, qualified, file)]; id != "" && !prior.claimed[id] {
+			prior.claimed[id] = true
+			return symbolIdentityMatch{SymbolID: id, Continuity: "preserved", Method: "exact"}, nil
+		}
+	}
+	if prior == nil {
 		newID := "sym_" + uuid.NewString()
 		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO repository_symbols (id, repository_id, language, kind, display_name, qualified_name) VALUES (?, ?, ?, ?, ?, ?)`, newID, repositoryID, language, kind, name, qualified); err != nil {
 			return symbolIdentityMatch{}, err
