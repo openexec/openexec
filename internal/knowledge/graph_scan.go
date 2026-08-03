@@ -206,6 +206,30 @@ func gitListedFiles(root string) ([]string, bool) {
 	return files, len(files) > 0
 }
 
+// structuralCandidates loads (and caches) the history pool for one
+// language|kind pair, preserving the per-symbol query's candidate order.
+func (p *priorSymbols) structuralCandidates(ctx context.Context, tx *sql.Tx, repositoryID, language, kind, generationID string) ([]structuralCandidate, error) {
+	key := language + "\x00" + kind
+	if pool, ok := p.structuralPool[key]; ok {
+		return pool, nil
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT s.id, s.display_name, o.file_path, o.signature FROM repository_symbols s JOIN symbol_occurrences o ON o.symbol_id = s.id JOIN graph_generations g ON g.id = o.generation_id WHERE s.repository_id = ? AND s.retired_at IS NULL AND s.language = ? AND s.kind = ? AND o.generation_id <> ? AND g.status IN ('current','superseded','partial') ORDER BY CASE g.status WHEN 'current' THEN 0 ELSE 1 END, g.created_at DESC`, repositoryID, language, kind, generationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var pool []structuralCandidate
+	for rows.Next() {
+		var candidate structuralCandidate
+		if err := rows.Scan(&candidate.id, &candidate.display, &candidate.file, &candidate.signature); err != nil {
+			return nil, err
+		}
+		pool = append(pool, candidate)
+	}
+	p.structuralPool[key] = pool
+	return pool, rows.Err()
+}
+
 func finishScanManifest(inputs []ScanInput) ScanManifest {
 	sort.Slice(inputs, func(i, j int) bool { return inputs[i].FilePath < inputs[j].FilePath })
 	manifestHasher := sha256.New()
@@ -770,9 +794,15 @@ type symbolIdentityMatch struct {
 // query per symbol. Claimed tracks symbols already re-used this generation
 // so a duplicate key falls back to the full SQL path, which preserves the
 // original NOT EXISTS semantics.
+type structuralCandidate struct{ id, display, file, signature string }
+
 type priorSymbols struct {
 	exact   map[string]string
 	claimed map[string]bool
+	// structuralPool caches history candidates per language|kind so a scan
+	// with thousands of exact-misses (e.g. migrated legacy symbols) runs one
+	// pool query per pair instead of one heavy join per symbol.
+	structuralPool map[string][]structuralCandidate
 }
 
 func priorKey(language, kind, qualified, file string) string {
@@ -787,7 +817,7 @@ func loadPriorSymbols(ctx context.Context, tx *sql.Tx, repositoryID, generationI
 		return nil, err
 	}
 	defer rows.Close()
-	prior := &priorSymbols{exact: map[string]string{}, claimed: map[string]bool{}}
+	prior := &priorSymbols{exact: map[string]string{}, claimed: map[string]bool{}, structuralPool: map[string][]structuralCandidate{}}
 	for rows.Next() {
 		var id, language, kind, qualified, file string
 		if err := rows.Scan(&id, &language, &kind, &qualified, &file); err != nil {
@@ -821,32 +851,32 @@ func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositor
 	var symbolID string
 	err := tx.QueryRowContext(ctx, `SELECT s.id FROM repository_symbols s JOIN symbol_occurrences o ON o.symbol_id = s.id JOIN graph_generations g ON g.id = o.generation_id WHERE s.repository_id = ? AND s.retired_at IS NULL AND s.language = ? AND s.kind = ? AND s.qualified_name = ? AND o.file_path = ? AND o.generation_id <> ? AND NOT EXISTS (SELECT 1 FROM symbol_occurrences current WHERE current.generation_id = ? AND current.symbol_id = s.id) ORDER BY CASE g.status WHEN 'current' THEN 0 ELSE 1 END, g.created_at DESC LIMIT 1`, repositoryID, language, kind, qualified, file, generationID, generationID).Scan(&symbolID)
 	if err == nil {
+		if prior != nil {
+			prior.claimed[symbolID] = true
+		}
 		return symbolIdentityMatch{SymbolID: symbolID, Continuity: "preserved", Method: "exact"}, nil
 	}
 	if err != sql.ErrNoRows {
 		return symbolIdentityMatch{}, err
 	}
 	structure := normalizedSymbolStructure(name, signature)
-	var candidates []struct{ id, display, file, signature string }
+	var candidates []structuralCandidate
 	if structure != "" {
-		rows, queryErr := tx.QueryContext(ctx, `SELECT s.id, s.display_name, o.file_path, o.signature FROM repository_symbols s JOIN symbol_occurrences o ON o.symbol_id = s.id JOIN graph_generations g ON g.id = o.generation_id WHERE s.repository_id = ? AND s.retired_at IS NULL AND s.language = ? AND s.kind = ? AND o.generation_id <> ? AND g.status IN ('current','superseded','partial') AND NOT EXISTS (SELECT 1 FROM symbol_occurrences current WHERE current.generation_id = ? AND current.symbol_id = s.id) ORDER BY CASE g.status WHEN 'current' THEN 0 ELSE 1 END, g.created_at DESC`, repositoryID, language, kind, generationID, generationID)
-		if queryErr != nil {
-			return symbolIdentityMatch{}, queryErr
+		pool, err := prior.structuralCandidates(ctx, tx, repositoryID, language, kind, generationID)
+		if err != nil {
+			return symbolIdentityMatch{}, err
 		}
 		seen := map[string]bool{}
-		for rows.Next() {
-			var candidate struct{ id, display, file, signature string }
-			if scanErr := rows.Scan(&candidate.id, &candidate.display, &candidate.file, &candidate.signature); scanErr != nil {
-				rows.Close()
-				return symbolIdentityMatch{}, scanErr
+		for _, candidate := range pool {
+			// Claimed symbols already re-materialized in this generation; the
+			// per-symbol query excluded them with NOT EXISTS on current rows.
+			if prior.claimed[candidate.id] || seen[candidate.id] {
+				continue
 			}
-			if !seen[candidate.id] && normalizedSymbolStructure(candidate.display, candidate.signature) == structure {
+			if normalizedSymbolStructure(candidate.display, candidate.signature) == structure {
 				seen[candidate.id] = true
 				candidates = append(candidates, candidate)
 			}
-		}
-		if rowsErr := rows.Close(); rowsErr != nil {
-			return symbolIdentityMatch{}, rowsErr
 		}
 	}
 	if len(candidates) == 1 {
@@ -857,6 +887,9 @@ func findOrCreateSymbol(ctx context.Context, tx *sql.Tx, generationID, repositor
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE repository_symbols SET display_name = ?, qualified_name = ?, retired_at = NULL WHERE id = ?`, name, qualified, candidate.id); err != nil {
 			return symbolIdentityMatch{}, err
+		}
+		if prior != nil {
+			prior.claimed[candidate.id] = true
 		}
 		return symbolIdentityMatch{SymbolID: candidate.id, Continuity: continuity, Method: "structural", PreviousSymbolIDs: []string{candidate.id}}, nil
 	}
