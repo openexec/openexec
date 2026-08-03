@@ -52,6 +52,7 @@ type Store interface {
 	ListTasksByStory(ctx context.Context, storyID string) ([]*Task, error)
 	ListTasksByStatus(ctx context.Context, status string) ([]*Task, error)
 	UpdateTask(ctx context.Context, t *Task) error
+	CanCompleteTask(ctx context.Context, id string) error
 	DeleteTask(ctx context.Context, id string) error
 
 	// Bulk operations for bootstrap

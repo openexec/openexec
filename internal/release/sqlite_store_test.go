@@ -845,5 +845,43 @@ func TestSQLiteStore_ListMethods(t *testing.T) {
 	})
 }
 
+func TestSQLiteStore_CanCompleteTaskEnforcesAcceptedEvidenceOnly(t *testing.T) {
+	db, cleanup := testDB(t)
+	defer cleanup()
+	store, err := NewSQLiteStore(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := store.CanCompleteTask(ctx, "legacy-task"); err != nil {
+		t.Fatalf("task without an accepted validation plan lost compatibility: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO repositories (id, persisted_uuid) VALUES ('repo', 'persisted');
+		INSERT INTO checkouts (id, repository_id, root_path) VALUES ('checkout', 'repo', '/project');
+		INSERT INTO worktrees (id, repository_id, checkout_id, root_path) VALUES ('worktree', 'repo', 'checkout', '/project');
+		INSERT INTO graph_generations (id, schema_version, repository_id, checkout_id, worktree_id, worktree_state_hash, configuration_digest, extractor_version, manifest_hash, status) VALUES ('graph', 1, 'repo', 'checkout', 'worktree', 'state', 'config', 'extractor', 'manifest', 'current');
+		INSERT INTO validation_plan_revisions (id, task_id, revision, generation_id, worktree_state_hash, status) VALUES ('plan', 'guarded-task', 1, 'graph', 'state', 'accepted');
+		INSERT INTO validation_items (id, plan_revision_id, source, disposition, requirement, criterion) VALUES ('item', 'plan', 'policy', 'accepted', 'blocking', 'Tests pass');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CanCompleteTask(ctx, "guarded-task"); err == nil {
+		t.Fatal("task completed without supported evidence")
+	}
+	if _, err := db.Exec(`INSERT INTO completion_claims (id, validation_item_id, predicate, scope, status, repository_state_hash) VALUES ('claim', 'item', 'validation_item_passed', 'tests', 'supported', 'state')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CanCompleteTask(ctx, "guarded-task"); err != nil {
+		t.Fatalf("supported evidence did not satisfy completion gate: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE graph_generations SET status = 'stale' WHERE id = 'graph'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CanCompleteTask(ctx, "guarded-task"); err == nil {
+		t.Fatal("stale validation state passed completion gate")
+	}
+}
+
 // Ensure SQLiteStore implements Store interface.
 var _ Store = (*SQLiteStore)(nil)

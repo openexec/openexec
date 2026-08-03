@@ -53,3 +53,36 @@ func TestSymbolReaderTool(t *testing.T) {
 		}
 	})
 }
+
+func TestGraphSymbolReaderToolReadsSourceAndRejectsStalePointer(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(tmpDir, "service.go")
+	if err := os.WriteFile(path, []byte("package service\n\nfunc Run() string { return \"ok\" }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := knowledge.NewStore(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if _, err := store.ScanRepository(context.Background(), tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	tool := NewSymbolReaderToolForRepository(store, tmpDir)
+	result, err := tool.Execute(context.Background(), map[string]interface{}{"name": "Run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result.(string), "func Run() string") || !strings.Contains(result.(string), "Freshness: current") {
+		t.Fatalf("graph source was not returned: %v", result)
+	}
+	if err := os.WriteFile(path, []byte("package service\n\nfunc Run() string { return \"changed\" }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tool.Execute(context.Background(), map[string]interface{}{"name": "Run"}); err == nil || !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("stale pointer was returned: %v", err)
+	}
+}

@@ -1,6 +1,7 @@
 package release
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -56,6 +57,9 @@ func (m *Manager) CompleteTask(taskID string) (*TaskCompletionResult, error) {
 
 	result := &TaskCompletionResult{
 		TaskID: taskID,
+	}
+	if err := m.store.CanCompleteTask(context.Background(), taskID); err != nil {
+		return nil, err
 	}
 
 	// Mark task as done

@@ -95,6 +95,7 @@ Detailed contracts for the runtime subsystems.
 *   [**Policy & Sandbox Contract v1**](../future/POLICY-SANDBOX-CONTRACT-V1.md) — Capability-based access control and runtime safety enforcement.
 *   [**Run Timeline & Replay System**](../future/TIMELINE-REPLAY-SYSTEM.md) — Event-driven observability and deterministic run reconstruction.
 *   [**Operational Memory Layer**](../future/OPERATIONAL-MEMORY-LAYER.md) — Pointer-record architecture for deterministic system knowledge.
+*   [**Repository Pointer Graph and Verification Evidence Plan**](../REPOSITORY_POINTER_GRAPH_PLAN.md) — Implementation contracts for versioned repository structure, bounded impact, evidence-backed claims, and the Agent Console read model.
 
 ## 4. Roadmap & Execution
 The tactical plan for simplifying and stabilizing the codebase.

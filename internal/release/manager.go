@@ -688,6 +688,11 @@ func (m *Manager) UpdateTask(updated *Task) error {
 	if !ok {
 		return fmt.Errorf("task %s not found", updated.ID)
 	}
+	if updated.Status == TaskStatusDone && existing.Status != TaskStatusDone {
+		if err := m.store.CanCompleteTask(context.Background(), updated.ID); err != nil {
+			return err
+		}
+	}
 
 	// Track old story to repair story.Tasks list if StoryID changes
 	oldStoryID := existing.StoryID

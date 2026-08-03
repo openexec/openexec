@@ -1,18 +1,270 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/internal/repository"
 	"github.com/spf13/cobra"
 )
 
 var knowledgeCmd = &cobra.Command{
 	Use:   "knowledge",
 	Short: "Manage and inspect the Deterministic Knowledge Base",
+}
+
+var (
+	graphDirectory        string
+	graphJSON             bool
+	graphFile             string
+	graphKind             string
+	graphRead             bool
+	graphReverse          bool
+	graphDepth            int
+	graphImpactDepth      int
+	graphConsoleURL       string
+	graphConsoleProject   string
+	graphConsoleTokenFile string
+	graphSymbols          []string
+	graphTaskID           string
+	graphRunID            string
+	graphPlanID           string
+)
+
+var knowledgeGraphCmd = &cobra.Command{
+	Use:   "graph",
+	Short: "Inspect the versioned repository pointer graph",
+}
+
+var knowledgeGraphScanCmd = &cobra.Command{
+	Use:   "scan",
+	Short: "Build and atomically publish a repository graph generation",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := knowledge.NewStore(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := store.ScanRepository(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, result)
+		}
+		cmd.Printf("Graph %s: %s (%d files, %d symbols, %d edges)\n", result.Generation.ID, result.Generation.Status, result.Files, result.Symbols, result.Edges)
+		for _, limitation := range result.Limitations {
+			cmd.Printf("  limitation: %s\n", limitation)
+		}
+		return nil
+	},
+}
+
+var knowledgeGraphRefreshCmd = &cobra.Command{
+	Use:   "refresh",
+	Short: "Refresh changed graph inputs and fall back to a full scan when required",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, err := knowledge.NewStore(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := store.RefreshRepository(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, result)
+		}
+		cmd.Printf("Graph %s: %s; changed=%t; invalidation=%s/%s; full_scan=%t\n", result.Generation.ID, result.Generation.Status, result.Changed, result.Invalidation.Scope, result.Invalidation.Cause, result.Invalidation.FullScan)
+		return nil
+	},
+}
+
+var knowledgeGraphSymbolCmd = &cobra.Command{
+	Use:   "symbol NAME",
+	Short: "Resolve a symbol without silently selecting ambiguous candidates",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		store, identity, err := openGraphStore(ctx, graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		resolved, err := store.ResolveGraphSymbol(ctx, identity, args[0], graphFile, graphKind, 20)
+		if err != nil {
+			return err
+		}
+		if graphRead && resolved.Result.Candidate != nil {
+			reader, err := repository.NewRootedReader(graphDirectory, identity.RepositoryID, identity.WorktreeID, knowledge.DefaultGraphLimits().MaxBytes)
+			if err != nil {
+				return err
+			}
+			returnValue, err := store.ReadGraphSymbol(ctx, identity, resolved.Result.Candidate.Symbol.ID, reader)
+			if err != nil {
+				return err
+			}
+			if graphJSON {
+				return writeCommandJSON(cmd, returnValue)
+			}
+			cmd.Printf("%s (%s) %s:%d-%d\n%s\n", returnValue.Result.Symbol.DisplayName, returnValue.Result.Symbol.Kind, returnValue.Result.Occurrence.FilePath, returnValue.Result.Occurrence.StartLine, returnValue.Result.Occurrence.EndLine, returnValue.Result.Source.Content)
+			return nil
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, resolved)
+		}
+		if resolved.Result.Candidate != nil {
+			candidate := resolved.Result.Candidate
+			cmd.Printf("%s %s (%s:%d-%d) [%s]\n", candidate.Symbol.Kind, candidate.Symbol.QualifiedName, candidate.Occurrence.FilePath, candidate.Occurrence.StartLine, candidate.Occurrence.EndLine, candidate.Symbol.ID)
+			return nil
+		}
+		if len(resolved.Result.Candidates) > 0 {
+			cmd.Println("Ambiguous symbol; specify --file or --kind:")
+			for _, candidate := range resolved.Result.Candidates {
+				cmd.Printf("  %s %s (%s:%d) [%s]\n", candidate.Symbol.Kind, candidate.Symbol.QualifiedName, candidate.Occurrence.FilePath, candidate.Occurrence.StartLine, candidate.Symbol.ID)
+			}
+			return nil
+		}
+		return fmt.Errorf("symbol %q was not resolved", args[0])
+	},
+}
+
+var knowledgeGraphDependenciesCmd = &cobra.Command{
+	Use:   "dependencies MODULE",
+	Short: "Show bounded module dependencies or dependants",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := store.FindModuleDependencies(cmd.Context(), identity, args[0], graphReverse, graphDepth, knowledge.DefaultGraphLimits())
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, result)
+		}
+		cmd.Printf("%s [%s]\n", result.Result.Root.QualifiedName, result.Generation.Freshness)
+		for _, node := range result.Result.Nodes {
+			cmd.Printf("  %s %s\n", node.NodeType, node.QualifiedName)
+		}
+		if result.Truncated {
+			cmd.Println("  result truncated by graph limits")
+		}
+		return nil
+	},
+}
+
+var knowledgeGraphImpactCmd = &cobra.Command{
+	Use:   "impact SYMBOL_ID...",
+	Short: "Explain a bounded affected set and validation recommendations",
+	Args:  cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := store.ImpactAnalysis(cmd.Context(), identity, args, graphImpactDepth, knowledge.DefaultGraphLimits())
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, result)
+		}
+		cmd.Printf("Impact: %s [%s]\n", result.Resolution.Status, result.Generation.Freshness)
+		for _, caller := range result.Result.DirectCallers {
+			cmd.Printf("  caller: %s\n", caller.Node.QualifiedName)
+		}
+		for _, test := range result.Result.RelatedTests {
+			cmd.Printf("  test candidate: %s (%s)\n", test.FilePath, test.Reason)
+		}
+		for _, limitation := range result.Result.Unresolved {
+			cmd.Printf("  unresolved: %s\n", limitation)
+		}
+		return nil
+	},
+}
+
+var knowledgeGraphStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show the active graph generation and freshness",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		state, err := store.CurrentRepositoryState(cmd.Context(), identity)
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, state)
+		}
+		cmd.Printf("Graph: %s\nFreshness: %s\nRepository: %s\nWorktree: %s\nState: %s\n", state.GraphVersion, state.Freshness, state.RepositoryID, state.WorktreeID, state.WorktreeStateHash)
+		return nil
+	},
+}
+
+var knowledgeGraphPublishCmd = &cobra.Command{
+	Use:   "publish",
+	Short: "Publish the current lossy repository read model to Agent Console",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		projection, err := store.BuildRepositoryContext(cmd.Context(), identity, graphSymbols, graphTaskID, graphRunID, graphPlanID, nil)
+		if err != nil {
+			return err
+		}
+		token := strings.TrimSpace(os.Getenv("AGENT_CONSOLE_TOKEN"))
+		if graphConsoleTokenFile != "" {
+			contents, readErr := os.ReadFile(graphConsoleTokenFile)
+			if readErr != nil {
+				return fmt.Errorf("read Agent Console token file: %w", readErr)
+			}
+			if len(contents) > 4096 {
+				return fmt.Errorf("Agent Console token file is unexpectedly large")
+			}
+			token = strings.TrimSpace(string(contents))
+		}
+		if err := (knowledge.RepositoryContextPublisher{}).Publish(cmd.Context(), graphConsoleURL, graphConsoleProject, token, projection); err != nil {
+			return err
+		}
+		cmd.Printf("Published graph %s (%s) to Agent Console project %s\n", projection.GraphVersion, projection.Freshness, graphConsoleProject)
+		return nil
+	},
+}
+
+func openGraphStore(ctx context.Context, directory string) (*knowledge.Store, knowledge.RepositoryIdentity, error) {
+	store, err := knowledge.NewStore(directory)
+	if err != nil {
+		return nil, knowledge.RepositoryIdentity{}, err
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, directory, "")
+	if err != nil {
+		store.Close()
+		return nil, knowledge.RepositoryIdentity{}, err
+	}
+	_, _ = store.MigrateLegacySymbols(ctx, identity)
+	return store, identity, nil
+}
+
+func writeCommandJSON(cmd *cobra.Command, value any) error {
+	encoder := json.NewEncoder(cmd.OutOrStdout())
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(value)
 }
 
 var knowledgeLsCmd = &cobra.Command{
@@ -172,6 +424,11 @@ var knowledgeIndexCmd = &cobra.Command{
 		for lang, count := range stats.ByLanguage {
 			cmd.Printf("  %s: %d symbols\n", lang, count)
 		}
+		graph, err := kStore.ScanRepository(cmd.Context(), projectDir)
+		if err != nil {
+			return fmt.Errorf("legacy pointers were indexed but graph publication failed: %w", err)
+		}
+		cmd.Printf("✓ Graph %s published: %d modules, %d symbols, %d edges.\n", graph.Generation.ID, graph.Files, graph.Symbols, graph.Edges)
 		return nil
 	},
 }
@@ -274,11 +531,32 @@ func formatBytes(b int64) string {
 }
 
 func init() {
+	for _, command := range []*cobra.Command{knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd} {
+		command.Flags().StringVarP(&graphDirectory, "directory", "d", ".", "repository directory")
+		command.Flags().BoolVar(&graphJSON, "json", false, "emit machine-readable JSON")
+	}
+	knowledgeGraphSymbolCmd.Flags().StringVar(&graphFile, "file", "", "repository-relative file filter")
+	knowledgeGraphSymbolCmd.Flags().StringVar(&graphKind, "kind", "", "symbol kind filter")
+	knowledgeGraphSymbolCmd.Flags().BoolVar(&graphRead, "read", false, "read the hash-validated source range")
+	knowledgeGraphDependenciesCmd.Flags().BoolVar(&graphReverse, "reverse", false, "show module dependants")
+	knowledgeGraphDependenciesCmd.Flags().IntVar(&graphDepth, "depth", 1, "bounded traversal depth")
+	knowledgeGraphImpactCmd.Flags().IntVar(&graphImpactDepth, "depth", 2, "bounded traversal depth")
+	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleURL, "console-url", "", "Agent Console base URL")
+	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleProject, "console-project", "", "Agent Console checkout ID")
+	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleTokenFile, "console-token-file", "", "file containing the Agent Console bearer token (or export AGENT_CONSOLE_TOKEN)")
+	knowledgeGraphPublishCmd.Flags().StringSliceVar(&graphSymbols, "symbol", nil, "symbol name to include (repeatable)")
+	knowledgeGraphPublishCmd.Flags().StringVar(&graphTaskID, "task", "", "OpenExec task reference")
+	knowledgeGraphPublishCmd.Flags().StringVar(&graphRunID, "run", "", "OpenExec run reference")
+	knowledgeGraphPublishCmd.Flags().StringVar(&graphPlanID, "plan", "", "OpenExec validation-plan reference")
+	_ = knowledgeGraphPublishCmd.MarkFlagRequired("console-url")
+	_ = knowledgeGraphPublishCmd.MarkFlagRequired("console-project")
+	knowledgeGraphCmd.AddCommand(knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd)
 	knowledgeCmd.AddCommand(knowledgeLsCmd)
 	knowledgeCmd.AddCommand(knowledgeShowCmd)
 	knowledgeCmd.AddCommand(knowledgeInitCmd)
 	knowledgeCmd.AddCommand(knowledgeIndexCmd)
 	knowledgeCmd.AddCommand(knowledgeSymbolsCmd)
 	knowledgeCmd.AddCommand(knowledgeStatusCmd)
+	knowledgeCmd.AddCommand(knowledgeGraphCmd)
 	rootCmd.AddCommand(knowledgeCmd)
 }

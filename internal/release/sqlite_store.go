@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	statepkg "github.com/openexec/openexec/pkg/db/state"
 )
 
 // SQLiteStore is a SQLite-based implementation of Store.
@@ -116,8 +118,10 @@ func (s *SQLiteStore) initSchema(ctx context.Context) error {
 		}
 	}
 
-	_, err := s.db.ExecContext(ctx, StateSchema)
-	return err
+	if _, err := s.db.ExecContext(ctx, StateSchema); err != nil {
+		return err
+	}
+	return statepkg.EnsureKnowledgeGraphSchema(s.db)
 }
 
 // tableExists checks whether a table exists in the database.
@@ -1146,6 +1150,42 @@ func (s *SQLiteStore) UpdateTask(ctx context.Context, task *Task) error {
 		return ErrTaskNotFound
 	}
 
+	return nil
+}
+
+// CanCompleteTask enforces only validation obligations that an accepted plan
+// made authoritative. Tasks with no accepted plan preserve legacy behavior.
+func (s *SQLiteStore) CanCompleteTask(ctx context.Context, taskID string) error {
+	var planID, generationID, stateHash string
+	err := s.db.QueryRowContext(ctx, `SELECT id, generation_id, worktree_state_hash FROM validation_plan_revisions WHERE task_id = ? AND status = 'accepted' ORDER BY revision DESC LIMIT 1`, taskID).Scan(&planID, &generationID, &stateHash)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load accepted validation plan: %w", err)
+	}
+	var generationStatus, currentState string
+	if err := s.db.QueryRowContext(ctx, `SELECT status, worktree_state_hash FROM graph_generations WHERE id = ?`, generationID).Scan(&generationStatus, &currentState); err != nil {
+		return fmt.Errorf("load validation graph generation: %w", err)
+	}
+	if generationStatus != "current" || currentState != stateHash {
+		return fmt.Errorf("task %s validation evidence is stale: graph generation is %s", taskID, generationStatus)
+	}
+	var outstanding int
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM validation_items i
+		WHERE i.plan_revision_id = ? AND i.disposition = 'accepted'
+		AND i.requirement IN ('required','blocking')
+		AND NOT EXISTS (
+			SELECT 1 FROM completion_claims c
+			WHERE c.validation_item_id = i.id AND c.predicate = 'validation_item_passed'
+			AND c.repository_state_hash = ? AND c.status = 'supported'
+		)`, planID, stateHash).Scan(&outstanding)
+	if err != nil {
+		return fmt.Errorf("check validation completion claims: %w", err)
+	}
+	if outstanding > 0 {
+		return fmt.Errorf("task %s has %d required validation obligation(s) without supported evidence", taskID, outstanding)
+	}
 	return nil
 }
 

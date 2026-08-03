@@ -3,11 +3,13 @@ package knowledge
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/openexec/openexec/pkg/db/sqlitecfg"
+	state "github.com/openexec/openexec/pkg/db/state"
 )
 
 // SymbolRecord represents detailed function/struct metadata (OpenCode)
@@ -71,6 +73,9 @@ type Store struct {
 func NewStore(projectDir string) (*Store, error) {
 	// For standalone usage, default to the unified db path
 	dbPath := filepath.Join(projectDir, ".openexec", "openexec.db")
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
+		return nil, fmt.Errorf("create knowledge store directory: %w", err)
+	}
 	db, err := sql.Open("sqlite", sqlitecfg.DSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open knowledge db: %w", err)
@@ -157,7 +162,7 @@ func (s *Store) migrate() error {
 			return fmt.Errorf("migration failed: %w", err)
 		}
 	}
-	return nil
+	return state.EnsureKnowledgeGraphSchema(s.db)
 }
 
 // --- Symbol Methods ---

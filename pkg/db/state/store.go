@@ -77,6 +77,9 @@ func (s *Store) Init() error {
 	if _, err := s.db.Exec(UnifiedSchema); err != nil {
 		return fmt.Errorf("failed to initialize unified schema: %w", err)
 	}
+	if err := EnsureKnowledgeGraphSchema(s.db); err != nil {
+		return fmt.Errorf("failed to initialize knowledge graph schema: %w", err)
+	}
 	// Apply forward-safe migrations for columns that may be missing on older DBs.
 	// These are idempotent: we check the table schema before attempting ALTERs.
 	// Covers drift between this unified schema and internal/release/schema.go.

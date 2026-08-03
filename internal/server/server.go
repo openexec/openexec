@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/openexec/openexec"
@@ -28,7 +29,6 @@ import (
 	"github.com/openexec/openexec/pkg/manager"
 	"github.com/openexec/openexec/pkg/telemetry"
 	"github.com/openexec/openexec/pkg/version"
-	"strings"
 )
 
 // Server is the unified OpenExec API and UI host.
@@ -234,11 +234,62 @@ func New(cfg Config) (*Server, error) {
 		// Start background indexing only when DCP is enabled
 		go s.Coordinator.SyncKnowledge(".")
 	}
+	s.Mux.HandleFunc("POST /api/v1/repository-graph/scan", s.handleRepositoryGraphScan)
+	s.Mux.HandleFunc("GET /api/v1/repository-context", s.handleRepositoryContext)
 
 	// Log active feature flags for operators
 	logFeatureFlags()
 
 	return s, nil
+}
+
+func (s *Server) handleRepositoryGraphScan(w http.ResponseWriter, r *http.Request) {
+	store, err := knowledge.NewStoreWithDB(s.StateStore.GetDB())
+	if err != nil {
+		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	result, err := store.RefreshRepository(r.Context(), s.ProjectsDir)
+	if err != nil {
+		s.respondJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleRepositoryContext(w http.ResponseWriter, r *http.Request) {
+	store, err := knowledge.NewStoreWithDB(s.StateStore.GetDB())
+	if err != nil {
+		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	identity, err := store.EnsureRepositoryIdentity(r.Context(), s.ProjectsDir, "")
+	if err != nil {
+		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	var names []string
+	for _, name := range strings.Split(r.URL.Query().Get("symbols"), ",") {
+		if trimmed := strings.TrimSpace(name); trimmed != "" {
+			names = append(names, trimmed)
+		}
+	}
+	planID := r.URL.Query().Get("plan_revision_id")
+	var report *state.CompletionReport
+	if planID != "" {
+		coverage, coverageErr := s.StateStore.EvidenceCoverage(r.Context(), planID)
+		if coverageErr != nil {
+			s.respondJSON(w, http.StatusConflict, map[string]string{"error": coverageErr.Error()})
+			return
+		}
+		report = &coverage
+	}
+	projection, err := store.BuildRepositoryContext(r.Context(), identity, names, r.URL.Query().Get("task_id"), r.URL.Query().Get("run_id"), planID, report)
+	if err != nil {
+		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, http.StatusOK, projection)
 }
 
 // logFeatureFlags logs the state of all feature flags on startup.
