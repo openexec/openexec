@@ -20,7 +20,10 @@ package sqlitecfg
 // WAL journaling (multi-process readers + writer), foreign key enforcement,
 // and a 5s busy timeout so concurrent writers wait instead of failing.
 func DSN(dbPath string) string {
-	return dbPath + "?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	// synchronous=NORMAL is the recommended WAL pairing: durability moves to
+	// checkpoint boundaries and bulk writers stop paying an fsync per page.
+	// The 64MB page cache keeps graph-scan B-tree seeks off the disk.
+	return dbPath + "?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=cache_size(-64000)"
 }
 
 // ReadOnlyDSN returns a read-only connection string with the same busy
