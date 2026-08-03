@@ -11,6 +11,7 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -84,6 +85,55 @@ func BuildScanManifest(root string) (ScanManifest, error) {
 		root = evaluated
 	}
 	var inputs []ScanInput
+	// Prefer git's view of the repository: tracked plus unignored untracked
+	// files. The hard-coded directory list alone treated gitignored trees
+	// (dependency caches, build output) as project source - on one real
+	// checkout 5,300 of 6,100 scanned files were an ignored GOPATH cache.
+	if listed, ok := gitListedFiles(root); ok {
+		for _, rel := range listed {
+			ignored := false
+			for _, part := range strings.Split(rel, "/") {
+				if graphIgnoredDirectories[part] || (strings.HasPrefix(part, ".") && part != ".github") {
+					ignored = true
+					break
+				}
+			}
+			if ignored {
+				continue
+			}
+			kind, include := graphInputKind(rel)
+			if !include {
+				continue
+			}
+			path := filepath.Join(root, filepath.FromSlash(rel))
+			info, statErr := os.Lstat(path)
+			if statErr != nil {
+				continue // tracked but deleted from the worktree
+			}
+			resolvedPath := path
+			symlinkTarget := ""
+			if info.Mode()&os.ModeSymlink != 0 {
+				resolvedPath, err = filepath.EvalSymlinks(path)
+				if err != nil {
+					return ScanManifest{}, fmt.Errorf("resolve symlink %s: %w", rel, err)
+				}
+				if _, err := safeRepositoryRelative(root, resolvedPath); err != nil {
+					return ScanManifest{}, fmt.Errorf("symlink %s escapes repository: %w", rel, err)
+				}
+				symlinkTarget, _ = filepath.Rel(root, resolvedPath)
+				symlinkTarget = filepath.ToSlash(symlinkTarget)
+				if info, err = os.Stat(resolvedPath); err != nil {
+					return ScanManifest{}, err
+				}
+			}
+			data, readErr := os.ReadFile(resolvedPath)
+			if readErr != nil {
+				return ScanManifest{}, fmt.Errorf("read scan input %s: %w", rel, readErr)
+			}
+			inputs = append(inputs, ScanInput{FilePath: filepath.ToSlash(rel), InputKind: kind, Size: info.Size(), ContentHash: hashBytes(data), SymlinkTarget: symlinkTarget, Included: true})
+		}
+		return finishScanManifest(inputs), nil
+	}
 	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -136,6 +186,27 @@ func BuildScanManifest(root string) (ScanManifest, error) {
 	if err != nil {
 		return ScanManifest{}, err
 	}
+	return finishScanManifest(inputs), nil
+}
+
+// gitListedFiles asks git for tracked and unignored untracked files, so the
+// manifest honors .gitignore. ok=false falls back to the directory walk.
+func gitListedFiles(root string) ([]string, bool) {
+	command := exec.Command("git", "-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	output, err := command.Output()
+	if err != nil {
+		return nil, false
+	}
+	var files []string
+	for _, rel := range strings.Split(string(output), "\x00") {
+		if rel != "" {
+			files = append(files, filepath.ToSlash(rel))
+		}
+	}
+	return files, len(files) > 0
+}
+
+func finishScanManifest(inputs []ScanInput) ScanManifest {
 	sort.Slice(inputs, func(i, j int) bool { return inputs[i].FilePath < inputs[j].FilePath })
 	manifestHasher := sha256.New()
 	configHasher := sha256.New()
@@ -150,7 +221,7 @@ func BuildScanManifest(root string) (ScanManifest, error) {
 	}
 	manifestHash := "sha256:" + hex.EncodeToString(manifestHasher.Sum(nil))
 	configurationDigest := "sha256:" + hex.EncodeToString(configHasher.Sum(nil))
-	return ScanManifest{Inputs: inputs, ManifestHash: manifestHash, WorktreeStateHash: manifestHash, ConfigurationDigest: configurationDigest}, nil
+	return ScanManifest{Inputs: inputs, ManifestHash: manifestHash, WorktreeStateHash: manifestHash, ConfigurationDigest: configurationDigest}
 }
 
 func graphInputKind(rel string) (string, bool) {
@@ -198,6 +269,11 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 		"typescript.definitions": "pending", "typescript.imports": "pending", "typescript.exports": "pending",
 	}
 	var limitations []string
+	// A cancelled or crashed scan must not leave generations parked in
+	// "building" forever - they read as running work that never existed.
+	if _, err := s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'failed', error_message = 'abandoned: superseded by a newer scan', completed_at = CURRENT_TIMESTAMP WHERE repository_id = ? AND status = 'building'`, identity.RepositoryID); err != nil {
+		return ScanResult{}, err
+	}
 	generation, err := s.BeginGeneration(ctx, identity, manifest, capabilities, limitations)
 	if err != nil {
 		return ScanResult{}, err

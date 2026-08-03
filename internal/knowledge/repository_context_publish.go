@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // RepositoryContextPublisher publishes only the versioned presentation model.
@@ -28,7 +29,9 @@ func (p RepositoryContextPublisher) Publish(ctx context.Context, consoleURL, pro
 	}
 	client := p.Client
 	if client == nil {
-		client = http.DefaultClient
+		// Never the zero-timeout default: a hung Agent Console must fail the
+		// publish, not park it forever.
+		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	endpoint := strings.TrimRight(base.String(), "/") + "/api/projects/" + url.PathEscape(projectID) + "/repository-context"
 	current, err := p.currentVersion(ctx, client, endpoint, token)
