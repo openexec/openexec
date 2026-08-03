@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -72,5 +73,26 @@ func TestRepositoryContextPublisherTimesOutDefaultClient(t *testing.T) {
 	client = (RepositoryContextPublisher{}).httpClient()
 	if client.Timeout != 30*time.Second {
 		t.Fatalf("default client timeout = %s", client.Timeout)
+	}
+}
+
+func TestRepositoryContextProjectionEncodesEmptyCollectionsAsArrays(t *testing.T) {
+	encoded, err := json.Marshal(RepositoryContextProjection{
+		ResolvedSymbols:    []SafeSymbolProjection{},
+		ModuleDependencies: []SafeModuleDependency{},
+		ValidationSummary: ValidationSummaryProjection{
+			Verified:    []string{},
+			NotVerified: []string{},
+		},
+		Limitations: []string{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(encoded)
+	for _, field := range []string{"resolved_symbols", "module_dependencies", "verified", "not_verified", "limitations"} {
+		if !strings.Contains(text, `"`+field+`":[]`) {
+			t.Fatalf("%s was not encoded as an array: %s", field, text)
+		}
 	}
 }

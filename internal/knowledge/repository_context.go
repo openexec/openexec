@@ -62,7 +62,14 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 		SchemaVersion: RepositoryContextSchemaVersion, SourceSystem: "openexec",
 		RepositoryID: identity.RepositoryID, CheckoutID: identity.CheckoutID,
 		WorktreeID: identity.WorktreeID, GraphVersion: state.GraphVersion,
-		Freshness:         state.Freshness,
+		Freshness:          state.Freshness,
+		ResolvedSymbols:    []SafeSymbolProjection{},
+		ModuleDependencies: []SafeModuleDependency{},
+		ValidationSummary: ValidationSummaryProjection{
+			Verified:    []string{},
+			NotVerified: []string{},
+		},
+		Limitations:       []string{},
 		OpenExecReference: OpenExecReference{TaskID: taskID, RunID: runID, PlanRevisionID: planRevisionID},
 	}
 	seenDependencies := make(map[string]bool)

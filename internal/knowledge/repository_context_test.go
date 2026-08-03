@@ -41,6 +41,13 @@ func TestRepositoryContextIsVersionedLossyProjection(t *testing.T) {
 	if withoutSymbols.OpenExecReference.ResourceVersion == projection.OpenExecReference.ResourceVersion {
 		t.Fatal("different projection payloads reused one resource version")
 	}
+	emptyProjection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if emptyProjection.ResolvedSymbols == nil || emptyProjection.ModuleDependencies == nil || emptyProjection.Limitations == nil || emptyProjection.ValidationSummary.Verified == nil || emptyProjection.ValidationSummary.NotVerified == nil {
+		t.Fatalf("empty projection contains nil collections: %#v", emptyProjection)
+	}
 	if len(projection.ResolvedSymbols) != 1 || projection.ResolvedSymbols[0].SafeLocation != "main.ts:2" {
 		t.Fatalf("safe symbol projection is wrong: %#v", projection.ResolvedSymbols)
 	}
