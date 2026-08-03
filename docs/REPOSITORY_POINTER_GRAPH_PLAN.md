@@ -1067,3 +1067,38 @@ The controlled 20–30 task baseline/treatment evaluation remains a post-release
 product experiment, not an implementation prerequisite. It decides whether to
 invest in Version 2; it must not be reported as completed until its persisted
 evaluation artifacts exist.
+
+## Status correction and Version 2 outline (2026-08-03)
+
+An independent audit found the earlier "V1A-V1C implemented" statement too
+strong by this plan's own acceptance rule: symbol resolution and source
+reads load the active generation without recomputing repository freshness
+first, so the complete "edit -> detect stale -> re-resolve -> read current
+source" journey does not exist yet. V1 is a verified structural graph
+engine with a bounded, honest projection - not yet a trustworthy
+interactive product.
+
+Delivered with this correction: the projection now carries graph totals
+(shown-versus-held honesty), dead-code candidates, hotspots, and a
+top-level module sketch - conclusions instead of inventory, with heuristic
+boundaries disclosed as limitations.
+
+### Version 2 milestone (ordered)
+
+1. Enforce freshness on every resolve/read; implement stale re-resolution.
+2. Publish selection scope, base commit, worktree state, and extractor
+   capabilities beside the existing totals and truncation disclosures.
+3. Secure OpenExec query/source API for Agent Console (find-symbol,
+   source retrieval, ambiguity selection, dependency navigation).
+4. Clickable symbols in Agent Console with source, identity, resolution,
+   and ambiguity views; symbols grouped by module.
+5. Dead-code deletion pipeline: candidate -> attention item -> task ->
+   read-only cross-examination -> supervised deletion branch.
+6. Run the full dirty-worktree, line-shift, move, rename, ambiguity,
+   restart, and degraded-mode journey end to end and persist the evidence.
+
+### Version 3 candidates (unscoped)
+
+Cross-repository graphs over the portfolio; per-question diagrams and
+regenerated documentation; Jira-adapter tasks citing graph evidence; the
+20-30 task baseline/treatment experiment gates all of it.

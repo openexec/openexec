@@ -44,6 +44,15 @@ type OpenExecReference struct {
 	ResourceVersion string `json:"resource_version"`
 }
 
+// GraphTotals makes the projection honest about its own lossiness: what the
+// graph holds versus what this bounded view shows.
+type GraphTotals struct {
+	Symbols     int `json:"symbols"`
+	Modules     int `json:"modules"`
+	Edges       int `json:"edges"`
+	ImportEdges int `json:"import_edges"`
+}
+
 type RepositoryContextProjection struct {
 	SchemaVersion      int                         `json:"schema_version"`
 	SourceSystem       string                      `json:"source_system"`
@@ -55,6 +64,10 @@ type RepositoryContextProjection struct {
 	ResolvedSymbols    []SafeSymbolProjection      `json:"resolved_symbols"`
 	ModuleDependencies []SafeModuleDependency      `json:"module_dependencies"`
 	ValidationSummary  ValidationSummaryProjection `json:"validation_summary"`
+	Totals             *GraphTotals                `json:"totals,omitempty"`
+	DeadCodeCandidates []InsightSymbol             `json:"dead_code_candidates,omitempty"`
+	Hotspots           []InsightSymbol             `json:"hotspots,omitempty"`
+	ModuleSketch       []ModuleFlow                `json:"module_sketch,omitempty"`
 	Limitations        []string                    `json:"limitations"`
 	OpenExecReference  OpenExecReference           `json:"openexec_reference"`
 }
@@ -87,6 +100,9 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	}
 	if projection.Limitations == nil {
 		projection.Limitations = []string{}
+	}
+	if err := s.attachRepositoryInsights(ctx, state.GraphVersion, &projection); err != nil {
+		return RepositoryContextProjection{}, err
 	}
 
 	var candidates []SymbolCandidate
