@@ -109,6 +109,38 @@ func TestRefreshRepositoryUsesFullScanForConfigurationChange(t *testing.T) {
 	}
 }
 
+func TestRefreshRepositoryDoesNotPromotePartialCoverageIncrementally(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	writeTestFile(t, root, "main.go", "package sample\nfunc Main() {}\n")
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	scan, err := store.ScanRepository(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Exec(`UPDATE graph_generations SET status = 'partial' WHERE id = ?`, scan.Generation.ID); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, root, "main.go", "package sample\nfunc Main() { println(\"changed\") }\n")
+	refresh, err := store.RefreshRepository(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !refresh.Invalidation.FullScan || refresh.Invalidation.Scope != InvalidationRepository {
+		t.Fatalf("partial generation was carried forward incrementally: %#v", refresh.Invalidation)
+	}
+	if refresh.Generation.Status != GraphCurrent {
+		t.Fatalf("successful full extraction did not restore current status: %s", refresh.Generation.Status)
+	}
+}
+
 func semanticGraph(t *testing.T, store *Store, generationID string) []string {
 	t.Helper()
 	var result []string

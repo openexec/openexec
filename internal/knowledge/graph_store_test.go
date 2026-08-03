@@ -59,8 +59,8 @@ func TestRepositoryIdentityAndLegacyMigration(t *testing.T) {
 	if got := resolved.Result.Candidate.Occurrence.FilePath; got != "service.go" {
 		t.Fatalf("expected repository-relative path, got %q", got)
 	}
-	if resolved.Generation.Freshness != FreshnessPartial {
-		t.Fatalf("legacy graph must disclose partial freshness, got %q", resolved.Generation.Freshness)
+	if resolved.Generation.Freshness != FreshnessCurrent {
+		t.Fatalf("legacy pointer was not upgraded before resolution, got %q", resolved.Generation.Freshness)
 	}
 	legacy, err := store.GetSymbol("Run")
 	if err != nil || legacy == nil {
@@ -71,37 +71,18 @@ func TestRepositoryIdentityAndLegacyMigration(t *testing.T) {
 func TestResolveGraphSymbolRefusesAmbiguity(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	writeTestFile(t, root, "a.go", "package sample\ntype A struct{}\nfunc (A) Run() {}\n")
+	writeTestFile(t, root, "b.go", "package sample\ntype B struct{}\nfunc (B) Run() {}\n")
 	store, err := NewStore(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer store.Close()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
 	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
 	if err != nil {
-		t.Fatal(err)
-	}
-	manifest := ScanManifest{ManifestHash: "m", WorktreeStateHash: "w", ConfigurationDigest: "c"}
-	generation, err := store.BeginGeneration(ctx, identity, manifest, map[string]string{"definitions": "ast_exact"}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for index, file := range []string{"a.go", "b.go"} {
-		symbolID := stableID("sym", identity.RepositoryID, file, "Run")
-		nodeID := stableID("node", generation.ID, symbolID)
-		if _, err := store.db.Exec(`INSERT INTO repository_symbols (id, repository_id, language, kind, display_name, qualified_name) VALUES (?, ?, 'go', 'method', 'Run', ?)`, symbolID, identity.RepositoryID, file+".Run"); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := store.db.Exec(`INSERT INTO graph_nodes (id, generation_id, repository_id, node_type, language, display_name, qualified_name) VALUES (?, ?, ?, 'symbol', 'go', 'Run', ?)`, nodeID, generation.ID, identity.RepositoryID, file+".Run"); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := store.db.Exec(`INSERT INTO symbol_occurrences (symbol_id, generation_id, node_id, file_path, start_line, end_line, start_byte, end_byte, file_content_hash, source_range_hash, resolution_status) VALUES (?, ?, ?, ?, ?, ?, 0, 1, 'file', 'range', 'ast_exact')`, symbolID, generation.ID, nodeID, file, index+1, index+1); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := store.PromoteGeneration(ctx, generation.ID); err != nil {
 		t.Fatal(err)
 	}
 	resolved, err := store.ResolveGraphSymbol(ctx, identity, "Run", "", "", 20)

@@ -54,7 +54,7 @@ func TestSymbolReaderTool(t *testing.T) {
 	})
 }
 
-func TestGraphSymbolReaderToolReadsSourceAndRejectsStalePointer(t *testing.T) {
+func TestGraphSymbolReaderToolReadsSourceAndRefreshesStalePointer(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0o755); err != nil {
 		t.Fatal(err)
@@ -82,7 +82,11 @@ func TestGraphSymbolReaderToolReadsSourceAndRejectsStalePointer(t *testing.T) {
 	if err := os.WriteFile(path, []byte("package service\n\nfunc Run() string { return \"changed\" }\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tool.Execute(context.Background(), map[string]interface{}{"name": "Run"}); err == nil || !strings.Contains(err.Error(), "stale") {
-		t.Fatalf("stale pointer was returned: %v", err)
+	result, err = tool.Execute(context.Background(), map[string]interface{}{"name": "Run"})
+	if err != nil {
+		t.Fatalf("refresh current symbol source: %v", err)
+	}
+	if !strings.Contains(result.(string), `return "changed"`) || !strings.Contains(result.(string), "Freshness: current") {
+		t.Fatalf("current source was not returned after refresh: %v", result)
 	}
 }

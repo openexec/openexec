@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	_ "modernc.org/sqlite"
 
@@ -67,7 +68,8 @@ type PRDRecord struct {
 }
 
 type Store struct {
-	db *sql.DB
+	db      *sql.DB
+	graphMu sync.Mutex
 }
 
 func NewStore(projectDir string) (*Store, error) {

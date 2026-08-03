@@ -34,7 +34,7 @@ type SymbolSource struct {
 }
 
 func (s *Store) ReadGraphSymbol(ctx context.Context, identity RepositoryIdentity, symbolID string, reader RepositoryReader) (QueryEnvelope[*SymbolSource], error) {
-	generation, err := s.activeGeneration(ctx, identity.WorktreeID)
+	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
 		return QueryEnvelope[*SymbolSource]{}, err
 	}
@@ -69,7 +69,7 @@ func (s *Store) ReadGraphSymbol(ctx context.Context, identity RepositoryIdentity
 	}
 	return QueryEnvelope[*SymbolSource]{
 		Query:       QueryMeta{Type: "read_symbol", Roots: []string{symbolID}},
-		Generation:  generationState(generation),
+		Generation:  state,
 		Result:      &SymbolSource{Symbol: candidate.Symbol, Occurrence: candidate.Occurrence, Source: read},
 		Resolution:  ResolutionMeta{Status: "resolved", Methods: []ResolutionStatus{candidate.Occurrence.Resolution}},
 		Limitations: generation.Limitations,

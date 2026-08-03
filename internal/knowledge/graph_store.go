@@ -360,7 +360,7 @@ func (s *Store) ResolveGraphSymbol(ctx context.Context, identity RepositoryIdent
 	if maxCandidates <= 0 || maxCandidates > 100 {
 		maxCandidates = 20
 	}
-	generation, err := s.activeGeneration(ctx, identity.WorktreeID)
+	generation, _, err := s.freshGeneration(ctx, identity)
 	if err == sql.ErrNoRows {
 		return QueryEnvelope[SymbolResolution]{
 			Query:       QueryMeta{Type: "resolve_symbol", Roots: []string{name}},

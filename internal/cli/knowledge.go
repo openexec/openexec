@@ -26,6 +26,8 @@ var (
 	graphRead             bool
 	graphReverse          bool
 	graphDepth            int
+	graphCallDirection    string
+	graphCallDepth        int
 	graphImpactDepth      int
 	graphConsoleURL       string
 	graphConsoleProject   string
@@ -189,6 +191,37 @@ var knowledgeGraphImpactCmd = &cobra.Command{
 		}
 		for _, limitation := range result.Result.Unresolved {
 			cmd.Printf("  unresolved: %s\n", limitation)
+		}
+		return nil
+	},
+}
+
+var knowledgeGraphCallsCmd = &cobra.Command{
+	Use:   "calls SYMBOL_ID",
+	Short: "Show bounded incoming or outgoing symbol call relationships",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if graphCallDirection != "incoming" && graphCallDirection != "outgoing" {
+			return fmt.Errorf("direction must be incoming or outgoing")
+		}
+		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := store.FindSymbolRelationships(cmd.Context(), identity, args[0], graphCallDirection == "incoming", graphCallDepth, []string{"calls"}, knowledge.DefaultGraphLimits())
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, result)
+		}
+		cmd.Printf("%s calls for %s [%s]\n", graphCallDirection, result.Result.Root.QualifiedName, result.Generation.Freshness)
+		for _, node := range result.Result.Nodes {
+			cmd.Printf("  %s %s\n", node.NodeType, node.QualifiedName)
+		}
+		if result.Truncated {
+			cmd.Println("  result truncated by graph limits")
 		}
 		return nil
 	},
@@ -546,7 +579,7 @@ func formatBytes(b int64) string {
 }
 
 func init() {
-	for _, command := range []*cobra.Command{knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd} {
+	for _, command := range []*cobra.Command{knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphCallsCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd} {
 		command.Flags().StringVarP(&graphDirectory, "directory", "d", ".", "repository directory")
 		command.Flags().BoolVar(&graphJSON, "json", false, "emit machine-readable JSON")
 	}
@@ -555,6 +588,8 @@ func init() {
 	knowledgeGraphSymbolCmd.Flags().BoolVar(&graphRead, "read", false, "read the hash-validated source range")
 	knowledgeGraphDependenciesCmd.Flags().BoolVar(&graphReverse, "reverse", false, "show module dependants")
 	knowledgeGraphDependenciesCmd.Flags().IntVar(&graphDepth, "depth", 1, "bounded traversal depth")
+	knowledgeGraphCallsCmd.Flags().StringVar(&graphCallDirection, "direction", "outgoing", "call direction: outgoing or incoming")
+	knowledgeGraphCallsCmd.Flags().IntVar(&graphCallDepth, "depth", 1, "bounded traversal depth")
 	knowledgeGraphImpactCmd.Flags().IntVar(&graphImpactDepth, "depth", 2, "bounded traversal depth")
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleURL, "console-url", "", "Agent Console base URL")
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleProject, "console-project", "", "Agent Console checkout ID")
@@ -565,7 +600,7 @@ func init() {
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphPlanID, "plan", "", "OpenExec validation-plan reference")
 	_ = knowledgeGraphPublishCmd.MarkFlagRequired("console-url")
 	_ = knowledgeGraphPublishCmd.MarkFlagRequired("console-project")
-	knowledgeGraphCmd.AddCommand(knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd)
+	knowledgeGraphCmd.AddCommand(knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphCallsCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd)
 	knowledgeCmd.AddCommand(knowledgeLsCmd)
 	knowledgeCmd.AddCommand(knowledgeShowCmd)
 	knowledgeCmd.AddCommand(knowledgeInitCmd)

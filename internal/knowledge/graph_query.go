@@ -17,27 +17,12 @@ type ModuleDependencyResult struct {
 // CurrentRepositoryState compares the current generation with the current
 // worktree manifest. A mismatch marks the generation stale before returning.
 func (s *Store) CurrentRepositoryState(ctx context.Context, identity RepositoryIdentity) (RepositoryState, error) {
-	generation, err := s.activeGeneration(ctx, identity.WorktreeID)
+	_, state, err := s.freshGeneration(ctx, identity)
 	if err == sql.ErrNoRows {
 		return RepositoryState{RepositoryID: identity.RepositoryID, CheckoutID: identity.CheckoutID, WorktreeID: identity.WorktreeID, BaseCommit: identity.BaseCommit, Freshness: FreshnessMissing}, nil
 	}
 	if err != nil {
 		return RepositoryState{}, err
-	}
-	state := generationState(generation)
-	if generation.ManifestHash == "legacy-unversioned" {
-		return state, nil
-	}
-	manifest, err := BuildScanManifest(identity.RootPath)
-	if err != nil {
-		state.Freshness = FreshnessInconsistent
-		return state, nil
-	}
-	if manifest.ManifestHash != generation.ManifestHash || manifest.ConfigurationDigest != generation.ConfigurationDigest {
-		state.Freshness = FreshnessStale
-		if generation.Status == GraphCurrent {
-			_, _ = s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'stale' WHERE id = ? AND status = 'current'`, generation.ID)
-		}
 	}
 	return state, nil
 }
@@ -52,7 +37,7 @@ func (s *Store) FindModuleDependencies(ctx context.Context, identity RepositoryI
 	if depth > limits.MaxDepth {
 		depth = limits.MaxDepth
 	}
-	generation, err := s.activeGeneration(ctx, identity.WorktreeID)
+	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
 		return QueryEnvelope[ModuleDependencyResult]{}, err
 	}
@@ -105,7 +90,6 @@ func (s *Store) FindModuleDependencies(ctx context.Context, identity RepositoryI
 	if reverse {
 		queryType = "find_module_dependants"
 	}
-	state, _ := s.CurrentRepositoryState(ctx, identity)
 	return QueryEnvelope[ModuleDependencyResult]{
 		Query: QueryMeta{Type: queryType, Roots: []string{root.ID}}, Generation: state,
 		Result:      ModuleDependencyResult{Root: root, Nodes: nodes, Edges: edges},

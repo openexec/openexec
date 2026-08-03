@@ -24,7 +24,7 @@ import (
 
 var graphIgnoredDirectories = map[string]bool{
 	".git": true, ".openexec": true, ".gocache": true, "node_modules": true,
-	"vendor": true, "dist": true, "build": true, "coverage": true,
+	"vendor": true, "dist": true, "build": true, "coverage": true, "_archive": true,
 }
 
 type ExtractedSymbol struct {
@@ -262,7 +262,7 @@ func graphInputKind(rel string) (string, bool) {
 	base := filepath.Base(rel)
 	ext := strings.ToLower(filepath.Ext(base))
 	switch ext {
-	case ".go", ".ts", ".tsx", ".js", ".jsx":
+	case ".go", ".ts", ".tsx", ".js", ".jsx", ".svelte", ".py":
 		return "source", true
 	}
 	if base == "go.mod" || base == "go.sum" || base == "go.work" || base == "go.work.sum" || base == "package.json" || base == "package-lock.json" || base == "pnpm-lock.yaml" || base == "yarn.lock" || (strings.HasPrefix(base, "tsconfig") && strings.HasSuffix(base, ".json")) {
@@ -285,6 +285,8 @@ func safeRepositoryRelative(root, path string) (string, error) {
 // ScanRepository builds, revalidates, and atomically promotes a full graph.
 // Incremental refresh uses this result as its correctness oracle.
 func (s *Store) ScanRepository(ctx context.Context, root string) (ScanResult, error) {
+	s.graphMu.Lock()
+	defer s.graphMu.Unlock()
 	return s.scanRepository(ctx, root, nil)
 }
 
@@ -301,6 +303,8 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 	capabilities := map[string]string{
 		"go.definitions": "ast_exact", "go.imports": "ast_exact",
 		"typescript.definitions": "pending", "typescript.imports": "pending", "typescript.exports": "pending",
+		"svelte.definitions": "static_lexical", "svelte.imports": "static_lexical", "svelte.routes": "configuration_derived",
+		"python.definitions": "static_lexical", "python.imports": "static_lexical", "python.calls": "heuristic",
 	}
 	var limitations []string
 	// A cancelled or crashed scan must not leave generations parked in
@@ -405,6 +409,7 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 		limitations = append(limitations, tsLimitations...)
 	}
 	incomplete := false
+	seenLimitations := map[string]bool{}
 	for _, input := range manifest.Inputs {
 		if input.InputKind != "source" {
 			continue
@@ -415,6 +420,10 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 		switch strings.ToLower(filepath.Ext(input.FilePath)) {
 		case ".go":
 			extracted, err = extractGoFile(path, input.FilePath)
+		case ".py":
+			extracted, err = extractPythonFile(root, path, input.FilePath)
+		case ".svelte":
+			extracted, err = extractSvelteFile(path, input.FilePath)
 		case ".ts", ".tsx", ".js", ".jsx":
 			if compilerErr == nil {
 				var ok bool
@@ -430,6 +439,12 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 			limitations = append(limitations, fmt.Sprintf("%s: %v", input.FilePath, err))
 			incomplete = true
 			continue
+		}
+		for _, limitation := range extracted.Limitations {
+			if !seenLimitations[limitation] {
+				limitations = append(limitations, limitation)
+				seenLimitations[limitation] = true
+			}
 		}
 		files = append(files, extracted)
 	}
@@ -701,7 +716,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				}
 			}
 			stored := storedSymbol{nodeID: nodeID, file: file.Path, name: extracted.Name, start: extracted.StartByte, end: extracted.EndByte}
-			symbolsByName[extracted.Name] = append(symbolsByName[extracted.Name], stored)
+			symbolsByName[file.Language+"\x00"+extracted.Name] = append(symbolsByName[file.Language+"\x00"+extracted.Name], stored)
 			symbolsByFileName[file.Path+"\x00"+extracted.Name] = append(symbolsByFileName[file.Path+"\x00"+extracted.Name], stored)
 			symbolsByFile[file.Path] = append(symbolsByFile[file.Path], stored)
 			symbolCount++
@@ -767,7 +782,11 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				candidates = symbolsByFileName[filepath.ToSlash(reference.TargetPath)+"\x00"+reference.TargetName]
 			}
 			if len(candidates) == 0 {
-				candidates = symbolsByName[reference.TargetName]
+				// Lexical/heuristic names never prove a cross-language call.
+				// Compiler-resolved references use TargetPath above; an unqualified
+				// fallback is bounded to the source language to prevent names such
+				// as Python query() from linking to an unrelated TypeScript query().
+				candidates = symbolsByName[file.Language+"\x00"+reference.TargetName]
 			}
 			if len(candidates) != 1 {
 				continue

@@ -43,6 +43,9 @@ type Server struct {
 	HttpServer  *http.Server
 	axonBridge  *api.Server
 	StateStore  *state.Store
+	// KnowledgeStore is process-scoped so freshness checks and graph writers
+	// share the same single-writer lock across concurrent HTTP requests.
+	KnowledgeStore *knowledge.Store
 	// Observability
 	runnerCommand string
 	runnerArgs    []string
@@ -92,6 +95,11 @@ func New(cfg Config) (*Server, error) {
 	stateStore, err := state.NewStore(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init unified state store: %w", err)
+	}
+	knowledgeStore, err := knowledge.NewStoreWithDB(stateStore.GetDB())
+	if err != nil {
+		_ = stateStore.Close()
+		return nil, fmt.Errorf("failed to init repository graph store: %w", err)
 	}
 
 	// Legacy adapters for backward compatibility during transition
@@ -221,11 +229,12 @@ func New(cfg Config) (*Server, error) {
 			Addr:    fmt.Sprintf(":%d", cfg.Port),
 			Handler: mux,
 		},
-		runnerCommand: runnerCmd,
-		runnerArgs:    runnerArgs,
-		runnerModel:   modelUsed,
-		skipPreflight: cfg.SkipPreflight,
-		StateStore:    stateStore,
+		runnerCommand:  runnerCmd,
+		runnerArgs:     runnerArgs,
+		runnerModel:    modelUsed,
+		skipPreflight:  cfg.SkipPreflight,
+		StateStore:     stateStore,
+		KnowledgeStore: knowledgeStore,
 	}
 
 	s.registerRoutes()
@@ -236,6 +245,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.Mux.HandleFunc("POST /api/v1/repository-graph/scan", s.handleRepositoryGraphScan)
 	s.Mux.HandleFunc("GET /api/v1/repository-context", s.handleRepositoryContext)
+	s.registerRepositoryGraphQueryRoutes()
 
 	// Log active feature flags for operators
 	logFeatureFlags()
@@ -244,7 +254,7 @@ func New(cfg Config) (*Server, error) {
 }
 
 func (s *Server) handleRepositoryGraphScan(w http.ResponseWriter, r *http.Request) {
-	store, err := knowledge.NewStoreWithDB(s.StateStore.GetDB())
+	store, err := s.repositoryGraphStore()
 	if err != nil {
 		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -258,7 +268,7 @@ func (s *Server) handleRepositoryGraphScan(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleRepositoryContext(w http.ResponseWriter, r *http.Request) {
-	store, err := knowledge.NewStoreWithDB(s.StateStore.GetDB())
+	store, err := s.repositoryGraphStore()
 	if err != nil {
 		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

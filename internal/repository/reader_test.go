@@ -119,8 +119,12 @@ func TestGraphResolutionReadsCurrentSourceThroughRepositoryAuthority(t *testing.
 	if err := os.WriteFile(filepath.Join(root, "run.go"), []byte("package sample\n\nfunc Run() string { return \"changed\" }\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ReadGraphSymbol(ctx, identity, resolved.Result.Candidate.Symbol.ID, reader); !errors.Is(err, ErrStalePointer) {
-		t.Fatalf("changed source was returned through stale pointer: %v", err)
+	refreshed, err := store.ReadGraphSymbol(ctx, identity, resolved.Result.Candidate.Symbol.ID, reader)
+	if err != nil {
+		t.Fatalf("source read did not refresh stale pointer: %v", err)
+	}
+	if refreshed.Generation.Freshness != knowledge.FreshnessCurrent || refreshed.Result == nil || refreshed.Result.Source.Content != "func Run() string { return \"changed\" }" {
+		t.Fatalf("source read did not return current bytes: %#v", refreshed)
 	}
 }
 

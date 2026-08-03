@@ -63,11 +63,11 @@ func TestImpactAnalysisExplainsCallersTestsAndValidationScope(t *testing.T) {
 	}
 
 	writeTestFile(t, root, "service.go", "package sample\nfunc A() string { return \"changed\" }\n")
-	stale, err := store.ImpactAnalysis(ctx, identity, []string{resolved.Result.Candidate.Symbol.ID}, 2, DefaultGraphLimits())
+	refreshed, err := store.ImpactAnalysis(ctx, identity, []string{resolved.Result.Candidate.Symbol.ID}, 2, DefaultGraphLimits())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stale.Generation.Freshness != FreshnessStale || stale.Resolution.Status != "unavailable" || len(stale.Result.DirectCallers) != 0 {
-		t.Fatalf("stale graph produced impact conclusions: %#v", stale)
+	if refreshed.Generation.Freshness != FreshnessCurrent || refreshed.Resolution.Status != "bounded" || len(refreshed.Result.DirectCallers) == 0 {
+		t.Fatalf("impact did not refresh before deriving conclusions: %#v", refreshed)
 	}
 }

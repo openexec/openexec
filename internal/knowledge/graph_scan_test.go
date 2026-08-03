@@ -138,12 +138,13 @@ func TestScanRepositoryPromotesDeterministicGoAndTypeScriptGraph(t *testing.T) {
 		t.Fatalf("bounded module dependency query returned the wrong graph: %#v", dependencies)
 	}
 	writeTestFile(t, root, "ui/dep.ts", "export function dependency(): number { return 2 }\n")
+	beforeVersion := dependencies.Generation.GraphVersion
 	state, err := store.CurrentRepositoryState(ctx, identity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.Freshness != FreshnessStale {
-		t.Fatalf("worktree change did not stale the graph: %#v", state)
+	if state.Freshness != FreshnessCurrent || state.GraphVersion == beforeVersion {
+		t.Fatalf("read-time freshness did not refresh the graph: %#v", state)
 	}
 }
 

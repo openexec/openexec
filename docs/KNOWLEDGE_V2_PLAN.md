@@ -1,9 +1,26 @@
 # Knowledge Graph V2 — implementation plan
 
-Status: plan for review
+Status: implementation complete; release acceptance has two host-constrained checks outstanding
 Date: 2026-08-03
 Related: `REPOSITORY_POINTER_GRAPH_PLAN.md` (V1 + status correction),
 Agent Console integration contract, 2026-08-03 freshness audit.
+
+## Implementation record
+
+| Phase | Delivered evidence | Status |
+| --- | --- | --- |
+| V2.1 | Read-time manifest comparison, serialized refresh/re-resolution, typed stale refusal, edit/move/rename/line-shift/current-source tests | Implemented; focused Go tests pass |
+| V2.2 | Projection provenance, worktree state, extractor capabilities, exact totals and per-list selection/truncation scopes; console rendering | Implemented; Go/React tests pass |
+| V2.3 | Checkout-authorized paginated symbol/detail/relationship/impact/source API and incoming/outgoing CLI calls | Implemented; endpoint contract tests pass |
+| V2.4 | Console Explore Overview, Dependencies, Symbols, Call flow, Impact and Source views plus Mermaid export | Implemented; type, lint, unit and production build pass; Playwright could not start because this host forbids listener sockets |
+| V2.5 | Fact-derived owner summary and dead-candidate projection into existing Attention -> triage -> supervised execution lifecycle | Implemented; server and owner tests pass |
+| V2.6 | Python/Svelte extraction, `_archive` exclusion and persisted named-generation tender/bid audit in Siivous | Implemented and manually spot-checked; Python behavior tests were not run because `pytest` is absent and Docker access is denied |
+
+The implementation is not allowed to turn those two unavailable execution
+checks into passed evidence. Release acceptance requires rerunning the console
+Playwright journey on a host that permits localhost listeners and the Siivous
+backend/integration tests in its provisioned environment. The persisted
+benchmark records exactly what was and was not verified.
 
 ## Outcome
 

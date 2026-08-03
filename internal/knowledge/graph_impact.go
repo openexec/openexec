@@ -57,7 +57,7 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 	if maxDepth > limits.MaxDepth {
 		maxDepth = limits.MaxDepth
 	}
-	state, err := s.CurrentRepositoryState(ctx, identity)
+	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
 		return QueryEnvelope[ImpactResult]{}, err
 	}
@@ -68,10 +68,6 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 			Resolution:  ResolutionMeta{Status: "unavailable", Methods: []ResolutionStatus{ResolutionUnresolved}},
 			Limitations: []string{"graph is " + string(state.Freshness) + "; use normal repository inspection"},
 		}, nil
-	}
-	generation, err := s.activeGeneration(ctx, identity.WorktreeID)
-	if err != nil {
-		return QueryEnvelope[ImpactResult]{}, err
 	}
 	result := ImpactResult{Unresolved: append([]string{}, generation.Limitations...)}
 	result.Unresolved = append(result.Unresolved, "dynamic dependency injection and runtime registration may not be resolved")

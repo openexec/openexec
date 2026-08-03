@@ -53,6 +53,27 @@ type GraphTotals struct {
 	ImportEdges int `json:"import_edges"`
 }
 
+type WorktreeProjection struct {
+	State      string `json:"state"`
+	DirtyCount int    `json:"dirty_count"`
+	StateHash  string `json:"state_hash"`
+}
+
+type ProjectionProvenance struct {
+	BaseCommit string             `json:"base_commit"`
+	Worktree   WorktreeProjection `json:"worktree"`
+	Extractors map[string]string  `json:"extractors"`
+}
+
+type SelectionScope struct {
+	Scope          string `json:"scope"`
+	Limit          int    `json:"limit"`
+	Returned       int    `json:"returned"`
+	Total          int    `json:"total"`
+	Truncated      bool   `json:"truncated"`
+	TruncatedCount int    `json:"truncated_count"`
+}
+
 type RepositoryContextProjection struct {
 	SchemaVersion      int                         `json:"schema_version"`
 	SourceSystem       string                      `json:"source_system"`
@@ -65,6 +86,8 @@ type RepositoryContextProjection struct {
 	ModuleDependencies []SafeModuleDependency      `json:"module_dependencies"`
 	ValidationSummary  ValidationSummaryProjection `json:"validation_summary"`
 	Totals             *GraphTotals                `json:"totals,omitempty"`
+	Provenance         ProjectionProvenance        `json:"provenance"`
+	Selections         map[string]SelectionScope   `json:"selections"`
 	DeadCodeCandidates []InsightSymbol             `json:"dead_code_candidates,omitempty"`
 	Hotspots           []InsightSymbol             `json:"hotspots,omitempty"`
 	ModuleSketch       []ModuleFlow                `json:"module_sketch,omitempty"`
@@ -88,6 +111,12 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 			Verified:    []string{},
 			NotVerified: []string{},
 		},
+		Provenance: ProjectionProvenance{
+			BaseCommit: state.BaseCommit,
+			Worktree:   worktreeProjection(ctx, identity.RootPath, state.WorktreeStateHash),
+			Extractors: map[string]string{},
+		},
+		Selections:        map[string]SelectionScope{},
 		Limitations:       []string{},
 		OpenExecReference: OpenExecReference{TaskID: taskID, RunID: runID, PlanRevisionID: planRevisionID},
 	}
@@ -97,6 +126,13 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	}
 	if err := json.Unmarshal([]byte(generationLimitationsJSON), &projection.Limitations); err != nil {
 		return RepositoryContextProjection{}, fmt.Errorf("decode graph limitations: %w", err)
+	}
+	var capabilitiesJSON string
+	if err := s.db.QueryRowContext(ctx, `SELECT capabilities FROM graph_generations WHERE id = ?`, state.GraphVersion).Scan(&capabilitiesJSON); err != nil {
+		return RepositoryContextProjection{}, fmt.Errorf("load graph capabilities: %w", err)
+	}
+	if err := json.Unmarshal([]byte(capabilitiesJSON), &projection.Provenance.Extractors); err != nil {
+		return RepositoryContextProjection{}, fmt.Errorf("decode graph capabilities: %w", err)
 	}
 	if projection.Limitations == nil {
 		projection.Limitations = []string{}
@@ -129,6 +165,15 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 			candidates = append(candidates, *resolved.Result.Candidate)
 		}
 	}
+	symbolTotal := len(names)
+	symbolScope := "explicitly requested symbols"
+	symbolLimit := len(names)
+	if len(names) == 0 {
+		symbolTotal = projection.Totals.Symbols
+		symbolScope = "representative symbols selected from all repository symbols"
+		symbolLimit = defaultRepositoryContextSymbolLimit
+	}
+	projection.Selections["resolved_symbols"] = selectionScope(symbolScope, symbolLimit, len(candidates), symbolTotal)
 
 	seenDependencies := make(map[string]bool)
 	seenDependencyFiles := make(map[string]bool)
@@ -170,6 +215,7 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 			}
 		}
 	}
+	projection.Selections["module_dependencies"] = selectionScope("direct module dependencies selected from repository import edges", defaultRepositoryContextDependencyLimit, len(projection.ModuleDependencies), projection.Totals.ImportEdges)
 	if report != nil {
 		projection.ValidationSummary.CanComplete = report.CanComplete
 		for _, claim := range report.Verified {
@@ -200,6 +246,14 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	}
 	projection.OpenExecReference.ResourceVersion = stableID("resource", string(encoded))
 	return projection, nil
+}
+
+func selectionScope(scope string, limit, returned, total int) SelectionScope {
+	if total < returned {
+		total = returned
+	}
+	omitted := total - returned
+	return SelectionScope{Scope: scope, Limit: limit, Returned: returned, Total: total, Truncated: omitted > 0, TruncatedCount: omitted}
 }
 
 func (s *Store) defaultRepositoryContextSymbols(ctx context.Context, generationID string, limit int) ([]SymbolCandidate, bool, error) {

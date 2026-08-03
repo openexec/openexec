@@ -4,7 +4,7 @@ import "time"
 
 const (
 	GraphSchemaVersion = 1
-	ExtractorVersion   = "repository-graph-v1"
+	ExtractorVersion   = "repository-graph-v2.2"
 )
 
 type GraphStatus string
@@ -168,6 +168,14 @@ type QueryEnvelope[T any] struct {
 	Resolution  ResolutionMeta  `json:"resolution"`
 	Limitations []string        `json:"limitations,omitempty"`
 	Truncated   bool            `json:"truncated"`
+	Pagination  *PaginationMeta `json:"pagination,omitempty"`
+}
+
+type PaginationMeta struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
 }
 
 type SymbolResolution struct {

@@ -94,13 +94,19 @@ func PlanInvalidation(previous, current ScanManifest, extractorChanged bool) Inv
 // extraction into a new atomic generation. Configuration and extractor changes
 // deliberately use a full scan.
 func (s *Store) RefreshRepository(ctx context.Context, root string) (RefreshResult, error) {
+	s.graphMu.Lock()
+	defer s.graphMu.Unlock()
+	return s.refreshRepository(ctx, root)
+}
+
+func (s *Store) refreshRepository(ctx context.Context, root string) (RefreshResult, error) {
 	identity, err := s.EnsureRepositoryIdentity(ctx, root, "")
 	if err != nil {
 		return RefreshResult{}, err
 	}
 	previousGeneration, err := s.activeGeneration(ctx, identity.WorktreeID)
 	if err == sql.ErrNoRows || previousGeneration.ExtractorVersion == "legacy-pointer-v0" {
-		result, scanErr := s.ScanRepository(ctx, root)
+		result, scanErr := s.scanRepository(ctx, root, nil)
 		return RefreshResult{ScanResult: result, Invalidation: InvalidationPlan{Scope: InvalidationRepository, Cause: CauseExtractorChange, FullScan: true}, Changed: scanErr == nil}, scanErr
 	}
 	if err != nil {
@@ -115,12 +121,18 @@ func (s *Store) RefreshRepository(ctx context.Context, root string) (RefreshResu
 		return RefreshResult{}, err
 	}
 	plan := PlanInvalidation(previousManifest, currentManifest, previousGeneration.ExtractorVersion != ExtractorVersion)
+	// A partial generation omitted source. Carrying its extracted files into a
+	// later generation could silently turn missing coverage into "current".
+	// Only a full extraction may clear partial status.
+	if previousGeneration.Status == GraphPartial {
+		plan.Scope, plan.FullScan = InvalidationRepository, true
+	}
 	if previousManifest.ManifestHash == currentManifest.ManifestHash && !plan.FullScan {
 		files, symbols, edges, err := s.generationCounts(ctx, previousGeneration.ID)
 		return RefreshResult{ScanResult: ScanResult{Generation: previousGeneration, Files: files, Symbols: symbols, Edges: edges, Limitations: previousGeneration.Limitations}, Invalidation: plan, Changed: false}, err
 	}
 	if plan.FullScan {
-		result, scanErr := s.ScanRepository(ctx, root)
+		result, scanErr := s.scanRepository(ctx, root, nil)
 		return RefreshResult{ScanResult: result, Invalidation: plan, Changed: scanErr == nil}, scanErr
 	}
 
@@ -139,9 +151,16 @@ func (s *Store) RefreshRepository(ctx context.Context, root string) (RefreshResu
 		}
 	}
 	changedManifest := ScanManifest{}
+	changedTypeScript := false
 	for _, input := range currentManifest.Inputs {
 		if input.InputKind == "configuration" || changed[input.FilePath] {
 			changedManifest.Inputs = append(changedManifest.Inputs, input)
+			if changed[input.FilePath] {
+				switch strings.ToLower(filepath.Ext(input.FilePath)) {
+				case ".ts", ".tsx", ".js", ".jsx":
+					changedTypeScript = true
+				}
+			}
 		}
 	}
 	parsed, tsMethod, limitations, incomplete, err := extractManifestFiles(ctx, identity.RootPath, changedManifest)
@@ -160,7 +179,7 @@ func (s *Store) RefreshRepository(ctx context.Context, root string) (RefreshResu
 	if capabilities == nil {
 		capabilities = map[string]string{}
 	}
-	if len(parsed) > 0 {
+	if changedTypeScript {
 		capabilities["typescript.definitions"] = tsMethod
 		capabilities["typescript.imports"] = tsMethod
 		capabilities["typescript.exports"] = tsMethod
