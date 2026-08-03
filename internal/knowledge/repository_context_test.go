@@ -2,8 +2,10 @@ package knowledge
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	statepkg "github.com/openexec/openexec/pkg/db/state"
@@ -41,12 +43,18 @@ func TestRepositoryContextIsVersionedLossyProjection(t *testing.T) {
 	if withoutSymbols.OpenExecReference.ResourceVersion == projection.OpenExecReference.ResourceVersion {
 		t.Fatal("different projection payloads reused one resource version")
 	}
-	emptyProjection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	overviewProjection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if emptyProjection.ResolvedSymbols == nil || emptyProjection.ModuleDependencies == nil || emptyProjection.Limitations == nil || emptyProjection.ValidationSummary.Verified == nil || emptyProjection.ValidationSummary.NotVerified == nil {
-		t.Fatalf("empty projection contains nil collections: %#v", emptyProjection)
+	if overviewProjection.ResolvedSymbols == nil || overviewProjection.ModuleDependencies == nil || overviewProjection.Limitations == nil || overviewProjection.ValidationSummary.Verified == nil || overviewProjection.ValidationSummary.NotVerified == nil {
+		t.Fatalf("overview projection contains nil collections: %#v", overviewProjection)
+	}
+	if len(overviewProjection.ResolvedSymbols) == 0 {
+		t.Fatalf("default projection omitted repository symbols: %#v", overviewProjection)
+	}
+	if len(overviewProjection.ModuleDependencies) != 1 || overviewProjection.ModuleDependencies[0].To != "dep.ts" {
+		t.Fatalf("default projection omitted module dependency: %#v", overviewProjection.ModuleDependencies)
 	}
 	if len(projection.ResolvedSymbols) != 1 || projection.ResolvedSymbols[0].SafeLocation != "main.ts:2" {
 		t.Fatalf("safe symbol projection is wrong: %#v", projection.ResolvedSymbols)
@@ -61,5 +69,46 @@ func TestRepositoryContextIsVersionedLossyProjection(t *testing.T) {
 	// ranges; it receives only a safe line locator and stable OpenExec reference.
 	if projection.ResolvedSymbols[0].SafeLocation == filepath.Join(root, "main.ts") {
 		t.Fatal("projection exposed an authoritative absolute source location")
+	}
+}
+
+func TestRepositoryContextDefaultOverviewIsBoundedAndCarriesGraphLimitations(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	var source strings.Builder
+	source.WriteString("package sample\n\n")
+	for i := 0; i < defaultRepositoryContextSymbolLimit+5; i++ {
+		fmt.Fprintf(&source, "func Exported%02d() {}\n", i)
+	}
+	writeTestFile(t, root, "sample.go", source.String())
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	result, err := store.ScanRepository(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(ctx, `UPDATE graph_generations SET limitations = ? WHERE id = ?`, `["fixture graph limitation"]`, result.Generation.ID); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(projection.ResolvedSymbols); got != defaultRepositoryContextSymbolLimit {
+		t.Fatalf("default projection has %d symbols, want %d", got, defaultRepositoryContextSymbolLimit)
+	}
+	joined := strings.Join(projection.Limitations, "\n")
+	if !strings.Contains(joined, "fixture graph limitation") {
+		t.Fatalf("projection omitted graph limitation: %#v", projection.Limitations)
+	}
+	if !strings.Contains(joined, "bounded to 50 representative symbols") {
+		t.Fatalf("projection omitted bounded-overview limitation: %#v", projection.Limitations)
 	}
 }
