@@ -283,7 +283,19 @@ func (s *Store) MigrateLegacySymbols(ctx context.Context, identity RepositoryIde
 func normalizeStoredPath(root, stored string) string {
 	stored = filepath.Clean(stored)
 	if filepath.IsAbs(stored) {
-		if rel, err := filepath.Rel(root, stored); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		// Canonicalize both sides before relativizing: on macOS the temp root
+		// crosses the /var -> /private/var symlink, so a legacy absolute path
+		// and the evaluated root otherwise disagree and the path stays
+		// absolute, leaking the host layout into the graph.
+		base := root
+		if evaluated, err := filepath.EvalSymlinks(root); err == nil {
+			base = evaluated
+		}
+		candidate := stored
+		if evaluated, err := filepath.EvalSymlinks(stored); err == nil {
+			candidate = evaluated
+		}
+		if rel, err := filepath.Rel(base, candidate); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			stored = rel
 		}
 	}
