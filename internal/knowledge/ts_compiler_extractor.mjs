@@ -207,9 +207,41 @@ for (const group of groups.values()) {
         ...location(sourceFile, targetNode),
       });
     }
+    // A name in a declaration is where a symbol is defined, and an import or
+    // export clause is plumbing that moves it between files. Neither is a use,
+    // and counting them would make every exported symbol look referenced.
+    function isDefinitionOrBinding(node) {
+      const parent = node.parent;
+      if (!parent) return true;
+      if (parent.name === node && (
+        ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent) ||
+        ts.isInterfaceDeclaration(parent) || ts.isTypeAliasDeclaration(parent) ||
+        ts.isEnumDeclaration(parent) || ts.isEnumMember(parent) ||
+        ts.isMethodDeclaration(parent) || ts.isMethodSignature(parent) ||
+        ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent) ||
+        ts.isVariableDeclaration(parent) || ts.isParameter(parent) ||
+        ts.isBindingElement(parent) || ts.isModuleDeclaration(parent) ||
+        ts.isPropertyAssignment(parent) || ts.isShorthandPropertyAssignment(parent)
+      )) return true;
+      if (ts.isImportSpecifier(parent) || ts.isImportClause(parent) ||
+          ts.isNamespaceImport(parent) || ts.isExportSpecifier(parent) ||
+          ts.isImportEqualsDeclaration(parent) || ts.isNamespaceExport(parent)) return true;
+      // A label is not a symbol.
+      if (ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) return true;
+      return false;
+    }
+    // Recorded once per identifier: a call expression and the general pass
+    // would otherwise both claim the callee and double its inbound count,
+    // which is what "most depended-on" is ranked by.
+    const claimed = new Set();
+    function claim(node, edgeType) {
+      if (!node || claimed.has(node)) return;
+      claimed.add(node);
+      recordReference(node, edgeType);
+    }
     function visit(node) {
       if (ts.isCallExpression(node)) {
-        recordReference(ts.isPropertyAccessExpression(node.expression) ? node.expression.name : node.expression, "calls");
+        claim(ts.isPropertyAccessExpression(node.expression) ? node.expression.name : node.expression, "calls");
       }
       // Rendering a component uses it. Without this every component reached
       // only through JSX has no inbound edge at all, so a React application
@@ -217,9 +249,14 @@ for (const group of groups.values()) {
       if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
         const tag = node.tagName;
         // Lowercase tags are intrinsic DOM elements, not symbols in this repo.
-        if (ts.isIdentifier(tag) && /^[A-Z]/.test(tag.text)) recordReference(tag, "references");
-        else if (ts.isPropertyAccessExpression(tag)) recordReference(tag.name, "references");
+        if (ts.isIdentifier(tag) && /^[A-Z]/.test(tag.text)) claim(tag, "references");
+        else if (ts.isPropertyAccessExpression(tag)) claim(tag.name, "references");
       }
+      // Every remaining resolved name is a use: reading a constant, naming a
+      // type in an annotation, passing a function without calling it. Counting
+      // only calls left 43 constants and 54 types looking unreferenced in a
+      // codebase that reads them constantly.
+      if (ts.isIdentifier(node) && !isDefinitionOrBinding(node)) claim(node, "references");
       ts.forEachChild(node, visit);
     }
     visit(sourceFile);
