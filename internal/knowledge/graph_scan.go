@@ -853,7 +853,14 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				// as Python query() from linking to an unrelated TypeScript query().
 				candidates = symbolsByName[file.Language+"\x00"+reference.TargetName]
 			}
-			if len(candidates) != 1 {
+			// One name, several symbols: which one this use meant is unknown.
+			// Dropping it made every candidate look unreferenced, which is how
+			// a repository where Store, New and Config recur across packages
+			// reported thousands of live symbols as dead. Record the use
+			// against each possibility instead, marked ambiguous so ranking
+			// and call flow can ignore what dead-code review must not.
+			ambiguous := len(candidates) > 1
+			if len(candidates) == 0 {
 				continue
 			}
 			from := moduleNodes[file.Path]
@@ -868,12 +875,18 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 			if edgeType == "" {
 				edgeType = "references"
 			}
-			inserted, err := insertEdge(ctx, tx, generation.ID, from, candidates[0].nodeID, edgeType, reference.Resolution, file.Path, reference.StartByte, reference.EndByte, map[string]string{"target_name": reference.TargetName})
-			if err != nil {
-				return 0, 0, 0, err
+			resolution := reference.Resolution
+			if ambiguous {
+				resolution = ResolutionAmbiguous
 			}
-			if inserted {
-				edgeCount++
+			for _, candidate := range candidates {
+				inserted, err := insertEdge(ctx, tx, generation.ID, from, candidate.nodeID, edgeType, resolution, file.Path, reference.StartByte, reference.EndByte, map[string]string{"target_name": reference.TargetName})
+				if err != nil {
+					return 0, 0, 0, err
+				}
+				if inserted {
+					edgeCount++
+				}
 			}
 		}
 	}

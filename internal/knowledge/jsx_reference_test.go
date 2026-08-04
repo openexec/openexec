@@ -97,3 +97,51 @@ func TestGoTypesAndConstantsAreNotDeadCode(t *testing.T) {
 		t.Errorf("a type nobody mentions was not flagged: %v", dead)
 	}
 }
+
+// A name shared by several symbols used to be dropped, which made every one of
+// them look unreferenced. Ambiguity means "which one is unknown", not "none of
+// them" — and for deletion review the safe reading is that all are alive.
+func TestAmbiguousReferencesKeepEveryCandidateAlive(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "alpha/store.go", "package alpha\n\ntype Store struct{}\n")
+	writeTestFile(t, root, "beta/store.go", "package beta\n\ntype Store struct{}\n")
+	writeTestFile(t, root, "use.go", "package sample\n\nfunc Use(s Store) {}\n")
+	writeTestFile(t, root, "lonely/lonely.go", "package lonely\n\ntype NeverMentioned struct{}\n")
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := map[string]bool{}
+	for _, candidate := range projection.DeadCodeCandidates {
+		dead[candidate.DisplayName] = true
+	}
+	if dead["Store"] {
+		t.Error("an ambiguously referenced symbol was offered for deletion")
+	}
+	if !dead["NeverMentioned"] {
+		t.Errorf("a symbol nobody mentions was not flagged: %v", dead)
+	}
+	// Ranking must stay precise: a guess about which Store was meant would
+	// promote it up the "touch with care" list on evidence that does not exist.
+	for _, hotspot := range projection.Hotspots {
+		if hotspot.DisplayName == "Store" {
+			t.Error("an ambiguous use was counted as a hotspot ranking signal")
+		}
+	}
+}

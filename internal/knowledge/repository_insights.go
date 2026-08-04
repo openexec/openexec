@@ -86,6 +86,7 @@ func (s *Store) hotspots(ctx context.Context, generationID string) ([]InsightSym
 		JOIN symbol_occurrences o ON o.node_id = n.id AND o.generation_id = e.generation_id
 		JOIN repository_symbols rs ON rs.id = o.symbol_id
 		WHERE e.generation_id = ? AND e.edge_type IN ('calls', 'references')
+		  AND e.resolution_status != 'ambiguous'
 		GROUP BY n.id ORDER BY inbound DESC, rs.display_name`, generationID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("hotspots: %w", err)
