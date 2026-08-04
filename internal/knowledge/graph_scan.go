@@ -495,20 +495,54 @@ func extractGoFile(path, rel string) (ExtractedFile, error) {
 			}
 		}
 	}
+	// Where each declared name sits, so the definition of a symbol is not
+	// mistaken for a use of it.
+	declared := map[int]bool{}
+	for _, declaration := range file.Decls {
+		switch value := declaration.(type) {
+		case *ast.FuncDecl:
+			declared[fset.Position(value.Name.Pos()).Offset] = true
+		case *ast.GenDecl:
+			for _, spec := range value.Specs {
+				switch typed := spec.(type) {
+				case *ast.TypeSpec:
+					declared[fset.Position(typed.Name.Pos()).Offset] = true
+				case *ast.ValueSpec:
+					for _, name := range typed.Names {
+						declared[fset.Position(name.Pos()).Offset] = true
+					}
+				}
+			}
+		}
+	}
+	// Every name a file mentions is a use of something: a type in a field, a
+	// constant in an expression, a function passed without being called. Only
+	// call expressions were recorded, so a Go package's types and constants had
+	// no inbound edge and were offered for deletion review in bulk.
+	claimed := map[int]bool{}
+	record := func(node ast.Node, name, edgeType string) {
+		offset := fset.Position(node.Pos()).Offset
+		if name == "" || claimed[offset] || declared[offset] || isLanguageCallKeyword(name) {
+			return
+		}
+		claimed[offset] = true
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: offset, EndByte: fset.Position(node.End()).Offset, EdgeType: edgeType, Resolution: ResolutionHeuristic})
+	}
 	ast.Inspect(file, func(node ast.Node) bool {
-		call, ok := node.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		name := ""
-		switch function := call.Fun.(type) {
-		case *ast.Ident:
-			name = function.Name
+		switch value := node.(type) {
+		case *ast.CallExpr:
+			switch function := value.Fun.(type) {
+			case *ast.Ident:
+				record(function, function.Name, "calls")
+			case *ast.SelectorExpr:
+				record(function.Sel, function.Sel.Name, "calls")
+			}
 		case *ast.SelectorExpr:
-			name = function.Sel.Name
-		}
-		if name != "" && !isLanguageCallKeyword(name) {
-			result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: fset.Position(call.Fun.Pos()).Offset, EndByte: fset.Position(call.Fun.End()).Offset, EdgeType: "calls", Resolution: ResolutionHeuristic})
+			// pkg.Symbol and value.Method both name something declared
+			// elsewhere; the selector carries the name that matters.
+			record(value.Sel, value.Sel.Name, "references")
+		case *ast.Ident:
+			record(value, value.Name, "references")
 		}
 		return true
 	})
