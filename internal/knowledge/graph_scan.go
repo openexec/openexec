@@ -535,7 +535,10 @@ func extractGoFile(path, rel string) (ExtractedFile, error) {
 			case *ast.Ident:
 				record(function, function.Name, "calls", ResolutionHeuristic)
 			case *ast.SelectorExpr:
-				record(function.Sel, function.Sel.Name, "calls", ResolutionHeuristic)
+				// The receiver's type is unknown without type checking, so the
+				// name alone does not identify the callee. Kept as evidence of
+				// use, excluded from ranking.
+				record(function.Sel, function.Sel.Name, "calls", ResolutionStaticLexical)
 			}
 		case *ast.SelectorExpr:
 			// pkg.Symbol and value.Method both name something declared
@@ -608,7 +611,7 @@ func extractTypeScriptLexical(path, rel string) (ExtractedFile, error) {
 		if declaresSymbolAt(result.Symbols, match[2]) {
 			continue
 		}
-		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "calls", Resolution: ResolutionHeuristic})
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "calls", Resolution: callResolution(data, match[2])})
 	}
 	// A component rendered as <Thing /> is used, but it is never called, so the
 	// call pattern above cannot see it. Without this a React codebase reports

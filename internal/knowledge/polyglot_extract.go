@@ -55,7 +55,11 @@ func extractPythonFile(root, path, rel string) (ExtractedFile, error) {
 			if isLanguageCallKeyword(target) || target == name {
 				continue
 			}
-			result.References = append(result.References, ExtractedReference{TargetName: target, StartByte: start + call[2], EndByte: start + call[3], EdgeType: "calls", Resolution: ResolutionHeuristic})
+			// session.commit() names a method on an object of unknown type;
+			// matching it by name alone made commit, post and count the
+			// repository's most depended-on symbols. Evidence of use, but not
+			// evidence of importance.
+			result.References = append(result.References, ExtractedReference{TargetName: target, StartByte: start + call[2], EndByte: start + call[3], EdgeType: "calls", Resolution: callResolution(data, start+call[2])})
 		}
 	}
 	// Calls found inside declarations were the only references recorded, so a
@@ -222,4 +226,20 @@ func svelteRouteName(rel string) string {
 		}
 	}
 	return "/" + strings.Join(visible, "/") + " [" + filepath.Base(path) + "]"
+}
+
+// callResolution grades a lexical call site: a bare name is a plausible
+// pointer to a symbol declared here, a dotted one is a method on a receiver
+// whose type this extractor cannot know.
+func callResolution(data []byte, offset int) ResolutionStatus {
+	for i := offset - 1; i >= 0; i-- {
+		switch data[i] {
+		case ' ', '\t':
+			continue
+		case '.':
+			return ResolutionStaticLexical
+		}
+		break
+	}
+	return ResolutionHeuristic
 }
