@@ -192,8 +192,16 @@ for (const group of groups.values()) {
       const targetFile = declaration.getSourceFile();
       const targetPath = path.relative(root, targetFile.fileName).split(path.sep).join("/");
       if (targetPath.startsWith("../")) return;
+      // TypeScript names a default-exported symbol "default", which matches no
+      // symbol this extractor recorded — those carry the declared name. Every
+      // use of `export default function App` therefore resolved to a target
+      // that did not exist, and App looked unreferenced in its own app.
+      let targetName = symbol.getName();
+      if (targetName === "default" && declaration.name && declaration.name.text) {
+        targetName = declaration.name.text;
+      }
       result.references.push({
-        target_name: symbol.getName(),
+        target_name: targetName,
         target_path: targetPath,
         edge_type: edgeType,
         ...location(sourceFile, targetNode),
