@@ -58,6 +58,23 @@ func extractPythonFile(root, path, rel string) (ExtractedFile, error) {
 			result.References = append(result.References, ExtractedReference{TargetName: target, StartByte: start + call[2], EndByte: start + call[3], EdgeType: "calls", Resolution: ResolutionHeuristic})
 		}
 	}
+	// Calls found inside declarations were the only references recorded, so a
+	// class named in a type hint, a constant read at module level and anything
+	// used outside a def left no trace at all — and Python puts a great deal at
+	// module level. Every mention outside a declaration header counts, which
+	// errs towards calling a symbol live; that is the safe direction when the
+	// answer decides whether the owner is invited to delete it.
+	claimed := map[int]bool{}
+	for _, symbol := range result.Symbols {
+		claimed[symbol.StartByte] = true
+	}
+	for _, match := range identifierPattern.FindAllSubmatchIndex(data, -1) {
+		name := string(data[match[2]:match[3]])
+		if isLanguageCallKeyword(name) || claimed[match[2]] || declaresSymbolAt(result.Symbols, match[2]) {
+			continue
+		}
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionHeuristic})
+	}
 	return result, nil
 }
 
