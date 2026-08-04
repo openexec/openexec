@@ -618,6 +618,20 @@ func extractTypeScriptLexical(path, rel string) (ExtractedFile, error) {
 		name := string(data[match[2]:match[3]])
 		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionHeuristic})
 	}
+	// Without the TypeScript compiler this pass is all the evidence there is,
+	// and calls alone are not evidence of use: reading a constant and naming a
+	// type look identical to reading nothing. Every remaining word that is not
+	// a declaration counts, which errs towards calling a symbol live. For
+	// deletion review that is the right direction to err in — the cost of
+	// missing a dead symbol is a little clutter, and the cost of the opposite
+	// is deleting working code.
+	for _, match := range identifierPattern.FindAllSubmatchIndex(data, -1) {
+		name := string(data[match[2]:match[3]])
+		if isLanguageCallKeyword(name) || declaresSymbolAt(result.Symbols, match[2]) {
+			continue
+		}
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionHeuristic})
+	}
 	sort.Slice(result.Symbols, func(i, j int) bool { return result.Symbols[i].StartByte < result.Symbols[j].StartByte })
 	return result, nil
 }
@@ -633,6 +647,10 @@ func declaresSymbolAt(symbols []ExtractedSymbol, offset int) bool {
 	}
 	return false
 }
+
+// identifierPattern matches any bare word, which is as precise as this
+// extractor can be without a compiler.
+var identifierPattern = regexp.MustCompile(`\b([A-Za-z_$][\w$]*)\b`)
 
 // jsxElementPattern matches an opening or self-closing JSX tag naming a
 // component: <Thing, <Thing.Member. A closing tag cannot match because the
