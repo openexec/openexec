@@ -10,12 +10,15 @@ outstanding), Agent Console `docs/OVERNIGHT_IMPACT_CONTRACT_PLAN.md`
 
 Agent Console's overnight lane needs to ask, per nightly run: *given these
 changed files, what is the propagation set, and how trustworthy is the
-answer?* Console v1 (their plan, phase D1) composes this from existing V2.3
-endpoints (`symbols?file=`, `symbols/{id}/impact`) — nothing here blocks
-them. This plan (a) closes the V2 release-acceptance debt first, because the
+answer?* The console plan's 2026-08-05 correction #6 showed the N+1
+composition does not fit its runtime budget at the stated caps
+(`finishNightlyRun` runs inside a 2-minute publish window; 200 sequential
+15s-timeout impact calls is a 50-minute worst case). **E1 is therefore a
+prerequisite for console D1 at real caps, not an optimisation** — the
+console either waits for E1 or ships D1 with caps low enough to fit
+(~15 symbols) and accepts `unavailable` above that. This plan (a) closes the V2 release-acceptance debt first, because the
 console is about to lean harder on graph conclusions than any consumer so
-far, and (b) adds one batch endpoint so the nightly path does not need
-N+1 HTTP round-trips per run.
+far, and (b) adds the batch endpoint the nightly path requires.
 
 Ordering is deliberate: **E0 before E1.** Do not ship a new consumer surface
 on top of an engine whose acceptance evidence is still open.
@@ -25,8 +28,9 @@ on top of an engine whose acceptance evidence is still open.
 The two checks KNOWLEDGE_V2_PLAN records as blocked-by-host, to be run on a
 host that permits what the original build host forbade:
 
-1. **Console Playwright journey (V2.4).** Run the Agent Console explorer
-   journey on a host permitting localhost listeners. Record the trace under
+1. **Console Playwright journey (V2.4).** (Console-territory check recorded
+   here only because V2's acceptance table owns it.) Run the Agent Console
+   explorer journey on a host permitting localhost listeners. Record the trace under
    the benchmark's evidence location. If any step fails, the failure is the
    deliverable — file it, do not massage it.
 2. **Siivous benchmark (V2.6).** Run the Siivous backend/integration tests in
@@ -112,12 +116,12 @@ verify:
   fix series (`0d9c225`, `e9f5111`) must remain visible truth in this
   surface, not get averaged away.
 
-## E2 — (optional, after E1 ships) console switchover
+## E2 — console switchover (required consumer of E1)
 
-Agent Console replaces its D1 N+1 composition with one `impact/changed`
-call. Their plan already isolates the openexec client behind a small
-internal client — the switch is contained there. Not part of this repo's
-acceptance; listed so nobody builds E1 without a consumer commitment.
+Agent Console D1 builds directly on `impact/changed` (see their amended
+plan, correction #6) — there is no N+1 composition to replace if E1 lands
+first, which is the recommended sequencing. Not part of this repo's
+acceptance; listed so E1 is not built without its consumer.
 
 ## Non-goals
 
