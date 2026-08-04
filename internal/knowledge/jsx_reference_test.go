@@ -145,3 +145,62 @@ func TestAmbiguousReferencesKeepEveryCandidateAlive(t *testing.T) {
 		}
 	}
 }
+
+// The panel's most prominent sentence is "X is the highest-ranked hotspot".
+// Counting bare mentions made that sentence report whichever common word
+// appeared most — "post", "count", "title" — and counting one-letter names
+// made it report `t`. Both are true numbers and useless conclusions.
+func TestHotspotRankingIgnoresBareMentionsAndTrivialNames(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "core.go", "package sample\n\nfunc Important() {}\n\nfunc t() {}\n\ntype count struct{}\n")
+	// count is only ever mentioned as a field name and a local; Important is
+	// genuinely called; t is called a great many times but says nothing.
+	body := "package sample\n\nfunc Driver() {\n\tImportant()\n"
+	for i := 0; i < 30; i++ {
+		body += "\tt()\n"
+	}
+	for i := 0; i < 40; i++ {
+		body += "\tvar count int\n\t_ = count\n"
+	}
+	body += "}\n"
+	writeTestFile(t, root, "driver.go", body)
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, hotspot := range projection.Hotspots {
+		if hotspot.DisplayName == "t" {
+			t.Error("a one-letter name headlined the hotspot ranking")
+		}
+		if hotspot.DisplayName == "count" {
+			t.Error("a symbol reached the ranking on bare mentions alone")
+		}
+	}
+	// The check must still rank something, or it has been emptied rather than
+	// cleaned: a genuinely called symbol has to survive.
+	var ranked bool
+	for _, hotspot := range projection.Hotspots {
+		if hotspot.DisplayName == "Important" {
+			ranked = true
+		}
+	}
+	if !ranked {
+		t.Errorf("a called symbol did not rank at all: %#v", projection.Hotspots)
+	}
+}

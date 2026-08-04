@@ -520,29 +520,29 @@ func extractGoFile(path, rel string) (ExtractedFile, error) {
 	// call expressions were recorded, so a Go package's types and constants had
 	// no inbound edge and were offered for deletion review in bulk.
 	claimed := map[int]bool{}
-	record := func(node ast.Node, name, edgeType string) {
+	record := func(node ast.Node, name, edgeType string, resolution ResolutionStatus) {
 		offset := fset.Position(node.Pos()).Offset
 		if name == "" || claimed[offset] || declared[offset] || isLanguageCallKeyword(name) {
 			return
 		}
 		claimed[offset] = true
-		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: offset, EndByte: fset.Position(node.End()).Offset, EdgeType: edgeType, Resolution: ResolutionHeuristic})
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: offset, EndByte: fset.Position(node.End()).Offset, EdgeType: edgeType, Resolution: resolution})
 	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch value := node.(type) {
 		case *ast.CallExpr:
 			switch function := value.Fun.(type) {
 			case *ast.Ident:
-				record(function, function.Name, "calls")
+				record(function, function.Name, "calls", ResolutionHeuristic)
 			case *ast.SelectorExpr:
-				record(function.Sel, function.Sel.Name, "calls")
+				record(function.Sel, function.Sel.Name, "calls", ResolutionHeuristic)
 			}
 		case *ast.SelectorExpr:
 			// pkg.Symbol and value.Method both name something declared
 			// elsewhere; the selector carries the name that matters.
-			record(value.Sel, value.Sel.Name, "references")
+			record(value.Sel, value.Sel.Name, "references", ResolutionStaticLexical)
 		case *ast.Ident:
-			record(value, value.Name, "references")
+			record(value, value.Name, "references", ResolutionStaticLexical)
 		}
 		return true
 	})
@@ -630,7 +630,7 @@ func extractTypeScriptLexical(path, rel string) (ExtractedFile, error) {
 		if isLanguageCallKeyword(name) || declaresSymbolAt(result.Symbols, match[2]) {
 			continue
 		}
-		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionHeuristic})
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionStaticLexical})
 	}
 	sort.Slice(result.Symbols, func(i, j int) bool { return result.Symbols[i].StartByte < result.Symbols[j].StartByte })
 	return result, nil

@@ -78,6 +78,15 @@ func (s *Store) deadCodeCandidates(ctx context.Context, generationID string) ([]
 
 // hotspots ranks symbols by inbound call/reference count — the "touch with
 // care" map an agent should read before scoping any change.
+//
+// Two exclusions keep the ranking meaningful rather than merely large. Bare
+// lexical mentions are counted for dead-code review, where over-linking is the
+// safe error, but they cannot rank importance: every occurrence of the word
+// "count" or "title" would link to a symbol of that name, and the panel's
+// headline conclusion became "post is the highest-ranked hotspot". And a name
+// under three characters is not a conclusion a reader can use — a codebase
+// whose most-depended-on symbol is `t` has been told nothing, however true the
+// number is.
 func (s *Store) hotspots(ctx context.Context, generationID string) ([]InsightSymbol, int, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT rs.display_name, rs.kind, o.file_path, o.start_line, COUNT(e.id) AS inbound
@@ -86,7 +95,8 @@ func (s *Store) hotspots(ctx context.Context, generationID string) ([]InsightSym
 		JOIN symbol_occurrences o ON o.node_id = n.id AND o.generation_id = e.generation_id
 		JOIN repository_symbols rs ON rs.id = o.symbol_id
 		WHERE e.generation_id = ? AND e.edge_type IN ('calls', 'references')
-		  AND e.resolution_status != 'ambiguous'
+		  AND e.resolution_status NOT IN ('ambiguous', 'static_lexical')
+		  AND LENGTH(rs.display_name) >= 3
 		GROUP BY n.id ORDER BY inbound DESC, rs.display_name`, generationID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("hotspots: %w", err)

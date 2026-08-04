@@ -73,7 +73,7 @@ func extractPythonFile(root, path, rel string) (ExtractedFile, error) {
 		if isLanguageCallKeyword(name) || claimed[match[2]] || declaresSymbolAt(result.Symbols, match[2]) {
 			continue
 		}
-		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionHeuristic})
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionStaticLexical})
 	}
 	return result, nil
 }
