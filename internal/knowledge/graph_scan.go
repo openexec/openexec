@@ -568,11 +568,42 @@ func extractTypeScriptLexical(path, rel string) (ExtractedFile, error) {
 		if isLanguageCallKeyword(name) {
 			continue
 		}
+		// `function Layout(` matches this pattern, so a declaration used to
+		// record a call from a symbol to itself. Every symbol then had an
+		// inbound edge and nothing could ever be reported as unreferenced.
+		if declaresSymbolAt(result.Symbols, match[2]) {
+			continue
+		}
 		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "calls", Resolution: ResolutionHeuristic})
+	}
+	// A component rendered as <Thing /> is used, but it is never called, so the
+	// call pattern above cannot see it. Without this a React codebase reports
+	// its whole component tree as dead code. Capitalised tags only: a lowercase
+	// tag is an intrinsic DOM element, not a symbol defined here.
+	for _, match := range jsxElementPattern.FindAllSubmatchIndex(data, -1) {
+		name := string(data[match[2]:match[3]])
+		result.References = append(result.References, ExtractedReference{TargetName: name, StartByte: match[2], EndByte: match[3], EdgeType: "references", Resolution: ResolutionHeuristic})
 	}
 	sort.Slice(result.Symbols, func(i, j int) bool { return result.Symbols[i].StartByte < result.Symbols[j].StartByte })
 	return result, nil
 }
+
+// declaresSymbolAt reports whether an offset falls inside the signature of a
+// symbol declared in this file, which is where a name is defined rather than
+// used.
+func declaresSymbolAt(symbols []ExtractedSymbol, offset int) bool {
+	for _, symbol := range symbols {
+		if offset >= symbol.StartByte && offset < symbol.EndByte {
+			return true
+		}
+	}
+	return false
+}
+
+// jsxElementPattern matches an opening or self-closing JSX tag naming a
+// component: <Thing, <Thing.Member. A closing tag cannot match because the
+// slash sits between the angle bracket and the name.
+var jsxElementPattern = regexp.MustCompile(`<([A-Z][\w$]*)`)
 
 func isLanguageCallKeyword(name string) bool {
 	switch name {

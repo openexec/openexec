@@ -184,24 +184,33 @@ for (const group of groups.values()) {
         }
       }
     }
+    function recordReference(targetNode, edgeType) {
+      let symbol = checker.getSymbolAtLocation(targetNode);
+      if (symbol && (symbol.flags & ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
+      const declaration = symbol?.valueDeclaration || symbol?.declarations?.[0];
+      if (!symbol || !declaration) return;
+      const targetFile = declaration.getSourceFile();
+      const targetPath = path.relative(root, targetFile.fileName).split(path.sep).join("/");
+      if (targetPath.startsWith("../")) return;
+      result.references.push({
+        target_name: symbol.getName(),
+        target_path: targetPath,
+        edge_type: edgeType,
+        ...location(sourceFile, targetNode),
+      });
+    }
     function visit(node) {
       if (ts.isCallExpression(node)) {
-        const targetNode = ts.isPropertyAccessExpression(node.expression) ? node.expression.name : node.expression;
-        let symbol = checker.getSymbolAtLocation(targetNode);
-        if (symbol && (symbol.flags & ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
-        const declaration = symbol?.valueDeclaration || symbol?.declarations?.[0];
-        if (symbol && declaration) {
-          const targetFile = declaration.getSourceFile();
-          const targetPath = path.relative(root, targetFile.fileName).split(path.sep).join("/");
-          if (!targetPath.startsWith("../")) {
-            result.references.push({
-              target_name: symbol.getName(),
-              target_path: targetPath,
-              edge_type: "calls",
-              ...location(sourceFile, targetNode),
-            });
-          }
-        }
+        recordReference(ts.isPropertyAccessExpression(node.expression) ? node.expression.name : node.expression, "calls");
+      }
+      // Rendering a component uses it. Without this every component reached
+      // only through JSX has no inbound edge at all, so a React application
+      // reports its entire component tree — App included — as dead code.
+      if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
+        const tag = node.tagName;
+        // Lowercase tags are intrinsic DOM elements, not symbols in this repo.
+        if (ts.isIdentifier(tag) && /^[A-Z]/.test(tag.text)) recordReference(tag, "references");
+        else if (ts.isPropertyAccessExpression(tag)) recordReference(tag.name, "references");
       }
       ts.forEachChild(node, visit);
     }
