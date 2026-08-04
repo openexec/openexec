@@ -30,6 +30,14 @@ type RelationshipResult struct {
 	Edges []GraphEdge `json:"edges"`
 }
 
+// escapeLikeWildcards keeps a caller's % and _ literal. Only the wildcards this
+// package adds may act as wildcards: a search for "_" means a symbol whose name
+// contains an underscore, and on any snake_case codebase the unescaped pattern
+// silently returned the entire repository instead.
+func escapeLikeWildcards(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(value)
+}
+
 func (s *Store) FindGraphSymbols(ctx context.Context, identity RepositoryIdentity, query, file, kind string, page, pageSize int) (QueryEnvelope[SymbolSearchResult], error) {
 	if page < 1 {
 		page = 1
@@ -47,8 +55,8 @@ func (s *Store) FindGraphSymbols(ctx context.Context, identity RepositoryIdentit
 	where := ` WHERE o.generation_id = ?`
 	args := []any{generation.ID}
 	if query != "" {
-		where += ` AND (LOWER(s.display_name) LIKE ? OR LOWER(s.qualified_name) LIKE ?)`
-		pattern := "%" + strings.ToLower(query) + "%"
+		where += ` AND (LOWER(s.display_name) LIKE ? ESCAPE '\' OR LOWER(s.qualified_name) LIKE ? ESCAPE '\')`
+		pattern := "%" + escapeLikeWildcards(strings.ToLower(query)) + "%"
 		args = append(args, pattern, pattern)
 	}
 	if file != "" {
