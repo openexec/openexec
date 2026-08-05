@@ -174,6 +174,16 @@ func findCompatibleNode(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("Node.js 18+ runtime unavailable")
 }
 
+// findTypeScriptCompiler locates a TypeScript compiler to analyse with. It is
+// the difference between this extractor and an IDE: with the compiler, a
+// reference resolves to the symbol it actually names, and "which functions call
+// this" and "is this export used" are answered exactly. Without it, everything
+// degrades to matching identifiers by spelling.
+//
+// The repository is searched first — a project's own pinned version analyses it
+// most faithfully — but a repository that has never run `npm install` used to
+// get the lexical fallback silently. A compiler installed anywhere the host can
+// see is far better than none.
 func findTypeScriptCompiler(root string, files []string) string {
 	candidates := []string{filepath.Join(root, "node_modules", "typescript", "lib", "typescript.js")}
 	for _, rel := range files {
@@ -186,6 +196,7 @@ func findTypeScriptCompiler(root string, files []string) string {
 			dir = filepath.Dir(dir)
 		}
 	}
+	candidates = append(candidates, hostTypeScriptCandidates()...)
 	seen := make(map[string]bool)
 	for _, candidate := range candidates {
 		candidate = filepath.Clean(candidate)
@@ -198,4 +209,34 @@ func findTypeScriptCompiler(root string, files []string) string {
 		}
 	}
 	return ""
+}
+
+// hostTypeScriptCandidates lists compilers installed outside the repository:
+// an explicit override first, then NODE_PATH, then the usual global roots.
+func hostTypeScriptCandidates() []string {
+	const lib = "typescript/lib/typescript.js"
+	var out []string
+	if explicit := strings.TrimSpace(os.Getenv("OPENEXEC_TYPESCRIPT_LIB")); explicit != "" {
+		out = append(out, explicit)
+	}
+	for _, entry := range filepath.SplitList(os.Getenv("NODE_PATH")) {
+		if entry != "" {
+			out = append(out, filepath.Join(entry, lib))
+		}
+	}
+	roots := []string{
+		"/usr/lib/node_modules", "/usr/local/lib/node_modules",
+		"/opt/homebrew/lib/node_modules",
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		roots = append(roots,
+			filepath.Join(home, ".npm-global", "lib", "node_modules"),
+			filepath.Join(home, "node_modules"),
+			filepath.Join(home, ".local", "lib", "node_modules"),
+		)
+	}
+	for _, root := range roots {
+		out = append(out, filepath.Join(root, lib))
+	}
+	return out
 }
