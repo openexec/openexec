@@ -163,7 +163,7 @@ func (s *Store) refreshRepository(ctx context.Context, root string) (RefreshResu
 			}
 		}
 	}
-	parsed, tsMethod, limitations, incomplete, err := extractManifestFiles(ctx, identity.RootPath, changedManifest)
+	parsed, tsMethod, goMethod, limitations, incomplete, err := extractManifestFiles(ctx, identity.RootPath, changedManifest)
 	if err != nil {
 		return RefreshResult{}, err
 	}
@@ -179,6 +179,10 @@ func (s *Store) refreshRepository(ctx context.Context, root string) (RefreshResu
 	if capabilities == nil {
 		capabilities = map[string]string{}
 	}
+	// A refresh can reach a different grade than the scan it supersedes — the
+	// module may now type-check, or may have stopped. Inheriting the old claim
+	// would report resolution the graph no longer has.
+	capabilities["go.calls"] = goMethod
 	if changedTypeScript {
 		capabilities["typescript.definitions"] = tsMethod
 		capabilities["typescript.imports"] = tsMethod

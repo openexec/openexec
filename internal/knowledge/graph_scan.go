@@ -301,7 +301,7 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 		return ScanResult{}, fmt.Errorf("build scan manifest: %w", err)
 	}
 	capabilities := map[string]string{
-		"go.definitions": "ast_exact", "go.imports": "ast_exact",
+		"go.definitions": "ast_exact", "go.imports": "ast_exact", "go.calls": "pending",
 		"typescript.definitions": "pending", "typescript.imports": "pending", "typescript.exports": "pending",
 		"svelte.definitions": "static_lexical", "svelte.imports": "static_lexical", "svelte.routes": "configuration_derived",
 		"python.definitions": "static_lexical", "python.imports": "static_lexical", "python.calls": "heuristic",
@@ -317,11 +317,12 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 		return ScanResult{}, err
 	}
 
-	files, tsMethod, extractionLimitations, incomplete, err := extractManifestFiles(ctx, identity.RootPath, manifest)
+	files, tsMethod, goMethod, extractionLimitations, incomplete, err := extractManifestFiles(ctx, identity.RootPath, manifest)
 	if err != nil {
 		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 		return ScanResult{}, err
 	}
+	capabilities["go.calls"] = goMethod
 	capabilities["typescript.definitions"] = tsMethod
 	capabilities["typescript.imports"] = tsMethod
 	capabilities["typescript.exports"] = tsMethod
@@ -388,7 +389,7 @@ func (s *Store) completePartialGeneration(ctx context.Context, generationID stri
 	return nil
 }
 
-func extractManifestFiles(ctx context.Context, root string, manifest ScanManifest) ([]ExtractedFile, string, []string, bool, error) {
+func extractManifestFiles(ctx context.Context, root string, manifest ScanManifest) ([]ExtractedFile, string, string, []string, bool, error) {
 	var files []ExtractedFile
 	var limitations []string
 	var tsFiles []string
@@ -408,6 +409,15 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 	} else {
 		limitations = append(limitations, tsLimitations...)
 	}
+	// Type-checked Go references, when the module type-checks. Same bargain as
+	// the TypeScript compiler above: exact identity where it is available,
+	// spelling where it is not, and the grade recorded either way.
+	goTyped, goTypedErr := goTypedReferences(ctx, root)
+	goMethod := string(ResolutionCompilerExact)
+	if goTypedErr != nil {
+		goMethod = string(ResolutionHeuristic)
+		limitations = append(limitations, "Go type checking unavailable; references matched by name: "+goTypedErr.Error())
+	}
 	incomplete := false
 	seenLimitations := map[string]bool{}
 	for _, input := range manifest.Inputs {
@@ -420,6 +430,11 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 		switch strings.ToLower(filepath.Ext(input.FilePath)) {
 		case ".go":
 			extracted, err = extractGoFile(path, input.FilePath)
+			if err == nil && goTypedErr == nil {
+				// The type checker saw every use in this file; the AST pass
+				// only guessed at them. Its symbols stay, its guesses go.
+				extracted.References = goTyped[input.FilePath]
+			}
 		case ".py":
 			extracted, err = extractPythonFile(root, path, input.FilePath)
 		case ".svelte":
@@ -449,7 +464,7 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 		files = append(files, extracted)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	return files, tsMethod, limitations, incomplete, nil
+	return files, tsMethod, goMethod, limitations, incomplete, nil
 }
 
 func extractGoFile(path, rel string) (ExtractedFile, error) {
