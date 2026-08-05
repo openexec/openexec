@@ -38,7 +38,7 @@ type ModuleFlow struct {
 // tests, and reflective use are not excluded — the caller must disclose that.
 func (s *Store) deadCodeCandidates(ctx context.Context, generationID string) ([]InsightSymbol, int, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT rs.display_name, rs.kind, o.file_path, o.start_line
+		SELECT COALESCE(NULLIF(rs.qualified_name, ''), rs.display_name), rs.kind, o.file_path, o.start_line
 		FROM symbol_occurrences o
 		JOIN graph_nodes n ON n.id = o.node_id
 		JOIN repository_symbols rs ON rs.id = o.symbol_id
@@ -89,7 +89,7 @@ func (s *Store) deadCodeCandidates(ctx context.Context, generationID string) ([]
 // number is.
 func (s *Store) hotspots(ctx context.Context, generationID string) ([]InsightSymbol, int, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT rs.display_name, rs.kind, o.file_path, o.start_line, COUNT(e.id) AS inbound
+		SELECT COALESCE(NULLIF(rs.qualified_name, ''), rs.display_name), rs.kind, o.file_path, o.start_line, COUNT(e.id) AS inbound
 		FROM graph_edges e
 		JOIN graph_nodes n ON n.id = e.to_node_id AND n.node_type = 'symbol'
 		JOIN symbol_occurrences o ON o.node_id = n.id AND o.generation_id = e.generation_id

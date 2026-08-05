@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -34,17 +35,17 @@ func TestProjectionCarriesInsightsAndTotals(t *testing.T) {
 	}
 	foundOrphan := false
 	for _, candidate := range projection.DeadCodeCandidates {
-		if candidate.DisplayName == "Orphan" {
+		if strings.HasSuffix(candidate.DisplayName, "Orphan") {
 			foundOrphan = true
 		}
-		if candidate.DisplayName == "Used" {
+		if strings.HasSuffix(candidate.DisplayName, "Used") {
 			t.Fatalf("called symbol reported dead: %#v", projection.DeadCodeCandidates)
 		}
 	}
 	if !foundOrphan {
 		t.Fatalf("Orphan not reported dead: %#v", projection.DeadCodeCandidates)
 	}
-	if len(projection.Hotspots) == 0 || projection.Hotspots[0].DisplayName != "Used" || projection.Hotspots[0].Inbound < 2 {
+	if len(projection.Hotspots) == 0 || !strings.HasSuffix(projection.Hotspots[0].DisplayName, "Used") || projection.Hotspots[0].Inbound < 2 {
 		t.Fatalf("hotspots = %#v", projection.Hotspots)
 	}
 	disclosed := false

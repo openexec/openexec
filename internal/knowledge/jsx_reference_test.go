@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -43,7 +44,7 @@ func TestJSXRenderedComponentsAreNotDeadCode(t *testing.T) {
 	}
 	dead := map[string]bool{}
 	for _, candidate := range projection.DeadCodeCandidates {
-		dead[candidate.DisplayName] = true
+		dead[trailingName(candidate.DisplayName)] = true
 	}
 	for _, rendered := range []string{"App", "Layout"} {
 		if dead[rendered] {
@@ -86,7 +87,7 @@ func TestGoTypesAndConstantsAreNotDeadCode(t *testing.T) {
 	}
 	dead := map[string]bool{}
 	for _, candidate := range projection.DeadCodeCandidates {
-		dead[candidate.DisplayName] = true
+		dead[trailingName(candidate.DisplayName)] = true
 	}
 	for _, used := range []string{"Config", "Retries"} {
 		if dead[used] {
@@ -129,7 +130,7 @@ func TestAmbiguousReferencesKeepEveryCandidateAlive(t *testing.T) {
 	}
 	dead := map[string]bool{}
 	for _, candidate := range projection.DeadCodeCandidates {
-		dead[candidate.DisplayName] = true
+		dead[trailingName(candidate.DisplayName)] = true
 	}
 	if dead["Store"] {
 		t.Error("an ambiguously referenced symbol was offered for deletion")
@@ -140,7 +141,7 @@ func TestAmbiguousReferencesKeepEveryCandidateAlive(t *testing.T) {
 	// Ranking must stay precise: a guess about which Store was meant would
 	// promote it up the "touch with care" list on evidence that does not exist.
 	for _, hotspot := range projection.Hotspots {
-		if hotspot.DisplayName == "Store" {
+		if trailingName(hotspot.DisplayName) == "Store" {
 			t.Error("an ambiguous use was counted as a hotspot ranking signal")
 		}
 	}
@@ -185,10 +186,10 @@ func TestHotspotRankingIgnoresBareMentionsAndTrivialNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, hotspot := range projection.Hotspots {
-		if hotspot.DisplayName == "t" {
+		if trailingName(hotspot.DisplayName) == "t" {
 			t.Error("a one-letter name headlined the hotspot ranking")
 		}
-		if hotspot.DisplayName == "count" {
+		if trailingName(hotspot.DisplayName) == "count" {
 			t.Error("a symbol reached the ranking on bare mentions alone")
 		}
 	}
@@ -196,11 +197,21 @@ func TestHotspotRankingIgnoresBareMentionsAndTrivialNames(t *testing.T) {
 	// cleaned: a genuinely called symbol has to survive.
 	var ranked bool
 	for _, hotspot := range projection.Hotspots {
-		if hotspot.DisplayName == "Important" {
+		if trailingName(hotspot.DisplayName) == "Important" {
 			ranked = true
 		}
 	}
 	if !ranked {
 		t.Errorf("a called symbol did not rank at all: %#v", projection.Hotspots)
 	}
+}
+
+// trailingName takes the last segment of a qualified identity. Insights name a
+// symbol by what distinguishes it (internal/logging/logger.Logger.Error), and
+// these fixtures care only which symbol was meant.
+func trailingName(identity string) string {
+	if index := strings.LastIndex(identity, "."); index >= 0 {
+		return identity[index+1:]
+	}
+	return identity
 }

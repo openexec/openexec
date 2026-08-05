@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	statepkg "github.com/openexec/openexec/pkg/db/state"
 )
@@ -179,7 +180,9 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	seenDependencyFiles := make(map[string]bool)
 	for _, candidate := range candidates {
 		projection.ResolvedSymbols = append(projection.ResolvedSymbols, SafeSymbolProjection{
-			SymbolID: candidate.Symbol.ID, DisplayName: candidate.Symbol.DisplayName,
+			// A list of fifteen entries all reading "Error" tells a reader
+			// nothing; the graph already knows which Error each one is.
+			SymbolID: candidate.Symbol.ID, DisplayName: symbolIdentity(candidate.Symbol),
 			Kind:             candidate.Symbol.Kind,
 			SafeLocation:     candidate.Occurrence.FilePath + ":" + strconv.Itoa(candidate.Occurrence.StartLine),
 			ResolutionStatus: string(candidate.Occurrence.Resolution),
@@ -317,4 +320,14 @@ func (s *Store) defaultRepositoryContextSymbols(ctx context.Context, generationI
 		candidates = candidates[:limit]
 	}
 	return candidates, truncated, nil
+}
+
+// symbolIdentity prefers the qualified name a reader can act on. Go records
+// receiver and package (internal/logging/logger.Logger.Error); where the
+// extractor could not qualify, the bare name is all there is.
+func symbolIdentity(symbol GraphSymbol) string {
+	if qualified := strings.TrimSpace(symbol.QualifiedName); qualified != "" {
+		return qualified
+	}
+	return symbol.DisplayName
 }
