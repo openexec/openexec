@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -204,7 +205,12 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 					break
 				}
 			}
-			if to == "" {
+			// The consumer's contract is repository-relative module paths. An
+			// external package (react, @eslint/js) and an unresolved relative
+			// asset (./App.css) are neither, and emitting one made the consumer
+			// reject the whole projection — a single CSS import cost the
+			// repository its entire published context.
+			if to == "" || !repositoryRelativeModule(to) {
 				continue
 			}
 			key := candidate.Occurrence.FilePath + "\x00" + to
@@ -330,4 +336,16 @@ func symbolIdentity(symbol GraphSymbol) string {
 		return qualified
 	}
 	return symbol.DisplayName
+}
+
+// repositoryRelativeModule mirrors the consumer's validation. It is duplicated
+// deliberately: publishing something the consumer will reject is a failure the
+// publisher should catch, and coupling the two repositories to share the rule
+// would be worse than restating six lines.
+func repositoryRelativeModule(value string) bool {
+	if value == "" || strings.Contains(value, "\\") || strings.HasPrefix(value, "/") {
+		return false
+	}
+	cleaned := filepath.ToSlash(filepath.Clean(value))
+	return cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, "../") && cleaned == value
 }

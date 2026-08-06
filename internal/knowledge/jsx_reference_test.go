@@ -372,4 +372,100 @@ func TestRunnerInvokedEntryPointsAreNotCleanupCandidates(t *testing.T) {
 	if !found {
 		t.Errorf("genuinely unused code was not reported: %v", projection.DeadCodeCandidates)
 	}
+	// The listing and its total come from one exclusion, and the test has to
+	// hold both to that: a divergence would otherwise report "15 of 856" with
+	// fifteen correct rows and a count that still includes what was excluded.
+	scope := projection.Selections["dead_code_candidates"]
+	if scope.Total != len(projection.DeadCodeCandidates) {
+		t.Errorf("count %d disagrees with the %d rows it summarises", scope.Total, len(projection.DeadCodeCandidates))
+	}
+}
+
+// FastAPI, Celery and pytest call functions the code never calls: the
+// decorator hands them over. Siivous's cleanup list opened with every HTTP
+// handler in the admin API for exactly this reason.
+func TestDecoratorRegisteredFunctionsAreNotCleanupCandidates(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "app/api/admin.py",
+		"from fastapi import APIRouter\n\nrouter = APIRouter()\n\n\n@router.get(\"/\")\nasync def admin_root():\n    return {}\n\n\n@router.post(\"/users\")\nasync def create_user():\n    return {}\n")
+	writeTestFile(t, root, "app/workers.py",
+		"import celery\n\n\n@celery.task\ndef rebuild_index():\n    return 1\n")
+	// A bare decorator only changes behaviour; it registers nothing.
+	writeTestFile(t, root, "app/model.py",
+		"class Thing:\n    @property\n    def unused_property(self):\n        return 1\n\n\ndef genuinely_unused():\n    return 2\n")
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := map[string]bool{}
+	for _, candidate := range projection.DeadCodeCandidates {
+		dead[trailingName(candidate.DisplayName)] = true
+	}
+	for _, registered := range []string{"admin_root", "create_user", "rebuild_index"} {
+		if dead[registered] {
+			t.Errorf("%s is registered by a decorator but was offered for deletion", registered)
+		}
+	}
+	if !dead["genuinely_unused"] {
+		t.Errorf("undecorated unused code was not reported: %v", dead)
+	}
+}
+
+// A CSS import becomes an external node named ./App.css, which is not a
+// repository-relative module path. Publishing it made the consumer reject the
+// entire projection, so one stylesheet cost a repository its published
+// context — and seven repositories were failing this way.
+func TestProjectionOmitsDependencyTargetsTheConsumerWouldReject(t *testing.T) {
+	for _, value := range []string{"./App.css", "../shared/x.ts", "/abs/path.ts", "react", "@eslint/js", ".."} {
+		relative := repositoryRelativeModule(value)
+		wanted := value == "react" || value == "@eslint/js"
+		if relative != wanted {
+			t.Errorf("repositoryRelativeModule(%q) = %v, want %v", value, relative, wanted)
+		}
+	}
+	root := t.TempDir()
+	writeTestFile(t, root, "src/App.css", "body { color: red }\n")
+	writeTestFile(t, root, "src/App.tsx", "import './App.css'\nimport { fmt } from './lib/fmt'\nexport const App = () => fmt()\n")
+	writeTestFile(t, root, "src/lib/fmt.ts", "export function fmt() { return 1 }\n")
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dependency := range projection.ModuleDependencies {
+		if !repositoryRelativeModule(dependency.To) || !repositoryRelativeModule(dependency.From) {
+			t.Errorf("published a dependency the consumer rejects: %#v", dependency)
+		}
+	}
 }

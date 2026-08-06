@@ -50,6 +50,16 @@ func extractPythonFile(root, path, rel string) (ExtractedFile, error) {
 			StartLine: lineNumberAt(data, start), EndLine: lineNumberAt(data, end), StartByte: start, EndByte: end,
 			Exported: !strings.HasPrefix(name, "_"), Resolution: ResolutionStaticLexical,
 		})
+		// A registering decorator is a use. @router.get("/") hands the function
+		// to FastAPI, @celery.task to a worker, @pytest.fixture to pytest — the
+		// framework calls it and no line of code ever does. Without this the
+		// cleanup list offered every HTTP handler in the service for deletion.
+		if at := registeringDecorator(data, start); at >= 0 {
+			result.References = append(result.References, ExtractedReference{
+				TargetName: name, StartByte: at, EndByte: at + len(name),
+				EdgeType: "references", Resolution: ResolutionConfigurationDerived,
+			})
+		}
 		for _, call := range pythonCall.FindAllSubmatchIndex(data[start:end], -1) {
 			target := string(data[start+call[2] : start+call[3]])
 			if isLanguageCallKeyword(target) || target == name {
@@ -242,4 +252,37 @@ func callResolution(data []byte, offset int) ResolutionStatus {
 		break
 	}
 	return ResolutionHeuristic
+}
+
+// registeringDecorator reports the offset of a decorator that hands the
+// following definition to something else, or -1. A bare @property or
+// @staticmethod only changes how the definition behaves; a dotted or called
+// decorator — @router.get(...), @app.task, @pytest.fixture — registers it
+// somewhere this extractor cannot see.
+func registeringDecorator(data []byte, declaration int) int {
+	line := declaration
+	for line > 0 {
+		previousEnd := line - 1
+		if previousEnd > 0 && data[previousEnd-1] == '\r' {
+			previousEnd--
+		}
+		start := previousEnd
+		for start > 0 && data[start-1] != '\n' {
+			start--
+		}
+		text := strings.TrimSpace(string(data[start:previousEnd]))
+		if text == "" {
+			line = start
+			continue
+		}
+		if !strings.HasPrefix(text, "@") {
+			return -1
+		}
+		body := strings.TrimPrefix(text, "@")
+		if strings.ContainsAny(body, ".(") {
+			return start
+		}
+		line = start
+	}
+	return -1
 }
