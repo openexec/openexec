@@ -498,10 +498,18 @@ func TestProjectionOmitsUnpublishableDependenciesAndSaysSo(t *testing.T) {
 	if !keptReal {
 		t.Errorf("the real dependency was dropped with the unpublishable one: %#v", projection.ModuleDependencies)
 	}
+	// The count is exact and scoped: it describes this bounded projection, not
+	// a repository-wide total, and the wording has to say so.
 	var disclosed bool
 	for _, limitation := range projection.Limitations {
 		if strings.Contains(limitation, "dependency target") && strings.Contains(limitation, "omitted") {
 			disclosed = true
+			if !strings.Contains(limitation, "bounded projection") {
+				t.Errorf("omission disclosed without its scope: %q", limitation)
+			}
+			if !strings.HasPrefix(limitation, "1 dependency target ") {
+				t.Errorf("expected exactly one omission (the stylesheet), got %q", limitation)
+			}
 		}
 	}
 	if !disclosed {

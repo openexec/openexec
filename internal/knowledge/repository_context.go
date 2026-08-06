@@ -250,7 +250,7 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	})
 	if omittedDependencies > 0 {
 		projection.Limitations = append(projection.Limitations, fmt.Sprintf(
-			"%d dependency target%s omitted: unresolved relative asset or module paths this extractor could not place in the repository",
+			"%d dependency target%s omitted from this bounded projection: unresolved relative asset or module paths this extractor could not place in the repository",
 			omittedDependencies, map[bool]string{true: "", false: "s"}[omittedDependencies == 1]))
 	}
 	sort.Slice(projection.ModuleDependencies, func(i, j int) bool {
