@@ -381,18 +381,25 @@ func TestRunnerInvokedEntryPointsAreNotCleanupCandidates(t *testing.T) {
 	}
 }
 
-// FastAPI, Celery and pytest call functions the code never calls: the
-// decorator hands them over. Siivous's cleanup list opened with every HTTP
-// handler in the admin API for exactly this reason.
-func TestDecoratorRegisteredFunctionsAreNotCleanupCandidates(t *testing.T) {
+// FastAPI, Celery and pytest call functions the code never calls: something
+// holds a reference the source does not show. Which one needs framework
+// knowledge this extractor lacks, so anything decorated is treated as used —
+// being wrong here costs working code.
+func TestDecoratedDeclarationsAreNotCleanupCandidates(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, root, "app/api/admin.py",
-		"from fastapi import APIRouter\n\nrouter = APIRouter()\n\n\n@router.get(\"/\")\nasync def admin_root():\n    return {}\n\n\n@router.post(\"/users\")\nasync def create_user():\n    return {}\n")
-	writeTestFile(t, root, "app/workers.py",
-		"import celery\n\n\n@celery.task\ndef rebuild_index():\n    return 1\n")
-	// A bare decorator only changes behaviour; it registers nothing.
-	writeTestFile(t, root, "app/model.py",
-		"class Thing:\n    @property\n    def unused_property(self):\n        return 1\n\n\ndef genuinely_unused():\n    return 2\n")
+		"from fastapi import APIRouter\n\nrouter = APIRouter()\n\n\n@router.get(\"/\")\nasync def admin_root():\n    return {}\n")
+	// Arguments spanning lines: the decorator is not on the line above.
+	writeTestFile(t, root, "app/api/users.py",
+		"from fastapi import APIRouter\n\nrouter = APIRouter()\n\n\n@router.get(\n    \"/users\",\n    response_model=dict,\n)\nasync def get_user():\n    return {}\n")
+	// A stack whose nearest decorator is bare must not hide the one above it.
+	writeTestFile(t, root, "app/api/stacked.py",
+		"from functools import cache\nfrom fastapi import APIRouter\n\nrouter = APIRouter()\n\n\n@router.get(\"/stacked\")\n@cache\nasync def stacked_handler():\n    return {}\n")
+	// An imported bare decorator registers just as thoroughly as a dotted one.
+	writeTestFile(t, root, "tests_support/fixtures.py",
+		"from pytest import fixture\n\n\n@fixture\ndef database():\n    return 1\n")
+	writeTestFile(t, root, "app/model.py", "def genuinely_unused():\n    return 2\n")
+
 	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -417,32 +424,41 @@ func TestDecoratorRegisteredFunctionsAreNotCleanupCandidates(t *testing.T) {
 	for _, candidate := range projection.DeadCodeCandidates {
 		dead[trailingName(candidate.DisplayName)] = true
 	}
-	for _, registered := range []string{"admin_root", "create_user", "rebuild_index"} {
-		if dead[registered] {
-			t.Errorf("%s is registered by a decorator but was offered for deletion", registered)
+	for _, decorated := range []string{"admin_root", "get_user", "stacked_handler", "database"} {
+		if dead[decorated] {
+			t.Errorf("%s is decorated but was offered for deletion", decorated)
 		}
 	}
 	if !dead["genuinely_unused"] {
 		t.Errorf("undecorated unused code was not reported: %v", dead)
 	}
+	scope := projection.Selections["dead_code_candidates"]
+	if scope.Total != len(projection.DeadCodeCandidates) {
+		t.Errorf("count %d disagrees with the %d rows it summarises", scope.Total, len(projection.DeadCodeCandidates))
+	}
 }
 
 // A CSS import becomes an external node named ./App.css, which is not a
 // repository-relative module path. Publishing it made the consumer reject the
-// entire projection, so one stylesheet cost a repository its published
-// context — and seven repositories were failing this way.
-func TestProjectionOmitsDependencyTargetsTheConsumerWouldReject(t *testing.T) {
-	for _, value := range []string{"./App.css", "../shared/x.ts", "/abs/path.ts", "react", "@eslint/js", ".."} {
-		relative := repositoryRelativeModule(value)
-		wanted := value == "react" || value == "@eslint/js"
-		if relative != wanted {
-			t.Errorf("repositoryRelativeModule(%q) = %v, want %v", value, relative, wanted)
+// whole projection, so one stylesheet cost seven repositories their context —
+// and dropping it silently would trade that for quiet data loss.
+func TestProjectionOmitsUnpublishableDependenciesAndSaysSo(t *testing.T) {
+	for _, value := range []string{"./App.css", "../styles/main.scss", "/abs/path.ts", ".."} {
+		if repositoryRelativeModule(value) {
+			t.Errorf("repositoryRelativeModule(%q) accepted a path the consumer rejects", value)
+		}
+	}
+	// Bare package names are accepted by both sides; the filter is about
+	// unresolved relative paths, not about external packages.
+	for _, value := range []string{"react", "@eslint/js"} {
+		if !repositoryRelativeModule(value) {
+			t.Errorf("repositoryRelativeModule(%q) rejected a target the consumer accepts", value)
 		}
 	}
 	root := t.TempDir()
 	writeTestFile(t, root, "src/App.css", "body { color: red }\n")
-	writeTestFile(t, root, "src/App.tsx", "import './App.css'\nimport { fmt } from './lib/fmt'\nexport const App = () => fmt()\n")
 	writeTestFile(t, root, "src/lib/fmt.ts", "export function fmt() { return 1 }\n")
+	writeTestFile(t, root, "src/App.tsx", "import './App.css'\nimport { fmt } from './lib/fmt'\nexport const App = () => fmt()\n")
 	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -463,9 +479,32 @@ func TestProjectionOmitsDependencyTargetsTheConsumerWouldReject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var keptReal, keptCSS bool
 	for _, dependency := range projection.ModuleDependencies {
 		if !repositoryRelativeModule(dependency.To) || !repositoryRelativeModule(dependency.From) {
 			t.Errorf("published a dependency the consumer rejects: %#v", dependency)
 		}
+		if strings.HasSuffix(dependency.To, ".css") {
+			keptCSS = true
+		}
+		if strings.Contains(dependency.To, "lib/fmt") {
+			keptReal = true
+		}
+	}
+	if keptCSS {
+		t.Error("the unresolved stylesheet target was published")
+	}
+	// An empty dependency list would satisfy the assertion above; it must not.
+	if !keptReal {
+		t.Errorf("the real dependency was dropped with the unpublishable one: %#v", projection.ModuleDependencies)
+	}
+	var disclosed bool
+	for _, limitation := range projection.Limitations {
+		if strings.Contains(limitation, "dependency target") && strings.Contains(limitation, "omitted") {
+			disclosed = true
+		}
+	}
+	if !disclosed {
+		t.Errorf("dropped targets were not disclosed: %v", projection.Limitations)
 	}
 }

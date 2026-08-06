@@ -178,6 +178,7 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	projection.Selections["resolved_symbols"] = selectionScope(symbolScope, symbolLimit, len(candidates), symbolTotal)
 
 	seenDependencies := make(map[string]bool)
+	omittedDependencies := 0
 	seenDependencyFiles := make(map[string]bool)
 	for _, candidate := range candidates {
 		projection.ResolvedSymbols = append(projection.ResolvedSymbols, SafeSymbolProjection{
@@ -205,12 +206,19 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 					break
 				}
 			}
-			// The consumer's contract is repository-relative module paths. An
-			// external package (react, @eslint/js) and an unresolved relative
-			// asset (./App.css) are neither, and emitting one made the consumer
-			// reject the whole projection — a single CSS import cost the
-			// repository its entire published context.
-			if to == "" || !repositoryRelativeModule(to) {
+			if to == "" {
+				continue
+			}
+			// The consumer's contract is repository-relative module paths, and
+			// an unresolved relative target — ./index.css, ../styles/main.scss,
+			// ./locales/en.json — is not one. Publishing it made the consumer
+			// reject the whole projection, so a single stylesheet cost the
+			// repository its entire context. Dropping them silently would trade
+			// that for quiet data loss, so the count is disclosed: a stylesheet
+			// or a JSON resource may be architecturally meaningful even when
+			// this extractor cannot resolve where it lives.
+			if !repositoryRelativeModule(to) {
+				omittedDependencies++
 				continue
 			}
 			key := candidate.Occurrence.FilePath + "\x00" + to
@@ -240,6 +248,11 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	sort.Slice(projection.ResolvedSymbols, func(i, j int) bool {
 		return projection.ResolvedSymbols[i].SafeLocation < projection.ResolvedSymbols[j].SafeLocation
 	})
+	if omittedDependencies > 0 {
+		projection.Limitations = append(projection.Limitations, fmt.Sprintf(
+			"%d dependency target%s omitted: unresolved relative asset or module paths this extractor could not place in the repository",
+			omittedDependencies, map[bool]string{true: "", false: "s"}[omittedDependencies == 1]))
+	}
 	sort.Slice(projection.ModuleDependencies, func(i, j int) bool {
 		if projection.ModuleDependencies[i].From == projection.ModuleDependencies[j].From {
 			return projection.ModuleDependencies[i].To < projection.ModuleDependencies[j].To

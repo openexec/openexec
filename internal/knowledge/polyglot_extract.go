@@ -50,13 +50,16 @@ func extractPythonFile(root, path, rel string) (ExtractedFile, error) {
 			StartLine: lineNumberAt(data, start), EndLine: lineNumberAt(data, end), StartByte: start, EndByte: end,
 			Exported: !strings.HasPrefix(name, "_"), Resolution: ResolutionStaticLexical,
 		})
-		// A registering decorator is a use. @router.get("/") hands the function
-		// to FastAPI, @celery.task to a worker, @pytest.fixture to pytest — the
-		// framework calls it and no line of code ever does. Without this the
-		// cleanup list offered every HTTP handler in the service for deletion.
-		if at := registeringDecorator(data, start); at >= 0 {
+		// A decorated definition is not offered for deletion. Something holds a
+		// reference to it — a router, a worker, a test runner — and which one
+		// needs framework knowledge this extractor lacks. Wrong here costs
+		// working code, so anything decorated counts as used.
+		if at := decoratedDeclaration(data, start); at >= 0 {
+			// TargetPath pins the reference to this file's definition. Without
+			// it a handler named `index` in one module would keep every
+			// same-named symbol in the repository alive.
 			result.References = append(result.References, ExtractedReference{
-				TargetName: name, StartByte: at, EndByte: at + len(name),
+				TargetName: name, TargetPath: rel, StartByte: at, EndByte: at + len(name),
 				EdgeType: "references", Resolution: ResolutionConfigurationDerived,
 			})
 		}
@@ -254,13 +257,22 @@ func callResolution(data []byte, offset int) ResolutionStatus {
 	return ResolutionHeuristic
 }
 
-// registeringDecorator reports the offset of a decorator that hands the
-// following definition to something else, or -1. A bare @property or
-// @staticmethod only changes how the definition behaves; a dotted or called
-// decorator — @router.get(...), @app.task, @pytest.fixture — registers it
-// somewhere this extractor cannot see.
-func registeringDecorator(data []byte, declaration int) int {
+// decoratedDeclaration reports the offset of the decorator block above a
+// definition, or -1.
+//
+// It does not try to tell a registering decorator from a behavioural one. The
+// question this answers is "may a deletion tool offer this?", and for that the
+// safe answer is no whenever anything decorates the definition: @router.get
+// hands it to FastAPI, @fixture hands it to pytest under a bare imported name,
+// and a stack can mix both so the nearest one proves nothing. Distinguishing
+// them needs framework knowledge this extractor does not have; being wrong
+// here costs working code.
+//
+// Decorator arguments span lines, so the scan walks up through a balanced
+// bracket region rather than reading only the line above.
+func decoratedDeclaration(data []byte, declaration int) int {
 	line := declaration
+	depth := 0
 	for line > 0 {
 		previousEnd := line - 1
 		if previousEnd > 0 && data[previousEnd-1] == '\r' {
@@ -275,14 +287,18 @@ func registeringDecorator(data []byte, declaration int) int {
 			line = start
 			continue
 		}
-		if !strings.HasPrefix(text, "@") {
-			return -1
-		}
-		body := strings.TrimPrefix(text, "@")
-		if strings.ContainsAny(body, ".(") {
+		// Count brackets right-to-left: a line closing more than it opens is
+		// the tail of a multi-line decorator argument list.
+		opens, closes := strings.Count(text, "(")+strings.Count(text, "["), strings.Count(text, ")")+strings.Count(text, "]")
+		depth += closes - opens
+		if strings.HasPrefix(text, "@") && depth <= 0 {
 			return start
 		}
-		line = start
+		if depth > 0 {
+			line = start
+			continue
+		}
+		return -1
 	}
 	return -1
 }
