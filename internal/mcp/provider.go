@@ -23,6 +23,11 @@ func reservedCoreToolNames() map[string]bool {
 		WriteFileToolDef(), RunShellCommandToolDef(),
 		ApprovalListToolDef(), ApprovalDecideToolDef(),
 		ForkSessionToolDef(), GetForkInfoToolDef(), ListSessionForksToolDef(),
+		// Symbol tools are authorized by name in every permission mode
+		// (broker.go), so a module allowed to take one of these names would be
+		// dispatched ahead of the core handler with a read-only session's
+		// blessing. Reserved unconditionally, like the infra names below.
+		SymbolFindToolDef(), SymbolReadToolDef(), SymbolRelationsToolDef(),
 	}
 	names := make(map[string]bool, len(defs)+5)
 	for _, d := range defs {

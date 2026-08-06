@@ -29,6 +29,25 @@ func IsStaleGraph(err error) bool {
 	return errors.As(err, &stale)
 }
 
+// errRefreshDisabled explains a stale refusal that the reader deliberately did
+// not repair.
+var errRefreshDisabled = errors.New(
+	"this server does not rebuild the graph on read; run `openexec knowledge graph scan` to refresh it")
+
+// SetRefreshOnRead controls whether a read may repair a drifted generation.
+//
+// The default (true) is the V2.1 contract: a read recomputes and re-resolves
+// rather than answering from stale pointers. A server that advertises symbol
+// lookup as the cheap alternative to grep sets it false — on a large
+// repository the refresh path runs a full extraction, so an advertised-cheap
+// lookup would block for minutes. With refresh disabled the reader reports the
+// drift as an explicit stale refusal and mutates nothing.
+func (s *Store) SetRefreshOnRead(refresh bool) {
+	s.graphMu.Lock()
+	defer s.graphMu.Unlock()
+	s.noRefreshOnRead = !refresh
+}
+
 // freshGeneration is the load-bearing V2 read gate. It serializes with graph
 // writers, recomputes the current scan manifest at read time, refreshes drifted
 // inputs, and returns only a generation built from the current worktree.
@@ -53,6 +72,12 @@ func (s *Store) freshGeneration(ctx context.Context, identity RepositoryIdentity
 		generation.ConfigurationDigest == manifest.ConfigurationDigest &&
 		generation.Status != GraphStale && generation.Status != GraphSuperseded {
 		return generation, state, nil
+	}
+	// Checked before the status write below: a non-refreshing reader must be
+	// side-effect free, so it may not even downgrade the stored status.
+	if s.noRefreshOnRead {
+		state.Freshness = FreshnessStale
+		return GraphGeneration{}, state, &StaleGraphError{State: state, Cause: errRefreshDisabled}
 	}
 	if generation.Status == GraphCurrent {
 		_, _ = s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'stale' WHERE id = ? AND status = 'current'`, generation.ID)

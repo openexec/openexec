@@ -70,6 +70,9 @@ type PRDRecord struct {
 type Store struct {
 	db      *sql.DB
 	graphMu sync.Mutex
+	// noRefreshOnRead makes reads report drift instead of repairing it.
+	// See SetRefreshOnRead.
+	noRefreshOnRead bool
 }
 
 func NewStore(projectDir string) (*Store, error) {

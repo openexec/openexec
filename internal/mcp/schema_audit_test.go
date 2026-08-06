@@ -35,6 +35,9 @@ func allToolDefs() []map[string]interface{} {
 		BacklogAddTaskToolDef(),
 		MemoryReadToolDef(),
 		SkillProposeToolDef(),
+		SymbolFindToolDef(),
+		SymbolReadToolDef(),
+		SymbolRelationsToolDef(),
 		// Infra tool schemas are compiled from the operator allowlist;
 		// audit them against a representative config.
 		AnsibleRunPlaybookToolDef(auditInfraRegistry()),
@@ -183,6 +186,9 @@ func TestToolSchemasMatchRequestStructs(t *testing.T) {
 		{OpenExecResultToolDef(), OpenExecResultRequest{}},
 		{SkillProposeToolDef(), skillProposeArgs{}},
 		{BacklogAddTaskToolDef(), backlogAddTaskArgs{}},
+		{SymbolFindToolDef(), SymbolFindRequest{}},
+		{SymbolReadToolDef(), SymbolReadRequest{}},
+		{SymbolRelationsToolDef(), SymbolRelationsRequest{}},
 		{AnsibleRunPlaybookToolDef(auditInfraRegistry()), AnsibleRunPlaybookRequest{}},
 		{SaltApplyStateToolDef(auditInfraRegistry()), SaltApplyStateRequest{}},
 		{SSHRunQueryToolDef(auditInfraRegistry()), SSHRunQueryRequest{}},

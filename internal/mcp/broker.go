@@ -27,6 +27,7 @@ type ToolBroker struct {
 	runID           string            // Current run ID for tracing
 	toolsetRegistry *toolset.Registry // Optional toolset-based filtering
 	activeToolset   string            // Currently active toolset
+	symbolsOnly     bool              // Restrict to repository symbol tools
 }
 
 // SetRunID sets the current run ID for tracing context.
@@ -74,8 +75,34 @@ func NewToolBroker(modeOverride string) *ToolBroker {
 	return &ToolBroker{mode: mode}
 }
 
+// IsSymbolTool reports whether a name is one of the read-only repository
+// graph lookups.
+func IsSymbolTool(name string) bool {
+	switch name {
+	case "symbol_find", "symbol_read", "symbol_relations":
+		return true
+	}
+	return false
+}
+
+// SetSymbolsOnly restricts this broker to the repository symbol tools.
+//
+// Enforced here rather than only in handleToolsList because advertisement is
+// not authorization: a client that already knows a tool name can call it
+// without ever listing. This is the profile Agent Console runs, so the deny
+// must be the authoritative one.
+func (b *ToolBroker) SetSymbolsOnly(only bool) {
+	b.symbolsOnly = only
+}
+
 // Authorize checks if a tool call is permitted in the current mode and toolset.
 func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string) {
+	// Symbols-only profile: deny everything else outright, before any
+	// mode or toolset reasoning can widen it.
+	if b.symbolsOnly && !IsSymbolTool(toolName) {
+		return false, fmt.Sprintf("[Symbols-only] tool '%s' is not available; this server exposes only symbol_find, symbol_read and symbol_relations", toolName)
+	}
+
 	// Check toolset-based authorization first (if configured)
 	if b.toolsetRegistry != nil && b.activeToolset != "" {
 		ts, ok := b.toolsetRegistry.Get(b.activeToolset)
@@ -99,6 +126,17 @@ func (b *ToolBroker) Authorize(toolName string, arguments string) (bool, string)
 
 	case "backlog_list_stories", "backlog_get_story", "memory_read":
 		return true, "" // Read-only backlog/memory access, allowed in every mode
+
+	case "symbol_find", "symbol_read", "symbol_relations":
+		// Repository graph lookups (symbols.go). These never write workspace
+		// files; symbol_read returns source the caller could already obtain
+		// with read_file. They can refresh the graph index as a side effect —
+		// the V2.1 read gate recomputes a drifted generation rather than
+		// answering from a stale one — which mutates orchestrator bookkeeping
+		// (.openexec), the same documented exception the backlog writes use.
+		// Allowed in every mode so even read-only chat locates code by pointer
+		// instead of scanning files.
+		return true, ""
 
 	case "backlog_claim_story", "backlog_complete_task", "backlog_complete_story", "backlog_add_task":
 		// Backlog state writes are allowed in every mode, including read-only

@@ -92,6 +92,11 @@ type Server struct {
 	// Injected by the composition root so mcp does not import internal/memory.
 	memoryLoader func(workspaceRoot string) (string, error)
 
+	// symbolIndex backs the symbol_* tools (see symbols.go). Injected by the
+	// composition root so mcp does not import internal/knowledge. Nil means
+	// this workspace has no repository graph: the tools are not advertised.
+	symbolIndex SymbolIndex
+
 	// providerTools holds MCP tools contributed by MODULE providers (registered
 	// by the composition root), keyed by tool name. This is how a separable
 	// module ships its tools without core importing it.
@@ -102,6 +107,15 @@ type Server struct {
 	// sessions must never gain self-approval at runtime.
 	operatorSession bool
 	approvalMgr     *approval.Manager
+}
+
+// toolContext returns the tracing context, falling back to Background so
+// handlers never receive a nil context.
+func (s *Server) toolContext() context.Context {
+	if s.ctx == nil {
+		return context.Background()
+	}
+	return s.ctx
 }
 
 // SetContext sets the tracing context and run ID for the server.
@@ -271,6 +285,19 @@ func (s *Server) handleInitialize(req Request) {
 }
 
 func (s *Server) handleToolsList(req Request) {
+	// Symbols-only profile: the repository lookups and nothing else. No
+	// control plane, no backlog, no patch tool — a client of this profile is
+	// asking "where is this code", not driving the orchestrator.
+	if s.broker.symbolsOnly {
+		var symbolTools []interface{}
+		if s.symbolIndex != nil {
+			symbolTools = append(symbolTools,
+				SymbolFindToolDef(), SymbolReadToolDef(), SymbolRelationsToolDef())
+		}
+		s.writeResult(req.ID, map[string]interface{}{"tools": symbolTools})
+		return
+	}
+
 	// Core tools always available in all modes
 	tools := []interface{}{
 		axonSignalToolDef(),     // Always available (control plane)
@@ -321,6 +348,17 @@ func (s *Server) handleToolsList(req Request) {
 			ForkSessionToolDef(),
 			GetForkInfoToolDef(),
 			ListSessionForksToolDef(),
+		)
+	}
+
+	// Repository symbol tools (see symbols.go): read-only pointer lookup over
+	// the knowledge graph, advertised only when this workspace has an index.
+	// Available in every mode for the same reason read_file is.
+	if s.symbolIndex != nil {
+		tools = append(tools,
+			SymbolFindToolDef(),
+			SymbolReadToolDef(),
+			SymbolRelationsToolDef(),
 		)
 	}
 
@@ -541,6 +579,17 @@ func (s *Server) handleToolsCall(req Request) {
 		telemetry.RecordToolSuccess(span, "")
 	case "skill_propose":
 		s.handleSkillPropose(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	// Repository symbol tools (symbols.go): read-only graph lookups, so no
+	// idempotency marking and no approval gate — they change nothing.
+	case "symbol_find":
+		s.handleSymbolFind(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "symbol_read":
+		s.handleSymbolRead(req, params)
+		telemetry.RecordToolSuccess(span, "")
+	case "symbol_relations":
+		s.handleSymbolRelations(req, params)
 		telemetry.RecordToolSuccess(span, "")
 	// Module tools come from registered providers (dispatched above via
 	// dispatchProvider), not this switch.
