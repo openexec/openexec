@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -216,6 +217,74 @@ func trailingName(identity string) string {
 	return identity
 }
 
+// The architecture must survive a layout where different relationships
+// separate at different depths. One global depth cannot: stopping at the first
+// depth that produced any edge reported tests -> app and left the
+// services -> repositories relationship — the one that carries the design —
+// collapsed into a single area.
+func TestModuleSketchNamesEachRelationshipWhereItDiverges(t *testing.T) {
+	root := t.TempDir()
+	// Shallow: src/components -> src/lib, separating at segment 2.
+	writeTestFile(t, root, "src/components/Card.ts", "import { fmt } from '../lib/fmt'\nexport const Card = () => fmt()\n")
+	writeTestFile(t, root, "src/lib/fmt.ts", "export function fmt() { return 1 }\n")
+	// Deep: app/services -> app/repositories, separating at segment 4.
+	writeTestFile(t, root, "code/backend/app/services/order.py", "from code.backend.app.repositories.order import fetch\n\ndef place():\n    return fetch()\n")
+	writeTestFile(t, root, "code/backend/app/repositories/order.py", "def fetch():\n    return 1\n")
+	// Mixed, in the same repository: tests -> app separates at segment 3, and
+	// must not decide the granularity of the pair above.
+	writeTestFile(t, root, "code/backend/tests/test_order.py", "from code.backend.app.services.order import place\n\ndef test_place():\n    assert place()\n")
+	// Deeper than four segments, to prove nothing is capped.
+	writeTestFile(t, root, "code/backend/app/domain/pricing/rules.py", "from code.backend.app.domain.tax.vat import rate\n\ndef price():\n    return rate()\n")
+	writeTestFile(t, root, "code/backend/app/domain/tax/vat.py", "def rate():\n    return 24\n")
+
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flows := map[string]bool{}
+	for _, flow := range projection.ModuleSketch {
+		flows[flow.From+" -> "+flow.To] = true
+		if flow.From == flow.To {
+			t.Errorf("an area was reported as depending on itself: %#v", flow)
+		}
+	}
+	for _, wanted := range []string{
+		"src/components -> src/lib",
+		"code/backend/app/services -> code/backend/app/repositories",
+		"code/backend/tests -> code/backend/app",
+		"code/backend/app/domain/pricing -> code/backend/app/domain/tax",
+	} {
+		if !flows[wanted] {
+			t.Errorf("missing relationship %q; got %v", wanted, keysOf(flows))
+		}
+	}
+}
+
+func keysOf(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for key := range set {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // A repository laid out as code/backend/app/... collapsed to a single area at
 // the fixed two-segment depth, so every import pointed at itself and the
 // architecture came out empty — 732 module imports, no flows, and a flowchart
@@ -252,5 +321,55 @@ func TestModuleSketchFindsFlowsInADeepLayout(t *testing.T) {
 		if flow.From == flow.To {
 			t.Errorf("an area was reported as depending on itself: %#v", flow)
 		}
+	}
+}
+
+// A migration's upgrade and downgrade have no caller by construction: the
+// migration runner finds them by convention. Offering them for deletion is a
+// wrong answer, not a cautious one — Siivous listed 856 of them.
+func TestRunnerInvokedEntryPointsAreNotCleanupCandidates(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "alembic/versions/0cae_add_users.py",
+		"def upgrade():\n    pass\n\ndef downgrade():\n    pass\n")
+	writeTestFile(t, root, "migrations/0002_add_index.py", "def upgrade():\n    pass\n")
+	writeTestFile(t, root, "tests/conftest.py", "def pytest_configure():\n    pass\n")
+	writeTestFile(t, root, "app/orphan.py", "def really_unused():\n    pass\n")
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range projection.DeadCodeCandidates {
+		if strings.Contains(candidate.SafeLocation, "alembic") ||
+			strings.Contains(candidate.SafeLocation, "migrations/") ||
+			strings.Contains(candidate.SafeLocation, "conftest") {
+			t.Errorf("a runner-invoked entry point was offered for deletion: %#v", candidate)
+		}
+	}
+	// And the check must still find code nothing invokes, or it has been
+	// emptied rather than corrected.
+	var found bool
+	for _, candidate := range projection.DeadCodeCandidates {
+		if trailingName(candidate.DisplayName) == "really_unused" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("genuinely unused code was not reported: %v", projection.DeadCodeCandidates)
 	}
 }

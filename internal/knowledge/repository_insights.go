@@ -33,6 +33,20 @@ type ModuleFlow struct {
 	Weight int    `json:"weight"`
 }
 
+// frameworkEntryExclusion removes symbols a runner invokes by name rather than
+// code calling them. A database migration's upgrade and downgrade have no
+// caller by construction — Alembic finds them by convention — so listing them
+// as unused is not a heuristic being cautious, it is a wrong answer, and it
+// offered 856 of them at the top of Siivous's cleanup list.
+const frameworkEntryExclusion = `
+	AND o.file_path NOT LIKE '%alembic/versions/%'
+	AND o.file_path NOT LIKE '%/migrations/%'
+	AND o.file_path NOT LIKE 'migrations/%'
+	AND NOT (rs.display_name IN ('upgrade', 'downgrade') AND o.file_path LIKE '%alembic%')
+	AND o.file_path NOT LIKE '%conftest.py'
+	AND o.file_path NOT LIKE '%/tests/%'
+	AND o.file_path NOT LIKE 'tests/%'`
+
 // deadCodeCandidates lists exported symbols with no inbound call or reference
 // edges in the current generation. Static reachability only: entry points,
 // tests, and reflective use are not excluded — the caller must disclose that.
@@ -45,6 +59,7 @@ func (s *Store) deadCodeCandidates(ctx context.Context, generationID string) ([]
 		WHERE o.generation_id = ? AND o.exported = 1
 		  AND rs.display_name NOT IN ('main', 'init', 'TestMain')
 		  AND o.file_path NOT LIKE '%_test.go' AND o.file_path NOT LIKE '%.test.ts%' AND o.file_path NOT LIKE '%.spec.ts%'
+		  `+frameworkEntryExclusion+`
 		  AND NOT EXISTS (
 			SELECT 1 FROM graph_edges e
 			WHERE e.generation_id = o.generation_id AND e.to_node_id = n.id
@@ -67,7 +82,7 @@ func (s *Store) deadCodeCandidates(ctx context.Context, generationID string) ([]
 		return nil, 0, err
 	}
 	var total int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM symbol_occurrences o JOIN graph_nodes n ON n.id = o.node_id JOIN repository_symbols rs ON rs.id = o.symbol_id WHERE o.generation_id = ? AND o.exported = 1 AND rs.display_name NOT IN ('main','init','TestMain') AND o.file_path NOT LIKE '%_test.go' AND o.file_path NOT LIKE '%.test.ts%' AND o.file_path NOT LIKE '%.spec.ts%' AND NOT EXISTS (SELECT 1 FROM graph_edges e WHERE e.generation_id = o.generation_id AND e.to_node_id = n.id AND e.edge_type IN ('calls','references'))`, generationID).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM symbol_occurrences o JOIN graph_nodes n ON n.id = o.node_id JOIN repository_symbols rs ON rs.id = o.symbol_id WHERE o.generation_id = ? AND o.exported = 1 AND rs.display_name NOT IN ('main','init','TestMain') AND o.file_path NOT LIKE '%_test.go' AND o.file_path NOT LIKE '%.test.ts%' AND o.file_path NOT LIKE '%.spec.ts%' `+frameworkEntryExclusion+` AND NOT EXISTS (SELECT 1 FROM graph_edges e WHERE e.generation_id = o.generation_id AND e.to_node_id = n.id AND e.edge_type IN ('calls','references'))`, generationID).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	if len(out) > deadCodeCandidateLimit {
@@ -147,25 +162,19 @@ func (s *Store) moduleSketch(ctx context.Context, generationID string) ([]Module
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
-	// How deep an "area" is depends on how the repository is laid out. Two
-	// segments describes src/components and src/lib, and collapses
-	// code/backend/app/services and code/backend/app/repositories into one
-	// node whose every edge points at itself — which is why a repository with
-	// 732 module imports produced no architecture at all. Go deeper until the
-	// layout actually separates, and no deeper than it needs to.
+	// Areas are decided per relationship, not by one depth for the whole
+	// repository. A single global depth cannot describe a layout where
+	// tests/ -> app/ separates at one level and app/services -> app/repositories
+	// separates at another: stopping at the first depth that produced any edge
+	// reported the shallow relationships and collapsed the ones that carry the
+	// architecture.
 	weights := map[[2]string]int{}
-	for depth := 2; depth <= 4; depth++ {
-		weights = map[[2]string]int{}
-		for _, pair := range pairs {
-			key := [2]string{moduleArea(pair[0], depth), moduleArea(pair[1], depth)}
-			if key[0] == key[1] {
-				continue
-			}
-			weights[key]++
+	for _, pair := range pairs {
+		from, to, ok := relationshipAreas(pair[0], pair[1])
+		if !ok {
+			continue
 		}
-		if len(weights) > 0 {
-			break
-		}
+		weights[[2]string{from, to}]++
 	}
 	out := make([]ModuleFlow, 0, len(weights))
 	for key, weight := range weights {
@@ -224,14 +233,40 @@ func (s *Store) attachRepositoryInsights(ctx context.Context, generationID strin
 	return nil
 }
 
-// moduleArea groups a module path into the area a reader would name, at the
-// requested depth. A path shallower than the depth is its own area.
-func moduleArea(path string, depth int) string {
-	parts := strings.Split(path, "/")
-	if len(parts) > depth {
-		parts = parts[:depth]
-	} else if len(parts) > 1 {
+// relationshipAreas names the two areas a single import crosses, at the level
+// where they actually diverge: the shared prefix plus the first segment that
+// differs. app/services -> app/repositories is reported at that granularity
+// whether or not some other pair in the same repository separates higher up.
+// Two modules in the same directory are not a relationship between areas.
+func relationshipAreas(from, to string) (string, string, bool) {
+	fromParts := directorySegments(from)
+	toParts := directorySegments(to)
+	shared := 0
+	for shared < len(fromParts) && shared < len(toParts) && fromParts[shared] == toParts[shared] {
+		shared++
+	}
+	if shared >= len(fromParts) && shared >= len(toParts) {
+		return "", "", false
+	}
+	cut := func(parts []string) string {
+		end := shared + 1
+		if end > len(parts) {
+			end = len(parts)
+		}
+		return strings.Join(parts[:end], "/")
+	}
+	fromArea, toArea := cut(fromParts), cut(toParts)
+	if fromArea == toArea {
+		return "", "", false
+	}
+	return fromArea, toArea, true
+}
+
+// directorySegments drops the file name: a module's area is where it lives.
+func directorySegments(module string) []string {
+	parts := strings.Split(module, "/")
+	if len(parts) > 1 {
 		parts = parts[:len(parts)-1]
 	}
-	return strings.Join(parts, "/")
+	return parts
 }
