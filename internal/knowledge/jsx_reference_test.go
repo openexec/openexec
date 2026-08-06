@@ -215,3 +215,42 @@ func trailingName(identity string) string {
 	}
 	return identity
 }
+
+// A repository laid out as code/backend/app/... collapsed to a single area at
+// the fixed two-segment depth, so every import pointed at itself and the
+// architecture came out empty — 732 module imports, no flows, and a flowchart
+// export that produced nothing.
+func TestModuleSketchFindsFlowsInADeepLayout(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, root, "code/backend/app/services/order.py", "from code.backend.app.repositories.order import fetch\n\ndef place():\n    return fetch()\n")
+	writeTestFile(t, root, "code/backend/app/repositories/order.py", "def fetch():\n    return 1\n")
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	if _, err := store.ScanRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, nil, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projection.ModuleSketch) == 0 {
+		t.Fatalf("a repository whose areas differ below the second segment reported no architecture")
+	}
+	// The areas must still be distinguishable, not the whole repository as one.
+	for _, flow := range projection.ModuleSketch {
+		if flow.From == flow.To {
+			t.Errorf("an area was reported as depending on itself: %#v", flow)
+		}
+	}
+}

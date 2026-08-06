@@ -136,29 +136,36 @@ func (s *Store) moduleSketch(ctx context.Context, generationID string) ([]Module
 		return nil, 0, fmt.Errorf("module sketch: %w", err)
 	}
 	defer rows.Close()
-	weights := map[[2]string]int{}
+	pairs := [][2]string{}
 	for rows.Next() {
 		var from, to string
 		if err := rows.Scan(&from, &to); err != nil {
 			return nil, 0, err
 		}
-		area := func(path string) string {
-			parts := strings.Split(path, "/")
-			if len(parts) > 2 {
-				parts = parts[:2]
-			} else if len(parts) > 1 {
-				parts = parts[:len(parts)-1]
-			}
-			return strings.Join(parts, "/")
-		}
-		key := [2]string{area(from), area(to)}
-		if key[0] == key[1] {
-			continue
-		}
-		weights[key]++
+		pairs = append(pairs, [2]string{from, to})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
+	}
+	// How deep an "area" is depends on how the repository is laid out. Two
+	// segments describes src/components and src/lib, and collapses
+	// code/backend/app/services and code/backend/app/repositories into one
+	// node whose every edge points at itself — which is why a repository with
+	// 732 module imports produced no architecture at all. Go deeper until the
+	// layout actually separates, and no deeper than it needs to.
+	weights := map[[2]string]int{}
+	for depth := 2; depth <= 4; depth++ {
+		weights = map[[2]string]int{}
+		for _, pair := range pairs {
+			key := [2]string{moduleArea(pair[0], depth), moduleArea(pair[1], depth)}
+			if key[0] == key[1] {
+				continue
+			}
+			weights[key]++
+		}
+		if len(weights) > 0 {
+			break
+		}
 	}
 	out := make([]ModuleFlow, 0, len(weights))
 	for key, weight := range weights {
@@ -215,4 +222,16 @@ func (s *Store) attachRepositoryInsights(ctx context.Context, generationID strin
 	}
 	projection.Selections["module_sketch"] = selectionScope("aggregated top-level module import directions", moduleSketchLimit, len(projection.ModuleSketch), sketchTotal)
 	return nil
+}
+
+// moduleArea groups a module path into the area a reader would name, at the
+// requested depth. A path shallower than the depth is its own area.
+func moduleArea(path string, depth int) string {
+	parts := strings.Split(path, "/")
+	if len(parts) > depth {
+		parts = parts[:depth]
+	} else if len(parts) > 1 {
+		parts = parts[:len(parts)-1]
+	}
+	return strings.Join(parts, "/")
 }
