@@ -242,3 +242,46 @@ func TestGatewayCapsWhatItReturns(t *testing.T) {
 		t.Error("the cut was silent")
 	}
 }
+
+// A descriptor is how a caller chooses. Advertising workspace-write because
+// *an* executor exists sends editing work to a provider that will refuse it at
+// the turn — the refusal arriving after the choice instead of shaping it.
+func TestDescriptorReportsTheExecutorsRealCapability(t *testing.T) {
+	gateway, err := NewGatewayToolExecutor(context.Background(), (&fakeGateway{}).start(t).URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withGateway, err := NewAPIProvider(APIProviderConfig{
+		Adapter: &fakeAPIAdapter{}, Tools: gateway.Tools(), ToolExecutor: gateway,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capabilities := withGateway.Descriptor().Capabilities
+	if capabilities.WorkspaceWrite {
+		t.Error("a gateway-backed provider advertised workspace-write, which it refuses")
+	}
+	if !capabilities.ToolCalling {
+		t.Error("a gateway-backed provider denied tool calling, which is all it does")
+	}
+
+	withFiles, err := NewAPIProvider(APIProviderConfig{
+		Adapter: &fakeAPIAdapter{}, Tools: WorkspaceTools(Sandbox{Mode: SandboxWorkspaceWrite}),
+		ToolExecutor: NewWorkspaceToolExecutor(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !withFiles.Descriptor().Capabilities.WorkspaceWrite {
+		t.Error("a filesystem-backed provider denied workspace-write")
+	}
+
+	// No executor at all is a conversation, and cannot write anything.
+	plain, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.Descriptor().Capabilities.WorkspaceWrite || plain.Descriptor().Capabilities.ToolCalling {
+		t.Error("a provider with no executor advertised tools")
+	}
+}

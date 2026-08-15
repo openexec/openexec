@@ -84,6 +84,12 @@ func (e *GatewayToolExecutor) Tools() []agent.ToolDefinition {
 	return append([]agent.ToolDefinition(nil), e.tools...)
 }
 
+// SupportsWorkspaceWrite is false, and ValidateAccess below is why: a gateway
+// run is read-only by construction. Declaring it keeps a caller from choosing
+// this provider for editing work and meeting the refusal at the turn instead
+// of at the choice.
+func (e *GatewayToolExecutor) SupportsWorkspaceWrite() bool { return false }
+
 // ValidateAccess refuses the combination that would make the boundary
 // meaningless. A gateway run has no writable roots and no file tools; asking
 // for workspace-write alongside one is either a mistake or an attempt to have

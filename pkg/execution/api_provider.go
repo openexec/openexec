@@ -22,6 +22,28 @@ type ToolRequest struct {
 	ReadableRoots []string
 }
 
+// WorkspaceCapable is implemented by tool executors that know whether they can
+// serve a workspace-write run.
+//
+// Optional rather than part of ToolExecutor: a third-party executor written
+// against the older interface still compiles, and is assumed capable — which
+// is the honest default for something that implements file tools. Both
+// executors in this repository answer explicitly, so the assumption is never
+// load-bearing for anything shipped here.
+type WorkspaceCapable interface {
+	SupportsWorkspaceWrite() bool
+}
+
+func supportsWorkspaceWrite(executor ToolExecutor) bool {
+	if executor == nil {
+		return false
+	}
+	if capable, ok := executor.(WorkspaceCapable); ok {
+		return capable.SupportsWorkspaceWrite()
+	}
+	return true
+}
+
 type ToolExecutor interface {
 	ValidateAccess(workingDir string, sandbox Sandbox, writableRoots []string) error
 	ExecuteTool(context.Context, ToolRequest) (string, error)
@@ -71,7 +93,14 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 			// replays the conversation it already persisted.
 			Streaming: true, Resume: false, Replay: true, ToolGateway: p.gateway,
 			Cancellation: true, ReadOnly: true,
-			WorkspaceWrite: p.config.ToolExecutor != nil, ToolCalling: p.config.ToolExecutor != nil,
+			// Whether this provider can edit files is the executor's answer,
+			// not the fact that it has one. A gateway executor has tools and
+			// no filesystem, so "an executor exists" advertised workspace-write
+			// to a caller that would then be refused at the turn instead of at
+			// the choice. ToolCalling stays presence-based: a gateway does call
+			// tools.
+			WorkspaceWrite: supportsWorkspaceWrite(p.config.ToolExecutor),
+			ToolCalling:    p.config.ToolExecutor != nil,
 		},
 	}
 }

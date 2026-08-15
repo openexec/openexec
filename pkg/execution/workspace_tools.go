@@ -67,6 +67,10 @@ var _ ToolExecutor = (*WorkspaceToolExecutor)(nil)
 
 func NewWorkspaceToolExecutor() *WorkspaceToolExecutor { return &WorkspaceToolExecutor{} }
 
+// SupportsWorkspaceWrite is true: this executor owns files, and editing them
+// under a granted root is what it is for.
+func (e *WorkspaceToolExecutor) SupportsWorkspaceWrite() bool { return true }
+
 // WorkspaceTools returns the definitions offered to the model for a sandbox
 // mode. Read-only sessions are never shown a writing tool: refusing at
 // dispatch would work, but only after the model has spent a turn proposing
