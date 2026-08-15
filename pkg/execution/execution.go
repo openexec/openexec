@@ -53,6 +53,12 @@ type Request struct {
 	// persisted it. Empty for a provider that resumes its own native session:
 	// that history lives inside the CLI and must not be duplicated here.
 	History []HistoryMessage
+	// ToolGateway is a per-run loopback endpoint offering tools that belong to
+	// the caller rather than to OpenExec — console state a model may read,
+	// which OpenExec has no business implementing and must not approximate
+	// with a shell. Mutually exclusive with the workspace tools: a run either
+	// touches files or asks the console questions, never both.
+	ToolGateway string
 	// NetworkAccess and NativeSessionID keep their meaning.
 	NetworkAccess   bool
 	NativeSessionID string

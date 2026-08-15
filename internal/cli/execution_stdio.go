@@ -67,9 +67,9 @@ var executionStdioCmd = &cobra.Command{
 // resolved from the *project's* configuration and offers a tool set that
 // depends on the sandbox, neither of which is known until the request
 // arrives. CLI providers ignore both arguments.
-func executionProviderFor(directory string, sandbox execution.Sandbox) (execution.Provider, error) {
+func executionProviderFor(ctx context.Context, directory string, sandbox execution.Sandbox, gateway string) (execution.Provider, error) {
 	if executionProviderKind == "api" {
-		return newConfiguredAPIProvider(directory, executionAPIProvider, sandbox)
+		return newConfiguredAPIProvider(ctx, directory, executionAPIProvider, sandbox, gateway)
 	}
 	return execution.NewAgentCLIProvider(execution.AgentCLIConfig{
 		Kind: executionProviderKind, Binary: executionProviderBin, SearchPath: executionSearchPath,
@@ -79,7 +79,7 @@ func executionProviderFor(directory string, sandbox execution.Sandbox) (executio
 // newConfiguredAPIProvider builds an OpenAI-compatible provider from one named
 // entry in the project's execution config. The endpoint lives there and
 // nowhere else — callers name a provider, never a URL.
-func newConfiguredAPIProvider(directory, name string, sandbox execution.Sandbox) (execution.Provider, error) {
+func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandbox execution.Sandbox, gateway string) (execution.Provider, error) {
 	if name == "" {
 		return nil, fmt.Errorf("--api-provider is required with --provider api")
 	}
@@ -134,6 +134,23 @@ func newConfiguredAPIProvider(directory, name string, sandbox execution.Sandbox)
 	if err != nil {
 		return nil, fmt.Errorf("create API provider %q: %w", name, err)
 	}
+	// A run either touches files or asks the caller questions. Both at once
+	// would let a model reach console state and the repository in one turn,
+	// and the reason each boundary is defensible is that it is the only one in
+	// play. Refused here, before the model is contacted, rather than by
+	// whichever executor happened to be asked first.
+	if gateway != "" {
+		if sandbox.Mode != execution.SandboxReadOnly {
+			return nil, fmt.Errorf("a tool gateway run is read-only; %q was requested", sandbox.Mode)
+		}
+		executor, err := execution.NewGatewayToolExecutor(ctx, gateway)
+		if err != nil {
+			return nil, err
+		}
+		return execution.NewAPIProvider(execution.APIProviderConfig{
+			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor,
+		})
+	}
 	// Tools in both modes, filtered by the sandbox: a read-only reviewer that
 	// cannot open a file is useless, and the executor re-checks the mode on
 	// every call, so the filtering is convenience and the enforcement is
@@ -154,7 +171,7 @@ func resolveAPIKeyReference(key string) string {
 	return key
 }
 
-func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(directory string, sandbox execution.Sandbox) (execution.Provider, error)) error {
+func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway string) (execution.Provider, error)) error {
 	decoder := json.NewDecoder(io.LimitReader(input, 1<<20))
 	writer := bufio.NewWriter(output)
 	defer writer.Flush()
@@ -203,7 +220,11 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		}
 		sandbox = request.Request.Sandbox
 	}
-	provider, err := providerFor(directory, sandbox)
+	gateway := ""
+	if request.Request != nil {
+		gateway = request.Request.ToolGateway
+	}
+	provider, err := providerFor(ctx, directory, sandbox, gateway)
 	if err != nil {
 		return err
 	}

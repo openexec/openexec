@@ -25,8 +25,8 @@ func (protocolProvider) Execute(_ context.Context, request execution.Request, si
 	return execution.Result{Outcome: execution.OutcomeSucceeded, FinalText: request.Prompt}, nil
 }
 
-func staticProvider(p execution.Provider) func(string, execution.Sandbox) (execution.Provider, error) {
-	return func(string, execution.Sandbox) (execution.Provider, error) { return p, nil }
+func staticProvider(p execution.Provider) func(context.Context, string, execution.Sandbox, string) (execution.Provider, error) {
+	return func(context.Context, string, execution.Sandbox, string) (execution.Provider, error) { return p, nil }
 }
 
 func TestExecutionProtocolExecute(t *testing.T) {
