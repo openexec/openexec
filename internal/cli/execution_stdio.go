@@ -231,6 +231,13 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	descriptor := provider.Descriptor()
 	switch request.Operation {
 	case "describe":
+		// describe answers for the runtime, execute answers for one provider
+		// instance. A provider built without a gateway cannot serve one and
+		// says so; this binary can build one when asked, and the caller needs
+		// that fact before it has anything to ask with.
+		if executionProviderKind == "api" {
+			descriptor.Capabilities.ToolGateway = true
+		}
 		return write(executionEnvelope{Operation: "describe", Provider: &descriptor})
 	case "probe":
 		readiness := provider.Probe(ctx, request.Directory)

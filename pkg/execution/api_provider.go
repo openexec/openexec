@@ -39,19 +39,28 @@ type APIProviderConfig struct {
 // and roots from the authorized request.
 type APIProvider struct {
 	config APIProviderConfig
+	// gateway reports that this instance's tools come from a caller-owned
+	// endpoint rather than from the filesystem.
+	gateway bool
 }
 
 func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if config.Adapter == nil {
 		return nil, errors.New("API adapter is required")
 	}
+	// Whether this provider can serve a gateway request is a property of the
+	// executor it was built with, not of the type. Advertising it
+	// unconditionally told a direct consumer it had a gateway when it had
+	// filesystem tools — a false capability that ends with workspace tools
+	// answering an administrative question.
+	_, gateway := config.ToolExecutor.(*GatewayToolExecutor)
 	if len(config.Tools) > 0 && config.ToolExecutor == nil {
 		return nil, errors.New("tool executor is required when API tools are configured")
 	}
 	if config.MaxSteps <= 0 {
 		config.MaxSteps = 16
 	}
-	return &APIProvider{config: config}, nil
+	return &APIProvider{config: config, gateway: gateway}, nil
 }
 
 func (p *APIProvider) Descriptor() ProviderDescriptor {
@@ -60,7 +69,7 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 		Capabilities: Capability{
 			// No native session to resume, and no need for one: the caller
 			// replays the conversation it already persisted.
-			Streaming: true, Resume: false, Replay: true, ToolGateway: true,
+			Streaming: true, Resume: false, Replay: true, ToolGateway: p.gateway,
 			Cancellation: true, ReadOnly: true,
 			WorkspaceWrite: p.config.ToolExecutor != nil, ToolCalling: p.config.ToolExecutor != nil,
 		},
@@ -101,6 +110,14 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 	if err := request.ValidateReplay(); err != nil {
 		finish()
 		return result, err
+	}
+	// A request naming a gateway must be served by one. Otherwise the caller
+	// believes it is asking console-owned questions while the model is handed
+	// the filesystem — which is what happens when the field is ignored rather
+	// than refused.
+	if request.ToolGateway != "" && !p.gateway {
+		finish()
+		return result, errors.New("this provider has no tool gateway; the request named one")
 	}
 	if request.NativeSessionID != "" {
 		finish()
