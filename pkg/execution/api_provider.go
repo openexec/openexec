@@ -18,6 +18,8 @@ type ToolRequest struct {
 	WorkingDir    string
 	Sandbox       Sandbox
 	WritableRoots []string
+	// ReadableRoots may be opened but never changed, in every sandbox mode.
+	ReadableRoots []string
 }
 
 type ToolExecutor interface {
@@ -56,7 +58,9 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	return ProviderDescriptor{
 		ID: p.config.Adapter.GetName(), Runtime: "api", Models: p.config.Adapter.GetModels(),
 		Capabilities: Capability{
-			Streaming: true, Cancellation: true, ReadOnly: true,
+			// No native session to resume, and no need for one: the caller
+			// replays the conversation it already persisted.
+			Streaming: true, Resume: false, Replay: true, Cancellation: true, ReadOnly: true,
 			WorkspaceWrite: p.config.ToolExecutor != nil, ToolCalling: p.config.ToolExecutor != nil,
 		},
 	}
@@ -93,6 +97,10 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		finish()
 		return result, err
 	}
+	if err := request.ValidateReplay(); err != nil {
+		finish()
+		return result, err
+	}
 	if request.NativeSessionID != "" {
 		finish()
 		return result, errors.New("API provider does not support native CLI session resume")
@@ -111,9 +119,10 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		finish()
 		return result, err
 	}
-	messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, request.Prompt)}
+	messages := replayMessages(request)
 	if len(p.config.Tools) == 0 {
-		stream, err := p.config.Adapter.Stream(ctx, agent.Request{Model: request.Model, Messages: messages})
+		stream, err := p.config.Adapter.Stream(ctx, agent.Request{
+			Model: request.Model, Messages: messages, System: request.System})
 		if err != nil {
 			finish()
 			_ = sink(Event{Type: EventFailed, Text: err.Error()})
@@ -157,7 +166,8 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			return result, err
 		}
 		response, err := p.config.Adapter.Complete(ctx, agent.Request{
-			Model: request.Model, Messages: messages, Tools: p.config.Tools, ToolChoice: "auto",
+			Model: request.Model, Messages: messages, System: request.System,
+			Tools: p.config.Tools, ToolChoice: "auto",
 		})
 		if err != nil {
 			finish()
@@ -198,7 +208,9 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			}
 			output, toolErr := p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
 				CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
-				WorkingDir: request.WorkingDir, Sandbox: request.Sandbox, WritableRoots: append([]string(nil), request.WritableRoots...),
+				WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
+				WritableRoots: append([]string(nil), request.WritableRoots...),
+				ReadableRoots: append([]string(nil), request.ReadableRoots...),
 			})
 			event.Type, event.Text = EventToolCompleted, output
 			if toolErr != nil {
@@ -215,6 +227,24 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 	err := fmt.Errorf("API tool loop exceeded %d steps", p.config.MaxSteps)
 	_ = sink(Event{Type: EventFailed, Text: err.Error()})
 	return result, err
+}
+
+// replayMessages turns the console's history into the conversation this turn
+// starts from, with the current prompt last.
+//
+// Both paths through Execute build it the same way. They did not have to —
+// the streaming path had no history to add — and that is exactly how a
+// conversation ends up remembering more with tools than without.
+func replayMessages(request Request) []agent.Message {
+	messages := make([]agent.Message, 0, len(request.History)+1)
+	for _, message := range request.History {
+		role := agent.RoleUser
+		if message.Role == HistoryRoleAssistant {
+			role = agent.RoleAssistant
+		}
+		messages = append(messages, agent.NewTextMessage(role, message.Content))
+	}
+	return append(messages, agent.NewTextMessage(agent.RoleUser, request.Prompt))
 }
 
 var _ Provider = (*APIProvider)(nil)

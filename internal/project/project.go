@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // ProjectConfig holds project-specific configuration
@@ -245,6 +246,31 @@ func (e *ExecutionConfig) ActiveAPI() (name, baseURL, apiKey, model string) {
 		return e.APIProvider, e.APIBaseURL, e.APIKey, e.APIModel
 	}
 	return "", "", "", ""
+}
+
+// APIByName resolves one named endpoint directly, without consulting or
+// mutating ActiveProvider.
+//
+// Selection has to be per invocation, not per project: a console that
+// implements on one endpoint and reviews on another runs both at once, and
+// two concurrent runs cannot race over a single field on disk. ActiveAPI
+// remains the answer to "what did the owner select in this checkout"; this is
+// the answer to "run this one, now".
+func (e *ExecutionConfig) APIByName(name string) (ProviderConfig, bool) {
+	entry, ok := e.Providers[name]
+	return entry, ok
+}
+
+// ProviderNames lists the configured endpoint names, sorted. For error
+// messages: a caller that named a provider that is not there needs to see
+// what is.
+func (e *ExecutionConfig) ProviderNames() []string {
+	names := make([]string, 0, len(e.Providers))
+	for name := range e.Providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // IsSymbolIndexingEnabled returns true when the symbol indexer should run.
