@@ -60,7 +60,8 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 		Capabilities: Capability{
 			// No native session to resume, and no need for one: the caller
 			// replays the conversation it already persisted.
-			Streaming: true, Resume: false, Replay: true, Cancellation: true, ReadOnly: true,
+			Streaming: true, Resume: false, Replay: true, ToolGateway: true,
+			Cancellation: true, ReadOnly: true,
 			WorkspaceWrite: p.config.ToolExecutor != nil, ToolCalling: p.config.ToolExecutor != nil,
 		},
 	}

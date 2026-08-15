@@ -170,8 +170,14 @@ type Capability struct {
 	// caller resending the conversation. They are different mechanisms with
 	// different owners, and a provider may have either, both, or neither — so
 	// they are two bits rather than one "multi-turn".
-	Resume         bool `json:"resume"`
-	Replay         bool `json:"replay"`
+	Resume bool `json:"resume"`
+	Replay bool `json:"replay"`
+	// ToolGateway is this runtime's ability to forward tools to a caller-owned
+	// loopback endpoint. Declared because the alternative is what it replaced:
+	// an older binary ignores the field, runs the workspace tools instead, and
+	// the caller learns that the "administrative" turn read its repository
+	// only by reading the transcript afterwards.
+	ToolGateway    bool `json:"tool_gateway"`
 	Cancellation   bool `json:"cancellation"`
 	ReadOnly       bool `json:"read_only"`
 	WorkspaceWrite bool `json:"workspace_write"`
