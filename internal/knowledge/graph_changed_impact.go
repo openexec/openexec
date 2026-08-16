@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"sort"
@@ -133,7 +134,7 @@ func (s *Store) ChangedImpactAnalysis(ctx context.Context, identity RepositoryId
 	for name, grade := range generation.Capabilities {
 		extractors[name] = grade
 	}
-	return ChangedImpactResponse{
+	response := ChangedImpactResponse{
 		Query:      QueryMeta{Type: "changed_impact", Roots: append(append([]string{}, files...), request.SymbolIDs...)},
 		Generation: state,
 		Provenance: ImpactProvenance{
@@ -153,7 +154,41 @@ func (s *Store) ChangedImpactAnalysis(ctx context.Context, identity RepositoryId
 		Unresolved:                append([]string{}, impact.Result.Unresolved...),
 		ValidationRecommendations: append([]ValidationRecommendation{}, impact.Result.ValidationRecommendations...),
 		Resolution:                resolution, Limitations: limitations, Truncated: impact.Truncated || fileExpansionTruncated,
-	}, nil
+	}
+	return boundChangedImpactResponseBytes(response, limits.MaxBytes), nil
+}
+
+func boundChangedImpactResponseBytes(response ChangedImpactResponse, maxBytes int) ChangedImpactResponse {
+	if maxBytes <= 0 {
+		return response
+	}
+	encoded, err := json.Marshal(response)
+	if err != nil || len(encoded) <= maxBytes {
+		return response
+	}
+	response.Truncated = true
+	response.Unresolved = appendUniqueString(response.Unresolved, fmt.Sprintf("changed-impact response exceeded the %d-byte result bound; optional reach was omitted", maxBytes))
+	response.ValidationRecommendations = nil
+	for {
+		encoded, err = json.Marshal(response)
+		if err != nil || len(encoded) <= maxBytes {
+			return response
+		}
+		switch {
+		case len(response.Propagation.AffectedCallers) > 0:
+			response.Propagation.AffectedCallers = response.Propagation.AffectedCallers[:len(response.Propagation.AffectedCallers)-1]
+		case len(response.Propagation.ModuleDependants) > 0:
+			response.Propagation.ModuleDependants = response.Propagation.ModuleDependants[:len(response.Propagation.ModuleDependants)-1]
+		case len(response.Propagation.OperationalEffects) > 0:
+			response.Propagation.OperationalEffects = response.Propagation.OperationalEffects[:len(response.Propagation.OperationalEffects)-1]
+		case len(response.Propagation.RelatedTests) > 0:
+			response.Propagation.RelatedTests = response.Propagation.RelatedTests[:len(response.Propagation.RelatedTests)-1]
+		case len(response.Propagation.DirectCallers) > 0:
+			response.Propagation.DirectCallers = response.Propagation.DirectCallers[:len(response.Propagation.DirectCallers)-1]
+		default:
+			return response
+		}
+	}
 }
 
 func normalizeChangedImpactFiles(files []string) ([]string, error) {
@@ -228,31 +263,55 @@ func (s *Store) symbolIDsForFiles(ctx context.Context, generationID string, file
 	selectedByFile := make(map[string]int, len(files))
 	var symbolIDs []string
 	if limit > 0 {
-		query := `SELECT o.file_path, s.id FROM repository_symbols s
-			JOIN symbol_occurrences o ON o.symbol_id = s.id
-			WHERE o.generation_id = ? AND o.file_path IN (` + filePlaceholders + `)
-			GROUP BY o.file_path, s.id
-			ORDER BY o.file_path, MIN(o.start_line), s.id LIMIT ?`
-		args := append(append([]any{}, baseArgs...), limit)
-		rows, queryErr := s.db.QueryContext(ctx, query, args...)
-		if queryErr != nil {
-			return nil, nil, false, queryErr
+		// Allocate in rounds so filename order cannot let one large file consume
+		// the batch before later changed files contribute any anchors.
+		allocations := make(map[string]int, len(files))
+		remaining := limit
+		for remaining > 0 {
+			progressed := false
+			for _, file := range files {
+				if remaining == 0 {
+					break
+				}
+				if allocations[file] >= totals[file] {
+					continue
+				}
+				allocations[file]++
+				remaining--
+				progressed = true
+			}
+			if !progressed {
+				break
+			}
 		}
-		for rows.Next() {
-			var file, symbolID string
-			if err := rows.Scan(&file, &symbolID); err != nil {
+		for _, file := range files {
+			allocation := allocations[file]
+			if allocation == 0 {
+				continue
+			}
+			rows, queryErr := s.db.QueryContext(ctx, `SELECT s.id FROM repository_symbols s
+				JOIN symbol_occurrences o ON o.symbol_id = s.id
+				WHERE o.generation_id = ? AND o.file_path = ?
+				GROUP BY s.id ORDER BY MIN(o.start_line), s.id LIMIT ?`, generationID, file, allocation)
+			if queryErr != nil {
+				return nil, nil, false, queryErr
+			}
+			for rows.Next() {
+				var symbolID string
+				if err := rows.Scan(&symbolID); err != nil {
+					rows.Close()
+					return nil, nil, false, err
+				}
+				selectedByFile[file]++
+				symbolIDs = append(symbolIDs, symbolID)
+			}
+			if err := rows.Err(); err != nil {
 				rows.Close()
 				return nil, nil, false, err
 			}
-			selectedByFile[file]++
-			symbolIDs = append(symbolIDs, symbolID)
-		}
-		if err := rows.Err(); err != nil {
-			rows.Close()
-			return nil, nil, false, err
-		}
-		if err := rows.Close(); err != nil {
-			return nil, nil, false, err
+			if err := rows.Close(); err != nil {
+				return nil, nil, false, err
+			}
 		}
 	}
 

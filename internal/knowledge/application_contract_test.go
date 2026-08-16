@@ -36,8 +36,9 @@ func load(settings Settings) bool { return settings.Enabled }
 export function TaskBoard() { return api('/api/settings', { method: 'POST' }) }
 `)
 	writeTestFile(t, root, "ui/src/api/client.ts", "export function api(path: string, init?: unknown) { return { path, init } }\n")
-	writeTestFile(t, root, "ui/e2e/surfaces.json", `{"surfaces":[{"id":"tasks","owner":"task.spec.ts","sources":["ui/src/TaskBoard.tsx"],"states":["ready"]}]}`)
+	writeTestFile(t, root, "ui/e2e/surfaces.json", `{"surfaces":[{"id":"tasks","owner":"task.spec.ts","sources":["ui/src/TaskBoard.tsx"],"states":["ready"]},{"id":"tasks-compact","owner":"task-compact.spec.ts","sources":["ui/src/TaskBoard.tsx"],"states":["ready"]}]}`)
 	writeTestFile(t, root, "ui/e2e/task.spec.ts", "export const taskJourney = 'tasks'\n")
+	writeTestFile(t, root, "ui/e2e/task-compact.spec.ts", "export const compactTaskJourney = 'tasks-compact'\n")
 
 	store, err := NewStore(root)
 	if err != nil {
@@ -81,6 +82,23 @@ export function TaskBoard() { return api('/api/settings', { method: 'POST' }) }
 	}
 	if !relatedTestExists(handlerImpact.Result.RelatedTests, "ui/e2e/task.spec.ts") {
 		t.Fatalf("component did not reach registered browser journey: %#v", handlerImpact.Result.RelatedTests)
+	}
+	tightLimits := DefaultChangedImpactLimits()
+	tightLimits.MaxNodes = 1
+	boundedImpact, err := store.ImpactAnalysis(t.Context(), identity, []string{handler.Symbol.ID}, 2, tightLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boundedImpact.Result.OperationalEffects) > 1 || !containsString(boundedImpact.Result.Unresolved, "effect bound was exhausted") {
+		t.Fatalf("operational effects escaped the node bound: %#v", boundedImpact)
+	}
+	taskBoard := requireGraphSymbol(t, store, identity, "TaskBoard", "function")
+	boundedTests, err := store.ImpactAnalysis(t.Context(), identity, []string{taskBoard.Symbol.ID}, 1, tightLimits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boundedTests.Result.RelatedTests) > 1 || !containsString(boundedTests.Result.Unresolved, "related-evidence bound was exhausted") {
+		t.Fatalf("related tests escaped the node bound: %#v", boundedTests)
 	}
 
 	field := requireGraphSymbol(t, store, identity, "Enabled", "persisted_field")
@@ -297,6 +315,24 @@ func TestMalformedOpenAPIIsScopedInsteadOfMakingAllImpactUnavailable(t *testing.
 	live := requireGraphSymbol(t, store, identity, "Live", "function")
 	if _, err := store.ImpactAnalysis(t.Context(), identity, []string{live.Symbol.ID}, 1, DefaultChangedImpactLimits()); err != nil {
 		t.Fatalf("scoped contract parse failure refused unrelated source impact: %v", err)
+	}
+}
+
+func TestContractDerivationDoesNotDropUnreadableGraphFile(t *testing.T) {
+	files := []ExtractedFile{{
+		Path:     "missing.go",
+		Language: "go",
+		Symbols:  []ExtractedSymbol{{Name: "StillKnown", Kind: "function"}},
+	}}
+	derived, limitations, err := deriveApplicationContracts(t.TempDir(), files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(derived) != 1 || derived[0].Path != "missing.go" || len(derived[0].Symbols) != 1 {
+		t.Fatalf("unreadable file was silently removed: %#v", derived)
+	}
+	if !containsString(limitations, "could not read missing.go") {
+		t.Fatalf("unreadable file was not named as a limitation: %#v", limitations)
 	}
 }
 

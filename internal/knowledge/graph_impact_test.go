@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -171,6 +172,44 @@ func TestImpactDeduplicationKeepsShortestExplanation(t *testing.T) {
 	}
 }
 
+func TestImpactResponseByteBoundDropsOptionalReachWithHonesty(t *testing.T) {
+	largePath := []ImpactPath{{FromNodeID: strings.Repeat("from", 80), EdgeID: "edge", EdgeType: "calls", ToNodeID: "to", Reason: strings.Repeat("reason", 100)}}
+	envelope := QueryEnvelope[ImpactResult]{
+		Result: ImpactResult{
+			Changed:         []GraphSymbol{{ID: "changed", DisplayName: "Changed"}},
+			AffectedCallers: []ImpactNode{{Node: GraphNode{ID: "consumer", QualifiedName: "consumer"}, Path: largePath}},
+			ValidationRecommendations: []ValidationRecommendation{{
+				Criterion: "consumer tests pass", GraphPaths: largePath,
+			}},
+		},
+	}
+	bounded := boundImpactEnvelopeBytes(envelope, 700)
+	encoded, err := json.Marshal(bounded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) > 700 || !bounded.Truncated || !containsText(bounded.Result.Unresolved, "byte result bound") {
+		t.Fatalf("byte bound was not enforced honestly: bytes=%d envelope=%#v", len(encoded), bounded)
+	}
+	if len(bounded.Result.ValidationRecommendations) != 0 {
+		t.Fatal("a recommendation survived after its evidence was byte-truncated")
+	}
+	changed := boundChangedImpactResponseBytes(ChangedImpactResponse{
+		ChangedSymbols: []GraphSymbol{{ID: "changed", DisplayName: "Changed"}},
+		Propagation:    ImpactPropagation{AffectedCallers: envelope.Result.AffectedCallers},
+		ValidationRecommendations: []ValidationRecommendation{{
+			Criterion: "consumer tests pass", GraphPaths: largePath,
+		}},
+	}, 1000)
+	encoded, err = json.Marshal(changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) > 1000 || !changed.Truncated || !containsText(changed.Unresolved, "byte result bound") || len(changed.ValidationRecommendations) != 0 {
+		t.Fatalf("changed-impact byte bound was not enforced honestly: bytes=%d response=%#v", len(encoded), changed)
+	}
+}
+
 func TestChangedImpactAnalysisEnumeratesTraversalBounds(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
@@ -247,6 +286,52 @@ func TestChangedImpactAnalysisBoundsFileExpansionWithoutRefusingResult(t *testin
 	}
 	if !containsText(result.UnresolvedFiles, "selected 200 of 205 symbols") || !containsText(result.Limitations, "file-granularity over-approximation") {
 		t.Fatalf("file expansion honesty signals missing: %#v", result)
+	}
+}
+
+func TestChangedImpactFileExpansionSharesBudgetAcrossFiles(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	for _, file := range []string{"a.go", "b.go", "z.go"} {
+		var source strings.Builder
+		source.WriteString("package sample\n")
+		for index := 0; index < 5; index++ {
+			source.WriteString("func " + strings.TrimSuffix(file, ".go") + strconv.Itoa(index) + "() {}\n")
+		}
+		writeTestFile(t, root, file, source.String())
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	scan, err := store.ScanRepository(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ids, unresolved, truncated, err := store.symbolIDsForFiles(ctx, scan.Generation.ID, []string{"a.go", "b.go", "z.go"}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 3 || !truncated || len(unresolved) != 3 {
+		t.Fatalf("fair expansion = ids=%d truncated=%v unresolved=%#v", len(ids), truncated, unresolved)
+	}
+	selectedFiles := map[string]bool{}
+	for _, id := range ids {
+		var file string
+		if err := store.db.QueryRowContext(ctx, `SELECT file_path FROM symbol_occurrences WHERE generation_id = ? AND symbol_id = ? LIMIT 1`, scan.Generation.ID, id).Scan(&file); err != nil {
+			t.Fatal(err)
+		}
+		selectedFiles[file] = true
+	}
+	for _, file := range []string{"a.go", "b.go", "z.go"} {
+		if !selectedFiles[file] {
+			t.Fatalf("%s contributed no symbol: %#v", file, selectedFiles)
+		}
 	}
 }
 

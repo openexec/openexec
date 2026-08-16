@@ -18,10 +18,11 @@ type openAPIDocument struct {
 
 type surfaceManifest struct {
 	Surfaces []struct {
-		ID      string   `json:"id"`
-		Owner   string   `json:"owner"`
-		Sources []string `json:"sources"`
-		States  []string `json:"states"`
+		ID           string   `json:"id"`
+		Owner        string   `json:"owner"`
+		Sources      []string `json:"sources"`
+		SourceReason string   `json:"sourceReason"`
+		States       []string `json:"states"`
 	} `json:"surfaces"`
 }
 
@@ -177,19 +178,7 @@ type contractDeclaration struct {
 }
 
 func deriveApplicationContracts(root string, files []ExtractedFile) ([]ExtractedFile, []string, error) {
-	contents := make(map[string][]byte, len(files))
-	readable := make([]ExtractedFile, 0, len(files))
 	var limitations []string
-	for _, file := range files {
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.Path)))
-		if err != nil {
-			limitations = appendUniqueString(limitations, fmt.Sprintf("application contract derivation could not read %s: %v", file.Path, err))
-			continue
-		}
-		contents[file.Path] = data
-		readable = append(readable, file)
-	}
-	files = readable
 	byPath := make(map[string]int, len(files))
 	declarations := make(map[string][]contractDeclaration)
 	operations := make(map[string]contractDeclaration)
@@ -212,8 +201,11 @@ func deriveApplicationContracts(root string, files []ExtractedFile) ([]Extracted
 	generatedContractSeen := false
 	for index := range files {
 		file := &files[index]
-		data := contents[file.Path]
 		if file.Language == "go" {
+			data, ok := readApplicationContractInput(root, file.Path, &limitations)
+			if !ok {
+				continue
+			}
 			routes, unsupported := extractGoHTTPRoutes(data)
 			if unsupported {
 				limitations = appendUniqueString(limitations, "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved")
@@ -236,13 +228,17 @@ func deriveApplicationContracts(root string, files []ExtractedFile) ([]Extracted
 				})
 				routeHandlers[httpOperationKey(route.method, route.path)] = handler
 			}
+			file.Effects = append(file.Effects, extractOperationalEffects(data)...)
 		}
 	}
 
 	for index := range files {
 		file := &files[index]
-		data := contents[file.Path]
 		if file.Language == "typescript" || file.Language == "javascript" || file.Language == "svelte" {
+			data, ok := readApplicationContractInput(root, file.Path, &limitations)
+			if !ok {
+				continue
+			}
 			calls, dynamic := extractAPIClientCalls(data)
 			if dynamic {
 				limitations = appendUniqueString(limitations, "dynamically constructed HTTP client paths remain unresolved")
@@ -266,15 +262,17 @@ func deriveApplicationContracts(root string, files []ExtractedFile) ([]Extracted
 				}
 			}
 		}
-
-		file.Effects = append(file.Effects, extractOperationalEffects(data)...)
 	}
 
 	for index := range files {
 		file := &files[index]
 		base := strings.ToLower(filepath.Base(file.Path))
 		if base == "surfaces.json" || base == "usability-manifest.json" {
-			manifestRelations, manifestReferences, unresolved, err := deriveSurfaceManifest(contents[file.Path], file.Path, byPath)
+			data, ok := readApplicationContractInput(root, file.Path, &limitations)
+			if !ok {
+				continue
+			}
+			manifestRelations, manifestReferences, unresolved, err := deriveSurfaceManifest(data, file.Path, byPath)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -288,7 +286,11 @@ func deriveApplicationContracts(root string, files []ExtractedFile) ([]Extracted
 			}
 		}
 		if base == "package.json" {
-			relations, err := deriveGeneratedArtifacts(contents[file.Path], file.Path, byPath)
+			data, ok := readApplicationContractInput(root, file.Path, &limitations)
+			if !ok {
+				continue
+			}
+			relations, err := deriveGeneratedArtifacts(data, file.Path, byPath)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -300,6 +302,15 @@ func deriveApplicationContracts(root string, files []ExtractedFile) ([]Extracted
 		limitations = appendUniqueString(limitations, "cross-repository generated-package consumers require a portfolio graph and remain unresolved in a single-checkout scan")
 	}
 	return files, limitations, nil
+}
+
+func readApplicationContractInput(root, path string, limitations *[]string) ([]byte, bool) {
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+	if err != nil {
+		*limitations = appendUniqueString(*limitations, fmt.Sprintf("application contract derivation could not read %s: %v", path, err))
+		return nil, false
+	}
+	return data, true
 }
 
 type goHTTPRoute struct{ method, path, handler string }
@@ -433,16 +444,6 @@ func isHTTPMethod(value string) bool {
 	return false
 }
 
-func uniqueDeclaration(candidates []contractDeclaration, kind string) (contractDeclaration, bool) {
-	var found []contractDeclaration
-	for _, candidate := range candidates {
-		if kind == "" || candidate.kind == kind {
-			found = append(found, candidate)
-		}
-	}
-	return firstOrZero(found), len(found) == 1
-}
-
 func uniqueHandlerDeclaration(candidates []contractDeclaration, routeFile string) (contractDeclaration, bool) {
 	var handlers []contractDeclaration
 	for _, candidate := range candidates {
@@ -470,14 +471,26 @@ func deriveSurfaceManifest(data []byte, manifestPath string, byPath map[string]i
 	references := make(map[string][]ExtractedReference)
 	unresolved := false
 	for _, surface := range manifest.Surfaces {
-		owner := filepath.ToSlash(filepath.Clean(filepath.Join(base, surface.Owner)))
-		if _, exists := byPath[owner]; !exists || len(surface.Sources) == 0 {
+		owner := filepath.ToSlash(filepath.Clean(surface.Owner))
+		if _, exists := byPath[owner]; !exists {
+			// Existing manifests historically made owner relative to their own
+			// directory. Prefer the documented repository-root base, but retain
+			// that format as a compatibility fallback.
+			owner = filepath.ToSlash(filepath.Clean(filepath.Join(base, surface.Owner)))
+		}
+		if _, exists := byPath[owner]; !exists {
 			unresolved = true
 			continue
 		}
 		references[owner] = append(references[owner], ExtractedReference{
 			TargetName: surface.ID, TargetPath: manifestPath, EdgeType: "exercises_surface", Resolution: ResolutionConfigurationDerived,
 		})
+		if len(surface.Sources) == 0 {
+			if strings.TrimSpace(surface.SourceReason) == "" {
+				unresolved = true
+			}
+			continue
+		}
 		for _, source := range surface.Sources {
 			source = filepath.ToSlash(filepath.Clean(source))
 			if _, sourceExists := byPath[source]; !sourceExists {

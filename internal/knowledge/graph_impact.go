@@ -3,6 +3,7 @@ package knowledge
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sort"
 )
@@ -92,6 +93,14 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 	tests := map[string]RelatedTest{}
 	methods := []ResolutionStatus{}
 	truncated := false
+	keepBoundedTest := func(candidate RelatedTest, scope string) {
+		if _, exists := tests[candidate.FilePath]; !exists && len(tests) >= limits.MaxNodes {
+			truncated = true
+			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("%s incomplete; the %d-node related-evidence bound was exhausted", scope, limits.MaxNodes))
+			return
+		}
+		keepShortestTest(tests, candidate)
+	}
 	collectEffects := func(origin GraphNode, affectedPath []ImpactPath) error {
 		edges, edgeLimitReached, err := s.loadOutgoingImpactEdges(ctx, generation.ID, origin.ID, []string{"has_operational_effect"}, limits.MaxEdges)
 		if err != nil {
@@ -102,6 +111,11 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("operational effects for %s exceeded the %d-edge adjacency bound", origin.ID, limits.MaxEdges))
 		}
 		for _, edge := range edges {
+			if _, exists := effects[edge.ToNodeID]; !exists && len(effects) >= limits.MaxNodes {
+				truncated = true
+				result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("operational effects incomplete; the %d-node effect bound was exhausted", limits.MaxNodes))
+				continue
+			}
 			node, err := s.loadGraphNode(ctx, generation.ID, edge.ToNodeID)
 			if err != nil {
 				return err
@@ -133,7 +147,7 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 				return err
 			}
 			step := ImpactPath{FromNodeID: edge.FromNodeID, EdgeID: edge.ID, EdgeType: edge.Type, ToNodeID: edge.ToNodeID, Reason: node.QualifiedName + " is registered evidence for affected consumer " + origin.QualifiedName}
-			keepShortestTest(tests, RelatedTest{FilePath: node.QualifiedName, Reason: "registered browser or unit fixture for an affected consumer", Path: append(append([]ImpactPath{}, affectedPath...), step)})
+			keepBoundedTest(RelatedTest{FilePath: node.QualifiedName, Reason: "registered browser or unit fixture for an affected consumer", Path: append(append([]ImpactPath{}, affectedPath...), step)}, "registered browser/unit evidence")
 			methods = append(methods, edge.Resolution)
 		}
 		return nil
@@ -201,7 +215,7 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 						return QueryEnvelope[ImpactResult]{}, err
 					}
 					if isTestFile(edge.SourceFilePath) {
-						keepShortestTest(tests, RelatedTest{FilePath: edge.SourceFilePath, Reason: "test references a changed or affected symbol", Path: impact.Path})
+						keepBoundedTest(RelatedTest{FilePath: edge.SourceFilePath, Reason: "test references a changed or affected symbol", Path: impact.Path}, "call/reference test evidence")
 					}
 				}
 			}
@@ -247,7 +261,7 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 					next = append(next, impact)
 					methods = append(methods, edge.Resolution)
 					if isTestFile(node.QualifiedName) {
-						keepShortestTest(tests, RelatedTest{FilePath: node.QualifiedName, Reason: "test module imports an affected module", Path: impact.Path})
+						keepBoundedTest(RelatedTest{FilePath: node.QualifiedName, Reason: "test module imports an affected module", Path: impact.Path}, "module test evidence")
 					}
 				}
 			}
@@ -270,7 +284,7 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 				return QueryEnvelope[ImpactResult]{}, err
 			}
 			path := ImpactPath{FromNodeID: edge.FromNodeID, EdgeID: edge.ID, EdgeType: edge.Type, ToNodeID: edge.ToNodeID, Reason: node.QualifiedName + " is structurally related to changed module " + moduleNode.QualifiedName}
-			keepShortestTest(tests, RelatedTest{FilePath: node.QualifiedName, Reason: "structural test relationship; not behavioral proof", Path: []ImpactPath{path}})
+			keepBoundedTest(RelatedTest{FilePath: node.QualifiedName, Reason: "structural test relationship; not behavioral proof", Path: []ImpactPath{path}}, "structural test evidence")
 			methods = append(methods, edge.Resolution)
 		}
 	}
@@ -312,11 +326,49 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 		}
 		result.ValidationRecommendations = append(result.ValidationRecommendations, ValidationRecommendation{Criterion: "Structurally related tests for changed symbols pass", Scope: "related_tests", TestFiles: files, GraphPaths: paths, Limitations: []string{"test relationship selects candidates but does not prove behavioral coverage"}})
 	}
-	return QueryEnvelope[ImpactResult]{
+	envelope := QueryEnvelope[ImpactResult]{
 		Query: QueryMeta{Type: "impact_analysis", Roots: symbolIDs}, Generation: state,
 		Result: result, Resolution: ResolutionMeta{Status: "bounded", Methods: uniqueMethods(methods)},
 		Limitations: generation.Limitations, Truncated: truncated,
-	}, nil
+	}
+	return boundImpactEnvelopeBytes(envelope, limits.MaxBytes), nil
+}
+
+func boundImpactEnvelopeBytes(envelope QueryEnvelope[ImpactResult], maxBytes int) QueryEnvelope[ImpactResult] {
+	if maxBytes <= 0 {
+		return envelope
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil || len(encoded) <= maxBytes {
+		return envelope
+	}
+	envelope.Truncated = true
+	envelope.Result.Unresolved = appendUniqueString(envelope.Result.Unresolved, fmt.Sprintf("impact response exceeded the %d-byte result bound; optional reach was omitted", maxBytes))
+	// Recommendations duplicate the related-test paths and cannot remain an
+	// acceptance gate once the underlying impact answer has been byte-truncated.
+	envelope.Result.ValidationRecommendations = nil
+	for {
+		encoded, err = json.Marshal(envelope)
+		if err != nil || len(encoded) <= maxBytes {
+			return envelope
+		}
+		switch {
+		case len(envelope.Result.AffectedCallers) > 0:
+			envelope.Result.AffectedCallers = envelope.Result.AffectedCallers[:len(envelope.Result.AffectedCallers)-1]
+		case len(envelope.Result.ModuleDependants) > 0:
+			envelope.Result.ModuleDependants = envelope.Result.ModuleDependants[:len(envelope.Result.ModuleDependants)-1]
+		case len(envelope.Result.OperationalEffects) > 0:
+			envelope.Result.OperationalEffects = envelope.Result.OperationalEffects[:len(envelope.Result.OperationalEffects)-1]
+		case len(envelope.Result.RelatedTests) > 0:
+			envelope.Result.RelatedTests = envelope.Result.RelatedTests[:len(envelope.Result.RelatedTests)-1]
+		case len(envelope.Result.DirectCallers) > 0:
+			envelope.Result.DirectCallers = envelope.Result.DirectCallers[:len(envelope.Result.DirectCallers)-1]
+		default:
+			// Changed roots and honesty metadata are irreducible. Request bounds
+			// keep this residual well below the proxy ceiling in normal operation.
+			return envelope
+		}
+	}
 }
 
 func keepShortestImpact(target map[string]ImpactNode, candidate ImpactNode) {
