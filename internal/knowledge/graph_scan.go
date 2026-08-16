@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -48,11 +49,31 @@ type ExtractedImport struct {
 }
 
 type ExtractedReference struct {
-	TargetName string
+	SourceName          string
+	SourcePath          string
+	TargetName          string
+	TargetPath          string
+	TargetStartByte     int
+	TargetPositionKnown bool
+	StartByte           int
+	EndByte             int
+	EdgeType            string
+	Resolution          ResolutionStatus
+}
+
+type ExtractedModuleRelation struct {
+	FromPath   string
 	TargetPath string
+	EdgeType   string
+	Resolution ResolutionStatus
+	Metadata   map[string]string
+}
+
+type ExtractedEffect struct {
+	Kind       string
+	Evidence   string
 	StartByte  int
 	EndByte    int
-	EdgeType   string
 	Resolution ResolutionStatus
 }
 
@@ -63,6 +84,8 @@ type ExtractedFile struct {
 	Symbols     []ExtractedSymbol
 	Imports     []ExtractedImport
 	References  []ExtractedReference
+	Relations   []ExtractedModuleRelation
+	Effects     []ExtractedEffect
 	Limitations []string
 }
 
@@ -248,7 +271,7 @@ func finishScanManifest(inputs []ScanInput) ScanManifest {
 		line := strings.Join([]string{input.FilePath, input.InputKind, strconv.FormatInt(input.Size, 10), input.ContentHash, input.SymlinkTarget}, "\x00")
 		_, _ = manifestHasher.Write([]byte(line))
 		_, _ = manifestHasher.Write([]byte{'\n'})
-		if input.InputKind == "configuration" {
+		if input.InputKind == "configuration" || input.InputKind == "contract" || input.InputKind == "test_manifest" {
 			_, _ = configHasher.Write([]byte(line))
 			_, _ = configHasher.Write([]byte{'\n'})
 		}
@@ -264,6 +287,12 @@ func graphInputKind(rel string) (string, bool) {
 	switch ext {
 	case ".go", ".ts", ".tsx", ".js", ".jsx", ".svelte", ".py":
 		return "source", true
+	}
+	if base == "openapi.yaml" || base == "openapi.yml" {
+		return "contract", true
+	}
+	if base == "surfaces.json" || base == "usability-manifest.json" || strings.HasSuffix(base, ".schema.json") {
+		return "test_manifest", true
 	}
 	if base == "go.mod" || base == "go.sum" || base == "go.work" || base == "go.work.sum" || base == "package.json" || base == "package-lock.json" || base == "pnpm-lock.yaml" || base == "yarn.lock" || (strings.HasPrefix(base, "tsconfig") && strings.HasSuffix(base, ".json")) {
 		return "configuration", true
@@ -305,6 +334,8 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 		"typescript.definitions": "pending", "typescript.imports": "pending", "typescript.exports": "pending",
 		"svelte.definitions": "static_lexical", "svelte.imports": "static_lexical", "svelte.routes": "configuration_derived",
 		"python.definitions": "static_lexical", "python.imports": "static_lexical", "python.calls": "heuristic",
+		"contracts.openapi": "configuration_derived", "contracts.persistence": "compiler_exact", "contracts.ui_surfaces": "configuration_derived",
+		"effects.static": "static_lexical",
 	}
 	var limitations []string
 	// A cancelled or crashed scan must not leave generations parked in
@@ -322,6 +353,12 @@ func (s *Store) scanRepository(ctx context.Context, root string, beforeRevalidat
 		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
 		return ScanResult{}, err
 	}
+	files, contractLimitations, err := deriveApplicationContracts(identity.RootPath, files)
+	if err != nil {
+		_ = s.failGenerationAfterError(ctx, generation.ID, GraphFailed, err.Error())
+		return ScanResult{}, err
+	}
+	extractionLimitations = append(extractionLimitations, contractLimitations...)
 	capabilities["go.calls"] = goMethod
 	capabilities["typescript.definitions"] = tsMethod
 	capabilities["typescript.imports"] = tsMethod
@@ -421,7 +458,7 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 	incomplete := false
 	seenLimitations := map[string]bool{}
 	for _, input := range manifest.Inputs {
-		if input.InputKind != "source" {
+		if input.InputKind != "source" && input.InputKind != "contract" && input.InputKind != "test_manifest" && !(input.InputKind == "configuration" && filepath.Base(input.FilePath) == "package.json") {
 			continue
 		}
 		path := filepath.Join(root, filepath.FromSlash(input.FilePath))
@@ -449,10 +486,17 @@ func extractManifestFiles(ctx context.Context, root string, manifest ScanManifes
 			} else {
 				extracted, err = extractTypeScriptLexical(path, input.FilePath)
 			}
+		case ".yaml", ".yml", ".json":
+			extracted, err = extractApplicationContractFile(path, input.FilePath)
 		}
 		if err != nil {
 			limitations = append(limitations, fmt.Sprintf("%s: %v", input.FilePath, err))
-			incomplete = true
+			// A malformed contract is a scoped blind spot, not evidence that the
+			// source graph itself is incomplete. Impact keeps working and carries
+			// this limitation instead of refusing every query in the repository.
+			if input.InputKind != "contract" {
+				incomplete = true
+			}
 			continue
 		}
 		for _, limitation := range extracted.Limitations {
@@ -498,6 +542,27 @@ func extractGoFile(path, rel string) (ExtractedFile, error) {
 						kind = "interface"
 					}
 					result.Symbols = append(result.Symbols, ExtractedSymbol{Name: typed.Name.Name, Kind: kind, Signature: "type " + typed.Name.Name, StartLine: fset.Position(typed.Pos()).Line, EndLine: fset.Position(typed.End()).Line, StartByte: fset.Position(typed.Pos()).Offset, EndByte: fset.Position(typed.End()).Offset, Exported: ast.IsExported(typed.Name.Name), Resolution: ResolutionASTExact})
+					if structure, ok := typed.Type.(*ast.StructType); ok {
+						for _, field := range structure.Fields.List {
+							if field.Tag == nil || len(field.Names) == 0 {
+								continue
+							}
+							tag, _ := strconv.Unquote(field.Tag.Value)
+							jsonName := strings.Split(reflect.StructTag(tag).Get("json"), ",")[0]
+							if jsonName == "" || jsonName == "-" {
+								continue
+							}
+							for _, name := range field.Names {
+								result.Symbols = append(result.Symbols, ExtractedSymbol{
+									Name: name.Name, Kind: "persisted_field", Parent: typed.Name.Name,
+									Signature: name.Name + " json:\"" + jsonName + "\"",
+									StartLine: fset.Position(name.Pos()).Line, EndLine: fset.Position(field.End()).Line,
+									StartByte: fset.Position(name.Pos()).Offset, EndByte: fset.Position(field.End()).Offset,
+									Exported: ast.IsExported(name.Name), Resolution: ResolutionASTExact,
+								})
+							}
+						}
+					}
 				case *ast.ValueSpec:
 					for _, name := range typed.Names {
 						kind := "variable"
@@ -760,6 +825,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 		nodeID string
 		file   string
 		name   string
+		kind   string
 		start  int
 		end    int
 	}
@@ -816,7 +882,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 					edgeCount++
 				}
 			}
-			stored := storedSymbol{nodeID: nodeID, file: file.Path, name: extracted.Name, start: extracted.StartByte, end: extracted.EndByte}
+			stored := storedSymbol{nodeID: nodeID, file: file.Path, name: extracted.Name, kind: extracted.Kind, start: extracted.StartByte, end: extracted.EndByte}
 			symbolsByName[file.Language+"\x00"+extracted.Name] = append(symbolsByName[file.Language+"\x00"+extracted.Name], stored)
 			symbolsByFileName[file.Path+"\x00"+extracted.Name] = append(symbolsByFileName[file.Path+"\x00"+extracted.Name], stored)
 			symbolsByFile[file.Path] = append(symbolsByFile[file.Path], stored)
@@ -889,6 +955,15 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				// as Python query() from linking to an unrelated TypeScript query().
 				candidates = symbolsByName[file.Language+"\x00"+reference.TargetName]
 			}
+			if reference.TargetPositionKnown {
+				positioned := make([]storedSymbol, 0, len(candidates))
+				for _, candidate := range candidates {
+					if candidate.start <= reference.TargetStartByte && reference.TargetStartByte < candidate.end {
+						positioned = append(positioned, candidate)
+					}
+				}
+				candidates = positioned
+			}
 			// One name, several symbols: which one this use meant is unknown.
 			// Dropping it made every candidate look unreferenced, which is how
 			// a repository where Store, New and Config recur across packages
@@ -901,10 +976,21 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 			}
 			from := moduleNodes[file.Path]
 			bestWidth := int(^uint(0) >> 1)
-			for _, origin := range symbolsByFile[file.Path] {
-				if origin.start <= reference.StartByte && reference.StartByte < origin.end && origin.end-origin.start < bestWidth {
-					from = origin.nodeID
-					bestWidth = origin.end - origin.start
+			if reference.SourceName != "" {
+				sourcePath := reference.SourcePath
+				if sourcePath == "" {
+					sourcePath = file.Path
+				}
+				origins := symbolsByFileName[sourcePath+"\x00"+reference.SourceName]
+				if len(origins) == 1 {
+					from = origins[0].nodeID
+				}
+			} else {
+				for _, origin := range symbolsByFile[file.Path] {
+					if origin.start <= reference.StartByte && reference.StartByte < origin.end && origin.end-origin.start < bestWidth {
+						from = origin.nodeID
+						bestWidth = origin.end - origin.start
+					}
 				}
 			}
 			edgeType := reference.EdgeType
@@ -916,13 +1002,63 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				resolution = ResolutionAmbiguous
 			}
 			for _, candidate := range candidates {
-				inserted, err := insertEdge(ctx, tx, generation.ID, from, candidate.nodeID, edgeType, resolution, file.Path, reference.StartByte, reference.EndByte, map[string]string{"target_name": reference.TargetName})
+				candidateEdgeType := edgeType
+				if candidate.kind == "persisted_field" {
+					candidateEdgeType = "uses_persisted_field"
+				}
+				metadata := map[string]string{"target_name": reference.TargetName, "source_name": reference.SourceName, "source_path": reference.SourcePath}
+				if reference.TargetPositionKnown {
+					metadata["target_start_byte"] = strconv.Itoa(reference.TargetStartByte)
+				}
+				inserted, err := insertEdge(ctx, tx, generation.ID, from, candidate.nodeID, candidateEdgeType, resolution, file.Path, reference.StartByte, reference.EndByte, metadata)
 				if err != nil {
 					return 0, 0, 0, err
 				}
 				if inserted {
 					edgeCount++
 				}
+			}
+		}
+	}
+	for _, file := range files {
+		for _, relation := range file.Relations {
+			fromPath := relation.FromPath
+			if fromPath == "" {
+				fromPath = file.Path
+			}
+			from, to := moduleNodes[fromPath], moduleNodes[relation.TargetPath]
+			if from == "" || to == "" {
+				continue
+			}
+			inserted, err := insertEdge(ctx, tx, generation.ID, from, to, relation.EdgeType, relation.Resolution, file.Path, 0, 0, relation.Metadata)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+			if inserted {
+				edgeCount++
+			}
+		}
+		for _, effect := range file.Effects {
+			from := moduleNodes[file.Path]
+			bestWidth := int(^uint(0) >> 1)
+			originName := file.Path
+			for _, origin := range symbolsByFile[file.Path] {
+				if origin.start <= effect.StartByte && effect.StartByte < origin.end && origin.end-origin.start < bestWidth {
+					from = origin.nodeID
+					originName = origin.name
+					bestWidth = origin.end - origin.start
+				}
+			}
+			to := stableID("node", generation.ID, "operational_effect", from, effect.Kind)
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO graph_nodes (id, generation_id, repository_id, node_type, display_name, qualified_name, metadata) VALUES (?, ?, ?, 'operational_effect', ?, ?, ?)`, to, generation.ID, identity.RepositoryID, effect.Kind, file.Path+":"+originName+" -> "+effect.Kind, jsonText(map[string]string{"effect": effect.Kind, "evidence": effect.Evidence}, "{}")); err != nil {
+				return 0, 0, 0, err
+			}
+			inserted, err := insertEdge(ctx, tx, generation.ID, from, to, "has_operational_effect", effect.Resolution, file.Path, effect.StartByte, effect.EndByte, map[string]string{"effect": effect.Kind, "evidence": effect.Evidence})
+			if err != nil {
+				return 0, 0, 0, err
+			}
+			if inserted {
+				edgeCount++
 			}
 		}
 	}

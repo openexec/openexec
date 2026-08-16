@@ -25,6 +25,10 @@ func (protocolProvider) Execute(_ context.Context, request execution.Request, si
 	return execution.Result{Outcome: execution.OutcomeSucceeded, FinalText: request.Prompt}, nil
 }
 
+func staticProvider(p execution.Provider) func(context.Context, string, execution.Sandbox, string) (execution.Provider, error) {
+	return func(context.Context, string, execution.Sandbox, string) (execution.Provider, error) { return p, nil }
+}
+
 func TestExecutionProtocolExecute(t *testing.T) {
 	request := executionEnvelope{
 		Version: executionProtocolVersion, Operation: "execute",
@@ -32,7 +36,7 @@ func TestExecutionProtocolExecute(t *testing.T) {
 	}
 	input, _ := json.Marshal(request)
 	var output bytes.Buffer
-	if err := serveExecutionProtocol(context.Background(), bytes.NewReader(input), &output, protocolProvider{}); err != nil {
+	if err := serveExecutionProtocol(context.Background(), bytes.NewReader(input), &output, staticProvider(protocolProvider{})); err != nil {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
@@ -52,8 +56,42 @@ func TestExecutionProtocolExecute(t *testing.T) {
 
 func TestExecutionProtocolRejectsVersionDrift(t *testing.T) {
 	var output bytes.Buffer
-	err := serveExecutionProtocol(context.Background(), strings.NewReader(`{"version":2,"operation":"describe"}`), &output, protocolProvider{})
+	err := serveExecutionProtocol(context.Background(), strings.NewReader(`{"version":99,"operation":"describe"}`), &output, staticProvider(protocolProvider{}))
 	if err == nil || !strings.Contains(err.Error(), "unsupported execution protocol version") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+// The previous version is still spoken, because a console that sends no
+// history has not changed and should not be broken by a binary upgrade.
+func TestExecutionProtocolStillAnswersTheOlderVersion(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":1,"operation":"describe"}`), &output,
+		staticProvider(protocolProvider{})); err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	if !strings.Contains(output.String(), `"operation":"describe"`) {
+		t.Fatalf("output = %s", output.String())
+	}
+}
+
+// What must never happen quietly: a caller sends a conversation, the binary
+// does not understand the field, and the model answers as though the
+// conversation had just begun.
+func TestExecutionProtocolRefusesReplayOnTheOlderVersion(t *testing.T) {
+	request := executionEnvelope{
+		Version: 1, Operation: "execute",
+		Request: &execution.Request{
+			ID: "one", WorkingDir: t.TempDir(), Prompt: "and then?",
+			Sandbox: execution.Sandbox{Mode: execution.SandboxReadOnly},
+			History: []execution.HistoryMessage{{Role: "user", Content: "remember 41"}},
+		},
+	}
+	input, _ := json.Marshal(request)
+	var output bytes.Buffer
+	err := serveExecutionProtocol(context.Background(), bytes.NewReader(input), &output, staticProvider(protocolProvider{}))
+	if err == nil || !strings.Contains(err.Error(), "carries no replay") {
+		t.Fatalf("error = %v, want a refusal naming the version", err)
 	}
 }

@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,6 +21,8 @@ func (s *Server) registerRepositoryGraphQueryRoutes() {
 	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/calls", s.handleGraphSymbolCalls)
 	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/impact", s.handleGraphSymbolImpact)
 	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/source", s.handleGraphSymbolSource)
+	s.Mux.HandleFunc("POST /api/v1/repository-graph/impact/changed", s.handleGraphChangedImpact)
+	s.registerRepositoryGraphValidationRoutes()
 }
 
 func (s *Server) authorizedGraphStore(ctx context.Context, checkoutID string) (*knowledge.Store, knowledge.RepositoryIdentity, int, error) {
@@ -136,6 +140,36 @@ func (s *Server) handleGraphSymbolImpact(w http.ResponseWriter, r *http.Request)
 	}
 	result, err := store.ImpactAnalysis(r.Context(), identity, []string{r.PathValue("id")}, intQuery(r, "depth", 2), knowledge.DefaultGraphLimits())
 	if err != nil {
+		s.respondGraphError(w, err)
+		return
+	}
+	s.respondJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGraphChangedImpact(w http.ResponseWriter, r *http.Request) {
+	store, identity, ok := s.graphAccess(w, r)
+	if !ok {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	var request knowledge.ChangedImpactRequest
+	if err := decoder.Decode(&request); err != nil {
+		s.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid changed impact request: " + err.Error()})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		s.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid changed impact request: request must contain one JSON object"})
+		return
+	}
+	result, err := store.ChangedImpactAnalysis(r.Context(), identity, request, knowledge.DefaultChangedImpactLimits())
+	if err != nil {
+		var requestError *knowledge.ImpactRequestError
+		if errors.As(err, &requestError) {
+			s.respondJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": requestError.Error()})
+			return
+		}
 		s.respondGraphError(w, err)
 		return
 	}

@@ -127,12 +127,14 @@ func typedReference(fset *token.FileSet, root string, ident *ast.Ident, object t
 		edge = "calls"
 	}
 	return ExtractedReference{
-		TargetName: object.Name(),
-		TargetPath: target,
-		StartByte:  use.Offset,
-		EndByte:    use.Offset + len(ident.Name),
-		EdgeType:   edge,
-		Resolution: ResolutionCompilerExact,
+		TargetName:          object.Name(),
+		TargetPath:          target,
+		TargetStartByte:     declaration.Offset,
+		TargetPositionKnown: true,
+		StartByte:           use.Offset,
+		EndByte:             use.Offset + len(ident.Name),
+		EdgeType:            edge,
+		Resolution:          ResolutionCompilerExact,
 	}, from, true
 }
 

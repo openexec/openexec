@@ -4,7 +4,7 @@ import "time"
 
 const (
 	GraphSchemaVersion = 1
-	ExtractorVersion   = "repository-graph-v2.2"
+	ExtractorVersion   = "repository-graph-v2.3"
 )
 
 type GraphStatus string
