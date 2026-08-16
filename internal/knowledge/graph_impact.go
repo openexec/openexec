@@ -39,6 +39,7 @@ type ImpactResult struct {
 	DirectCallers             []ImpactNode               `json:"direct_callers,omitempty"`
 	AffectedCallers           []ImpactNode               `json:"affected_callers,omitempty"`
 	ModuleDependants          []ImpactNode               `json:"module_dependants,omitempty"`
+	OperationalEffects        []ImpactNode               `json:"operational_effects,omitempty"`
 	RelatedTests              []RelatedTest              `json:"related_tests,omitempty"`
 	Unresolved                []string                   `json:"unresolved,omitempty"`
 	ValidationRecommendations []ValidationRecommendation `json:"validation_recommendations,omitempty"`
@@ -48,6 +49,15 @@ type ImpactResult struct {
 // generation. Stale or incomplete generations are discovery aids and cannot
 // produce impact conclusions.
 func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity, symbolIDs []string, maxDepth int, limits GraphLimits) (QueryEnvelope[ImpactResult], error) {
+	maxDepth, limits = normalizeImpactBounds(maxDepth, limits)
+	generation, state, err := s.freshGeneration(ctx, identity)
+	if err != nil {
+		return QueryEnvelope[ImpactResult]{}, err
+	}
+	return s.impactAnalysisForGeneration(ctx, generation, state, symbolIDs, maxDepth, limits)
+}
+
+func normalizeImpactBounds(maxDepth int, limits GraphLimits) (int, GraphLimits) {
 	if limits.MaxDepth <= 0 {
 		limits = DefaultGraphLimits()
 	}
@@ -57,10 +67,14 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 	if maxDepth > limits.MaxDepth {
 		maxDepth = limits.MaxDepth
 	}
-	generation, state, err := s.freshGeneration(ctx, identity)
-	if err != nil {
-		return QueryEnvelope[ImpactResult]{}, err
-	}
+	return maxDepth, limits
+}
+
+// impactAnalysisForGeneration is the shared traversal behind symbol and
+// changed-file impact. The caller has already passed the freshness gate, so a
+// changed-file batch resolves every file and traverses every symbol against one
+// named generation rather than racing a refresh between those two operations.
+func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation GraphGeneration, state RepositoryState, symbolIDs []string, maxDepth int, limits GraphLimits) (QueryEnvelope[ImpactResult], error) {
 	if state.Freshness != FreshnessCurrent {
 		return QueryEnvelope[ImpactResult]{
 			Query: QueryMeta{Type: "impact_analysis", Roots: symbolIDs}, Generation: state,
@@ -74,9 +88,56 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 	directCallers := map[string]ImpactNode{}
 	affectedCallers := map[string]ImpactNode{}
 	dependants := map[string]ImpactNode{}
+	effects := map[string]ImpactNode{}
 	tests := map[string]RelatedTest{}
 	methods := []ResolutionStatus{}
 	truncated := false
+	collectEffects := func(origin GraphNode, affectedPath []ImpactPath) error {
+		edges, edgeLimitReached, err := s.loadOutgoingImpactEdges(ctx, generation.ID, origin.ID, []string{"has_operational_effect"}, limits.MaxEdges)
+		if err != nil {
+			return err
+		}
+		if edgeLimitReached {
+			truncated = true
+			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("operational effects for %s exceeded the %d-edge adjacency bound", origin.ID, limits.MaxEdges))
+		}
+		for _, edge := range edges {
+			node, err := s.loadGraphNode(ctx, generation.ID, edge.ToNodeID)
+			if err != nil {
+				return err
+			}
+			step := ImpactPath{FromNodeID: edge.FromNodeID, EdgeID: edge.ID, EdgeType: edge.Type, ToNodeID: edge.ToNodeID, Reason: origin.QualifiedName + " can cause " + node.DisplayName}
+			keepShortestImpact(effects, ImpactNode{Node: node, Path: append(append([]ImpactPath{}, affectedPath...), step)})
+			methods = append(methods, edge.Resolution)
+		}
+		return nil
+	}
+	collectBrowserTests := func(origin GraphNode, affectedPath []ImpactPath) error {
+		var moduleID string
+		if err := s.db.QueryRowContext(ctx, `SELECT from_node_id FROM graph_edges WHERE generation_id = ? AND to_node_id = ? AND edge_type = 'contains' LIMIT 1`, generation.ID, origin.ID).Scan(&moduleID); err == sql.ErrNoRows {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		edges, edgeLimitReached, err := s.loadOutgoingImpactEdges(ctx, generation.ID, moduleID, []string{"tested_by"}, limits.MaxEdges)
+		if err != nil {
+			return err
+		}
+		if edgeLimitReached {
+			truncated = true
+			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("browser/unit evidence for %s exceeded the %d-edge adjacency bound", origin.ID, limits.MaxEdges))
+		}
+		for _, edge := range edges {
+			node, err := s.loadGraphNode(ctx, generation.ID, edge.ToNodeID)
+			if err != nil {
+				return err
+			}
+			step := ImpactPath{FromNodeID: edge.FromNodeID, EdgeID: edge.ID, EdgeType: edge.Type, ToNodeID: edge.ToNodeID, Reason: node.QualifiedName + " is registered evidence for affected consumer " + origin.QualifiedName}
+			keepShortestTest(tests, RelatedTest{FilePath: node.QualifiedName, Reason: "registered browser or unit fixture for an affected consumer", Path: append(append([]ImpactPath{}, affectedPath...), step)})
+			methods = append(methods, edge.Resolution)
+		}
+		return nil
+	}
 	for _, symbolID := range symbolIDs {
 		symbol, nodeID, moduleNode, err := s.loadImpactRoot(ctx, generation.ID, symbolID)
 		if err == sql.ErrNoRows {
@@ -87,21 +148,35 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 			return QueryEnvelope[ImpactResult]{}, err
 		}
 		result.Changed = append(result.Changed, symbol)
+		if err := collectEffects(GraphNode{ID: nodeID, QualifiedName: symbol.QualifiedName}, nil); err != nil {
+			return QueryEnvelope[ImpactResult]{}, err
+		}
+		if err := collectBrowserTests(GraphNode{ID: nodeID, QualifiedName: symbol.QualifiedName}, nil); err != nil {
+			return QueryEnvelope[ImpactResult]{}, err
+		}
+		callerBudgetExhausted := false
 		callerFrontier := []ImpactNode{{Node: GraphNode{ID: nodeID, QualifiedName: symbol.QualifiedName}}}
 		callerSeen := map[string]bool{nodeID: true}
 		for depth := 0; depth < maxDepth && len(callerFrontier) > 0; depth++ {
 			var next []ImpactNode
 			for _, current := range callerFrontier {
-				incoming, err := s.loadIncomingImpactEdges(ctx, generation.ID, current.Node.ID, []string{"calls", "references"}, limits.MaxEdges)
+				incoming, edgeLimitReached, err := s.loadIncomingImpactEdges(ctx, generation.ID, current.Node.ID, []string{"calls", "references", "implements_http_operation", "uses_http_operation", "http_contract_consumer", "uses_persisted_field", "exercises_surface"}, limits.MaxEdges)
 				if err != nil {
 					return QueryEnvelope[ImpactResult]{}, err
 				}
+				if edgeLimitReached {
+					truncated = true
+					result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("symbol %s: incoming call/reference edges for %s exceeded the %d-edge adjacency bound", symbolID, current.Node.ID, limits.MaxEdges))
+				}
 				for _, edge := range incoming {
-					if len(directCallers)+len(affectedCallers) >= limits.MaxNodes {
-						truncated = true
-						break
-					}
 					if callerSeen[edge.FromNodeID] {
+						continue
+					}
+					_, knownDirect := directCallers[edge.FromNodeID]
+					_, knownAffected := affectedCallers[edge.FromNodeID]
+					if !knownDirect && !knownAffected && len(directCallers)+len(affectedCallers) >= limits.MaxNodes {
+						truncated = true
+						callerBudgetExhausted = true
 						continue
 					}
 					node, err := s.loadGraphNode(ctx, generation.ID, edge.FromNodeID)
@@ -112,37 +187,53 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 					impact := ImpactNode{Node: node, Path: append([]ImpactPath{pathStep}, current.Path...)}
 					callerSeen[node.ID] = true
 					if depth == 0 {
-						directCallers[node.ID] = impact
-					} else {
-						affectedCallers[node.ID] = impact
+						keepShortestImpact(directCallers, impact)
+						delete(affectedCallers, node.ID)
+					} else if _, direct := directCallers[node.ID]; !direct {
+						keepShortestImpact(affectedCallers, impact)
 					}
 					next = append(next, impact)
 					methods = append(methods, edge.Resolution)
+					if err := collectEffects(node, impact.Path); err != nil {
+						return QueryEnvelope[ImpactResult]{}, err
+					}
+					if err := collectBrowserTests(node, impact.Path); err != nil {
+						return QueryEnvelope[ImpactResult]{}, err
+					}
 					if isTestFile(edge.SourceFilePath) {
-						tests[edge.SourceFilePath] = RelatedTest{FilePath: edge.SourceFilePath, Reason: "test references a changed or affected symbol", Path: impact.Path}
+						keepShortestTest(tests, RelatedTest{FilePath: edge.SourceFilePath, Reason: "test references a changed or affected symbol", Path: impact.Path})
 					}
 				}
 			}
 			callerFrontier = next
 		}
+		if callerBudgetExhausted {
+			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("symbol %s: caller propagation incomplete; the %d-node batch bound was exhausted", symbolID, limits.MaxNodes))
+		}
 		if moduleNode.ID == "" {
 			continue
 		}
+		moduleBudgetExhausted := false
 		moduleFrontier := []ImpactNode{{Node: moduleNode}}
 		moduleSeen := map[string]bool{moduleNode.ID: true}
 		for depth := 0; depth < maxDepth && len(moduleFrontier) > 0; depth++ {
 			var next []ImpactNode
 			for _, current := range moduleFrontier {
-				imports, err := s.loadIncomingImpactEdges(ctx, generation.ID, current.Node.ID, []string{"imports"}, limits.MaxEdges)
+				imports, edgeLimitReached, err := s.loadIncomingImpactEdges(ctx, generation.ID, current.Node.ID, []string{"imports", "generated_from"}, limits.MaxEdges)
 				if err != nil {
 					return QueryEnvelope[ImpactResult]{}, err
 				}
+				if edgeLimitReached {
+					truncated = true
+					result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("symbol %s: incoming import edges for %s exceeded the %d-edge adjacency bound", symbolID, current.Node.ID, limits.MaxEdges))
+				}
 				for _, edge := range imports {
-					if len(dependants) >= limits.MaxNodes {
-						truncated = true
-						break
-					}
 					if moduleSeen[edge.FromNodeID] {
+						continue
+					}
+					if _, known := dependants[edge.FromNodeID]; !known && len(dependants) >= limits.MaxNodes {
+						truncated = true
+						moduleBudgetExhausted = true
 						continue
 					}
 					node, err := s.loadGraphNode(ctx, generation.ID, edge.FromNodeID)
@@ -152,19 +243,26 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 					pathStep := ImpactPath{FromNodeID: edge.FromNodeID, EdgeID: edge.ID, EdgeType: edge.Type, ToNodeID: edge.ToNodeID, Reason: node.QualifiedName + " imports affected module " + current.Node.QualifiedName}
 					impact := ImpactNode{Node: node, Path: append([]ImpactPath{pathStep}, current.Path...)}
 					moduleSeen[node.ID] = true
-					dependants[node.ID] = impact
+					keepShortestImpact(dependants, impact)
 					next = append(next, impact)
 					methods = append(methods, edge.Resolution)
 					if isTestFile(node.QualifiedName) {
-						tests[node.QualifiedName] = RelatedTest{FilePath: node.QualifiedName, Reason: "test module imports an affected module", Path: impact.Path}
+						keepShortestTest(tests, RelatedTest{FilePath: node.QualifiedName, Reason: "test module imports an affected module", Path: impact.Path})
 					}
 				}
 			}
 			moduleFrontier = next
 		}
-		testEdges, err := s.loadOutgoingImpactEdges(ctx, generation.ID, moduleNode.ID, []string{"tested_by"}, limits.MaxEdges)
+		if moduleBudgetExhausted {
+			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("symbol %s: module-dependant propagation incomplete; the %d-node batch bound was exhausted", symbolID, limits.MaxNodes))
+		}
+		testEdges, edgeLimitReached, err := s.loadOutgoingImpactEdges(ctx, generation.ID, moduleNode.ID, []string{"tested_by"}, limits.MaxEdges)
 		if err != nil {
 			return QueryEnvelope[ImpactResult]{}, err
+		}
+		if edgeLimitReached {
+			truncated = true
+			result.Unresolved = appendUniqueString(result.Unresolved, fmt.Sprintf("symbol %s: structural test edges for %s exceeded the %d-edge adjacency bound", symbolID, moduleNode.ID, limits.MaxEdges))
 		}
 		for _, edge := range testEdges {
 			node, err := s.loadGraphNode(ctx, generation.ID, edge.ToNodeID)
@@ -172,7 +270,7 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 				return QueryEnvelope[ImpactResult]{}, err
 			}
 			path := ImpactPath{FromNodeID: edge.FromNodeID, EdgeID: edge.ID, EdgeType: edge.Type, ToNodeID: edge.ToNodeID, Reason: node.QualifiedName + " is structurally related to changed module " + moduleNode.QualifiedName}
-			tests[node.QualifiedName] = RelatedTest{FilePath: node.QualifiedName, Reason: "structural test relationship; not behavioral proof", Path: []ImpactPath{path}}
+			keepShortestTest(tests, RelatedTest{FilePath: node.QualifiedName, Reason: "structural test relationship; not behavioral proof", Path: []ImpactPath{path}})
 			methods = append(methods, edge.Resolution)
 		}
 	}
@@ -184,6 +282,9 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 	}
 	for _, item := range dependants {
 		result.ModuleDependants = append(result.ModuleDependants, item)
+	}
+	for _, item := range effects {
+		result.OperationalEffects = append(result.OperationalEffects, item)
 	}
 	for _, item := range tests {
 		result.RelatedTests = append(result.RelatedTests, item)
@@ -197,6 +298,9 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 	})
 	sort.Slice(result.ModuleDependants, func(i, j int) bool {
 		return result.ModuleDependants[i].Node.QualifiedName < result.ModuleDependants[j].Node.QualifiedName
+	})
+	sort.Slice(result.OperationalEffects, func(i, j int) bool {
+		return result.OperationalEffects[i].Node.QualifiedName < result.OperationalEffects[j].Node.QualifiedName
 	})
 	sort.Slice(result.RelatedTests, func(i, j int) bool { return result.RelatedTests[i].FilePath < result.RelatedTests[j].FilePath })
 	if len(result.RelatedTests) > 0 {
@@ -213,6 +317,29 @@ func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity,
 		Result: result, Resolution: ResolutionMeta{Status: "bounded", Methods: uniqueMethods(methods)},
 		Limitations: generation.Limitations, Truncated: truncated,
 	}, nil
+}
+
+func keepShortestImpact(target map[string]ImpactNode, candidate ImpactNode) {
+	current, exists := target[candidate.Node.ID]
+	if !exists || len(candidate.Path) < len(current.Path) {
+		target[candidate.Node.ID] = candidate
+	}
+}
+
+func keepShortestTest(target map[string]RelatedTest, candidate RelatedTest) {
+	current, exists := target[candidate.FilePath]
+	if !exists || len(candidate.Path) < len(current.Path) {
+		target[candidate.FilePath] = candidate
+	}
+}
+
+func appendUniqueString(values []string, candidate string) []string {
+	for _, value := range values {
+		if value == candidate {
+			return values
+		}
+	}
+	return append(values, candidate)
 }
 
 func (s *Store) loadImpactRoot(ctx context.Context, generationID, symbolID string) (GraphSymbol, string, GraphNode, error) {
@@ -234,17 +361,17 @@ func (s *Store) loadImpactRoot(ctx context.Context, generationID, symbolID strin
 	return symbol, nodeID, module, err
 }
 
-func (s *Store) loadIncomingImpactEdges(ctx context.Context, generationID, nodeID string, edgeTypes []string, limit int) ([]GraphEdge, error) {
+func (s *Store) loadIncomingImpactEdges(ctx context.Context, generationID, nodeID string, edgeTypes []string, limit int) ([]GraphEdge, bool, error) {
 	return s.loadTypedImpactEdges(ctx, generationID, "to_node_id", nodeID, edgeTypes, limit)
 }
 
-func (s *Store) loadOutgoingImpactEdges(ctx context.Context, generationID, nodeID string, edgeTypes []string, limit int) ([]GraphEdge, error) {
+func (s *Store) loadOutgoingImpactEdges(ctx context.Context, generationID, nodeID string, edgeTypes []string, limit int) ([]GraphEdge, bool, error) {
 	return s.loadTypedImpactEdges(ctx, generationID, "from_node_id", nodeID, edgeTypes, limit)
 }
 
-func (s *Store) loadTypedImpactEdges(ctx context.Context, generationID, direction, nodeID string, edgeTypes []string, limit int) ([]GraphEdge, error) {
+func (s *Store) loadTypedImpactEdges(ctx context.Context, generationID, direction, nodeID string, edgeTypes []string, limit int) ([]GraphEdge, bool, error) {
 	if limit <= 0 || len(edgeTypes) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 	placeholders := "?"
 	for range edgeTypes[1:] {
@@ -255,10 +382,10 @@ func (s *Store) loadTypedImpactEdges(ctx context.Context, generationID, directio
 	for _, edgeType := range edgeTypes {
 		args = append(args, edgeType)
 	}
-	args = append(args, limit)
+	args = append(args, limit+1)
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 	var result []GraphEdge
@@ -266,9 +393,16 @@ func (s *Store) loadTypedImpactEdges(ctx context.Context, generationID, directio
 		var edge GraphEdge
 		var metadata string
 		if err := rows.Scan(&edge.ID, &edge.GenerationID, &edge.FromNodeID, &edge.ToNodeID, &edge.Type, &edge.Resolution, &edge.SourceFilePath, &edge.SourceStartByte, &edge.SourceEndByte, &metadata); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		result = append(result, edge)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	truncated := len(result) > limit
+	if truncated {
+		result = result[:limit]
+	}
+	return result, truncated, nil
 }

@@ -16,6 +16,11 @@ import (
 var (
 	ErrImmutableValidationPlan = errors.New("accepted validation plan is immutable")
 	ErrEvidenceStateMismatch   = errors.New("evidence was produced against a different repository state")
+	ErrEvidenceStepMismatch    = errors.New("evidence status does not match the structured run step")
+	ErrInvalidItemDecision     = errors.New("invalid validation item decision")
+	ErrValidationProposalStale = errors.New("validation proposal is stale; recompute impact before accepting it")
+	ErrCompletionStateMoved    = errors.New("repository state moved; completion cannot be frozen")
+	ErrCompletionEvidenceEmpty = errors.New("validation evidence is missing; completion cannot be frozen")
 )
 
 type TaskGraphBinding struct {
@@ -28,17 +33,36 @@ type TaskGraphBinding struct {
 }
 
 type ValidationPlanRevision struct {
-	ID                string           `json:"id"`
-	TaskID            string           `json:"task_id"`
-	RunID             string           `json:"run_id,omitempty"`
-	Revision          int              `json:"revision"`
-	GenerationID      string           `json:"generation_id"`
-	WorktreeStateHash string           `json:"worktree_state_hash"`
-	PatchHash         string           `json:"patch_hash,omitempty"`
-	Status            string           `json:"status"`
-	Items             []ValidationItem `json:"items"`
-	CreatedAt         time.Time        `json:"created_at"`
-	AcceptedAt        *time.Time       `json:"accepted_at,omitempty"`
+	ID                string                  `json:"id"`
+	TaskID            string                  `json:"task_id"`
+	RunID             string                  `json:"run_id,omitempty"`
+	Revision          int                     `json:"revision"`
+	GenerationID      string                  `json:"generation_id"`
+	WorktreeStateHash string                  `json:"worktree_state_hash"`
+	PatchHash         string                  `json:"patch_hash,omitempty"`
+	ImpactQuery       ValidationImpactQuery   `json:"impact_query"`
+	ImpactSummary     ValidationImpactSummary `json:"impact_summary"`
+	SourceRevisionID  string                  `json:"source_revision_id,omitempty"`
+	Status            string                  `json:"status"`
+	Items             []ValidationItem        `json:"items"`
+	CreatedAt         time.Time               `json:"created_at"`
+	AcceptedAt        *time.Time              `json:"accepted_at,omitempty"`
+}
+
+type ValidationImpactQuery struct {
+	Files     []string `json:"files"`
+	SymbolIDs []string `json:"symbol_ids"`
+	MaxDepth  int      `json:"max_depth"`
+}
+
+type ValidationImpactSummary struct {
+	ChangedSymbolIDs []string `json:"changed_symbol_ids"`
+	AffectedNodeIDs  []string `json:"affected_node_ids"`
+	RelatedTestFiles []string `json:"related_test_files"`
+	UnresolvedFiles  []string `json:"unresolved_files"`
+	Unresolved       []string `json:"unresolved"`
+	Limitations      []string `json:"limitations"`
+	Truncated        bool     `json:"truncated"`
 }
 
 type ValidationItem struct {
@@ -51,6 +75,15 @@ type ValidationItem struct {
 	Scope       string   `json:"scope,omitempty"`
 	GraphPaths  []string `json:"graph_paths,omitempty"`
 	Limitations []string `json:"limitations,omitempty"`
+}
+
+// ValidationItemDecision is the explicit policy decision applied when an
+// advisory proposal becomes execution authority. Suggestions not named by a
+// decision are rejected instead of silently becoming required gates.
+type ValidationItemDecision struct {
+	ID          string `json:"id"`
+	Disposition string `json:"disposition"`
+	Requirement string `json:"requirement"`
 }
 
 type ValidationEvidenceLink struct {
@@ -76,10 +109,18 @@ type CompletionClaim struct {
 }
 
 type CompletionReport struct {
+	ID             string            `json:"id"`
 	PlanRevisionID string            `json:"plan_revision_id"`
 	Verified       []CompletionClaim `json:"verified"`
 	NotVerified    []CompletionClaim `json:"not_verified"`
 	CanComplete    bool              `json:"can_complete"`
+	CreatedAt      time.Time         `json:"created_at"`
+}
+
+type verificationQuerier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
 func (s *Store) BindTaskGraphState(ctx context.Context, binding TaskGraphBinding) error {
@@ -112,8 +153,8 @@ func (s *Store) CreateValidationPlanRevision(ctx context.Context, plan Validatio
 	if plan.Status != "proposed" && plan.Status != "accepted" {
 		return ValidationPlanRevision{}, fmt.Errorf("invalid validation plan status %q", plan.Status)
 	}
-	var generationState string
-	if err := s.db.QueryRowContext(ctx, `SELECT worktree_state_hash FROM graph_generations WHERE id = ?`, plan.GenerationID).Scan(&generationState); err != nil {
+	var generationState, generationCheckout string
+	if err := s.db.QueryRowContext(ctx, `SELECT worktree_state_hash, checkout_id FROM graph_generations WHERE id = ?`, plan.GenerationID).Scan(&generationState, &generationCheckout); err != nil {
 		return ValidationPlanRevision{}, fmt.Errorf("load validation generation: %w", err)
 	}
 	if generationState != plan.WorktreeStateHash {
@@ -140,13 +181,22 @@ func (s *Store) CreateValidationPlanRevision(ctx context.Context, plan Validatio
 	}
 	plan.CreatedAt = time.Now().UTC()
 	if plan.Status == "accepted" {
+		if plan.SourceRevisionID != "" {
+			var isCurrent int
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM graph_generations WHERE id = ? AND worktree_state_hash = ? AND status = 'current'`, plan.GenerationID, plan.WorktreeStateHash).Scan(&isCurrent); err != nil {
+				return ValidationPlanRevision{}, err
+			}
+			if isCurrent != 1 {
+				return ValidationPlanRevision{}, ErrValidationProposalStale
+			}
+		}
 		accepted := plan.CreatedAt
 		plan.AcceptedAt = &accepted
-		if _, err := tx.ExecContext(ctx, `UPDATE validation_plan_revisions SET status = 'superseded' WHERE task_id = ? AND status = 'accepted'`, plan.TaskID); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE validation_plan_revisions SET status = 'superseded' WHERE task_id = ? AND status = 'accepted' AND generation_id IN (SELECT id FROM graph_generations WHERE checkout_id = ?)`, plan.TaskID, generationCheckout); err != nil {
 			return ValidationPlanRevision{}, err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO validation_plan_revisions (id, task_id, run_id, revision, generation_id, worktree_state_hash, patch_hash, status, created_at, accepted_at) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?)`, plan.ID, plan.TaskID, plan.RunID, plan.Revision, plan.GenerationID, plan.WorktreeStateHash, plan.PatchHash, plan.Status, plan.CreatedAt, plan.AcceptedAt); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO validation_plan_revisions (id, task_id, run_id, revision, generation_id, worktree_state_hash, patch_hash, impact_query, impact_summary, source_revision_id, status, created_at, accepted_at) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, plan.ID, plan.TaskID, plan.RunID, plan.Revision, plan.GenerationID, plan.WorktreeStateHash, plan.PatchHash, encodeJSON(plan.ImpactQuery, "{}"), encodeJSON(plan.ImpactSummary, "{}"), plan.SourceRevisionID, plan.Status, plan.CreatedAt, plan.AcceptedAt); err != nil {
 		return ValidationPlanRevision{}, err
 	}
 	for _, item := range plan.Items {
@@ -158,6 +208,155 @@ func (s *Store) CreateValidationPlanRevision(ctx context.Context, plan Validatio
 		return ValidationPlanRevision{}, err
 	}
 	return plan, nil
+}
+
+func (s *Store) GetValidationPlanRevision(ctx context.Context, id string) (ValidationPlanRevision, error) {
+	var plan ValidationPlanRevision
+	var runID sql.NullString
+	var acceptedAt sql.NullTime
+	var impactQueryJSON, impactSummaryJSON string
+	err := s.db.QueryRowContext(ctx, `SELECT id, task_id, run_id, revision, generation_id, worktree_state_hash, patch_hash, impact_query, impact_summary, source_revision_id, status, created_at, accepted_at FROM validation_plan_revisions WHERE id = ?`, id).Scan(
+		&plan.ID, &plan.TaskID, &runID, &plan.Revision, &plan.GenerationID, &plan.WorktreeStateHash, &plan.PatchHash, &impactQueryJSON, &impactSummaryJSON, &plan.SourceRevisionID, &plan.Status, &plan.CreatedAt, &acceptedAt,
+	)
+	if err != nil {
+		return ValidationPlanRevision{}, err
+	}
+	plan.RunID = runID.String
+	if acceptedAt.Valid {
+		plan.AcceptedAt = &acceptedAt.Time
+	}
+	if err := json.Unmarshal([]byte(impactQueryJSON), &plan.ImpactQuery); err != nil {
+		return ValidationPlanRevision{}, fmt.Errorf("decode validation impact query: %w", err)
+	}
+	if err := json.Unmarshal([]byte(impactSummaryJSON), &plan.ImpactSummary); err != nil {
+		return ValidationPlanRevision{}, fmt.Errorf("decode validation impact summary: %w", err)
+	}
+	plan.ImpactQuery.Files = append([]string{}, plan.ImpactQuery.Files...)
+	plan.ImpactQuery.SymbolIDs = append([]string{}, plan.ImpactQuery.SymbolIDs...)
+	plan.ImpactSummary.ChangedSymbolIDs = append([]string{}, plan.ImpactSummary.ChangedSymbolIDs...)
+	plan.ImpactSummary.AffectedNodeIDs = append([]string{}, plan.ImpactSummary.AffectedNodeIDs...)
+	plan.ImpactSummary.RelatedTestFiles = append([]string{}, plan.ImpactSummary.RelatedTestFiles...)
+	plan.ImpactSummary.UnresolvedFiles = append([]string{}, plan.ImpactSummary.UnresolvedFiles...)
+	plan.ImpactSummary.Unresolved = append([]string{}, plan.ImpactSummary.Unresolved...)
+	plan.ImpactSummary.Limitations = append([]string{}, plan.ImpactSummary.Limitations...)
+	plan.Items = make([]ValidationItem, 0)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, source, disposition, requirement, criterion, command_argv, scope, graph_paths, limitations FROM validation_items WHERE plan_revision_id = ? ORDER BY id`, id)
+	if err != nil {
+		return ValidationPlanRevision{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item ValidationItem
+		var commandArgvJSON, graphPathsJSON, limitationsJSON string
+		if err := rows.Scan(&item.ID, &item.Source, &item.Disposition, &item.Requirement, &item.Criterion, &commandArgvJSON, &item.Scope, &graphPathsJSON, &limitationsJSON); err != nil {
+			return ValidationPlanRevision{}, err
+		}
+		if err := json.Unmarshal([]byte(commandArgvJSON), &item.CommandArgv); err != nil {
+			return ValidationPlanRevision{}, fmt.Errorf("decode validation command argv: %w", err)
+		}
+		if err := json.Unmarshal([]byte(graphPathsJSON), &item.GraphPaths); err != nil {
+			return ValidationPlanRevision{}, fmt.Errorf("decode validation graph paths: %w", err)
+		}
+		if err := json.Unmarshal([]byte(limitationsJSON), &item.Limitations); err != nil {
+			return ValidationPlanRevision{}, fmt.Errorf("decode validation limitations: %w", err)
+		}
+		plan.Items = append(plan.Items, item)
+	}
+	return plan, rows.Err()
+}
+
+// AcceptValidationPlanRevision creates one accepted revision from an immutable
+// proposal. Retrying the same proposal returns the existing accepted revision.
+// Item identities are regenerated for the new authority; the proposal remains
+// readable as the historical decision input.
+func (s *Store) AcceptValidationPlanRevision(ctx context.Context, proposedID, runID string, decisions []ValidationItemDecision) (ValidationPlanRevision, error) {
+	if accepted, err := s.acceptedRevisionForProposal(ctx, proposedID); err == nil {
+		return accepted, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return ValidationPlanRevision{}, err
+	}
+	proposed, err := s.GetValidationPlanRevision(ctx, proposedID)
+	if err != nil {
+		return ValidationPlanRevision{}, err
+	}
+	if proposed.Status != "proposed" {
+		return ValidationPlanRevision{}, fmt.Errorf("validation plan %s is %s, not proposed", proposedID, proposed.Status)
+	}
+	decisionsByID := make(map[string]ValidationItemDecision, len(decisions))
+	for _, decision := range decisions {
+		if decision.ID == "" || decisionsByID[decision.ID].ID != "" {
+			return ValidationPlanRevision{}, fmt.Errorf("%w: item ids must be non-empty and unique", ErrInvalidItemDecision)
+		}
+		if decision.Disposition != "accepted" && decision.Disposition != "rejected" {
+			return ValidationPlanRevision{}, fmt.Errorf("%w: item %q has disposition %q", ErrInvalidItemDecision, decision.ID, decision.Disposition)
+		}
+		if decision.Disposition == "accepted" && decision.Requirement != "optional" && decision.Requirement != "required" && decision.Requirement != "blocking" {
+			return ValidationPlanRevision{}, fmt.Errorf("%w: accepted item %q has requirement %q", ErrInvalidItemDecision, decision.ID, decision.Requirement)
+		}
+		decisionsByID[decision.ID] = decision
+	}
+	for index := range proposed.Items {
+		decision, decided := decisionsByID[proposed.Items[index].ID]
+		if decided {
+			delete(decisionsByID, proposed.Items[index].ID)
+			proposed.Items[index].Disposition = decision.Disposition
+			if decision.Disposition == "accepted" {
+				proposed.Items[index].Requirement = decision.Requirement
+			} else {
+				proposed.Items[index].Requirement = "optional"
+			}
+		} else {
+			proposed.Items[index].Disposition = "rejected"
+			proposed.Items[index].Requirement = "optional"
+		}
+		proposed.Items[index].ID = ""
+	}
+	if len(decisionsByID) != 0 {
+		for id := range decisionsByID {
+			return ValidationPlanRevision{}, fmt.Errorf("%w: item %q does not belong to proposal", ErrInvalidItemDecision, id)
+		}
+	}
+	proposed.ID = ""
+	proposed.Revision = 0
+	proposed.Status = "accepted"
+	proposed.CreatedAt = time.Time{}
+	proposed.AcceptedAt = nil
+	proposed.SourceRevisionID = proposedID
+	if runID != "" {
+		proposed.RunID = runID
+	}
+	accepted, err := s.CreateValidationPlanRevision(ctx, proposed)
+	if err == nil {
+		return accepted, nil
+	}
+	// The unique source revision index closes the two-tab/retry race. If the
+	// other request won, return the authority it created.
+	if existing, lookupErr := s.acceptedRevisionForProposal(ctx, proposedID); lookupErr == nil {
+		return existing, nil
+	}
+	return ValidationPlanRevision{}, err
+}
+
+func (s *Store) acceptedRevisionForProposal(ctx context.Context, proposedID string) (ValidationPlanRevision, error) {
+	var id string
+	if err := s.db.QueryRowContext(ctx, `SELECT id FROM validation_plan_revisions WHERE source_revision_id = ?`, proposedID).Scan(&id); err != nil {
+		return ValidationPlanRevision{}, err
+	}
+	plan, err := s.GetValidationPlanRevision(ctx, id)
+	if err != nil {
+		return ValidationPlanRevision{}, err
+	}
+	if plan.Status != "accepted" {
+		return ValidationPlanRevision{}, fmt.Errorf("validation proposal %s was already consumed by %s revision %s", proposedID, plan.Status, plan.ID)
+	}
+	return plan, nil
+}
+
+// AcceptedValidationPlanRevisionForProposal returns the single execution
+// authority already created from a proposal. It lets HTTP/CLI retries converge
+// before refreshing a worktree that may legitimately have moved since accept.
+func (s *Store) AcceptedValidationPlanRevisionForProposal(ctx context.Context, proposedID string) (ValidationPlanRevision, error) {
+	return s.acceptedRevisionForProposal(ctx, proposedID)
 }
 
 func validateValidationItem(item ValidationItem, planStatus string) error {
@@ -191,23 +390,29 @@ func (s *Store) LinkValidationEvidence(ctx context.Context, link ValidationEvide
 	if !validStatus[link.Status] {
 		return fmt.Errorf("invalid evidence status %q", link.Status)
 	}
-	var stateHash, patchHash, planStatus string
-	err := s.db.QueryRowContext(ctx, `SELECT p.worktree_state_hash, p.patch_hash, p.status FROM validation_items i JOIN validation_plan_revisions p ON p.id = i.plan_revision_id WHERE i.id = ?`, link.ValidationItemID).Scan(&stateHash, &patchHash, &planStatus)
+	var stateHash, patchHash, planStatus, disposition string
+	err := s.db.QueryRowContext(ctx, `SELECT p.worktree_state_hash, p.patch_hash, p.status, i.disposition FROM validation_items i JOIN validation_plan_revisions p ON p.id = i.plan_revision_id WHERE i.id = ?`, link.ValidationItemID).Scan(&stateHash, &patchHash, &planStatus, &disposition)
 	if err != nil {
 		return err
 	}
 	if planStatus != "accepted" {
 		return fmt.Errorf("evidence can link only to an accepted validation plan")
 	}
+	if disposition != "accepted" {
+		return fmt.Errorf("evidence can link only to an accepted validation item")
+	}
 	if stateHash != link.WorktreeStateHash || patchHash != link.PatchHash {
 		return ErrEvidenceStateMismatch
 	}
-	var stepRunID string
-	if err := s.db.QueryRowContext(ctx, `SELECT run_id FROM run_steps WHERE id = ?`, link.RunStepID).Scan(&stepRunID); err != nil {
+	var stepRunID, stepStatus string
+	if err := s.db.QueryRowContext(ctx, `SELECT run_id, status FROM run_steps WHERE id = ?`, link.RunStepID).Scan(&stepRunID, &stepStatus); err != nil {
 		return fmt.Errorf("load evidence run step: %w", err)
 	}
 	if stepRunID != link.RunID {
 		return fmt.Errorf("run step does not belong to evidence run")
+	}
+	if !EvidenceStatusMatchesRunStep(link.Status, stepStatus) {
+		return ErrEvidenceStepMismatch
 	}
 	if link.ArtifactHash != "" {
 		var exists int
@@ -219,9 +424,26 @@ func (s *Store) LinkValidationEvidence(ctx context.Context, link ValidationEvide
 	return err
 }
 
+// EvidenceStatusMatchesRunStep is the authoritative mapping between evidence
+// outcomes and the structured run-step terminal state that may support them.
+func EvidenceStatusMatchesRunStep(evidenceStatus, stepStatus string) bool {
+	expected := map[string]string{
+		"passed":       "completed",
+		"failed":       "failed",
+		"inconclusive": "inconclusive",
+		"not_run":      "unavailable",
+		"unavailable":  "unavailable",
+	}
+	return expected[evidenceStatus] != "" && expected[evidenceStatus] == stepStatus
+}
+
 func (s *Store) EvidenceCoverage(ctx context.Context, planRevisionID string) (CompletionReport, error) {
+	return s.evidenceCoverage(ctx, s.db, planRevisionID)
+}
+
+func (s *Store) evidenceCoverage(ctx context.Context, db verificationQuerier, planRevisionID string) (CompletionReport, error) {
 	var planStatus, stateHash, worktreeID string
-	if err := s.db.QueryRowContext(ctx, `SELECT p.status, p.worktree_state_hash, g.worktree_id FROM validation_plan_revisions p JOIN graph_generations g ON g.id = p.generation_id WHERE p.id = ?`, planRevisionID).Scan(&planStatus, &stateHash, &worktreeID); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT p.status, p.worktree_state_hash, g.worktree_id FROM validation_plan_revisions p JOIN graph_generations g ON g.id = p.generation_id WHERE p.id = ?`, planRevisionID).Scan(&planStatus, &stateHash, &worktreeID); err != nil {
 		return CompletionReport{}, err
 	}
 	if planStatus != "accepted" {
@@ -229,10 +451,10 @@ func (s *Store) EvidenceCoverage(ctx context.Context, planRevisionID string) (Co
 	}
 	currentStateMatches := false
 	var currentState string
-	if err := s.db.QueryRowContext(ctx, `SELECT worktree_state_hash FROM graph_generations WHERE worktree_id = ? AND status = 'current' ORDER BY promoted_at DESC LIMIT 1`, worktreeID).Scan(&currentState); err == nil && currentState == stateHash {
+	if err := db.QueryRowContext(ctx, `SELECT worktree_state_hash FROM graph_generations WHERE worktree_id = ? AND status = 'current' ORDER BY promoted_at DESC LIMIT 1`, worktreeID).Scan(&currentState); err == nil && currentState == stateHash {
 		currentStateMatches = true
 	}
-	rows, err := s.db.QueryContext(ctx, `SELECT id, criterion, requirement, disposition, scope FROM validation_items WHERE plan_revision_id = ? ORDER BY id`, planRevisionID)
+	rows, err := db.QueryContext(ctx, `SELECT id, criterion, requirement, disposition, scope FROM validation_items WHERE plan_revision_id = ? ORDER BY id`, planRevisionID)
 	if err != nil {
 		return CompletionReport{}, err
 	}
@@ -254,7 +476,7 @@ func (s *Store) EvidenceCoverage(ctx context.Context, planRevisionID string) (Co
 		if item.disposition != "accepted" {
 			continue
 		}
-		status, artifacts, err := s.coverageForItem(ctx, item.id, stateHash)
+		status, artifacts, err := coverageForItem(ctx, db, item.id, stateHash)
 		if err != nil {
 			return CompletionReport{}, err
 		}
@@ -272,8 +494,9 @@ func (s *Store) EvidenceCoverage(ctx context.Context, planRevisionID string) (Co
 		case "unavailable":
 			claimStatus = "unavailable"
 		}
-		claim := CompletionClaim{ID: "claim_" + uuid.NewString(), ValidationItemID: item.id, Predicate: "validation_item_passed", Scope: item.scope, Status: claimStatus, RepositoryStateHash: stateHash, EvidenceArtifactIDs: artifacts, Criterion: item.criterion, Requirement: item.requirement}
-		if _, err := s.db.ExecContext(ctx, `INSERT INTO completion_claims (id, validation_item_id, predicate, scope, status, repository_state_hash, evidence_artifact_ids) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(validation_item_id, predicate, repository_state_hash) DO UPDATE SET status = excluded.status, evidence_artifact_ids = excluded.evidence_artifact_ids`, claim.ID, claim.ValidationItemID, claim.Predicate, claim.Scope, claim.Status, claim.RepositoryStateHash, encodeJSON(claim.EvidenceArtifactIDs, "[]")); err != nil {
+		claimID := "claim_" + uuid.NewSHA1(uuid.NameSpaceOID, []byte(item.id+"\x00"+stateHash)).String()
+		claim := CompletionClaim{ID: claimID, ValidationItemID: item.id, Predicate: "validation_item_passed", Scope: item.scope, Status: claimStatus, RepositoryStateHash: stateHash, EvidenceArtifactIDs: artifacts, Criterion: item.criterion, Requirement: item.requirement}
+		if _, err := db.ExecContext(ctx, `INSERT INTO completion_claims (id, validation_item_id, predicate, scope, status, repository_state_hash, evidence_artifact_ids) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(validation_item_id, predicate, repository_state_hash) DO UPDATE SET status = excluded.status, evidence_artifact_ids = excluded.evidence_artifact_ids`, claim.ID, claim.ValidationItemID, claim.Predicate, claim.Scope, claim.Status, claim.RepositoryStateHash, encodeJSON(claim.EvidenceArtifactIDs, "[]")); err != nil {
 			return CompletionReport{}, err
 		}
 		if claim.Status == "supported" {
@@ -288,8 +511,91 @@ func (s *Store) EvidenceCoverage(ctx context.Context, planRevisionID string) (Co
 	return report, nil
 }
 
-func (s *Store) coverageForItem(ctx context.Context, itemID, stateHash string) (string, []string, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT status, COALESCE(artifact_hash, '') FROM validation_evidence_links WHERE validation_item_id = ? AND worktree_state_hash = ? ORDER BY created_at DESC`, itemID, stateHash)
+// FinalizeEvidenceCoverage freezes the first report produced for an accepted
+// revision. Later evidence or worktree drift cannot rewrite this historical
+// completion decision.
+func (s *Store) FinalizeEvidenceCoverage(ctx context.Context, planRevisionID string) (CompletionReport, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return CompletionReport{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if existing, err := readCompletionReport(ctx, tx, planRevisionID); err == nil {
+		return existing, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return CompletionReport{}, err
+	}
+	var planStatus, acceptedState, currentState string
+	err = tx.QueryRowContext(ctx, `SELECT p.status, p.worktree_state_hash, COALESCE(current.worktree_state_hash, '')
+		FROM validation_plan_revisions p
+		JOIN graph_generations bound ON bound.id = p.generation_id
+		LEFT JOIN graph_generations current ON current.worktree_id = bound.worktree_id AND current.status = 'current'
+		WHERE p.id = ?
+		ORDER BY current.promoted_at DESC LIMIT 1`, planRevisionID).Scan(&planStatus, &acceptedState, &currentState)
+	if err != nil {
+		return CompletionReport{}, err
+	}
+	if planStatus != "accepted" {
+		return CompletionReport{}, fmt.Errorf("evidence coverage requires an accepted plan")
+	}
+	if currentState == "" || currentState != acceptedState {
+		return CompletionReport{}, ErrCompletionStateMoved
+	}
+	var acceptedItems, evidenceLinks int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM validation_items WHERE plan_revision_id = ? AND disposition = 'accepted'`, planRevisionID).Scan(&acceptedItems); err != nil {
+		return CompletionReport{}, err
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM validation_evidence_links links JOIN validation_items items ON items.id = links.validation_item_id WHERE items.plan_revision_id = ? AND items.disposition = 'accepted'`, planRevisionID).Scan(&evidenceLinks); err != nil {
+		return CompletionReport{}, err
+	}
+	if acceptedItems > 0 && evidenceLinks == 0 {
+		return CompletionReport{}, ErrCompletionEvidenceEmpty
+	}
+	report, err := s.evidenceCoverage(ctx, tx, planRevisionID)
+	if err != nil {
+		return CompletionReport{}, err
+	}
+	report.ID = "completion_report_" + uuid.NewString()
+	report.CreatedAt = time.Now().UTC()
+	report.Verified = append([]CompletionClaim{}, report.Verified...)
+	report.NotVerified = append([]CompletionClaim{}, report.NotVerified...)
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		return CompletionReport{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO completion_reports (id, plan_revision_id, report_json, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(plan_revision_id) DO NOTHING`, report.ID, planRevisionID, string(encoded), report.CreatedAt); err != nil {
+		return CompletionReport{}, err
+	}
+	stored, err := readCompletionReport(ctx, tx, planRevisionID)
+	if err != nil {
+		return CompletionReport{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return CompletionReport{}, err
+	}
+	return stored, nil
+}
+
+func (s *Store) ReadCompletionReport(ctx context.Context, planRevisionID string) (CompletionReport, error) {
+	return readCompletionReport(ctx, s.db, planRevisionID)
+}
+
+func readCompletionReport(ctx context.Context, db verificationQuerier, planRevisionID string) (CompletionReport, error) {
+	var encoded string
+	if err := db.QueryRowContext(ctx, `SELECT report_json FROM completion_reports WHERE plan_revision_id = ?`, planRevisionID).Scan(&encoded); err != nil {
+		return CompletionReport{}, err
+	}
+	var report CompletionReport
+	if err := json.Unmarshal([]byte(encoded), &report); err != nil {
+		return CompletionReport{}, fmt.Errorf("decode completion report: %w", err)
+	}
+	report.Verified = append([]CompletionClaim{}, report.Verified...)
+	report.NotVerified = append([]CompletionClaim{}, report.NotVerified...)
+	return report, nil
+}
+
+func coverageForItem(ctx context.Context, db verificationQuerier, itemID, stateHash string) (string, []string, error) {
+	rows, err := db.QueryContext(ctx, `SELECT status, COALESCE(artifact_hash, '') FROM validation_evidence_links WHERE validation_item_id = ? AND worktree_state_hash = ? ORDER BY created_at DESC`, itemID, stateHash)
 	if err != nil {
 		return "", nil, err
 	}

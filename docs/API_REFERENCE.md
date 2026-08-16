@@ -1,11 +1,22 @@
 # OpenExec API Reference
 
-This document provides a comprehensive API reference for OpenExec's integrated orchestration platform. It covers all HTTP endpoints, WebSocket protocols, MCP tools, and data types used for multi-project management.
+**Status:** built, partial coverage. The HTTP and WebSocket surface below is
+the daemon's, written 2026-03-16 and not re-verified endpoint by endpoint
+since. **It does not describe the current MCP tool surface** — none of
+`backlog_list_stories`, `skill_propose`, `approval_decide`, the infra tools or
+`symbol_find` appear here. For those, read [LIGHT_MODE.md](LIGHT_MODE.md),
+[SKILLS_SYSTEM.md](SKILLS_SYSTEM.md),
+[SRE_ORCHESTRATION_ROADMAP.md](SRE_ORCHESTRATION_ROADMAP.md) and
+[SYMBOL_TOOLS_REVIEW.md](SYMBOL_TOOLS_REVIEW.md); the definitive list is
+`internal/mcp/`, whose schemas are guarded by `schema_audit_test.go`.
+
+This document provides an HTTP and WebSocket API reference for OpenExec's integrated orchestration platform, covering endpoints and data types used for multi-project management.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [HTTP REST API](#http-rest-api)
+  - [Repository Graph API](#repository-graph-api)
   - [Task Execution API](#task-execution-api)
   - [Session API](#session-api)
   - [Project API](#project-api)
@@ -51,6 +62,66 @@ OpenExec uses a strict separation of concerns:
 ---
 
 ## HTTP REST API
+
+### Repository Graph API
+
+#### Analyze a changed set
+
+`POST /api/v1/repository-graph/impact/changed`
+
+Returns bounded structural impact for repository-relative file anchors and
+optional stable symbol IDs against one current graph generation. Access is
+scoped by the `X-OpenExec-Checkout-ID` header. The response includes graph and
+worktree provenance, changed symbols, callers, module dependants, related test
+candidates, unresolved files, limitations, and whether a traversal or symbol
+budget truncated the result.
+
+```json
+{
+  "files": ["internal/server/server.go"],
+  "symbol_ids": [],
+  "max_depth": 2
+}
+```
+
+At most 50 files, 200 caller-supplied symbol IDs, and depth 3 are accepted.
+Unsafe paths and bounds that cannot be honored return `422` with a reason.
+File anchors intentionally expand to the file's symbols and therefore report
+a conservative over-approximation; expansion or traversal budgets return a
+partial result with `truncated: true` and enumerable unresolved details rather
+than presenting the partial reach as complete.
+
+`propagation.operational_effects` names statically derived or adjacently
+registered Git, filesystem, subprocess, scheduler, restart, notification and
+external-network effects. Application-contract paths can include
+`implements_http_operation`, `uses_http_operation`,
+`http_contract_consumer`, `uses_persisted_field`, `tested_by`, and
+`generated_from`. Every path retains its resolution grade; dynamic wiring is
+reported as unresolved rather than inferred from runtime silence.
+
+#### Persist validation authority
+
+The checkout-authorized validation lifecycle reuses the same
+`X-OpenExec-Checkout-ID` boundary:
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `POST` | `/api/v1/repository-graph/validation-plans/propose` | Recomputes changed impact and stores an immutable proposed revision. |
+| `GET` | `/api/v1/repository-graph/validation-plans/{id}` | Reads one immutable revision, including its impact query and compact affected summary. |
+| `POST` | `/api/v1/repository-graph/validation-plans/{id}/accept` | Idempotently creates one accepted revision while current; `items` explicitly accepts or rejects advisory suggestions and unlisted suggestions are rejected. |
+| `POST` | `/api/v1/repository-graph/validation-runs` | Registers an external Console run in the header-authorized checkout. |
+| `POST` | `/api/v1/repository-graph/validation-runs/{id}/steps` | Registers a structured terminal run step. |
+| `POST` | `/api/v1/repository-graph/validation-plans/{id}/evidence` | Links a state-matched run step to one accepted item. |
+| `POST` | `/api/v1/repository-graph/validation-plans/{id}/completion` | Freezes the first evidence-coverage report only while repository state is current and accepted items have evidence. |
+| `GET` | `/api/v1/repository-graph/validation-plans/{id}/completion` | Reads that immutable completion snapshot. |
+
+The local CLI mirrors this lifecycle under
+`openexec knowledge graph validation` with `propose`, `show`, `accept`, `run`,
+`step`, `evidence`, and `completion --finalize`. Every command requires
+`--directory`; revision reads and writes refuse identities belonging to a
+different checkout. `accept` takes repeatable `--require-item`,
+`--optional-item`, and `--reject-item` decisions; suggestions not named by a
+flag are rejected rather than silently promoted to gates.
 
 ### Session API
 

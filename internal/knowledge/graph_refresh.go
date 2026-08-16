@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -175,6 +176,11 @@ func (s *Store) refreshRepository(ctx context.Context, root string) (RefreshResu
 		files = append(files, file)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	files, contractLimitations, err := deriveApplicationContracts(identity.RootPath, files)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	limitations = append(limitations, contractLimitations...)
 	capabilities := previousGeneration.Capabilities
 	if capabilities == nil {
 		capabilities = map[string]string{}
@@ -319,7 +325,7 @@ func (s *Store) loadExtractedFiles(ctx context.Context, generationID string) (ma
 	if err := importRows.Err(); err != nil {
 		return nil, err
 	}
-	referenceRows, err := s.db.QueryContext(ctx, `SELECT e.source_file_path, e.source_start_byte, e.source_end_byte, e.edge_type, e.resolution_status, e.metadata, COALESCE(o.file_path, '') FROM graph_edges e LEFT JOIN symbol_occurrences o ON o.node_id = e.to_node_id AND o.generation_id = e.generation_id WHERE e.generation_id = ? AND e.edge_type IN ('calls','references') ORDER BY e.source_file_path, e.source_start_byte`, generationID)
+	referenceRows, err := s.db.QueryContext(ctx, `SELECT e.source_file_path, e.source_start_byte, e.source_end_byte, e.edge_type, e.resolution_status, e.metadata, COALESCE(o.file_path, '') FROM graph_edges e LEFT JOIN symbol_occurrences o ON o.node_id = e.to_node_id AND o.generation_id = e.generation_id WHERE e.generation_id = ? AND e.edge_type IN ('calls','references','implements_http_operation','uses_http_operation','http_contract_consumer','uses_persisted_field','exercises_surface') ORDER BY e.source_file_path, e.source_start_byte`, generationID)
 	if err != nil {
 		return nil, err
 	}
@@ -332,8 +338,14 @@ func (s *Store) loadExtractedFiles(ctx context.Context, generationID string) (ma
 		}
 		values := map[string]string{}
 		_ = json.Unmarshal([]byte(metadata), &values)
+		targetStart, targetPositionKnown := 0, false
+		if encoded, exists := values["target_start_byte"]; exists {
+			if parsed, parseErr := strconv.Atoi(encoded); parseErr == nil {
+				targetStart, targetPositionKnown = parsed, true
+			}
+		}
 		file := result[path]
-		file.References = append(file.References, ExtractedReference{TargetName: values["target_name"], TargetPath: targetPath, StartByte: start, EndByte: end, EdgeType: edgeType, Resolution: ResolutionStatus(resolution)})
+		file.References = append(file.References, ExtractedReference{SourceName: values["source_name"], SourcePath: values["source_path"], TargetName: values["target_name"], TargetPath: targetPath, TargetStartByte: targetStart, TargetPositionKnown: targetPositionKnown, StartByte: start, EndByte: end, EdgeType: edgeType, Resolution: ResolutionStatus(resolution)})
 		result[path] = file
 	}
 	return result, referenceRows.Err()

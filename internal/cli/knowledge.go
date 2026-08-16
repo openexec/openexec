@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +12,9 @@ import (
 
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/repository"
+	statepkg "github.com/openexec/openexec/pkg/db/state"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var knowledgeCmd = &cobra.Command{
@@ -19,28 +23,384 @@ var knowledgeCmd = &cobra.Command{
 }
 
 var (
-	graphDirectory        string
-	graphJSON             bool
-	graphFile             string
-	graphKind             string
-	graphRead             bool
-	graphReverse          bool
-	graphDepth            int
-	graphCallDirection    string
-	graphCallDepth        int
-	graphImpactDepth      int
-	graphConsoleURL       string
-	graphConsoleProject   string
-	graphConsoleTokenFile string
-	graphSymbols          []string
-	graphTaskID           string
-	graphRunID            string
-	graphPlanID           string
+	graphDirectory           string
+	graphJSON                bool
+	graphFile                string
+	graphKind                string
+	graphRead                bool
+	graphReverse             bool
+	graphDepth               int
+	graphCallDirection       string
+	graphCallDepth           int
+	graphImpactDepth         int
+	graphImpactFiles         []string
+	graphConsoleURL          string
+	graphConsoleProject      string
+	graphConsoleTokenFile    string
+	graphSymbols             []string
+	graphTaskID              string
+	graphRunID               string
+	graphPlanID              string
+	validationFiles          []string
+	validationSymbolIDs      []string
+	validationPatchHash      string
+	validationDepth          int
+	validationMode           string
+	validationPhase          string
+	validationStatus         string
+	validationEvidenceStatus string
+	validationIteration      int
+	validationItemID         string
+	validationStepID         string
+	validationArtifact       string
+	validationFinalize       bool
+	validationRequiredItems  []string
+	validationOptionalItems  []string
+	validationRejectedItems  []string
 )
 
 var knowledgeGraphCmd = &cobra.Command{
 	Use:   "graph",
 	Short: "Inspect the versioned repository pointer graph",
+}
+
+var knowledgeGraphValidationCmd = &cobra.Command{
+	Use:   "validation",
+	Short: "Manage graph-derived validation authority",
+}
+
+func openValidationState(directory string) (*statepkg.Store, error) {
+	abs, err := filepath.Abs(directory)
+	if err != nil {
+		return nil, err
+	}
+	return statepkg.NewStore(filepath.Join(abs, ".openexec", "openexec.db"))
+}
+
+func ensurePlanMatchesDirectory(ctx context.Context, canonical *statepkg.Store, plan statepkg.ValidationPlanRevision, identity knowledge.RepositoryIdentity) error {
+	var checkoutID string
+	if err := canonical.GetDB().QueryRowContext(ctx, `SELECT checkout_id FROM graph_generations WHERE id = ?`, plan.GenerationID).Scan(&checkoutID); err != nil {
+		return err
+	}
+	if checkoutID != identity.CheckoutID {
+		return fmt.Errorf("validation plan belongs to a different checkout")
+	}
+	return nil
+}
+
+var knowledgeGraphValidationProposeCmd = &cobra.Command{
+	Use:   "propose",
+	Short: "Create an immutable validation proposal from changed files and symbols",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if strings.TrimSpace(graphTaskID) == "" {
+			return fmt.Errorf("--task is required")
+		}
+		graph, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		impactRequest := knowledge.ChangedImpactRequest{Files: validationFiles, SymbolIDs: validationSymbolIDs, MaxDepth: validationDepth}
+		impact, err := graph.ChangedImpactAnalysis(cmd.Context(), identity, impactRequest, knowledge.DefaultChangedImpactLimits())
+		if closeErr := graph.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+		if err != nil {
+			return err
+		}
+		if len(impact.ChangedSymbols) == 0 {
+			return fmt.Errorf("validation proposal requires at least one resolved changed symbol")
+		}
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		plan, err := knowledge.ProposeValidationPlanFromChangedImpact(cmd.Context(), canonical, strings.TrimSpace(graphTaskID), strings.TrimSpace(graphRunID), strings.TrimSpace(validationPatchHash), impactRequest, impact)
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, plan)
+		}
+		cmd.Printf("Proposed validation plan %s revision %d for graph %s\n", plan.ID, plan.Revision, plan.GenerationID)
+		return nil
+	},
+}
+
+var knowledgeGraphValidationShowCmd = &cobra.Command{
+	Use:   "show PLAN_ID",
+	Short: "Read one immutable validation-plan revision",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		graph, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		if err := graph.Close(); err != nil {
+			return err
+		}
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		plan, err := canonical.GetValidationPlanRevision(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if err := ensurePlanMatchesDirectory(cmd.Context(), canonical, plan, identity); err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, plan)
+		}
+		cmd.Printf("Validation plan %s: %s revision %d; %d changed symbols, %d items, truncated=%t\n", plan.ID, plan.Status, plan.Revision, len(plan.ImpactSummary.ChangedSymbolIDs), len(plan.Items), plan.ImpactSummary.Truncated)
+		return nil
+	},
+}
+
+var knowledgeGraphValidationAcceptCmd = &cobra.Command{
+	Use:   "accept PLAN_ID",
+	Short: "Create an accepted revision from a current proposal",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		graph, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer graph.Close()
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		plan, err := canonical.GetValidationPlanRevision(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if err := ensurePlanMatchesDirectory(cmd.Context(), canonical, plan, identity); err != nil {
+			return err
+		}
+		if len(plan.ImpactSummary.ChangedSymbolIDs) == 0 {
+			return fmt.Errorf("validation plan has no resolved changed symbol")
+		}
+		if existing, err := canonical.AcceptedValidationPlanRevisionForProposal(cmd.Context(), plan.ID); err == nil {
+			if graphJSON {
+				return writeCommandJSON(cmd, existing)
+			}
+			cmd.Printf("Accepted validation plan %s revision %d\n", existing.ID, existing.Revision)
+			return nil
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		current, err := graph.CurrentRepositoryState(cmd.Context(), identity)
+		if err != nil {
+			return err
+		}
+		if current.GraphVersion != plan.GenerationID || current.WorktreeStateHash != plan.WorktreeStateHash {
+			return statepkg.ErrValidationProposalStale
+		}
+		decisions := make([]statepkg.ValidationItemDecision, 0, len(validationRequiredItems)+len(validationOptionalItems)+len(validationRejectedItems))
+		for _, id := range validationRequiredItems {
+			decisions = append(decisions, statepkg.ValidationItemDecision{ID: id, Disposition: "accepted", Requirement: "required"})
+		}
+		for _, id := range validationOptionalItems {
+			decisions = append(decisions, statepkg.ValidationItemDecision{ID: id, Disposition: "accepted", Requirement: "optional"})
+		}
+		for _, id := range validationRejectedItems {
+			decisions = append(decisions, statepkg.ValidationItemDecision{ID: id, Disposition: "rejected", Requirement: "optional"})
+		}
+		accepted, err := canonical.AcceptValidationPlanRevision(cmd.Context(), plan.ID, strings.TrimSpace(graphRunID), decisions)
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, accepted)
+		}
+		cmd.Printf("Accepted validation plan %s revision %d\n", accepted.ID, accepted.Revision)
+		return nil
+	},
+}
+
+var knowledgeGraphValidationRunCmd = &cobra.Command{
+	Use:   "run RUN_ID",
+	Short: "Register an external validation run in this checkout",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if validationMode != "read-only" && validationMode != "workspace-write" {
+			return fmt.Errorf("--mode must be read-only or workspace-write")
+		}
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		root, err := filepath.Abs(graphDirectory)
+		if err != nil {
+			return err
+		}
+		if existing, err := canonical.GetRun(cmd.Context(), args[0]); err != nil {
+			return err
+		} else if existing != nil {
+			if existing.ProjectPath != root || existing.Mode != validationMode {
+				return fmt.Errorf("run id already belongs to a different execution context")
+			}
+			if graphJSON {
+				return writeCommandJSON(cmd, existing)
+			}
+			cmd.Printf("Validation run %s already registered\n", existing.ID)
+			return nil
+		}
+		if err := canonical.CreateRun(cmd.Context(), args[0], "", "", root, validationMode); err != nil {
+			return err
+		}
+		created, err := canonical.GetRun(cmd.Context(), args[0])
+		if err != nil || created == nil || created.ProjectPath != root || created.Mode != validationMode {
+			return fmt.Errorf("run id was claimed by a different execution context")
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, created)
+		}
+		cmd.Printf("Registered validation run %s\n", args[0])
+		return nil
+	},
+}
+
+var knowledgeGraphValidationStepCmd = &cobra.Command{
+	Use:   "step RUN_ID STEP_ID",
+	Short: "Register a structured terminal step for an external run",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		validPhase := map[string]bool{"plan": true, "execute": true, "verify": true, "finalize": true}
+		validStatus := map[string]bool{"completed": true, "failed": true, "inconclusive": true, "unavailable": true}
+		if !validPhase[validationPhase] || !validStatus[validationStatus] || validationIteration < 1 {
+			return fmt.Errorf("step requires a valid phase, terminal status, and positive iteration")
+		}
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		root, _ := filepath.Abs(graphDirectory)
+		run, err := canonical.GetRun(cmd.Context(), args[0])
+		if err != nil || run == nil || run.ProjectPath != root {
+			return fmt.Errorf("validation run not found in this checkout")
+		}
+		if existing, err := canonical.GetRunStep(cmd.Context(), args[1]); err != nil {
+			return err
+		} else if existing != nil {
+			if existing.RunID != run.ID || existing.Phase != validationPhase || existing.Iteration != validationIteration || existing.Status != validationStatus {
+				return fmt.Errorf("run step id already belongs to different evidence")
+			}
+			cmd.Printf("Validation step %s already registered\n", existing.ID)
+			return nil
+		}
+		if err := canonical.AddRunStep(cmd.Context(), args[1], run.ID, "", validationPhase, validationIteration, validationStatus); err != nil {
+			return err
+		}
+		created, err := canonical.GetRunStep(cmd.Context(), args[1])
+		if err != nil || created == nil || created.RunID != run.ID || created.Phase != validationPhase || created.Iteration != validationIteration || created.Status != validationStatus {
+			return fmt.Errorf("run step id was claimed by different evidence")
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, created)
+		}
+		cmd.Printf("Registered validation step %s\n", args[1])
+		return nil
+	},
+}
+
+var knowledgeGraphValidationEvidenceCmd = &cobra.Command{
+	Use:   "evidence PLAN_ID",
+	Short: "Link one structured run step to an accepted validation item",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		graph, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		if err := graph.Close(); err != nil {
+			return err
+		}
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		plan, err := canonical.GetValidationPlanRevision(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if err := ensurePlanMatchesDirectory(cmd.Context(), canonical, plan, identity); err != nil {
+			return err
+		}
+		root, _ := filepath.Abs(graphDirectory)
+		run, err := canonical.GetRun(cmd.Context(), graphRunID)
+		if err != nil || run == nil || run.ProjectPath != root {
+			return fmt.Errorf("validation run not found in this checkout")
+		}
+		step, err := canonical.GetRunStep(cmd.Context(), validationStepID)
+		if err != nil || step == nil || step.RunID != run.ID {
+			return fmt.Errorf("validation run step not found")
+		}
+		if !statepkg.EvidenceStatusMatchesRunStep(validationEvidenceStatus, step.Status) {
+			return fmt.Errorf("evidence status does not match the structured run step")
+		}
+		itemBelongs := false
+		for _, item := range plan.Items {
+			itemBelongs = itemBelongs || item.ID == validationItemID
+		}
+		if !itemBelongs {
+			return fmt.Errorf("validation item does not belong to this plan revision")
+		}
+		link := statepkg.ValidationEvidenceLink{ValidationItemID: validationItemID, RunID: run.ID, RunStepID: step.ID, ArtifactHash: validationArtifact, WorktreeStateHash: plan.WorktreeStateHash, PatchHash: plan.PatchHash, Status: validationEvidenceStatus}
+		if err := canonical.LinkValidationEvidence(cmd.Context(), link); err != nil {
+			return err
+		}
+		cmd.Printf("Linked %s evidence to validation item %s\n", validationEvidenceStatus, validationItemID)
+		return nil
+	},
+}
+
+var knowledgeGraphValidationCompletionCmd = &cobra.Command{
+	Use:   "completion PLAN_ID",
+	Short: "Read or finalize an immutable completion report",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		graph, identity, err := openGraphStore(cmd.Context(), graphDirectory)
+		if err != nil {
+			return err
+		}
+		if err := graph.Close(); err != nil {
+			return err
+		}
+		canonical, err := openValidationState(graphDirectory)
+		if err != nil {
+			return err
+		}
+		defer canonical.Close()
+		plan, err := canonical.GetValidationPlanRevision(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		if err := ensurePlanMatchesDirectory(cmd.Context(), canonical, plan, identity); err != nil {
+			return err
+		}
+		var report statepkg.CompletionReport
+		if validationFinalize {
+			report, err = canonical.FinalizeEvidenceCoverage(cmd.Context(), args[0])
+		} else {
+			report, err = canonical.ReadCompletionReport(cmd.Context(), args[0])
+		}
+		if err != nil {
+			return err
+		}
+		if graphJSON {
+			return writeCommandJSON(cmd, report)
+		}
+		cmd.Printf("Completion report %s: can_complete=%t; verified=%d; not_verified=%d\n", report.ID, report.CanComplete, len(report.Verified), len(report.NotVerified))
+		return nil
+	},
 }
 
 var knowledgeGraphScanCmd = &cobra.Command{
@@ -166,15 +526,67 @@ var knowledgeGraphDependenciesCmd = &cobra.Command{
 }
 
 var knowledgeGraphImpactCmd = &cobra.Command{
-	Use:   "impact SYMBOL_ID...",
+	Use:   "impact [SYMBOL_ID...]",
 	Short: "Explain a bounded affected set and validation recommendations",
-	Args:  cobra.MinimumNArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 && len(graphImpactFiles) == 0 {
+			return fmt.Errorf("impact requires symbol ids or --files")
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		store, identity, err := openGraphStore(cmd.Context(), graphDirectory)
 		if err != nil {
 			return err
 		}
 		defer store.Close()
+		if len(graphImpactFiles) > 0 {
+			result, err := store.ChangedImpactAnalysis(cmd.Context(), identity, knowledge.ChangedImpactRequest{
+				Files: graphImpactFiles, SymbolIDs: args, MaxDepth: graphImpactDepth,
+			}, knowledge.DefaultChangedImpactLimits())
+			if err != nil {
+				return err
+			}
+			if graphJSON {
+				return writeCommandJSON(cmd, result)
+			}
+			cmd.Printf("Changed impact: %s [%s]\n", result.Resolution.Status, result.Generation.Freshness)
+			for _, symbol := range result.ChangedSymbols {
+				cmd.Printf("  changed: %s\n", symbol.QualifiedName)
+			}
+			for _, caller := range result.Propagation.DirectCallers {
+				cmd.Printf("  caller: %s\n", caller.Node.QualifiedName)
+			}
+			for _, caller := range result.Propagation.AffectedCallers {
+				cmd.Printf("  affected caller: %s\n", caller.Node.QualifiedName)
+			}
+			for _, dependant := range result.Propagation.ModuleDependants {
+				cmd.Printf("  module dependant: %s\n", dependant.Node.QualifiedName)
+			}
+			for _, effect := range result.Propagation.OperationalEffects {
+				cmd.Printf("  operational effect: %s\n", effect.Node.QualifiedName)
+			}
+			for _, test := range result.Propagation.RelatedTests {
+				cmd.Printf("  test candidate: %s (%s)\n", test.FilePath, test.Reason)
+			}
+			for _, file := range result.UnresolvedFiles {
+				cmd.Printf("  unresolved file: %s\n", file)
+			}
+			printed := map[string]bool{}
+			for _, limitation := range result.Unresolved {
+				cmd.Printf("  unresolved: %s\n", limitation)
+				printed[limitation] = true
+			}
+			for _, limitation := range result.Limitations {
+				if !printed[limitation] {
+					cmd.Printf("  limitation: %s\n", limitation)
+				}
+			}
+			if result.Truncated {
+				cmd.Println("  result truncated by graph limits")
+			}
+			return nil
+		}
 		result, err := store.ImpactAnalysis(cmd.Context(), identity, args, graphImpactDepth, knowledge.DefaultGraphLimits())
 		if err != nil {
 			return err
@@ -590,7 +1002,14 @@ func init() {
 	knowledgeGraphDependenciesCmd.Flags().IntVar(&graphDepth, "depth", 1, "bounded traversal depth")
 	knowledgeGraphCallsCmd.Flags().StringVar(&graphCallDirection, "direction", "outgoing", "call direction: outgoing or incoming")
 	knowledgeGraphCallsCmd.Flags().IntVar(&graphCallDepth, "depth", 1, "bounded traversal depth")
-	knowledgeGraphImpactCmd.Flags().IntVar(&graphImpactDepth, "depth", 2, "bounded traversal depth")
+	knowledgeGraphImpactCmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == "depth" {
+			return pflag.NormalizedName("max-depth")
+		}
+		return pflag.NormalizedName(name)
+	})
+	knowledgeGraphImpactCmd.Flags().IntVar(&graphImpactDepth, "max-depth", 2, "bounded traversal depth")
+	knowledgeGraphImpactCmd.Flags().StringSliceVar(&graphImpactFiles, "files", nil, "repository-relative changed files (comma-separated or repeated)")
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleURL, "console-url", "", "Agent Console base URL")
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleProject, "console-project", "", "Agent Console checkout ID")
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphConsoleTokenFile, "console-token-file", "", "file containing the Agent Console bearer token (or export AGENT_CONSOLE_TOKEN)")
@@ -600,7 +1019,39 @@ func init() {
 	knowledgeGraphPublishCmd.Flags().StringVar(&graphPlanID, "plan", "", "OpenExec validation-plan reference")
 	_ = knowledgeGraphPublishCmd.MarkFlagRequired("console-url")
 	_ = knowledgeGraphPublishCmd.MarkFlagRequired("console-project")
+	validationCommands := []*cobra.Command{knowledgeGraphValidationProposeCmd, knowledgeGraphValidationShowCmd, knowledgeGraphValidationAcceptCmd, knowledgeGraphValidationRunCmd, knowledgeGraphValidationStepCmd, knowledgeGraphValidationEvidenceCmd, knowledgeGraphValidationCompletionCmd}
+	for _, command := range validationCommands {
+		command.Flags().StringVarP(&graphDirectory, "directory", "d", ".", "repository directory")
+		command.Flags().BoolVar(&graphJSON, "json", false, "emit machine-readable JSON")
+		_ = command.MarkFlagRequired("directory")
+	}
+	knowledgeGraphValidationProposeCmd.Flags().StringVar(&graphTaskID, "task", "", "external task identity")
+	knowledgeGraphValidationProposeCmd.Flags().StringVar(&graphRunID, "run", "", "external planning run identity")
+	knowledgeGraphValidationProposeCmd.Flags().StringVar(&validationPatchHash, "patch-hash", "", "patch identity for post-change validation")
+	knowledgeGraphValidationProposeCmd.Flags().StringSliceVar(&validationFiles, "files", nil, "repository-relative changed files (comma-separated or repeated)")
+	knowledgeGraphValidationProposeCmd.Flags().StringSliceVar(&validationSymbolIDs, "symbol-id", nil, "stable changed symbol id (repeatable)")
+	knowledgeGraphValidationProposeCmd.Flags().IntVar(&validationDepth, "max-depth", 2, "bounded traversal depth")
+	knowledgeGraphValidationAcceptCmd.Flags().StringVar(&graphRunID, "run", "", "external run identity to bind")
+	knowledgeGraphValidationAcceptCmd.Flags().StringSliceVar(&validationRequiredItems, "require-item", nil, "proposal item id to accept as required (repeatable)")
+	knowledgeGraphValidationAcceptCmd.Flags().StringSliceVar(&validationOptionalItems, "optional-item", nil, "proposal item id to accept as optional (repeatable)")
+	knowledgeGraphValidationAcceptCmd.Flags().StringSliceVar(&validationRejectedItems, "reject-item", nil, "proposal item id to reject (repeatable)")
+	knowledgeGraphValidationRunCmd.Flags().StringVar(&validationMode, "mode", "read-only", "run access mode")
+	knowledgeGraphValidationStepCmd.Flags().StringVar(&validationPhase, "phase", "verify", "structured phase")
+	knowledgeGraphValidationStepCmd.Flags().StringVar(&validationStatus, "status", "completed", "terminal step status")
+	knowledgeGraphValidationStepCmd.Flags().IntVar(&validationIteration, "iteration", 1, "step iteration")
+	knowledgeGraphValidationEvidenceCmd.Flags().StringVar(&validationItemID, "item", "", "accepted validation item identity")
+	knowledgeGraphValidationEvidenceCmd.Flags().StringVar(&graphRunID, "run", "", "registered validation run identity")
+	knowledgeGraphValidationEvidenceCmd.Flags().StringVar(&validationStepID, "step", "", "registered run step identity")
+	knowledgeGraphValidationEvidenceCmd.Flags().StringVar(&validationArtifact, "artifact", "", "optional registered artifact hash")
+	knowledgeGraphValidationEvidenceCmd.Flags().StringVar(&validationEvidenceStatus, "status", "passed", "evidence status")
+	knowledgeGraphValidationCompletionCmd.Flags().BoolVar(&validationFinalize, "finalize", false, "freeze the current evidence coverage")
+	_ = knowledgeGraphValidationProposeCmd.MarkFlagRequired("task")
+	_ = knowledgeGraphValidationEvidenceCmd.MarkFlagRequired("item")
+	_ = knowledgeGraphValidationEvidenceCmd.MarkFlagRequired("run")
+	_ = knowledgeGraphValidationEvidenceCmd.MarkFlagRequired("step")
+	knowledgeGraphValidationCmd.AddCommand(validationCommands...)
 	knowledgeGraphCmd.AddCommand(knowledgeGraphScanCmd, knowledgeGraphRefreshCmd, knowledgeGraphSymbolCmd, knowledgeGraphDependenciesCmd, knowledgeGraphCallsCmd, knowledgeGraphImpactCmd, knowledgeGraphStatusCmd, knowledgeGraphPublishCmd)
+	knowledgeGraphCmd.AddCommand(knowledgeGraphValidationCmd)
 	knowledgeCmd.AddCommand(knowledgeLsCmd)
 	knowledgeCmd.AddCommand(knowledgeShowCmd)
 	knowledgeCmd.AddCommand(knowledgeInitCmd)

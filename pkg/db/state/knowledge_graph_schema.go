@@ -5,9 +5,6 @@ import (
 	"fmt"
 )
 
-// KnowledgeGraphSchemaVersion is the current additive repository graph schema.
-const KnowledgeGraphSchemaVersion = 1
-
 // KnowledgeGraphSchema extends the legacy symbols table without replacing it.
 // The legacy table remains readable until a separately approved deprecation.
 const KnowledgeGraphSchema = `
@@ -192,6 +189,9 @@ CREATE TABLE IF NOT EXISTS validation_plan_revisions (
     generation_id TEXT NOT NULL,
     worktree_state_hash TEXT NOT NULL,
     patch_hash TEXT NOT NULL DEFAULT '',
+    impact_query TEXT NOT NULL DEFAULT '{}',
+    impact_summary TEXT NOT NULL DEFAULT '{}',
+    source_revision_id TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL CHECK (status IN ('proposed','accepted','superseded')),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     accepted_at DATETIME DEFAULT NULL,
@@ -239,6 +239,14 @@ CREATE TABLE IF NOT EXISTS completion_claims (
     FOREIGN KEY (validation_item_id) REFERENCES validation_items(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS completion_reports (
+    id TEXT PRIMARY KEY,
+    plan_revision_id TEXT NOT NULL UNIQUE,
+    report_json TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (plan_revision_id) REFERENCES validation_plan_revisions(id) ON DELETE RESTRICT
+);
+
 CREATE INDEX IF NOT EXISTS idx_checkouts_repository ON checkouts(repository_id);
 CREATE INDEX IF NOT EXISTS idx_worktrees_repository ON worktrees(repository_id);
 CREATE INDEX IF NOT EXISTS idx_generations_worktree_status ON graph_generations(worktree_id, status, created_at DESC);
@@ -265,8 +273,48 @@ func EnsureKnowledgeGraphSchema(db *sql.DB) error {
 	if _, err := tx.Exec(KnowledgeGraphSchema); err != nil {
 		return fmt.Errorf("apply knowledge graph schema: %w", err)
 	}
+	for _, column := range [][2]string{
+		{"impact_query", "TEXT NOT NULL DEFAULT '{}'"},
+		{"impact_summary", "TEXT NOT NULL DEFAULT '{}'"},
+		{"source_revision_id", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if err := ensureKnowledgeGraphColumn(tx, "validation_plan_revisions", column[0], column[1]); err != nil {
+			return fmt.Errorf("migrate validation_plan_revisions.%s: %w", column[0], err)
+		}
+	}
+	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_validation_plan_source_revision ON validation_plan_revisions(source_revision_id) WHERE source_revision_id <> ''`); err != nil {
+		return fmt.Errorf("create validation source revision index: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit knowledge graph migration: %w", err)
 	}
 	return nil
+}
+
+func ensureKnowledgeGraphColumn(tx *sql.Tx, table, column, definition string) error {
+	rows, err := tx.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	found := false
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, columnType string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == column {
+			found = true
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if found {
+		return nil
+	}
+	_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
+	return err
 }

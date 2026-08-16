@@ -184,13 +184,17 @@ func (s *Store) FindSymbolRelationships(ctx context.Context, identity Repository
 				break
 			}
 			var found []GraphEdge
+			var edgeLimitReached bool
 			if incoming {
-				found, err = s.loadIncomingImpactEdges(ctx, generation.ID, current, edgeTypes, remaining)
+				found, edgeLimitReached, err = s.loadIncomingImpactEdges(ctx, generation.ID, current, edgeTypes, remaining)
 			} else {
-				found, err = s.loadOutgoingImpactEdges(ctx, generation.ID, current, edgeTypes, remaining)
+				found, edgeLimitReached, err = s.loadOutgoingImpactEdges(ctx, generation.ID, current, edgeTypes, remaining)
 			}
 			if err != nil {
 				return QueryEnvelope[RelationshipResult]{}, err
+			}
+			if edgeLimitReached {
+				truncated = true
 			}
 			for _, edge := range found {
 				edges = append(edges, edge)
