@@ -76,6 +76,29 @@ type Store struct {
 }
 
 func NewStore(projectDir string) (*Store, error) {
+	// The store owns .openexec. It does not own the repository around it.
+	//
+	// MkdirAll below creates every missing parent, so a projectDir that was not
+	// on disk used to be conjured rather than refused. Agent Console runs a
+	// knowledge refresh per registered checkout, so seconds after every boot it
+	// recreated the directory of each project whose folder the owner had
+	// deleted — empty, with a fresh database, and indistinguishable from a real
+	// checkout to anything that asks the filesystem. A deleted repository came
+	// back looking live, and deleting it again never helped, because the
+	// registration is what drives the refresh.
+	//
+	// mcp_serve already guards its own call site against this ("would otherwise
+	// create .openexec in a directory the user never initialized"). This is the
+	// same rule, applied once, where the directory is actually created — a
+	// caller pointed at nothing is told so instead of being handed a new
+	// workspace it did not ask for.
+	info, err := os.Stat(projectDir)
+	if err != nil {
+		return nil, fmt.Errorf("knowledge store: no repository at %q: %w", projectDir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("knowledge store: %q is not a directory", projectDir)
+	}
 	// For standalone usage, default to the unified db path
 	dbPath := filepath.Join(projectDir, ".openexec", "openexec.db")
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
