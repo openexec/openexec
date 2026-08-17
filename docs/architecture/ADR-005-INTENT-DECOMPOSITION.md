@@ -1,10 +1,11 @@
 # ADR-005: Intent Decomposition & The Execution Loop
 
 *   **ID:** ADR-005
-*   **Status:** Approved
+*   **Status:** Approved; product-definition ordering amended 2026-08-17
 *   **Author:** Systems Architect
 *   **Date:** 2026-06-06
 *   **Decides on:** Task Breakdown, Branching, and the Coding Loop
+*   **Amended by:** [`docs/EXPERIENCE_FIRST_OPERATING_MODEL.md`](../EXPERIENCE_FIRST_OPERATING_MODEL.md)
 
 ---
 
@@ -19,11 +20,34 @@ When a user asks to "Build a complete billing dashboard," handing the entire int
 ## 3. Architectural Decision (The Chosen Path)
 We mandate a strict **Intent Decomposition Pipeline** utilizing Git Branching and scoped state machines.
 
+### 2026-08-17 ordering amendment
+
+The hierarchy below originally placed an architecture-bearing Blueprint
+directly after raw human intent. The documentation-level direction for new
+initiatives is that decomposition begins only after an owner-authored root
+`PROJECT_INTENT.md` and an owner-accepted Experience Contract establish the
+outcome and workflow:
+
+```text
+PROJECT_INTENT.md -> Experience Contract -> Workflow -> Capabilities
+    -> Blueprint/Architecture -> Stories -> Tasks
+```
+
+A wizard-generated root `INTENT.md`, if present, is a derived execution
+specification and cannot substitute for `PROJECT_INTENT.md`; OpenExec has no
+such file as of 2026-08-17. This amendment records target product direction,
+not a shipped runtime refusal. The E2 gate in the operating model remains
+proposed. Until it ships, in-flight work and the execution engine continue
+under the previously implemented ordering. The amendment does not change this
+ADR's bounded story/task decomposition, branch isolation, verification, or
+human merge review.
+
 ### The Decomposition Hierarchy
-1.  **Intent:** The human's raw input (e.g., "Build a billing dashboard").
-2.  **Blueprint:** The orchestrator defines constraints, architecture, and dependencies.
-3.  **Stories:** User-visible outcomes (e.g., "User can view invoice history").
-4.  **Tasks:** Executable code units (e.g., "Implement `InvoiceTable.tsx`", "Add `GET /invoices` route").
+1.  **Owner Project Definition:** The owner-authored purpose and constraints in root `PROJECT_INTENT.md`.
+2.  **Experience and Workflow:** The owner-accepted customer outcome and simplest successful journey.
+3.  **Blueprint:** The orchestrator derives constraints, architecture, and dependencies from the accepted experience.
+4.  **Stories:** User-visible outcomes (e.g., "User can view invoice history").
+5.  **Tasks:** Executable code units (e.g., "Implement `InvoiceTable.tsx`", "Add `GET /invoices` route").
 
 ### The Coding and Review Loop
 When a Task is popped from the `.openexec.db` backlog:

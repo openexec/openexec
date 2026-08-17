@@ -26,8 +26,8 @@ OpenExec strictly enforces **ADR-Driven Development** (inspired by the decentral
     *Status:* Approved | *Implementation:* Shipped  
     *Summary:* Replaces open-ended conversational REPLs with a strict 5-stage state-machine pipeline.
 *   [**ADR-005: Intent Decomposition & Task Pipeline**](./ADR-005-INTENT-DECOMPOSITION.md)  
-    *Status:* Approved | *Implementation:* Shipped  
-    *Summary:* Breaks human intent into Blueprints, Stories, and branch-isolated Tasks.
+    *Status:* Approved, ordering amended 2026-08-17 | *Implementation:* Shipped except the proposed experience gate
+    *Summary:* Breaks accepted experience into Blueprints, Stories, and branch-isolated Tasks. The [experience-first amendment](../EXPERIENCE_FIRST_OPERATING_MODEL.md) places owner-authored purpose, outcome, and workflow before architecture; its enforcement is not yet built.
 *   [**ADR-006: Multi-Provider Routing & Pointer Records**](./ADR-006-MULTI-PROVIDER-ROUTING.md)  
     *Status:* Approved | *Implementation:* Shipped  
     *Summary:* Agnostic HTTP API adapters (Claude/Gemini/Ollama) and AST-based context extraction.
@@ -107,4 +107,4 @@ The tactical plan for simplifying and stabilizing the codebase.
 *   [**Elixir/BEAM Orchestrator**](./ELIXIR_BEAM_ORCHESTRATOR.md) — Research on high-scale, supervisor-tree concurrency using the BEAM virtual machine.
 
 ---
-*Last Updated: 2026-06-06 — Registry Expanded to 19 Canonical ADRs*
+*Last Updated: 2026-08-17 — ADR-005 ordering direction amended; 19 Canonical ADRs*
