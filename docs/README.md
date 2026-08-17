@@ -55,7 +55,7 @@ citing anything below it as built.
 
 | Document | State |
 |---|---|
-| [EXPERIENCE_FIRST_OPERATING_MODEL.md](EXPERIENCE_FIRST_OPERATING_MODEL.md) | Owner-directed Experience First and Finish What Matters operating model, with E0–E4 and F1–F3 implementation stages. Documented, not enforced. OpenExec still lacks its owner-authored root `PROJECT_INTENT.md`. |
+| [EXPERIENCE_FIRST_OPERATING_MODEL.md](EXPERIENCE_FIRST_OPERATING_MODEL.md) | Owner-directed Experience First and Finish What Matters operating model, including focus, magical moment, demo, website/pitch communication, whole-product and Taste Reviews, with E0–E4 and F1–F3 implementation stages. Documented, not enforced. OpenExec still lacks its owner-authored root `PROJECT_INTENT.md`. |
 | [IMPACT_MANIFEST_FOR_CONSOLE_PLAN.md](IMPACT_MANIFEST_FOR_CONSOLE_PLAN.md) | Plan, not started (2026-08-04). |
 | [future/](future/) | Explicitly speculative: operational memory layer, policy sandbox contract, timeline replay. |
 

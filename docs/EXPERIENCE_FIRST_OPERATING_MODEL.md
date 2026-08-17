@@ -46,6 +46,15 @@ task manager. For another OpenExec product, the named customer comes from that
 product's owner-authored `PROJECT_INTENT.md`; it must not be copied from Agent
 Console merely because the technology is shared.
 
+Every initiative also has one **experience owner** with authority over
+coherence. That person decides the primary customer, hero workflow, magical
+moment, removal boundary, and whether the whole result feels like one product.
+Agents may investigate and implement in parallel, but they do not independently
+define competing product directions. For Agent Console, the experience owner
+is the owner and primary user identified in `PROJECT_INTENT.md`. The system's
+job is to preserve that person's accepted decisions so coherence does not
+require repeated supervision.
+
 ## Authority and decision order
 
 OpenExec exists to turn intent into bounded, trustworthy execution. It must not
@@ -203,6 +212,22 @@ Success measurement:
 Validation source:
 Unanswered owner questions:
 ```
+
+The magical moment is not a slogan. Expand it into the following required
+block so product design and communication refer to the same observable
+transformation:
+
+```markdown
+Magical moment:
+What becomes possible:
+What frustration disappears:
+Time until the person experiences it:
+Evidence that makes it believable:
+```
+
+“Wow” must come from a meaningful limitation disappearing, not from decorative
+animation, inflated claims, or technology presented without a human
+consequence.
 
 ### Feature contract
 
@@ -511,6 +536,17 @@ deliberately excluded, not by how many ideas were generated.
 The machine should always recommend at least one removal or simplification. The
 owner decides whether to accept it.
 
+This is the **Focus Gate**:
+
+> If removing a capability does not weaken the hero experience, remove it from
+> the current slice.
+
+For a hackathon, one unforgettable complete workflow is preferred to several
+partially demonstrated capabilities. Secondary personas, advanced
+configuration, general-purpose builders, competing demonstrations, and
+infrastructure without a trace to the hero journey belong in `Not doing` by
+default.
+
 ## Demo-first design and communication
 
 The demo is a design tool before it becomes marketing. Write the shortest
@@ -566,6 +602,44 @@ Exact claims for each product must come from that product's owner-authored
 invent the customer or promise from repository technology. A generated
 `INTENT.md` cannot authorize a website claim by itself.
 
+### One experience, several communication forms
+
+The accepted Experience Contract and Demo Contract are the source for product
+communication, not merely inputs to implementation. They derive:
+
+- the product's one-sentence promise;
+- the website hero, problem, workflow, proof, and recovery story;
+- the 90-second live demonstration;
+- the pitch deck narrative;
+- hackathon submission copy and judging presentation;
+- onboarding, release, and stakeholder communication.
+
+These are different lengths of the same claim. They must not invent different
+customers, promises, magical moments, or evidence for different channels.
+Technology appears only where it explains why the accepted benefit is now
+possible or trustworthy.
+
+A minimal pitch deck follows the experience rather than the architecture:
+
+```text
+1. Person and painful situation
+2. Cost of the current workaround
+3. One clear promise
+4. Hero workflow
+5. Magical moment
+6. Result and evidence
+7. Failure, recovery, and user control
+8. Why this matters now
+9. Technology and defensibility, traced to the experience
+10. The one thing the audience should remember or do next
+```
+
+If a slide, website section, or technical diagram cannot be traced to a beat in
+the accepted experience, it waits. Communication is therefore an early design
+instrument: difficulty explaining the transformation is evidence that the
+product definition is still unclear, not a marketing problem to solve after
+implementation.
+
 ## Whole-product review
 
 A capability is reviewed from discovery through recovery:
@@ -588,6 +662,48 @@ The review covers:
 Backend presence, a settings field, a merged bundle, and isolated unit tests are
 intermediate evidence. Completion requires the accepted journey through the
 running product, including a failure branch and a persistence check.
+
+## Taste review
+
+Correctness proves that behavior satisfies a specification. It does not prove
+that the experience is clear, coherent, desirable, or memorable. Taste is an
+explicit owner review and cannot be replaced by a test suite or a score an
+agent can optimize.
+
+The review asks:
+
+- Is the hierarchy immediately obvious?
+- Is the primary action where the person naturally looks?
+- Does the copy communicate a benefit rather than machinery?
+- Is anything competing with the magical moment?
+- Do empty, waiting, failure, recovery, and success feel intentional?
+- Is the whole experience coherent on a phone?
+- Does setup, use, evidence, and recovery feel like one product?
+- What would the experience owner remove if thirty percent had to disappear?
+
+The output is a small list of owner judgments, removals, and unresolved taste
+questions. It is kept separate from functional defects so green tests cannot
+be misreported as product coherence.
+
+## Building taste through outside domains
+
+OpenExec should not become another agent framework whose only references are
+other agent frameworks. During experience work, deliberately collect useful
+patterns from domains with different strengths:
+
+- games for feedback, progression, and legible state;
+- aviation for operational clarity and recovery under pressure;
+- consumer devices for setup and useful defaults;
+- film for narrative, pacing, and revelation;
+- banking for trust, confirmation, and reversibility;
+- emergency systems for escalation and recovery;
+- hospitality for anticipating needs without demanding attention.
+
+Inspiration is evidence for an option, not authority to copy a surface. Every
+borrowed pattern still has to reduce the real customer's effort or strengthen
+the hero experience. The distinctive opportunity is the combination of senior
+engineering judgment, ADHD-aware attention design, governance, and remote
+operation—not novelty in agent technology alone.
 
 ## Traceability into architecture and implementation
 
@@ -634,18 +750,24 @@ and `Not required for Done` list. The owner accepts or refines the boundary.
 Inspect the actual interface and wording. Record concrete experience-debt
 deltas. Do not replace this with a numerical score.
 
-### 4. Architecture Review
+### 4. Taste Review
+
+The experience owner reviews hierarchy, coherence, benefit-led language,
+intentional states, phone use, and what can still be removed. Functional tests
+are evidence but cannot pass this judgment.
+
+### 5. Architecture Review
 
 Now choose how to deliver the accepted experience. Every significant choice
 includes its customer-value trace.
 
-### 5. Closure Review
+### 6. Closure Review
 
 When the accepted capability exists, enter Finish explicitly. Review remaining
 conditions, park unrelated work, name blockers, and identify the next smallest
 closure action. The machine may propose Done but cannot accept it.
 
-### 6. Running Journey Review
+### 7. Running Journey Review
 
 Exercise the accepted path in the production-shaped build on its target device,
 including failure, recovery, and persistence. Only this stage can mark the
