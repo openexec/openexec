@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/openexec/openexec/internal/toolset"
@@ -86,6 +87,24 @@ var deterministicToolMatches = []deterministicToolMatch{
 	{[]string{"can you explain", "understand", "help"}, GeneralChatTool, 0.7},
 }
 
+// wordBoundaryKeywords are keywords that must match on whole-word boundaries
+// rather than as substrings. Bare "diff" would otherwise match "difference",
+// "different", etc. and misroute chat queries to git_diff. Phrases containing
+// these words (e.g. "git diff") still match — the boundary check sees "diff"
+// as a whole word within them.
+var wordBoundaryKeywords = map[string]*regexp.Regexp{
+	"diff": regexp.MustCompile(`\bdiff\b`),
+}
+
+// keywordMatches reports whether kw is present in text. Keywords listed in
+// wordBoundaryKeywords require a whole-word match; all others match as substrings.
+func keywordMatches(text, kw string) bool {
+	if re, ok := wordBoundaryKeywords[kw]; ok {
+		return re.MatchString(text)
+	}
+	return strings.Contains(text, kw)
+}
+
 // ParseIntent takes natural language and returns a deterministic tool call
 // based on keyword matching. No model inference is performed.
 func (r *DeterministicRouter) ParseIntent(ctx context.Context, query string) (*Intent, error) {
@@ -94,7 +113,7 @@ func (r *DeterministicRouter) ParseIntent(ctx context.Context, query string) (*I
 	// Check each tool match rule in order
 	for _, match := range deterministicToolMatches {
 		for _, kw := range match.keywords {
-			if strings.Contains(lower, kw) {
+			if keywordMatches(lower, kw) {
 				return &Intent{
 					ToolName:   match.toolName,
 					Args:       map[string]interface{}{"query": query},

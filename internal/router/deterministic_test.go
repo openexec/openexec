@@ -86,6 +86,34 @@ func TestDeterministicRouter_ParseIntent_Explain(t *testing.T) {
 	}
 }
 
+func TestDeterministicRouter_ParseIntent_DiffWordBoundary(t *testing.T) {
+	r := NewDeterministicRouter()
+	cases := []struct {
+		query string
+		want  string
+	}{
+		// Bare "diff" as a whole word routes to git_diff.
+		{"show me the diff", "git_diff"},
+		{"git diff HEAD~1", "git_diff"},
+		// "diff" embedded in another word must NOT route to git_diff.
+		{"what is the difference between these two approaches?", GeneralChatTool},
+		// Contract AC #1: the literal example query must NOT route to git_diff.
+		// It resolves to list_directory (the "list" keyword precedes the diff
+		// rule), which is the honest actual result; the invariant this change
+		// delivers is only that "difference" no longer reaches git_diff.
+		{"what is the difference between a list and a tuple?", "list_directory"},
+	}
+	for _, tc := range cases {
+		intent, err := r.ParseIntent(context.Background(), tc.query)
+		if err != nil {
+			t.Fatalf("query %q: unexpected error: %v", tc.query, err)
+		}
+		if intent.ToolName != tc.want {
+			t.Errorf("query %q: expected tool_name %q, got %q", tc.query, tc.want, intent.ToolName)
+		}
+	}
+}
+
 func TestDeterministicRouter_RegisterTool(t *testing.T) {
 	r := NewDeterministicRouter()
 	err := r.RegisterTool("my_tool", "does things", `{"type":"object"}`)
