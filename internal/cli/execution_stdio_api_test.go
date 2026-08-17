@@ -62,7 +62,7 @@ func writeProjectConfig(t *testing.T, active string) string {
 // its default the OpenAI client claims the whole hosted catalogue, which sends
 // Probe's readiness prompt to gpt-4o against an endpoint serving Qwen.
 func TestAPIProviderAdvertisesOnlyConfiguredModel(t *testing.T) {
-	provider, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, "qwen-gpu0"), "qwen-gpu0", readOnly, "")
+	provider, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, "qwen-gpu0"), "qwen-gpu0", readOnly, toolGateway{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestAPIProviderSelectionIgnoresActiveProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider, err := newConfiguredAPIProvider(context.Background(), directory, "qwen-coder-gpu1", readOnly, "")
+	provider, err := newConfiguredAPIProvider(context.Background(), directory, "qwen-coder-gpu1", readOnly, toolGateway{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestAPIProviderSelectionIgnoresActiveProvider(t *testing.T) {
 }
 
 func TestAPIProviderUnknownNameListsConfigured(t *testing.T) {
-	_, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, "qwen-gpu0"), "qwen-gpu7", readOnly, "")
+	_, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, "qwen-gpu0"), "qwen-gpu7", readOnly, toolGateway{})
 	if err == nil {
 		t.Fatal("expected an error for an unconfigured provider name")
 	}
@@ -119,14 +119,14 @@ func TestAPIProviderUnknownNameListsConfigured(t *testing.T) {
 // scrubbed environment. The failure has to name the field, not surface as an
 // authentication problem against a local endpoint that has no auth.
 func TestAPIProviderRejectsUnresolvedKeyReference(t *testing.T) {
-	_, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, "qwen-gpu0"), "needs-env", readOnly, "")
+	_, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, "qwen-gpu0"), "needs-env", readOnly, toolGateway{})
 	if err == nil || !strings.Contains(err.Error(), "api_key") {
 		t.Fatalf("error = %v, want one naming api_key", err)
 	}
 }
 
 func TestAPIProviderRequiresName(t *testing.T) {
-	if _, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, ""), "", readOnly, ""); err == nil {
+	if _, err := newConfiguredAPIProvider(context.Background(), writeProjectConfig(t, ""), "", readOnly, toolGateway{}); err == nil {
 		t.Fatal("expected an error when --api-provider is omitted")
 	}
 }
@@ -183,7 +183,7 @@ func TestAPIProviderLiveOllama(t *testing.T) {
 	_ = connection.Close()
 
 	directory := writeProjectConfig(t, "qwen-gpu0")
-	provider, err := newConfiguredAPIProvider(context.Background(), directory, "qwen-gpu0", readOnly, "")
+	provider, err := newConfiguredAPIProvider(context.Background(), directory, "qwen-gpu0", readOnly, toolGateway{})
 	if err != nil {
 		t.Fatal(err)
 	}

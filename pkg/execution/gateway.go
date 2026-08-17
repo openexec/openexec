@@ -104,10 +104,28 @@ func (e *GatewayToolExecutor) ValidateAccess(workingDir string, sandbox Sandbox,
 	return nil
 }
 
+// servesGateway marks this executor as forwarding verbs to a caller-owned
+// endpoint. Read through an interface rather than a type assertion, because a
+// composite executor forwards some of its verbs and owns the rest, and a
+// provider that decided by concrete type reported that one as having no
+// gateway — a false capability in the direction that matters.
+func (e *GatewayToolExecutor) servesGateway() bool { return true }
+
 func (e *GatewayToolExecutor) ExecuteTool(ctx context.Context, request ToolRequest) (string, error) {
 	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
 		return "", err
 	}
+	return e.executeAuthorized(ctx, request)
+}
+
+// executeAuthorized forwards a call whose access has already been decided.
+//
+// Split from ExecuteTool for the composite executor, where the standalone
+// read-only rule is the wrong question: those runs are authorized as a whole
+// by the workspace executor, against the sandbox and roots the caller granted.
+// The name check stays here, on every path — it is what keeps a model to the
+// verbs the endpoint actually offered.
+func (e *GatewayToolExecutor) executeAuthorized(ctx context.Context, request ToolRequest) (string, error) {
 	if !e.offers(request.Name) {
 		// The model invented a name, or a gateway changed under a running
 		// turn. Either way this is not one of the verbs that was authorized.

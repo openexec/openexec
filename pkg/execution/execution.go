@@ -54,11 +54,31 @@ type Request struct {
 	// that history lives inside the CLI and must not be duplicated here.
 	History []HistoryMessage
 	// ToolGateway is a per-run loopback endpoint offering tools that belong to
-	// the caller rather than to OpenExec — console state a model may read,
-	// which OpenExec has no business implementing and must not approximate
-	// with a shell. Mutually exclusive with the workspace tools: a run either
-	// touches files or asks the console questions, never both.
+	// the caller rather than to OpenExec — console state a model may read, or
+	// commands the caller executes under its own approval, neither of which
+	// OpenExec has any business implementing or approximating with a shell.
 	ToolGateway string
+	// ToolGatewayScope says what the endpoint above is being used for, and so
+	// what may run beside it.
+	//
+	// Empty — the original meaning, and still the default — is a gateway that
+	// stands alone: console state, read-only, no workspace tools. A run either
+	// touches files or asks the console about itself, never both, because
+	// reaching console state and the repository in one turn is the pairing
+	// that has no defensible story.
+	//
+	// GatewayScopeWithWorkspace is a different endpoint doing a different job:
+	// the caller's own execution verbs — run a command, push — offered beside
+	// the workspace tools. That combination is not new authority. It is what
+	// every agent CLI on this contract already has, and withholding it from an
+	// API provider was an artifact of the gateway having been built for the
+	// console-state case first, not a decision about local models.
+	//
+	// Named on the wire rather than inferred from the sandbox mode so the
+	// default is the strict one: a caller that sets a gateway without saying
+	// why gets the standalone rule, and an older runtime paired with a newer
+	// caller refuses instead of silently combining the two.
+	ToolGatewayScope string
 	// NetworkAccess and NativeSessionID keep their meaning.
 	NetworkAccess   bool
 	NativeSessionID string
@@ -150,6 +170,9 @@ const (
 const (
 	SandboxReadOnly       = "read-only"
 	SandboxWorkspaceWrite = "workspace-write"
+	// GatewayScopeWithWorkspace lets the caller's execution verbs run beside
+	// the workspace tools. See Request.ToolGatewayScope.
+	GatewayScopeWithWorkspace = "with-workspace"
 )
 
 // Executor performs an authorized request. Implementations must return a
@@ -177,12 +200,25 @@ type Capability struct {
 	// an older binary ignores the field, runs the workspace tools instead, and
 	// the caller learns that the "administrative" turn read its repository
 	// only by reading the transcript afterwards.
-	ToolGateway    bool `json:"tool_gateway"`
-	Cancellation   bool `json:"cancellation"`
-	ReadOnly       bool `json:"read_only"`
-	WorkspaceWrite bool `json:"workspace_write"`
-	CommandNetwork bool `json:"command_network"`
-	ToolCalling    bool `json:"tool_calling"`
+	ToolGateway bool `json:"tool_gateway"`
+	// ToolGatewayWithWorkspace is the ability to run a gateway's verbs *beside*
+	// the workspace tools. A separate bit from ToolGateway, and it has to be:
+	// every runtime that forwards console state already answers true to that
+	// one, including every build made before this scope existed. A caller that
+	// read the general bit as consent to the new scope would send it to a
+	// runtime that ignores the unknown field, sees a gateway on a
+	// workspace-write run, and refuses the turn outright — so the feature would
+	// not degrade, it would break every Build-mode turn on a local endpoint.
+	//
+	// Absent means false, which is exactly right for those older builds: the
+	// caller withholds the composite endpoint and the run proceeds with the
+	// workspace tools alone, which is what it had before.
+	ToolGatewayWithWorkspace bool `json:"tool_gateway_with_workspace"`
+	Cancellation             bool `json:"cancellation"`
+	ReadOnly                 bool `json:"read_only"`
+	WorkspaceWrite           bool `json:"workspace_write"`
+	CommandNetwork           bool `json:"command_network"`
+	ToolCalling              bool `json:"tool_calling"`
 }
 
 type ProviderDescriptor struct {

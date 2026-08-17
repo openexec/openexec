@@ -67,7 +67,7 @@ var executionStdioCmd = &cobra.Command{
 // resolved from the *project's* configuration and offers a tool set that
 // depends on the sandbox, neither of which is known until the request
 // arrives. CLI providers ignore both arguments.
-func executionProviderFor(ctx context.Context, directory string, sandbox execution.Sandbox, gateway string) (execution.Provider, error) {
+func executionProviderFor(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error) {
 	if executionProviderKind == "api" {
 		return newConfiguredAPIProvider(ctx, directory, executionAPIProvider, sandbox, gateway)
 	}
@@ -76,10 +76,21 @@ func executionProviderFor(ctx context.Context, directory string, sandbox executi
 	})
 }
 
+// toolGateway is the caller-owned endpoint for one run, and what it is for.
+//
+// Carried together rather than as two adjacent strings: the endpoint decides
+// where authority is asked and the scope decides what may run beside it, and a
+// pair of bare strings in that order is a swap away from granting the wrong
+// combination silently.
+type toolGateway struct {
+	Endpoint string
+	Scope    string
+}
+
 // newConfiguredAPIProvider builds an OpenAI-compatible provider from one named
 // entry in the project's execution config. The endpoint lives there and
 // nowhere else — callers name a provider, never a URL.
-func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandbox execution.Sandbox, gateway string) (execution.Provider, error) {
+func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error) {
 	if name == "" {
 		return nil, fmt.Errorf("--api-provider is required with --provider api")
 	}
@@ -134,16 +145,57 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 	if err != nil {
 		return nil, fmt.Errorf("create API provider %q: %w", name, err)
 	}
-	// A run either touches files or asks the caller questions. Both at once
-	// would let a model reach console state and the repository in one turn,
-	// and the reason each boundary is defensible is that it is the only one in
-	// play. Refused here, before the model is contacted, rather than by
+	// A gateway that stands alone still stands alone. Console state and the
+	// repository in one turn is the pairing with no defensible story, and the
+	// reason that boundary holds is that it is the only one in play — so this
+	// stays refused here, before the model is contacted, rather than by
 	// whichever executor happened to be asked first.
-	if gateway != "" {
+	//
+	// The caller says which kind of gateway it is. Silence means the strict
+	// one: a caller that names an endpoint without saying why gets the
+	// standalone rule, and this runtime paired with a caller that knows about
+	// the other scope refuses rather than combining anything by accident.
+	if gateway.Endpoint != "" && gateway.Scope != execution.GatewayScopeWithWorkspace {
 		if sandbox.Mode != execution.SandboxReadOnly {
 			return nil, fmt.Errorf("a tool gateway run is read-only; %q was requested", sandbox.Mode)
 		}
-		executor, err := execution.NewGatewayToolExecutor(ctx, gateway)
+		executor, err := execution.NewGatewayToolExecutor(ctx, gateway.Endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return execution.NewAPIProvider(execution.APIProviderConfig{
+			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor,
+		})
+	}
+	// The caller's execution verbs beside the workspace tools: an agent that
+	// edits a repository and can also build, test and push it. OpenExec owns
+	// the file tools and bounds them by sandbox and roots; it does not own a
+	// shell, so those verbs stay the caller's, executed under the caller's
+	// approval and never approximated here.
+	if gateway.Endpoint != "" {
+		// This scope is for editing work, and the mode is checked here rather
+		// than trusted from the caller — the same reason the standalone rule
+		// above is enforced on this side at all.
+		//
+		// Without it a read-only run could be handed forwarded run_command and
+		// git_push: the workspace executor validates paths, not modes, so
+		// nothing downstream would have objected. A read-only conversation that
+		// can push is not read-only, whatever the field says.
+		//
+		// Refused rather than filtered down to the harmless verbs. Which of a
+		// caller's verbs mutate is the caller's knowledge, not OpenExec's, and
+		// guessing it from a name is how a boundary becomes decorative.
+		if sandbox.Mode != execution.SandboxWorkspaceWrite {
+			return nil, fmt.Errorf(
+				"a %s tool gateway requires workspace-write; %q was requested",
+				execution.GatewayScopeWithWorkspace, sandbox.Mode)
+		}
+		forwarded, err := execution.NewGatewayToolExecutor(ctx, gateway.Endpoint)
+		if err != nil {
+			return nil, err
+		}
+		executor, err := execution.NewCompositeToolExecutor(
+			execution.NewWorkspaceToolExecutor(), execution.WorkspaceTools(sandbox), forwarded)
 		if err != nil {
 			return nil, err
 		}
@@ -171,7 +223,7 @@ func resolveAPIKeyReference(key string) string {
 	return key
 }
 
-func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway string) (execution.Provider, error)) error {
+func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
 	decoder := json.NewDecoder(io.LimitReader(input, 1<<20))
 	writer := bufio.NewWriter(output)
 	defer writer.Flush()
@@ -220,9 +272,9 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		}
 		sandbox = request.Request.Sandbox
 	}
-	gateway := ""
+	var gateway toolGateway
 	if request.Request != nil {
-		gateway = request.Request.ToolGateway
+		gateway = toolGateway{Endpoint: request.Request.ToolGateway, Scope: request.Request.ToolGatewayScope}
 	}
 	provider, err := providerFor(ctx, directory, sandbox, gateway)
 	if err != nil {
@@ -237,6 +289,12 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		// that fact before it has anything to ask with.
 		if executionProviderKind == "api" {
 			descriptor.Capabilities.ToolGateway = true
+			// This binary can also run those verbs beside the workspace tools.
+			// Declared separately from the line above so a caller can tell the
+			// two apart: builds that predate the composite scope answer true to
+			// ToolGateway and nothing at all to this, and a caller that
+			// conflated them would send them a request they refuse whole.
+			descriptor.Capabilities.ToolGatewayWithWorkspace = true
 		}
 		return write(executionEnvelope{Operation: "describe", Provider: &descriptor})
 	case "probe":

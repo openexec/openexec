@@ -75,7 +75,15 @@ func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	// unconditionally told a direct consumer it had a gateway when it had
 	// filesystem tools — a false capability that ends with workspace tools
 	// answering an administrative question.
-	_, gateway := config.ToolExecutor.(*GatewayToolExecutor)
+	//
+	// Asked through an interface rather than a concrete type: a composite
+	// executor forwards some verbs and owns the rest, and a type assertion
+	// answered no for it — which would refuse the very requests it was built
+	// to serve, at Execute below.
+	gateway := false
+	if serving, ok := config.ToolExecutor.(interface{ servesGateway() bool }); ok {
+		gateway = serving.servesGateway()
+	}
 	if len(config.Tools) > 0 && config.ToolExecutor == nil {
 		return nil, errors.New("tool executor is required when API tools are configured")
 	}
