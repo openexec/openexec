@@ -236,8 +236,12 @@ openexec/
 │   └── api/               # HTTP handlers and WebSocket
 ├── ui/                    # Web UI (React/Vite, embedded in binary)
 ├── agents/                # Personas, workflows, manifests
-└── docs/                  # Documentation
+└── docs/                  # Documentation — start at docs/README.md
 ```
+
+[docs/README.md](docs/README.md) indexes every document by status: what is
+built, what is planned, and what is a record of a moment that has passed.
+Each document repeats that status in its own header.
 
 ---
 

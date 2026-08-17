@@ -4,6 +4,9 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [task] Dogfood the experience-first operating model, then implement an
+  advisory, provenance-labelled triage that the owner must refine and accept
+  before architecture or implementation begins.
 - Run the preregistered 20–30 task pointer-graph baseline/treatment evaluation
   on at least two repositories before deciding whether to fund Version 2.
 - [task] V2.1: enforce freshness on every graph resolve/read, with stale re-resolution (trust gap from 2026-08-03 audit)
