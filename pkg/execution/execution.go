@@ -54,11 +54,31 @@ type Request struct {
 	// that history lives inside the CLI and must not be duplicated here.
 	History []HistoryMessage
 	// ToolGateway is a per-run loopback endpoint offering tools that belong to
-	// the caller rather than to OpenExec — console state a model may read,
-	// which OpenExec has no business implementing and must not approximate
-	// with a shell. Mutually exclusive with the workspace tools: a run either
-	// touches files or asks the console questions, never both.
+	// the caller rather than to OpenExec — console state a model may read, or
+	// commands the caller executes under its own approval, neither of which
+	// OpenExec has any business implementing or approximating with a shell.
 	ToolGateway string
+	// ToolGatewayScope says what the endpoint above is being used for, and so
+	// what may run beside it.
+	//
+	// Empty — the original meaning, and still the default — is a gateway that
+	// stands alone: console state, read-only, no workspace tools. A run either
+	// touches files or asks the console about itself, never both, because
+	// reaching console state and the repository in one turn is the pairing
+	// that has no defensible story.
+	//
+	// GatewayScopeWithWorkspace is a different endpoint doing a different job:
+	// the caller's own execution verbs — run a command, push — offered beside
+	// the workspace tools. That combination is not new authority. It is what
+	// every agent CLI on this contract already has, and withholding it from an
+	// API provider was an artifact of the gateway having been built for the
+	// console-state case first, not a decision about local models.
+	//
+	// Named on the wire rather than inferred from the sandbox mode so the
+	// default is the strict one: a caller that sets a gateway without saying
+	// why gets the standalone rule, and an older runtime paired with a newer
+	// caller refuses instead of silently combining the two.
+	ToolGatewayScope string
 	// NetworkAccess and NativeSessionID keep their meaning.
 	NetworkAccess   bool
 	NativeSessionID string
@@ -150,6 +170,9 @@ const (
 const (
 	SandboxReadOnly       = "read-only"
 	SandboxWorkspaceWrite = "workspace-write"
+	// GatewayScopeWithWorkspace lets the caller's execution verbs run beside
+	// the workspace tools. See Request.ToolGatewayScope.
+	GatewayScopeWithWorkspace = "with-workspace"
 )
 
 // Executor performs an authorized request. Implementations must return a
