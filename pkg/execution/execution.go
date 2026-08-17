@@ -200,12 +200,25 @@ type Capability struct {
 	// an older binary ignores the field, runs the workspace tools instead, and
 	// the caller learns that the "administrative" turn read its repository
 	// only by reading the transcript afterwards.
-	ToolGateway    bool `json:"tool_gateway"`
-	Cancellation   bool `json:"cancellation"`
-	ReadOnly       bool `json:"read_only"`
-	WorkspaceWrite bool `json:"workspace_write"`
-	CommandNetwork bool `json:"command_network"`
-	ToolCalling    bool `json:"tool_calling"`
+	ToolGateway bool `json:"tool_gateway"`
+	// ToolGatewayWithWorkspace is the ability to run a gateway's verbs *beside*
+	// the workspace tools. A separate bit from ToolGateway, and it has to be:
+	// every runtime that forwards console state already answers true to that
+	// one, including every build made before this scope existed. A caller that
+	// read the general bit as consent to the new scope would send it to a
+	// runtime that ignores the unknown field, sees a gateway on a
+	// workspace-write run, and refuses the turn outright — so the feature would
+	// not degrade, it would break every Build-mode turn on a local endpoint.
+	//
+	// Absent means false, which is exactly right for those older builds: the
+	// caller withholds the composite endpoint and the run proceeds with the
+	// workspace tools alone, which is what it had before.
+	ToolGatewayWithWorkspace bool `json:"tool_gateway_with_workspace"`
+	Cancellation             bool `json:"cancellation"`
+	ReadOnly                 bool `json:"read_only"`
+	WorkspaceWrite           bool `json:"workspace_write"`
+	CommandNetwork           bool `json:"command_network"`
+	ToolCalling              bool `json:"tool_calling"`
 }
 
 type ProviderDescriptor struct {

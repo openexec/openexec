@@ -173,6 +173,23 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 	// shell, so those verbs stay the caller's, executed under the caller's
 	// approval and never approximated here.
 	if gateway.Endpoint != "" {
+		// This scope is for editing work, and the mode is checked here rather
+		// than trusted from the caller — the same reason the standalone rule
+		// above is enforced on this side at all.
+		//
+		// Without it a read-only run could be handed forwarded run_command and
+		// git_push: the workspace executor validates paths, not modes, so
+		// nothing downstream would have objected. A read-only conversation that
+		// can push is not read-only, whatever the field says.
+		//
+		// Refused rather than filtered down to the harmless verbs. Which of a
+		// caller's verbs mutate is the caller's knowledge, not OpenExec's, and
+		// guessing it from a name is how a boundary becomes decorative.
+		if sandbox.Mode != execution.SandboxWorkspaceWrite {
+			return nil, fmt.Errorf(
+				"a %s tool gateway requires workspace-write; %q was requested",
+				execution.GatewayScopeWithWorkspace, sandbox.Mode)
+		}
 		forwarded, err := execution.NewGatewayToolExecutor(ctx, gateway.Endpoint)
 		if err != nil {
 			return nil, err
@@ -272,6 +289,12 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		// that fact before it has anything to ask with.
 		if executionProviderKind == "api" {
 			descriptor.Capabilities.ToolGateway = true
+			// This binary can also run those verbs beside the workspace tools.
+			// Declared separately from the line above so a caller can tell the
+			// two apart: builds that predate the composite scope answer true to
+			// ToolGateway and nothing at all to this, and a caller that
+			// conflated them would send them a request they refuse whole.
+			descriptor.Capabilities.ToolGatewayWithWorkspace = true
 		}
 		return write(executionEnvelope{Operation: "describe", Provider: &descriptor})
 	case "probe":
