@@ -229,7 +229,7 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			_ = sink(Event{Type: EventFailed, Text: err.Error()})
 			return result, err
 		}
-		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content}
+		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content, Metadata: response.Metadata}
 		messages = append(messages, assistant)
 		for _, block := range response.Content {
 			if block.Type == agent.ContentTypeText && block.Text != "" {

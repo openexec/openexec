@@ -67,7 +67,8 @@ func TestAPIProviderPassesAuthorizationContractToTools(t *testing.T) {
 		{Content: []agent.ContentBlock{{
 			Type: agent.ContentTypeToolUse, ToolUseID: "call-1", ToolName: "write_file",
 			ToolInput: json.RawMessage(`{"path":"result.txt"}`),
-		}}, StopReason: agent.StopReasonToolUse},
+		}}, StopReason: agent.StopReasonToolUse,
+			Metadata: map[string]interface{}{"reasoning_content": "provider continuation state"}},
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "finished"}}, StopReason: agent.StopReasonEnd},
 	}}
 	tools := &recordingToolExecutor{}
@@ -103,6 +104,9 @@ func TestAPIProviderPassesAuthorizationContractToTools(t *testing.T) {
 	}
 	if len(adapter.requests) != 2 || len(adapter.requests[1].Messages) != 3 {
 		t.Fatalf("loop requests = %#v", adapter.requests)
+	}
+	if got := adapter.requests[1].Messages[1].Metadata["reasoning_content"]; got != "provider continuation state" {
+		t.Fatalf("assistant replay metadata = %#v", adapter.requests[1].Messages[1].Metadata)
 	}
 }
 

@@ -129,6 +129,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 	}
 	adapter, err := agent.NewOpenAIProvider(agent.OpenAIProviderConfig{
 		Name: name, BaseURL: entry.BaseURL, APIKey: apiKey,
+		ReplayReasoningContent: requiresReasoningContentReplay(entry.Model),
 		// Exactly the configured model, never appended to DefaultOpenAIModels()
 		// the way the pipeline does it. Probe sends its readiness prompt to
 		// models[0] and consumers list these in a picker, so an inherited
@@ -212,6 +213,11 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 		Tools:        execution.WorkspaceTools(sandbox),
 		ToolExecutor: execution.NewWorkspaceToolExecutor(),
 	})
+}
+
+func requiresReasoningContentReplay(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return model == "kimi-k3" || strings.HasPrefix(model, "kimi-k3-")
 }
 
 // resolveAPIKeyReference expands a "$VAR" indirection, matching the pipeline's

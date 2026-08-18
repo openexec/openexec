@@ -866,7 +866,7 @@ func TestOpenAIProvider_BuildOpenAIRequest(t *testing.T) {
 }
 
 func TestOpenAIProvider_ConvertToOpenAIMessage(t *testing.T) {
-	provider, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "test-key"})
+	provider, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "test-key", ReplayReasoningContent: true})
 
 	t.Run("user message", func(t *testing.T) {
 		msg := NewTextMessage(RoleUser, "Hello")
@@ -882,7 +882,8 @@ func TestOpenAIProvider_ConvertToOpenAIMessage(t *testing.T) {
 
 	t.Run("assistant message with tool calls", func(t *testing.T) {
 		msg := Message{
-			Role: RoleAssistant,
+			Role:     RoleAssistant,
+			Metadata: map[string]interface{}{"reasoning_content": "private continuation state"},
 			Content: []ContentBlock{
 				{Type: ContentTypeText, Text: "Let me check."},
 				{
@@ -904,6 +905,20 @@ func TestOpenAIProvider_ConvertToOpenAIMessage(t *testing.T) {
 		}
 		if openAIMsg.ToolCalls[0].ID != "call_123" {
 			t.Errorf("expected tool call ID 'call_123', got %q", openAIMsg.ToolCalls[0].ID)
+		}
+		if openAIMsg.ReasoningContent != "private continuation state" {
+			t.Errorf("reasoning_content = %q", openAIMsg.ReasoningContent)
+		}
+	})
+
+	t.Run("generic endpoint does not receive provider-specific reasoning", func(t *testing.T) {
+		generic, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "test-key"})
+		message := Message{
+			Role: RoleAssistant, Metadata: map[string]interface{}{"reasoning_content": "private continuation state"},
+			Content: []ContentBlock{{Type: ContentTypeText, Text: "answer"}},
+		}
+		if got := generic.convertToOpenAIMessage(message).ReasoningContent; got != "" {
+			t.Fatalf("generic endpoint received reasoning_content %q", got)
 		}
 	})
 
@@ -979,7 +994,7 @@ func TestOpenAIProvider_ConvertResponse(t *testing.T) {
 			}{
 				{
 					Message: openAIMessage{
-						Role: "assistant",
+						Role: "assistant", ReasoningContent: "provider continuation state",
 						ToolCalls: []openAIToolCall{
 							{
 								ID:   "call_abc",
@@ -1011,6 +1026,9 @@ func TestOpenAIProvider_ConvertResponse(t *testing.T) {
 		}
 		if toolCalls[0].ToolName != "search" {
 			t.Errorf("expected tool name 'search', got %q", toolCalls[0].ToolName)
+		}
+		if resp.Metadata["reasoning_content"] != "provider continuation state" {
+			t.Errorf("response metadata = %#v", resp.Metadata)
 		}
 	})
 

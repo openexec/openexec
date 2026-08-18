@@ -67,6 +67,11 @@ type OpenAIProviderConfig struct {
 
 	// ModelInfo is an optional map of model information.
 	ModelInfo map[string]*ModelInfo
+
+	// ReplayReasoningContent echoes provider-returned reasoning_content on
+	// assistant messages during a tool loop. Kimi K3 requires this continuation
+	// state; many OpenAI-compatible endpoints do not accept the extra field.
+	ReplayReasoningContent bool
 }
 
 // OpenAIProvider implements ProviderAdapter for OpenAI's API.
@@ -420,6 +425,11 @@ func (p *OpenAIProvider) convertToOpenAIMessage(msg Message) openAIMessage {
 	openAIMsg := openAIMessage{
 		Role: string(msg.Role),
 	}
+	if p.config.ReplayReasoningContent {
+		if reasoning, ok := msg.Metadata["reasoning_content"].(string); ok {
+			openAIMsg.ReasoningContent = reasoning
+		}
+	}
 
 	// Handle tool role messages (tool results)
 	if msg.Role == RoleTool {
@@ -489,6 +499,11 @@ func (p *OpenAIProvider) convertResponse(resp *openAIChatCompletionResponse) *Re
 
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
+		if choice.Message.ReasoningContent != "" {
+			response.Metadata = map[string]interface{}{
+				"reasoning_content": choice.Message.ReasoningContent,
+			}
+		}
 
 		// Set stop reason
 		switch choice.FinishReason {
@@ -528,6 +543,10 @@ func (p *OpenAIProvider) convertResponse(resp *openAIChatCompletionResponse) *Re
 
 // processStreamResponse reads the SSE stream and sends events to the channel.
 func (p *OpenAIProvider) processStreamResponse(ctx context.Context, resp *http.Response, eventCh chan<- StreamEvent) {
+	// StreamEvent has no provider-metadata channel, so reasoning_content deltas
+	// cannot be preserved here. The agentic tool loop intentionally uses
+	// Complete, whose Response.Metadata is replayed; moving tool calls to this
+	// streaming path requires extending StreamEvent first.
 	defer close(eventCh)
 	defer resp.Body.Close()
 
@@ -1005,10 +1024,11 @@ type openAIStreamOptions struct {
 }
 
 type openAIMessage struct {
-	Role       string           `json:"role"`
-	Content    string           `json:"content,omitempty"`
-	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string           `json:"tool_call_id,omitempty"`
+	Role             string           `json:"role"`
+	Content          string           `json:"content,omitempty"`
+	ReasoningContent string           `json:"reasoning_content,omitempty"`
+	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string           `json:"tool_call_id,omitempty"`
 }
 
 type openAITool struct {

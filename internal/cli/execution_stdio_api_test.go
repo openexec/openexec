@@ -23,6 +23,16 @@ const (
 // Most cases here only need a provider built; read-only is the narrower mode.
 var readOnly = execution.Sandbox{Mode: execution.SandboxReadOnly}
 
+func TestReasoningContentReplayIsScopedToKimiK3(t *testing.T) {
+	for model, want := range map[string]bool{
+		"kimi-k3": true, "kimi-k3-preview": true, "gpt-4o": false, "qwen3:8b": false,
+	} {
+		if got := requiresReasoningContentReplay(model); got != want {
+			t.Errorf("requiresReasoningContentReplay(%q) = %v, want %v", model, got, want)
+		}
+	}
+}
+
 // writeProjectConfig lays down a project whose execution config names two
 // endpoints, mirroring the two-GPU layout the console routes across.
 func writeProjectConfig(t *testing.T, active string) string {
