@@ -51,3 +51,12 @@ func (s *Server) repositoryBearerAuth(token, unavailableMessage, unauthorizedMes
 func (s *Server) repositoryGraphAuth(next http.Handler) http.Handler {
 	return s.repositoryBearerAuth(s.repositoryGraphToken, "repository graph credential is not configured", "repository graph bearer required", next)
 }
+
+func (s *Server) repositoryGraphScopedAuth(next http.Handler) http.Handler {
+	return s.repositoryGraphAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, _, ok := s.graphAccess(w, r); !ok {
+			return
+		}
+		next.ServeHTTP(w, r)
+	}))
+}

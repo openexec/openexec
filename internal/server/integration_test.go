@@ -42,8 +42,28 @@ func newTestCoordinator(db *sql.DB, projectsDir string) (DCPCoordinator, error) 
 
 // TestServer provides a controlled E2E test environment for DCP queries
 type TestServer struct {
-	Server *Server
-	t      *testing.T
+	Server     *Server
+	t          *testing.T
+	checkoutID string
+}
+
+func (ts *TestServer) authorize(request *http.Request) {
+	request.Header.Set("Authorization", "Bearer "+repositoryGraphTestToken)
+	request.Header.Set("X-OpenExec-Checkout-ID", ts.checkoutID)
+}
+
+func authorizeTestRepositoryGraph(t *testing.T, server *Server, request *http.Request) {
+	t.Helper()
+	store, err := server.repositoryGraphStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(request.Context(), server.ProjectsDir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+repositoryGraphTestToken)
+	request.Header.Set("X-OpenExec-Checkout-ID", identity.CheckoutID)
 }
 
 // QueryResponse represents the expected response structure from DCP queries
@@ -58,12 +78,13 @@ func NewTestServer(t *testing.T) *TestServer {
 	t.Helper()
 
 	cfg := Config{
-		Port:          0, // random port
-		ProjectsDir:   t.TempDir(),
-		DataDir:       t.TempDir(),
-		SkipPreflight:  true, // Skip preflight checks that require real runner
-		EnableDCP:      true, // Enable DCP for integration tests
-		NewCoordinator: newTestCoordinator,
+		Port:                 0, // random port
+		ProjectsDir:          t.TempDir(),
+		DataDir:              t.TempDir(),
+		SkipPreflight:        true, // Skip preflight checks that require real runner
+		EnableDCP:            true, // Enable DCP for integration tests
+		NewCoordinator:       newTestCoordinator,
+		RepositoryGraphToken: repositoryGraphTestToken,
 	}
 
 	s, err := New(cfg)
@@ -71,10 +92,16 @@ func NewTestServer(t *testing.T) *TestServer {
 		t.Fatalf("failed to create test server: %v", err)
 	}
 
-	return &TestServer{
-		Server: s,
-		t:      t,
+	store, err := s.repositoryGraphStore()
+	if err != nil {
+		t.Fatal(err)
 	}
+	identity, err := store.EnsureRepositoryIdentity(context.Background(), s.ProjectsDir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &TestServer{Server: s, t: t, checkoutID: identity.CheckoutID}
 }
 
 // Query sends a DCP query and returns the parsed response
@@ -86,6 +113,7 @@ func (ts *TestServer) Query(ctx context.Context, query string) (*QueryResponse, 
 
 	req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
 	req = req.WithContext(ctx)
+	ts.authorize(req)
 	rec := httptest.NewRecorder()
 
 	ts.Server.Mux.ServeHTTP(rec, req)
@@ -143,6 +171,7 @@ func (ts *TestServer) AssertStatusOK(query string) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(payload)
 
 	req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
+	ts.authorize(req)
 	rec := httptest.NewRecorder()
 
 	ts.Server.Mux.ServeHTTP(rec, req)
@@ -784,12 +813,13 @@ func (m *mockErrorRouter) ParseIntent(ctx context.Context, query string) (*route
 
 func TestDCPQueryErrorIntegration(t *testing.T) {
 	cfg := Config{
-		Port:           0,
-		ProjectsDir:    t.TempDir(),
-		DataDir:        t.TempDir(),
-		EnableDCP:      true,
-		SkipPreflight:  true,
-		NewCoordinator: newTestCoordinator, // registers the /api/v1/dcp/query route
+		Port:                 0,
+		ProjectsDir:          t.TempDir(),
+		DataDir:              t.TempDir(),
+		EnableDCP:            true,
+		SkipPreflight:        true,
+		NewCoordinator:       newTestCoordinator, // registers the /api/v1/dcp/query route
+		RepositoryGraphToken: repositoryGraphTestToken,
 	}
 
 	s, err := New(cfg)
@@ -805,6 +835,7 @@ func TestDCPQueryErrorIntegration(t *testing.T) {
 	body, _ := json.Marshal(payload)
 
 	req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
+	authorizeTestRepositoryGraph(t, s, req)
 	rec := httptest.NewRecorder()
 
 	s.Mux.ServeHTTP(rec, req)

@@ -476,11 +476,29 @@ export OPENEXEC_EXECUTION_TIMEOUT=1800
 export OPENEXEC_DAEMON_MAX_PARALLEL=4
 export OPENEXEC_DAEMON_POLL_INTERVAL=60
 
+# Repository evidence planes (use two different random values)
+export OPENEXEC_REPOSITORY_EVIDENCE_TOKEN=<external-read-only-token>
+export OPENEXEC_REPOSITORY_GRAPH_TOKEN=<internal-graph-token>
+
 # API Keys (secrets - only via env vars, never in files)
 export OPENEXEC_CLAUDE_API_KEY=sk-ant-...
 export OPENEXEC_CODEX_API_KEY=sk-...
 export OPENEXEC_GEMINI_API_KEY=AIza...
 ```
+
+### Repository evidence and graph credentials
+
+`OPENEXEC_REPOSITORY_EVIDENCE_TOKEN` authorizes only the read-only
+`/api/v1/external-evidence/` profile. `OPENEXEC_REPOSITORY_GRAPH_TOKEN`
+authorizes the internal repository-context, repository-graph, DCP query, and
+knowledge routes; those routes also require the checkout ID header. The two
+values must be non-empty and different. OpenExec refuses to start if they are
+equal.
+
+**Upgrade note:** repository graph and repository context routes now fail
+closed with `503` until `OPENEXEC_REPOSITORY_GRAPH_TOKEN` is configured. Give
+trusted internal callers that graph token. Do not give it to external advisory
+clients; they receive only the evidence token.
 
 ## Agent Comparison
 

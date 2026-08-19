@@ -141,3 +141,49 @@ func TestServerListenAddressDefaultsToLoopback(t *testing.T) {
 		t.Fatalf("explicit listen address = %q", got)
 	}
 }
+
+func TestServerRejectsSharedEvidenceAndGraphCredential(t *testing.T) {
+	_, err := New(Config{
+		ProjectsDir:             t.TempDir(),
+		DataDir:                 t.TempDir(),
+		SkipPreflight:           true,
+		RepositoryEvidenceToken: repositoryEvidenceTestToken,
+		RepositoryGraphToken:    repositoryEvidenceTestToken,
+	})
+	if err == nil || !strings.Contains(err.Error(), "OPENEXEC_REPOSITORY_EVIDENCE_TOKEN") ||
+		!strings.Contains(err.Error(), "OPENEXEC_REPOSITORY_GRAPH_TOKEN") {
+		t.Fatalf("New equal-token error = %v", err)
+	}
+}
+
+func TestDCPAndKnowledgeRoutesRequireGraphCredentialAndCheckout(t *testing.T) {
+	server := NewTestServer(t).Server
+	requests := []*http.Request{
+		httptest.NewRequest(http.MethodPost, "/api/v1/dcp/query", strings.NewReader(`{"query":"help"}`)),
+		httptest.NewRequest(http.MethodGet, "/api/v1/knowledge/symbols", nil),
+		httptest.NewRequest(http.MethodGet, "/api/v1/knowledge/envs", nil),
+	}
+	for _, request := range requests {
+		response := httptest.NewRecorder()
+		server.Mux.ServeHTTP(response, request)
+		if response.Code != http.StatusUnauthorized {
+			t.Errorf("%s without bearer = %d, want 401; body=%s", request.URL.Path, response.Code, response.Body.String())
+		}
+
+		request = request.Clone(request.Context())
+		request.Header.Set("Authorization", "Bearer wrong-token")
+		response = httptest.NewRecorder()
+		server.Mux.ServeHTTP(response, request)
+		if response.Code != http.StatusUnauthorized {
+			t.Errorf("%s with wrong bearer = %d, want 401; body=%s", request.URL.Path, response.Code, response.Body.String())
+		}
+
+		request = request.Clone(request.Context())
+		request.Header.Set("Authorization", "Bearer "+repositoryGraphTestToken)
+		response = httptest.NewRecorder()
+		server.Mux.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Errorf("%s without checkout = %d, want 403; body=%s", request.URL.Path, response.Code, response.Body.String())
+		}
+	}
+}

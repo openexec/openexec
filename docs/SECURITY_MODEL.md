@@ -99,6 +99,20 @@ human sign-off through a persistent approval store (`.openexec/approvals.db`):
   autonomously; `high` (production) always requires a human. Deterministically detected
   destructive terraform changes require a human **even in low-risk environments**.
 
+### Two repository credential planes
+
+Repository evidence is split by authority:
+
+- `OPENEXEC_REPOSITORY_EVIDENCE_TOKEN` reaches only the bounded, read-only
+  `/api/v1/external-evidence/` routes intended for external evaluators.
+- `OPENEXEC_REPOSITORY_GRAPH_TOKEN` reaches the internal repository-context,
+  graph, DCP query, and knowledge routes. Those routes also require the
+  repository's `X-OpenExec-Checkout-ID`.
+
+The daemon fails closed when the relevant token is absent and refuses startup
+when both variables contain the same value. This prevents an external evidence
+credential from becoming graph-mutation authority through configuration error.
+
 ## 4. Defense in depth (assume any single layer fails)
 
 | Layer | What it stops |
