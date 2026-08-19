@@ -8,6 +8,7 @@ import (
 )
 
 const repositoryEvidenceTestToken = "openexec-evidence-token-longer-than-thirty-two"
+const repositoryGraphTestToken = "openexec-graph-token-distinct-from-evidence"
 
 func evidenceRequest(t *testing.T, fixture graphQueryFixture, target, token string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -25,7 +26,7 @@ func TestRepositoryEvidenceProfileRequiresIndependentTokenAndPreservesProvenance
 	fixture := newGraphQueryFixture(t)
 	fixture.server.repositoryEvidenceToken = repositoryEvidenceTestToken
 	fixture.server.registerRepositoryEvidenceRoutes()
-	for _, token := range []string{"", "wrong-token"} {
+	for _, token := range []string{"", "wrong-token", repositoryGraphTestToken} {
 		response := evidenceRequest(t, fixture, "/api/v1/external-evidence/symbols?q=Target", token)
 		if response.Code != http.StatusUnauthorized {
 			t.Fatalf("token %q status = %d, body=%s", token, response.Code, response.Body.String())
@@ -58,8 +59,8 @@ func TestRepositoryEvidenceProfileHasNoValidationOrMutationRoute(t *testing.T) {
 	}
 }
 
-func TestRepositoryEvidenceTokenAlsoProtectsLegacyGraphReads(t *testing.T) {
-	fixture := newGraphQueryFixtureWithToken(t, repositoryEvidenceTestToken)
+func TestRepositoryGraphReadsRequireTheIndependentGraphToken(t *testing.T) {
+	fixture := newGraphQueryFixtureWithToken(t, repositoryGraphTestToken)
 	for _, target := range []string{
 		"/api/v1/repository-graph/symbols?q=Target",
 		"/api/v1/repository-context?symbols=Target",
@@ -69,7 +70,11 @@ func TestRepositoryEvidenceTokenAlsoProtectsLegacyGraphReads(t *testing.T) {
 			t.Fatalf("legacy read %s without bearer = %d, body=%s", target, response.Code, response.Body.String())
 		}
 	}
-	response := graphRequestWithToken(t, fixture, "/api/v1/repository-graph/symbols?q=Target", fixture.identity.CheckoutID, repositoryEvidenceTestToken)
+	evidenceTokenResponse := graphRequestWithToken(t, fixture, "/api/v1/repository-graph/symbols?q=Target", fixture.identity.CheckoutID, repositoryEvidenceTestToken)
+	if evidenceTokenResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("evidence token authorized graph read = %d, body=%s", evidenceTokenResponse.Code, evidenceTokenResponse.Body.String())
+	}
+	response := graphRequestWithToken(t, fixture, "/api/v1/repository-graph/symbols?q=Target", fixture.identity.CheckoutID, repositoryGraphTestToken)
 	if response.Code != http.StatusOK {
 		t.Fatalf("legacy read with bearer = %d, body=%s", response.Code, response.Body.String())
 	}

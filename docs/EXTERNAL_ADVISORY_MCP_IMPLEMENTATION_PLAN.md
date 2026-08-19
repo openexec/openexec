@@ -16,10 +16,12 @@ The first read adapter is implemented behind
 under `/api/v1/external-evidence/` for symbols, source, dependencies, calls and
 impact. The token must match Agent Console's
 `AGENT_CONSOLE_OPENEXEC_EVIDENCE_TOKEN`; use a different secret from every web,
-provider and external-MCP credential. The same server-to-server credential now
-protects every legacy repository-context and repository-graph route, including
-scan, changed-impact, and validation writes; Agent Console retains that secret
-and never exposes it through the external advisory profile. OpenExec binds to
-loopback by default and graph routes fail closed when the credential is absent.
+provider and external-MCP credential. A separate
+`OPENEXEC_REPOSITORY_GRAPH_TOKEN`, matched by Agent Console's
+`AGENT_CONSOLE_OPENEXEC_GRAPH_TOKEN`, protects repository-context and every
+legacy repository-graph route, including scan, changed-impact, and validation
+writes. Agent Console retains both server credentials and never exposes either
+through the external advisory profile. OpenExec binds to loopback by default;
+each route family fails closed when its own credential is absent.
 Broader V2.1 freshness enforcement is still open and must not be inferred from
 this adapter.
