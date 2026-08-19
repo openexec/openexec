@@ -83,6 +83,35 @@ export function TaskBoard() { return api('/api/settings', { method: 'POST' }) }
 	if !relatedTestExists(handlerImpact.Result.RelatedTests, "ui/e2e/task.spec.ts") {
 		t.Fatalf("component did not reach registered browser journey: %#v", handlerImpact.Result.RelatedTests)
 	}
+	// The lexical TypeScript fallback attributes a contract call to its module,
+	// while compiler extraction can attribute it to the enclosing function.
+	// Browser evidence must survive either representation.
+	var handlerNodeID, taskBoardModuleID string
+	if err := store.db.QueryRowContext(t.Context(), `SELECT node_id FROM symbol_occurrences WHERE generation_id = ? AND symbol_id = ?`, scan.Generation.ID, handler.Symbol.ID).Scan(&handlerNodeID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRowContext(t.Context(), `SELECT id FROM graph_nodes WHERE generation_id = ? AND node_type = 'module' AND qualified_name = 'ui/src/TaskBoard.tsx'`, scan.Generation.ID).Scan(&taskBoardModuleID); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := store.db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(t.Context(), `DELETE FROM graph_edges WHERE generation_id = ? AND edge_type = 'http_contract_consumer' AND to_node_id = ?`, scan.Generation.ID, handlerNodeID); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if _, err := insertEdge(t.Context(), tx, scan.Generation.ID, taskBoardModuleID, handlerNodeID, "http_contract_consumer", ResolutionHeuristic, "ui/src/TaskBoard.tsx", 0, 0, nil); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	moduleImpact, err := store.ImpactAnalysis(t.Context(), identity, []string{handler.Symbol.ID}, 2, DefaultChangedImpactLimits())
+	if err != nil || !relatedTestExists(moduleImpact.Result.RelatedTests, "ui/e2e/task.spec.ts") {
+		t.Fatalf("module-attributed consumer did not reach registered browser journey: %#v, %v", moduleImpact.Result.RelatedTests, err)
+	}
 	tightLimits := DefaultChangedImpactLimits()
 	tightLimits.MaxNodes = 1
 	boundedImpact, err := store.ImpactAnalysis(t.Context(), identity, []string{handler.Symbol.ID}, 2, tightLimits)
