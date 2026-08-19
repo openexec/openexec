@@ -34,6 +34,13 @@ func TestServableGraphRequiresAGeneration(t *testing.T) {
 	if !hasServableGraph(root) {
 		t.Error("a scanned workspace was not treated as servable")
 	}
+	alias := filepath.Join(t.TempDir(), "workspace-alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	if !hasServableGraph(alias) {
+		t.Error("a canonical scanned workspace was not servable through its path alias")
+	}
 }
 
 func writeSample(t *testing.T, root string) {

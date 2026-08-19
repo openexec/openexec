@@ -64,7 +64,15 @@ func symbolIndexRoot(roots []string) string {
 // it byte-identical. Any error — missing file, missing table, unreadable —
 // means "nothing to serve", never "assume yes".
 func hasServableGraph(root string) bool {
-	path := filepath.Join(root, ".openexec", "openexec.db")
+	canonicalRoot, err := filepath.Abs(root)
+	if err != nil {
+		return false
+	}
+	if evaluated, evalErr := filepath.EvalSymlinks(canonicalRoot); evalErr == nil {
+		canonicalRoot = evaluated
+	}
+	canonicalRoot = filepath.Clean(canonicalRoot)
+	path := filepath.Join(canonicalRoot, ".openexec", "openexec.db")
 	if _, err := os.Stat(path); err != nil {
 		return false
 	}
@@ -80,7 +88,7 @@ func hasServableGraph(root string) bool {
 	err = db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM graph_generations g
 		JOIN worktrees w ON w.id = g.worktree_id
-		WHERE w.root_path = ? AND g.status IN ('current', 'partial')`, root).Scan(&count)
+		WHERE w.root_path = ? AND g.status IN ('current', 'partial')`, canonicalRoot).Scan(&count)
 	if err != nil {
 		return false
 	}
