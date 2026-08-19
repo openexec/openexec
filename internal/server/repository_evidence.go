@@ -21,6 +21,10 @@ func (s *Server) registerRepositoryEvidenceRoutes() {
 
 func (s *Server) repositoryEvidenceAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.TrimSpace(s.repositoryEvidenceToken) == "" {
+			s.respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "repository graph credential is not configured"})
+			return
+		}
 		scheme, supplied, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 		if !ok || !strings.EqualFold(scheme, "Bearer") {
 			s.respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "repository evidence bearer required"})
@@ -36,13 +40,10 @@ func (s *Server) repositoryEvidenceAuth(next http.Handler) http.Handler {
 	})
 }
 
-// repositoryGraphReadAuth preserves the historical checkout-only API when no
-// external evidence credential is configured. Once the external profile is
-// enabled, the legacy read routes must require the same independent bearer;
-// otherwise they are an unauthenticated alias of the protected handlers.
-func (s *Server) repositoryGraphReadAuth(next http.Handler) http.Handler {
-	if s.repositoryEvidenceToken == "" {
-		return next
-	}
+// repositoryGraphAuth protects the internal repository graph API. The bearer
+// belongs to the trusted Agent Console/OpenExec server connection and is never
+// exposed to an external advisory principal. Checkout identity remains a
+// separate, mandatory scope check inside each handler.
+func (s *Server) repositoryGraphAuth(next http.Handler) http.Handler {
 	return s.repositoryEvidenceAuth(next)
 }

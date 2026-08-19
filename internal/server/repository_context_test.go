@@ -27,6 +27,15 @@ func TestRepositoryContextAPIRefreshesAndSurvivesRestart(t *testing.T) {
 	}
 	server := &Server{StateStore: stateStore, ProjectsDir: root}
 	scanRequest := httptest.NewRequest(http.MethodPost, "/api/v1/repository-graph/scan", nil)
+	identityStore, err := knowledge.NewStoreWithDB(stateStore.GetDB())
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := identityStore.EnsureRepositoryIdentity(t.Context(), root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scanRequest.Header.Set("X-OpenExec-Checkout-ID", identity.CheckoutID)
 	scanResponse := httptest.NewRecorder()
 	server.handleRepositoryGraphScan(scanResponse, scanRequest)
 	if scanResponse.Code != http.StatusOK {

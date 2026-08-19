@@ -71,7 +71,11 @@ OpenExec uses a strict separation of concerns:
 
 Returns bounded structural impact for repository-relative file anchors and
 optional stable symbol IDs against one current graph generation. Access is
-scoped by the `X-OpenExec-Checkout-ID` header. The response includes graph and
+scoped by both `Authorization: Bearer <OPENEXEC_REPOSITORY_EVIDENCE_TOKEN>` and
+the `X-OpenExec-Checkout-ID` header. The daemon binds to `127.0.0.1` by default;
+remote binding requires an explicit `openexec start --listen <address>`. When
+the server credential is not configured, repository-context and every
+repository-graph route fail closed with `503`. The response includes graph and
 worktree provenance, changed symbols, callers, module dependants, related test
 candidates, unresolved files, limitations, and whether a traversal or symbol
 budget truncated the result.
@@ -101,8 +105,7 @@ reported as unresolved rather than inferred from runtime silence.
 
 #### Persist validation authority
 
-The checkout-authorized validation lifecycle reuses the same
-`X-OpenExec-Checkout-ID` boundary:
+The validation lifecycle reuses the same server bearer and checkout boundary:
 
 | Method | Path | Result |
 | --- | --- | --- |

@@ -77,6 +77,7 @@ type CoordinatorFactory func(db *sql.DB, projectsDir string) (DCPCoordinator, er
 // Config defines settings for the unified server
 type Config struct {
 	Port                    int
+	ListenAddress           string
 	DataDir                 string
 	UnifiedDB               string
 	ModelsPath              string
@@ -87,6 +88,14 @@ type Config struct {
 	// NewCoordinator, when set and EnableDCP resolves true, builds the DCP
 	// coordinator. Left nil by default so core needs no DCP dependency.
 	NewCoordinator CoordinatorFactory
+}
+
+func serverListenAddress(host string, port int) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, fmt.Sprintf("%d", port))
 }
 
 // New creates a new unified OpenExec server
@@ -230,7 +239,7 @@ func New(cfg Config) (*Server, error) {
 		Mux:         mux,
 		axonBridge:  api.New(mgr, sessionRepo, auditLogger, cfg.ProjectsDir, "", api.WithStateStore(stateStore)),
 		HttpServer: &http.Server{
-			Addr:    fmt.Sprintf(":%d", cfg.Port),
+			Addr:    serverListenAddress(cfg.ListenAddress, cfg.Port),
 			Handler: mux,
 		},
 		runnerCommand:           runnerCmd,
@@ -248,8 +257,8 @@ func New(cfg Config) (*Server, error) {
 		// Start background indexing only when DCP is enabled
 		go s.Coordinator.SyncKnowledge(".")
 	}
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/scan", s.handleRepositoryGraphScan)
-	s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleRepositoryContext)))
+	s.Mux.Handle("POST /api/v1/repository-graph/scan", s.repositoryGraphAuth(http.HandlerFunc(s.handleRepositoryGraphScan)))
+	s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphAuth(http.HandlerFunc(s.handleRepositoryContext)))
 	s.registerRepositoryGraphQueryRoutes()
 	if s.repositoryEvidenceToken != "" {
 		s.registerRepositoryEvidenceRoutes()
@@ -262,9 +271,8 @@ func New(cfg Config) (*Server, error) {
 }
 
 func (s *Server) handleRepositoryGraphScan(w http.ResponseWriter, r *http.Request) {
-	store, err := s.repositoryGraphStore()
-	if err != nil {
-		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	store, _, ok := s.graphAccess(w, r)
+	if !ok {
 		return
 	}
 	result, err := store.RefreshRepository(r.Context(), s.ProjectsDir)
