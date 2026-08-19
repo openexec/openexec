@@ -2,6 +2,7 @@ package approval
 
 import (
 	"context"
+	"time"
 )
 
 // Repository defines the interface for approval data persistence.
@@ -20,6 +21,12 @@ type Repository interface {
 
 	// UpdateRequest updates an existing approval request.
 	UpdateRequest(ctx context.Context, request *ApprovalRequest) error
+
+	// UpdateRequestStatus updates a request only while it still has expectedStatus.
+	UpdateRequestStatus(ctx context.Context, request *ApprovalRequest, expectedStatus RequestStatus) error
+
+	// ExtendRequestExpiration extends a pending request without changing its status.
+	ExtendRequestExpiration(ctx context.Context, requestID string, expiresAt, updatedAt time.Time) error
 
 	// ListPendingRequests lists all pending approval requests for a session.
 	ListPendingRequests(ctx context.Context, sessionID string) ([]*ApprovalRequest, error)

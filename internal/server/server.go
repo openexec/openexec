@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -105,6 +106,12 @@ func serverListenAddress(host string, port int) string {
 
 // New creates a new unified OpenExec server
 func New(cfg Config) (*Server, error) {
+	evidenceToken := strings.TrimSpace(cfg.RepositoryEvidenceToken)
+	graphToken := strings.TrimSpace(cfg.RepositoryGraphToken)
+	if evidenceToken != "" && graphToken != "" && evidenceToken == graphToken {
+		return nil, errors.New("OPENEXEC_REPOSITORY_EVIDENCE_TOKEN and OPENEXEC_REPOSITORY_GRAPH_TOKEN must be different")
+	}
+
 	// 1. Initialize Storage
 	dbPath := cfg.UnifiedDB
 	if dbPath == "" {
@@ -371,9 +378,9 @@ func (s *Server) registerRoutes() {
 
 	// --- DCP Surgical Routes ---
 	if s.Coordinator != nil {
-		s.Mux.HandleFunc("POST /api/v1/dcp/query", s.handleDCPQuery)
-		s.Mux.HandleFunc("GET /api/v1/knowledge/symbols", s.handleKnowledgeSymbols)
-		s.Mux.HandleFunc("GET /api/v1/knowledge/envs", s.handleKnowledgeEnvs)
+		s.Mux.Handle("POST /api/v1/dcp/query", s.repositoryGraphScopedAuth(http.HandlerFunc(s.handleDCPQuery)))
+		s.Mux.Handle("GET /api/v1/knowledge/symbols", s.repositoryGraphScopedAuth(http.HandlerFunc(s.handleKnowledgeSymbols)))
+		s.Mux.Handle("GET /api/v1/knowledge/envs", s.repositoryGraphScopedAuth(http.HandlerFunc(s.handleKnowledgeEnvs)))
 	}
 
 	// --- Health & System Routes ---

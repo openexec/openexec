@@ -60,6 +60,7 @@ func TestE2EIntentRoutingValidation(t *testing.T) {
 			body, _ := json.Marshal(payload)
 
 			req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
+			ts.authorize(req)
 			rec := httptest.NewRecorder()
 
 			// Execute
@@ -148,6 +149,7 @@ func TestE2ENoConfidenceErrorsOnAnyInput(t *testing.T) {
 			body, _ := json.Marshal(payload)
 
 			req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
+			ts.authorize(req)
 			rec := httptest.NewRecorder()
 
 			s.Mux.ServeHTTP(rec, req)
@@ -183,6 +185,7 @@ func TestE2ERapidSequentialQueries(t *testing.T) {
 		body, _ := json.Marshal(payload)
 
 		req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
+		ts.authorize(req)
 		rec := httptest.NewRecorder()
 
 		s.Mux.ServeHTTP(rec, req)

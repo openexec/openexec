@@ -13,6 +13,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -45,6 +46,7 @@ type PersistentGate struct {
 	manager     *Manager
 	waitTimeout time.Duration
 	projectPath string
+	waitStarted chan<- struct{}
 }
 
 // OpenPersistentGate opens (or creates) the shared approvals database and
@@ -110,15 +112,21 @@ func (g *PersistentGate) RequestApproval(ctx context.Context, req *GateRequest) 
 	}
 
 	// The seeded default policy expires requests after 5 minutes — far too
-	// short for async sign-off. Extend the expiration to the gate's wait
-	// window. (Same package: direct repo access is intentional.)
-	apReq.SetExpiration(time.Now().Add(g.waitTimeout))
-	if err := g.manager.repo.UpdateRequest(ctx, apReq); err != nil {
+	// short for async sign-off. Extend only the expiration while the request
+	// remains pending; never write stale status over an operator decision.
+	expiresAt := time.Now().Add(g.waitTimeout)
+	if err := g.manager.repo.ExtendRequestExpiration(ctx, apReq.ID, expiresAt, time.Now()); err != nil && !errors.Is(err, ErrApprovalConflict) {
 		return nil, fmt.Errorf("extend request expiration: %w", err)
 	}
 
 	waitCtx, cancel := context.WithTimeout(ctx, g.waitTimeout)
 	defer cancel()
+	if g.waitStarted != nil {
+		select {
+		case g.waitStarted <- struct{}{}:
+		default:
+		}
+	}
 	result, err := g.manager.WaitForApproval(waitCtx, apReq.ID, pollInterval)
 	if err != nil {
 		if waitCtx.Err() != nil {

@@ -55,6 +55,7 @@ func newTestCoordinator(db *sql.DB, projectsDir string) (server.DCPCoordinator, 
 // and Pipeline/Loop is the single orchestration core.
 // DCP routes queries to tools without orchestration logic.
 func TestG001_SingleOrchestrationPlane(t *testing.T) {
+	const graphToken = "validation-graph-token-distinct-from-evidence"
 	testCases := []struct {
 		name       string
 		query      string
@@ -78,17 +79,26 @@ func TestG001_SingleOrchestrationPlane(t *testing.T) {
 
 	// Create test server
 	cfg := server.Config{
-		Port:          0,
-		ProjectsDir:   t.TempDir(),
-		DataDir:       t.TempDir(),
-		EnableDCP:      true,
-		SkipPreflight:  true,
-		NewCoordinator: newTestCoordinator,
+		Port:                 0,
+		ProjectsDir:          t.TempDir(),
+		DataDir:              t.TempDir(),
+		EnableDCP:            true,
+		SkipPreflight:        true,
+		NewCoordinator:       newTestCoordinator,
+		RepositoryGraphToken: graphToken,
 	}
 
 	srv, err := server.New(cfg)
 	if err != nil {
 		t.Fatalf("failed to create test server: %v", err)
+	}
+	graphStore, err := knowledge.NewStoreWithDB(srv.StateStore.GetDB())
+	if err != nil {
+		t.Fatal(err)
+	}
+	repositoryIdentity, err := graphStore.EnsureRepositoryIdentity(context.Background(), cfg.ProjectsDir, "")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	for _, tc := range testCases {
@@ -97,6 +107,8 @@ func TestG001_SingleOrchestrationPlane(t *testing.T) {
 			body, _ := json.Marshal(payload)
 
 			req := httptest.NewRequest("POST", "/api/v1/dcp/query", bytes.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+graphToken)
+			req.Header.Set("X-OpenExec-Checkout-ID", repositoryIdentity.CheckoutID)
 			rec := httptest.NewRecorder()
 
 			srv.Mux.ServeHTTP(rec, req)

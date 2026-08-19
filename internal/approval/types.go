@@ -21,6 +21,7 @@ var (
 	ErrInvalidApprovalDecision = errors.New("invalid approval decision data")
 	ErrAlreadyDecided          = errors.New("approval request already has a decision")
 	ErrRequestExpired          = errors.New("approval request has expired")
+	ErrApprovalConflict        = errors.New("approval request changed concurrently")
 )
 
 // RiskLevel represents the risk category of a tool operation.
