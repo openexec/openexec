@@ -15,12 +15,12 @@ import (
 )
 
 func (s *Server) registerRepositoryGraphQueryRoutes() {
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols", s.handleGraphSymbols)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}", s.handleGraphSymbolDetail)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/dependencies", s.handleGraphSymbolDependencies)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/calls", s.handleGraphSymbolCalls)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/impact", s.handleGraphSymbolImpact)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/symbols/{id}/source", s.handleGraphSymbolSource)
+	s.Mux.Handle("GET /api/v1/repository-graph/symbols", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleGraphSymbols)))
+	s.Mux.Handle("GET /api/v1/repository-graph/symbols/{id}", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleGraphSymbolDetail)))
+	s.Mux.Handle("GET /api/v1/repository-graph/symbols/{id}/dependencies", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleGraphSymbolDependencies)))
+	s.Mux.Handle("GET /api/v1/repository-graph/symbols/{id}/calls", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleGraphSymbolCalls)))
+	s.Mux.Handle("GET /api/v1/repository-graph/symbols/{id}/impact", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleGraphSymbolImpact)))
+	s.Mux.Handle("GET /api/v1/repository-graph/symbols/{id}/source", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleGraphSymbolSource)))
 	s.Mux.HandleFunc("POST /api/v1/repository-graph/impact/changed", s.handleGraphChangedImpact)
 	s.registerRepositoryGraphValidationRoutes()
 }

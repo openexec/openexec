@@ -148,8 +148,8 @@ func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) 
 		t.Fatalf("tool requests = %d, model requests = %d", len(tools.requests), len(adapter.requests))
 	}
 	finalRequest := adapter.requests[2]
-	if len(finalRequest.Tools) != 0 || finalRequest.ToolChoice != "none" {
-		t.Fatalf("final request still offered tools: %+v", finalRequest)
+	if len(finalRequest.Tools) != 1 || finalRequest.ToolChoice != "none" {
+		t.Fatalf("final request did not preserve disabled tool schema: %+v", finalRequest)
 	}
 	if !strings.Contains(finalRequest.System, finalSynthesisInstruction) ||
 		!strings.Contains(finalRequest.System, "standing context") {

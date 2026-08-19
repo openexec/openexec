@@ -25,7 +25,8 @@ var readOnly = execution.Sandbox{Mode: execution.SandboxReadOnly}
 
 func TestReasoningContentReplayIsScopedToKimiK3(t *testing.T) {
 	for model, want := range map[string]bool{
-		"kimi-k3": true, "kimi-k3-preview": true, "gpt-4o": false, "qwen3:8b": false,
+		"kimi-k3": true, "kimi-k3-preview": true, "moonshotai/kimi-k3": true,
+		"kimi-k3:latest": true, "gpt-4o": false, "qwen3:8b": false,
 	} {
 		if got := requiresReasoningContentReplay(model); got != want {
 			t.Errorf("requiresReasoningContentReplay(%q) = %v, want %v", model, got, want)

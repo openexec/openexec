@@ -283,8 +283,10 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 	// Reaching the tool budget means research must stop, not that the work the
 	// model already did should be discarded. The old path failed the whole run
 	// here, leaving the owner with tool cards and a few transitional sentences
-	// but no answer. Ask once more with no tools available so the model must
-	// synthesize the evidence already in the conversation.
+	// but no answer. Ask once more with tool choice disabled so the model must
+	// synthesize the evidence already in the conversation. Definitions remain
+	// present because strict compatible endpoints validate historical tool calls
+	// against the request's tools array even when no new call is permitted.
 	if err := ctx.Err(); err != nil {
 		result.Outcome = OutcomeCancelled
 		finish()
@@ -297,7 +299,8 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 	}
 	system += finalSynthesisInstruction
 	response, err := p.config.Adapter.Complete(ctx, agent.Request{
-		Model: request.Model, Messages: messages, System: system, ToolChoice: "none",
+		Model: request.Model, Messages: messages, System: system,
+		Tools: p.config.Tools, ToolChoice: "none",
 	})
 	if err != nil {
 		finish()

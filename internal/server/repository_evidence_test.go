@@ -57,3 +57,20 @@ func TestRepositoryEvidenceProfileHasNoValidationOrMutationRoute(t *testing.T) {
 		}
 	}
 }
+
+func TestRepositoryEvidenceTokenAlsoProtectsLegacyGraphReads(t *testing.T) {
+	fixture := newGraphQueryFixtureWithToken(t, repositoryEvidenceTestToken)
+	for _, target := range []string{
+		"/api/v1/repository-graph/symbols?q=Target",
+		"/api/v1/repository-context?symbols=Target",
+	} {
+		response := graphRequest(t, fixture, target, fixture.identity.CheckoutID)
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("legacy read %s without bearer = %d, body=%s", target, response.Code, response.Body.String())
+		}
+	}
+	response := graphRequestWithToken(t, fixture, "/api/v1/repository-graph/symbols?q=Target", fixture.identity.CheckoutID, repositoryEvidenceTestToken)
+	if response.Code != http.StatusOK {
+		t.Fatalf("legacy read with bearer = %d, body=%s", response.Code, response.Body.String())
+	}
+}

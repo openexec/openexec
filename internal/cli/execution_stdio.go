@@ -217,7 +217,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 
 func requiresReasoningContentReplay(model string) bool {
 	model = strings.ToLower(strings.TrimSpace(model))
-	return model == "kimi-k3" || strings.HasPrefix(model, "kimi-k3-")
+	return strings.Contains(model, "kimi-k3")
 }
 
 // resolveAPIKeyReference expands a "$VAR" indirection, matching the pipeline's
