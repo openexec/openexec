@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/openexec/openexec/pkg/agent"
@@ -67,7 +68,8 @@ func TestAPIProviderPassesAuthorizationContractToTools(t *testing.T) {
 		{Content: []agent.ContentBlock{{
 			Type: agent.ContentTypeToolUse, ToolUseID: "call-1", ToolName: "write_file",
 			ToolInput: json.RawMessage(`{"path":"result.txt"}`),
-		}}, StopReason: agent.StopReasonToolUse},
+		}}, StopReason: agent.StopReasonToolUse,
+			Metadata: map[string]interface{}{"reasoning_content": "provider continuation state"}},
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "finished"}}, StopReason: agent.StopReasonEnd},
 	}}
 	tools := &recordingToolExecutor{}
@@ -103,6 +105,63 @@ func TestAPIProviderPassesAuthorizationContractToTools(t *testing.T) {
 	}
 	if len(adapter.requests) != 2 || len(adapter.requests[1].Messages) != 3 {
 		t.Fatalf("loop requests = %#v", adapter.requests)
+	}
+	if got := adapter.requests[1].Messages[1].Metadata["reasoning_content"]; got != "provider continuation state" {
+		t.Fatalf("assistant replay metadata = %#v", adapter.requests[1].Messages[1].Metadata)
+	}
+}
+
+func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) {
+	toolCall := func(id string) *agent.Response {
+		return &agent.Response{Content: []agent.ContentBlock{{
+			Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: "read_file",
+			ToolInput: json.RawMessage(`{"path":"evidence.txt"}`),
+		}}, StopReason: agent.StopReasonToolUse}
+	}
+	adapter := &fakeAPIAdapter{responses: []*agent.Response{
+		toolCall("call-1"), toolCall("call-2"),
+		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "final analysis"}}, StopReason: agent.StopReasonEnd},
+	}}
+	tools := &recordingToolExecutor{}
+	provider, err := NewAPIProvider(APIProviderConfig{
+		Adapter: adapter, ToolExecutor: tools, MaxSteps: 2,
+		Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []Event
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "budget", WorkingDir: t.TempDir(), Prompt: "analyze", Model: "test-model",
+		System: "standing context", Sandbox: Sandbox{Mode: "read-only"},
+	}, func(event Event) error {
+		events = append(events, event)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeSucceeded || result.FinalText != "final analysis" {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(tools.requests) != 2 || len(adapter.requests) != 3 {
+		t.Fatalf("tool requests = %d, model requests = %d", len(tools.requests), len(adapter.requests))
+	}
+	finalRequest := adapter.requests[2]
+	if len(finalRequest.Tools) != 1 || finalRequest.ToolChoice != "none" {
+		t.Fatalf("final request did not preserve disabled tool schema: %+v", finalRequest)
+	}
+	if !strings.Contains(finalRequest.System, finalSynthesisInstruction) ||
+		!strings.Contains(finalRequest.System, "standing context") {
+		t.Fatalf("final synthesis instruction = %q", finalRequest.System)
+	}
+	if len(events) == 0 || events[len(events)-1].Type != EventCompleted {
+		t.Fatalf("terminal events = %#v", events)
+	}
+	for _, event := range events {
+		if event.Type == EventFailed {
+			t.Fatalf("tool budget still failed the run: %#v", events)
+		}
 	}
 }
 

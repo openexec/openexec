@@ -42,10 +42,89 @@ func TestWorkspaceToolsRefuseWorkspaceConfiguration(t *testing.T) {
 		}
 	}
 
+	// The policy follows the opened target, not only the path spelling. These
+	// aliases are pre-existing checkout content; write_file itself has no
+	// symlink operation.
+	if err := os.Symlink(".openexec/config.json", filepath.Join(root, "notes.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(".openexec", filepath.Join(root, "project-notes")); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := executor.ExecuteTool(context.Background(),
+		readRequest(root, "notes.txt", Sandbox{Mode: SandboxReadOnly}, nil)); err == nil || strings.Contains(out, "sk-live") {
+		t.Fatalf("read through denied symlink returned %q, err=%v", out, err)
+	}
+	listInput, _ := json.Marshal(map[string]string{"path": "project-notes"})
+	if out, err := executor.ExecuteTool(context.Background(), ToolRequest{
+		Name: "list_directory", Input: listInput, WorkingDir: root, Sandbox: Sandbox{Mode: SandboxReadOnly},
+	}); err == nil || strings.Contains(out, "config.json") {
+		t.Fatalf("list through denied symlink returned %q, err=%v", out, err)
+	}
+	writeInput, _ := json.Marshal(map[string]string{"path": "notes.txt", "content": "overwritten"})
+	if out, err := executor.ExecuteTool(context.Background(), ToolRequest{
+		Name: "write_file", Input: writeInput, WorkingDir: root, Sandbox: Sandbox{Mode: SandboxWorkspaceWrite},
+		WritableRoots: []string{root},
+	}); err == nil {
+		t.Fatalf("write through denied symlink returned %q", out)
+	}
+	secret, err := os.ReadFile(filepath.Join(root, ".openexec", "config.json"))
+	if err != nil || !strings.Contains(string(secret), "sk-live-do-not-leak") {
+		t.Fatalf("refused symlink write changed credential file: %q, err=%v", secret, err)
+	}
+	if err := os.Symlink(".git", filepath.Join(root, "git-alias")); err != nil {
+		t.Fatal(err)
+	}
+	lockInput, _ := json.Marshal(map[string]any{"path": "git-alias/index.lock", "content": "x"})
+	if _, err := executor.ExecuteTool(context.Background(), ToolRequest{
+		Name: "write_file", Input: lockInput, WorkingDir: root, Sandbox: Sandbox{Mode: SandboxWorkspaceWrite},
+		WritableRoots: []string{root},
+	}); err == nil {
+		t.Fatal("write through a denied parent symlink was allowed")
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".git", "index.lock")); !os.IsNotExist(err) {
+		t.Fatalf("refused write left .git/index.lock behind: %v", err)
+	}
+	nestedInput, _ := json.Marshal(map[string]any{
+		"path": "project-notes/x/y.txt", "content": "x", "create_directories": true,
+	})
+	if _, err := executor.ExecuteTool(context.Background(), ToolRequest{
+		Name: "write_file", Input: nestedInput, WorkingDir: root, Sandbox: Sandbox{Mode: SandboxWorkspaceWrite},
+		WritableRoots: []string{root},
+	}); err == nil {
+		t.Fatal("directory creation through a denied parent symlink was allowed")
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".openexec", "x")); !os.IsNotExist(err) {
+		t.Fatalf("refused write created a directory in .openexec: %v", err)
+	}
+
 	// Listing the checkout still works; only entering the directory is refused.
 	if _, err := executor.ExecuteTool(context.Background(),
 		readRequest(root, "main.go", Sandbox{Mode: SandboxReadOnly}, nil)); err != nil {
 		t.Errorf("ordinary read broke: %v", err)
+	}
+}
+
+func TestWorkspaceToolsIgnoreDeniedNamesAboveTheGrantedRoot(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, ".openexec", "projects", "ordinary-checkout")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	executor := NewWorkspaceToolExecutor()
+	if out, err := executor.ExecuteTool(context.Background(),
+		readRequest(root, "main.go", Sandbox{Mode: SandboxReadOnly}, nil)); err != nil || !strings.Contains(out, "package main") {
+		t.Fatalf("ordinary read under a denied-named ancestor = %q, %v", out, err)
+	}
+	input, _ := json.Marshal(map[string]string{"path": "new.txt", "content": "written"})
+	if out, err := executor.ExecuteTool(context.Background(), ToolRequest{
+		Name: "write_file", Input: input, WorkingDir: root, Sandbox: Sandbox{Mode: SandboxWorkspaceWrite},
+		WritableRoots: []string{root},
+	}); err != nil {
+		t.Fatalf("ordinary write under a denied-named ancestor = %q, %v", out, err)
 	}
 }
 

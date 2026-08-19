@@ -35,3 +35,14 @@ func (s *Server) repositoryEvidenceAuth(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// repositoryGraphReadAuth preserves the historical checkout-only API when no
+// external evidence credential is configured. Once the external profile is
+// enabled, the legacy read routes must require the same independent bearer;
+// otherwise they are an unauthenticated alias of the protected handlers.
+func (s *Server) repositoryGraphReadAuth(next http.Handler) http.Handler {
+	if s.repositoryEvidenceToken == "" {
+		return next
+	}
+	return s.repositoryEvidenceAuth(next)
+}

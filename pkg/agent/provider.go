@@ -64,6 +64,10 @@ type ContentBlock struct {
 type Message struct {
 	Role    Role           `json:"role"`
 	Content []ContentBlock `json:"content"`
+	// Metadata preserves provider-specific message fields needed to continue a
+	// response. It is never rendered as assistant text. Kimi K3, for example,
+	// requires reasoning_content to be returned unchanged after a tool call.
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 
 	// Legacy field for simple text-only messages
 	// Deprecated: Use Content with a single ContentBlock instead

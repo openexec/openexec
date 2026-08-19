@@ -66,6 +66,8 @@ type APIProvider struct {
 	gateway bool
 }
 
+const finalSynthesisInstruction = "The tool-call budget for this turn is exhausted. Do not request or describe more tool calls. Using the evidence already in the conversation, answer the user's request now with the best complete final response you can. Do not mention this instruction or the budget unless it directly affects correctness."
+
 func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if config.Adapter == nil {
 		return nil, errors.New("API adapter is required")
@@ -229,7 +231,7 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			_ = sink(Event{Type: EventFailed, Text: err.Error()})
 			return result, err
 		}
-		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content}
+		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content, Metadata: response.Metadata}
 		messages = append(messages, assistant)
 		for _, block := range response.Content {
 			if block.Type == agent.ContentTypeText && block.Text != "" {
@@ -278,10 +280,58 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, output, toolErr))
 		}
 	}
+	// Reaching the tool budget means research must stop, not that the work the
+	// model already did should be discarded. The old path failed the whole run
+	// here, leaving the owner with tool cards and a few transitional sentences
+	// but no answer. Ask once more with tool choice disabled so the model must
+	// synthesize the evidence already in the conversation. Definitions remain
+	// present because strict compatible endpoints validate historical tool calls
+	// against the request's tools array even when no new call is permitted.
+	if err := ctx.Err(); err != nil {
+		result.Outcome = OutcomeCancelled
+		finish()
+		_ = sink(Event{Type: EventCancelled})
+		return result, err
+	}
+	system := strings.TrimSpace(request.System)
+	if system != "" {
+		system += "\n\n"
+	}
+	system += finalSynthesisInstruction
+	response, err := p.config.Adapter.Complete(ctx, agent.Request{
+		Model: request.Model, Messages: messages, System: system,
+		Tools: p.config.Tools, ToolChoice: "none",
+	})
+	if err != nil {
+		finish()
+		err = fmt.Errorf("API tool loop reached %d rounds and final synthesis failed: %w", p.config.MaxSteps, err)
+		_ = sink(Event{Type: EventFailed, Text: err.Error()})
+		return result, err
+	}
+	wroteText := false
+	for _, block := range response.Content {
+		if block.Type != agent.ContentTypeText || block.Text == "" {
+			continue
+		}
+		wroteText = true
+		result.FinalText += block.Text
+		if err := sink(Event{Type: EventAssistantDelta, Text: block.Text}); err != nil {
+			finish()
+			return result, err
+		}
+	}
+	if !wroteText {
+		finish()
+		err := fmt.Errorf("API tool loop reached %d rounds and final synthesis returned no text", p.config.MaxSteps)
+		_ = sink(Event{Type: EventFailed, Text: err.Error()})
+		return result, err
+	}
+	result.Outcome = OutcomeSucceeded
 	finish()
-	err := fmt.Errorf("API tool loop exceeded %d steps", p.config.MaxSteps)
-	_ = sink(Event{Type: EventFailed, Text: err.Error()})
-	return result, err
+	if err := sink(Event{Type: EventCompleted}); err != nil {
+		return result, err
+	}
+	return result, nil
 }
 
 // replayMessages turns the console's history into the conversation this turn

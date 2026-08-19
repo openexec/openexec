@@ -20,6 +20,10 @@ type graphQueryFixture struct {
 }
 
 func newGraphQueryFixture(t *testing.T) graphQueryFixture {
+	return newGraphQueryFixtureWithToken(t, "")
+}
+
+func newGraphQueryFixtureWithToken(t *testing.T, evidenceToken string) graphQueryFixture {
 	t.Helper()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
@@ -54,16 +58,29 @@ func newGraphQueryFixture(t *testing.T) graphQueryFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{StateStore: stateStore, ProjectsDir: root, Mux: http.NewServeMux()}
+	s := &Server{
+		StateStore: stateStore, ProjectsDir: root, Mux: http.NewServeMux(),
+		repositoryEvidenceToken: evidenceToken,
+	}
+	if evidenceToken != "" {
+		s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleRepositoryContext)))
+	}
 	s.registerRepositoryGraphQueryRoutes()
 	return graphQueryFixture{server: s, identity: identity}
 }
 
 func graphRequest(t *testing.T, fixture graphQueryFixture, target, checkoutID string) *httptest.ResponseRecorder {
+	return graphRequestWithToken(t, fixture, target, checkoutID, "")
+}
+
+func graphRequestWithToken(t *testing.T, fixture graphQueryFixture, target, checkoutID, token string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodGet, target, nil)
 	if checkoutID != "" {
 		request.Header.Set("X-OpenExec-Checkout-ID", checkoutID)
+	}
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
 	response := httptest.NewRecorder()
 	fixture.server.Mux.ServeHTTP(response, request)

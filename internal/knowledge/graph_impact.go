@@ -127,11 +127,13 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 		return nil
 	}
 	collectBrowserTests := func(origin GraphNode, affectedPath []ImpactPath) error {
-		var moduleID string
-		if err := s.db.QueryRowContext(ctx, `SELECT from_node_id FROM graph_edges WHERE generation_id = ? AND to_node_id = ? AND edge_type = 'contains' LIMIT 1`, generation.ID, origin.ID).Scan(&moduleID); err == sql.ErrNoRows {
-			return nil
-		} else if err != nil {
-			return err
+		moduleID := origin.ID
+		if origin.NodeType != "module" {
+			if err := s.db.QueryRowContext(ctx, `SELECT from_node_id FROM graph_edges WHERE generation_id = ? AND to_node_id = ? AND edge_type = 'contains' LIMIT 1`, generation.ID, origin.ID).Scan(&moduleID); err == sql.ErrNoRows {
+				return nil
+			} else if err != nil {
+				return err
+			}
 		}
 		edges, edgeLimitReached, err := s.loadOutgoingImpactEdges(ctx, generation.ID, moduleID, []string{"tested_by"}, limits.MaxEdges)
 		if err != nil {

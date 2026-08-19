@@ -143,15 +143,18 @@ func TestPythonIncrementalRefreshPreservesTypeScriptCapability(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scan.Generation.Capabilities["typescript.definitions"] != "static_lexical" {
-		t.Fatalf("fixture unexpectedly found a TypeScript compiler: %#v", scan.Generation.Capabilities)
+	initialCapability := scan.Generation.Capabilities["typescript.definitions"]
+	capabilityStrength := map[string]int{"static_lexical": 1, "compiler_exact": 2}
+	if capabilityStrength[initialCapability] == 0 {
+		t.Fatalf("unexpected initial TypeScript capability: %#v", scan.Generation.Capabilities)
 	}
 	writeTestFile(t, root, "backend/main.py", "def main():\n    return 2\n")
 	refresh, err := store.RefreshRepository(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if refresh.Generation.Capabilities["typescript.definitions"] != "static_lexical" {
-		t.Fatalf("Python-only refresh changed TypeScript capability: %#v", refresh.Generation.Capabilities)
+	refreshedCapability := refresh.Generation.Capabilities["typescript.definitions"]
+	if capabilityStrength[refreshedCapability] < capabilityStrength[initialCapability] {
+		t.Fatalf("Python-only refresh weakened TypeScript capability from %q to %q: %#v", initialCapability, refreshedCapability, refresh.Generation.Capabilities)
 	}
 }

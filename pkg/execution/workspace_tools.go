@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/openexec/openexec/pkg/agent"
@@ -22,11 +24,10 @@ const maxToolOutputBytes = 128 << 10
 // deniedComponents are path components no tool may traverse into, whatever the
 // roots say.
 //
-// `.openexec/config.json` holds this feature's own provider entries, and those
-// entries must carry a literal API key — the client rejects an empty one and
-// the console's scrubbed environment cannot resolve a `$VAR`. Every configured
-// credential for every endpoint therefore sits in a file inside the checkout
-// the model is reading. Containment alone would hand it over on request.
+// `.openexec/config.json` holds provider configuration. Agent Console writes
+// only a reference to its console-owned hosted credential there, but OpenExec
+// also supports standalone literal credentials and older configurations may
+// still contain them. Containment alone would hand those over on request.
 //
 // `.git` is here for the same reason one level up: config there holds remote
 // credentials and helpers.
@@ -179,6 +180,9 @@ func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
 			return "", fmt.Errorf("read file: %w", err)
 		}
 		defer file.Close()
+		if err := refuseDeniedOpenedTarget(root, file, relative, input.Path); err != nil {
+			return "", err
+		}
 		// One byte past the cap distinguishes "exactly at the limit" from
 		// "truncated", so the marker is never a lie in either direction.
 		data, err := io.ReadAll(io.LimitReader(file, maxToolOutputBytes+1))
@@ -211,6 +215,9 @@ func (e *WorkspaceToolExecutor) listDirectory(request ToolRequest) (string, erro
 			return "", fmt.Errorf("list directory: %w", err)
 		}
 		defer directory.Close()
+		if err := refuseDeniedOpenedTarget(root, directory, relative, input.Path); err != nil {
+			return "", err
+		}
 		entries, err := directory.ReadDir(-1)
 		if err != nil {
 			return "", fmt.Errorf("list directory: %w", err)
@@ -248,6 +255,12 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 	// is readable by virtue of being where the run happens; that does not make
 	// it writable.
 	return withinRoots(input.Path, request.WorkingDir, request.WritableRoots, "write", func(root *os.Root, relative string) (string, error) {
+		// Decide before creating either parents or the file. The descriptor check
+		// below remains the final authority after open, but it is too late to be
+		// the first check: O_CREATE and MkdirAll are themselves side effects.
+		if err := refuseDeniedProspectiveTarget(root, relative, input.Path); err != nil {
+			return "", err
+		}
 		if input.CreateDirectories {
 			if parent := filepath.Dir(relative); parent != "." && parent != "" {
 				if err := root.MkdirAll(parent, 0o755); err != nil {
@@ -255,16 +268,130 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 				}
 			}
 		}
-		file, err := root.Create(relative)
+		// Do not truncate until the opened descriptor has been checked. A
+		// pre-existing symlink may resolve to a denied file even though no
+		// denied component appears in the argument.
+		file, err := root.OpenFile(relative, os.O_WRONLY|os.O_CREATE, 0o666)
 		if err != nil {
 			return "", fmt.Errorf("write file: %w", err)
 		}
 		defer file.Close()
+		if err := refuseDeniedOpenedTarget(root, file, relative, input.Path); err != nil {
+			return "", err
+		}
+		if err := file.Truncate(0); err != nil {
+			return "", fmt.Errorf("write file: %w", err)
+		}
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return "", fmt.Errorf("write file: %w", err)
+		}
 		if _, err := file.WriteString(input.Content); err != nil {
 			return "", fmt.Errorf("write file: %w", err)
 		}
 		return fmt.Sprintf("wrote %d bytes to %s", len(input.Content), input.Path), nil
 	})
+}
+
+// refuseDeniedOpenedTarget checks the object the kernel actually opened. The
+// literal argument check in withinRoots is still useful for a fast refusal,
+// but cannot see `notes -> .openexec/config.json`.
+//
+// Linux exposes the stable target of an open descriptor through /proc. If proc
+// is unavailable, and on other platforms, the check falls back to resolving
+// the name. That fallback is best-effort for the denied-subtree decision;
+// os.Root still owns containment of the actual operation.
+func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument string) error {
+	resolvedRoot, err := filepath.EvalSymlinks(root.Name())
+	if err != nil {
+		return fmt.Errorf("verify workspace root for %q: %w", argument, err)
+	}
+	resolved := ""
+	if runtime.GOOS == "linux" {
+		resolved, err = os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(file.Fd()), 10)))
+		resolved = strings.TrimSuffix(resolved, " (deleted)")
+	}
+	if resolved == "" || err != nil {
+		resolved, err = filepath.EvalSymlinks(filepath.Join(root.Name(), relative))
+	}
+	if err != nil {
+		return fmt.Errorf("verify opened path %q: %w", argument, err)
+	}
+	policyPath, err := filepath.Rel(resolvedRoot, resolved)
+	if err != nil || policyPath == ".." || strings.HasPrefix(policyPath, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("verify opened path %q: resolved target is outside the workspace root", argument)
+	}
+	if component, denied := deniedComponent(policyPath); denied {
+		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
+			argument, component)
+	}
+	return nil
+}
+
+// refuseDeniedProspectiveTarget resolves every existing prefix, then appends
+// any not-yet-created suffix. This catches `alias -> .git` before
+// `alias/index.lock` creates a lock file, and before create_directories can
+// make a subtree through `alias -> .openexec`.
+func refuseDeniedProspectiveTarget(root *os.Root, relative, argument string) error {
+	resolvedRoot, err := filepath.EvalSymlinks(root.Name())
+	if err != nil {
+		return fmt.Errorf("verify workspace root for %q: %w", argument, err)
+	}
+	resolved, err := resolveExistingPrefix(filepath.Join(resolvedRoot, relative))
+	if err != nil {
+		return fmt.Errorf("verify target path %q: %w", argument, err)
+	}
+	policyPath, err := filepath.Rel(resolvedRoot, resolved)
+	if err != nil || policyPath == ".." || strings.HasPrefix(policyPath, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("verify target path %q: resolved target is outside the workspace root", argument)
+	}
+	if component, denied := deniedComponent(policyPath); denied {
+		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
+			argument, component)
+	}
+	return nil
+}
+
+func resolveExistingPrefix(path string) (string, error) {
+	return resolveExistingPrefixDepth(path, 0)
+}
+
+func resolveExistingPrefixDepth(path string, depth int) (string, error) {
+	if depth > 255 {
+		return "", fmt.Errorf("too many symbolic links")
+	}
+	probe := filepath.Clean(path)
+	var suffix []string
+	for {
+		if info, statErr := os.Lstat(probe); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
+			target, readErr := os.Readlink(probe)
+			if readErr != nil {
+				return "", readErr
+			}
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(probe), target)
+			}
+			resolved, resolveErr := resolveExistingPrefixDepth(target, depth+1)
+			if resolveErr != nil {
+				return "", resolveErr
+			}
+			parts := append([]string{resolved}, suffix...)
+			return filepath.Join(parts...), nil
+		}
+		resolved, err := filepath.EvalSymlinks(probe)
+		if err == nil {
+			parts := append([]string{resolved}, suffix...)
+			return filepath.Join(parts...), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(probe)
+		if parent == probe {
+			return "", err
+		}
+		suffix = append([]string{filepath.Base(probe)}, suffix...)
+		probe = parent
+	}
 }
 
 // readableRoots is what a call may open: the roots granted for reading, the

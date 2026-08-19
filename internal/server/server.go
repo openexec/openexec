@@ -249,7 +249,7 @@ func New(cfg Config) (*Server, error) {
 		go s.Coordinator.SyncKnowledge(".")
 	}
 	s.Mux.HandleFunc("POST /api/v1/repository-graph/scan", s.handleRepositoryGraphScan)
-	s.Mux.HandleFunc("GET /api/v1/repository-context", s.handleRepositoryContext)
+	s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleRepositoryContext)))
 	s.registerRepositoryGraphQueryRoutes()
 	if s.repositoryEvidenceToken != "" {
 		s.registerRepositoryEvidenceRoutes()
