@@ -202,12 +202,13 @@ WebSocket events are available at /ws for real-time monitoring.`,
 		}
 
 		srv, err := server.New(server.Config{
-			Port:           startPort,
-			UnifiedDB:      auditDB,
-			DataDir:        dataDir,
-			ProjectsDir:    config.ProjectDir,
-			EnableDCP:      enableDCP,
-			NewCoordinator: newDCPCoordinator,
+			Port:                    startPort,
+			UnifiedDB:               auditDB,
+			DataDir:                 dataDir,
+			ProjectsDir:             config.ProjectDir,
+			EnableDCP:               enableDCP,
+			RepositoryEvidenceToken: strings.TrimSpace(os.Getenv("OPENEXEC_REPOSITORY_EVIDENCE_TOKEN")),
+			NewCoordinator:          newDCPCoordinator,
 		})
 		if err != nil {
 			return err
