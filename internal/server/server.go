@@ -46,6 +46,9 @@ type Server struct {
 	// KnowledgeStore is process-scoped so freshness checks and graph writers
 	// share the same single-writer lock across concurrent HTTP requests.
 	KnowledgeStore *knowledge.Store
+	// repositoryEvidenceToken protects the narrow server-to-server read profile
+	// used by Agent Console. It grants no validation or execution authority.
+	repositoryEvidenceToken string
 	// Observability
 	runnerCommand string
 	runnerArgs    []string
@@ -73,13 +76,14 @@ type CoordinatorFactory func(db *sql.DB, projectsDir string) (DCPCoordinator, er
 
 // Config defines settings for the unified server
 type Config struct {
-	Port          int
-	DataDir       string
-	UnifiedDB     string
-	ModelsPath    string
-	ProjectsDir   string
-	SkipPreflight bool // For testing: skip preflight checks that require real runner
-	EnableDCP     bool // Feature flag: enable Deterministic Control Plane (default: false)
+	Port                    int
+	DataDir                 string
+	UnifiedDB               string
+	ModelsPath              string
+	ProjectsDir             string
+	SkipPreflight           bool // For testing: skip preflight checks that require real runner
+	EnableDCP               bool // Feature flag: enable Deterministic Control Plane (default: false)
+	RepositoryEvidenceToken string
 	// NewCoordinator, when set and EnableDCP resolves true, builds the DCP
 	// coordinator. Left nil by default so core needs no DCP dependency.
 	NewCoordinator CoordinatorFactory
@@ -229,12 +233,13 @@ func New(cfg Config) (*Server, error) {
 			Addr:    fmt.Sprintf(":%d", cfg.Port),
 			Handler: mux,
 		},
-		runnerCommand:  runnerCmd,
-		runnerArgs:     runnerArgs,
-		runnerModel:    modelUsed,
-		skipPreflight:  cfg.SkipPreflight,
-		StateStore:     stateStore,
-		KnowledgeStore: knowledgeStore,
+		runnerCommand:           runnerCmd,
+		runnerArgs:              runnerArgs,
+		runnerModel:             modelUsed,
+		skipPreflight:           cfg.SkipPreflight,
+		StateStore:              stateStore,
+		KnowledgeStore:          knowledgeStore,
+		repositoryEvidenceToken: cfg.RepositoryEvidenceToken,
 	}
 
 	s.registerRoutes()
@@ -246,6 +251,9 @@ func New(cfg Config) (*Server, error) {
 	s.Mux.HandleFunc("POST /api/v1/repository-graph/scan", s.handleRepositoryGraphScan)
 	s.Mux.HandleFunc("GET /api/v1/repository-context", s.handleRepositoryContext)
 	s.registerRepositoryGraphQueryRoutes()
+	if s.repositoryEvidenceToken != "" {
+		s.registerRepositoryEvidenceRoutes()
+	}
 
 	// Log active feature flags for operators
 	logFeatureFlags()
