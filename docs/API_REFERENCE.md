@@ -71,7 +71,7 @@ OpenExec uses a strict separation of concerns:
 
 Returns bounded structural impact for repository-relative file anchors and
 optional stable symbol IDs against one current graph generation. Access is
-scoped by both `Authorization: Bearer <OPENEXEC_REPOSITORY_EVIDENCE_TOKEN>` and
+scoped by both `Authorization: Bearer <OPENEXEC_REPOSITORY_GRAPH_TOKEN>` and
 the `X-OpenExec-Checkout-ID` header. The daemon binds to `127.0.0.1` by default;
 remote binding requires an explicit `openexec start --listen <address>`. When
 the server credential is not configured, repository-context and every

@@ -210,6 +210,7 @@ WebSocket events are available at /ws for real-time monitoring.`,
 			ProjectsDir:             config.ProjectDir,
 			EnableDCP:               enableDCP,
 			RepositoryEvidenceToken: strings.TrimSpace(os.Getenv("OPENEXEC_REPOSITORY_EVIDENCE_TOKEN")),
+			RepositoryGraphToken:    strings.TrimSpace(os.Getenv("OPENEXEC_REPOSITORY_GRAPH_TOKEN")),
 			NewCoordinator:          newDCPCoordinator,
 		})
 		if err != nil {

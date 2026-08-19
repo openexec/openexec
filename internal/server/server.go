@@ -49,6 +49,10 @@ type Server struct {
 	// repositoryEvidenceToken protects the narrow server-to-server read profile
 	// used by Agent Console. It grants no validation or execution authority.
 	repositoryEvidenceToken string
+	// repositoryGraphToken protects the internal graph plane, including scans,
+	// changed-impact queries, and validation state mutations. External advisory
+	// principals never receive it.
+	repositoryGraphToken string
 	// Observability
 	runnerCommand string
 	runnerArgs    []string
@@ -85,6 +89,7 @@ type Config struct {
 	SkipPreflight           bool // For testing: skip preflight checks that require real runner
 	EnableDCP               bool // Feature flag: enable Deterministic Control Plane (default: false)
 	RepositoryEvidenceToken string
+	RepositoryGraphToken    string
 	// NewCoordinator, when set and EnableDCP resolves true, builds the DCP
 	// coordinator. Left nil by default so core needs no DCP dependency.
 	NewCoordinator CoordinatorFactory
@@ -249,6 +254,7 @@ func New(cfg Config) (*Server, error) {
 		StateStore:              stateStore,
 		KnowledgeStore:          knowledgeStore,
 		repositoryEvidenceToken: cfg.RepositoryEvidenceToken,
+		repositoryGraphToken:    cfg.RepositoryGraphToken,
 	}
 
 	s.registerRoutes()

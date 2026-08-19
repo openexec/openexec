@@ -21,10 +21,10 @@ type graphQueryFixture struct {
 }
 
 func newGraphQueryFixture(t *testing.T) graphQueryFixture {
-	return newGraphQueryFixtureWithToken(t, repositoryEvidenceTestToken)
+	return newGraphQueryFixtureWithToken(t, repositoryGraphTestToken)
 }
 
-func newGraphQueryFixtureWithToken(t *testing.T, evidenceToken string) graphQueryFixture {
+func newGraphQueryFixtureWithToken(t *testing.T, graphToken string) graphQueryFixture {
 	t.Helper()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".openexec"), 0o755); err != nil {
@@ -61,12 +61,12 @@ func newGraphQueryFixtureWithToken(t *testing.T, evidenceToken string) graphQuer
 	}
 	s := &Server{
 		StateStore: stateStore, ProjectsDir: root, Mux: http.NewServeMux(),
-		repositoryEvidenceToken: evidenceToken,
+		repositoryGraphToken: graphToken,
 	}
 	s.Mux.Handle("POST /api/v1/repository-graph/scan", s.repositoryGraphAuth(http.HandlerFunc(s.handleRepositoryGraphScan)))
 	s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphAuth(http.HandlerFunc(s.handleRepositoryContext)))
 	s.registerRepositoryGraphQueryRoutes()
-	return graphQueryFixture{server: s, identity: identity, token: evidenceToken}
+	return graphQueryFixture{server: s, identity: identity, token: graphToken}
 }
 
 func graphRequest(t *testing.T, fixture graphQueryFixture, target, checkoutID string) *httptest.ResponseRecorder {
