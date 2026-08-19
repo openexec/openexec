@@ -261,7 +261,7 @@ func (m *Manager) Approve(ctx context.Context, requestID, decidedBy, reason stri
 		return err
 	}
 
-	if err := m.repo.UpdateRequest(ctx, request); err != nil {
+	if err := m.repo.UpdateRequestStatus(ctx, request, RequestStatusPending); err != nil {
 		return fmt.Errorf("failed to update request: %w", err)
 	}
 
@@ -294,7 +294,7 @@ func (m *Manager) Reject(ctx context.Context, requestID, decidedBy, reason strin
 		return err
 	}
 
-	if err := m.repo.UpdateRequest(ctx, request); err != nil {
+	if err := m.repo.UpdateRequestStatus(ctx, request, RequestStatusPending); err != nil {
 		return fmt.Errorf("failed to update request: %w", err)
 	}
 
@@ -323,7 +323,7 @@ func (m *Manager) Cancel(ctx context.Context, requestID, reason string) error {
 		return err
 	}
 
-	if err := m.repo.UpdateRequest(ctx, request); err != nil {
+	if err := m.repo.UpdateRequestStatus(ctx, request, RequestStatusPending); err != nil {
 		return fmt.Errorf("failed to update request: %w", err)
 	}
 
@@ -767,6 +767,55 @@ func (r *SQLiteRepository) UpdateRequest(ctx context.Context, request *ApprovalR
 	return nil
 }
 
+func (r *SQLiteRepository) UpdateRequestStatus(ctx context.Context, request *ApprovalRequest, expectedStatus RequestStatus) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE approval_requests
+		SET status = ?, policy_id = ?, expires_at = ?, updated_at = ?
+		WHERE id = ? AND status = ?
+	`, request.Status.String(), nullStringVal(request.PolicyID), nullTimeVal(request.ExpiresAt),
+		request.UpdatedAt.UTC().Format(time.RFC3339), request.ID, expectedStatus.String())
+	if err != nil {
+		return fmt.Errorf("failed to update approval request status: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		return ErrApprovalConflict
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) ExtendRequestExpiration(ctx context.Context, requestID string, expiresAt, updatedAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE approval_requests
+		SET expires_at = ?, updated_at = ?
+		WHERE id = ? AND status = ?
+	`, expiresAt.UTC().Format(time.RFC3339), updatedAt.UTC().Format(time.RFC3339), requestID, RequestStatusPending.String())
+	if err != nil {
+		return fmt.Errorf("failed to extend approval request expiration: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		return ErrApprovalConflict
+	}
+	return nil
+}
+
 func (r *SQLiteRepository) ListPendingRequests(ctx context.Context, sessionID string) ([]*ApprovalRequest, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -1141,6 +1190,8 @@ func (r *SQLiteRepository) GetDecisionByRequestID(ctx context.Context, requestID
 	query := `
 		SELECT id, request_id, decision, decided_by, reason, policy_applied, created_at
 		FROM approval_decisions WHERE request_id = ?
+		ORDER BY created_at DESC, rowid DESC
+		LIMIT 1
 	`
 
 	row := r.db.QueryRowContext(ctx, query, requestID)

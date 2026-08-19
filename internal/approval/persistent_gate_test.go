@@ -3,6 +3,7 @@ package approval
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func openSecondProcess(t *testing.T, dbPath string) *Manager {
 
 func TestPersistentGate_CrossProcessApprove(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "approvals.db")
-	gate, _, err := OpenPersistentGate(dbPath, t.TempDir(), 30*time.Second)
+	gate, _, err := OpenPersistentGate(dbPath, t.TempDir(), 60*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +42,8 @@ func TestPersistentGate_CrossProcessApprove(t *testing.T) {
 		err error
 	}
 	done := make(chan outcome, 1)
+	waitStarted := make(chan struct{}, 1)
+	gate.waitStarted = waitStarted
 	go func() {
 		req, err := gate.RequestApproval(context.Background(), &GateRequest{
 			ToolName: "terraform_apply",
@@ -48,11 +51,16 @@ func TestPersistentGate_CrossProcessApprove(t *testing.T) {
 		})
 		done <- outcome{req, err}
 	}()
+	select {
+	case <-waitStarted:
+	case <-time.After(10 * time.Second):
+		t.Fatal("gate did not enter approval wait")
+	}
 
 	// "Other terminal": wait until the request is visible, then approve it.
 	operator := openSecondProcess(t, dbPath)
 	var pendingID string
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		pending, err := operator.ListPendingRequests(context.Background(), PersistentGateSessionID)
 		if err == nil && len(pending) == 1 {
@@ -83,7 +91,7 @@ func TestPersistentGate_CrossProcessApprove(t *testing.T) {
 
 func TestPersistentGate_CrossProcessReject(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "approvals.db")
-	gate, _, err := OpenPersistentGate(dbPath, t.TempDir(), 30*time.Second)
+	gate, _, err := OpenPersistentGate(dbPath, t.TempDir(), 60*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,6 +100,8 @@ func TestPersistentGate_CrossProcessReject(t *testing.T) {
 	}
 
 	done := make(chan *GateRequest, 1)
+	waitStarted := make(chan struct{}, 1)
+	gate.waitStarted = waitStarted
 	go func() {
 		req, _ := gate.RequestApproval(context.Background(), &GateRequest{
 			ToolName: "salt_apply_state",
@@ -99,9 +109,14 @@ func TestPersistentGate_CrossProcessReject(t *testing.T) {
 		})
 		done <- req
 	}()
+	select {
+	case <-waitStarted:
+	case <-time.After(10 * time.Second):
+		t.Fatal("gate did not enter approval wait")
+	}
 
 	operator := openSecondProcess(t, dbPath)
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		pending, err := operator.ListPendingRequests(context.Background(), PersistentGateSessionID)
 		if err == nil && len(pending) == 1 {
@@ -123,6 +138,60 @@ func TestPersistentGate_CrossProcessReject(t *testing.T) {
 		}
 	case <-time.After(60 * time.Second):
 		t.Fatal("gate did not observe the cross-process rejection")
+	}
+}
+
+func TestPersistentGateStaleWritesCannotReplaceOperatorDecision(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "approvals.db")
+	gate, manager, err := OpenPersistentGate(dbPath, t.TempDir(), 60*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gate.SetToolRisk(RiskLevelHigh, "terraform_apply"); err != nil {
+		t.Fatal(err)
+	}
+
+	request, canExec, err := manager.RequestApproval(
+		context.Background(), PersistentGateSessionID, "tool-call-race", "terraform_apply", `{}`, "agent", gate.projectPath,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if canExec {
+		t.Fatal("high-risk request was unexpectedly auto-approved")
+	}
+	stale := *request
+
+	operator := openSecondProcess(t, dbPath)
+	if err := operator.Approve(context.Background(), request.ID, "test-operator", "approved once"); err != nil {
+		t.Fatalf("operator approve: %v", err)
+	}
+
+	err = manager.repo.ExtendRequestExpiration(context.Background(), request.ID, time.Now().Add(time.Hour), time.Now())
+	if !errors.Is(err, ErrApprovalConflict) {
+		t.Fatalf("stale expiration extension error = %v, want ErrApprovalConflict", err)
+	}
+	if err := stale.Reject(); err != nil {
+		t.Fatal(err)
+	}
+	err = manager.repo.UpdateRequestStatus(context.Background(), &stale, RequestStatusPending)
+	if !errors.Is(err, ErrApprovalConflict) {
+		t.Fatalf("stale status transition error = %v, want ErrApprovalConflict", err)
+	}
+
+	stored, err := manager.repo.GetRequest(context.Background(), request.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Status != RequestStatusApproved {
+		t.Fatalf("stored status = %s, want approved", stored.Status)
+	}
+	decision, err := manager.repo.GetDecisionByRequestID(context.Background(), request.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decision.Decision != RequestStatusApproved || decision.Reason != "approved once" {
+		t.Fatalf("decision = %s %q, want approved once", decision.Decision, decision.Reason)
 	}
 }
 
