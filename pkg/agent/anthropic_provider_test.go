@@ -1225,7 +1225,7 @@ func TestAnthropicProviderToolChoice(t *testing.T) {
 	}{
 		{"auto", &anthropicToolChoice{Type: "auto"}},
 		{"any", &anthropicToolChoice{Type: "any"}},
-		{"none", nil}, // tools should be cleared
+		{"none", &anthropicToolChoice{Type: "none"}},
 		{"specific_tool", &anthropicToolChoice{Type: "tool", Name: "specific_tool"}},
 	}
 
@@ -1247,16 +1247,13 @@ func TestAnthropicProviderToolChoice(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if tc.choice == "none" {
-				if len(anthropicReq.Tools) != 0 {
-					t.Error("expected tools to be cleared for 'none' choice")
-				}
-			} else {
-				if anthropicReq.ToolChoice == nil {
-					t.Error("expected tool choice to be set")
-				} else if anthropicReq.ToolChoice.Type != tc.expected.Type {
-					t.Errorf("expected type %q, got %q", tc.expected.Type, anthropicReq.ToolChoice.Type)
-				}
+			if anthropicReq.ToolChoice == nil {
+				t.Error("expected tool choice to be set")
+			} else if anthropicReq.ToolChoice.Type != tc.expected.Type {
+				t.Errorf("expected type %q, got %q", tc.expected.Type, anthropicReq.ToolChoice.Type)
+			}
+			if len(anthropicReq.Tools) != 1 {
+				t.Errorf("tool definitions = %d, want 1", len(anthropicReq.Tools))
 			}
 		})
 	}

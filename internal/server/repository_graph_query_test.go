@@ -17,10 +17,11 @@ import (
 type graphQueryFixture struct {
 	server   *Server
 	identity knowledge.RepositoryIdentity
+	token    string
 }
 
 func newGraphQueryFixture(t *testing.T) graphQueryFixture {
-	return newGraphQueryFixtureWithToken(t, "")
+	return newGraphQueryFixtureWithToken(t, repositoryEvidenceTestToken)
 }
 
 func newGraphQueryFixtureWithToken(t *testing.T, evidenceToken string) graphQueryFixture {
@@ -62,15 +63,14 @@ func newGraphQueryFixtureWithToken(t *testing.T, evidenceToken string) graphQuer
 		StateStore: stateStore, ProjectsDir: root, Mux: http.NewServeMux(),
 		repositoryEvidenceToken: evidenceToken,
 	}
-	if evidenceToken != "" {
-		s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphReadAuth(http.HandlerFunc(s.handleRepositoryContext)))
-	}
+	s.Mux.Handle("POST /api/v1/repository-graph/scan", s.repositoryGraphAuth(http.HandlerFunc(s.handleRepositoryGraphScan)))
+	s.Mux.Handle("GET /api/v1/repository-context", s.repositoryGraphAuth(http.HandlerFunc(s.handleRepositoryContext)))
 	s.registerRepositoryGraphQueryRoutes()
-	return graphQueryFixture{server: s, identity: identity}
+	return graphQueryFixture{server: s, identity: identity, token: evidenceToken}
 }
 
 func graphRequest(t *testing.T, fixture graphQueryFixture, target, checkoutID string) *httptest.ResponseRecorder {
-	return graphRequestWithToken(t, fixture, target, checkoutID, "")
+	return graphRequestWithToken(t, fixture, target, checkoutID, fixture.token)
 }
 
 func graphRequestWithToken(t *testing.T, fixture graphQueryFixture, target, checkoutID, token string) *httptest.ResponseRecorder {
@@ -97,6 +97,9 @@ func graphPostRequest(t *testing.T, fixture graphQueryFixture, target, checkoutI
 	request.Header.Set("Content-Type", "application/json")
 	if checkoutID != "" {
 		request.Header.Set("X-OpenExec-Checkout-ID", checkoutID)
+	}
+	if fixture.token != "" {
+		request.Header.Set("Authorization", "Bearer "+fixture.token)
 	}
 	response := httptest.NewRecorder()
 	fixture.server.Mux.ServeHTTP(response, request)
@@ -157,6 +160,7 @@ func TestRepositoryGraphChangedImpactIsCheckoutAuthorizedAndBounded(t *testing.T
 	for _, body := range []string{`{"files":["main.go"],"unknown":true}`, `{"files":["main.go"]}{"files":["other.go"]}`} {
 		malformedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/repository-graph/impact/changed", bytes.NewBufferString(body))
 		malformedRequest.Header.Set("X-OpenExec-Checkout-ID", fixture.identity.CheckoutID)
+		malformedRequest.Header.Set("Authorization", "Bearer "+fixture.token)
 		malformedResponse := httptest.NewRecorder()
 		fixture.server.Mux.ServeHTTP(malformedResponse, malformedRequest)
 		if malformedResponse.Code != http.StatusBadRequest {

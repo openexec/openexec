@@ -73,6 +73,7 @@ func newDCPCoordinator(db *sql.DB, projectsDir string) (server.DCPCoordinator, e
 
 var (
 	startPort        int
+	startListen      string
 	startTimeout     int
 	startReviewer    string
 	startDaemon      bool
@@ -150,7 +151,7 @@ WebSocket events are available at /ws for real-time monitoring.`,
 			startPort = finalPort
 		}
 
-		serverArgs := []string{"start", "--port", fmt.Sprintf("%d", startPort)}
+		serverArgs := []string{"start", "--port", fmt.Sprintf("%d", startPort), "--listen", startListen}
 
 		if startDaemon {
 			if isServerRunning(config.ProjectDir, startPort) {
@@ -203,6 +204,7 @@ WebSocket events are available at /ws for real-time monitoring.`,
 
 		srv, err := server.New(server.Config{
 			Port:                    startPort,
+			ListenAddress:           startListen,
 			UnifiedDB:               auditDB,
 			DataDir:                 dataDir,
 			ProjectsDir:             config.ProjectDir,
@@ -844,6 +846,7 @@ func ensureMCPConfig(projectDir string) (string, error) {
 
 func init() {
 	startCmd.Flags().IntVarP(&startPort, "port", "P", 8765, "HTTP server port")
+	startCmd.Flags().StringVar(&startListen, "listen", "127.0.0.1", "HTTP listen address (set explicitly for remote exposure)")
 	startCmd.Flags().BoolVarP(&startDaemon, "daemon", "d", false, "Run as background daemon")
 	startCmd.Flags().BoolVar(&startUI, "ui", false, "Open web console")
 	startCmd.Flags().StringVar(&startReviewer, "reviewer", "", "Model for code review")

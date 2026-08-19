@@ -531,23 +531,23 @@ func (p *AnthropicProvider) Stream(ctx context.Context, req Request) (<-chan Str
 
 // setHeaders sets the required headers for Anthropic API requests.
 func (p *AnthropicProvider) setHeaders(req *http.Request) {
-    req.Header.Set("Content-Type", "application/json")
-    req.Header.Set("x-api-key", p.apiKey)
-    req.Header.Set("anthropic-version", AnthropicAPIVersion)
-    // Enable prompt caching beta to allow stable-prefix caching benefits
-    req.Header.Set("anthropic-beta", "prompt-caching-2024-07-31")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", p.apiKey)
+	req.Header.Set("anthropic-version", AnthropicAPIVersion)
+	// Enable prompt caching beta to allow stable-prefix caching benefits
+	req.Header.Set("anthropic-beta", "prompt-caching-2024-07-31")
 }
 
 // buildRequest converts a unified Request to an Anthropic request.
 func (p *AnthropicProvider) buildRequest(req Request) (*anthropicRequest, error) {
-    anthropicReq := &anthropicRequest{
-        Model:       req.Model,
-        System:      req.System,
-        MaxTokens:   req.MaxTokens,
-        Temperature: req.Temperature,
-        TopP:        req.TopP,
-        Stop:        req.StopSequences,
-    }
+	anthropicReq := &anthropicRequest{
+		Model:       req.Model,
+		System:      req.System,
+		MaxTokens:   req.MaxTokens,
+		Temperature: req.Temperature,
+		TopP:        req.TopP,
+		Stop:        req.StopSequences,
+	}
 
 	if anthropicReq.MaxTokens == 0 {
 		anthropicReq.MaxTokens = DefaultMaxTokens
@@ -571,7 +571,7 @@ func (p *AnthropicProvider) buildRequest(req Request) (*anthropicRequest, error)
 		})
 	}
 
-    // Convert tool choice
+	// Convert tool choice
 	if req.ToolChoice != "" {
 		switch req.ToolChoice {
 		case "auto":
@@ -579,8 +579,9 @@ func (p *AnthropicProvider) buildRequest(req Request) (*anthropicRequest, error)
 		case "any":
 			anthropicReq.ToolChoice = &anthropicToolChoice{Type: "any"}
 		case "none":
-			// Don't include tool_choice for "none", just don't send tools
-			anthropicReq.Tools = nil
+			// Keep definitions because replayed history may contain tool_use and
+			// tool_result blocks that strict endpoints validate against them.
+			anthropicReq.ToolChoice = &anthropicToolChoice{Type: "none"}
 		default:
 			// Specific tool name
 			anthropicReq.ToolChoice = &anthropicToolChoice{
@@ -588,19 +589,19 @@ func (p *AnthropicProvider) buildRequest(req Request) (*anthropicRequest, error)
 				Name: req.ToolChoice,
 			}
 		}
-    }
+	}
 
-    // Forward prompt_cache_key for observability/routing
-    if req.Metadata != nil {
-        if v, ok := req.Metadata["prompt_cache_key"].(string); ok && v != "" {
-            if anthropicReq.Metadata == nil {
-                anthropicReq.Metadata = map[string]string{}
-            }
-            anthropicReq.Metadata["prompt_cache_key"] = v
-        }
-    }
+	// Forward prompt_cache_key for observability/routing
+	if req.Metadata != nil {
+		if v, ok := req.Metadata["prompt_cache_key"].(string); ok && v != "" {
+			if anthropicReq.Metadata == nil {
+				anthropicReq.Metadata = map[string]string{}
+			}
+			anthropicReq.Metadata["prompt_cache_key"] = v
+		}
+	}
 
-    return anthropicReq, nil
+	return anthropicReq, nil
 }
 
 // convertMessage converts a unified Message to an Anthropic message.

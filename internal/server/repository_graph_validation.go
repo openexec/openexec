@@ -50,14 +50,14 @@ type validationEvidenceRequest struct {
 }
 
 func (s *Server) registerRepositoryGraphValidationRoutes() {
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/validation-plans/propose", s.handleValidationPlanPropose)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/validation-plans/{id}", s.handleValidationPlanRead)
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/validation-plans/{id}/accept", s.handleValidationPlanAccept)
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/validation-plans/{id}/evidence", s.handleValidationEvidenceLink)
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/validation-plans/{id}/completion", s.handleValidationCompletionFinalize)
-	s.Mux.HandleFunc("GET /api/v1/repository-graph/validation-plans/{id}/completion", s.handleValidationCompletionRead)
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/validation-runs", s.handleValidationRunRegister)
-	s.Mux.HandleFunc("POST /api/v1/repository-graph/validation-runs/{id}/steps", s.handleValidationRunStepRegister)
+	s.Mux.Handle("POST /api/v1/repository-graph/validation-plans/propose", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationPlanPropose)))
+	s.Mux.Handle("GET /api/v1/repository-graph/validation-plans/{id}", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationPlanRead)))
+	s.Mux.Handle("POST /api/v1/repository-graph/validation-plans/{id}/accept", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationPlanAccept)))
+	s.Mux.Handle("POST /api/v1/repository-graph/validation-plans/{id}/evidence", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationEvidenceLink)))
+	s.Mux.Handle("POST /api/v1/repository-graph/validation-plans/{id}/completion", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationCompletionFinalize)))
+	s.Mux.Handle("GET /api/v1/repository-graph/validation-plans/{id}/completion", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationCompletionRead)))
+	s.Mux.Handle("POST /api/v1/repository-graph/validation-runs", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationRunRegister)))
+	s.Mux.Handle("POST /api/v1/repository-graph/validation-runs/{id}/steps", s.repositoryGraphAuth(http.HandlerFunc(s.handleValidationRunStepRegister)))
 }
 
 func decodeValidationJSON(w http.ResponseWriter, r *http.Request, target any) bool {
