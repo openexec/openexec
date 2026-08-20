@@ -1053,7 +1053,9 @@ Without `--plan`, the published validation summary explicitly reports that
 repository validation is unevaluated; an empty array must not imply success.
 Pass `--plan VALIDATION_PLAN_REVISION_ID` only after its immutable completion
 report exists. The publisher verifies that the plan belongs to this checkout
-and includes that frozen report's verified, not-verified, and completion state.
+and to the freshly scanned graph/worktree state, then includes that frozen
+report's verified, not-verified, and completion state. A stale plan is refused;
+its green result is never paired with a newer repository snapshot.
 
 Use `--console-token-file` instead of the environment variable when a managed
 secret file is available. Publishing sends the bounded schema-v1 projection,

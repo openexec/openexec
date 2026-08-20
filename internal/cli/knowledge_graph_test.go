@@ -328,4 +328,63 @@ func TestPublishIncludesTheNamedFrozenCompletionReport(t *testing.T) {
 		projection.ValidationSummary.Verified[0] != "The owner journey passes" || len(projection.ValidationSummary.NotVerified) != 0 {
 		t.Fatalf("published validation summary = %#v", projection.ValidationSummary)
 	}
+
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc main() { println(\"changed\") }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stalePublisher := &recordingRepositoryContextPublisher{}
+	if _, err := refreshAndPublishRepositoryContext(ctx, graph, identity, "https://console.example", "project-1", "token", nil, "task-publish", "run-publish", plan.ID, stalePublisher); err == nil ||
+		!strings.Contains(err.Error(), "belongs to repository state") {
+		t.Fatalf("stale completion report publish error = %v", err)
+	}
+	if stalePublisher.called {
+		t.Fatal("stale completion report was published against the refreshed repository")
+	}
+}
+
+func TestPublishNamesAnUnfinalizedValidationPlan(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	graph, err := knowledge.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer graph.Close()
+	identity, err := graph.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := graph.RefreshRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	current, err := graph.CurrentRepositoryState(ctx, identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := openValidationState(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := canonical.CreateValidationPlanRevision(ctx, statepkg.ValidationPlanRevision{
+		TaskID: "task-unfinalized", GenerationID: current.GraphVersion,
+		WorktreeStateHash: current.WorktreeStateHash, Status: "accepted",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := canonical.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	publisher := &recordingRepositoryContextPublisher{}
+	if _, err := refreshAndPublishRepositoryContext(ctx, graph, identity, "https://console.example", "project-1", "token", nil, "", "", plan.ID, publisher); err == nil ||
+		!strings.Contains(err.Error(), "has no frozen completion report") {
+		t.Fatalf("unfinalized completion report error = %v", err)
+	}
+	if publisher.called {
+		t.Fatal("unfinalized completion report was published")
+	}
 }
