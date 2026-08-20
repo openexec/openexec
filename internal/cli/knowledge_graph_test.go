@@ -262,3 +262,70 @@ func TestPublishRefreshesGraphBeforeSendingRepositoryContext(t *testing.T) {
 		t.Fatalf("persisted graph state = %#v, projection = %#v", state, projection)
 	}
 }
+
+func TestPublishIncludesTheNamedFrozenCompletionReport(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	graph, err := knowledge.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer graph.Close()
+	identity, err := graph.EnsureRepositoryIdentity(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := graph.RefreshRepository(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	current, err := graph.CurrentRepositoryState(ctx, identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := openValidationState(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := canonical.CreateRun(ctx, "run-publish", "", "", root, "workspace-write"); err != nil {
+		t.Fatal(err)
+	}
+	if err := canonical.AddRunStep(ctx, "step-publish", "run-publish", "trace", "verify", 1, "completed"); err != nil {
+		t.Fatal(err)
+	}
+	if err := canonical.RecordArtifact(ctx, "artifact-publish", "test_log", ".openexec/artifacts/publish.log", 10); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := canonical.CreateValidationPlanRevision(ctx, statepkg.ValidationPlanRevision{
+		TaskID: "task-publish", RunID: "run-publish", GenerationID: current.GraphVersion,
+		WorktreeStateHash: current.WorktreeStateHash, Status: "accepted",
+		Items: []statepkg.ValidationItem{{Source: "user", Disposition: "accepted", Requirement: "blocking", Criterion: "The owner journey passes", Scope: "owner_journey"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := canonical.LinkValidationEvidence(ctx, statepkg.ValidationEvidenceLink{
+		ValidationItemID: plan.Items[0].ID, RunID: "run-publish", RunStepID: "step-publish",
+		ArtifactHash: "artifact-publish", WorktreeStateHash: current.WorktreeStateHash, Status: "passed",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := canonical.FinalizeEvidenceCoverage(ctx, plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := canonical.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	publisher := &recordingRepositoryContextPublisher{}
+	projection, err := refreshAndPublishRepositoryContext(ctx, graph, identity, "https://console.example", "project-1", "token", nil, "task-publish", "run-publish", plan.ID, publisher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !projection.ValidationSummary.CanComplete || len(projection.ValidationSummary.Verified) != 1 ||
+		projection.ValidationSummary.Verified[0] != "The owner journey passes" || len(projection.ValidationSummary.NotVerified) != 0 {
+		t.Fatalf("published validation summary = %#v", projection.ValidationSummary)
+	}
+}

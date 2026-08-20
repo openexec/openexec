@@ -111,7 +111,7 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 		ModuleDependencies: []SafeModuleDependency{},
 		ValidationSummary: ValidationSummaryProjection{
 			Verified:    []string{},
-			NotVerified: []string{},
+			NotVerified: []string{"Repository validation is unevaluated: no completion report was supplied."},
 		},
 		Provenance: ProjectionProvenance{
 			BaseCommit: state.BaseCommit,
@@ -234,6 +234,7 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	}
 	projection.Selections["module_dependencies"] = selectionScope("direct module dependencies selected from repository import edges", defaultRepositoryContextDependencyLimit, len(projection.ModuleDependencies), projection.Totals.ImportEdges)
 	if report != nil {
+		projection.ValidationSummary.NotVerified = []string{}
 		projection.ValidationSummary.CanComplete = report.CanComplete
 		for _, claim := range report.Verified {
 			projection.ValidationSummary.Verified = append(projection.ValidationSummary.Verified, claim.Criterion)

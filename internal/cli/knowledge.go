@@ -697,7 +697,11 @@ func refreshAndPublishRepositoryContext(ctx context.Context, store *knowledge.St
 	if _, err := store.RefreshRepository(ctx, identity.RootPath); err != nil {
 		return knowledge.RepositoryContextProjection{}, fmt.Errorf("refresh repository graph: %w", err)
 	}
-	projection, err := store.BuildRepositoryContext(ctx, identity, symbols, taskID, runID, planID, nil)
+	report, err := repositoryContextCompletionReport(ctx, identity, planID)
+	if err != nil {
+		return knowledge.RepositoryContextProjection{}, err
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, symbols, taskID, runID, planID, report)
 	if err != nil {
 		return knowledge.RepositoryContextProjection{}, err
 	}
@@ -705,6 +709,29 @@ func refreshAndPublishRepositoryContext(ctx context.Context, store *knowledge.St
 		return knowledge.RepositoryContextProjection{}, err
 	}
 	return projection, nil
+}
+
+func repositoryContextCompletionReport(ctx context.Context, identity knowledge.RepositoryIdentity, planID string) (*statepkg.CompletionReport, error) {
+	if strings.TrimSpace(planID) == "" {
+		return nil, nil
+	}
+	canonical, err := openValidationState(identity.RootPath)
+	if err != nil {
+		return nil, err
+	}
+	defer canonical.Close()
+	plan, err := canonical.GetValidationPlanRevision(ctx, planID)
+	if err != nil {
+		return nil, fmt.Errorf("load repository context validation plan: %w", err)
+	}
+	if err := ensurePlanMatchesDirectory(ctx, canonical, plan, identity); err != nil {
+		return nil, fmt.Errorf("validate repository context plan: %w", err)
+	}
+	report, err := canonical.ReadCompletionReport(ctx, planID)
+	if err != nil {
+		return nil, fmt.Errorf("load repository context completion report: %w", err)
+	}
+	return &report, nil
 }
 
 func openGraphStore(ctx context.Context, directory string) (*knowledge.Store, knowledge.RepositoryIdentity, error) {
