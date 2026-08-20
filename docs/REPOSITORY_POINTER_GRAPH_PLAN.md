@@ -625,7 +625,9 @@ repository_context:
   module_dependencies: []
   validation_summary:
     verified: []
-    not_verified: []
+    not_verified:
+      - "Repository validation is unevaluated: no completion report was supplied."
+    can_complete: false
   limitations: []
 
   openexec_reference:
@@ -1046,6 +1048,14 @@ openexec knowledge graph publish \
   --console-project AGENT_CONSOLE_CHECKOUT_ID \
   --symbol SymbolName
 ```
+
+Without `--plan`, the published validation summary explicitly reports that
+repository validation is unevaluated; an empty array must not imply success.
+Pass `--plan VALIDATION_PLAN_REVISION_ID` only after its immutable completion
+report exists. The publisher verifies that the plan belongs to this checkout
+and to the freshly scanned graph/worktree state, then includes that frozen
+report's verified, not-verified, and completion state. A stale plan is refused;
+its green result is never paired with a newer repository snapshot.
 
 Use `--console-token-file` instead of the environment variable when a managed
 secret file is available. Publishing sends the bounded schema-v1 projection,

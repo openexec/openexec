@@ -51,6 +51,9 @@ func TestRepositoryContextIsVersionedLossyProjection(t *testing.T) {
 	if overviewProjection.ResolvedSymbols == nil || overviewProjection.ModuleDependencies == nil || overviewProjection.Limitations == nil || overviewProjection.ValidationSummary.Verified == nil || overviewProjection.ValidationSummary.NotVerified == nil {
 		t.Fatalf("overview projection contains nil collections: %#v", overviewProjection)
 	}
+	if len(overviewProjection.ValidationSummary.NotVerified) != 1 || !strings.Contains(overviewProjection.ValidationSummary.NotVerified[0], "unevaluated") || overviewProjection.ValidationSummary.CanComplete {
+		t.Fatalf("missing validation report was presented as empty evidence: %#v", overviewProjection.ValidationSummary)
+	}
 	if len(overviewProjection.ResolvedSymbols) == 0 {
 		t.Fatalf("default projection omitted repository symbols: %#v", overviewProjection)
 	}

@@ -697,7 +697,15 @@ func refreshAndPublishRepositoryContext(ctx context.Context, store *knowledge.St
 	if _, err := store.RefreshRepository(ctx, identity.RootPath); err != nil {
 		return knowledge.RepositoryContextProjection{}, fmt.Errorf("refresh repository graph: %w", err)
 	}
-	projection, err := store.BuildRepositoryContext(ctx, identity, symbols, taskID, runID, planID, nil)
+	current, err := store.CurrentRepositoryState(ctx, identity)
+	if err != nil {
+		return knowledge.RepositoryContextProjection{}, fmt.Errorf("read refreshed repository state: %w", err)
+	}
+	report, err := repositoryContextCompletionReport(ctx, identity, current, planID)
+	if err != nil {
+		return knowledge.RepositoryContextProjection{}, err
+	}
+	projection, err := store.BuildRepositoryContext(ctx, identity, symbols, taskID, runID, planID, report)
 	if err != nil {
 		return knowledge.RepositoryContextProjection{}, err
 	}
@@ -705,6 +713,38 @@ func refreshAndPublishRepositoryContext(ctx context.Context, store *knowledge.St
 		return knowledge.RepositoryContextProjection{}, err
 	}
 	return projection, nil
+}
+
+func repositoryContextCompletionReport(ctx context.Context, identity knowledge.RepositoryIdentity, current knowledge.RepositoryState, planID string) (*statepkg.CompletionReport, error) {
+	if strings.TrimSpace(planID) == "" {
+		return nil, nil
+	}
+	canonical, err := openValidationState(identity.RootPath)
+	if err != nil {
+		return nil, err
+	}
+	defer canonical.Close()
+	plan, err := canonical.GetValidationPlanRevision(ctx, planID)
+	if err != nil {
+		return nil, fmt.Errorf("load repository context validation plan: %w", err)
+	}
+	if err := ensurePlanMatchesDirectory(ctx, canonical, plan, identity); err != nil {
+		return nil, fmt.Errorf("validate repository context plan: %w", err)
+	}
+	if plan.GenerationID != current.GraphVersion || plan.WorktreeStateHash != current.WorktreeStateHash {
+		return nil, fmt.Errorf(
+			"validation plan %s belongs to repository state %s (%s), but the refreshed state is %s (%s); finalize a plan for the current state or publish without --plan",
+			planID, plan.GenerationID, plan.WorktreeStateHash, current.GraphVersion, current.WorktreeStateHash,
+		)
+	}
+	report, err := canonical.ReadCompletionReport(ctx, planID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("validation plan %s has no frozen completion report; finalize it or publish without --plan", planID)
+		}
+		return nil, fmt.Errorf("load repository context completion report: %w", err)
+	}
+	return &report, nil
 }
 
 func openGraphStore(ctx context.Context, directory string) (*knowledge.Store, knowledge.RepositoryIdentity, error) {
