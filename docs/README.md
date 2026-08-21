@@ -6,9 +6,9 @@ What is built, what is planned, and what is only a record of a moment. Every
 document also carries its own status line; this table exists so you do not have
 to open thirty files to find out which kind you are reading.
 
-Authority depends on the question. An owner-authored root `PROJECT_INTENT.md`
+Authority depends on the question. The accepted root [`PROJECT_INTENT.md`](../PROJECT_INTENT.md)
 outranks every derived product, experience, architecture, and implementation
-artifact; OpenExec does not yet have that file. A wizard-generated root
+artifact. A wizard-generated root
 `INTENT.md`, if present, is a derived execution specification and cannot
 substitute for it; OpenExec has no such file as of 2026-08-17.
 For current implementation facts, `CLAUDE.md` at the repository root is the
@@ -55,7 +55,7 @@ citing anything below it as built.
 
 | Document | State |
 |---|---|
-| [EXPERIENCE_FIRST_OPERATING_MODEL.md](EXPERIENCE_FIRST_OPERATING_MODEL.md) | Owner-directed Experience First and Finish What Matters operating model, including focus, magical moment, demo, website/pitch communication, whole-product and Taste Reviews, with E0–E4 and F1–F3 implementation stages. Documented, not enforced. OpenExec still lacks its owner-authored root `PROJECT_INTENT.md`. |
+| [EXPERIENCE_FIRST_OPERATING_MODEL.md](EXPERIENCE_FIRST_OPERATING_MODEL.md) | Owner-directed Experience First and Finish What Matters operating model, including focus, magical moment, demo, website/pitch communication, whole-product and Taste Reviews, with E0–E4 and F1–F3 implementation stages. Documented, not fully enforced. The root `PROJECT_INTENT.md` dependency is now accepted. |
 | [IMPACT_MANIFEST_FOR_CONSOLE_PLAN.md](IMPACT_MANIFEST_FOR_CONSOLE_PLAN.md) | Plan, not started (2026-08-04). |
 | [future/](future/) | Explicitly speculative: operational memory layer, policy sandbox contract, timeline replay. |
 
