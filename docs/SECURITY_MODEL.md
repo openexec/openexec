@@ -113,6 +113,21 @@ The daemon fails closed when the relevant token is absent and refuses startup
 when both variables contain the same value. This prevents an external evidence
 credential from becoming graph-mutation authority through configuration error.
 
+### Governed outbound MCP credentials
+
+The optional external-capability control plane uses a third dedicated bearer,
+`OPENEXEC_EXTERNAL_CAPABILITY_TOKEN`, and an independent AES-256-GCM key in
+`OPENEXEC_EXTERNAL_CREDENTIAL_KEY`. Both must be configured together. The
+control bearer cannot equal either repository bearer. Provider tokens are
+stored only in the authenticated encrypted envelope and are never returned by
+the API.
+
+Outbound MCP URLs and OAuth redirects must be HTTPS. The HTTP client resolves
+each host, refuses non-public addresses, then connects to the validated address
+instead of resolving the hostname again. Redirects remain HTTPS and bounded.
+Provider tool annotations are untrusted: the project binding names the exact
+read tools allowed, while unknown and consequential tools are denied.
+
 ## 4. Defense in depth (assume any single layer fails)
 
 | Layer | What it stops |

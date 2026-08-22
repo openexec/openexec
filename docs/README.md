@@ -38,6 +38,7 @@ date it stopped being true.
 | [REUSABILITY_LIBRARIES.md](REUSABILITY_LIBRARIES.md) | How `blueprints/`, `intent-compiler/packs/` and the skills engine relate. Spans three repositories. |
 | [API_REFERENCE.md](API_REFERENCE.md) | The daemon's HTTP and WebSocket surface. **Does not cover the MCP tools** — `internal/mcp/` is the list. |
 | [CONFIGURATION.md](CONFIGURATION.md) | `openexec.yaml`. **Partial**: newer configuration lives elsewhere, listed in its header. |
+| [EXTERNAL_CAPABILITY_CONNECTIONS.md](EXTERNAL_CAPABILITY_CONNECTIONS.md) | Governed outbound MCP connections. Phase 0 builds Lovable OAuth, encrypted credentials, project binding, catalog/identity verification, restart recovery and local disable; design mutation remains a later effect contract. |
 
 ## Mixed — shipped in part, proposed in part
 

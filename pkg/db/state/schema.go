@@ -160,6 +160,66 @@ CREATE TABLE IF NOT EXISTS audit_entries (
     FOREIGN KEY (step_id) REFERENCES run_steps(id) ON DELETE SET NULL
 );
 
+-- 7b. EXTERNAL CAPABILITY CONNECTIONS
+-- Credentials are never stored here in plaintext. credential_ciphertext is an
+-- authenticated encrypted envelope whose key is supplied outside the database.
+CREATE TABLE IF NOT EXISTS external_connections (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    server_url TEXT NOT NULL,
+    credential_ref TEXT NOT NULL,
+    credential_ciphertext BLOB,
+    status TEXT NOT NULL DEFAULT 'pending_authorization',
+    identity_json TEXT NOT NULL DEFAULT '{}',
+    catalog_digest TEXT NOT NULL DEFAULT '',
+    tool_count INTEGER NOT NULL DEFAULT 0,
+    protocol_version TEXT NOT NULL DEFAULT '',
+    server_name TEXT NOT NULL DEFAULT '',
+    server_version TEXT NOT NULL DEFAULT '',
+    last_health_error TEXT NOT NULL DEFAULT '',
+    last_checked_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS external_connection_bindings (
+    connection_id TEXT NOT NULL,
+    project_ref TEXT NOT NULL,
+    allowed_effects TEXT NOT NULL DEFAULT '["read"]',
+    allowed_tools TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (connection_id, project_ref),
+    FOREIGN KEY (connection_id) REFERENCES external_connections(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS external_catalog_snapshots (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    protocol_version TEXT NOT NULL DEFAULT '',
+    server_name TEXT NOT NULL DEFAULT '',
+    server_version TEXT NOT NULL DEFAULT '',
+    tools_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (connection_id) REFERENCES external_connections(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS external_invocations (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL,
+    project_ref TEXT NOT NULL,
+    tool_name TEXT NOT NULL,
+    catalog_digest TEXT NOT NULL,
+    effect TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error_message TEXT NOT NULL DEFAULT '',
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    FOREIGN KEY (connection_id) REFERENCES external_connections(id) ON DELETE CASCADE
+);
+
 -- 8. RELEASE STATE (Goals, Stories, Tasks)
 -- [Reusing schemas from internal/release/schema.go but integrated]
 
@@ -312,6 +372,9 @@ CREATE INDEX IF NOT EXISTS idx_run_checkpoints_run ON run_checkpoints(run_id);
 
 -- Composite indexes for pagination queries (high-volume tables)
 CREATE INDEX IF NOT EXISTS idx_runs_project_created ON runs(project_path, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_external_bindings_project ON external_connection_bindings(project_ref, connection_id);
+CREATE INDEX IF NOT EXISTS idx_external_catalog_connection_created ON external_catalog_snapshots(connection_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_external_invocations_connection_started ON external_invocations(connection_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status_created ON runs(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_run_steps_run_started ON run_steps(run_id, started_at ASC);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_run_timestamp ON run_checkpoints(run_id, timestamp DESC);

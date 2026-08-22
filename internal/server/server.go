@@ -20,6 +20,7 @@ import (
 
 	"github.com/openexec/openexec"
 	"github.com/openexec/openexec/internal/execution/health"
+	"github.com/openexec/openexec/internal/externalcap"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/runner"
@@ -34,16 +35,17 @@ import (
 
 // Server is the unified OpenExec API and UI host.
 type Server struct {
-	Mgr         *manager.Manager
-	SessionRepo session.Repository
-	AuditLogger audit.Logger
-	Coordinator DCPCoordinator
-	Checker     *health.Checker
-	ProjectsDir string
-	Mux         *http.ServeMux
-	HttpServer  *http.Server
-	axonBridge  *api.Server
-	StateStore  *state.Store
+	Mgr                  *manager.Manager
+	SessionRepo          session.Repository
+	AuditLogger          audit.Logger
+	Coordinator          DCPCoordinator
+	Checker              *health.Checker
+	ProjectsDir          string
+	Mux                  *http.ServeMux
+	HttpServer           *http.Server
+	axonBridge           *api.Server
+	StateStore           *state.Store
+	ExternalCapabilities *externalcap.Service
 	// KnowledgeStore is process-scoped so freshness checks and graph writers
 	// share the same single-writer lock across concurrent HTTP requests.
 	KnowledgeStore *knowledge.Store
@@ -54,6 +56,9 @@ type Server struct {
 	// changed-impact queries, and validation state mutations. External advisory
 	// principals never receive it.
 	repositoryGraphToken string
+	// externalCapabilityToken protects Agent Console's connection-management
+	// control plane. It is distinct from graph and evidence credentials.
+	externalCapabilityToken string
 	// Observability
 	runnerCommand string
 	runnerArgs    []string
@@ -91,6 +96,8 @@ type Config struct {
 	EnableDCP               bool // Feature flag: enable Deterministic Control Plane (default: false)
 	RepositoryEvidenceToken string
 	RepositoryGraphToken    string
+	ExternalCapabilityToken string
+	ExternalCredentialKey   string
 	// NewCoordinator, when set and EnableDCP resolves true, builds the DCP
 	// coordinator. Left nil by default so core needs no DCP dependency.
 	NewCoordinator CoordinatorFactory
@@ -111,6 +118,13 @@ func New(cfg Config) (*Server, error) {
 	if evidenceToken != "" && graphToken != "" && evidenceToken == graphToken {
 		return nil, errors.New("OPENEXEC_REPOSITORY_EVIDENCE_TOKEN and OPENEXEC_REPOSITORY_GRAPH_TOKEN must be different")
 	}
+	externalToken := strings.TrimSpace(cfg.ExternalCapabilityToken)
+	if externalToken != "" && (externalToken == evidenceToken || externalToken == graphToken) {
+		return nil, errors.New("OPENEXEC_EXTERNAL_CAPABILITY_TOKEN must differ from repository credentials")
+	}
+	if (externalToken == "") != (strings.TrimSpace(cfg.ExternalCredentialKey) == "") {
+		return nil, errors.New("OPENEXEC_EXTERNAL_CAPABILITY_TOKEN and OPENEXEC_EXTERNAL_CREDENTIAL_KEY must be configured together")
+	}
 
 	// 1. Initialize Storage
 	dbPath := cfg.UnifiedDB
@@ -125,6 +139,14 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		_ = stateStore.Close()
 		return nil, fmt.Errorf("failed to init repository graph store: %w", err)
+	}
+	var externalCapabilities *externalcap.Service
+	if externalToken != "" {
+		externalCapabilities, err = externalcap.NewService(stateStore, cfg.ExternalCredentialKey)
+		if err != nil {
+			_ = stateStore.Close()
+			return nil, fmt.Errorf("failed to init external capabilities: %w", err)
+		}
 	}
 
 	// Legacy adapters for backward compatibility during transition
@@ -259,12 +281,15 @@ func New(cfg Config) (*Server, error) {
 		runnerModel:             modelUsed,
 		skipPreflight:           cfg.SkipPreflight,
 		StateStore:              stateStore,
+		ExternalCapabilities:    externalCapabilities,
 		KnowledgeStore:          knowledgeStore,
 		repositoryEvidenceToken: cfg.RepositoryEvidenceToken,
 		repositoryGraphToken:    cfg.RepositoryGraphToken,
+		externalCapabilityToken: externalToken,
 	}
 
 	s.registerRoutes()
+	s.registerExternalCapabilityRoutes()
 
 	if s.Coordinator != nil {
 		// Start background indexing only when DCP is enabled

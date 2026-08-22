@@ -1,6 +1,11 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed "s/^v//" || echo dev)
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 
+# VERSION and COMMIT above are the build identity. Go's implicit VCS probe is
+# redundant and fails in otherwise valid linked worktrees whose gitdir lives
+# outside the checkout.
+export GOFLAGS := $(strip $(GOFLAGS) -buildvcs=false)
+
 .PHONY: all build build-all clean lint test compat-test type-check ui-build ui-lint ui-test ui-type-check help
 
 # Default target
