@@ -14,8 +14,8 @@ project binding, OpenExec credential, or OAuth connection identity.
 The first Lovable connection can:
 
 - authorize against `https://mcp.lovable.dev` through OAuth with PKCE,
-  protected-resource discovery, dynamic client registration and resource
-  binding;
+  protected-resource discovery, Client ID Metadata Documents (with dynamic
+  registration as a compatibility fallback), and resource binding;
 - encrypt the OAuth configuration and tokens at rest with AES-256-GCM;
 - bind the connection to exactly one Agent Console owner project;
 - discover and hash the live MCP catalog;
@@ -62,6 +62,13 @@ Every route requires `Authorization: Bearer
 The OAuth callback accepts only the authorization `code`, random `state`, and
 optional issuer. The server-side state selects the connection and project.
 Unknown, expired or restart-lost state is refused.
+
+OAuth start also requires a `client_metadata_url`. It must be a non-root HTTPS
+URL on the exact callback origin. When the authorization server advertises
+Client ID Metadata Document support, OpenExec uses that URL as `client_id`;
+the public document, served by Agent Console, binds the callback without a
+shared client secret. OpenExec falls back to dynamic registration only when
+the authorization server does not advertise the metadata-document mechanism.
 
 ## Persisted evidence
 

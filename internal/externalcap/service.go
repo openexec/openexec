@@ -170,12 +170,17 @@ func (s *Service) List(ctx context.Context, projectRef string) ([]state.External
 	return s.store.ListExternalConnections(ctx, strings.TrimSpace(projectRef))
 }
 
-func (s *Service) StartOAuth(ctx context.Context, connectionID, projectRef, redirectURL string) (OAuthStart, error) {
+func (s *Service) StartOAuth(ctx context.Context, connectionID, projectRef, redirectURL, clientMetadataURL string) (OAuthStart, error) {
 	connection, binding, err := s.authorizedConnection(ctx, connectionID, projectRef, false)
 	if err != nil {
 		return OAuthStart{}, err
 	}
-	if _, err := validateRedirectURL(redirectURL); err != nil {
+	redirect, err := validateRedirectURL(redirectURL)
+	if err != nil {
+		return OAuthStart{}, err
+	}
+	metadata, err := validateClientMetadataURL(clientMetadataURL, redirect)
+	if err != nil {
 		return OAuthStart{}, err
 	}
 	flowCtx, cancel := context.WithTimeout(context.Background(), defaultFlowLifetime)
@@ -184,7 +189,7 @@ func (s *Service) StartOAuth(ctx context.Context, connectionID, projectRef, redi
 		done: make(chan error, 1), cancel: cancel}
 	authorizationURL := make(chan string, 1)
 	go func() {
-		flow.done <- s.authorizeAndDiscover(flowCtx, connection, binding, redirectURL, authorizationURL, flow.callback)
+		flow.done <- s.authorizeAndDiscover(flowCtx, connection, binding, redirectURL, metadata.String(), authorizationURL, flow.callback)
 		cancel()
 	}()
 	select {
@@ -280,10 +285,11 @@ func (s *Service) Disable(ctx context.Context, connectionID, projectRef string) 
 }
 
 func (s *Service) authorizeAndDiscover(ctx context.Context, connection state.ExternalConnection, binding state.ExternalConnectionBinding,
-	redirectURL string, authorizationURL chan<- string, callback <-chan auth.AuthorizationResult) error {
+	redirectURL, clientMetadataURL string, authorizationURL chan<- string, callback <-chan auth.AuthorizationResult) error {
 	var persisted credentialEnvelope
 	handler, err := auth.NewAuthorizationCodeHandler(&auth.AuthorizationCodeHandlerConfig{
-		RedirectURL: redirectURL,
+		RedirectURL:                    redirectURL,
+		ClientIDMetadataDocumentConfig: &auth.ClientIDMetadataDocumentConfig{URL: clientMetadataURL},
 		DynamicClientRegistrationConfig: &auth.DynamicClientRegistrationConfig{Metadata: &oauthex.ClientRegistrationMetadata{
 			RedirectURIs: []string{redirectURL}, TokenEndpointAuthMethod: "none",
 			GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"},
@@ -612,6 +618,17 @@ func validateRedirectURL(raw string) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
 		return nil, errors.New("redirect_url must be an absolute HTTPS URL")
+	}
+	return parsed, nil
+}
+
+func validateClientMetadataURL(raw string, redirect *url.URL) (*url.URL, error) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" || parsed.RawQuery != "" || parsed.Path == "" || parsed.Path == "/" {
+		return nil, errors.New("client_metadata_url must be an absolute non-root HTTPS URL without credentials, query, or fragment")
+	}
+	if redirect == nil || !strings.EqualFold(parsed.Scheme, redirect.Scheme) || !strings.EqualFold(parsed.Host, redirect.Host) {
+		return nil, errors.New("client_metadata_url must use the redirect_url origin")
 	}
 	return parsed, nil
 }

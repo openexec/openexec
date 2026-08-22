@@ -42,6 +42,7 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	mux.HandleFunc("/.well-known/oauth-authorization-server", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(t, w, map[string]any{"issuer": server.URL, "authorization_endpoint": server.URL + "/authorize",
 			"token_endpoint": server.URL + "/token", "registration_endpoint": server.URL + "/register",
+			"client_id_metadata_document_supported": true,
 			"scopes_supported":                      []string{"read", "offline_access"},
 			"code_challenge_methods_supported":      []string{"S256"},
 			"token_endpoint_auth_methods_supported": []string{"none"}})
@@ -85,7 +86,9 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	started, err := service.StartOAuth(context.Background(), created.ID, "openexec", "https://console.example.test/oauth/external-connections/callback")
+	started, err := service.StartOAuth(context.Background(), created.ID, "openexec",
+		"https://console.example.test/oauth/external-connections/callback",
+		"https://console.example.test/oauth/client-metadata.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +96,8 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if authURL.Query().Get("resource") != server.URL+"/mcp" || authURL.Query().Get("code_challenge") == "" {
+	if authURL.Query().Get("resource") != server.URL+"/mcp" || authURL.Query().Get("code_challenge") == "" ||
+		authURL.Query().Get("client_id") != "https://console.example.test/oauth/client-metadata.json" {
 		t.Fatalf("OAuth URL lacks resource binding or PKCE: %s", started.AuthorizationURL)
 	}
 	completeCtx, cancelComplete := context.WithTimeout(context.Background(), 5*time.Second)
@@ -119,7 +123,9 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cancelledStart, err := service.StartOAuth(context.Background(), cancelled.ID, "openexec", "https://console.example.test/oauth/external-connections/callback")
+	cancelledStart, err := service.StartOAuth(context.Background(), cancelled.ID, "openexec",
+		"https://console.example.test/oauth/external-connections/callback",
+		"https://console.example.test/oauth/client-metadata.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,6 +239,29 @@ func TestProjectBindingCannotBeReused(t *testing.T) {
 	}
 	if _, err := service.Disable(context.Background(), created.ID, "another-project"); err != ErrProjectNotBound {
 		t.Fatalf("cross-project disable error = %v", err)
+	}
+}
+
+func TestOAuthClientMetadataMustBeAttestedByCallbackOrigin(t *testing.T) {
+	store, err := state.NewStore(filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	service, err := NewService(store, base64.RawStdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.Create(context.Background(), CreateInput{Name: "Lovable", Provider: "lovable",
+		ServerURL: "https://mcp.lovable.dev", ProjectRef: "openexec"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.StartOAuth(context.Background(), created.ID, "openexec",
+		"https://console.example.test/oauth/external-connections/callback",
+		"https://attacker.example/oauth/client-metadata.json")
+	if err == nil || !strings.Contains(err.Error(), "must use the redirect_url origin") {
+		t.Fatalf("cross-origin client metadata error = %v", err)
 	}
 }
 
