@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -89,6 +88,7 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	}
 	started, err := service.StartOAuth(context.Background(), created.ID, "openexec",
 		"https://console.example.test/oauth/external-connections/callback",
+		"http://127.0.0.1:7337/oauth/external-connections/callback",
 		"https://console.example.test/oauth/client-metadata.json")
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +98,8 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if authURL.Query().Get("resource") != server.URL+"/mcp" || authURL.Query().Get("code_challenge") == "" ||
-		authURL.Query().Get("client_id") != "https://console.example.test/oauth/client-metadata.json" {
+		authURL.Query().Get("client_id") != lovableOAuthClientID ||
+		authURL.Query().Get("redirect_uri") != "http://127.0.0.1:7337/oauth/external-connections/callback" {
 		t.Fatalf("OAuth URL lacks resource binding or PKCE: %s", started.AuthorizationURL)
 	}
 	completeCtx, cancelComplete := context.WithTimeout(context.Background(), 5*time.Second)
@@ -126,6 +127,7 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	}
 	cancelledStart, err := service.StartOAuth(context.Background(), cancelled.ID, "openexec",
 		"https://console.example.test/oauth/external-connections/callback",
+		"http://127.0.0.1:7337/oauth/external-connections/callback",
 		"https://console.example.test/oauth/client-metadata.json")
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +203,7 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	}
 }
 
-func TestLovableOAuthRefusesDynamicRegistrationFallback(t *testing.T) {
+func TestLovableOAuthUsesDocumentedClientWithoutDynamicRegistration(t *testing.T) {
 	var registrationCalls atomic.Int32
 	var server *httptest.Server
 	mux := http.NewServeMux()
@@ -243,19 +245,31 @@ func TestLovableOAuthRefusesDynamicRegistrationFallback(t *testing.T) {
 	}
 	service.httpClient = server.Client()
 	created, err := service.Create(context.Background(), CreateInput{
-		Name: "Lovable without CIMD", Provider: "lovable", ServerURL: server.URL + "/mcp", ProjectRef: "openexec",
+		Name: "Lovable", Provider: "lovable", ServerURL: server.URL + "/mcp", ProjectRef: "openexec",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.StartOAuth(context.Background(), created.ID, "openexec",
+	started, err := service.StartOAuth(context.Background(), created.ID, "openexec",
 		"https://console.example.test/oauth/external-connections/callback",
+		"http://127.0.0.1:7337/oauth/external-connections/callback",
 		"https://console.example.test/oauth/client-metadata.json")
-	if !errors.Is(err, ErrLovableCIMDRequired) || !strings.Contains(err.Error(), "client_id_metadata_document_supported") {
-		t.Fatalf("missing CIMD error = %v", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authURL, err := url.Parse(started.AuthorizationURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if authURL.Query().Get("client_id") != lovableOAuthClientID ||
+		authURL.Query().Get("redirect_uri") != "http://127.0.0.1:7337/oauth/external-connections/callback" {
+		t.Fatalf("Lovable authorization URL = %s", started.AuthorizationURL)
 	}
 	if got := registrationCalls.Load(); got != 0 {
 		t.Fatalf("Lovable dynamic registration calls = %d, want 0", got)
+	}
+	if _, err := service.Disable(context.Background(), created.ID, "openexec"); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -311,13 +325,14 @@ func TestOAuthClientMetadataMustBeAttestedByCallbackOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := service.Create(context.Background(), CreateInput{Name: "Lovable", Provider: "lovable",
+	created, err := service.Create(context.Background(), CreateInput{Name: "Generic MCP", Provider: "mcp",
 		ServerURL: "https://mcp.lovable.dev", ProjectRef: "openexec"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = service.StartOAuth(context.Background(), created.ID, "openexec",
 		"https://console.example.test/oauth/external-connections/callback",
+		"",
 		"https://attacker.example/oauth/client-metadata.json")
 	if err == nil || !strings.Contains(err.Error(), "must use the redirect_url origin") {
 		t.Fatalf("cross-origin client metadata error = %v", err)

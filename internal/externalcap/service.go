@@ -40,6 +40,7 @@ const (
 	StatusError                = "error"
 	EffectRead                 = "read"
 	defaultFlowLifetime        = 10 * time.Minute
+	lovableOAuthClientID       = "6d465f583e1e4ce5801b1616f735670c"
 )
 
 var (
@@ -48,7 +49,6 @@ var (
 	ErrToolNotAllowed      = errors.New("external tool is not allowed by the project binding")
 	ErrOAuthFlowNotFound   = errors.New("OAuth flow not found or expired")
 	ErrCredentialKeyNeeded = errors.New("external credential encryption key is not configured")
-	ErrLovableCIMDRequired = errors.New("Lovable OAuth requires Client ID Metadata Document support; dynamic client registration is disabled for the public callback")
 )
 
 var lovableReadTools = map[string]struct{}{
@@ -171,18 +171,25 @@ func (s *Service) List(ctx context.Context, projectRef string) ([]state.External
 	return s.store.ListExternalConnections(ctx, strings.TrimSpace(projectRef))
 }
 
-func (s *Service) StartOAuth(ctx context.Context, connectionID, projectRef, redirectURL, clientMetadataURL string) (OAuthStart, error) {
+func (s *Service) StartOAuth(ctx context.Context, connectionID, projectRef, redirectURL, loopbackRedirectURL, clientMetadataURL string) (OAuthStart, error) {
 	connection, binding, err := s.authorizedConnection(ctx, connectionID, projectRef, false)
 	if err != nil {
 		return OAuthStart{}, err
 	}
-	redirect, err := validateRedirectURL(redirectURL)
+	if connection.Provider == "lovable" {
+		redirectURL = loopbackRedirectURL
+	}
+	redirect, err := validateRedirectURL(redirectURL, connection.Provider == "lovable")
 	if err != nil {
 		return OAuthStart{}, err
 	}
-	metadata, err := validateClientMetadataURL(clientMetadataURL, redirect)
-	if err != nil {
-		return OAuthStart{}, err
+	metadataURL := ""
+	if connection.Provider != "lovable" {
+		metadata, metadataErr := validateClientMetadataURL(clientMetadataURL, redirect)
+		if metadataErr != nil {
+			return OAuthStart{}, metadataErr
+		}
+		metadataURL = metadata.String()
 	}
 	flowCtx, cancel := context.WithTimeout(context.Background(), defaultFlowLifetime)
 	flow := &oauthFlow{connectionID: connection.ID, projectRef: binding.ProjectRef,
@@ -190,7 +197,7 @@ func (s *Service) StartOAuth(ctx context.Context, connectionID, projectRef, redi
 		done: make(chan error, 1), cancel: cancel}
 	authorizationURL := make(chan string, 1)
 	go func() {
-		flow.done <- s.authorizeAndDiscover(flowCtx, connection, binding, redirectURL, metadata.String(), authorizationURL, flow.callback)
+		flow.done <- s.authorizeAndDiscover(flowCtx, connection, binding, redirectURL, metadataURL, authorizationURL, flow.callback)
 		cancel()
 	}()
 	select {
@@ -289,8 +296,7 @@ func (s *Service) authorizeAndDiscover(ctx context.Context, connection state.Ext
 	redirectURL, clientMetadataURL string, authorizationURL chan<- string, callback <-chan auth.AuthorizationResult) error {
 	var persisted credentialEnvelope
 	handlerConfig := &auth.AuthorizationCodeHandlerConfig{
-		RedirectURL:                    redirectURL,
-		ClientIDMetadataDocumentConfig: &auth.ClientIDMetadataDocumentConfig{URL: clientMetadataURL},
+		RedirectURL: redirectURL,
 		AuthorizationCodeFetcher: func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
 			select {
 			case authorizationURL <- args.URL:
@@ -315,10 +321,12 @@ func (s *Service) authorizeAndDiscover(ctx context.Context, connection state.Ext
 			}}, nil
 		},
 	}
-	// Lovable refuses dynamic registration for a public web callback. Requiring
-	// CIMD here makes a missing capability explicit instead of silently choosing
-	// the same registration path that Lovable rejects with invalid_redirect_uri.
-	if connection.Provider != "lovable" {
+	if connection.Provider == "lovable" {
+		// Lovable documents this public client for MCP clients other than Claude
+		// and ChatGPT, and accepts it only with a loopback PKCE callback.
+		handlerConfig.PreregisteredClient = &oauthex.ClientCredentials{ClientID: lovableOAuthClientID}
+	} else {
+		handlerConfig.ClientIDMetadataDocumentConfig = &auth.ClientIDMetadataDocumentConfig{URL: clientMetadataURL}
 		handlerConfig.DynamicClientRegistrationConfig = &auth.DynamicClientRegistrationConfig{Metadata: &oauthex.ClientRegistrationMetadata{
 			RedirectURIs: []string{redirectURL}, TokenEndpointAuthMethod: "none",
 			GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"},
@@ -330,9 +338,6 @@ func (s *Service) authorizeAndDiscover(ctx context.Context, connection state.Ext
 		return err
 	}
 	if err := s.discover(ctx, connection, binding, credentialEnvelope{}, handler); err != nil {
-		if connection.Provider == "lovable" && strings.Contains(err.Error(), "no configured client registration methods are supported by the authorization server") {
-			return fmt.Errorf("%w: authorization metadata did not advertise client_id_metadata_document_supported", ErrLovableCIMDRequired)
-		}
 		return err
 	}
 	if persisted.Token == nil {
@@ -624,10 +629,12 @@ func validateServerURL(raw string) (string, error) {
 	return strings.TrimRight(parsed.String(), "/"), nil
 }
 
-func validateRedirectURL(raw string) (*url.URL, error) {
+func validateRedirectURL(raw string, allowLoopbackHTTP bool) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
-		return nil, errors.New("redirect_url must be an absolute HTTPS URL")
+	validHTTPS := parsed != nil && parsed.Scheme == "https"
+	validLoopback := parsed != nil && allowLoopbackHTTP && parsed.Scheme == "http" && parsed.Hostname() == "127.0.0.1"
+	if err != nil || (!validHTTPS && !validLoopback) || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
+		return nil, errors.New("redirect_url must be an absolute HTTPS URL, or an HTTP 127.0.0.1 loopback URL for Lovable")
 	}
 	return parsed, nil
 }
