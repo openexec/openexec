@@ -6,9 +6,9 @@ What is built, what is planned, and what is only a record of a moment. Every
 document also carries its own status line; this table exists so you do not have
 to open thirty files to find out which kind you are reading.
 
-Authority depends on the question. The accepted root [`PROJECT_INTENT.md`](../PROJECT_INTENT.md)
-outranks every derived product, experience, architecture, and implementation
-artifact. A wizard-generated root
+Authority depends on the question. The owner-authored root `PROJECT_INTENT.md`
+accepted 2026-08-22 outranks every derived product, experience, architecture,
+and implementation artifact. A wizard-generated root
 `INTENT.md`, if present, is a derived execution specification and cannot
 substitute for it; OpenExec has no such file as of 2026-08-17.
 For current implementation facts, `CLAUDE.md` at the repository root is the
@@ -55,7 +55,7 @@ citing anything below it as built.
 
 | Document | State |
 |---|---|
-| [EXPERIENCE_FIRST_OPERATING_MODEL.md](EXPERIENCE_FIRST_OPERATING_MODEL.md) | Owner-directed Experience First and Finish What Matters operating model, including focus, magical moment, demo, website/pitch communication, whole-product and Taste Reviews, with E0–E4 and F1–F3 implementation stages. Documented, not fully enforced. The root `PROJECT_INTENT.md` dependency is now accepted. |
+| [EXPERIENCE_FIRST_OPERATING_MODEL.md](EXPERIENCE_FIRST_OPERATING_MODEL.md) | Owner-directed Experience First and Finish What Matters operating model, including focus, magical moment, demo, website/pitch communication, whole-product and Taste Reviews, with E0–E4 and F1–F3 implementation stages. Documented, not enforced. OpenExec's owner-authored root `PROJECT_INTENT.md` was accepted 2026-08-22; [the interview record](OPENEXEC_PROJECT_INTENT_QUESTIONS.md) preserves the verbatim answers and remaining clarification points. |
 | [IMPACT_MANIFEST_FOR_CONSOLE_PLAN.md](IMPACT_MANIFEST_FOR_CONSOLE_PLAN.md) | Plan, not started (2026-08-04). |
 | [future/](future/) | Explicitly speculative: operational memory layer, policy sandbox contract, timeline replay. |
 

@@ -93,12 +93,17 @@ particular initiative or change from it; it must never quietly invent a new
 purpose, customer, or trade-off. An unanswered product question is recorded as
 `UNANSWERED — owner`, not completed by a model.
 
-OpenExec's root `PROJECT_INTENT.md` was accepted on 2026-08-22. It defines the
-multi-repository ecosystem boundary and the Agent Console → OpenExec
-control-plane/navigation-plane dependency. Earlier runs correctly treated the
-Intent as missing; later runs must read the accepted root artifact rather than
-borrowing Agent Console's repository-specific definition or inferring purpose
-from source code.
+OpenExec's owner completed the Project Intent interview on 2026-08-22. The
+owner's verbatim answers are recorded in root `PROJECT_INTENT.md` and
+`docs/OPENEXEC_PROJECT_INTENT_QUESTIONS.md`. Creating and answering the root
+artifact remains reserved for the owner. A machine may present the template,
+transcribe answers, and retain unanswered questions, but may not fill them.
+Console context is authoritative only when it is explicitly scoped to this
+repository and identified as owner-authored; another repository's definition
+must never be borrowed because the portfolio purpose sounds related. The
+accepted Agent Console/OpenExec dependency Goal governs that bounded journey;
+the repository Intent now independently establishes OpenExec's purpose and
+primary user.
 
 A wizard-generated root `INTENT.md`, if present, is a different artifact; none
 is present in OpenExec as of 2026-08-17. `openexec wizard` can generate it and
@@ -779,10 +784,13 @@ Implementation should be incremental and supervised.
 
 ### E0 — Manual contract and dogfooding
 
-- Read OpenExec's accepted root `PROJECT_INTENT.md` and bind every initiative
-  to its multi-repository authority and dependency boundary. A route may use a
-  sibling repository only when it records how that dependency advances the
-  current destination or completion condition.
+- Bind every initiative to OpenExec's owner-authored root `PROJECT_INTENT.md`,
+  accepted through the recorded owner interview on 2026-08-22. Retain its
+  unanswered clarification points rather than completing them by inference. A
+  bounded owner-accepted Goal may define a multi-repository dependency, but it
+  cannot invent or revise OpenExec's purpose. A route may use a sibling
+  repository only when it records how that dependency advances the current
+  destination or completion condition.
 - Use the proportional templates on real OpenExec and Agent Console changes.
 - Write the demo before implementation on one hackathon-sized initiative.
 - Record which questions were useful, repetitive, or impossible to answer.
