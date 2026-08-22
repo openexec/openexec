@@ -80,13 +80,14 @@ func (s *Server) startExternalConnectionOAuth(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var input struct {
-		ProjectRef  string `json:"project_ref"`
-		RedirectURL string `json:"redirect_url"`
+		ProjectRef        string `json:"project_ref"`
+		RedirectURL       string `json:"redirect_url"`
+		ClientMetadataURL string `json:"client_metadata_url"`
 	}
 	if !s.decodeExternalCapabilityBody(w, r, &input) {
 		return
 	}
-	started, err := service.StartOAuth(r.Context(), r.PathValue("id"), input.ProjectRef, input.RedirectURL)
+	started, err := service.StartOAuth(r.Context(), r.PathValue("id"), input.ProjectRef, input.RedirectURL, input.ClientMetadataURL)
 	if err != nil {
 		s.externalCapabilityError(w, err)
 		return
