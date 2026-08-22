@@ -48,6 +48,7 @@ var (
 	ErrToolNotAllowed      = errors.New("external tool is not allowed by the project binding")
 	ErrOAuthFlowNotFound   = errors.New("OAuth flow not found or expired")
 	ErrCredentialKeyNeeded = errors.New("external credential encryption key is not configured")
+	ErrLovableCIMDRequired = errors.New("Lovable OAuth requires Client ID Metadata Document support; dynamic client registration is disabled for the public callback")
 )
 
 var lovableReadTools = map[string]struct{}{
@@ -287,14 +288,9 @@ func (s *Service) Disable(ctx context.Context, connectionID, projectRef string) 
 func (s *Service) authorizeAndDiscover(ctx context.Context, connection state.ExternalConnection, binding state.ExternalConnectionBinding,
 	redirectURL, clientMetadataURL string, authorizationURL chan<- string, callback <-chan auth.AuthorizationResult) error {
 	var persisted credentialEnvelope
-	handler, err := auth.NewAuthorizationCodeHandler(&auth.AuthorizationCodeHandlerConfig{
+	handlerConfig := &auth.AuthorizationCodeHandlerConfig{
 		RedirectURL:                    redirectURL,
 		ClientIDMetadataDocumentConfig: &auth.ClientIDMetadataDocumentConfig{URL: clientMetadataURL},
-		DynamicClientRegistrationConfig: &auth.DynamicClientRegistrationConfig{Metadata: &oauthex.ClientRegistrationMetadata{
-			RedirectURIs: []string{redirectURL}, TokenEndpointAuthMethod: "none",
-			GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"},
-			ClientName: "OpenExec", SoftwareID: "openexec", ApplicationType: "web",
-		}},
 		AuthorizationCodeFetcher: func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
 			select {
 			case authorizationURL <- args.URL:
@@ -318,11 +314,25 @@ func (s *Service) authorizeAndDiscover(ctx context.Context, connection state.Ext
 				return s.saveCredential(context.Background(), connection.ID, persisted)
 			}}, nil
 		},
-	})
+	}
+	// Lovable refuses dynamic registration for a public web callback. Requiring
+	// CIMD here makes a missing capability explicit instead of silently choosing
+	// the same registration path that Lovable rejects with invalid_redirect_uri.
+	if connection.Provider != "lovable" {
+		handlerConfig.DynamicClientRegistrationConfig = &auth.DynamicClientRegistrationConfig{Metadata: &oauthex.ClientRegistrationMetadata{
+			RedirectURIs: []string{redirectURL}, TokenEndpointAuthMethod: "none",
+			GrantTypes: []string{"authorization_code", "refresh_token"}, ResponseTypes: []string{"code"},
+			ClientName: "OpenExec", SoftwareID: "openexec", ApplicationType: "web",
+		}}
+	}
+	handler, err := auth.NewAuthorizationCodeHandler(handlerConfig)
 	if err != nil {
 		return err
 	}
 	if err := s.discover(ctx, connection, binding, credentialEnvelope{}, handler); err != nil {
+		if connection.Provider == "lovable" && strings.Contains(err.Error(), "no configured client registration methods are supported by the authorization server") {
+			return fmt.Errorf("%w: authorization metadata did not advertise client_id_metadata_document_supported", ErrLovableCIMDRequired)
+		}
 		return err
 	}
 	if persisted.Token == nil {
