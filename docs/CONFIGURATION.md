@@ -480,6 +480,11 @@ export OPENEXEC_DAEMON_POLL_INTERVAL=60
 export OPENEXEC_REPOSITORY_EVIDENCE_TOKEN=<external-read-only-token>
 export OPENEXEC_REPOSITORY_GRAPH_TOKEN=<internal-graph-token>
 
+# Optional governed outbound MCP connections. Configure both together and use
+# a third distinct server token. The credential key is base64 for 32 random bytes.
+export OPENEXEC_EXTERNAL_CAPABILITY_TOKEN=<external-capability-control-token>
+export OPENEXEC_EXTERNAL_CREDENTIAL_KEY=<base64-encoded-32-byte-key>
+
 # API Keys (secrets - only via env vars, never in files)
 export OPENEXEC_CLAUDE_API_KEY=sk-ant-...
 export OPENEXEC_CODEX_API_KEY=sk-...
@@ -499,6 +504,17 @@ equal.
 closed with `503` until `OPENEXEC_REPOSITORY_GRAPH_TOKEN` is configured. Give
 trusted internal callers that graph token. Do not give it to external advisory
 clients; they receive only the evidence token.
+
+### Governed external capability credentials
+
+`OPENEXEC_EXTERNAL_CAPABILITY_TOKEN` authorizes only the outbound connection
+control API. It must differ from both repository credentials.
+`OPENEXEC_EXTERNAL_CREDENTIAL_KEY` encrypts provider OAuth credentials at rest
+with AES-256-GCM. OpenExec refuses to start when only one is configured, when
+the key is not a base64-encoded 32-byte value, or when the control token reuses
+a repository credential. Preserve the key across restarts; a replacement key
+requires provider reauthorization. See
+[EXTERNAL_CAPABILITY_CONNECTIONS.md](EXTERNAL_CAPABILITY_CONNECTIONS.md).
 
 ## Agent Comparison
 
