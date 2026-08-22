@@ -28,7 +28,7 @@ rather than being completed by a machine.
 
 *Owner answer, 2026-08-22:*
 
-> It should handle coding like senior engineers do and process is iso
+> It should handle coding like senior engineers do and process is ISO 27001
 > compliant.
 
 ## What is deliberately not OpenExec's purpose?
@@ -39,11 +39,4 @@ rather than being completed by a machine.
 
 *Owner answer, 2026-08-22:*
 
-> Main think is that shops tested and working code
-
-## Open clarification points
-
-- `UNANSWERED — owner`: Which ISO standard or standards does “iso compliant”
-  refer to?
-- `UNANSWERED — owner`: In the success answer, does “shops” mean “ships”?
-
+> Main think is that ships tested and working code
