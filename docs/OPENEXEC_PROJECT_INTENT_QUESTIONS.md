@@ -38,7 +38,7 @@ parts should remain under owner judgment?
 
 ## What must remain true?
 
-> It should handle coding like senior engineers do and process is iso
+> It should handle coding like senior engineers do and process is ISO 27001
 > compliant.
 
 Prompt: Which authority, safety, evidence, compatibility, cost, and product
@@ -53,14 +53,15 @@ used to justify work merely because their repositories share the portfolio?
 
 ## How is success recognized?
 
-> Main think is that shops tested and working code
+> Main think is that ships tested and working code
 
 Prompt: What owner-observable evidence would show that OpenExec is serving its
 purpose, independently of task counts, agent activity, commits, or green unit
 tests?
 
-## Clarification points retained without inference
+## Owner clarification, 2026-08-22
 
-- `UNANSWERED — owner`: Which ISO standard or standards does “iso compliant”
-  refer to?
-- `UNANSWERED — owner`: In the success answer, does “shops” mean “ships”?
+> Shops is ships and iso27001
+
+The current Intent therefore names ISO 27001 and says “ships tested and working
+code.” The deliberately-not-purpose question remains `UNANSWERED — owner`.
