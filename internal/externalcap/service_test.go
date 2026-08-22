@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -197,6 +198,64 @@ func TestLovableOAuthDiscoveryPersistenceAndDisable(t *testing.T) {
 	disabledConnection := connectionByID(connections, created.ID)
 	if disabledConnection == nil || disabledConnection.Status != StatusDisabled || disabledConnection.CatalogDigest != completed.CatalogDigest {
 		t.Fatalf("disabled restart projection = %#v", connections)
+	}
+}
+
+func TestLovableOAuthRefusesDynamicRegistrationFallback(t *testing.T) {
+	var registrationCalls atomic.Int32
+	var server *httptest.Server
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/oauth-protected-resource/mcp", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{"resource": server.URL + "/mcp", "authorization_servers": []string{server.URL}})
+	})
+	mux.HandleFunc("/.well-known/oauth-protected-resource", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{"resource": server.URL, "authorization_servers": []string{server.URL}})
+	})
+	mux.HandleFunc("/.well-known/oauth-authorization-server", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(t, w, map[string]any{
+			"issuer":                                server.URL,
+			"authorization_endpoint":                server.URL + "/authorize",
+			"token_endpoint":                        server.URL + "/token",
+			"registration_endpoint":                 server.URL + "/register",
+			"code_challenge_methods_supported":      []string{"S256"},
+			"token_endpoint_auth_methods_supported": []string{"none"},
+		})
+	})
+	mux.HandleFunc("/register", func(w http.ResponseWriter, _ *http.Request) {
+		registrationCalls.Add(1)
+		writeJSON(t, w, map[string]any{"client_id": "must-not-be-used", "token_endpoint_auth_method": "none"})
+	})
+	mux.HandleFunc("/mcp", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+server.URL+`/.well-known/oauth-protected-resource/mcp"`)
+		http.Error(w, "authorization required", http.StatusUnauthorized)
+	})
+	server = httptest.NewTLSServer(mux)
+	defer server.Close()
+
+	store, err := state.NewStore(filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	service, err := NewService(store, base64.RawStdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.httpClient = server.Client()
+	created, err := service.Create(context.Background(), CreateInput{
+		Name: "Lovable without CIMD", Provider: "lovable", ServerURL: server.URL + "/mcp", ProjectRef: "openexec",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.StartOAuth(context.Background(), created.ID, "openexec",
+		"https://console.example.test/oauth/external-connections/callback",
+		"https://console.example.test/oauth/client-metadata.json")
+	if !errors.Is(err, ErrLovableCIMDRequired) || !strings.Contains(err.Error(), "client_id_metadata_document_supported") {
+		t.Fatalf("missing CIMD error = %v", err)
+	}
+	if got := registrationCalls.Load(); got != 0 {
+		t.Fatalf("Lovable dynamic registration calls = %d, want 0", got)
 	}
 }
 
