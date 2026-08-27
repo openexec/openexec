@@ -326,16 +326,78 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 				request.Request.Model = descriptor.Models[0]
 			}
 		}
+		reducer := executionTerminalReducer{}
 		result, err := provider.Execute(ctx, *request.Request, func(event execution.Event) error {
+			if isExecutionTerminal(event.Type) {
+				reducer.terminals = append(reducer.terminals, event)
+				return nil
+			}
 			return write(executionEnvelope{Operation: "event", Event: &event})
 		})
+		terminal := reducer.reduce(&result, err)
+		if writeErr := write(executionEnvelope{Operation: "event", Event: &terminal}); writeErr != nil {
+			return writeErr
+		}
 		response := executionEnvelope{Operation: "result", Result: &result}
-		if err != nil {
+		if err != nil && result.Outcome == execution.OutcomeFailed {
 			response.Error = err.Error()
 		}
 		return write(response)
 	default:
 		return fmt.Errorf("unsupported execution operation %q", request.Operation)
+	}
+}
+
+type executionTerminalReducer struct {
+	terminals []execution.Event
+}
+
+func isExecutionTerminal(eventType string) bool {
+	switch eventType {
+	case execution.EventCompleted, execution.EventFailed, execution.EventCancelled, execution.EventInconclusive:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r executionTerminalReducer) reduce(result *execution.Result, executeErr error) execution.Event {
+	if result.Outcome == "" && executeErr != nil {
+		result.Outcome = execution.OutcomeFailed
+	}
+	if len(r.terminals) == 1 && terminalMatchesResult(r.terminals[0], *result, executeErr) {
+		return r.terminals[0]
+	}
+	result.Outcome = execution.OutcomeInconclusive
+	result.Reason = execution.ReasonProtocolError
+	return execution.Event{Type: execution.EventInconclusive, Reason: execution.ReasonProtocolError}
+}
+
+func terminalMatchesResult(event execution.Event, result execution.Result, executeErr error) bool {
+	if executeErr != nil && result.Outcome != execution.OutcomeFailed && result.Outcome != execution.OutcomeCancelled {
+		return false
+	}
+	switch result.Outcome {
+	case execution.OutcomeSucceeded:
+		return event.Type == execution.EventCompleted && result.Reason == ""
+	case execution.OutcomeFailed:
+		return event.Type == execution.EventFailed && result.Reason == ""
+	case execution.OutcomeCancelled:
+		return event.Type == execution.EventCancelled && result.Reason == ""
+	case execution.OutcomeInconclusive:
+		return event.Type == execution.EventInconclusive && event.Reason == result.Reason && validInconclusiveReason(result.Reason)
+	default:
+		return false
+	}
+}
+
+func validInconclusiveReason(reason string) bool {
+	switch reason {
+	case execution.ReasonMaxTurns, execution.ReasonBudgetExhausted,
+		execution.ReasonRouteFalsified, execution.ReasonProtocolError:
+		return true
+	default:
+		return false
 	}
 }
 

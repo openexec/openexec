@@ -157,12 +157,19 @@ type Result struct {
 	StartedAt       time.Time `json:"started_at"`
 	EndedAt         time.Time `json:"ended_at"`
 	Outcome         string    `json:"outcome"`
+	Reason          string    `json:"reason,omitempty"`
 }
 
 const (
-	OutcomeSucceeded = "succeeded"
-	OutcomeFailed    = "failed"
-	OutcomeCancelled = "cancelled"
+	OutcomeSucceeded    = "succeeded"
+	OutcomeFailed       = "failed"
+	OutcomeCancelled    = "cancelled"
+	OutcomeInconclusive = "inconclusive"
+
+	ReasonMaxTurns        = "max_turns"
+	ReasonBudgetExhausted = "budget_exhausted"
+	ReasonRouteFalsified  = "route_falsified"
+	ReasonProtocolError   = "protocol_error"
 )
 
 // Sandbox modes. The strings are the wire values and predate these names;
@@ -264,6 +271,7 @@ type Event struct {
 	CallID   string          `json:"call_id,omitempty"`
 	ToolName string          `json:"tool_name,omitempty"`
 	Data     json.RawMessage `json:"data,omitempty"`
+	Reason   string          `json:"reason,omitempty"`
 }
 
 const (
@@ -275,6 +283,7 @@ const (
 	EventFailed         = "execution.failed"
 	EventCancelled      = "execution.cancelled"
 	EventCompleted      = "execution.completed"
+	EventInconclusive   = "execution.inconclusive"
 )
 
 type EventSink func(Event) error

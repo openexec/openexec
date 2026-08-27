@@ -303,10 +303,12 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		Tools: p.config.Tools, ToolChoice: "none",
 	})
 	if err != nil {
+		message := fmt.Sprintf("API tool loop reached %d rounds and final synthesis failed: %v", p.config.MaxSteps, err)
+		result.FinalText += message
+		result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
 		finish()
-		err = fmt.Errorf("API tool loop reached %d rounds and final synthesis failed: %w", p.config.MaxSteps, err)
-		_ = sink(Event{Type: EventFailed, Text: err.Error()})
-		return result, err
+		_ = sink(Event{Type: EventInconclusive, Text: message, Reason: ReasonMaxTurns})
+		return result, nil
 	}
 	wroteText := false
 	for _, block := range response.Content {
@@ -321,14 +323,16 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		}
 	}
 	if !wroteText {
+		message := fmt.Sprintf("API tool loop reached %d rounds and final synthesis returned no text", p.config.MaxSteps)
+		result.FinalText += message
+		result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
 		finish()
-		err := fmt.Errorf("API tool loop reached %d rounds and final synthesis returned no text", p.config.MaxSteps)
-		_ = sink(Event{Type: EventFailed, Text: err.Error()})
-		return result, err
+		_ = sink(Event{Type: EventInconclusive, Text: message, Reason: ReasonMaxTurns})
+		return result, nil
 	}
-	result.Outcome = OutcomeSucceeded
+	result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
 	finish()
-	if err := sink(Event{Type: EventCompleted}); err != nil {
+	if err := sink(Event{Type: EventInconclusive, Reason: ReasonMaxTurns}); err != nil {
 		return result, err
 	}
 	return result, nil

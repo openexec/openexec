@@ -14,10 +14,11 @@ import (
 )
 
 type fakeAPIAdapter struct {
-	responses []*agent.Response
-	err       error
-	requests  []agent.Request
-	stream    <-chan agent.StreamEvent
+	responses      []*agent.Response
+	completeErrors []error
+	err            error
+	requests       []agent.Request
+	stream         <-chan agent.StreamEvent
 }
 
 func (a *fakeAPIAdapter) GetName() string     { return "openai-compatible" }
@@ -30,6 +31,13 @@ func (a *fakeAPIAdapter) GetCapabilities(string) (*agent.ProviderCapabilities, e
 }
 func (a *fakeAPIAdapter) Complete(_ context.Context, request agent.Request) (*agent.Response, error) {
 	a.requests = append(a.requests, request)
+	if len(a.completeErrors) > 0 {
+		err := a.completeErrors[0]
+		a.completeErrors = a.completeErrors[1:]
+		if err != nil {
+			return nil, err
+		}
+	}
 	if a.err != nil {
 		return nil, a.err
 	}
@@ -141,7 +149,7 @@ func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Outcome != OutcomeSucceeded || result.FinalText != "final analysis" {
+	if result.Outcome != OutcomeInconclusive || result.Reason != ReasonMaxTurns || result.FinalText != "final analysis" {
 		t.Fatalf("result = %+v", result)
 	}
 	if len(tools.requests) != 2 || len(adapter.requests) != 3 {
@@ -155,7 +163,7 @@ func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) 
 		!strings.Contains(finalRequest.System, "standing context") {
 		t.Fatalf("final synthesis instruction = %q", finalRequest.System)
 	}
-	if len(events) == 0 || events[len(events)-1].Type != EventCompleted {
+	if len(events) == 0 || events[len(events)-1].Type != EventInconclusive || events[len(events)-1].Reason != ReasonMaxTurns {
 		t.Fatalf("terminal events = %#v", events)
 	}
 	for _, event := range events {
