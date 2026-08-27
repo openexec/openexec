@@ -16,7 +16,7 @@ import (
 )
 
 // executionProtocolVersion is what this binary speaks. Version 2 added typed
-// replay (system text and conversation history) to the execute request.
+// replay. Version 3 adds the negotiated Outcome Navigator capability envelope.
 //
 // Both versions are accepted, because the alternative is worse in the
 // direction that matters: a console that sends history to a v1 binary must be
@@ -24,7 +24,8 @@ import (
 // working. What must never happen is a binary silently dropping history and
 // answering as though the conversation had just begun.
 const (
-	executionProtocolVersion       = 2
+	executionProtocolVersion       = 3
+	executionProtocolVersionReplay = 2
 	executionProtocolVersionLegacy = 1
 )
 
@@ -233,8 +234,9 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	decoder := json.NewDecoder(io.LimitReader(input, 1<<20))
 	writer := bufio.NewWriter(output)
 	defer writer.Flush()
+	responseVersion := executionProtocolVersion
 	write := func(value executionEnvelope) error {
-		value.Version = executionProtocolVersion
+		value.Version = responseVersion
 		data, err := json.Marshal(value)
 		if err != nil {
 			return err
@@ -249,10 +251,14 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		return fmt.Errorf("decode execution request: %w", err)
 	}
 	switch request.Version {
-	case executionProtocolVersion, executionProtocolVersionLegacy:
+	case executionProtocolVersion, executionProtocolVersionReplay, executionProtocolVersionLegacy:
 	default:
 		return fmt.Errorf("unsupported execution protocol version %d", request.Version)
 	}
+	// Reply in the requester's version. This lets v1/v2 callers keep working
+	// while a v3 caller can require the new capability contract. Unknown fields
+	// are additive and ignored by older callers.
+	responseVersion = request.Version
 	// A v1 caller cannot have meant to send history — the field did not exist —
 	// so anything in it came from a confusion about who is speaking.
 	if request.Version == executionProtocolVersionLegacy && request.Request != nil {

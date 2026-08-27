@@ -78,6 +78,50 @@ func TestExecutionProtocolStillAnswersTheOlderVersion(t *testing.T) {
 	}
 }
 
+func TestExecutionProtocolStillAnswersReplayVersion(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":2,"operation":"describe"}`), &output,
+		staticProvider(protocolProvider{})); err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	var response executionEnvelope
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Version != 2 {
+		t.Fatalf("response version = %d, want 2", response.Version)
+	}
+}
+
+func TestExecutionProtocolCarriesProviderEnforcedNavigatorCapabilities(t *testing.T) {
+	provider := protocolProviderWithDescriptor{descriptor: execution.ProviderDescriptor{
+		ID: "fake", Runtime: "test", Capabilities: execution.Capability{
+			OutcomeNavigator: &execution.OutcomeNavigatorCapability{
+				Version: 1, TerminalInconclusive: true,
+			},
+		},
+	}}
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":3,"operation":"describe"}`), &output,
+		staticProvider(provider)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), `"outcome_navigator":{"version":1,"terminal_inconclusive_v1":true`) {
+		t.Fatalf("output = %s", output.String())
+	}
+}
+
+type protocolProviderWithDescriptor struct {
+	protocolProvider
+	descriptor execution.ProviderDescriptor
+}
+
+func (p protocolProviderWithDescriptor) Descriptor() execution.ProviderDescriptor {
+	return p.descriptor
+}
+
 // What must never happen quietly: a caller sends a conversation, the binary
 // does not understand the field, and the model answers as though the
 // conversation had just begun.

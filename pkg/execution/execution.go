@@ -219,6 +219,24 @@ type Capability struct {
 	WorkspaceWrite           bool `json:"workspace_write"`
 	CommandNetwork           bool `json:"command_network"`
 	ToolCalling              bool `json:"tool_calling"`
+	// OutcomeNavigator is absent until the provider/runtime enforces every
+	// capability it claims. A transport upgrade alone must never enable
+	// autonomous navigation.
+	OutcomeNavigator *OutcomeNavigatorCapability `json:"outcome_navigator,omitempty"`
+}
+
+// OutcomeNavigatorCapability is the versioned, fail-closed runtime contract
+// negotiated before an Outcome Navigator provider call. Each field names an
+// independently enforced boundary; missing is false.
+type OutcomeNavigatorCapability struct {
+	Version                int  `json:"version"`
+	TerminalInconclusive   bool `json:"terminal_inconclusive_v1"`
+	UsageReservations      bool `json:"usage_reservations_v1"`
+	ChildAccounting        bool `json:"child_accounting_v1"`
+	ChallengeWithWorkspace bool `json:"challenge_with_workspace_v1"`
+	EffectFencing          bool `json:"effect_fencing_v1"`
+	RemoteHardContainment  bool `json:"remote_hard_containment_v1"`
+	TerminalReducer        bool `json:"terminal_reducer_v1"`
 }
 
 type ProviderDescriptor struct {
