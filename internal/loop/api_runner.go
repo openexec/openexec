@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,8 @@ import (
 
 // DefaultMaxTurns is the default limit for agentic conversation turns.
 const DefaultMaxTurns = 50
+
+var ErrMaxTurns = errors.New("inconclusive: max_turns")
 
 // APIRunnerConfig holds configuration for the API-based agentic runner.
 type APIRunnerConfig struct {
@@ -163,18 +166,15 @@ func (r *APIRunner) Run(ctx context.Context) error {
 
 	// Max turns reached
 	r.emit(Event{
-		Type: EventMaxIterationsReached,
-		Text: fmt.Sprintf("Reached maximum of %d turns", r.config.MaxTurns),
-	})
-	r.emit(Event{
-		Type:      EventComplete,
+		Type:      EventMaxIterationsReached,
+		Text:      fmt.Sprintf("Reached maximum of %d turns", r.config.MaxTurns),
 		Artifacts: r.usageArtifacts(),
 		Result: &StepResult{
-			Status: "complete",
+			Status: "inconclusive",
 			Reason: "max_turns",
 		},
 	})
-	return nil
+	return ErrMaxTurns
 }
 
 // usageArtifacts reports the peak context size for smart-zone flagging, or

@@ -45,6 +45,17 @@ printf '%s\n' '{"type":"item.completed","thread_id":"native-1","item":{"type":"a
 	}
 }
 
+func TestAgentCLIUsageEventsPreserveProviderAccounting(t *testing.T) {
+	codex, _, ok := parseCLIEvent("codex", []byte(`{"type":"turn.completed","thread_id":"c1","usage":{"input_tokens":120,"output_tokens":30}}`))
+	if !ok || codex.Type != EventUsage || codex.InputTokens != 120 || codex.OutputTokens != 30 {
+		t.Fatalf("Codex usage = %#v", codex)
+	}
+	claude, _, ok := parseCLIEvent("claude", []byte(`{"type":"result","session_id":"s1","total_cost_usd":0.25,"usage":{"input_tokens":80,"output_tokens":20}}`))
+	if !ok || claude.Type != EventUsage || claude.InputTokens != 80 || claude.OutputTokens != 20 || claude.CostMicros != 250000 {
+		t.Fatalf("Claude usage = %#v", claude)
+	}
+}
+
 func TestAgentCLIProviderAdvertisesOnlyEnforceableCommandNetworking(t *testing.T) {
 	for _, test := range []struct {
 		kind string

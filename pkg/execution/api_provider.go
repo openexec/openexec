@@ -231,6 +231,10 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			_ = sink(Event{Type: EventFailed, Text: err.Error()})
 			return result, err
 		}
+		if err := emitUsage(sink, response.Usage); err != nil {
+			finish()
+			return result, err
+		}
 		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content, Metadata: response.Metadata}
 		messages = append(messages, assistant)
 		for _, block := range response.Content {
@@ -308,6 +312,10 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		_ = sink(Event{Type: EventFailed, Text: err.Error()})
 		return result, err
 	}
+	if err := emitUsage(sink, response.Usage); err != nil {
+		finish()
+		return result, err
+	}
 	wroteText := false
 	for _, block := range response.Content {
 		if block.Type != agent.ContentTypeText || block.Text == "" {
@@ -332,6 +340,13 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		return result, err
 	}
 	return result, nil
+}
+
+func emitUsage(sink EventSink, usage agent.Usage) error {
+	if usage.PromptTokens <= 0 && usage.CompletionTokens <= 0 {
+		return nil
+	}
+	return sink(Event{Type: EventUsage, InputTokens: int64(usage.PromptTokens), OutputTokens: int64(usage.CompletionTokens)})
 }
 
 // replayMessages turns the console's history into the conversation this turn

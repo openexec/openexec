@@ -76,7 +76,7 @@ type CostInfo struct {
 // StepResult is the constrained output schema for an execution step.
 // This is used to enforce determinism and limit excessive agency.
 type StepResult struct {
-	Status      string            `json:"status"`      // complete, error, pivot, retry
+	Status      string            `json:"status"`      // complete, inconclusive, error, pivot, retry
 	Reason      string            `json:"reason"`      // explanation for the status
 	NextPhase   string            `json:"next_phase"`  // requested transition
 	Artifacts   map[string]string `json:"artifacts"`   // hash-addressed results

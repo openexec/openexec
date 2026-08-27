@@ -231,7 +231,11 @@ func parseCLIEvent(kind string, line []byte) (Event, string, bool) {
 		var value struct {
 			Type     string `json:"type"`
 			ThreadID string `json:"thread_id"`
-			Item     struct {
+			Usage    struct {
+				InputTokens  int64 `json:"input_tokens"`
+				OutputTokens int64 `json:"output_tokens"`
+			} `json:"usage"`
+			Item struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
 			} `json:"item"`
@@ -239,19 +243,34 @@ func parseCLIEvent(kind string, line []byte) (Event, string, bool) {
 		if json.Unmarshal(line, &value) == nil && value.Type == "item.completed" && value.Item.Type == "agent_message" {
 			return Event{Type: EventAssistantDelta, Text: value.Item.Text}, value.ThreadID, value.Item.Text != ""
 		}
+		if value.Type == "turn.completed" {
+			return Event{Type: EventUsage, InputTokens: value.Usage.InputTokens, OutputTokens: value.Usage.OutputTokens}, value.ThreadID, true
+		}
 		return Event{}, value.ThreadID, false
 	}
 	var value struct {
-		Type      string `json:"type"`
-		SessionID string `json:"session_id"`
-		Message   struct {
+		Type         string  `json:"type"`
+		SessionID    string  `json:"session_id"`
+		TotalCostUSD float64 `json:"total_cost_usd"`
+		Usage        struct {
+			InputTokens  int64 `json:"input_tokens"`
+			OutputTokens int64 `json:"output_tokens"`
+		} `json:"usage"`
+		Message struct {
 			Content []struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
 			} `json:"content"`
 		} `json:"message"`
 	}
-	if json.Unmarshal(line, &value) != nil || value.Type != "assistant" {
+	if json.Unmarshal(line, &value) != nil {
+		return Event{}, value.SessionID, false
+	}
+	if value.Type == "result" {
+		return Event{Type: EventUsage, InputTokens: value.Usage.InputTokens, OutputTokens: value.Usage.OutputTokens,
+			CostMicros: int64(value.TotalCostUSD * 1_000_000)}, value.SessionID, true
+	}
+	if value.Type != "assistant" {
 		return Event{}, value.SessionID, false
 	}
 	var text strings.Builder
