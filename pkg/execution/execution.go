@@ -241,14 +241,11 @@ const (
 )
 
 type Event struct {
-	Type         string          `json:"type"`
-	Text         string          `json:"text,omitempty"`
-	CallID       string          `json:"call_id,omitempty"`
-	ToolName     string          `json:"tool_name,omitempty"`
-	Data         json.RawMessage `json:"data,omitempty"`
-	InputTokens  int64           `json:"input_tokens,omitempty"`
-	OutputTokens int64           `json:"output_tokens,omitempty"`
-	CostMicros   int64           `json:"cost_micros,omitempty"`
+	Type     string          `json:"type"`
+	Text     string          `json:"text,omitempty"`
+	CallID   string          `json:"call_id,omitempty"`
+	ToolName string          `json:"tool_name,omitempty"`
+	Data     json.RawMessage `json:"data,omitempty"`
 }
 
 const (
@@ -260,7 +257,6 @@ const (
 	EventFailed         = "execution.failed"
 	EventCancelled      = "execution.cancelled"
 	EventCompleted      = "execution.completed"
-	EventUsage          = "execution.usage"
 )
 
 type EventSink func(Event) error
