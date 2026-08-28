@@ -18,6 +18,13 @@ func TestOutcomeNavigatorContractTerminalProtocol(t *testing.T) {
 		t.Fatalf("valid terminal = %+v, result=%+v", event, result)
 	}
 
+	providerFailure := execution.Result{Outcome: execution.OutcomeFailed}
+	providerErr := errors.New("bounded gateway is unavailable")
+	if event := (executionTerminalReducer{}).reduce(&providerFailure, providerErr); providerFailure.Outcome != execution.OutcomeFailed || providerFailure.Reason != "" ||
+		event.Type != execution.EventFailed || event.Text != providerErr.Error() {
+		t.Fatalf("provider failure = event %+v result %+v", event, providerFailure)
+	}
+
 	tests := []struct {
 		name      string
 		terminals []execution.Event

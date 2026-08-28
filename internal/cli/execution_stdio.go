@@ -362,8 +362,15 @@ func isExecutionTerminal(eventType string) bool {
 }
 
 func (r executionTerminalReducer) reduce(result *execution.Result, executeErr error) execution.Event {
-	if result.Outcome == "" && executeErr != nil {
+	// A provider can fail before it has a stream to emit into: invalid gateway
+	// configuration, a missing executable, or cmd.Start itself. That is a real
+	// failed execution, not malformed terminal data. Preserve both its type and
+	// its cause; protocol_error is reserved for a provider that did speak a
+	// terminal contract and contradicted it (or claimed success without one).
+	if len(r.terminals) == 0 && executeErr != nil {
 		result.Outcome = execution.OutcomeFailed
+		result.Reason = ""
+		return execution.Event{Type: execution.EventFailed, Text: executeErr.Error()}
 	}
 	if len(r.terminals) == 1 && terminalMatchesResult(r.terminals[0], *result, executeErr) {
 		return r.terminals[0]

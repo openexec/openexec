@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -14,6 +15,12 @@ type protocolProvider struct{}
 
 func (protocolProvider) Descriptor() execution.ProviderDescriptor {
 	return execution.ProviderDescriptor{ID: "fake", Runtime: "test"}
+}
+
+type failingProtocolProvider struct{ protocolProvider }
+
+func (failingProtocolProvider) Execute(context.Context, execution.Request, execution.EventSink) (execution.Result, error) {
+	return execution.Result{Outcome: execution.OutcomeFailed}, errors.New("bounded gateway is unavailable")
 }
 func (protocolProvider) Probe(context.Context, string) execution.Readiness {
 	return execution.Readiness{State: execution.ReadinessReady}
@@ -53,6 +60,41 @@ func TestExecutionProtocolExecute(t *testing.T) {
 		if envelope.Version != executionProtocolVersion {
 			t.Fatalf("version = %d", envelope.Version)
 		}
+	}
+}
+
+func TestExecutionProtocolPreservesProviderFailureWithoutTerminalEvent(t *testing.T) {
+	request := executionEnvelope{
+		Version: executionProtocolVersion, Operation: "execute",
+		Request: &execution.Request{ID: "one", WorkingDir: t.TempDir(), Prompt: "answer", Sandbox: execution.Sandbox{Mode: "read-only"}},
+	}
+	input, _ := json.Marshal(request)
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(), bytes.NewReader(input), &output,
+		staticProvider(failingProtocolProvider{})); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("protocol lines = %q", lines)
+	}
+	var terminal, result executionEnvelope
+	if err := json.Unmarshal([]byte(lines[0]), &terminal); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &result); err != nil {
+		t.Fatal(err)
+	}
+	if terminal.Event == nil || terminal.Event.Type != execution.EventFailed ||
+		terminal.Event.Text != "bounded gateway is unavailable" {
+		t.Fatalf("terminal = %#v", terminal.Event)
+	}
+	if result.Result == nil || result.Result.Outcome != execution.OutcomeFailed ||
+		result.Error != "bounded gateway is unavailable" {
+		t.Fatalf("result = %#v error = %q", result.Result, result.Error)
+	}
+	if strings.Contains(output.String(), execution.ReasonProtocolError) {
+		t.Fatalf("provider failure became protocol error: %s", output.String())
 	}
 }
 
