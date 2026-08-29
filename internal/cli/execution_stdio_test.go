@@ -136,32 +136,43 @@ func TestExecutionProtocolStillAnswersReplayVersion(t *testing.T) {
 	}
 }
 
-func TestExecutionProtocolCarriesProviderEnforcedNavigatorCapabilities(t *testing.T) {
-	provider := protocolProviderWithDescriptor{descriptor: execution.ProviderDescriptor{
-		ID: "fake", Runtime: "test", Capabilities: execution.Capability{
-			OutcomeNavigator: &execution.OutcomeNavigatorCapability{
-				Version: 1, TerminalInconclusive: true,
-			},
-		},
-	}}
+func TestExecutionProtocolAdvertisesOnlyEnforcedNavigatorCapabilities(t *testing.T) {
 	var output bytes.Buffer
 	if err := serveExecutionProtocol(context.Background(),
 		strings.NewReader(`{"version":3,"operation":"describe"}`), &output,
-		staticProvider(provider)); err != nil {
+		staticProvider(protocolProvider{})); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), `"outcome_navigator":{"version":1,"terminal_inconclusive_v1":true`) {
-		t.Fatalf("output = %s", output.String())
+	var response executionEnvelope
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	capability := response.Provider.Capabilities.OutcomeNavigator
+	if capability == nil || capability.Version != 1 ||
+		!capability.TerminalInconclusive || !capability.TerminalReducer {
+		t.Fatalf("terminal capabilities = %+v", capability)
+	}
+	if capability.UsageReservations || capability.ChildAccounting ||
+		capability.ChallengeWithWorkspace || capability.EffectFencing ||
+		capability.RemoteHardContainment {
+		t.Fatalf("runtime overclaims navigator capabilities: %+v", capability)
 	}
 }
 
-type protocolProviderWithDescriptor struct {
-	protocolProvider
-	descriptor execution.ProviderDescriptor
-}
-
-func (p protocolProviderWithDescriptor) Descriptor() execution.ProviderDescriptor {
-	return p.descriptor
+func TestExecutionProtocolDoesNotAdvertiseNavigatorContractOnOlderWire(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":2,"operation":"describe"}`), &output,
+		staticProvider(protocolProvider{})); err != nil {
+		t.Fatal(err)
+	}
+	var response executionEnvelope
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Provider.Capabilities.OutcomeNavigator != nil {
+		t.Fatalf("v2 response advertised v3 contract: %+v", response.Provider.Capabilities.OutcomeNavigator)
+	}
 }
 
 // What must never happen quietly: a caller sends a conversation, the binary

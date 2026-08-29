@@ -295,6 +295,18 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	descriptor := provider.Descriptor()
 	switch request.Operation {
 	case "describe":
+		// The terminal contract belongs to this v3 transport, not to a provider
+		// that may also be called directly. Advertise only the two boundaries
+		// enforced here; authoritative budget reservations, child accounting,
+		// challenge composition, effect fencing, and remote containment remain
+		// false until their own authorities can prove them.
+		if request.Version == executionProtocolVersion {
+			descriptor.Capabilities.OutcomeNavigator = &execution.OutcomeNavigatorCapability{
+				Version:              1,
+				TerminalInconclusive: true,
+				TerminalReducer:      true,
+			}
+		}
 		// describe answers for the runtime, execute answers for one provider
 		// instance. A provider built without a gateway cannot serve one and
 		// says so; this binary can build one when asked, and the caller needs
