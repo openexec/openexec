@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -14,6 +15,12 @@ type protocolProvider struct{}
 
 func (protocolProvider) Descriptor() execution.ProviderDescriptor {
 	return execution.ProviderDescriptor{ID: "fake", Runtime: "test"}
+}
+
+type failingProtocolProvider struct{ protocolProvider }
+
+func (failingProtocolProvider) Execute(context.Context, execution.Request, execution.EventSink) (execution.Result, error) {
+	return execution.Result{Outcome: execution.OutcomeFailed}, errors.New("bounded gateway is unavailable")
 }
 func (protocolProvider) Probe(context.Context, string) execution.Readiness {
 	return execution.Readiness{State: execution.ReadinessReady}
@@ -56,6 +63,41 @@ func TestExecutionProtocolExecute(t *testing.T) {
 	}
 }
 
+func TestExecutionProtocolPreservesProviderFailureWithoutTerminalEvent(t *testing.T) {
+	request := executionEnvelope{
+		Version: executionProtocolVersion, Operation: "execute",
+		Request: &execution.Request{ID: "one", WorkingDir: t.TempDir(), Prompt: "answer", Sandbox: execution.Sandbox{Mode: "read-only"}},
+	}
+	input, _ := json.Marshal(request)
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(), bytes.NewReader(input), &output,
+		staticProvider(failingProtocolProvider{})); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("protocol lines = %q", lines)
+	}
+	var terminal, result executionEnvelope
+	if err := json.Unmarshal([]byte(lines[0]), &terminal); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &result); err != nil {
+		t.Fatal(err)
+	}
+	if terminal.Event == nil || terminal.Event.Type != execution.EventFailed ||
+		terminal.Event.Text != "bounded gateway is unavailable" {
+		t.Fatalf("terminal = %#v", terminal.Event)
+	}
+	if result.Result == nil || result.Result.Outcome != execution.OutcomeFailed ||
+		result.Error != "bounded gateway is unavailable" {
+		t.Fatalf("result = %#v error = %q", result.Result, result.Error)
+	}
+	if strings.Contains(output.String(), execution.ReasonProtocolError) {
+		t.Fatalf("provider failure became protocol error: %s", output.String())
+	}
+}
+
 func TestExecutionProtocolRejectsVersionDrift(t *testing.T) {
 	var output bytes.Buffer
 	err := serveExecutionProtocol(context.Background(), strings.NewReader(`{"version":99,"operation":"describe"}`), &output, staticProvider(protocolProvider{}))
@@ -75,6 +117,61 @@ func TestExecutionProtocolStillAnswersTheOlderVersion(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), `"operation":"describe"`) {
 		t.Fatalf("output = %s", output.String())
+	}
+}
+
+func TestExecutionProtocolStillAnswersReplayVersion(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":2,"operation":"describe"}`), &output,
+		staticProvider(protocolProvider{})); err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	var response executionEnvelope
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Version != 2 {
+		t.Fatalf("response version = %d, want 2", response.Version)
+	}
+}
+
+func TestExecutionProtocolAdvertisesOnlyEnforcedNavigatorCapabilities(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":3,"operation":"describe"}`), &output,
+		staticProvider(protocolProvider{})); err != nil {
+		t.Fatal(err)
+	}
+	var response executionEnvelope
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	capability := response.Provider.Capabilities.OutcomeNavigator
+	if capability == nil || capability.Version != 1 ||
+		!capability.TerminalInconclusive || !capability.TerminalReducer {
+		t.Fatalf("terminal capabilities = %+v", capability)
+	}
+	if capability.UsageReservations || capability.ChildAccounting ||
+		capability.ChallengeWithWorkspace || capability.EffectFencing ||
+		capability.RemoteHardContainment {
+		t.Fatalf("runtime overclaims navigator capabilities: %+v", capability)
+	}
+}
+
+func TestExecutionProtocolDoesNotAdvertiseNavigatorContractOnOlderWire(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(),
+		strings.NewReader(`{"version":2,"operation":"describe"}`), &output,
+		staticProvider(protocolProvider{})); err != nil {
+		t.Fatal(err)
+	}
+	var response executionEnvelope
+	if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Provider.Capabilities.OutcomeNavigator != nil {
+		t.Fatalf("v2 response advertised v3 contract: %+v", response.Provider.Capabilities.OutcomeNavigator)
 	}
 }
 

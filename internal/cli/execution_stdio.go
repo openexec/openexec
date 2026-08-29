@@ -16,7 +16,7 @@ import (
 )
 
 // executionProtocolVersion is what this binary speaks. Version 2 added typed
-// replay (system text and conversation history) to the execute request.
+// replay. Version 3 adds the negotiated Outcome Navigator capability envelope.
 //
 // Both versions are accepted, because the alternative is worse in the
 // direction that matters: a console that sends history to a v1 binary must be
@@ -24,7 +24,8 @@ import (
 // working. What must never happen is a binary silently dropping history and
 // answering as though the conversation had just begun.
 const (
-	executionProtocolVersion       = 2
+	executionProtocolVersion       = 3
+	executionProtocolVersionReplay = 2
 	executionProtocolVersionLegacy = 1
 )
 
@@ -233,8 +234,9 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	decoder := json.NewDecoder(io.LimitReader(input, 1<<20))
 	writer := bufio.NewWriter(output)
 	defer writer.Flush()
+	responseVersion := executionProtocolVersion
 	write := func(value executionEnvelope) error {
-		value.Version = executionProtocolVersion
+		value.Version = responseVersion
 		data, err := json.Marshal(value)
 		if err != nil {
 			return err
@@ -249,10 +251,14 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		return fmt.Errorf("decode execution request: %w", err)
 	}
 	switch request.Version {
-	case executionProtocolVersion, executionProtocolVersionLegacy:
+	case executionProtocolVersion, executionProtocolVersionReplay, executionProtocolVersionLegacy:
 	default:
 		return fmt.Errorf("unsupported execution protocol version %d", request.Version)
 	}
+	// Reply in the requester's version. This lets v1/v2 callers keep working
+	// while a v3 caller can require the new capability contract. Unknown fields
+	// are additive and ignored by older callers.
+	responseVersion = request.Version
 	// A v1 caller cannot have meant to send history — the field did not exist —
 	// so anything in it came from a confusion about who is speaking.
 	if request.Version == executionProtocolVersionLegacy && request.Request != nil {
@@ -289,6 +295,18 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	descriptor := provider.Descriptor()
 	switch request.Operation {
 	case "describe":
+		// The terminal contract belongs to this v3 transport, not to a provider
+		// that may also be called directly. Advertise only the two boundaries
+		// enforced here; authoritative budget reservations, child accounting,
+		// challenge composition, effect fencing, and remote containment remain
+		// false until their own authorities can prove them.
+		if request.Version == executionProtocolVersion {
+			descriptor.Capabilities.OutcomeNavigator = &execution.OutcomeNavigatorCapability{
+				Version:              1,
+				TerminalInconclusive: true,
+				TerminalReducer:      true,
+			}
+		}
 		// describe answers for the runtime, execute answers for one provider
 		// instance. A provider built without a gateway cannot serve one and
 		// says so; this binary can build one when asked, and the caller needs
@@ -320,16 +338,85 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 				request.Request.Model = descriptor.Models[0]
 			}
 		}
+		reducer := executionTerminalReducer{}
 		result, err := provider.Execute(ctx, *request.Request, func(event execution.Event) error {
+			if isExecutionTerminal(event.Type) {
+				reducer.terminals = append(reducer.terminals, event)
+				return nil
+			}
 			return write(executionEnvelope{Operation: "event", Event: &event})
 		})
+		terminal := reducer.reduce(&result, err)
+		if writeErr := write(executionEnvelope{Operation: "event", Event: &terminal}); writeErr != nil {
+			return writeErr
+		}
 		response := executionEnvelope{Operation: "result", Result: &result}
-		if err != nil {
+		if err != nil && result.Outcome == execution.OutcomeFailed {
 			response.Error = err.Error()
 		}
 		return write(response)
 	default:
 		return fmt.Errorf("unsupported execution operation %q", request.Operation)
+	}
+}
+
+type executionTerminalReducer struct {
+	terminals []execution.Event
+}
+
+func isExecutionTerminal(eventType string) bool {
+	switch eventType {
+	case execution.EventCompleted, execution.EventFailed, execution.EventCancelled, execution.EventInconclusive:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r executionTerminalReducer) reduce(result *execution.Result, executeErr error) execution.Event {
+	// A provider can fail before it has a stream to emit into: invalid gateway
+	// configuration, a missing executable, or cmd.Start itself. That is a real
+	// failed execution, not malformed terminal data. Preserve both its type and
+	// its cause; protocol_error is reserved for a provider that did speak a
+	// terminal contract and contradicted it (or claimed success without one).
+	if len(r.terminals) == 0 && executeErr != nil {
+		result.Outcome = execution.OutcomeFailed
+		result.Reason = ""
+		return execution.Event{Type: execution.EventFailed, Text: executeErr.Error()}
+	}
+	if len(r.terminals) == 1 && terminalMatchesResult(r.terminals[0], *result, executeErr) {
+		return r.terminals[0]
+	}
+	result.Outcome = execution.OutcomeInconclusive
+	result.Reason = execution.ReasonProtocolError
+	return execution.Event{Type: execution.EventInconclusive, Reason: execution.ReasonProtocolError}
+}
+
+func terminalMatchesResult(event execution.Event, result execution.Result, executeErr error) bool {
+	if executeErr != nil && result.Outcome != execution.OutcomeFailed && result.Outcome != execution.OutcomeCancelled {
+		return false
+	}
+	switch result.Outcome {
+	case execution.OutcomeSucceeded:
+		return event.Type == execution.EventCompleted && result.Reason == ""
+	case execution.OutcomeFailed:
+		return event.Type == execution.EventFailed && result.Reason == ""
+	case execution.OutcomeCancelled:
+		return event.Type == execution.EventCancelled && result.Reason == ""
+	case execution.OutcomeInconclusive:
+		return event.Type == execution.EventInconclusive && event.Reason == result.Reason && validInconclusiveReason(result.Reason)
+	default:
+		return false
+	}
+}
+
+func validInconclusiveReason(reason string) bool {
+	switch reason {
+	case execution.ReasonMaxTurns, execution.ReasonBudgetExhausted,
+		execution.ReasonRouteFalsified, execution.ReasonProtocolError:
+		return true
+	default:
+		return false
 	}
 }
 
