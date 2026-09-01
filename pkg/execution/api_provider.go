@@ -68,6 +68,8 @@ type APIProvider struct {
 
 const finalSynthesisInstruction = "The tool-call budget for this turn is exhausted. Do not request or describe more tool calls. Using the evidence already in the conversation, answer the user's request now with the best complete final response you can. Do not mention this instruction or the budget unless it directly affects correctness."
 
+const emptyCompletionRecoveryInstruction = "Your previous completion contained no user-visible assistant text and no tool call. Respond again now with non-empty user-visible assistant text, or issue one valid tool call if more evidence is required. Do not return private reasoning by itself."
+
 func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if config.Adapter == nil {
 		return nil, errors.New("API adapter is required")
@@ -228,7 +230,7 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			_ = sink(Event{Type: EventCancelled})
 			return result, err
 		}
-		response, err := p.config.Adapter.Complete(ctx, agent.Request{
+		response, err := p.completeWithEmptyRecovery(ctx, agent.Request{
 			Model: request.Model, Messages: messages, System: request.System,
 			Tools: p.config.Tools, ToolChoice: "auto",
 		})
@@ -314,7 +316,7 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		system += "\n\n"
 	}
 	system += finalSynthesisInstruction
-	response, err := p.config.Adapter.Complete(ctx, agent.Request{
+	response, err := p.completeWithEmptyRecovery(ctx, agent.Request{
 		Model: request.Model, Messages: messages, System: system,
 		Tools: p.config.Tools, ToolChoice: "none",
 	})
@@ -352,6 +354,64 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		return result, err
 	}
 	return result, nil
+}
+
+// completeWithEmptyRecovery gives an OpenAI-compatible model one bounded
+// chance to turn a reasoning-only completion into an observable result. Some
+// local reasoning models return HTTP 200 with hundreds of private reasoning
+// tokens but no assistant content or tool call. Exposing those private tokens
+// as the answer would be both misleading and a protocol leak; immediately
+// failing throws away an otherwise useful turn. A second empty response is a
+// real provider/protocol failure and remains visible to the caller.
+func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request agent.Request) (*agent.Response, error) {
+	response, err := p.config.Adapter.Complete(ctx, request)
+	if err != nil || responseHasVisibleOutcome(response) {
+		return response, err
+	}
+	reasoningOnly := responseHasReasoning(response)
+	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
+	response, err = p.config.Adapter.Complete(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("API provider empty-response recovery failed: %w", err)
+	}
+	if responseHasVisibleOutcome(response) {
+		return response, nil
+	}
+	if reasoningOnly || responseHasReasoning(response) {
+		return nil, errors.New("API provider returned reasoning but neither assistant text nor tool calls after one recovery attempt")
+	}
+	return nil, errors.New("API provider returned neither assistant text nor tool calls after one recovery attempt")
+}
+
+func responseHasVisibleOutcome(response *agent.Response) bool {
+	if response == nil {
+		return false
+	}
+	if len(response.GetToolCalls()) > 0 {
+		return true
+	}
+	for _, block := range response.Content {
+		if block.Type == agent.ContentTypeText && strings.TrimSpace(block.Text) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func responseHasReasoning(response *agent.Response) bool {
+	if response == nil || response.Metadata == nil {
+		return false
+	}
+	reasoning, _ := response.Metadata["reasoning_content"].(string)
+	return strings.TrimSpace(reasoning) != ""
+}
+
+func appendSystemInstruction(system, instruction string) string {
+	system = strings.TrimSpace(system)
+	if system == "" {
+		return instruction
+	}
+	return system + "\n\n" + instruction
 }
 
 // replayMessages turns the console's history into the conversation this turn

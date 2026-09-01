@@ -120,7 +120,10 @@ func TestAPIProviderPassesAuthorizationContractToTools(t *testing.T) {
 }
 
 func TestAPIProviderRejectsEmptyToolResponse(t *testing.T) {
-	adapter := &fakeAPIAdapter{responses: []*agent.Response{{StopReason: agent.StopReasonEnd}}}
+	adapter := &fakeAPIAdapter{responses: []*agent.Response{
+		{StopReason: agent.StopReasonEnd},
+		{StopReason: agent.StopReasonEnd},
+	}}
 	provider, err := NewAPIProvider(APIProviderConfig{
 		Adapter: adapter, ToolExecutor: &recordingToolExecutor{},
 		Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}},
@@ -136,13 +139,54 @@ func TestAPIProviderRejectsEmptyToolResponse(t *testing.T) {
 		events = append(events, event)
 		return nil
 	})
-	if err == nil || err.Error() != "API provider returned neither assistant text nor tool calls" {
+	if err == nil || err.Error() != "API provider returned neither assistant text nor tool calls after one recovery attempt" {
 		t.Fatalf("error = %v", err)
 	}
 	if result.Outcome != OutcomeFailed || result.FinalText != "" {
 		t.Fatalf("result = %+v", result)
 	}
 	if len(events) != 2 || events[0].Type != EventStarted || events[1].Type != EventFailed || events[1].Text != err.Error() {
+		t.Fatalf("events = %#v", events)
+	}
+	if len(adapter.requests) != 2 || !strings.Contains(adapter.requests[1].System, emptyCompletionRecoveryInstruction) {
+		t.Fatalf("recovery requests = %#v", adapter.requests)
+	}
+}
+
+func TestAPIProviderRecoversReasoningOnlyToolResponse(t *testing.T) {
+	adapter := &fakeAPIAdapter{responses: []*agent.Response{
+		{StopReason: agent.StopReasonEnd, Metadata: map[string]interface{}{
+			"reasoning_content": "private reasoning that must not become the answer",
+		}},
+		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "visible answer"}}, StopReason: agent.StopReasonEnd},
+	}}
+	provider, err := NewAPIProvider(APIProviderConfig{
+		Adapter: adapter, ToolExecutor: &recordingToolExecutor{},
+		Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []Event
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "reasoning-only", WorkingDir: t.TempDir(), Prompt: "inspect", Model: "test-model",
+		System: "standing context", Sandbox: Sandbox{Mode: "read-only"},
+	}, func(event Event) error {
+		events = append(events, event)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeSucceeded || result.FinalText != "visible answer" {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(adapter.requests) != 2 || !strings.Contains(adapter.requests[1].System, "standing context") ||
+		!strings.Contains(adapter.requests[1].System, emptyCompletionRecoveryInstruction) {
+		t.Fatalf("recovery requests = %#v", adapter.requests)
+	}
+	if len(events) != 3 || events[1].Type != EventAssistantDelta || events[1].Text != "visible answer" ||
+		events[2].Type != EventCompleted {
 		t.Fatalf("events = %#v", events)
 	}
 }
