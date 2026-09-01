@@ -370,6 +370,22 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 	}
 	reasoningOnly := responseHasReasoning(response)
 	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
+	// A final-synthesis retry must not keep the model inside the tool grammar
+	// that just produced an empty assistant turn. End the transcript with a
+	// fresh user-visible request and remove tool definitions only after the
+	// original, compatibility-preserving synthesis attempt was empty. Qwen's
+	// hybrid-thinking chat template recognizes /no_think; use it solely on this
+	// bounded recovery turn so private reasoning cannot consume the answer
+	// again. Other compatible providers receive the same instruction without a
+	// model-specific directive.
+	if request.ToolChoice == "none" {
+		request.Tools = nil
+		recovery := emptyCompletionRecoveryInstruction
+		if strings.Contains(strings.ToLower(request.Model), "qwen") {
+			recovery = "/no_think\n" + recovery
+		}
+		request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, recovery))
+	}
 	response, err = p.config.Adapter.Complete(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider empty-response recovery failed: %w", err)
