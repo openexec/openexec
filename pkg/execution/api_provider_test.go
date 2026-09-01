@@ -245,6 +245,61 @@ func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) 
 	}
 }
 
+func TestAPIProviderRecoversReasoningOnlyFinalSynthesisWithoutToolGrammar(t *testing.T) {
+	toolCall := &agent.Response{Content: []agent.ContentBlock{{
+		Type: agent.ContentTypeToolUse, ToolUseID: "call-1", ToolName: "read_file",
+		ToolInput: json.RawMessage(`{"path":"evidence.txt"}`),
+	}}, StopReason: agent.StopReasonToolUse}
+	adapter := &fakeAPIAdapter{responses: []*agent.Response{
+		toolCall,
+		{StopReason: agent.StopReasonEnd, Metadata: map[string]interface{}{
+			"reasoning_content": "private synthesis that must not become the answer",
+		}},
+		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "visible final answer"}}, StopReason: agent.StopReasonEnd},
+	}}
+	provider, err := NewAPIProvider(APIProviderConfig{
+		Adapter: adapter, ToolExecutor: &recordingToolExecutor{}, MaxSteps: 1,
+		Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []Event
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "qwen-final", WorkingDir: t.TempDir(), Prompt: "inspect", Model: "qwen38-27b-mtp2-128k",
+		System: "standing context", Sandbox: Sandbox{Mode: "read-only"},
+	}, func(event Event) error {
+		events = append(events, event)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeInconclusive || result.Reason != ReasonMaxTurns || result.FinalText != "visible final answer" {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(adapter.requests) != 3 {
+		t.Fatalf("model requests = %#v", adapter.requests)
+	}
+	firstSynthesis, recovery := adapter.requests[1], adapter.requests[2]
+	if len(firstSynthesis.Tools) != 1 || firstSynthesis.ToolChoice != "none" {
+		t.Fatalf("first synthesis lost compatibility schema: %+v", firstSynthesis)
+	}
+	if len(recovery.Tools) != 0 || recovery.ToolChoice != "none" || len(recovery.Messages) == 0 {
+		t.Fatalf("recovery retained tool grammar: %+v", recovery)
+	}
+	last := recovery.Messages[len(recovery.Messages)-1]
+	if last.Role != agent.RoleUser || !strings.Contains(last.GetText(), "/no_think") ||
+		!strings.Contains(recovery.System, emptyCompletionRecoveryInstruction) {
+		t.Fatalf("recovery did not end with a direct visible-answer request: %+v", recovery)
+	}
+	for _, event := range events {
+		if event.Type == EventFailed || strings.Contains(event.Text, "private synthesis") {
+			t.Fatalf("private reasoning escaped or recovery failed: %#v", events)
+		}
+	}
+}
+
 func TestAPIProviderRejectsUnboundedWorkspaceWrite(t *testing.T) {
 	provider, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{}})
 	if err != nil {
