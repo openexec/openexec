@@ -252,7 +252,10 @@ func TestAPIProviderRecoversReasoningOnlyFinalSynthesisWithoutToolGrammar(t *tes
 	}}, StopReason: agent.StopReasonToolUse}
 	adapter := &fakeAPIAdapter{responses: []*agent.Response{
 		toolCall,
-		{StopReason: agent.StopReasonEnd, Metadata: map[string]interface{}{
+		{Content: []agent.ContentBlock{{
+			Type: agent.ContentTypeToolUse, ToolUseID: "ignored-final-call", ToolName: "read_file",
+			ToolInput: json.RawMessage(`{"path":"evidence.txt"}`),
+		}}, StopReason: agent.StopReasonToolUse, Metadata: map[string]interface{}{
 			"reasoning_content": "private synthesis that must not become the answer",
 		}},
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "visible final answer"}}, StopReason: agent.StopReasonEnd},

@@ -316,7 +316,7 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		system += "\n\n"
 	}
 	system += finalSynthesisInstruction
-	response, err := p.completeWithEmptyRecovery(ctx, agent.Request{
+	response, err := p.completeFinalSynthesis(ctx, agent.Request{
 		Model: request.Model, Messages: messages, System: system,
 		Tools: p.config.Tools, ToolChoice: "none",
 	})
@@ -370,22 +370,6 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 	}
 	reasoningOnly := responseHasReasoning(response)
 	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
-	// A final-synthesis retry must not keep the model inside the tool grammar
-	// that just produced an empty assistant turn. End the transcript with a
-	// fresh user-visible request and remove tool definitions only after the
-	// original, compatibility-preserving synthesis attempt was empty. Qwen's
-	// hybrid-thinking chat template recognizes /no_think; use it solely on this
-	// bounded recovery turn so private reasoning cannot consume the answer
-	// again. Other compatible providers receive the same instruction without a
-	// model-specific directive.
-	if request.ToolChoice == "none" {
-		request.Tools = nil
-		recovery := emptyCompletionRecoveryInstruction
-		if strings.Contains(strings.ToLower(request.Model), "qwen") {
-			recovery = "/no_think\n" + recovery
-		}
-		request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, recovery))
-	}
 	response, err = p.config.Adapter.Complete(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider empty-response recovery failed: %w", err)
@@ -399,12 +383,46 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 	return nil, errors.New("API provider returned neither assistant text nor tool calls after one recovery attempt")
 }
 
-func responseHasVisibleOutcome(response *agent.Response) bool {
+// completeFinalSynthesis has a stricter success contract than an ordinary
+// agentic completion: after the tool budget is spent, another tool call is not
+// an observable answer. Some compatible local endpoints ignore tool_choice
+// none and emit a call anyway. Preserve tool definitions on the first attempt
+// for strict endpoints, then make one grammar-free direct-answer retry and
+// accept only non-empty assistant text.
+func (p *APIProvider) completeFinalSynthesis(ctx context.Context, request agent.Request) (*agent.Response, error) {
+	response, err := p.config.Adapter.Complete(ctx, request)
+	if err != nil || responseHasVisibleText(response) {
+		return response, err
+	}
+	firstHadReasoning := responseHasReasoning(response)
+	firstHadToolCall := response != nil && len(response.GetToolCalls()) > 0
+	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
+	request.Tools = nil
+	request.ToolChoice = "none"
+	recovery := emptyCompletionRecoveryInstruction
+	if strings.Contains(strings.ToLower(request.Model), "qwen") {
+		recovery = "/no_think\n" + recovery
+	}
+	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, recovery))
+	response, err = p.config.Adapter.Complete(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("API provider final-synthesis recovery failed: %w", err)
+	}
+	if responseHasVisibleText(response) {
+		return response, nil
+	}
+	if firstHadToolCall || (response != nil && len(response.GetToolCalls()) > 0) {
+		return nil, errors.New("API provider returned a tool call instead of assistant text after the tool budget was exhausted")
+	}
+	if firstHadReasoning || responseHasReasoning(response) {
+		return nil, errors.New("API provider returned reasoning but no assistant text after final-synthesis recovery")
+	}
+	return nil, errors.New("API provider returned no assistant text after final-synthesis recovery")
+}
+
+func responseHasVisibleText(response *agent.Response) bool {
 	if response == nil {
 		return false
-	}
-	if len(response.GetToolCalls()) > 0 {
-		return true
 	}
 	for _, block := range response.Content {
 		if block.Type == agent.ContentTypeText && strings.TrimSpace(block.Text) != "" {
@@ -412,6 +430,16 @@ func responseHasVisibleOutcome(response *agent.Response) bool {
 		}
 	}
 	return false
+}
+
+func responseHasVisibleOutcome(response *agent.Response) bool {
+	if response == nil {
+		return false
+	}
+	if len(response.GetToolCalls()) > 0 {
+		return true
+	}
+	return responseHasVisibleText(response)
 }
 
 func responseHasReasoning(response *agent.Response) bool {
