@@ -119,6 +119,34 @@ func TestAPIProviderPassesAuthorizationContractToTools(t *testing.T) {
 	}
 }
 
+func TestAPIProviderRejectsEmptyToolResponse(t *testing.T) {
+	adapter := &fakeAPIAdapter{responses: []*agent.Response{{StopReason: agent.StopReasonEnd}}}
+	provider, err := NewAPIProvider(APIProviderConfig{
+		Adapter: adapter, ToolExecutor: &recordingToolExecutor{},
+		Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []Event
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "empty-tools", WorkingDir: t.TempDir(), Prompt: "inspect", Model: "test-model",
+		Sandbox: Sandbox{Mode: "read-only"},
+	}, func(event Event) error {
+		events = append(events, event)
+		return nil
+	})
+	if err == nil || err.Error() != "API provider returned neither assistant text nor tool calls" {
+		t.Fatalf("error = %v", err)
+	}
+	if result.Outcome != OutcomeFailed || result.FinalText != "" {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(events) != 2 || events[0].Type != EventStarted || events[1].Type != EventFailed || events[1].Text != err.Error() {
+		t.Fatalf("events = %#v", events)
+	}
+}
+
 func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) {
 	toolCall := func(id string) *agent.Response {
 		return &agent.Response{Content: []agent.ContentBlock{{
@@ -220,6 +248,32 @@ func TestAPIProviderStreamsAndCancels(t *testing.T) {
 	}, nil)
 	if !errors.Is(err, context.Canceled) || result.Outcome != OutcomeCancelled {
 		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestAPIProviderRejectsEmptyStream(t *testing.T) {
+	stream := make(chan agent.StreamEvent)
+	close(stream)
+	provider, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{stream: stream}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []Event
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "empty-stream", WorkingDir: t.TempDir(), Prompt: "answer", Model: "test-model",
+		Sandbox: Sandbox{Mode: "read-only"},
+	}, func(event Event) error {
+		events = append(events, event)
+		return nil
+	})
+	if err == nil || err.Error() != "API provider returned no assistant text" {
+		t.Fatalf("error = %v", err)
+	}
+	if result.Outcome != OutcomeFailed || result.FinalText != "" {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(events) != 2 || events[0].Type != EventStarted || events[1].Type != EventFailed || events[1].Text != err.Error() {
+		t.Fatalf("events = %#v", events)
 	}
 }
 

@@ -26,7 +26,8 @@ func TestReplayReachesBothExecutePaths(t *testing.T) {
 		{Role: HistoryRoleAssistant, Content: "41 remembered"},
 	}
 
-	stream := make(chan agent.StreamEvent)
+	stream := make(chan agent.StreamEvent, 1)
+	stream <- agent.StreamEvent{Type: agent.StreamEventContentDelta, Delta: &agent.StreamDelta{Text: "42"}}
 	close(stream)
 	streaming := &fakeAPIAdapter{stream: stream}
 	provider, err := NewAPIProvider(APIProviderConfig{Adapter: streaming})
