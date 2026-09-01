@@ -1032,6 +1032,31 @@ func TestOpenAIProvider_ConvertResponse(t *testing.T) {
 		}
 	})
 
+	t.Run("ollama reasoning alias remains private metadata", func(t *testing.T) {
+		openAIResp := &openAIChatCompletionResponse{
+			ID:    "chatcmpl-reasoning",
+			Model: "qwen38-27b-mtp2-128k",
+			Choices: []struct {
+				Index        int           `json:"index"`
+				Message      openAIMessage `json:"message"`
+				FinishReason string        `json:"finish_reason"`
+			}{
+				{
+					Message:      openAIMessage{Role: "assistant", Reasoning: "private provider reasoning"},
+					FinishReason: "stop",
+				},
+			},
+		}
+
+		resp := provider.convertResponse(openAIResp)
+		if resp.GetText() != "" {
+			t.Fatalf("reasoning leaked into assistant text: %q", resp.GetText())
+		}
+		if resp.Metadata["reasoning_content"] != "private provider reasoning" {
+			t.Fatalf("response metadata = %#v", resp.Metadata)
+		}
+	})
+
 	t.Run("max tokens response", func(t *testing.T) {
 		openAIResp := &openAIChatCompletionResponse{
 			ID:    "chatcmpl-789",

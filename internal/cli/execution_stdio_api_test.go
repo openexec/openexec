@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	liveOllamaAddress = "127.0.0.1:11434"
-	liveOllamaBaseURL = "http://127.0.0.1:11434/v1"
-	liveOllamaModel   = "qwen3:8b"
+	liveOllamaAddress = "127.0.0.1:11436"
+	liveOllamaBaseURL = "http://127.0.0.1:11436/v1"
+	liveOllamaModel   = "qwen38-27b-mtp2-128k"
 )
 
 // Most cases here only need a provider built; read-only is the narrower mode.
@@ -26,7 +26,7 @@ var readOnly = execution.Sandbox{Mode: execution.SandboxReadOnly}
 func TestReasoningContentReplayIsScopedToKimiK3(t *testing.T) {
 	for model, want := range map[string]bool{
 		"kimi-k3": true, "kimi-k3-preview": true, "moonshotai/kimi-k3": true,
-		"kimi-k3:latest": true, "gpt-4o": false, "qwen3:8b": false,
+		"kimi-k3:latest": true, "gpt-4o": false, "qwen38-27b-mtp2-128k": false,
 	} {
 		if got := requiresReasoningContentReplay(model); got != want {
 			t.Errorf("requiresReasoningContentReplay(%q) = %v, want %v", model, got, want)
@@ -217,11 +217,6 @@ func TestAPIProviderLiveOllama(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		if err.Error() == "API provider returned neither assistant text nor tool calls" &&
-			result.Outcome == execution.OutcomeFailed && strings.TrimSpace(text.String()) == "" {
-			t.Log("local model returned an empty turn; provider exposed it as a failed outcome")
-			return
-		}
 		t.Fatalf("execute: %v", err)
 	}
 	if result.Outcome != execution.OutcomeSucceeded {

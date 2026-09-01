@@ -499,9 +499,13 @@ func (p *OpenAIProvider) convertResponse(resp *openAIChatCompletionResponse) *Re
 
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
-		if choice.Message.ReasoningContent != "" {
+		reasoning := choice.Message.ReasoningContent
+		if reasoning == "" {
+			reasoning = choice.Message.Reasoning
+		}
+		if reasoning != "" {
 			response.Metadata = map[string]interface{}{
-				"reasoning_content": choice.Message.ReasoningContent,
+				"reasoning_content": reasoning,
 			}
 		}
 
@@ -1024,11 +1028,15 @@ type openAIStreamOptions struct {
 }
 
 type openAIMessage struct {
-	Role             string           `json:"role"`
-	Content          string           `json:"content,omitempty"`
-	ReasoningContent string           `json:"reasoning_content,omitempty"`
-	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
-	ToolCallID       string           `json:"tool_call_id,omitempty"`
+	Role             string `json:"role"`
+	Content          string `json:"content,omitempty"`
+	ReasoningContent string `json:"reasoning_content,omitempty"`
+	// Ollama's OpenAI-compatible endpoint returns the same private model state
+	// under "reasoning". Keep accepting reasoning_content for providers that
+	// use the older extension, but recognize both response shapes.
+	Reasoning  string           `json:"reasoning,omitempty"`
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
 
 type openAITool struct {
