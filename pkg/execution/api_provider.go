@@ -208,6 +208,12 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 			_ = sink(Event{Type: EventCancelled})
 			return result, err
 		}
+		if strings.TrimSpace(result.FinalText) == "" {
+			finish()
+			err := errors.New("API provider returned no assistant text")
+			_ = sink(Event{Type: EventFailed, Text: err.Error()})
+			return result, err
+		}
 		result.Outcome = OutcomeSucceeded
 		finish()
 		if err := sink(Event{Type: EventCompleted}); err != nil {
@@ -233,8 +239,12 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		}
 		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content, Metadata: response.Metadata}
 		messages = append(messages, assistant)
+		wroteText := false
 		for _, block := range response.Content {
 			if block.Type == agent.ContentTypeText && block.Text != "" {
+				if strings.TrimSpace(block.Text) != "" {
+					wroteText = true
+				}
 				result.FinalText += block.Text
 				if err := sink(Event{Type: EventAssistantDelta, Text: block.Text}); err != nil {
 					finish()
@@ -244,6 +254,12 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		}
 		calls := response.GetToolCalls()
 		if len(calls) == 0 {
+			if !wroteText {
+				finish()
+				err := errors.New("API provider returned neither assistant text nor tool calls")
+				_ = sink(Event{Type: EventFailed, Text: err.Error()})
+				return result, err
+			}
 			result.Outcome = OutcomeSucceeded
 			finish()
 			if err := sink(Event{Type: EventCompleted}); err != nil {
