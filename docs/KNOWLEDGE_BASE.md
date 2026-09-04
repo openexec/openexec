@@ -1,5 +1,7 @@
 # OpenExec Knowledge Base: The Deterministic Control Plane (DCP)
 
+**Status:** built and opt-in (`internal/dcp/`, `OPENEXEC_ENABLE_DCP=true`). Off by default; deterministic routing handles the rest.
+
 > **Note:** This documents the DCP subsystem which provides optional enhanced routing. Deterministic routing (always-on) handles most use cases without DCP. DCP is opt-in via the `OPENEXEC_ENABLE_DCP=true` environment variable or `EnableDCP` server config. When disabled (the default), deterministic routing handles all classification.
 
 This document explains the architecture of OpenExec's **Deterministic Knowledge Base**, a purpose-driven relational system that replaces traditional Vector Databases for codebase management.

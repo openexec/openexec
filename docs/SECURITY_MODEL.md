@@ -1,5 +1,7 @@
 # Security Model: Running AI Against Production Infrastructure
 
+**Status:** built. The user-facing companion to `SRE_ORCHESTRATION_ROADMAP.md` phases 1–4, which are implemented.
+
 This document explains, in plain terms, why an OpenExec agent cannot "accidentally drop the
 prod database" — and exactly how hallucinations, prompt injection, and poisoned command
 output are contained. It is the user-facing companion to

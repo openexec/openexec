@@ -1,5 +1,7 @@
 # Skills Quick Start Guide
 
+**Status:** guide, current (`openexec skills`, `internal/skills/`).
+
 Get started with OpenExec Skills in 5 minutes.
 
 ## 1. Import Existing Claude Skills (30 seconds)

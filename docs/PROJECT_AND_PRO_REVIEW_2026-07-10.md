@@ -1,5 +1,7 @@
 # OpenExec and OpenExec Pro: technical and product review
 
+**Status:** historical record — point-in-time review, 2026-07-10. True on its date; do not read it as a current work list.
+
 **Review date:** 2026-07-10  
 **Repositories reviewed:** `openexec` and sibling `openexec-pro`  
 **Review type:** source inspection, flow tracing, local build/test verification, documentation comparison, repository-history inspection, and public-project signal check

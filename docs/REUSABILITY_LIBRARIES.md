@@ -1,5 +1,7 @@
 # The Reusability Ecosystem: Three-Tier AI Libraries
 
+**Status:** built across three repositories — `blueprints/`, `intent-compiler/packs/`, and this repository’s skills engine (`internal/skills/`). Describes how they fit together, not a single shipped component here.
+
 OpenExec and its companion tools do not let AI agents guess, drift, or write repetitive code from scratch. The ecosystem operates on a strict **Three-Tier Library Hierarchy** that standardizes code generation at every level of abstraction:
 
 ```

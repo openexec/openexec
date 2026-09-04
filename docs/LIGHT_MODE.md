@@ -1,5 +1,7 @@
 # Light Mode: working the backlog from Claude Code
 
+**Status:** built (`openexec mcp-serve`, `internal/mcp/backlog.go`). Describes shipped behaviour.
+
 OpenExec is a two-speed system:
 
 - **Heavy mode** (`openexec run`, the daemon): turns intent into a backlog of

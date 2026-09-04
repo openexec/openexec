@@ -1,5 +1,7 @@
 # OpenExec Context Pruning System
 
+**Status:** built (`internal/context/`). Describes shipped behaviour.
+
 ## Overview
 
 The Context Pruning System intelligently selects the most relevant files for a given task, dramatically reducing token usage and improving LLM performance. It analyzes natural language queries and ranks files by relevance using multiple scoring strategies.

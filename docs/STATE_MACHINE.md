@@ -1,5 +1,7 @@
 # OpenExec Execution State Machine
 
+**Status:** built (`internal/blueprint/`). The stage sequence it describes is the one the engine runs.
+
 This document describes the deterministic state machine that governs execution in OpenExec. OpenExec uses a **Blueprint Engine** as its orchestration model.
 
 ## 1. The Blueprint Engine

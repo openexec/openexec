@@ -1,5 +1,7 @@
 # Execution provider contract
 
+**Status:** built (`pkg/execution/`). Normative for callers of that package.
+
 `pkg/execution.Provider` is the public boundary for authorized local or API
 execution. Product callers own authorization and workflow; OpenExec owns
 runtime construction, containment validation, normalized events, and result

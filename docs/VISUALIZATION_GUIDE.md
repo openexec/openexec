@@ -1,5 +1,7 @@
 # Visualization Guide
 
+**Status:** drawing guide. Conventions for diagrams, not a claim about the system.
+
 This guide gives you a ready-to-draw blueprint for diagrams. Use these shapes and edges to explain OpenExec's flow.
 
 ## Swimlanes
