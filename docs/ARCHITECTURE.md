@@ -3,6 +3,24 @@
 **Version:** 1.0  
 **Last Updated:** 2026-03-31
 
+**Status:** built, but **incomplete as a map of the current system.** What it
+describes — the orchestration model, the blueprint engine, provider adapters —
+is accurate. What it predates is everything shipped since 2026-03-31, none of
+which appears below. If you are looking for one of these, this is not the file:
+
+| Subsystem | Where it is documented |
+|---|---|
+| Light mode: the story backlog over MCP (`openexec mcp-serve`, `backlog_*` tools) | [LIGHT_MODE.md](LIGHT_MODE.md) |
+| Skills, and the propose-then-approve trust boundary (`skill_propose`, `openexec skills approve`) | [SKILLS_SYSTEM.md](SKILLS_SYSTEM.md), [SKILLS_QUICKSTART.md](SKILLS_QUICKSTART.md) |
+| SRE/infra command registry (`ansible_run_playbook`, `terraform_plan`/`terraform_apply`, approval gate) | [SRE_ORCHESTRATION_ROADMAP.md](SRE_ORCHESTRATION_ROADMAP.md), [SECURITY_MODEL.md](SECURITY_MODEL.md) |
+| Repository symbol tools and the pointer graph (`symbol_find`, `symbol_read`, `symbol_relations`) | [SYMBOL_TOOLS_REVIEW.md](SYMBOL_TOOLS_REVIEW.md), [REPOSITORY_POINTER_GRAPH_PLAN.md](REPOSITORY_POINTER_GRAPH_PLAN.md), [KNOWLEDGE_V2_PLAN.md](KNOWLEDGE_V2_PLAN.md), [KNOWLEDGE_V3_PLAN.md](KNOWLEDGE_V3_PLAN.md) |
+| Vertical slices, afk/hitl execution modes, project phases, smart-zone budget | `CLAUDE.md` at the repository root |
+
+Two consequences worth stating plainly. `CLAUDE.md` makes this file the one a
+study story must write, so an agent is told to trust it — the gaps above are
+therefore load-bearing, not cosmetic. And a reader who takes this document as
+the whole system will conclude that several shipped subsystems do not exist.
+
 ## Executive Summary
 
 OpenExec is an **AI CLI orchestration platform**, not an LLM client. It wraps existing AI CLI tools (Claude Code, Codex CLI, Gemini CLI) with production-grade infrastructure for deterministic, reliable, and safe AI-assisted development.

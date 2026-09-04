@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+**Status:** contributor guide, current.
+
 ## Project Structure & Module Organization
 - `cmd/` CLI entrypoints (Go). Main binary: `./cmd/openexec`.
 - `internal/`, `pkg/` core engine packages. Built binaries go to `bin/`.

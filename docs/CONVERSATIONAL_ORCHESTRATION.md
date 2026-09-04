@@ -1,5 +1,7 @@
 # Conversational Orchestration Guide
 
+**Status:** built (`openexec chat`, `internal/cli/chat.go`). Written 2026-03-16 and not re-verified line by line since; treat details as indicative and the code as authoritative.
+
 OpenExec's conversational orchestration transforms project management from command-line batch operations into an interactive, multi-turn dialogue with AI agents. This guide covers the architecture, usage, and configuration of the conversational mode.
 
 ## Table of Contents

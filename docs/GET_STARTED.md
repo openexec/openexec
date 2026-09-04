@@ -1,5 +1,7 @@
 # Getting Started with OpenExec
 
+**Status:** guide, current. Every command it names exists in `internal/cli/`.
+
 Welcome to OpenExec! This guide will take you from zero to running your first AI-orchestrated project.
 
 ## Understanding Execution Modes

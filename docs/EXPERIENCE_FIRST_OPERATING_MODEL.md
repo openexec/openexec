@@ -67,6 +67,7 @@ The mandatory decision order is:
 
 ```text
 Owner Project Definition (`PROJECT_INTENT.md`)
+    -> Accepted Project Goal (high-level Definition of Done)
     -> Customer Outcome
     -> Experience Contract
     -> Completion Contract
@@ -92,6 +93,19 @@ the form established by Agent Console's
 particular initiative or change from it; it must never quietly invent a new
 purpose, customer, or trade-off. An unanswered product question is recorded as
 `UNANSWERED — owner`, not completed by a model.
+
+The next authority is one current **Project Goal** for each project activated
+for autonomous work. The Goal is a finite finish target and high-level
+Definition of Done: it translates enduring intent into the state the project
+is trying to reach now. Project Intent answers *why this project exists*; the
+Goal answers *what being ready or shipped means for the current iteration*.
+Experience triage cannot choose its hero workflow or remove scope coherently
+until both are known.
+
+The first operating slice requires one privileged Goal per project, not one
+exclusive Goal for the whole portfolio. Portfolio attention may rank project
+Goals and autonomous work may continue elsewhere, but each task must still
+trace to the accepted Goal of its own project.
 
 OpenExec's owner completed the Project Intent interview on 2026-08-22. The
 owner's verbatim answers are recorded in root `PROJECT_INTENT.md` and
@@ -141,13 +155,15 @@ product.
 
 ## Authority and trust
 
-The machine is an adviser during experience triage. The owner is the approval
-authority.
+The machine is an adviser during Goal definition and experience triage. The
+owner is the approval authority.
 
 The machine may:
 
 - prefill facts already stated in the owner-authored Project Definition or previously accepted
   contracts;
+- propose a finite Project Goal and high-level Definition of Done from an
+  iterative interview and known evidence;
 - summarize observed pain from owner reports and dogfooding evidence;
 - propose a customer outcome, hero workflow, magical moment, and things to
   remove;
@@ -158,6 +174,7 @@ The machine may:
 The machine must not:
 
 - approve its own Experience Contract;
+- activate autonomous project work without an owner-accepted Intent and Goal;
 - convert an inference into owner intent;
 - decide what feeling, trade-off, or magical moment matters to the owner;
 - optimize an experience score and declare the experience good;
@@ -183,6 +200,60 @@ verdicts:
 
 Only the owner can accept or revise the proposal. Acceptance is durable and
 auditable; later machine revisions never overwrite it silently.
+
+## Project Goal and high-level Definition of Done
+
+The Goal is a first-class, durable, versioned object rather than a sentence
+hidden in a task, conversation, plan, or branch. A proportional initial form
+is:
+
+```markdown
+# Project Goal
+
+Project Intent revision:
+Finish target:
+Why this advances the Project Intent:
+
+High-level Done:
+- [ ] owner-visible result that must exist
+- [ ] what “ready” or “shipped” means
+- [ ] protected behavior that must remain true
+
+Not this Goal:
+- ...
+
+Current evidence:
+Known unknowns:
+Owner acceptance:
+```
+
+The machine leads a short convergence loop rather than handing the owner a
+blank form:
+
+```text
+known owner facts -> machine proposal -> owner reaction -> revision -> acceptance
+```
+
+Several iterations are expected. The machine records the owner's words,
+distinguishes them from its synthesis, and never asks again for accepted or
+derivable information. `UNANSWERED — owner` is safer than invented certainty.
+
+The Goal is deliberately higher-level than a task list. Product discovery can
+change the route many times. Tasks are disposable route instructions derived
+from the gap between current evidence and high-level Done. The machine may
+recommend A, B, or C, but it must say which Goal condition each option advances
+and should recommend one route rather than create three obligations.
+
+Changing tasks or implementation does not change the Goal. When evidence shows
+that the destination itself is wrong, the machine proposes a versioned Goal
+revision and its consequences for accepted experience, scope, work, and public
+claims. Only the owner accepts that revision.
+
+An activated project without an accepted Intent and current Goal may be
+observed, discussed, or manually explored, but Agent Console must not derive
+and autonomously execute an indefinite queue for it. Existing projects are
+triaged when the owner activates automation; the system must not create thirty
+mandatory setup chores at once.
 
 ## Proportional Experience Contract
 
@@ -273,6 +344,7 @@ queue until the applicable contract passes owner review.
 
 ```text
 [ ] Customer and situation are known.
+[ ] The work traces to an owner-accepted Project Goal and high-level Done.
 [ ] The pain is owner-stated, observed, or otherwise evidenced.
 [ ] The desired outcome is expressed without implementation terminology.
 [ ] The simplest successful workflow is visible.
@@ -351,11 +423,14 @@ must be linked, and the owner must know what decision or action follows.
 
 ## Accepted focus and scope protection
 
-Agent Console should present one owner-attended portfolio outcome as **What we
-are finishing**. Projects may have subordinate tasks, and bounded autonomous
-work may run elsewhere without asking for attention, but repositories, agents,
-conversations, models, tokens, tools, and branches are implementation
-machinery. They must not dominate the primary attention surface.
+Agent Console should present one privileged finish target per activated
+project as **What we are finishing**. Projects may have subordinate tasks, and
+bounded autonomous work may run elsewhere without asking for attention, but
+repositories, agents, conversations, models, tokens, tools, and branches are
+implementation machinery. They must not dominate the primary attention
+surface. A later portfolio layer may recommend which project deserves owner
+attention now; it must not be a prerequisite for the first project-level
+slice.
 
 Starting or discovering another major outcome does not automatically replace
 the current focus. The system recommends one of four explicit choices:
@@ -712,8 +787,8 @@ operation—not novelty in agent technology alone.
 
 ## Traceability into architecture and implementation
 
-Once the Experience Contract is accepted, each lower-level decision must link
-upward:
+Once the Project Goal and Experience Contract are accepted, each lower-level
+decision must link upward:
 
 ```text
 technical choice
@@ -721,6 +796,8 @@ technical choice
     -> workflow step it supports
     -> experience requirement it satisfies
     -> customer outcome it advances
+    -> Project Goal condition it closes
+    -> Project Intent it serves
 ```
 
 A technical decision with no trace is removed or explicitly classified as
@@ -739,40 +816,47 @@ Pre-change impact analysis includes experience blast radius:
 
 ## Review stages
 
-### 1. Customer Experience Review
+### 1. Project Goal Review
+
+The owner reviews the machine-proposed finish target and high-level Definition
+of Done. Confirm where the project is going, what “ready” or “shipped” means,
+and what is deliberately outside this Goal. Without acceptance, experience
+triage may continue as discovery but autonomous execution does not start.
+
+### 2. Customer Experience Review
 
 The owner reviews the machine's recommendation and adjusts the outcome,
 workflow, magical moment, feeling, and trade-offs.
 
-### 2. Focus and Completion Review
+### 3. Focus and Completion Review
 
 Remove capabilities that do not strengthen the hero workflow. Review the
 machine-proposed Completion Contract, accepted scope, evidence requirements,
 and `Not required for Done` list. The owner accepts or refines the boundary.
 
-### 3. Cognitive-load Review
+### 4. Cognitive-load Review
 
 Inspect the actual interface and wording. Record concrete experience-debt
 deltas. Do not replace this with a numerical score.
 
-### 4. Taste Review
+### 5. Taste Review
 
 The experience owner reviews hierarchy, coherence, benefit-led language,
 intentional states, phone use, and what can still be removed. Functional tests
 are evidence but cannot pass this judgment.
 
-### 5. Architecture Review
+### 6. Architecture Review
 
 Now choose how to deliver the accepted experience. Every significant choice
 includes its customer-value trace.
 
-### 6. Closure Review
+### 7. Closure Review
 
 When the accepted capability exists, enter Finish explicitly. Review remaining
 conditions, park unrelated work, name blockers, and identify the next smallest
 closure action. The machine may propose Done but cannot accept it.
 
-### 7. Running Journey Review
+### 8. Running Journey Review
 
 Exercise the accepted path in the production-shaped build on its target device,
 including failure, recovery, and persistence. Only this stage can mark the
@@ -791,13 +875,17 @@ Implementation should be incremental and supervised.
   cannot invent or revise OpenExec's purpose. A route may use a sibling
   repository only when it records how that dependency advances the current
   destination or completion condition.
+- After Intent, manually interview the owner to accept one OpenExec Project
+  Goal and high-level Definition of Done before selecting the experience
+  fixture. Record multiple refinement turns rather than treating the first
+  machine wording as authoritative.
 - Use the proportional templates on real OpenExec and Agent Console changes.
 - Write the demo before implementation on one hackathon-sized initiative.
 - Record which questions were useful, repetitive, or impossible to answer.
 - If the Agent Console G2 owner gate authorizes a bounded implementation slice,
-  run it manually from Experience Contract through Completion Contract, phase
-  changes, scope decisions, evidence, and a terminal owner verdict. Do not
-  implement completion automation first.
+  run it manually from accepted Project Goal through Experience Contract,
+  Completion Contract, phase changes, scope decisions, evidence, and a terminal
+  owner verdict. Do not implement completion automation first.
 - If that completion run is authorized, capture at least one attractive new
   idea and verify that it can be preserved without displacing the accepted
   closure action.
@@ -808,11 +896,14 @@ negative owner decision and its reasoning rather than becoming permanently
 incomplete. E1–E4 proceed only if G2 separately authorizes them; F1–F3 remain
 blocked until a manual completion reference run exists.
 
-### E1 — Advisory experience triage
+### E1 — Advisory Goal and experience triage
 
-- Read root `PROJECT_INTENT.md` and previously accepted contracts. If the root
-  artifact is absent, stop with `needs_owner`; never substitute generated
-  `INTENT.md`.
+- Read root `PROJECT_INTENT.md`, the current accepted Project Goal, and
+  previously accepted contracts. If Intent is absent, stop with `needs_owner`;
+  never substitute generated `INTENT.md`.
+- If Goal is absent, conduct short iterative triage, reuse known facts, and
+  propose a high-level Definition of Done for owner refinement. Do not generate
+  an autonomous task queue yet.
 - Produce a provenance-labelled Experience Contract proposal.
 - Recommend missing questions, one hero workflow, one magical moment, and at
   least one removal.
@@ -822,7 +913,8 @@ blocked until a manual completion reference run exists.
 ### E2 — Durable gate
 
 - Add explicit `proposed`, `accepted`, `superseded`, and `rejected` revisions.
-- Require an accepted contract before planning an implementation initiative.
+- Require accepted Intent, Goal, and the applicable Experience Contract before
+  planning an autonomous implementation initiative.
 - Allow a bounded `experience_delta` path for defects and small changes.
 - Keep feasibility spikes separate from accepted product direction.
 - Refuse implementation when accepted `PROJECT_INTENT.md` and the proposal conflict.
@@ -844,10 +936,11 @@ blocked until a manual completion reference run exists.
 ### F1 — Advisory completion contract
 
 - Propose a proportional Completion Contract from accepted experience,
-  repository evidence, and the request.
+  Project Goal, repository evidence, and the request.
 - Recommend accepted scope, `Not required for Done`, protected behavior, and
   condition-level evidence.
-- Show one portfolio-level owner-attended outcome and its next closure action.
+- Show each activated project's accepted finish target, evidenced gaps, and
+  next closure action; portfolio ranking is a later layer.
 - Classify new ideas against the accepted contract and recommend quiet parking
   by default when they do not close a condition.
 
@@ -874,6 +967,8 @@ blocked until a manual completion reference run exists.
 This model succeeds when:
 
 - architecture discussions reliably begin from an accepted customer outcome;
+- activated projects have an owner-accepted Goal before autonomous task
+  derivation or execution;
 - the machine recommends and the owner retains product judgment;
 - technically present but unreachable features fail before implementation is
   called complete;
@@ -882,8 +977,8 @@ This model succeeds when:
 - people need fewer decisions, less memory, and less recovery outside the
   product;
 - owner corrections are remembered and not asked again;
-- one valuable owner-attended portfolio outcome is easier to resume and finish
-  than starting another outcome;
+- one valuable project-level finish target is easier to resume and finish than
+  inventing another task;
 - new ideas are preserved without silently expanding accepted scope;
 - Done consistently names the accepted contract revision and evidence that
   supports it;

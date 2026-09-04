@@ -1,8 +1,16 @@
 # OpenExec Skills System
 
 **Version:** 1.0  
-**Status:** Design Document  
-**Date:** 2026-04-01
+**Status:** built — this was the design document, and the design shipped
+(`internal/skills/`, `openexec skills`, review-stage convention push). One
+thing here is out of date by omission: it predates the **propose-then-approve**
+boundary, which is now the security-relevant half of the system. Agents write
+proposals to `.openexec/skills/_candidates/` via the `skill_propose` MCP tool
+and the registry never loads them; only `openexec skills approve <name>`
+activates one. See `internal/skills/candidates.go`, `internal/mcp/skills.go`
+and `CLAUDE.md`. Nothing below describes that gate, so do not read this file
+as the trust model.
+**Date:** 2026-04-01 (design), shipped since
 
 ---
 

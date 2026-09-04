@@ -1,5 +1,12 @@
 # Roadmap: BitNet-Gated SRE & Infrastructure Orchestration (Salt, Ansible, SSH, Terraform)
 
+**Status:** built. All four phases are implemented — each carries its own ✅
+marker and names the code (`internal/infra/`, `internal/mcp/infra.go`,
+`internal/approval/`). There is no phase 5. The one deliberate limit is phase
+4's router: it is **suggest-only**, its `Execute` always refuses, and execution
+happens through the MCP plane alone. Phase-1 prose written before phase 3
+landed is corrected inline where it appears.
+
 This document provides detailed implementation instructions and technical specifications for building a non-destructive SRE and deployment orchestration layer inside OpenExec. For the user-facing threat model — how hallucinations, prompt injection, and log poisoning are contained, and the honest limits to understand before production — see [SECURITY_MODEL.md](SECURITY_MODEL.md).
 
 **Core Design Philosophy:** Safety must be absolute, deterministic, and model-independent. The AI's action space is constrained at the schema level so that destructive verbs cannot be hallucinated, and execution bypasses shell expansions entirely.
@@ -17,7 +24,7 @@ Code lives in `internal/infra/` (config + registry + executor) and `internal/mcp
 
 Phase-1 status notes:
 - All infra tools require **danger-full-access** mode, uniformly (read-class included; relax only if real use demands it). Inside that mode, the registry and the approval gate are the shields.
-- Apply-class invocations (a real playbook run / `state.apply`) request approval via `internal/approval` and **fail closed when no gate is wired**. Since nothing in production wires a gate yet, apply-class commands are registered-validated-but-inert until the Phase 3 sign-off channel exists. Dry-runs (`check=true`, `test=true`) and read-class tools execute today.
+- Apply-class invocations (a real playbook run / `state.apply`) request approval via `internal/approval` and **fail closed when no gate is wired**. *Phase-3 update: the sign-off channel now exists* — `approval.PersistentGate` over `.openexec/approvals.db`, answered by `openexec approve list|yes|no <id> --local` or the operator-session MCP tools — so apply-class commands execute once approved, and `risk_profile: low` environments apply autonomously. The sentence that followed here, saying they are "registered-validated-but-inert until the Phase 3 sign-off channel exists", was true only between Phase 1 and Phase 3. Dry-runs (`check=true`, `test=true`) and read-class tools have executed since Phase 1.
 - Like `run_shell_command`, infra executions are never idempotency-marked: re-running on resume beats skipping over partial side effects.
 
 #### 1. Configuration Schema (`.openexec/infra.yaml`)

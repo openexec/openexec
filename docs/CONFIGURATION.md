@@ -1,6 +1,16 @@
 # OpenExec Configuration Guide
 
-This guide covers all configuration options for OpenExec, including agent selection, execution settings, quality gates, toolsets, blueprints, and more.
+**Status:** built, partial coverage. Everything documented here is `openexec.yaml`
+and its `OPENEXEC_*` overrides, written 2026-03-15. Configuration added since is
+**not** here: the operator-owned infra allowlist `.openexec/infra.yaml`
+([SRE_ORCHESTRATION_ROADMAP.md](SRE_ORCHESTRATION_ROADMAP.md) — deliberately a
+separate file, and unknown keys fail the load), the approval gate's
+`OPENEXEC_APPROVAL_WAIT` and `OPENEXEC_OPERATOR_SESSION`, `OPENEXEC_ENABLE_DCP`
+([KNOWLEDGE_BASE.md](KNOWLEDGE_BASE.md)), skills directories
+([SKILLS_SYSTEM.md](SKILLS_SYSTEM.md)), and the smart-zone token budget
+(`CLAUDE.md`).
+
+This guide covers the `openexec.yaml` configuration options for OpenExec, including agent selection, execution settings, quality gates, toolsets, blueprints, and more.
 
 ## Configuration File
 
