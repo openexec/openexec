@@ -391,11 +391,12 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 // accept only non-empty assistant text.
 func (p *APIProvider) completeFinalSynthesis(ctx context.Context, request agent.Request) (*agent.Response, error) {
 	response, err := p.config.Adapter.Complete(ctx, request)
-	if err != nil || responseHasVisibleText(response) {
+	if err != nil || responseHasFinalAnswerText(response) {
 		return response, err
 	}
 	firstHadReasoning := responseHasReasoning(response)
 	firstHadToolCall := response != nil && len(response.GetToolCalls()) > 0
+	firstHadSerializedToolCall := responseContainsSerializedToolCall(response)
 	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
 	request.Tools = nil
 	request.ToolChoice = "none"
@@ -408,16 +409,40 @@ func (p *APIProvider) completeFinalSynthesis(ctx context.Context, request agent.
 	if err != nil {
 		return nil, fmt.Errorf("API provider final-synthesis recovery failed: %w", err)
 	}
-	if responseHasVisibleText(response) {
+	if responseHasFinalAnswerText(response) {
 		return response, nil
 	}
-	if firstHadToolCall || (response != nil && len(response.GetToolCalls()) > 0) {
+	if firstHadToolCall || firstHadSerializedToolCall || (response != nil && len(response.GetToolCalls()) > 0) || responseContainsSerializedToolCall(response) {
 		return nil, errors.New("API provider returned a tool call instead of assistant text after the tool budget was exhausted")
 	}
 	if firstHadReasoning || responseHasReasoning(response) {
 		return nil, errors.New("API provider returned reasoning but no assistant text after final-synthesis recovery")
 	}
 	return nil, errors.New("API provider returned no assistant text after final-synthesis recovery")
+}
+
+// responseHasFinalAnswerText is stricter than ordinary visible text. Some
+// OpenAI-compatible reasoning endpoints serialize their native tool grammar
+// into a text block when tool calling is disabled. That block is visible, but
+// it is still another attempted action rather than an answer to the owner.
+func responseHasFinalAnswerText(response *agent.Response) bool {
+	return responseHasVisibleText(response) && !responseContainsSerializedToolCall(response)
+}
+
+func responseContainsSerializedToolCall(response *agent.Response) bool {
+	if response == nil {
+		return false
+	}
+	for _, block := range response.Content {
+		if block.Type != agent.ContentTypeText {
+			continue
+		}
+		text := strings.ToLower(block.Text)
+		if strings.Contains(text, "<tool_call") || strings.Contains(text, "</tool_call>") {
+			return true
+		}
+	}
+	return false
 }
 
 func responseHasVisibleText(response *agent.Response) bool {

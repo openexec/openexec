@@ -303,6 +303,42 @@ func TestAPIProviderRecoversReasoningOnlyFinalSynthesisWithoutToolGrammar(t *tes
 	}
 }
 
+func TestAPIProviderRejectsSerializedQwenToolCallAsFinalAnswer(t *testing.T) {
+	toolCall := &agent.Response{Content: []agent.ContentBlock{{
+		Type: agent.ContentTypeToolUse, ToolUseID: "call-1", ToolName: "run_command",
+		ToolInput: json.RawMessage(`{"command":["git","status"]}`),
+	}}, StopReason: agent.StopReasonToolUse}
+	serializedCall := "Let me verify the current state.\n\n<tool_call>\n<function=run_command>\n<parameter=command>\n[\"git\",\"status\"]\n</parameter>\n</function>\n</tool_call>"
+	adapter := &fakeAPIAdapter{responses: []*agent.Response{
+		toolCall,
+		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: serializedCall}}, StopReason: agent.StopReasonEnd},
+		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "The branch is not yet merged; the completed fixes remain on the open pull request."}}, StopReason: agent.StopReasonEnd},
+	}}
+	provider, err := NewAPIProvider(APIProviderConfig{
+		Adapter: adapter, ToolExecutor: &recordingToolExecutor{}, MaxSteps: 1,
+		Tools: []agent.ToolDefinition{{Name: "run_command", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "qwen-serialized-final", WorkingDir: t.TempDir(), Prompt: "Is this fixed?", Model: "qwen38-27b-mtp2-128k",
+		Sandbox: Sandbox{Mode: "read-only"},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.FinalText != "The branch is not yet merged; the completed fixes remain on the open pull request." || strings.Contains(result.FinalText, "<tool_call>") {
+		t.Fatalf("final text = %q", result.FinalText)
+	}
+	if result.Outcome != OutcomeInconclusive || result.Reason != ReasonMaxTurns {
+		t.Fatalf("result = %+v", result)
+	}
+	if len(adapter.requests) != 3 || len(adapter.requests[2].Tools) != 0 || adapter.requests[2].ToolChoice != "none" {
+		t.Fatalf("final recovery requests = %#v", adapter.requests)
+	}
+}
+
 func TestAPIProviderRejectsUnboundedWorkspaceWrite(t *testing.T) {
 	provider, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{}})
 	if err != nil {
