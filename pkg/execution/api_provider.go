@@ -101,6 +101,7 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	return ProviderDescriptor{
 		ID: p.config.Adapter.GetName(), Runtime: "api", Models: p.config.Adapter.GetModels(),
 		Capabilities: Capability{
+			HardTokenBudget: supportsHardTokens(p.config.Adapter),
 			// No native session to resume, and no need for one: the caller
 			// replays the conversation it already persisted.
 			Streaming: true, Resume: false, Replay: true, ToolGateway: p.gateway,
@@ -138,6 +139,27 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 }
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
+	if request.TokenBudget < 0 {
+		return Result{}, fmt.Errorf("negative token grant")
+	}
+	if request.TokenBudget > 0 {
+		if !supportsHardTokens(p.config.Adapter) {
+			return Result{}, fmt.Errorf("hard total-token admission unavailable")
+		}
+		// Each Execute owns its limiter, including all empty-response retries and
+		// final synthesis. Never store a run budget on the shared provider.
+		bounded := *p
+		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink}
+		bounded.config.Adapter = meter
+		request.TokenBudget = 0
+		result, err := bounded.Execute(ctx, request, sink)
+		if sink != nil {
+			if e := sink(Event{Type: EventUsage, InputTokens: meter.input, OutputTokens: meter.output, UsageFinal: !meter.unknown}); err == nil {
+				err = e
+			}
+		}
+		return result, err
+	}
 	started := time.Now().UTC()
 	result := Result{Executor: p.config.Adapter.GetName(), Model: request.Model, Sandbox: request.Sandbox, StartedAt: started, Outcome: OutcomeFailed}
 	finish := func() { result.EndedAt = time.Now().UTC() }

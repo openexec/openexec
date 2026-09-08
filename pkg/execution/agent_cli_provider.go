@@ -83,6 +83,9 @@ func (p *AgentCLIProvider) Probe(ctx context.Context, dir string) Readiness {
 }
 
 func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventSink) (Result, error) {
+	if req.TokenBudget != 0 {
+		return Result{}, fmt.Errorf("CLI cannot enforce a hard total-token grant")
+	}
 	started := time.Now().UTC()
 	result := Result{Executor: p.config.Kind, Model: req.Model, Sandbox: req.Sandbox, StartedAt: started, Outcome: OutcomeFailed}
 	finish := func() { result.EndedAt = time.Now().UTC() }

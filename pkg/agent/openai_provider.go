@@ -76,11 +76,12 @@ type OpenAIProviderConfig struct {
 
 // OpenAIProvider implements ProviderAdapter for OpenAI's API.
 type OpenAIProvider struct {
-	config     OpenAIProviderConfig
-	httpClient *http.Client
-	models     []string
-	modelInfo  map[string]*ModelInfo
-	name       string
+	ollamaBudgetURL string
+	config          OpenAIProviderConfig
+	httpClient      *http.Client
+	models          []string
+	modelInfo       map[string]*ModelInfo
+	name            string
 }
 
 // Compile-time check that OpenAIProvider implements ProviderAdapter.

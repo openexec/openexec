@@ -147,6 +147,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 	if err != nil {
 		return nil, fmt.Errorf("create API provider %q: %w", name, err)
 	}
+	adapter.EnableLocalOllamaBounds(ctx)
 	// A gateway that stands alone still stands alone. Console state and the
 	// repository in one turn is the pairing with no defensible story, and the
 	// reason that boundary holds is that it is the only one in play — so this
