@@ -22,8 +22,10 @@ type Sandbox struct {
 // Request is one authorized execution unit. Prompt is intentionally opaque to
 // the engine so callers can supply their own task instructions.
 type Request struct {
-	ID         string
-	WorkingDir string
+	// TokenBudget is a hard cumulative input+output grant for this execution.
+	TokenBudget int64
+	ID          string
+	WorkingDir  string
 	// ConfigDir is where this run's provider configuration is read from, when
 	// that is not the directory the work happens in.
 	//
@@ -195,7 +197,8 @@ type Streams struct {
 }
 
 type Capability struct {
-	Streaming bool `json:"streaming"`
+	HardTokenBudget bool `json:"hard_token_budget"`
+	Streaming       bool `json:"streaming"`
 	// Resume is the provider continuing its own native session. Replay is the
 	// caller resending the conversation. They are different mechanisms with
 	// different owners, and a provider may have either, both, or neither — so
@@ -266,15 +269,19 @@ const (
 )
 
 type Event struct {
-	Type     string          `json:"type"`
-	Text     string          `json:"text,omitempty"`
-	CallID   string          `json:"call_id,omitempty"`
-	ToolName string          `json:"tool_name,omitempty"`
-	Data     json.RawMessage `json:"data,omitempty"`
-	Reason   string          `json:"reason,omitempty"`
+	InputTokens  int64           `json:"input_tokens,omitempty"`
+	OutputTokens int64           `json:"output_tokens,omitempty"`
+	UsageFinal   bool            `json:"usage_final,omitempty"`
+	Type         string          `json:"type"`
+	Text         string          `json:"text,omitempty"`
+	CallID       string          `json:"call_id,omitempty"`
+	ToolName     string          `json:"tool_name,omitempty"`
+	Data         json.RawMessage `json:"data,omitempty"`
+	Reason       string          `json:"reason,omitempty"`
 }
 
 const (
+	EventUsage          = "execution.usage"
 	EventStarted        = "execution.started"
 	EventAssistantDelta = "assistant.delta"
 	EventToolProposed   = "tool.proposed"
