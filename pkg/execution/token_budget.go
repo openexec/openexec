@@ -20,7 +20,9 @@ type boundedAPIAdapter struct {
 }
 
 func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*agent.Response, error) {
-	if p.remaining < 2048 {
+	// Ollama may raise vision-capable model contexts to 2048 even for text.
+	// Keep the input reservation above that native floor before any inference.
+	if p.remaining < 4096 {
 		return nil, fmt.Errorf("hard token grant cannot admit another inference")
 	}
 	output := min(int64(2048), p.remaining/4)

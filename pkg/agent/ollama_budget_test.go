@@ -90,3 +90,11 @@ func TestOllamaBudgetRefusesUnknownProtocolAndMalformedUsage(t *testing.T) {
 		})
 	}
 }
+
+func TestOllamaBudgetRejectsContextBelowNativeFloor(t *testing.T) {
+	p := &OpenAIProvider{ollamaBudgetURL: "http://127.0.0.1:1/api/chat"}
+	_, err := p.CompleteBounded(context.Background(), Request{}, 1536, 512)
+	if err == nil || err.Error() != "hard token admission unavailable" {
+		t.Fatalf("below-floor request reached transport: %v", err)
+	}
+}

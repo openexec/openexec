@@ -64,7 +64,7 @@ func (p *OpenAIProvider) EnableLocalOllamaBounds(ctx context.Context) bool {
 func (p *OpenAIProvider) SupportsHardTokenBudget() bool { return p.ollamaBudgetURL != "" }
 
 func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, inputCap, outputCap int) (*Response, error) {
-	if !p.SupportsHardTokenBudget() || inputCap < 1 || outputCap < 1 {
+	if !p.SupportsHardTokenBudget() || inputCap < 2048 || outputCap < 1 {
 		return nil, fmt.Errorf("hard token admission unavailable")
 	}
 	messages := []map[string]any{}

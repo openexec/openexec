@@ -73,3 +73,13 @@ func TestCLITokenGrantRefusedBeforeExecutableResolution(t *testing.T) {
 		t.Fatalf("unsupported grant reached CLI path: %v", err)
 	}
 }
+
+func TestHardBudgetLowRemainingRefusesBeforeInference(t *testing.T) {
+	for _, remaining := range []int64{1, 2048, 2730, 4095} {
+		a := &boundedFake{}
+		meter := &boundedAPIAdapter{ProviderAdapter: a, remaining: remaining}
+		if _, err := meter.Complete(context.Background(), agent.Request{}); err == nil || a.calls != 0 {
+			t.Fatalf("remaining %d admitted inference below native context floor", remaining)
+		}
+	}
+}
