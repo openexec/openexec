@@ -147,3 +147,44 @@ func TestHardBudgetKeepsAdmittedContextForSmallUnevenGrant(t *testing.T) {
 		t.Fatal("small known remainder did not yield without inference", err)
 	}
 }
+
+func TestHardBudgetFinalSynthesisPreservesGrantYield(t *testing.T) {
+	for _, wrapped := range []bool{false, true} {
+		t.Run(map[bool]string{false: "initial-synthesis", true: "synthesis-recovery"}[wrapped], func(t *testing.T) {
+			first := &boundedFake{fakeAPIAdapter: fakeAPIAdapter{responses: []*agent.Response{{Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: "read-1", ToolName: "read", ToolInput: []byte(`{}`)}}}}}}
+			historical := &historicalContextAdapter{}
+			var adapter agent.ProviderAdapter = first
+			grant := int64(4096)
+			if wrapped {
+				adapter = historical
+				grant = 65536
+			}
+			p, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, MaxSteps: 1, Tools: []agent.ToolDefinition{{Name: "read"}}, ToolExecutor: &recordingToolExecutor{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var receipt Event
+			result, err := p.Execute(context.Background(), Request{ID: "synthesis", WorkingDir: t.TempDir(), Prompt: "Continue", Model: "test-model", Sandbox: Sandbox{Mode: "read-only"}, TokenBudget: grant}, func(e Event) error {
+				if e.Type == EventUsage && e.UsageFinal {
+					receipt = e
+				}
+				return nil
+			})
+			if err != errHardTokenGrantExhausted || result.Outcome != OutcomeFailed || result.Reason == ReasonMaxTurns {
+				t.Fatalf("capacity yield swallowed as round limit: result%+v err%v", result, err)
+			}
+			used := int64(4096)
+			if wrapped {
+				used = 47462
+				if historical.calls != 2 {
+					t.Fatalf("extra synthesis request: %d", historical.calls)
+				}
+			} else if first.calls != 1 {
+				t.Fatalf("extra synthesis request: %d", first.calls)
+			}
+			if !receipt.UsageFinal || receipt.InputTokens+receipt.OutputTokens != used {
+				t.Fatalf("lost finalized receipt: %+v", receipt)
+			}
+		})
+	}
+}
