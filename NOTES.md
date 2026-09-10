@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [V3 bounded repair, 2026-09-10] Shrinking-context HTTP 400 diagnosed and
+  locally repaired on the existing token-admission line. Preserve the owner's
+  non-renewing grant; remaining delivery is exact-head review, guarded promotion
+  and a reserved live request. See docs/HARD_TOKEN_ADMISSION.md. No new grant.
+
 - [owner-experience evidence, 2026-09-03] Autonomous runs stopping after roughly
   30 minutes on a navigation budget defeats the core benefit: the owner should
   be able to leave while the system continues its task loop toward completion.

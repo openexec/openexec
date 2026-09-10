@@ -83,3 +83,67 @@ func TestHardBudgetLowRemainingRefusesBeforeInference(t *testing.T) {
 		}
 	}
 }
+
+// historicalContextAdapter reproduces the provider's reported usage from the
+// 2026-09-08 failure. The third prepared prompt was 23,462 tokens, while the
+// shrinking limiter requested only 16,026 context tokens and received HTTP 400.
+type historicalContextAdapter struct {
+	fakeAPIAdapter
+	calls  int
+	limits [][2]int
+}
+
+func (*historicalContextAdapter) SupportsHardTokenBudget() bool { return true }
+func (a *historicalContextAdapter) CompleteBounded(_ context.Context, _ agent.Request, input, output int) (*agent.Response, error) {
+	a.calls++
+	a.limits = append(a.limits, [2]int{input, output})
+	switch a.calls {
+	case 1:
+		return &agent.Response{Usage: agent.Usage{PromptTokens: 20700, CompletionTokens: 1298}, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: "read-1", ToolName: "read", ToolInput: []byte(`{}`)}}}, nil
+	case 2:
+		return &agent.Response{Usage: agent.Usage{PromptTokens: 23416, CompletionTokens: 2048}, Metadata: map[string]any{"thinking": "fixture"}}, nil
+	default:
+		if input < 23462 {
+			return nil, errors.New("bounded local inference HTTP 400: fixture prompt 23462 exceeds context")
+		}
+		return nil, errors.New("third inference must not be dispatched")
+	}
+}
+
+func TestHardBudgetHistoricalContextExhaustionYieldsBeforeHTTP(t *testing.T) {
+	a := &historicalContextAdapter{}
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: a, Tools: []agent.ToolDefinition{{Name: "read"}}, ToolExecutor: &recordingToolExecutor{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var final Event
+	_, err = p.Execute(context.Background(), Request{ID: "historical", WorkingDir: t.TempDir(), Prompt: "Continue retained work", Model: "test-model", Sandbox: Sandbox{Mode: "read-only"}, TokenBudget: 65536}, func(e Event) error {
+		if e.Type == EventUsage && e.UsageFinal {
+			final = e
+		}
+		return nil
+	})
+	if err != errHardTokenGrantExhausted || err.Error() != "hard token grant cannot admit another inference" {
+		t.Fatalf("wrapped recovery failed to preserve typed grant yield: %v", err)
+	}
+	if a.calls != 2 || len(a.limits) != 2 || a.limits[0] != [2]int{32768, 2048} || a.limits[1] != a.limits[0] {
+		t.Fatalf("inference context shrank or a third HTTP request escaped: %+v", a.limits)
+	}
+	if !final.UsageFinal || final.InputTokens != 44116 || final.OutputTokens != 3346 {
+		t.Fatalf("known consumption lost: %+v", final)
+	}
+}
+
+func TestHardBudgetKeepsAdmittedContextForSmallUnevenGrant(t *testing.T) {
+	a := &boundedFake{fakeAPIAdapter: fakeAPIAdapter{responses: []*agent.Response{{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "ok"}}}}}}
+	meter := &boundedAPIAdapter{ProviderAdapter: a, remaining: 7001}
+	if _, err := meter.Complete(context.Background(), agent.Request{}); err != nil {
+		t.Fatal(err)
+	}
+	if a.limits[0] != [2]int{4096, 2048} || meter.remaining != 857 {
+		t.Fatalf("unsafe native context or accounting: limits%v remaining%d", a.limits, meter.remaining)
+	}
+	if _, err := meter.Complete(context.Background(), agent.Request{}); err != errHardTokenGrantExhausted || a.calls != 1 || meter.unknown {
+		t.Fatal("small known remainder did not yield without inference", err)
+	}
+}

@@ -34,3 +34,25 @@ native execution path, not Agent Console deployment or generation-24 acceptance.
 Live refusal checks returned HTTP 400 for 8052 input tokens against a 2048
 context bound, and exactly 8 output tokens with done_reason length for an
 8-token output cap. These probes do not establish generation-24 acceptance.
+
+## Shrinking-context repair (2026-09-10)
+
+Run `8fdc19bbf162a4da425eacf00d001b71` reserved 65,536 tokens. Two
+requests used 20,700 + 1,298 and 23,416 + 2,048 tokens, totaling 47,462.
+The next admission reduced `num_ctx` to 16,026; the native server instantiated
+16,128 and rejected the 23,462-token prompt at 2026-09-08T11:32:11Z.
+The user-service Ollama journal retains that diagnostic. The adapter discarded
+the HTTP response body; this is not a recovered response-body receipt.
+
+The executor now retains one context allowance throughout the run, selected
+from 2,048 through 32,768 in powers of two within its initial reservation,
+with a 2,048-token output allowance. If the remaining capacity cannot reserve
+that same allowance, execution yields before HTTP with finalized known usage.
+The existing Console per-run yield can schedule a separately reserved successor
+within the unchanged generation. No prompt is truncated and no grant is enlarged.
+Unknown provider failures still retain uncertain reservations.
+
+The historical-sequence regression proves two requests, 47,462 finalized tokens
+and no third request, including the empty-response recovery path. Removing the
+admission guard makes it fail. Agent and execution package suites passed.
+This is local repair evidence, not deployment or a new successful live request.

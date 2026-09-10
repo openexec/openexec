@@ -153,6 +153,12 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		bounded.config.Adapter = meter
 		request.TokenBudget = 0
 		result, err := bounded.Execute(ctx, request, sink)
+		if errors.Is(err, errHardTokenGrantExhausted) {
+			// Empty-response/final-synthesis recovery may wrap this refusal.
+			// Preserve the existing typed transport spelling for Console's
+			// per-run yield, without normalizing unrelated provider failures.
+			err = errHardTokenGrantExhausted
+		}
 		if sink != nil {
 			if e := sink(Event{Type: EventUsage, InputTokens: meter.input, OutputTokens: meter.output, UsageFinal: !meter.unknown}); err == nil {
 				err = e

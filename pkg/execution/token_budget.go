@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/openexec/openexec/pkg/agent"
 )
@@ -17,16 +18,34 @@ type boundedAPIAdapter struct {
 	input, output int64
 	unknown       bool
 	sink          EventSink
+	contextCap    int64
 }
+
+var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
 
 func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*agent.Response, error) {
 	// Ollama may raise vision-capable model contexts to 2048 even for text.
 	// Keep the input reservation above that native floor before any inference.
 	if p.remaining < 4096 {
-		return nil, fmt.Errorf("hard token grant cannot admit another inference")
+		return nil, errHardTokenGrantExhausted
 	}
-	output := min(int64(2048), p.remaining/4)
-	input := min(int64(32768), p.remaining-output)
+	const output int64 = 2048
+	if p.contextCap == 0 {
+		// Admit one stable context for this execution, using native-sized
+		// powers of two. Do not shrink it as prior requests consume capacity:
+		// that made a valid 23K prompt reach a newly reduced 16K context.
+		p.contextCap = 2048
+		for next := p.contextCap * 2; next <= 32768 && next <= p.remaining-output; next *= 2 {
+			p.contextCap = next
+		}
+	}
+	input := p.contextCap
+	if p.remaining < input+output {
+		// Conservative admission is intentional: preserve all request content
+		// and yield known usage before HTTP, rather than guess token counts,
+		// truncate authority, or enlarge the remaining grant.
+		return nil, errHardTokenGrantExhausted
+	}
 	// Debit the worst case before inference. Unknown usage never returns capacity.
 	p.remaining -= input + output
 	res, err := p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, r, int(input), int(output))
