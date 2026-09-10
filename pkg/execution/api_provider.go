@@ -349,13 +349,14 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		Tools: p.config.Tools, ToolChoice: "none",
 	})
 	if err != nil {
-		if errors.Is(err, errHardTokenGrantExhausted) {
+		var contextOverflow *agent.ContextOverflowError
+		if errors.Is(err, errHardTokenGrantExhausted) || errors.As(err, &contextOverflow) {
 			// The tool-round limit does not erase a pre-dispatch capacity
 			// refusal, including one wrapped by synthesis recovery. Let the
 			// outer limiter emit finalized usage and the existing yield signal.
 			result.Outcome = OutcomeFailed
 			finish()
-			_ = sink(Event{Type: EventFailed, Text: errHardTokenGrantExhausted.Error()})
+			_ = sink(Event{Type: EventFailed, Text: err.Error()})
 			return result, err
 		}
 		message := fmt.Sprintf("API tool loop reached %d rounds and final synthesis failed: %v", p.config.MaxSteps, err)
