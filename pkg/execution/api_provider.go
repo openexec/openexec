@@ -153,6 +153,12 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		bounded.config.Adapter = meter
 		request.TokenBudget = 0
 		result, err := bounded.Execute(ctx, request, sink)
+		if errors.Is(err, errHardTokenGrantExhausted) {
+			// Empty-response/final-synthesis recovery may wrap this refusal.
+			// Preserve the existing typed transport spelling for Console's
+			// per-run yield, without normalizing unrelated provider failures.
+			err = errHardTokenGrantExhausted
+		}
 		if sink != nil {
 			if e := sink(Event{Type: EventUsage, InputTokens: meter.input, OutputTokens: meter.output, UsageFinal: !meter.unknown}); err == nil {
 				err = e
@@ -343,6 +349,15 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		Tools: p.config.Tools, ToolChoice: "none",
 	})
 	if err != nil {
+		if errors.Is(err, errHardTokenGrantExhausted) {
+			// The tool-round limit does not erase a pre-dispatch capacity
+			// refusal, including one wrapped by synthesis recovery. Let the
+			// outer limiter emit finalized usage and the existing yield signal.
+			result.Outcome = OutcomeFailed
+			finish()
+			_ = sink(Event{Type: EventFailed, Text: errHardTokenGrantExhausted.Error()})
+			return result, err
+		}
 		message := fmt.Sprintf("API tool loop reached %d rounds and final synthesis failed: %v", p.config.MaxSteps, err)
 		result.FinalText += message
 		result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
