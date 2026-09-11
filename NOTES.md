@@ -4,6 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [V3 retrieval-context repair, 2026-09-10] Paired with Agent Console's bounded
+  record retrieval/remote-fresh repair. Assembled native requests now receive
+  padded context estimation and typed refusal; exact duplicate results can be
+  reduced once without losing unique facts or granting capacity. Agent/execution
+  suites and negative controls passed. Exact review/deployment and live native
+  task advancement remain; estimates are not proof of tokenizer fit.
+
 - [V3 bounded repair, 2026-09-10] Shrinking-context HTTP 400 diagnosed and
   locally repaired on the existing token-admission line. Preserve the owner's
   non-renewing grant; remaining delivery is exact-head review, guarded promotion

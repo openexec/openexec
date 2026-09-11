@@ -49,6 +49,19 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 	// Debit the worst case before inference. Unknown usage never returns capacity.
 	p.remaining -= input + output
 	res, err := p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, r, int(input), int(output))
+	var overflow *agent.ContextOverflowError
+	if errors.As(err, &overflow) && !overflow.Dispatched {
+		// No inference was submitted. Rebuild once by removing only exact
+		// duplicate results. Unique obligations and owner authority stay intact.
+		if compacted, changed := compactRepeatedResults(r); changed {
+			res, err = p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, compacted, int(input), int(output))
+		}
+		overflow = nil
+		if errors.As(err, &overflow) && !overflow.Dispatched {
+			p.remaining += input + output
+			return nil, err
+		}
+	}
 	if err != nil {
 		p.unknown = true
 		return nil, err

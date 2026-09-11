@@ -116,6 +116,10 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	if err != nil {
 		return nil, err
 	}
+	messageCount, toolCount := boundedRequestShape(body)
+	if err := admitAssembledContext(body, inputCap, outputCap, messageCount, toolCount); err != nil {
+		return nil, err
+	}
 	wire, err := http.NewRequestWithContext(ctx, http.MethodPost, p.ollamaBudgetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -129,6 +133,14 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
+		// Retain only the classification, never raw provider content that may
+		// contain prompt text or credentials. The bounded body is diagnostic
+		// input, not evidence that an unsuccessful request consumed nothing.
+		diagnostic, _ := io.ReadAll(io.LimitReader(res.Body, 8192))
+		lower := strings.ToLower(string(diagnostic))
+		if res.StatusCode == 400 && strings.Contains(lower, "context") && (strings.Contains(lower, "exceed") || strings.Contains(lower, "too long")) {
+			return nil, &ContextOverflowError{EstimatedTokens: assembledContextEstimate(body, messageCount, toolCount), ContextTokens: inputCap, RequestBytes: len(body), Dispatched: true}
+		}
 		return nil, fmt.Errorf("bounded local inference HTTP %d", res.StatusCode)
 	}
 	var data struct {
