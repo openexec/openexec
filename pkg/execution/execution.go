@@ -24,8 +24,11 @@ type Sandbox struct {
 type Request struct {
 	// TokenBudget is a hard cumulative input+output grant for this execution.
 	TokenBudget int64
-	ID          string
-	WorkingDir  string
+	// ContextTokenLimit is an optional per-inference context ceiling, independent
+	// of cumulative capacity. Zero preserves legacy grant-derived sizing.
+	ContextTokenLimit int64
+	ID                string
+	WorkingDir        string
 	// ConfigDir is where this run's provider configuration is read from, when
 	// that is not the directory the work happens in.
 	//
@@ -197,8 +200,9 @@ type Streams struct {
 }
 
 type Capability struct {
-	HardTokenBudget bool `json:"hard_token_budget"`
-	Streaming       bool `json:"streaming"`
+	HardTokenBudget  bool `json:"hard_token_budget"`
+	HardContextLimit bool `json:"hard_context_limit"`
+	Streaming        bool `json:"streaming"`
 	// Resume is the provider continuing its own native session. Replay is the
 	// caller resending the conversation. They are different mechanisms with
 	// different owners, and a provider may have either, both, or neither — so

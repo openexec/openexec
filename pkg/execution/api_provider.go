@@ -101,7 +101,8 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	return ProviderDescriptor{
 		ID: p.config.Adapter.GetName(), Runtime: "api", Models: p.config.Adapter.GetModels(),
 		Capabilities: Capability{
-			HardTokenBudget: supportsHardTokens(p.config.Adapter),
+			HardTokenBudget:  supportsHardTokens(p.config.Adapter),
+			HardContextLimit: supportsHardTokens(p.config.Adapter),
 			// No native session to resume, and no need for one: the caller
 			// replays the conversation it already persisted.
 			Streaming: true, Resume: false, Replay: true, ToolGateway: p.gateway,
@@ -139,6 +140,9 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 }
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
+	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > 32768 || request.TokenBudget <= 0) {
+		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and 32768")
+	}
 	if request.TokenBudget < 0 {
 		return Result{}, fmt.Errorf("negative token grant")
 	}
@@ -149,9 +153,10 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		// Each Execute owns its limiter, including all empty-response retries and
 		// final synthesis. Never store a run budget on the shared provider.
 		bounded := *p
-		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink}
+		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink, contextLimit: request.ContextTokenLimit}
 		bounded.config.Adapter = meter
 		request.TokenBudget = 0
+		request.ContextTokenLimit = 0
 		result, err := bounded.Execute(ctx, request, sink)
 		if errors.Is(err, errHardTokenGrantExhausted) {
 			// Empty-response/final-synthesis recovery may wrap this refusal.

@@ -145,6 +145,18 @@ func TestAPIProviderRequiresName(t *testing.T) {
 // recordingProvider captures the request an API-runtime provider receives.
 type recordingProvider struct{ got execution.Request }
 
+func TestExecutionProtocolPreservesContextCeiling(t *testing.T) {
+	provider := &recordingProvider{}
+	input := `{"version":3,"operation":"execute","request":{"ID":"bounded","TokenBudget":65536,"ContextTokenLimit":16384}}`
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(), strings.NewReader(input), &output, staticProvider(provider)); err != nil {
+		t.Fatal(err)
+	}
+	if provider.got.ContextTokenLimit != 16384 || provider.got.TokenBudget != 65536 {
+		t.Fatalf("stdio lost independent context ceiling: %+v", provider.got)
+	}
+}
+
 func (p *recordingProvider) Descriptor() execution.ProviderDescriptor {
 	return execution.ProviderDescriptor{ID: "qwen-gpu0", Runtime: "api", Models: []string{liveOllamaModel}}
 }
