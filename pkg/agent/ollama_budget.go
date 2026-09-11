@@ -21,6 +21,19 @@ type HardTokenAdapter interface {
 	CompleteBounded(context.Context, Request, int, int) (*Response, error)
 }
 
+// NativeCompletionObservation contains only bounded protocol facts, never
+// response text, private reasoning, tool arguments or request content.
+type NativeCompletionObservation struct {
+	Reason       string `json:"reason"`
+	Input        int    `json:"input"`
+	Output       int    `json:"output"`
+	InputCap     int    `json:"inputCap"`
+	OutputCap    int    `json:"outputCap"`
+	HasText      bool   `json:"hasText"`
+	HasReasoning bool   `json:"hasReasoning"`
+	ToolCalls    int    `json:"toolCalls"`
+}
+
 // EnableLocalOllamaBounds negotiates only with the already configured loopback
 // endpoint. It does not probe with inference or contact a hosted fallback.
 func (p *OpenAIProvider) EnableLocalOllamaBounds(ctx context.Context) bool {
@@ -144,10 +157,11 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 		return nil, fmt.Errorf("bounded local inference HTTP %d", res.StatusCode)
 	}
 	var data struct {
-		Done    bool `json:"done"`
-		Prompt  *int `json:"prompt_eval_count"`
-		Output  *int `json:"eval_count"`
-		Message struct {
+		Done       bool   `json:"done"`
+		DoneReason string `json:"done_reason"`
+		Prompt     *int   `json:"prompt_eval_count"`
+		Output     *int   `json:"eval_count"`
+		Message    struct {
 			Content  string `json:"content"`
 			Thinking string `json:"thinking"`
 			Calls    []struct {
@@ -166,6 +180,19 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	}
 	p.observeNativeContext(body, *data.Prompt)
 	result := &Response{Model: req.Model, Usage: Usage{PromptTokens: *data.Prompt, CompletionTokens: *data.Output, TotalTokens: *data.Prompt + *data.Output}, Metadata: map[string]any{"thinking": data.Message.Thinking}}
+	// Whitelist native reasons: an unexpected provider string is not safe
+	// diagnostic text and must never escape into an owner-visible error.
+	reason := "unknown"
+	switch data.DoneReason {
+	case "stop", "length", "load", "unload":
+		reason = data.DoneReason
+	}
+	result.Metadata["native_completion"] = NativeCompletionObservation{
+		Reason: reason, Input: *data.Prompt, Output: *data.Output,
+		InputCap: inputCap, OutputCap: outputCap,
+		HasText:      strings.TrimSpace(data.Message.Content) != "",
+		HasReasoning: strings.TrimSpace(data.Message.Thinking) != "", ToolCalls: len(data.Message.Calls),
+	}
 	if data.Message.Content != "" {
 		result.Content = append(result.Content, ContentBlock{Type: ContentTypeText, Text: data.Message.Content})
 	}

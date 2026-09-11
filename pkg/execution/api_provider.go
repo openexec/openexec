@@ -407,18 +407,37 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 		return response, err
 	}
 	reasoningOnly := responseHasReasoning(response)
+	firstObservation := nativeCompletionEvidence(response)
 	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
 	response, err = p.config.Adapter.Complete(ctx, request)
 	if err != nil {
-		return nil, fmt.Errorf("API provider empty-response recovery failed: %w", err)
+		return nil, fmt.Errorf("API provider empty-response recovery failed%s: %w", firstObservation, err)
 	}
 	if responseHasVisibleOutcome(response) {
 		return response, nil
 	}
 	if reasoningOnly || responseHasReasoning(response) {
-		return nil, errors.New("API provider returned reasoning but neither assistant text nor tool calls after one recovery attempt")
+		return nil, fmt.Errorf("API provider returned reasoning but neither assistant text nor tool calls after one recovery attempt%s%s", firstObservation, nativeCompletionEvidence(response))
 	}
-	return nil, errors.New("API provider returned neither assistant text nor tool calls after one recovery attempt")
+	return nil, fmt.Errorf("API provider returned neither assistant text nor tool calls after one recovery attempt%s%s", firstObservation, nativeCompletionEvidence(response))
+}
+
+func nativeCompletionEvidence(response *agent.Response) string {
+	if response == nil {
+		return ""
+	}
+	observation, ok := response.Metadata["native_completion"].(agent.NativeCompletionObservation)
+	if !ok {
+		return ""
+	}
+	// Defense at the presentation boundary as well as the native parser.
+	switch observation.Reason {
+	case "stop", "length", "load", "unload":
+	default:
+		observation.Reason = "unknown"
+	}
+	raw, _ := json.Marshal(observation)
+	return " [native_completion=" + string(raw) + "]"
 }
 
 // completeFinalSynthesis has a stricter success contract than an ordinary
@@ -510,7 +529,8 @@ func responseHasReasoning(response *agent.Response) bool {
 		return false
 	}
 	reasoning, _ := response.Metadata["reasoning_content"].(string)
-	return strings.TrimSpace(reasoning) != ""
+	thinking, _ := response.Metadata["thinking"].(string)
+	return strings.TrimSpace(reasoning) != "" || strings.TrimSpace(thinking) != ""
 }
 
 func appendSystemInstruction(system, instruction string) string {
