@@ -117,7 +117,7 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 		return nil, err
 	}
 	messageCount, toolCount := boundedRequestShape(body)
-	if err := admitAssembledContext(body, inputCap, outputCap, messageCount, toolCount); err != nil {
+	if err := p.admitObservedContext(body, inputCap, outputCap, messageCount, toolCount); err != nil {
 		return nil, err
 	}
 	wire, err := http.NewRequestWithContext(ctx, http.MethodPost, p.ollamaBudgetURL, bytes.NewReader(body))
@@ -164,6 +164,7 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	if !data.Done || data.Prompt == nil || data.Output == nil || *data.Prompt < 0 || *data.Output < 0 || *data.Prompt > inputCap || *data.Output > outputCap {
 		return nil, fmt.Errorf("bounded local inference returned invalid usage")
 	}
+	p.observeNativeContext(body, *data.Prompt)
 	result := &Response{Model: req.Model, Usage: Usage{PromptTokens: *data.Prompt, CompletionTokens: *data.Output, TotalTokens: *data.Prompt + *data.Output}, Metadata: map[string]any{"thinking": data.Message.Thinking}}
 	if data.Message.Content != "" {
 		result.Content = append(result.Content, ContentBlock{Type: ContentTypeText, Text: data.Message.Content})
