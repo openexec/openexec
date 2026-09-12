@@ -103,6 +103,9 @@ func (p *AgentCLIProvider) Probe(ctx context.Context, dir string) Readiness {
 }
 
 func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventSink) (Result, error) {
+	if req.NonThinking {
+		return Result{}, fmt.Errorf("CLI cannot select validated native non-thinking mode")
+	}
 	if req.ContextTokenLimit != 0 {
 		return Result{}, fmt.Errorf("CLI cannot enforce a hard context limit")
 	}
