@@ -42,6 +42,13 @@ Sanitized native observations record whether non-thinking was requested.
 Metadata declares support; it is not live evidence of model compliance or
 useful task completion. Those require separately authorized execution evidence.
 
+The real-provider test `TestAPIProviderLiveOllama` requires explicit
+`OPENEXEC_LIVE_OLLAMA_TEST=1` before any network access. A listening local
+endpoint is not execution authorization. Set that opt-in only for separately
+authorized inference resources; ordinary test runs must leave it unset.
+`TestLiveOllamaRequiresOptInBeforeNetwork` invokes the actual live test with a
+network-denying stub, so removing the opt-in guard fails without inference.
+
 ## Protocol boundary
 
 `openexec execution-stdio` exposes protocol version 1 as JSON Lines. The
