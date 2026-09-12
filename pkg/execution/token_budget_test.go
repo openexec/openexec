@@ -7,6 +7,63 @@ import (
 	"testing"
 )
 
+func TestExplicitContextCeilingIndependentOfTotalGrant(t *testing.T) {
+	for _, tc := range []struct{ grant, ceiling, want int64 }{
+		{65536, 16384, 16384}, {250000, 16384, 16384},
+		{65536, 15000, 8192}, {7001, 16384, 4096}, {65536, 0, 32768},
+	} {
+		a := &boundedFake{fakeAPIAdapter: fakeAPIAdapter{responses: []*agent.Response{
+			{Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: "read-1", ToolName: "read", ToolInput: []byte(`{}`)}}},
+			{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "done"}}},
+		}}}
+		p, _ := NewAPIProvider(APIProviderConfig{Adapter: a, Tools: []agent.ToolDefinition{{Name: "read"}}, ToolExecutor: &recordingToolExecutor{}})
+		_, err := p.Execute(context.Background(), Request{ID: "bounded", WorkingDir: t.TempDir(), Prompt: "one action", Model: "test-model", Sandbox: Sandbox{Mode: "read-only"}, TokenBudget: tc.grant, ContextTokenLimit: tc.ceiling}, nil)
+		if err != nil && err != errHardTokenGrantExhausted {
+			t.Fatal(err)
+		}
+		if len(a.limits) == 0 {
+			t.Fatal("no inference")
+		}
+		for _, limits := range a.limits {
+			if limits != [2]int{int(tc.want), 2048} {
+				t.Fatalf("grant %d ceiling %d: limits %v", tc.grant, tc.ceiling, a.limits)
+			}
+		}
+		if tc.grant == 250000 && len(a.limits) != 2 {
+			t.Fatalf("second inference not exercised: %v", a.limits)
+		}
+	}
+}
+
+func TestExplicitContextCeilingRefusesInvalidAndUnsupported(t *testing.T) {
+	for _, tc := range []struct{ grant, ceiling int64 }{{65536, -1}, {65536, 2047}, {65536, 32769}, {0, 16384}} {
+		a := &boundedFake{}
+		p, _ := NewAPIProvider(APIProviderConfig{Adapter: a})
+		if _, err := p.Execute(context.Background(), Request{TokenBudget: tc.grant, ContextTokenLimit: tc.ceiling}, nil); err == nil || a.calls != 0 {
+			t.Fatalf("invalid ceiling executed: %+v", tc)
+		}
+	}
+	plain := &fakeAPIAdapter{}
+	p, _ := NewAPIProvider(APIProviderConfig{Adapter: plain})
+	if p.Descriptor().Capabilities.HardContextLimit {
+		t.Fatal("unsupported adapter advertises ceiling")
+	}
+	if _, err := p.Execute(context.Background(), Request{TokenBudget: 65536, ContextTokenLimit: 16384}, nil); err == nil || len(plain.requests) != 0 {
+		t.Fatal("unsupported ceiling executed")
+	}
+	bounded, _ := NewAPIProvider(APIProviderConfig{Adapter: &boundedFake{}})
+	if !bounded.Descriptor().Capabilities.HardContextLimit {
+		t.Fatal("missing enforced capability")
+	}
+	cli, _ := NewAgentCLIProvider(AgentCLIConfig{Kind: "codex", Binary: "/missing-cli"})
+	if cli.Descriptor().Capabilities.HardContextLimit {
+		t.Fatal("CLI advertises unsupported ceiling")
+	}
+	if _, err := cli.Execute(context.Background(), Request{ContextTokenLimit: 16384}, nil); err == nil || err.Error() != "CLI cannot enforce a hard context limit" {
+		t.Fatalf("ceiling reached CLI: %v", err)
+	}
+}
+
 type boundedFake struct {
 	fakeAPIAdapter
 	calls  int

@@ -19,6 +19,7 @@ type boundedAPIAdapter struct {
 	unknown       bool
 	sink          EventSink
 	contextCap    int64
+	contextLimit  int64
 }
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
@@ -35,7 +36,11 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		// powers of two. Do not shrink it as prior requests consume capacity:
 		// that made a valid 23K prompt reach a newly reduced 16K context.
 		p.contextCap = 2048
-		for next := p.contextCap * 2; next <= 32768 && next <= p.remaining-output; next *= 2 {
+		ceiling := int64(32768)
+		if p.contextLimit > 0 && p.contextLimit < ceiling {
+			ceiling = p.contextLimit
+		}
+		for next := p.contextCap * 2; next <= ceiling && next <= p.remaining-output; next *= 2 {
 			p.contextCap = next
 		}
 	}

@@ -4,6 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Bounded execution context ceiling, 2026-09-12] A larger cumulative grant
+  must not enlarge a bounded worker's authorized model context. Optional
+  ContextTokenLimit now caps native admission independently of TokenBudget;
+  hard_context_limit advertises enforcement, zero preserves legacy behavior.
+  Focused tests and a removed-ceiling falsifier passed. Live paired verification
+  remains owned by the Console recovery route; no provider was dispatched here.
+
 - [V3 retrieval-context repair, 2026-09-10] Paired with Agent Console's bounded
   record retrieval/remote-fresh repair. Assembled native requests now receive
   padded context estimation and typed refusal; exact duplicate results can be
