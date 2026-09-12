@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Non-inference readiness, 2026-09-12] APIProvider.Probe must never generate
+  tokens outside an execution reservation. OpenAI-compatible adapters now use
+  bounded GET model metadata; absent support is explicitly unknown, never a
+  completion fallback. Console's unknown-state consumer must remain compatible.
+  Focused HTTP fixtures and a restored-inference negative control passed; no
+  live inference was used. CLI probes use auth-status commands, with unknown
+  for unsupported status shapes. Both advertise non_inference_readiness so
+  Console can refuse older inference-producing probe implementations before
+  invoking them. Full validation and paired deployment remain.
+
 - [Bounded execution context ceiling, 2026-09-12] A larger cumulative grant
   must not enlarge a bounded worker's authorized model context. Optional
   ContextTokenLimit now caps native admission independently of TokenBudget;

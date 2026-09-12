@@ -200,9 +200,10 @@ type Streams struct {
 }
 
 type Capability struct {
-	HardTokenBudget  bool `json:"hard_token_budget"`
-	HardContextLimit bool `json:"hard_context_limit"`
-	Streaming        bool `json:"streaming"`
+	NonInferenceReadiness bool `json:"non_inference_readiness"`
+	HardTokenBudget       bool `json:"hard_token_budget"`
+	HardContextLimit      bool `json:"hard_context_limit"`
+	Streaming             bool `json:"streaming"`
 	// Resume is the provider continuing its own native session. Replay is the
 	// caller resending the conversation. They are different mechanisms with
 	// different owners, and a provider may have either, both, or neither — so
@@ -263,6 +264,8 @@ type ProviderDescriptor struct {
 type Readiness struct {
 	State   string `json:"state"`
 	Problem string `json:"problem,omitempty"`
+	// Check records the evidence scope; metadata readiness is not inference proof.
+	Check string `json:"check,omitempty"`
 }
 
 const (
@@ -270,6 +273,7 @@ const (
 	ReadinessNotInstalled = "not-installed"
 	ReadinessNeedsLogin   = "needs-login"
 	ReadinessUnhealthy    = "unhealthy"
+	ReadinessUnknown      = "unknown"
 )
 
 type Event struct {
