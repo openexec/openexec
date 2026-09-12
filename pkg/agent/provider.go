@@ -135,6 +135,8 @@ type ToolDefinition struct {
 
 // Request is the payload sent to a provider.
 type Request struct {
+	// NonThinking is a native protocol request, never a prompt instruction.
+	NonThinking bool `json:"non_thinking,omitempty"`
 	// Model is the model identifier (e.g., "claude-3-opus", "gpt-4", "gemini-pro")
 	Model string `json:"model"`
 

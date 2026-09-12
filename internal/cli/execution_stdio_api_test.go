@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -195,11 +196,16 @@ func TestExecutionProtocolResolvesDefaultModelForAPI(t *testing.T) {
 	}
 }
 
-// TestAPIProviderLiveOllama drives the protocol end to end against a real
-// local endpoint. Skipped when nothing is listening, like the other
-// environment-gated tests here.
+var liveOllamaDial = net.DialTimeout
+
+// Explicit opt-in is required before even dialing: a listening endpoint is
+// not authority to spend inference. Opt-in requires separate live-test resource
+// authorization; ordinary go test ./... must remain non-inferencing.
 func TestAPIProviderLiveOllama(t *testing.T) {
-	connection, err := net.DialTimeout("tcp", liveOllamaAddress, 300*time.Millisecond)
+	if os.Getenv("OPENEXEC_LIVE_OLLAMA_TEST") != "1" {
+		t.Skip("live inference requires explicit OPENEXEC_LIVE_OLLAMA_TEST=1 and separate resource authorization")
+	}
+	connection, err := liveOllamaDial("tcp", liveOllamaAddress, 300*time.Millisecond)
 	if err != nil {
 		t.Skipf("no local model endpoint on %s: %v", liveOllamaAddress, err)
 	}
@@ -238,4 +244,19 @@ func TestAPIProviderLiveOllama(t *testing.T) {
 		t.Fatal("no assistant text streamed from the local model")
 	}
 	t.Logf("local model replied: %.120q", strings.TrimSpace(text.String()))
+}
+
+func TestLiveOllamaRequiresOptInBeforeNetwork(t *testing.T) {
+	t.Setenv("OPENEXEC_LIVE_OLLAMA_TEST", "")
+	old := liveOllamaDial
+	t.Cleanup(func() { liveOllamaDial = old })
+	calls := 0
+	liveOllamaDial = func(string, string, time.Duration) (net.Conn, error) {
+		calls++
+		return nil, errors.New("test stub: no network or inference allowed")
+	}
+	t.Run("actual_live_test_without_authorization", TestAPIProviderLiveOllama)
+	if calls != 0 {
+		t.Fatal("live test reached network without explicit opt-in")
+	}
 }

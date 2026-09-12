@@ -22,6 +22,8 @@ type Sandbox struct {
 // Request is one authorized execution unit. Prompt is intentionally opaque to
 // the engine so callers can supply their own task instructions.
 type Request struct {
+	// NonThinking requires validated native model support and a hard grant.
+	NonThinking bool
 	// TokenBudget is a hard cumulative input+output grant for this execution.
 	TokenBudget int64
 	// ContextTokenLimit is an optional per-inference context ceiling, independent
@@ -200,9 +202,12 @@ type Streams struct {
 }
 
 type Capability struct {
-	HardTokenBudget  bool `json:"hard_token_budget"`
-	HardContextLimit bool `json:"hard_context_limit"`
-	Streaming        bool `json:"streaming"`
+	// NativeNonThinking can validate a model and request native non-thinking;
+	// it does not assert that every configured model supports this mode.
+	NativeNonThinking bool `json:"native_non_thinking"`
+	HardTokenBudget   bool `json:"hard_token_budget"`
+	HardContextLimit  bool `json:"hard_context_limit"`
+	Streaming         bool `json:"streaming"`
 	// Resume is the provider continuing its own native session. Replay is the
 	// caller resending the conversation. They are different mechanisms with
 	// different owners, and a provider may have either, both, or neither — so
