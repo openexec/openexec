@@ -65,8 +65,15 @@ func (p *OpenAIProvider) CheckModelMetadata(ctx context.Context, model string) e
 	if err := json.Unmarshal(body, &catalog); err != nil || catalog.Data == nil {
 		return fmt.Errorf("model metadata response has no valid catalog")
 	}
+	// Only a negotiated native Ollama endpoint has the documented implicit
+	// :latest tag (https://github.com/ollama/ollama/blob/main/docs/api.md).
+	// Hosted OpenAI-compatible catalogs and explicit tags remain exact.
+	nativeDefault := ""
+	if p.ollamaBudgetURL != "" && !strings.Contains(model[strings.LastIndex(model, "/")+1:], ":") && !strings.Contains(model, "@") {
+		nativeDefault = model + ":latest"
+	}
 	for _, entry := range catalog.Data {
-		if entry.ID == model {
+		if entry.ID == model || (nativeDefault != "" && entry.ID == nativeDefault) {
 			return nil
 		}
 	}
