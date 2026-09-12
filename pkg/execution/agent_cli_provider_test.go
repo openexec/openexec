@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,6 +126,40 @@ func TestAgentCLIProviderProbeClassifiesLogin(t *testing.T) {
 	readiness := provider.Probe(context.Background(), dir)
 	if readiness.State != ReadinessNeedsLogin {
 		t.Fatalf("readiness = %+v", readiness)
+	}
+}
+
+func TestAgentCLIReadinessUsesStatusNotInference(t *testing.T) {
+	for kind, arguments := range map[string]string{"claude": "auth status --json", "codex": "login status"} {
+		t.Run(kind, func(t *testing.T) {
+			dir := t.TempDir()
+			script := writeProviderScript(t, dir, kind, `printf '%s' "$*" >"${0%/*}/arguments"; printf '%s' '{"loggedIn":true}'`)
+			provider, _ := NewAgentCLIProvider(AgentCLIConfig{Kind: kind, Binary: script, SearchPath: dir})
+			got := provider.Probe(context.Background(), dir)
+			raw, _ := os.ReadFile(filepath.Join(dir, "arguments"))
+			if string(raw) != arguments || got.State != ReadinessReady || got.Check != "authentication-status" || !provider.Descriptor().Capabilities.NonInferenceReadiness {
+				t.Fatalf("unsafe readiness: args=%q state=%+v", raw, got)
+			}
+		})
+	}
+}
+
+func TestAgentCLIReadinessUnknownAndSignedOut(t *testing.T) {
+	for _, tc := range []struct {
+		output, state string
+		exit          int
+	}{
+		{`{"loggedIn":false}`, ReadinessNeedsLogin, 0},
+		{"unknown command auth: fixture-secret", ReadinessUnknown, 1},
+		{"unexpected fixture-secret output", ReadinessUnknown, 0},
+	} {
+		dir := t.TempDir()
+		script := writeProviderScript(t, dir, "claude", fmt.Sprintf("printf '%%s' '%s'; exit %d", tc.output, tc.exit))
+		provider, _ := NewAgentCLIProvider(AgentCLIConfig{Kind: "claude", Binary: script, SearchPath: dir})
+		got := provider.Probe(context.Background(), dir)
+		if got.State != tc.state || strings.Contains(got.Problem, "fixture-secret") {
+			t.Fatalf("unsafe readiness: %+v", got)
+		}
 	}
 }
 

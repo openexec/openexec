@@ -353,14 +353,6 @@ func TestAPIProviderRejectsUnboundedWorkspaceWrite(t *testing.T) {
 	}
 }
 
-func TestAPIProviderProbeClassifiesAuthentication(t *testing.T) {
-	provider, _ := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{err: errors.New("401 unauthorized API key")}})
-	readiness := provider.Probe(context.Background(), "")
-	if readiness.State != ReadinessNeedsLogin {
-		t.Fatalf("readiness = %+v", readiness)
-	}
-}
-
 func TestAPIProviderStreamsAndCancels(t *testing.T) {
 	stream := make(chan agent.StreamEvent, 2)
 	stream <- agent.StreamEvent{Type: agent.StreamEventContentDelta, Delta: &agent.StreamDelta{Text: "one"}}

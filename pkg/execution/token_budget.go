@@ -12,6 +12,11 @@ func supportsHardTokens(p agent.ProviderAdapter) bool {
 	return ok && b.SupportsHardTokenBudget()
 }
 
+func supportsNativeNonThinking(p agent.ProviderAdapter) bool {
+	b, ok := p.(agent.NativeNonThinkingAdapter)
+	return ok && b.SupportsNativeNonThinking()
+}
+
 type boundedAPIAdapter struct {
 	agent.ProviderAdapter
 	remaining     int64
@@ -20,11 +25,13 @@ type boundedAPIAdapter struct {
 	sink          EventSink
 	contextCap    int64
 	contextLimit  int64
+	nonThinking   bool
 }
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
 
 func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*agent.Response, error) {
+	r.NonThinking = p.nonThinking
 	// Ollama may raise vision-capable model contexts to 2048 even for text.
 	// Keep the input reservation above that native floor before any inference.
 	if p.remaining < 4096 {
@@ -83,6 +90,12 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 	if p.sink != nil {
 		if err = p.sink(Event{Type: EventUsage, InputTokens: p.input, OutputTokens: p.output}); err != nil {
 			return nil, err
+		}
+	}
+	if p.nonThinking {
+		thinking, _ := res.Metadata["thinking"].(string)
+		if thinking != "" {
+			return nil, fmt.Errorf("native provider ignored non-thinking mode")
 		}
 	}
 	return res, nil

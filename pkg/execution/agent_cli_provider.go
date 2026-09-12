@@ -45,7 +45,8 @@ func (p *AgentCLIProvider) Descriptor() ProviderDescriptor {
 	return ProviderDescriptor{
 		ID: p.config.Kind, Runtime: "cli", Models: append([]string(nil), p.config.Models...),
 		Capabilities: Capability{
-			Streaming: true, Resume: true, Cancellation: true, ReadOnly: true,
+			NonInferenceReadiness: true,
+			Streaming:             true, Resume: true, Cancellation: true, ReadOnly: true,
 			WorkspaceWrite: true, CommandNetwork: p.config.Kind == "codex", ToolCalling: true,
 		},
 	}
@@ -56,33 +57,55 @@ func (p *AgentCLIProvider) Probe(ctx context.Context, dir string) Readiness {
 	if err != nil {
 		return Readiness{State: ReadinessNotInstalled, Problem: err.Error()}
 	}
-	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var args []string
 	if p.config.Kind == "claude" {
-		args = []string{"-p", "Reply with exactly: ok", "--output-format", "text", "--permission-mode", "plan"}
+		args = []string{"auth", "status", "--json"}
 	} else {
-		args = []string{"exec", "-C", dir, "--sandbox", "read-only", "--skip-git-repo-check", "Reply with exactly: ok"}
+		args = []string{"login", "status"}
 	}
 	cmd := exec.CommandContext(probeCtx, bin, args...)
 	cmd.Dir, cmd.Env = dir, safeCLIEnv(p.config.SearchPath)
-	output, err := cmd.CombinedOutput()
+	var output bytes.Buffer
+	capture := &boundedWriter{writer: &output, remaining: 8192}
+	cmd.Stdout, cmd.Stderr = capture, capture
+	err = cmd.Run()
 	if err == nil {
-		return Readiness{State: ReadinessReady}
+		if p.config.Kind == "claude" {
+			var status struct {
+				LoggedIn *bool `json:"loggedIn"`
+			}
+			if json.Unmarshal(output.Bytes(), &status) != nil || status.LoggedIn == nil {
+				return Readiness{State: ReadinessUnknown, Check: "authentication-status", Problem: "authentication status format unavailable; inference not tested"}
+			}
+			if !*status.LoggedIn {
+				return Readiness{State: ReadinessNeedsLogin, Check: "authentication-status", Problem: "provider is not signed in"}
+			}
+		}
+		return Readiness{State: ReadinessReady, Check: "authentication-status"}
 	}
-	problem := compactOutput(output, err)
-	lower := strings.ToLower(problem)
-	state := ReadinessUnhealthy
-	for _, marker := range []string{"login", "log in", "auth", "credential", "unauthorized", "api key"} {
+	if probeCtx.Err() != nil {
+		return Readiness{State: ReadinessUnhealthy, Check: "authentication-status", Problem: "authentication status cancelled or timed out"}
+	}
+	lower := strings.ToLower(output.String())
+	for _, marker := range []string{"unknown", "unrecognized", "unsupported", "unexpected argument"} {
 		if strings.Contains(lower, marker) {
-			state = ReadinessNeedsLogin
-			break
+			return Readiness{State: ReadinessUnknown, Check: "authentication-status", Problem: "authentication status command unavailable; inference not tested"}
 		}
 	}
-	return Readiness{State: state, Problem: problem}
+	for _, marker := range []string{"login", "log in", "not logged in", "unauthorized", "credential"} {
+		if strings.Contains(lower, marker) {
+			return Readiness{State: ReadinessNeedsLogin, Check: "authentication-status", Problem: "provider is not signed in"}
+		}
+	}
+	return Readiness{State: ReadinessUnknown, Check: "authentication-status", Problem: "authentication status unavailable; inference not tested"}
 }
 
 func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventSink) (Result, error) {
+	if req.NonThinking {
+		return Result{}, fmt.Errorf("CLI cannot select validated native non-thinking mode")
+	}
 	if req.ContextTokenLimit != 0 {
 		return Result{}, fmt.Errorf("CLI cannot enforce a hard context limit")
 	}

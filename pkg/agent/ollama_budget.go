@@ -24,14 +24,15 @@ type HardTokenAdapter interface {
 // NativeCompletionObservation contains only bounded protocol facts, never
 // response text, private reasoning, tool arguments or request content.
 type NativeCompletionObservation struct {
-	Reason       string `json:"reason"`
-	Input        int    `json:"input"`
-	Output       int    `json:"output"`
-	InputCap     int    `json:"inputCap"`
-	OutputCap    int    `json:"outputCap"`
-	HasText      bool   `json:"hasText"`
-	HasReasoning bool   `json:"hasReasoning"`
-	ToolCalls    int    `json:"toolCalls"`
+	NonThinkingRequested bool   `json:"nonThinkingRequested,omitempty"`
+	Reason               string `json:"reason"`
+	Input                int    `json:"input"`
+	Output               int    `json:"output"`
+	InputCap             int    `json:"inputCap"`
+	OutputCap            int    `json:"outputCap"`
+	HasText              bool   `json:"hasText"`
+	HasReasoning         bool   `json:"hasReasoning"`
+	ToolCalls            int    `json:"toolCalls"`
 }
 
 // EnableLocalOllamaBounds negotiates only with the already configured loopback
@@ -125,7 +126,14 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 			tools = append(tools, map[string]any{"type": "function", "function": map[string]any{"name": t.Name, "description": t.Description, "parameters": t.InputSchema}})
 		}
 	}
-	body, err := json.Marshal(map[string]any{"model": req.Model, "messages": messages, "tools": tools, "stream": false, "truncate": false, "options": map[string]any{"num_ctx": inputCap, "num_predict": outputCap}})
+	wireBody := map[string]any{"model": req.Model, "messages": messages, "tools": tools, "stream": false, "truncate": false, "options": map[string]any{"num_ctx": inputCap, "num_predict": outputCap}}
+	if req.NonThinking {
+		if err := p.ValidateNativeNonThinking(ctx, req.Model); err != nil {
+			return nil, err
+		}
+		wireBody["think"] = false
+	}
+	body, err := json.Marshal(wireBody)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +196,8 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 		reason = data.DoneReason
 	}
 	result.Metadata["native_completion"] = NativeCompletionObservation{
-		Reason: reason, Input: *data.Prompt, Output: *data.Output,
+		NonThinkingRequested: req.NonThinking,
+		Reason:               reason, Input: *data.Prompt, Output: *data.Output,
 		InputCap: inputCap, OutputCap: outputCap,
 		HasText:      strings.TrimSpace(data.Message.Content) != "",
 		HasReasoning: strings.TrimSpace(data.Message.Thinking) != "", ToolCalls: len(data.Message.Calls),
