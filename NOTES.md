@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Console handover seam, 2026-09-13] Building on the validated PR #54 slice:
+  `Manager.Config.StageExecutor` admits Console execution without native/host
+  fallback; `PlanRequest.RequestID` + accepted `Intent` retain exact reviewed
+  plan IDs and import atomically using existing SQLite records. Console owns
+  only initial product assessment and fresh Goal review at stable boundaries.
+  Focused queue/repair, cancelled-review restart and import rollback checks
+  pass. Composed canonical review/publication and live brownfield delivery are
+  still outstanding; preserve the c7c2265 first-slice evidence as historical.
+
 - [OpenExec-first task route, 2026-09-13] Current feature:
   `feat/task-oriented-goal-loop`, design/acceptance in
   `docs/TASK_ORIENTED_GOAL_ROUTE.md`. Reuse the planner/reviewer prompts,

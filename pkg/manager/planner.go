@@ -24,6 +24,10 @@ import (
 
 // PlanRequest defines the input for a planning operation.
 type PlanRequest struct {
+	// RequestID binds a caller's accepted Goal/Ready/gap request to one durable
+	// reviewed plan. It is an identity, not new execution/effect authority.
+	RequestID  string `json:"request_id,omitempty"`
+	Intent     string `json:"intent,omitempty"`
 	IntentFile string `json:"intent_file"`
 	NoValidate bool   `json:"no_validate"`
 	AutoImport bool   `json:"auto_import"` // Automatically load stories into DB
@@ -55,6 +59,12 @@ func (e *PlanInputError) Error() string {
 
 // Plan executes the planning workflow on the server side (V1.0 Service).
 func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error) {
+	if req.RequestID != "" {
+		return m.replayReviewedPlan(ctx, req)
+	}
+	if req.Intent != "" {
+		return nil, &PlanInputError{Message: "in-memory intent requires a stable reviewed request ID"}
+	}
 	if req.Review && (m.cfg.PlanGenerator != nil || m.cfg.PlanReviewer != nil) &&
 		(m.cfg.PlanGenerator == nil || m.cfg.PlanReviewer == nil) {
 		return nil, fmt.Errorf("reviewed planning with admitted adapters requires both generator and reviewer; native fallback refused")
@@ -173,7 +183,7 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 		}
 		digest := sha256.Sum256(data)
 		reviewPath = filepath.Join(filepath.Dir(artifactPath), hex.EncodeToString(digest[:])+".review.json")
-		if err := os.WriteFile(reviewPath, data, 0600); err != nil {
+		if err := m.writePlanEvidence(reviewPath, data, 0600); err != nil {
 			return nil, fmt.Errorf("persist plan review: %w", err)
 		}
 		if !review.Approved {
@@ -222,16 +232,43 @@ func (m *Manager) writePlanArtifact(plan *planner.ProjectPlan) (planID, artifact
 
 	// Write to artifacts directory
 	dir := filepath.Join(m.cfg.WorkDir, ".openexec", "artifacts", "plans")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return planID, artifactHash, ""
-	}
-
 	artifactPath = filepath.Join(dir, artifactHash+".json")
-	if err := os.WriteFile(artifactPath, data, 0644); err != nil {
+	if err := m.writePlanEvidence(artifactPath, data, 0644); err != nil {
 		return planID, artifactHash, ""
 	}
 
 	return planID, artifactHash, artifactPath
+}
+
+// Root-relative I/O prevents candidate-controlled symlinks from escaping the
+// admitted workspace, including a swap after an ordinary path check.
+func (m *Manager) writePlanEvidence(path string, data []byte, mode os.FileMode) error {
+	root, err := os.OpenRoot(m.cfg.WorkDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	rel, err := filepath.Rel(m.cfg.WorkDir, path)
+	if err != nil {
+		return err
+	}
+	if err = root.MkdirAll(filepath.Dir(rel), 0755); err != nil {
+		return err
+	}
+	return root.WriteFile(rel, data, mode)
+}
+
+func (m *Manager) readPlanEvidence(path string) ([]byte, error) {
+	root, err := os.OpenRoot(m.cfg.WorkDir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	rel, err := filepath.Rel(m.cfg.WorkDir, path)
+	if err != nil {
+		return nil, err
+	}
+	return root.ReadFile(rel)
 }
 
 func (m *Manager) importPlan(plan *planner.ProjectPlan) error {

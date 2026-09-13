@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/knowledge"
@@ -92,6 +93,7 @@ type Manager struct {
 
 // Config defines settings for the manager.
 type Config struct {
+	StageExecutor blueprint.StageExecutor
 	// Optional admitted planning adapters. Nil preserves the configured CLI
 	// path. The task-oriented caller can supply its existing resource/effect
 	// boundary without the planner spawning an unaccounted nested provider.
@@ -167,29 +169,34 @@ func New(cfg Config) (*Manager, error) {
 		state:     cfg.StateStore,
 	}
 
-	// SELF-HEALING: Ghost State Cleanup
-	relMgr, err := m.GetInternalReleaseManager()
-	if err == nil {
-		tasks := relMgr.GetTasks()
-		resetCount := 0
-		for _, t := range tasks {
-			if t.Status == "running" || t.Status == "starting" {
-				t.Status = "pending"
-				_ = relMgr.UpdateTask(t)
-				resetCount++
+	// The admitted host owns process supervision. Constructor-time legacy
+	// cleanup must not rewrite another executor's live state before the queue
+	// acquires its workspace lock. Task-oriented recovery runs under that lock.
+	if cfg.StageExecutor == nil {
+		// SELF-HEALING: Ghost State Cleanup
+		relMgr, err := m.GetInternalReleaseManager()
+		if err == nil {
+			tasks := relMgr.GetTasks()
+			resetCount := 0
+			for _, t := range tasks {
+				if t.Status == "running" || t.Status == "starting" {
+					t.Status = "pending"
+					_ = relMgr.UpdateTask(t)
+					resetCount++
+				}
+			}
+			if resetCount > 0 {
+				log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
 			}
 		}
-		if resetCount > 0 {
-			log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
-		}
-	}
 
-	// SELF-HEALING: Orphan run cleanup
-	if m.state != nil {
-		if n, err := m.state.CleanupOrphanRuns(context.Background(), m.cfg.WorkDir); err != nil {
-			log.Printf("[Manager] Orphan run cleanup failed: %v", err)
-		} else if n > 0 {
-			log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
+		// SELF-HEALING: Orphan run cleanup
+		if m.state != nil {
+			if n, err := m.state.CleanupOrphanRuns(context.Background(), m.cfg.WorkDir); err != nil {
+				log.Printf("[Manager] Orphan run cleanup failed: %v", err)
+			} else if n > 0 {
+				log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
+			}
 		}
 	}
 
@@ -350,6 +357,7 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 	}
 
 	pCfg := pipeline.Config{
+		StageExecutor:        m.cfg.StageExecutor,
 		FWUID:                fwuID,
 		WorkDir:              m.cfg.WorkDir,
 		AgentsFS:             m.cfg.AgentsFS,
@@ -417,45 +425,47 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
-	var gateRunners []ptypesGateRunner
-	if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
-		gateRunners = append(gateRunners, &gateRunnerAdapter{runner: runner})
-	}
-	if projCfg == nil || projCfg.QualityGates.IsNoStubsEnabled() {
-		var overrides map[string]nostubs.Severity
-		if projCfg != nil && len(projCfg.QualityGates.NoStubsRules) > 0 {
-			overrides = make(map[string]nostubs.Severity, len(projCfg.QualityGates.NoStubsRules))
-			for k, v := range projCfg.QualityGates.NoStubsRules {
-				overrides[k] = nostubs.Severity(v)
+	if pCfg.StageExecutor == nil {
+		var gateRunners []ptypesGateRunner
+		if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
+			gateRunners = append(gateRunners, &gateRunnerAdapter{runner: runner})
+		}
+		if projCfg == nil || projCfg.QualityGates.IsNoStubsEnabled() {
+			var overrides map[string]nostubs.Severity
+			if projCfg != nil && len(projCfg.QualityGates.NoStubsRules) > 0 {
+				overrides = make(map[string]nostubs.Severity, len(projCfg.QualityGates.NoStubsRules))
+				for k, v := range projCfg.QualityGates.NoStubsRules {
+					overrides[k] = nostubs.Severity(v)
+				}
 			}
+			nsGate := nostubs.NewGate(m.cfg.WorkDir, nostubs.Config{RuleOverrides: overrides})
+			gateRunners = append(gateRunners, nsGate)
 		}
-		nsGate := nostubs.NewGate(m.cfg.WorkDir, nostubs.Config{RuleOverrides: overrides})
-		gateRunners = append(gateRunners, nsGate)
-	}
-	if projCfg == nil || projCfg.QualityGates.IsProductionReadyEnabled() {
-		var skip []string
-		if projCfg != nil && len(projCfg.QualityGates.ProductionReadySkip) > 0 {
-			skip = append(skip, projCfg.QualityGates.ProductionReadySkip...)
+		if projCfg == nil || projCfg.QualityGates.IsProductionReadyEnabled() {
+			var skip []string
+			if projCfg != nil && len(projCfg.QualityGates.ProductionReadySkip) > 0 {
+				skip = append(skip, projCfg.QualityGates.ProductionReadySkip...)
+			}
+			prGate := checklist.NewGate(m.cfg.WorkDir, checklist.Config{Skip: skip})
+			gateRunners = append(gateRunners, prGate)
 		}
-		prGate := checklist.NewGate(m.cfg.WorkDir, checklist.Config{Skip: skip})
-		gateRunners = append(gateRunners, prGate)
-	}
-	if len(gateRunners) > 0 {
-		pipeline.WithGateRunner(&compositeGateRunner{runners: gateRunners})(p)
-	}
+		if len(gateRunners) > 0 {
+			pipeline.WithGateRunner(&compositeGateRunner{runners: gateRunners})(p)
+		}
 
-	dr := router.NewDeterministicRouter()
-	pipeline.WithRouter(dr)(p)
+		dr := router.NewDeterministicRouter()
+		pipeline.WithRouter(dr)(p)
 
-	if projCfg != nil && projCfg.Execution.BitNetRouting {
-		br := router.NewBitNetRouter(projCfg.Execution.BitNetModel)
-		br.SetProjectDir(m.cfg.WorkDir)
-		pipeline.WithRouter(br)(p)
+		if projCfg != nil && projCfg.Execution.BitNetRouting {
+			br := router.NewBitNetRouter(projCfg.Execution.BitNetModel)
+			br.SetProjectDir(m.cfg.WorkDir)
+			pipeline.WithRouter(br)(p)
+		}
+
+		sr := skills.NewRegistry()
+		_ = sr.LoadAll(m.cfg.WorkDir)
+		pipeline.WithSkillRegistry(sr)(p)
 	}
-
-	sr := skills.NewRegistry()
-	_ = sr.LoadAll(m.cfg.WorkDir)
-	pipeline.WithSkillRegistry(sr)(p)
 
 	runCtx, runSpan := telemetry.StartRunSpan(ctx, fwuID, m.cfg.WorkDir, pCfg.ExecMode)
 	pipeCtx, cancel := context.WithCancel(runCtx)
