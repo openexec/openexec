@@ -14,10 +14,35 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
 func main() {
+	// The task-loop integration fixture uses the real CLI argument construction
+	// and task prompt, not an executor callback that marks tasks done. Only this
+	// test binary recognizes the opt-in marker inside its temporary workspace.
+	if _, err := os.Stat(".task-loop-fixture"); err == nil {
+		for i, arg := range os.Args {
+			if arg != "-p" || i+1 >= len(os.Args) {
+				continue
+			}
+			prompt := os.Args[i+1]
+			if strings.Contains(prompt, "Diagnose and repair the failed verification for task A.") {
+				if err := os.WriteFile("feature.txt", []byte("implemented and repaired\n"), 0600); err != nil {
+					panic(err)
+				}
+			}
+			if strings.Contains(prompt, "Finish remaining original task B") {
+				if err := os.WriteFile("remaining.txt", []byte("remaining work complete\n"), 0600); err != nil {
+					panic(err)
+				}
+			}
+			fmt.Println(`{"type":"system","subtype":"init","session_id":"fresh-task-fixture"}`)
+			fmt.Println(`{"type":"result","result":{"content":[{"type":"text","text":"Bounded fixture action finished."}]}}`)
+			return
+		}
+	}
 	scenario := "ok"
 	if len(os.Args) > 1 {
 		scenario = os.Args[1]

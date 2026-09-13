@@ -11,14 +11,15 @@ import (
 
 // GateResult holds the result of running a single gate.
 type GateResult struct {
-	Name      string        `json:"name"`
-	Passed    bool          `json:"passed"`
-	Output    string        `json:"output"`
-	Error     string        `json:"error,omitempty"`
-	Duration  time.Duration `json:"duration_ms"`
-	ExitCode  int           `json:"exit_code"`
-	IsWarning bool          `json:"is_warning,omitempty"`
-	FixHint   string        `json:"fix_hint,omitempty"`
+	verifiedExit bool          // Set only by the local command runner, never report JSON.
+	Name         string        `json:"name"`
+	Passed       bool          `json:"passed"`
+	Output       string        `json:"output"`
+	Error        string        `json:"error,omitempty"`
+	Duration     time.Duration `json:"duration_ms"`
+	ExitCode     int           `json:"exit_code"`
+	IsWarning    bool          `json:"is_warning,omitempty"`
+	FixHint      string        `json:"fix_hint,omitempty"`
 }
 
 // GateReport holds results from running all gates.
@@ -150,6 +151,7 @@ func (r *Runner) RunGate(ctx context.Context, name string) GateResult {
 			result.ExitCode = -1
 		}
 		result.Error = err.Error()
+		result.verifiedExit = gateCtx.Err() == nil && result.ExitCode > 0 && result.ExitCode < 126
 
 		// Check if warning mode
 		if gate.Mode == "warning" {

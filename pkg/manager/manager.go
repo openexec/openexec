@@ -3,18 +3,21 @@ package manager
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/gofrs/flock"
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/config"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/knowledge"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/pipeline"
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality/checklist"
 	"github.com/openexec/openexec/internal/quality/nostubs"
@@ -44,48 +47,58 @@ const (
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
 type PipelineInfo struct {
-	FWUID         string         `json:"fwu_id"`
-	Status        PipelineStatus `json:"status"`
-	Stage         string         `json:"stage,omitempty"` // current blueprint stage
-	Agent         string         `json:"agent,omitempty"`
-	Iteration     int            `json:"iteration,omitempty"`
-	ReviewCycles  int            `json:"review_cycles,omitempty"`
-	StartedAt     time.Time      `json:"started_at"`
-	Elapsed       string         `json:"elapsed"`
-	Error         string         `json:"error,omitempty"`
-	LastActivity  time.Time      `json:"last_activity"`
-	CurrentPID    int            `json:"current_pid,omitempty"`
-	DroppedEvents int            `json:"dropped_events,omitempty"`
-	DoneTasks     int            `json:"done_tasks"`
-	TotalTasks    int            `json:"total_tasks"`
+	FailureEvidenceID string         `json:"failure_evidence_id,omitempty"`
+	FWUID             string         `json:"fwu_id"`
+	Status            PipelineStatus `json:"status"`
+	Stage             string         `json:"stage,omitempty"` // current blueprint stage
+	Agent             string         `json:"agent,omitempty"`
+	Iteration         int            `json:"iteration,omitempty"`
+	ReviewCycles      int            `json:"review_cycles,omitempty"`
+	StartedAt         time.Time      `json:"started_at"`
+	Elapsed           string         `json:"elapsed"`
+	Error             string         `json:"error,omitempty"`
+	LastActivity      time.Time      `json:"last_activity"`
+	CurrentPID        int            `json:"current_pid,omitempty"`
+	DroppedEvents     int            `json:"dropped_events,omitempty"`
+	DoneTasks         int            `json:"done_tasks"`
+	TotalTasks        int            `json:"total_tasks"`
 }
 
 type entry struct {
-	pipeline *pipeline.Pipeline
-	info     PipelineInfo
-	cancel   context.CancelFunc
-	subs     []chan loop.Event
-	subsMu   sync.Mutex
-	drops    int
-	stepSeq  int
-	traceID  string
-	runSpan  trace.Span // OTel span for the entire run lifecycle
+	taskAttempt int // Durable attempt binding, independent of provider iteration.
+	done        chan struct{}
+	pipeline    *pipeline.Pipeline
+	info        PipelineInfo
+	cancel      context.CancelFunc
+	subs        []chan loop.Event
+	subsMu      sync.Mutex
+	drops       int
+	stepSeq     int
+	traceID     string
+	runSpan     trace.Span // OTel span for the entire run lifecycle
 }
 
 // Manager orchestrates multiple concurrent FWU pipelines.
 type Manager struct {
-	cfg       Config
-	pipelines map[string]*entry
-	mu        sync.RWMutex
-	watchdog  *Watchdog
-	state     *state.Store
-	cancel    context.CancelFunc // Cancels watchdog goroutine
-	relMu     sync.Mutex         // Serializes release manager creation
-	rel       *release.Manager   // Cached release manager
+	cfg             Config
+	pipelines       map[string]*entry
+	mu              sync.RWMutex
+	watchdog        *Watchdog
+	state           *state.Store
+	cancel          context.CancelFunc // Cancels watchdog goroutine
+	relMu           sync.Mutex         // Serializes release manager creation
+	rel             *release.Manager   // Cached release manager
+	taskQueueActive bool               // Single task-oriented queue; guarded by mu.
 }
 
 // Config defines settings for the manager.
 type Config struct {
+	StageExecutor blueprint.StageExecutor
+	// Optional admitted planning adapters. Nil preserves the configured CLI
+	// path. The task-oriented caller can supply its existing resource/effect
+	// boundary without the planner spawning an unaccounted nested provider.
+	PlanGenerator        planner.LLMProvider
+	PlanReviewer         planner.LLMProvider
 	WorkDir              string
 	AgentsFS             fs.FS
 	LogDir               string
@@ -108,12 +121,12 @@ type Config struct {
 	AuditLogger          audit.Logger
 	PIIScrubLevel        string
 
-// WatchdogStallThreshold overrides how long a pipeline may be inactive before
-// the watchdog treats it as stalled. Zero keeps the default.
+	// WatchdogStallThreshold overrides how long a pipeline may be inactive before
+	// the watchdog treats it as stalled. Zero keeps the default.
 	WatchdogStallThreshold time.Duration
 
-// WatchdogCheckInterval overrides how often the watchdog scans pipelines.
-// Zero keeps the default.
+	// WatchdogCheckInterval overrides how often the watchdog scans pipelines.
+	// Zero keeps the default.
 	WatchdogCheckInterval time.Duration
 }
 
@@ -156,29 +169,34 @@ func New(cfg Config) (*Manager, error) {
 		state:     cfg.StateStore,
 	}
 
-	// SELF-HEALING: Ghost State Cleanup
-	relMgr, err := m.GetInternalReleaseManager()
-	if err == nil {
-		tasks := relMgr.GetTasks()
-		resetCount := 0
-		for _, t := range tasks {
-			if t.Status == "running" || t.Status == "starting" {
-				t.Status = "pending"
-				_ = relMgr.UpdateTask(t)
-				resetCount++
+	// The admitted host owns process supervision. Constructor-time legacy
+	// cleanup must not rewrite another executor's live state before the queue
+	// acquires its workspace lock. Task-oriented recovery runs under that lock.
+	if cfg.StageExecutor == nil {
+		// SELF-HEALING: Ghost State Cleanup
+		relMgr, err := m.GetInternalReleaseManager()
+		if err == nil {
+			tasks := relMgr.GetTasks()
+			resetCount := 0
+			for _, t := range tasks {
+				if t.Status == "running" || t.Status == "starting" {
+					t.Status = "pending"
+					_ = relMgr.UpdateTask(t)
+					resetCount++
+				}
+			}
+			if resetCount > 0 {
+				log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
 			}
 		}
-		if resetCount > 0 {
-			log.Printf("[Manager] ✨ Self-Healed: Reset %d ghost tasks to pending", resetCount)
-		}
-	}
 
-	// SELF-HEALING: Orphan run cleanup
-	if m.state != nil {
-		if n, err := m.state.CleanupOrphanRuns(context.Background(), m.cfg.WorkDir); err != nil {
-			log.Printf("[Manager] Orphan run cleanup failed: %v", err)
-		} else if n > 0 {
-			log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
+		// SELF-HEALING: Orphan run cleanup
+		if m.state != nil {
+			if n, err := m.state.CleanupOrphanRuns(context.Background(), m.cfg.WorkDir); err != nil {
+				log.Printf("[Manager] Orphan run cleanup failed: %v", err)
+			} else if n > 0 {
+				log.Printf("[Manager] ✨ Self-Healed: Marked %d orphan runs as stopped", n)
+			}
 		}
 	}
 
@@ -299,19 +317,47 @@ func WithTaskDescription(description string) StartOption {
 
 // Start launches a new pipeline.
 func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) error {
+	return m.start(ctx, fwuID, false, opts...)
+}
+
+// start is shared by public one-task execution and the sequential task queue.
+// Queue ownership is private control flow, not a transferable context token.
+func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts ...StartOption) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.taskQueueActive && !queueOwned {
+		return fmt.Errorf("task-oriented queue owns sequential execution")
+	}
 
-	if e, ok := m.pipelines[fwuID]; ok && !isTerminal(e.info.Status) {
+	if e, ok := m.pipelines[fwuID]; ok && !entryFinished(e) {
 		return fmt.Errorf("pipeline %s already active (status: %s)", fwuID, e.info.Status)
 	}
+	var executionLock *flock.Flock
+	if !queueOwned {
+		var err error
+		executionLock, err = m.lockTaskExecution(false)
+		if err != nil {
+			return err
+		}
+	}
+	started := false
+	defer func() {
+		if !started && executionLock != nil {
+			_ = executionLock.Close()
+		}
+	}()
 
 	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return fmt.Errorf("load release manager: %w", err)
 	}
+	var taskAttempt int
+	if task, err := rel.TaskSnapshot(ctx, fwuID); err == nil {
+		taskAttempt = task.AttemptCount
+	}
 
 	pCfg := pipeline.Config{
+		StageExecutor:        m.cfg.StageExecutor,
 		FWUID:                fwuID,
 		WorkDir:              m.cfg.WorkDir,
 		AgentsFS:             m.cfg.AgentsFS,
@@ -379,51 +425,55 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 
 	p, events := pipeline.NewWithFactory(pCfg, factory)
 
-	var gateRunners []ptypesGateRunner
-	if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
-		gateRunners = append(gateRunners, &gateRunnerAdapter{runner: runner})
-	}
-	if projCfg == nil || projCfg.QualityGates.IsNoStubsEnabled() {
-		var overrides map[string]nostubs.Severity
-		if projCfg != nil && len(projCfg.QualityGates.NoStubsRules) > 0 {
-			overrides = make(map[string]nostubs.Severity, len(projCfg.QualityGates.NoStubsRules))
-			for k, v := range projCfg.QualityGates.NoStubsRules {
-				overrides[k] = nostubs.Severity(v)
+	if pCfg.StageExecutor == nil {
+		var gateRunners []ptypesGateRunner
+		if runner, err := gates.NewRunner(m.cfg.WorkDir, 5*time.Minute); err == nil {
+			gateRunners = append(gateRunners, &gateRunnerAdapter{runner: runner})
+		}
+		if projCfg == nil || projCfg.QualityGates.IsNoStubsEnabled() {
+			var overrides map[string]nostubs.Severity
+			if projCfg != nil && len(projCfg.QualityGates.NoStubsRules) > 0 {
+				overrides = make(map[string]nostubs.Severity, len(projCfg.QualityGates.NoStubsRules))
+				for k, v := range projCfg.QualityGates.NoStubsRules {
+					overrides[k] = nostubs.Severity(v)
+				}
 			}
+			nsGate := nostubs.NewGate(m.cfg.WorkDir, nostubs.Config{RuleOverrides: overrides})
+			gateRunners = append(gateRunners, nsGate)
 		}
-		nsGate := nostubs.NewGate(m.cfg.WorkDir, nostubs.Config{RuleOverrides: overrides})
-		gateRunners = append(gateRunners, nsGate)
-	}
-	if projCfg == nil || projCfg.QualityGates.IsProductionReadyEnabled() {
-		var skip []string
-		if projCfg != nil && len(projCfg.QualityGates.ProductionReadySkip) > 0 {
-			skip = append(skip, projCfg.QualityGates.ProductionReadySkip...)
+		if projCfg == nil || projCfg.QualityGates.IsProductionReadyEnabled() {
+			var skip []string
+			if projCfg != nil && len(projCfg.QualityGates.ProductionReadySkip) > 0 {
+				skip = append(skip, projCfg.QualityGates.ProductionReadySkip...)
+			}
+			prGate := checklist.NewGate(m.cfg.WorkDir, checklist.Config{Skip: skip})
+			gateRunners = append(gateRunners, prGate)
 		}
-		prGate := checklist.NewGate(m.cfg.WorkDir, checklist.Config{Skip: skip})
-		gateRunners = append(gateRunners, prGate)
-	}
-	if len(gateRunners) > 0 {
-		pipeline.WithGateRunner(&compositeGateRunner{runners: gateRunners})(p)
-	}
+		if len(gateRunners) > 0 {
+			pipeline.WithGateRunner(&compositeGateRunner{runners: gateRunners})(p)
+		}
 
-	dr := router.NewDeterministicRouter()
-	pipeline.WithRouter(dr)(p)
+		dr := router.NewDeterministicRouter()
+		pipeline.WithRouter(dr)(p)
 
-	if projCfg != nil && projCfg.Execution.BitNetRouting {
-		br := router.NewBitNetRouter(projCfg.Execution.BitNetModel)
-		br.SetProjectDir(m.cfg.WorkDir)
-		pipeline.WithRouter(br)(p)
+		if projCfg != nil && projCfg.Execution.BitNetRouting {
+			br := router.NewBitNetRouter(projCfg.Execution.BitNetModel)
+			br.SetProjectDir(m.cfg.WorkDir)
+			pipeline.WithRouter(br)(p)
+		}
+
+		sr := skills.NewRegistry()
+		_ = sr.LoadAll(m.cfg.WorkDir)
+		pipeline.WithSkillRegistry(sr)(p)
 	}
-
-	sr := skills.NewRegistry()
-	_ = sr.LoadAll(m.cfg.WorkDir)
-	pipeline.WithSkillRegistry(sr)(p)
 
 	runCtx, runSpan := telemetry.StartRunSpan(ctx, fwuID, m.cfg.WorkDir, pCfg.ExecMode)
 	pipeCtx, cancel := context.WithCancel(runCtx)
 
 	e := &entry{
-		pipeline: p,
+		taskAttempt: taskAttempt,
+		done:        make(chan struct{}),
+		pipeline:    p,
 		info: PipelineInfo{
 			FWUID:     fwuID,
 			Status:    StatusStarting,
@@ -438,12 +488,18 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		_ = m.state.CreateRun(ctx, fwuID, "", "", m.cfg.WorkDir, pCfg.ExecMode)
 	}
 
-	go m.consumeEvents(fwuID, events)
+	eventsDone := make(chan struct{})
+	go func() { defer close(eventsDone); m.consumeEvents(fwuID, events) }()
 	go func() {
+		defer close(e.done)
+		if executionLock != nil {
+			defer executionLock.Close()
+		}
 		log.Printf("[Manager] Pipeline %s: running", fwuID)
 		err := p.Run(pipeCtx)
+		<-eventsDone // Terminal evidence must persist before the attempt is settled.
 		m.mu.Lock()
-		if e, ok := m.pipelines[fwuID]; ok {
+		if current, ok := m.pipelines[fwuID]; ok && current == e {
 			if err != nil && !isTerminal(e.info.Status) {
 				e.info.Status = StatusError
 				e.info.Error = err.Error()
@@ -455,6 +511,7 @@ func (m *Manager) Start(ctx context.Context, fwuID string, opts ...StartOption) 
 		}
 		m.mu.Unlock()
 	}()
+	started = true
 	return nil
 }
 
@@ -467,6 +524,9 @@ func (m *Manager) Stop(fwuID string) error {
 		return nil
 	}
 	e.info.Status = StatusStopped
+	if e.cancel != nil {
+		e.cancel() // Deterministic checks share the attempt context too.
+	}
 	e.pipeline.Stop()
 	return nil
 }
@@ -575,7 +635,7 @@ type gateRunnerAdapter struct {
 func (a *gateRunnerAdapter) RunAll(ctx context.Context) error {
 	report := a.runner.RunAll(ctx)
 	if !report.Passed {
-		return fmt.Errorf("%s", report.Summary)
+		return gates.NewFailure(report)
 	}
 	return nil
 }
@@ -594,14 +654,14 @@ type compositeGateRunner struct {
 }
 
 func (c *compositeGateRunner) RunAll(ctx context.Context) error {
-	var errs []string
+	var errs []error
 	for _, r := range c.runners {
 		if err := r.RunAll(ctx); err != nil {
-			errs = append(errs, err.Error())
+			errs = append(errs, err)
 		}
 	}
 	if len(errs) == 0 {
 		return nil
 	}
-	return fmt.Errorf("quality gates failed: %s", strings.Join(errs, "; "))
+	return fmt.Errorf("quality gates failed: %w", errors.Join(errs...))
 }

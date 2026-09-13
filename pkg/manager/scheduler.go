@@ -13,9 +13,11 @@ import (
 
 // RunOptions defines settings for executing multiple tasks.
 type RunOptions struct {
-	MaxParallel int    `json:"worker_count"` // Fix mismatch: CLI sends worker_count
-	IsStudy     bool   `json:"is_study"`
-	Mode        string `json:"mode"`
+	TaskOriented bool     `json:"task_oriented,omitempty"`
+	StoryIDs     []string `json:"story_ids,omitempty"`
+	MaxParallel  int      `json:"worker_count"` // Fix mismatch: CLI sends worker_count
+	IsStudy      bool     `json:"is_study"`
+	Mode         string   `json:"mode"`
 }
 
 // filterAutoDispatchable splits pending tasks into auto-dispatchable tasks and
@@ -87,6 +89,9 @@ func holdReason(t *release.Task) string {
 
 // ExecuteTasks runs all pending tasks in the dependency graph.
 func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
+	if opts.TaskOriented {
+		return m.executeTaskQueue(ctx, opts)
+	}
 	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return err

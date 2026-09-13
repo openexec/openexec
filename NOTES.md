@@ -4,6 +4,27 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Console handover seam, 2026-09-13] Building on the validated PR #54 slice:
+  `Manager.Config.StageExecutor` admits Console execution without native/host
+  fallback; `PlanRequest.RequestID` + accepted `Intent` retain exact reviewed
+  plan IDs and import atomically using existing SQLite records. Console owns
+  only initial product assessment and fresh Goal review at stable boundaries.
+  Focused queue/repair, cancelled-review restart and import rollback checks
+  pass. Composed canonical review/publication and live brownfield delivery are
+  still outstanding; preserve the c7c2265 first-slice evidence as historical.
+
+- [OpenExec-first task route, 2026-09-13] Current feature:
+  `feat/task-oriented-goal-loop`, design/acceptance in
+  `docs/TASK_ORIENTED_GOAL_ROUTE.md`. Reuse the planner/reviewer prompts,
+  SQLite task ledger and blueprint engine. Opt-in sequential queue derives
+  one same-story repair from a trusted failed-check receipt and resumes the
+  original task; controlled-provider integration and restart tests exercise
+  actual processes and files. This is not native/deployed Goal convergence.
+  Next: finish independent review/full compatibility validation, then bridge
+  Console admission/effects to this engine; do not enable the old unrestricted
+  host command path or inherit expired grants. The outer fresh Goal review,
+  second planning pass and long brownfield proof remain unfinished.
+
 - [Non-inference readiness, 2026-09-12] APIProvider.Probe must never generate
   tokens outside an execution reservation. OpenAI-compatible adapters now use
   bounded GET model metadata; absent support is explicitly unknown, never a

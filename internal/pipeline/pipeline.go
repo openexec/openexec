@@ -19,6 +19,7 @@ import (
 	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
@@ -35,6 +36,8 @@ import (
 
 // Config controls pipeline behavior.
 type Config struct {
+	// StageExecutor supplies admitted execution; nil retains standalone execution.
+	StageExecutor        blueprint.StageExecutor
 	FWUID                string
 	WorkDir              string
 	AgentsFS             fs.FS
@@ -360,7 +363,7 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 // If BlueprintID is empty, it defaults to "standard_task".
 func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Deterministic routing: classify task and set context parameters
-	if p.intentRouter != nil && p.cfg.TaskDescription != "" {
+	if p.cfg.StageExecutor == nil && p.intentRouter != nil && p.cfg.TaskDescription != "" {
 		// Pass a real toolset registry so RoutingPlan.Toolset gets populated
 		// via intent-based lookup as well as the keyword selector. Previously
 		// nil, which forced selectToolset down its keyword-only path.
@@ -385,7 +388,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	// Pre-resolve symbols from task description (Layer 2)
-	if p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
+	if p.cfg.StageExecutor == nil && p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
 		pr := &PreResolver{}
 		preResolved := pr.Resolve(ctx, p.cfg.TaskDescription, p.cfg.WorkDir, p.cfg.StateDB)
 		if preResolved != "" {
@@ -395,7 +398,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	// Build context using two-stage assembly
 	var contextPack *ocontext.ContextPack
-	if p.cfg.ContextTokenBudget > 0 {
+	if p.cfg.StageExecutor == nil && p.cfg.ContextTokenBudget > 0 {
 		pack, err := ocontext.BuildContextWithRouting(
 			ctx,
 			p.cfg.WorkDir,
@@ -475,40 +478,55 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	// Override lint/test commands from project config
+	verificationStages := make(map[*blueprint.Stage]bool)
 	if projCfg, err := project.LoadProjectConfig(p.cfg.WorkDir); err == nil {
 		if lint, ok := bp.Stages["lint"]; ok && len(projCfg.Execution.LintCommands) > 0 {
 			lint.Commands = projCfg.Execution.LintCommands
+			verificationStages[lint] = true
 		}
 		if test, ok := bp.Stages["test"]; ok && len(projCfg.Execution.TestCommands) > 0 {
 			test.Commands = projCfg.Execution.TestCommands
+			verificationStages[test] = true
 		}
 	}
 
 	// Create executor with agentic runner
-	executor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
-	executor.ActionRegistry = actions.DefaultRegistry(p.cfg.WorkDir)
+	trustedGates := &gateRunnerAction{runner: p.gateRunner}
+	var executor blueprint.StageExecutor
+	if p.cfg.StageExecutor != nil {
+		executor = admittedStageExecutor{executor: p.cfg.StageExecutor, evidence: trustedGates}
+	} else {
+		defaultExecutor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
+		defaultExecutor.ActionRegistry = actions.DefaultRegistry(p.cfg.WorkDir)
+		defaultExecutor.VerificationStages = verificationStages
+		if p.gateRunner != nil {
+			defaultExecutor.ActionRegistry.Overwrite(trustedGates)
+		}
+		defaultExecutor.OnVerificationFailure = func(stage *blueprint.Stage, err error) {
+			trustedGates.receipt = gates.VerificationFailureArtifacts(err)
+		}
 
-	// If a custom gate runner is provided (e.g. by tests), register it as the 'run_gates' action
-	if p.gateRunner != nil {
-		executor.ActionRegistry.Overwrite(&gateRunnerAction{runner: p.gateRunner})
-	}
-
-	// Set up agentic runner that wraps a bounded loop
-	executor.AgenticRunner = &blueprint.LoopAgenticRunner{
-		MaxIterations: p.cfg.DefaultMaxIterations,
-		LoopFactory: func(stageName string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
-			// Model tiering: Use ReviewerModel for review stage if configured
-			model := p.cfg.ExecutorModel
-			if stageName == "review" && p.cfg.ReviewerModel != "" {
-				model = p.cfg.ReviewerModel
-			}
-			return p.createAgenticLoop(ctx, model, prompt, workDir, maxIterations)
-		},
+		// Set up agentic runner that wraps a bounded loop
+		defaultExecutor.AgenticRunner = &blueprint.LoopAgenticRunner{
+			MaxIterations: p.cfg.DefaultMaxIterations,
+			LoopFactory: func(stageName string, prompt string, workDir string, maxIterations int) (blueprint.AgenticLoop, error) {
+				// Model tiering: Use ReviewerModel for review stage if configured
+				model := p.cfg.ExecutorModel
+				if stageName == "review" && p.cfg.ReviewerModel != "" {
+					model = p.cfg.ReviewerModel
+				}
+				return p.createAgenticLoop(ctx, model, prompt, workDir, maxIterations)
+			},
+		}
+		executor = defaultExecutor
 	}
 
 	// Create engine with callbacks that emit events
 	engineConfig := blueprint.DefaultEngineConfig()
 	engineConfig.OnStageStart = func(run *blueprint.Run, stageName string) {
+		if trustedGates != nil {
+			trustedGates.receipt = nil
+		}
 		p.emit(loop.Event{
 			Type:      loop.EventStageStart,
 			FWUID:     p.cfg.FWUID,
@@ -533,7 +551,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 		// Run quality gates after successful stages that opt in
 		stage, _ := bp.GetStage(result.StageName)
-		if p.qualityManager != nil && result.Status == types.StageStatusCompleted && stage != nil && stage.RunQualityGates {
+		if p.cfg.StageExecutor == nil && p.qualityManager != nil && result.Status == types.StageStatusCompleted && stage != nil && stage.RunQualityGates {
 			go func() {
 				summary, err := p.qualityManager.RunAll(context.Background())
 				if err != nil {
@@ -557,7 +575,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		}
 
 		// Create checkpoint after successful stages for crash recovery
-		if p.checkpointMgr != nil && result.Status == types.StageStatusCompleted {
+		if p.cfg.StageExecutor == nil && p.checkpointMgr != nil && result.Status == types.StageStatusCompleted {
 			go func() {
 				if _, err := p.checkpointMgr.Create(run, p.cfg.WorkDir); err != nil {
 					p.emit(loop.Event{Type: loop.EventError, ErrText: fmt.Sprintf("checkpoint error: %v", err)})
@@ -668,11 +686,16 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	execErr := engine.Execute(ctx, run, input)
 
 	if execErr != nil {
+		var failureArtifacts map[string]string
+		if trustedGates != nil && ctx.Err() == nil {
+			failureArtifacts = trustedGates.terminalEvidence(bp, run)
+		}
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
 			FWUID:       p.cfg.FWUID,
 			BlueprintID: bp.ID,
 			ErrText:     execErr.Error(),
+			Artifacts:   failureArtifacts,
 		})
 		return execErr
 	}
@@ -885,20 +908,41 @@ func (a *agenticLoopAdapter) GetResult() (string, map[string]string, error) {
 
 // gateRunnerAction adapts a types.GateRunner to the actions.Action interface.
 type gateRunnerAction struct {
-	runner types.GateRunner
+	runner  types.GateRunner
+	receipt map[string]string // Private runner provenance, never populated from worker artifacts.
 }
 
 func (a *gateRunnerAction) Name() string {
 	return "run_gates"
 }
 
+func (a *gateRunnerAction) terminalEvidence(bp *blueprint.Blueprint, run *blueprint.Run) map[string]string {
+	if len(run.Results) == 0 || !gates.ValidateVerificationFailureArtifacts(a.receipt) {
+		return nil
+	}
+	last := run.Results[len(run.Results)-1]
+	stage, ok := bp.GetStage(last.StageName)
+	if !ok || stage.Type != types.StageTypeDeterministic || last.Status != types.StageStatusFailed {
+		return nil
+	}
+	// The receipt is captured by the actual local gate action in this stage.
+	// Do not copy StageResult.Artifacts, which may be worker-controlled.
+	return map[string]string{
+		gates.VerificationFailureReceiptKey: a.receipt[gates.VerificationFailureReceiptKey],
+		gates.VerificationFailureDigestKey:  a.receipt[gates.VerificationFailureDigestKey],
+	}
+}
+
 func (a *gateRunnerAction) Execute(ctx context.Context, req actions.ActionRequest) (actions.ActionResponse, error) {
+	a.receipt = nil
 	err := a.runner.RunAll(ctx)
 	if err != nil {
+		a.receipt = gates.VerificationFailureArtifacts(err)
 		return actions.ActionResponse{
-			Status: types.StageStatusFailed,
-			Output: "Quality gates failed",
-			Error:  err.Error(),
+			Status:    types.StageStatusFailed,
+			Output:    "Quality gates failed",
+			Error:     err.Error(),
+			Artifacts: a.receipt,
 		}, nil
 	}
 

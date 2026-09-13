@@ -16,9 +16,10 @@ import (
 
 // schedulerTestEnv bundles the common setup for scheduler tests.
 type schedulerTestEnv struct {
-	mgr *Manager
-	rel *release.Manager
-	dir string
+	mgr        *Manager
+	rel        *release.Manager
+	dir        string
+	closeState func()
 }
 
 // reloadTasks refreshes the test release manager's in-memory cache from SQLite
@@ -48,7 +49,8 @@ func newSchedulerTestEnv(t *testing.T) *schedulerTestEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { stateStore.Close() })
+	closeState := sync.OnceFunc(func() { _ = stateStore.Close() })
+	t.Cleanup(closeState)
 
 	writeGateCommands(t, tmpDir)
 	cfg := Config{
@@ -77,7 +79,7 @@ func newSchedulerTestEnv(t *testing.T) *schedulerTestEnv {
 		t.Fatal(err)
 	}
 
-	return &schedulerTestEnv{mgr: mgr, rel: relMgr, dir: tmpDir}
+	return &schedulerTestEnv{mgr: mgr, rel: relMgr, dir: tmpDir, closeState: closeState}
 }
 
 // createStory is a helper that creates a story in the release manager.
