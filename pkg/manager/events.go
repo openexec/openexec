@@ -47,6 +47,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 			log.Printf("[Manager] Event %s [%s]: loop complete", fwuID, event.Type)
 		}
 
+        failureEvidenceID := m.persistTaskVerificationFailure(fwuID, event)
         m.mu.Lock()
         e, ok = m.pipelines[fwuID]
         var newStatus PipelineStatus
@@ -55,6 +56,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
         if ok {
             prev := e.info.Status
             updateInfo(&e.info, event)
+            if failureEvidenceID != "" { e.info.FailureEvidenceID = failureEvidenceID }
             newStatus = e.info.Status
             newErr = e.info.Error
             becameTerminal = !isTerminal(prev) && isTerminal(newStatus)

@@ -27,17 +27,20 @@ type PlanRequest struct {
 	IntentFile string `json:"intent_file"`
 	NoValidate bool   `json:"no_validate"`
 	AutoImport bool   `json:"auto_import"` // Automatically load stories into DB
+	Review     bool   `json:"review"`      // Opt-in task-oriented route: review before import.
 }
 
 // PlanResult contains the generated plan and validation status.
 type PlanResult struct {
-	Plan          *planner.ProjectPlan `json:"plan"`
-	Valid         bool                 `json:"valid"`
-	Issues        []string             `json:"issues,omitempty"`
-	PlanID        string               `json:"plan_id,omitempty"`
-	ArtifactHash  string               `json:"artifact_hash,omitempty"`
-	ArtifactPath  string               `json:"artifact_path,omitempty"`
-	PromptVersion string               `json:"prompt_version,omitempty"`
+	Plan               *planner.ProjectPlan `json:"plan"`
+	Valid              bool                 `json:"valid"`
+	Issues             []string             `json:"issues,omitempty"`
+	PlanID             string               `json:"plan_id,omitempty"`
+	ArtifactHash       string               `json:"artifact_hash,omitempty"`
+	ArtifactPath       string               `json:"artifact_path,omitempty"`
+	PromptVersion      string               `json:"prompt_version,omitempty"`
+	Review             *planner.PlanReview  `json:"review,omitempty"`
+	ReviewArtifactPath string               `json:"review_artifact_path,omitempty"`
 }
 
 // PlanInputError represents a validation error for plan input.
@@ -52,6 +55,10 @@ func (e *PlanInputError) Error() string {
 
 // Plan executes the planning workflow on the server side (V1.0 Service).
 func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error) {
+	if req.Review && (m.cfg.PlanGenerator != nil || m.cfg.PlanReviewer != nil) &&
+		(m.cfg.PlanGenerator == nil || m.cfg.PlanReviewer == nil) {
+		return nil, fmt.Errorf("reviewed planning with admitted adapters requires both generator and reviewer; native fallback refused")
+	}
 	intentFile := req.IntentFile
 	if intentFile == "" {
 		intentFile = "INTENT.md"
@@ -115,29 +122,81 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 		return nil, err
 	}
 
-	p := planner.New(&cliLLMProvider{model: plannerModel})
+	generator := m.cfg.PlanGenerator
+	if generator == nil {
+		generator = &cliLLMProvider{model: plannerModel}
+	}
+	p := planner.New(generator)
 	plan, err := p.GeneratePlan(ctx, string(intentContent), nil)
 	if err != nil {
 		return nil, fmt.Errorf("planner failed: %w", err)
 	}
+	if err := plan.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid generated plan: %w", err)
+	}
+	if req.Review && req.AutoImport {
+		if err := m.preparePlanIDs(plan); err != nil {
+			return nil, err
+		}
+	}
+	var review *planner.PlanReview
+	if req.Review {
+		reviewer := m.cfg.PlanReviewer
+		if reviewer == nil {
+			model := projCfg.Execution.ReviewerModel
+			if model == "" {
+				model = plannerModel
+			}
+			reviewer = &cliLLMProvider{model: model}
+		}
+		review, err = planner.New(reviewer).ReviewPlan(ctx, string(intentContent), plan)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// Write plan artifact to .openexec/artifacts/plans/<hash>.json
 	planID, artifactHash, artifactPath := m.writePlanArtifact(plan)
+	var reviewPath string
+	if req.Review {
+		if artifactPath == "" {
+			return nil, fmt.Errorf("reviewed plan artifact was not persisted; import refused")
+		}
+		// Reuse content-addressed plan artifacts for review provenance. Different
+		// reviews of the same plan must not overwrite one another.
+		data, err := json.Marshal(struct {
+			PlanDigest string              `json:"plan_digest"`
+			Review     *planner.PlanReview `json:"review"`
+		}{artifactHash, review})
+		if err != nil {
+			return nil, err
+		}
+		digest := sha256.Sum256(data)
+		reviewPath = filepath.Join(filepath.Dir(artifactPath), hex.EncodeToString(digest[:])+".review.json")
+		if err := os.WriteFile(reviewPath, data, 0600); err != nil {
+			return nil, fmt.Errorf("persist plan review: %w", err)
+		}
+		if !review.Approved {
+			return &PlanResult{Plan: plan, Valid: false, Review: review, Issues: []string{review.Assessment}, PlanID: planID, ArtifactHash: artifactHash, ArtifactPath: artifactPath, ReviewArtifactPath: reviewPath}, nil
+		}
+	}
 
 	// Auto-import: persist stories/tasks to DB so runs:execute can find them
 	if req.AutoImport {
-		if err := m.importPlan(plan); err != nil {
+		if err := m.importBoundPlan(plan, req.Review); err != nil {
 			return nil, fmt.Errorf("failed to import plan to database: %w", err)
 		}
 	}
 
 	return &PlanResult{
-		Plan:          plan,
-		Valid:         true,
-		PlanID:        planID,
-		ArtifactHash:  artifactHash,
-		ArtifactPath:  artifactPath,
-		PromptVersion: prompt.PromptVersion,
+		Plan:               plan,
+		Valid:              true,
+		PlanID:             planID,
+		ArtifactHash:       artifactHash,
+		ArtifactPath:       artifactPath,
+		PromptVersion:      prompt.PromptVersion,
+		Review:             review,
+		ReviewArtifactPath: reviewPath,
 	}, nil
 }
 
@@ -176,6 +235,10 @@ func (m *Manager) writePlanArtifact(plan *planner.ProjectPlan) (planID, artifact
 }
 
 func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
+	return m.importBoundPlan(plan, false)
+}
+
+func (m *Manager) preparePlanIDs(plan *planner.ProjectPlan) error {
 	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return err
@@ -203,6 +266,28 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 	if remapped > 0 {
 		log.Printf("[Planner] Re-plan detected: remapped %d colliding IDs so the new plan appends to the existing backlog", remapped)
 	}
+	return nil
+}
+
+func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) error {
+	before, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	if err := m.preparePlanIDs(plan); err != nil {
+		return err
+	}
+	after, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	if reviewed && string(before) != string(after) {
+		return fmt.Errorf("backlog changed after plan review; changed task identities require review")
+	}
+	rel, err := m.GetInternalReleaseManager()
+	if err != nil {
+		return err
+	}
 
 	now := time.Now()
 	var importedGoals, importedStories, importedTasks int
@@ -229,11 +314,6 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 	// 2. Create stories and tasks
 	for i, s := range plan.Stories {
 		if rel.GetStory(s.ID) == nil {
-			taskIDs := make([]string, len(s.Tasks))
-			for j, t := range s.Tasks {
-				taskIDs[j] = t.ID
-			}
-
 			// Validate GoalID exists
 			goalID := s.GoalID
 			if goalID != "" && !importedGoalIDs[goalID] && rel.GetGoal(goalID) == nil {
@@ -248,25 +328,29 @@ func (m *Manager) importPlan(plan *planner.ProjectPlan) error {
 				Description:        s.Description,
 				AcceptanceCriteria: s.AcceptanceCriteria,
 				VerificationScript: s.VerificationScript,
-				Tasks:              taskIDs,
+				Contract:           s.Contract,
 				DependsOn:          s.DependsOn,
 				StoryType:          release.StoryTypeFeature,
 				Priority:           i,
 				Status:             release.StoryStatusPending,
 				CreatedAt:          now,
-				}
-				if err := rel.CreateStory(st); err != nil {
+			}
+			if err := rel.CreateStory(st); err != nil {
 				return fmt.Errorf("import story %s: %w", s.ID, err)
-				}
-				importedStories++
-				}
+			}
+			importedStories++
+		}
 
-				for j, t := range s.Tasks {
-				if rel.GetTask(t.ID) == nil {
+		for j, t := range s.Tasks {
+			if rel.GetTask(t.ID) == nil {
+				description := t.Description
+				if strings.TrimSpace(t.TechnicalStrategy) != "" {
+					description += "\n\nTechnical strategy:\n" + t.TechnicalStrategy
+				}
 				task := &release.Task{
 					ID:                 t.ID,
 					Title:              t.Title,
-					Description:        t.Description,
+					Description:        description,
 					VerificationScript: t.VerificationScript,
 					StoryID:            s.ID,
 					DependsOn:          t.DependsOn,

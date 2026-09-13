@@ -684,9 +684,9 @@ func (m *Manager) UpdateTask(updated *Task) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	existing, ok := m.tasks[updated.ID]
-	if !ok {
-		return fmt.Errorf("task %s not found", updated.ID)
+	existing, err := m.store.GetTask(context.Background(), updated.ID)
+	if err != nil {
+		return err
 	}
 	if updated.Status == TaskStatusDone && existing.Status != TaskStatusDone {
 		if err := m.store.CanCompleteTask(context.Background(), updated.ID); err != nil {
@@ -696,6 +696,16 @@ func (m *Manager) UpdateTask(updated *Task) error {
 
 	// Track old story to repair story.Tasks list if StoryID changes
 	oldStoryID := existing.StoryID
+	if oldStoryID == updated.StoryID {
+		// Task-local updates must not replay the manager's stale project cache.
+		// Workers and the queue may use separate managers over the same SQLite
+		// ledger. Persist first so a rejected write cannot advance this cache.
+		if err := m.store.UpdateTask(context.Background(), updated); err != nil {
+			return err
+		}
+		m.tasks[updated.ID] = updated
+		return nil
+	}
 
 	// Replace fields
 	m.tasks[updated.ID] = updated
@@ -747,10 +757,10 @@ func (m *Manager) ReassignTask(taskID, newStoryID string) error {
 // SetTaskStatus updates the lifecycle status of a task and persists it.
 func (m *Manager) SetTaskStatus(taskID string, status string) error {
 	m.mu.RLock()
-	t, ok := m.tasks[taskID]
+	t, err := m.store.GetTask(context.Background(), taskID)
 	m.mu.RUnlock()
-	if !ok {
-		return fmt.Errorf("task %s not found", taskID)
+	if err != nil {
+		return err
 	}
 	updated := *t
 	updated.Status = status

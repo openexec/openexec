@@ -19,6 +19,7 @@ import (
 	"github.com/openexec/openexec/internal/checkpoint"
 	"github.com/openexec/openexec/internal/config"
 	ocontext "github.com/openexec/openexec/internal/context"
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/loop"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/quality"
@@ -475,22 +476,30 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	// Override lint/test commands from project config
+	verificationStages := make(map[*blueprint.Stage]bool)
 	if projCfg, err := project.LoadProjectConfig(p.cfg.WorkDir); err == nil {
 		if lint, ok := bp.Stages["lint"]; ok && len(projCfg.Execution.LintCommands) > 0 {
 			lint.Commands = projCfg.Execution.LintCommands
+			verificationStages[lint] = true
 		}
 		if test, ok := bp.Stages["test"]; ok && len(projCfg.Execution.TestCommands) > 0 {
 			test.Commands = projCfg.Execution.TestCommands
+			verificationStages[test] = true
 		}
 	}
 
 	// Create executor with agentic runner
 	executor := blueprint.NewDefaultExecutor(p.cfg.WorkDir)
 	executor.ActionRegistry = actions.DefaultRegistry(p.cfg.WorkDir)
+	executor.VerificationStages = verificationStages
 
 	// If a custom gate runner is provided (e.g. by tests), register it as the 'run_gates' action
+	trustedGates := &gateRunnerAction{runner: p.gateRunner}
 	if p.gateRunner != nil {
-		executor.ActionRegistry.Overwrite(&gateRunnerAction{runner: p.gateRunner})
+		executor.ActionRegistry.Overwrite(trustedGates)
+	}
+	executor.OnVerificationFailure = func(stage *blueprint.Stage, err error) {
+		trustedGates.receipt = gates.VerificationFailureArtifacts(err)
 	}
 
 	// Set up agentic runner that wraps a bounded loop
@@ -509,6 +518,9 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Create engine with callbacks that emit events
 	engineConfig := blueprint.DefaultEngineConfig()
 	engineConfig.OnStageStart = func(run *blueprint.Run, stageName string) {
+		if trustedGates != nil {
+			trustedGates.receipt = nil
+		}
 		p.emit(loop.Event{
 			Type:      loop.EventStageStart,
 			FWUID:     p.cfg.FWUID,
@@ -668,11 +680,16 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	execErr := engine.Execute(ctx, run, input)
 
 	if execErr != nil {
+		var failureArtifacts map[string]string
+		if trustedGates != nil && ctx.Err() == nil {
+			failureArtifacts = trustedGates.terminalEvidence(bp, run)
+		}
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
 			FWUID:       p.cfg.FWUID,
 			BlueprintID: bp.ID,
 			ErrText:     execErr.Error(),
+			Artifacts:   failureArtifacts,
 		})
 		return execErr
 	}
@@ -885,20 +902,41 @@ func (a *agenticLoopAdapter) GetResult() (string, map[string]string, error) {
 
 // gateRunnerAction adapts a types.GateRunner to the actions.Action interface.
 type gateRunnerAction struct {
-	runner types.GateRunner
+	runner  types.GateRunner
+	receipt map[string]string // Private runner provenance, never populated from worker artifacts.
 }
 
 func (a *gateRunnerAction) Name() string {
 	return "run_gates"
 }
 
+func (a *gateRunnerAction) terminalEvidence(bp *blueprint.Blueprint, run *blueprint.Run) map[string]string {
+	if len(run.Results) == 0 || !gates.ValidateVerificationFailureArtifacts(a.receipt) {
+		return nil
+	}
+	last := run.Results[len(run.Results)-1]
+	stage, ok := bp.GetStage(last.StageName)
+	if !ok || stage.Type != types.StageTypeDeterministic || last.Status != types.StageStatusFailed {
+		return nil
+	}
+	// The receipt is captured by the actual local gate action in this stage.
+	// Do not copy StageResult.Artifacts, which may be worker-controlled.
+	return map[string]string{
+		gates.VerificationFailureReceiptKey: a.receipt[gates.VerificationFailureReceiptKey],
+		gates.VerificationFailureDigestKey:  a.receipt[gates.VerificationFailureDigestKey],
+	}
+}
+
 func (a *gateRunnerAction) Execute(ctx context.Context, req actions.ActionRequest) (actions.ActionResponse, error) {
+	a.receipt = nil
 	err := a.runner.RunAll(ctx)
 	if err != nil {
+		a.receipt = gates.VerificationFailureArtifacts(err)
 		return actions.ActionResponse{
-			Status: types.StageStatusFailed,
-			Output: "Quality gates failed",
-			Error:  err.Error(),
+			Status:    types.StageStatusFailed,
+			Output:    "Quality gates failed",
+			Error:     err.Error(),
+			Artifacts: a.receipt,
 		}, nil
 	}
 

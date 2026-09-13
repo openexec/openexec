@@ -15,6 +15,7 @@ import (
 
 	"github.com/openexec/openexec/internal/actions"
 	"github.com/openexec/openexec/internal/contracts"
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/skills"
 	"github.com/openexec/openexec/internal/types"
@@ -38,6 +39,10 @@ const ArtifactSmartZoneExceeded = "smart_zone_exceeded"
 // DefaultExecutor executes blueprint stages.
 // Deterministic stages run shell commands; agentic stages use bounded subloops.
 type DefaultExecutor struct {
+	// VerificationStages identifies exact server-configured check stages. It is
+	// not deserialized from a blueprint or inferred from stage names/output.
+	VerificationStages    map[*Stage]bool
+	OnVerificationFailure func(*Stage, error)
 	// WorkDir is the working directory for command execution.
 	WorkDir string
 
@@ -149,7 +154,11 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 				e.OnCommandStart(stage, cmdStr)
 			}
 
-			output, err := e.runCommand(cmdCtx, cmdStr)
+			checkName := ""
+			if e.VerificationStages[stage] {
+				checkName = stage.Name
+			}
+			output, err := e.runCommandWithCheck(cmdCtx, cmdStr, checkName)
 			outputs = append(outputs, output)
 
 			if e.OnCommandComplete != nil {
@@ -157,6 +166,9 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			}
 
 			if err != nil {
+				if checkName != "" && e.OnVerificationFailure != nil {
+					e.OnVerificationFailure(stage, err)
+				}
 				result.Output = strings.Join(outputs, "\n---\n")
 				result.Fail(fmt.Sprintf("command failed: %s: %v", cmdStr, err))
 				return result, nil
@@ -220,6 +232,10 @@ func (e *DefaultExecutor) runQualityGates(ctx context.Context, stage *Stage, inp
 
 // runCommand executes a shell command and returns its output.
 func (e *DefaultExecutor) runCommand(ctx context.Context, cmdStr string) (string, error) {
+	return e.runCommandWithCheck(ctx, cmdStr, "")
+}
+
+func (e *DefaultExecutor) runCommandWithCheck(ctx context.Context, cmdStr, checkName string) (string, error) {
 	workDir := e.WorkDir
 	if workDir == "" {
 		workDir = "."
@@ -237,6 +253,9 @@ func (e *DefaultExecutor) runCommand(ctx context.Context, cmdStr string) (string
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
+	if checkName != "" {
+		err = gates.NewCommandFailure(ctx, checkName, err)
+	}
 
 	output := stdout.String()
 	if stderr.Len() > 0 {

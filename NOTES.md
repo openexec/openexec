@@ -4,6 +4,18 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [OpenExec-first task route, 2026-09-13] Current feature:
+  `feat/task-oriented-goal-loop`, design/acceptance in
+  `docs/TASK_ORIENTED_GOAL_ROUTE.md`. Reuse the planner/reviewer prompts,
+  SQLite task ledger and blueprint engine. Opt-in sequential queue derives
+  one same-story repair from a trusted failed-check receipt and resumes the
+  original task; controlled-provider integration and restart tests exercise
+  actual processes and files. This is not native/deployed Goal convergence.
+  Next: finish independent review/full compatibility validation, then bridge
+  Console admission/effects to this engine; do not enable the old unrestricted
+  host command path or inherit expired grants. The outer fresh Goal review,
+  second planning pass and long brownfield proof remain unfinished.
+
 - [Non-inference readiness, 2026-09-12] APIProvider.Probe must never generate
   tokens outside an execution reservation. OpenAI-compatible adapters now use
   bounded GET model metadata; absent support is explicitly unknown, never a

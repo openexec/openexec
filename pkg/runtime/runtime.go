@@ -48,9 +48,10 @@ type (
 	// planner's own types, distinct from the release backlog's Goal/Story/Task).
 	// Exposed so callers can hand-build a small plan without importing the
 	// internal planner package.
-	PlanGoal  = planner.Goal
-	PlanStory = planner.Story
-	PlanTask  = planner.Task
+	PlanGoal   = planner.Goal
+	PlanStory  = planner.Story
+	PlanTask   = planner.Task
+	PlanReview = planner.PlanReview
 	// ExistingLookup lets RemapPlanIDs detect id collisions with an existing backlog.
 	ExistingLookup = planner.ExistingLookup
 	// LLMProvider is the single-shot completion interface the planner needs; any
@@ -78,6 +79,16 @@ func (p *Planner) GeneratePlan(ctx context.Context, intent string) (*ProjectPlan
 // small. GeneratePlan remains the full-shape path.
 func (p *Planner) GenerateCompactPlan(ctx context.Context, intent string) (*ProjectPlan, error) {
 	return p.inner.GenerateCompactPlan(ctx, intent)
+}
+
+// ReviewPlan and RefinePlan reuse OpenExec's planning discipline instead of
+// requiring a higher layer to maintain its own reviewer/fix prompts.
+func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPlan) (*PlanReview, error) {
+	return p.inner.ReviewPlan(ctx, intent, plan)
+}
+
+func (p *Planner) RefinePlan(ctx context.Context, intent string, plan *ProjectPlan, review *PlanReview) (*ProjectPlan, error) {
+	return p.inner.RefinePlan(ctx, intent, plan, review)
 }
 
 // LintPlanVerification flags false-green verification scripts in a plan
