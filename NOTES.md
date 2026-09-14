@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Simple Loop contract, 2026-09-14] `fix/native-reviewed-planning` exposes
+  existing compact generation through `Manager.Plan`; native reviewed-plan
+  replay/refinement/import and task execution remain canonical. Compact
+  generation/review/import/replay plus real persisted-file task execution pass;
+  removing compact selection makes the test fail. No Console Goal loop is
+  required for that small-task journey. Full gates/review/publication and native
+  brownfield acceptance remain pending. Do not reuse the exhausted PR185 live
+  window. Contract: `docs/OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md`.
+
 - [Console handover seam, 2026-09-13] Building on the validated PR #54 slice:
   `Manager.Config.StageExecutor` admits Console execution without native/host
   fallback; `PlanRequest.RequestID` + accepted `Intent` retain exact reviewed
