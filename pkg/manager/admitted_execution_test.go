@@ -21,6 +21,53 @@ func (f admittedFixture) Execute(c context.Context, s *runtime.Stage, i *runtime
 	return f(c, s, i)
 }
 
+func TestCancelledInjectedTaskRemainsResumable(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	createStory(t, e.rel, "S", nil)
+	createQueueTask(t, e, "A", nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	e.mgr.cfg.StageExecutor = admittedFixture(func(c context.Context, s *runtime.Stage, _ *runtime.StageInput) (*runtime.StageResult, error) {
+		if s.Name == "implement" {
+			cancel()
+			return nil, c.Err()
+		}
+		return &runtime.StageResult{StageName: s.Name, Status: runtime.StageStatusCompleted}, nil
+	})
+	if err := e.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); !errors.Is(err, context.Canceled) {
+		t.Fatal("cancellation not preserved", err)
+	}
+	task, err := e.rel.TaskSnapshot(context.Background(), "A")
+	if err != nil || task.Status != release.TaskStatusInProgress || task.AttemptCount != 1 {
+		t.Fatal("cancellation poisoned retained work", task, err)
+	}
+	e.mgr.Close()
+	cfg := e.mgr.cfg
+	cfg.StageExecutor = admittedFixture(func(_ context.Context, s *runtime.Stage, _ *runtime.StageInput) (*runtime.StageResult, error) {
+		if s.Name == "implement" {
+			if err := os.WriteFile(filepath.Join(e.dir, "resumed.txt"), []byte("useful work"), 0600); err != nil {
+				return nil, err
+			}
+		}
+		return &runtime.StageResult{StageName: s.Name, Status: runtime.StageStatusCompleted}, nil
+	})
+	fresh, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fresh.Close()
+	if err := fresh.ExecuteTasks(context.Background(), RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); err != nil {
+		t.Fatal(err)
+	}
+	task, err = e.rel.TaskSnapshot(context.Background(), "A")
+	if err != nil || task.Status != release.TaskStatusDone || task.AttemptCount != 2 {
+		t.Fatal("same native task did not resume", task, err)
+	}
+	if raw, err := os.ReadFile(filepath.Join(e.dir, "resumed.txt")); err != nil || string(raw) != "useful work" {
+		t.Fatal("resumed task produced no work", err)
+	}
+}
+
 func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 	for _, forged := range []bool{false, true} {
 		t.Run(map[bool]string{false: "typed_failure", true: "untrusted_artifacts"}[forged], func(t *testing.T) {

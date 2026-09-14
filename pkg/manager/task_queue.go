@@ -113,6 +113,11 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			return fmt.Errorf("task %s start refused: %w", task.ID, err)
 		}
 		if err := m.waitTaskQueueRun(ctx, task.ID); err != nil {
+			// Cancellation drains the attempt, but is not an implementation failure.
+			// Leave its native in-progress task for existing restart reconciliation.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			if info, statusErr := m.Status(task.ID); statusErr == nil && info.Status == StatusError {
 				if saveErr := rel.SetTaskStatus(task.ID, release.TaskStatusFailed); saveErr != nil {
 					return fmt.Errorf("task failed and failure disposition could not persist: %w", saveErr)
