@@ -30,8 +30,9 @@ type PlanRequest struct {
 	Intent     string `json:"intent,omitempty"`
 	IntentFile string `json:"intent_file"`
 	NoValidate bool   `json:"no_validate"`
-	AutoImport bool   `json:"auto_import"` // Automatically load stories into DB
-	Review     bool   `json:"review"`      // Opt-in task-oriented route: review before import.
+	AutoImport bool   `json:"auto_import"`       // Automatically load stories into DB
+	Review     bool   `json:"review"`            // Opt-in task-oriented route: review before import.
+	Compact    bool   `json:"compact,omitempty"` // Reuse the small-change planner; same review and native task loop.
 }
 
 // PlanResult contains the generated plan and validation status.
@@ -137,7 +138,12 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 		generator = &cliLLMProvider{model: plannerModel}
 	}
 	p := planner.New(generator)
-	plan, err := p.GeneratePlan(ctx, string(intentContent), nil)
+	var plan *planner.ProjectPlan
+	if req.Compact {
+		plan, err = p.GenerateCompactPlan(ctx, string(intentContent))
+	} else {
+		plan, err = p.GeneratePlan(ctx, string(intentContent), nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("planner failed: %w", err)
 	}

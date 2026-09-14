@@ -1,5 +1,13 @@
 # Repository Guidelines
 
+## Autonomy architecture
+
+Before changing planning, execution, continuation, recovery or delivery, read
+`docs/OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md`. Restate the user outcome,
+observed state, owning loop/boundary, existing OpenExec primitive to reuse and
+why no new abstraction is necessary. One native implementation loop, one outer
+Goal review, deterministic delivery. Report the complexity delta in reviews.
+
 ## Project Structure & Module Organization
 OpenExec is a Go monorepo with a separate React UI. The CLI entry point is `cmd/openexec/main.go`. Core backend code lives under `internal/` for app-private packages and `pkg/` for reusable/public packages. Frontend code is in `ui/src`, end-to-end tests are in `ui/e2e`, and static assets are in `ui/public`. Operational docs live in `docs/`, while helper scripts and release tooling live in `scripts/` and `bin/`.
 

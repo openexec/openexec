@@ -61,6 +61,11 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 		Intent                         string
 		AutoImport, Review, NoValidate bool
 	}{content, req.AutoImport, req.Review, req.NoValidate})
+	// Preserve existing full-plan receipt identities. Compact is a planning
+	// choice, never task authority; changing it must not reuse another plan.
+	if req.Compact {
+		digest = planDigest(struct{ Input, Mode string }{digest, "compact"})
+	}
 	runID := "plan-request-" + planDigest(req.RequestID)
 	stepID := runID + "-review"
 	db := m.state.GetDB()
@@ -130,7 +135,14 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 		return nil
 	}
 	if retained.Result == nil {
-		plan, err := planner.New(m.cfg.PlanGenerator).GeneratePlan(ctx, content, nil)
+		p := planner.New(m.cfg.PlanGenerator)
+		var plan *planner.ProjectPlan
+		var err error
+		if req.Compact {
+			plan, err = p.GenerateCompactPlan(ctx, content)
+		} else {
+			plan, err = p.GeneratePlan(ctx, content, nil)
+		}
 		if err != nil {
 			return nil, err
 		}
