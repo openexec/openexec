@@ -132,3 +132,54 @@ func TestReviewedPlanRefinementConflictRefusesBeforeRereview(t *testing.T) {
 		t.Fatal("pre-review validation persisted work")
 	}
 }
+
+// The production failure of 2026-09-19: the fix prompt asks for stories only,
+// the model answers with a bare array whose stories still cite the original
+// goal, and the reviewed import died with "FOREIGN KEY constraint failed (787)".
+func TestReviewedPlanRefinementKeepsCitedGoalsFromABareStoryArray(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	e.mgr.cfg.MaxReviewCycles = 2
+	generated, reviewed := 0, 0
+	refined := `[{"id":"US-001","title":"Edit","goal_id":"G-1","verification_script":"go test ./...","tasks":[{"id":"T-US-001-001","title":"Implement edit","description":"Implement and verify editing","mode":"afk"},{"id":"T-US-001-002","title":"Verify edit","description":"Verify the running editing journey and persistence after reload","mode":"afk","depends_on":["T-US-001-001"]}]}]`
+	e.mgr.cfg.PlanGenerator = planCompletionFunc(func(_ context.Context, _ string) (string, error) {
+		generated++
+		if generated == 1 {
+			return replayPlanFixture, nil
+		}
+		return refined, nil
+	})
+	e.mgr.cfg.PlanReviewer = planCompletionFunc(func(_ context.Context, _ string) (string, error) {
+		reviewed++
+		if reviewed == 1 {
+			return rejectedReplayReview, nil
+		}
+		return replayReviewFixture, nil
+	})
+	result, err := e.mgr.Plan(context.Background(), replayRequest())
+	if err != nil {
+		t.Fatalf("refined plan import failed: %v", err)
+	}
+	if !result.Valid || generated != 2 || reviewed != 2 || len(result.Plan.Goals) != 1 || result.Plan.Goals[0].ID != "G-1" {
+		t.Fatalf("refined plan lost its goal: %+v %d/%d", result.Plan.Goals, generated, reviewed)
+	}
+	var goals, stories int
+	db := e.mgr.state.GetDB()
+	db.QueryRow(`SELECT COUNT(*) FROM goals WHERE id='G-1'`).Scan(&goals)
+	db.QueryRow(`SELECT COUNT(*) FROM stories WHERE goal_id='G-1'`).Scan(&stories)
+	if goals != 1 || stories != 1 {
+		t.Fatalf("goal/story persisted %d/%d", goals, stories)
+	}
+}
+
+func TestReviewedPlanImportNamesADanglingGoalReference(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	e.mgr.cfg.MaxReviewCycles = 1
+	e.mgr.cfg.PlanGenerator = planCompletionFunc(func(_ context.Context, _ string) (string, error) {
+		return `{"goals":[{"id":"G-1","title":"Edit"}],"stories":[{"id":"US-1","title":"Edit","goal_id":"G-404","verification_script":"go test ./...","tasks":[{"id":"T-1","title":"Implement edit","description":"Implement","mode":"afk"}]}]}`, nil
+	})
+	e.mgr.cfg.PlanReviewer = planCompletionFunc(func(_ context.Context, _ string) (string, error) { return replayReviewFixture, nil })
+	_, err := e.mgr.Plan(context.Background(), replayRequest())
+	if err == nil || !strings.Contains(err.Error(), "US-1 references goal G-404") || strings.Contains(err.Error(), "787") {
+		t.Fatalf("dangling goal not named: %v", err)
+	}
+}

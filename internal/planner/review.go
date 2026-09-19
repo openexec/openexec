@@ -71,5 +71,46 @@ func (p *Planner) RefinePlan(ctx context.Context, intent string, plan *ProjectPl
 	if err != nil {
 		return nil, err
 	}
-	return p.parseResponse(response)
+	refined, err := p.parseResponse(response)
+	if err != nil {
+		return nil, err
+	}
+	carryGoals(plan, refined)
+	return refined, nil
+}
+
+// carryGoals keeps the accepted goals with the refined stories. The fix
+// prompt asks the model for stories only, so a refined plan normally has no
+// goals of its own while its stories still cite the original goal ids;
+// importing that plan would reference goals that were never persisted.
+// Refinement revises stories and tasks, never the goals they serve.
+func carryGoals(original, refined *ProjectPlan) {
+	if original == nil || refined == nil {
+		return
+	}
+	if refined.SchemaVersion == "" {
+		refined.SchemaVersion = original.SchemaVersion
+	}
+	present := make(map[string]bool, len(refined.Goals))
+	for _, g := range refined.Goals {
+		present[g.ID] = true
+	}
+	if len(refined.Goals) == 0 {
+		refined.Goals = append([]Goal(nil), original.Goals...)
+		for _, g := range original.Goals {
+			present[g.ID] = true
+		}
+	}
+	for _, s := range refined.Stories {
+		if s.GoalID == "" || present[s.GoalID] {
+			continue
+		}
+		for _, g := range original.Goals {
+			if g.ID == s.GoalID {
+				refined.Goals = append(refined.Goals, g)
+				present[g.ID] = true
+				break
+			}
+		}
+	}
 }

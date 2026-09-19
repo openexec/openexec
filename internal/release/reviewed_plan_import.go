@@ -90,6 +90,25 @@ func (m *Manager) importReviewedPlan(ctx context.Context, goals []*Goal, stories
 		raw, _ := json.Marshal(v)
 		return string(raw)
 	}
+	// Name a dangling goal reference before SQLite reports it as a bare
+	// foreign-key code: a refined plan can cite goals it did not carry along.
+	known := make(map[string]bool, len(goals))
+	for _, g := range goals {
+		known[g.ID] = true
+	}
+	for _, st := range stories {
+		if st.GoalID == "" || known[st.GoalID] {
+			continue
+		}
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM goals WHERE id=?`, st.GoalID).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("reviewed story %s references goal %s, which is neither in the plan nor already persisted", st.ID, st.GoalID)
+		}
+		known[st.GoalID] = true
+	}
 	for _, g := range goals {
 		if err := insert("goals", g.ID, []string{"title", "description", "success_criteria", "verification_method"}, []any{g.Title, g.Description, g.SuccessCriteria, g.VerificationMethod}, nil); err != nil {
 			return err

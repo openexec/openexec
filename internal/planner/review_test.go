@@ -60,3 +60,36 @@ func TestRejectedPlanRefinesThroughExistingPromptAndRequiresFreshReview(t *testi
 		t.Fatal("refining approved plan without findings")
 	}
 }
+
+func TestRefinedPlanKeepsTheGoalsItsStoriesCite(t *testing.T) {
+	review := &PlanReview{Assessment: "stories not implementation-ready", KeyIssues: []byte(`[{"description":"coverage"}]`)}
+	original := &ProjectPlan{SchemaVersion: "1.0", Goals: []Goal{{ID: "G-006", Title: "Verified repair"}, {ID: "G-007", Title: "Unused"}}, Stories: []Story{{ID: "US-001", Title: "Original", GoalID: "G-006"}}}
+	cases := []struct {
+		name     string
+		response string
+		want     []string
+	}{
+		{"bare story array keeps every original goal", `[{"id":"US-001","title":"Fixed","goal_id":"G-006"},{"id":"US-002","title":"More","goal_id":"G-006"}]`, []string{"G-006", "G-007"}},
+		{"object without goals keeps every original goal", `{"stories":[{"id":"US-001","title":"Fixed","goal_id":"G-006"}]}`, []string{"G-006", "G-007"}},
+		{"explicit goals are kept and cited originals are added", `{"goals":[{"id":"G-008","title":"New"}],"stories":[{"id":"US-001","title":"Fixed","goal_id":"G-006"}]}`, []string{"G-008", "G-006"}},
+		{"unknown citation is left for import validation", `{"goals":[{"id":"G-008","title":"New"}],"stories":[{"id":"US-001","title":"Fixed","goal_id":"G-999"}]}`, []string{"G-008"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			refined, err := New(&mockProvider{response: tc.response}).RefinePlan(context.Background(), "intent", original, review)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, g := range refined.Goals {
+				got = append(got, g.ID)
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Fatalf("goals = %v, want %v", got, tc.want)
+			}
+			if len(original.Goals) != 2 {
+				t.Fatal("original plan mutated")
+			}
+		})
+	}
+}
