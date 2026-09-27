@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"strings"
 	"context"
 	"fmt"
 	"time"
@@ -78,12 +79,7 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			if len(current) == 0 {
 				return fmt.Errorf("scoped stories have no tasks; completion is unproven")
 			}
-			for _, task := range current {
-				if task.Status != release.TaskStatusDone {
-					return fmt.Errorf("no executable work: task %s remains %s", task.ID, task.Status)
-				}
-			}
-			return nil // Task scope complete, not a Goal/Ready verdict.
+			return retainedTaskBoundary(current) // Task scope complete is not a Goal/Ready verdict.
 		}
 		task := ready[0]
 		attempt := *task
@@ -220,7 +216,17 @@ func (m *Manager) waitTaskQueueRun(ctx context.Context, id string) error {
 			}
 			return fmt.Errorf("task %s requires an existing boundary decision; remaining work retained", id)
 		case StatusError:
-			return fmt.Errorf("task %s failed; no typed deterministic failure receipt is available for automatic repair", id)
+			// The reason was never lost — it is on the pipeline info this loop
+			// already holds, and it was simply not read. Reporting only that a
+			// receipt is missing tells the owner nothing they can act on and
+			// leaves repair nothing to work from: four tasks failed this way in
+			// a row, each recording an empty metadata object, while the run
+			// advanced to the next task and failed identically.
+			if reason := strings.TrimSpace(info.Error); reason != "" {
+				return fmt.Errorf("task %s failed: %s", id, reason)
+			}
+			return fmt.Errorf("task %s failed, and the executor recorded no reason; "+
+				"there is nothing for automatic repair to work from", id)
 		}
 		select {
 		case <-ctx.Done():
