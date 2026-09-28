@@ -42,6 +42,8 @@ func TestHumanBoundaryReviewRequiresConcreteReason(t *testing.T) {
 }
 
 func TestHumanBoundaryRefinementCannotRemoveOrAuthorizeRetainedWork(t *testing.T) {
+	// Rewording or detaching a retained boundary is undone; removing retained
+	// work is refused. Either way the owner is asked exactly what was planned.
 	for _, change := range []string{"mode", "delete", "edge", "reference", "action", "unchanged", "legacy", "independent"} {
 		t.Run(change, func(t *testing.T) {
 			original, next := boundaryPlan(), boundaryPlan()
@@ -65,9 +67,21 @@ func TestHumanBoundaryRefinementCannotRemoveOrAuthorizeRetainedWork(t *testing.T
 			}
 			raw, _ := json.Marshal(next)
 			got, err := New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", original, &PlanReview{Assessment: "improve verification"})
-			wantPass := change == "unchanged" || change == "legacy" || change == "independent"
-			if (err == nil) != wantPass {
-				t.Fatalf("refinement = %+v, %v", got, err)
+			if change == "delete" {
+				if err == nil {
+					t.Fatalf("refinement removed retained work: %+v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			tasks := got.Stories[0].Tasks
+			if !reflect.DeepEqual(tasks[1], original.Stories[0].Tasks[1]) {
+				t.Fatalf("boundary not restored: %+v", tasks[1])
+			}
+			if !reflect.DeepEqual(tasks[2].DependsOn, []string{"decide"}) {
+				t.Fatalf("edge not restored: %v", tasks[2].DependsOn)
 			}
 		})
 	}

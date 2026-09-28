@@ -54,6 +54,7 @@ func (m *Manager) importReviewedPlan(ctx context.Context, goals []*Goal, stories
 	if err != sql.ErrNoRows {
 		return err
 	}
+	nullable := map[string]bool{"goal_id": true}
 	insert := func(table, id string, columns []string, values []any, jsonFields map[string]bool) error {
 		var n int
 		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table+" WHERE id=?", id).Scan(&n); err != nil {
@@ -79,6 +80,13 @@ func (m *Manager) importReviewedPlan(ctx context.Context, goals []*Goal, stories
 			return nil
 		}
 		args := append([]any{id}, values...)
+		// An empty reference is no reference: the ordinary store writes a
+		// story without a goal as NULL, and '' is a goal id no row has.
+		for i, column := range columns {
+			if nullable[column] && values[i] == "" {
+				args[i+1] = nil
+			}
+		}
 		marks := strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")
 		_, err := tx.ExecContext(ctx, "INSERT INTO "+table+" (id,"+strings.Join(columns, ",")+") VALUES ("+marks+")", args...)
 		return err

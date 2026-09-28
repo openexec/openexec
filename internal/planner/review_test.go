@@ -93,3 +93,22 @@ func TestRefinedPlanKeepsTheGoalsItsStoriesCite(t *testing.T) {
 		})
 	}
 }
+
+// The fix prompt's story shape carries no goal_id, and the model returned
+// every refined story without one. Saved as ”, each story then pointed at a
+// goal no row has: "FOREIGN KEY constraint failed (787)".
+func TestRefinedStoriesWithoutAGoalKeepTheGoalTheyServed(t *testing.T) {
+	review := &PlanReview{Assessment: "stories not implementation-ready"}
+	original := &ProjectPlan{Goals: []Goal{{ID: "G-006", Title: "Repair"}, {ID: "G-007", Title: "Deliver"}}, Stories: []Story{{ID: "US-014", Title: "Reconcile", GoalID: "G-007"}, {ID: "US-015", Title: "Repair", GoalID: "G-006"}}}
+	refined, err := New(&mockProvider{response: `[{"id":"US-015","title":"Repair better"},{"id":"US-014","title":"Reconcile better"},{"id":"US-099","title":"New"}]`}).RefinePlan(context.Background(), "intent", original, review)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, s := range refined.Stories {
+		got[s.ID] = s.GoalID
+	}
+	if got["US-014"] != "G-007" || got["US-015"] != "G-006" || got["US-099"] != "" {
+		t.Fatalf("story goals = %v", got)
+	}
+}
