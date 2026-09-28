@@ -47,6 +47,14 @@ func LintHumanBoundaries(plan *ProjectPlan) []string {
 
 // Refinement is not an owner answer. Keep retained boundary identities and the
 // graph around them; a rejected refinement cannot replace the original plan.
+//
+// A refinement that rewords a retained boundary, or drops an edge around it,
+// gets the original back rather than refusing the whole plan: the model was
+// asked to fix review findings, not to decide what the owner is asked, and
+// refusing stopped an otherwise sound repair on a changed sentence
+// ("refinement changed retained human boundary T-US-025-002"). Only removing
+// retained work is refused, since restoring it would mean guessing where it
+// now belongs.
 func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 	retained := map[string]bool{}
 	for _, story := range original.Stories {
@@ -81,13 +89,9 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			}
 		}
 	}
-	tasks := map[string]Task{}
-	stories := map[string]Story{}
-	for _, s := range refined.Stories {
-		stories[s.ID] = s
-		for _, t := range s.Tasks {
-			tasks[t.ID] = t
-		}
+	stories := map[string]*Story{}
+	for i := range refined.Stories {
+		stories[refined.Stories[i].ID] = &refined.Stories[i]
 	}
 	for _, s := range original.Stories {
 		if !slices.ContainsFunc(s.Tasks, func(task Task) bool { return retained[task.ID] }) {
@@ -99,24 +103,25 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 		}
 		for _, dep := range s.DependsOn {
 			if !slices.Contains(nextStory.DependsOn, dep) {
-				return fmt.Errorf("refinement removed story dependency %s", dep)
+				nextStory.DependsOn = append(nextStory.DependsOn, dep)
 			}
 		}
 		for _, t := range s.Tasks {
 			if !retained[t.ID] {
 				continue
 			}
-			next, ok := tasks[t.ID]
-			member := slices.ContainsFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == t.ID })
-			if !ok || !member {
+			i := slices.IndexFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == t.ID })
+			if i < 0 {
 				return fmt.Errorf("refinement removed task %s around a retained human boundary", t.ID)
 			}
-			if t.Mode == TaskModeHITL && (next.Mode != t.Mode || next.DecisionReason != t.DecisionReason || next.DecisionRef != t.DecisionRef || next.Description != t.Description || next.TechnicalStrategy != t.TechnicalStrategy) {
-				return fmt.Errorf("refinement changed retained human boundary %s", t.ID)
+			next := &nextStory.Tasks[i]
+			if t.Mode == TaskModeHITL {
+				next.Mode, next.DecisionReason, next.DecisionRef = t.Mode, t.DecisionReason, t.DecisionRef
+				next.Description, next.TechnicalStrategy = t.Description, t.TechnicalStrategy
 			}
 			for _, dep := range t.DependsOn {
 				if !slices.Contains(next.DependsOn, dep) {
-					return fmt.Errorf("refinement removed dependency %s from %s", dep, t.ID)
+					next.DependsOn = append(next.DependsOn, dep)
 				}
 			}
 		}

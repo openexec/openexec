@@ -108,6 +108,17 @@ func carryGoals(original, refined *ProjectPlan) {
 			present[g.ID] = true
 		}
 	}
+	// The fix prompt's story shape has no goal_id, so a refined story can come
+	// back without the goal its original served; it still serves it.
+	served := make(map[string]string, len(original.Stories))
+	for _, s := range original.Stories {
+		served[s.ID] = s.GoalID
+	}
+	for i := range refined.Stories {
+		if refined.Stories[i].GoalID == "" {
+			refined.Stories[i].GoalID = served[refined.Stories[i].ID]
+		}
+	}
 	for _, s := range refined.Stories {
 		if s.GoalID == "" || present[s.GoalID] {
 			continue
