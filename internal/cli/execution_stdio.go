@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/pkg/agent"
@@ -128,24 +131,9 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 		return nil, fmt.Errorf("API provider %q has no usable api_key (a literal is required; %q resolved to empty)",
 			name, entry.APIKey)
 	}
-	adapter, err := agent.NewOpenAIProvider(agent.OpenAIProviderConfig{
-		Name: name, BaseURL: entry.BaseURL, APIKey: apiKey,
-		ReplayReasoningContent: requiresReasoningContentReplay(entry.Model),
-		// Exactly the configured model, never appended to DefaultOpenAIModels()
-		// the way the pipeline does it. Probe sends its readiness prompt to
-		// models[0] and consumers list these in a picker, so an inherited
-		// OpenAI catalogue would probe a local endpoint with gpt-4o and
-		// advertise models it cannot serve.
-		Models: []string{entry.Model},
-		ModelInfo: map[string]*agent.ModelInfo{entry.Model: {
-			ID: entry.Model, Name: entry.Model, Provider: name, Enabled: true,
-			Capabilities: agent.ProviderCapabilities{
-				Streaming: true, ToolUse: true, SystemPrompt: true, MultiTurn: true,
-			},
-		}},
-	})
+	adapter, err := configuredOpenAIAdapter(name, entry, apiKey)
 	if err != nil {
-		return nil, fmt.Errorf("create API provider %q: %w", name, err)
+		return nil, err
 	}
 	adapter.EnableLocalOllamaBounds(ctx)
 	// A gateway that stands alone still stands alone. Console state and the
@@ -428,4 +416,54 @@ func init() {
 	executionStdioCmd.Flags().StringVar(&executionAPIProvider, "api-provider", "",
 		"named entry under execution.providers to run, with --provider api")
 	rootCmd.AddCommand(executionStdioCmd)
+}
+
+// unattendedRequestBudget is how long one request to a model on this machine
+// may take. The client default (agent.DefaultOpenAITimeout, 120s) was set for a
+// person at a keyboard. Nobody waits on these: lane triage runs unattended on a
+// 27B model that fills both GPUs, where an 8k-token prompt takes 35s. Every
+// local triage run on 2026-09-26/27 failed "awaiting headers" four to ten
+// minutes in, once its tool conversation had grown past what two minutes buys.
+const unattendedRequestBudget = 15 * time.Minute
+
+// loopbackRequestBudget gives an endpoint on this machine the unattended
+// budget and leaves a hosted one on the client default: a hosted API that has
+// not answered in two minutes is broken, a local one may just be working.
+func loopbackRequestBudget(baseURL string) time.Duration {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return 0
+	}
+	if u.Hostname() == "localhost" {
+		return unattendedRequestBudget
+	}
+	if ip := net.ParseIP(u.Hostname()); ip != nil && ip.IsLoopback() {
+		return unattendedRequestBudget
+	}
+	return 0
+}
+
+// configuredOpenAIAdapter builds the client for one named endpoint.
+func configuredOpenAIAdapter(name string, entry project.ProviderConfig, apiKey string) (*agent.OpenAIProvider, error) {
+	adapter, err := agent.NewOpenAIProvider(agent.OpenAIProviderConfig{
+		Name: name, BaseURL: entry.BaseURL, APIKey: apiKey,
+		Timeout:                loopbackRequestBudget(entry.BaseURL),
+		ReplayReasoningContent: requiresReasoningContentReplay(entry.Model),
+		// Exactly the configured model, never appended to DefaultOpenAIModels()
+		// the way the pipeline does it. Probe sends its readiness prompt to
+		// models[0] and consumers list these in a picker, so an inherited
+		// OpenAI catalogue would probe a local endpoint with gpt-4o and
+		// advertise models it cannot serve.
+		Models: []string{entry.Model},
+		ModelInfo: map[string]*agent.ModelInfo{entry.Model: {
+			ID: entry.Model, Name: entry.Model, Provider: name, Enabled: true,
+			Capabilities: agent.ProviderCapabilities{
+				Streaming: true, ToolUse: true, SystemPrompt: true, MultiTurn: true,
+			},
+		}},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create API provider %q: %w", name, err)
+	}
+	return adapter, nil
 }

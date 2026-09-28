@@ -159,6 +159,9 @@ func NewOpenAIProviderFromEnv() (*OpenAIProvider, error) {
 }
 
 // GetName returns the provider identifier.
+// RequestTimeout is how long one HTTP request may take before the client gives up.
+func (p *OpenAIProvider) RequestTimeout() time.Duration { return p.httpClient.Timeout }
+
 func (p *OpenAIProvider) GetName() string {
 	return p.name
 }
