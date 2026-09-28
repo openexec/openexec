@@ -67,31 +67,35 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 	if len(retained) == 0 {
 		return nil
 	}
-	// Retain the connected task graph around a boundary, while allowing
-	// unrelated work to be decomposed or removed by ordinary refinement.
-	for changed := true; changed; {
-		changed = false
-		for _, story := range original.Stories {
-			for _, task := range story.Tasks {
-				connected := retained[task.ID]
+	// Retain the boundary's direct neighbours: the work the owner decides on
+	// and the work that waits for the answer. Not the whole connected graph.
+	// A plan ending in owner acceptance is connected almost end to end, and
+	// freezing all of it refused every review asking to merge an
+	// implementation task with its verification ("refinement removed task
+	// T-US-013-002"), so the plan could never be repaired at all.
+	boundaries := make([]string, 0, len(retained))
+	for id := range retained {
+		boundaries = append(boundaries, id)
+	}
+	for _, story := range original.Stories {
+		for _, task := range story.Tasks {
+			if slices.ContainsFunc(task.DependsOn, func(dep string) bool { return slices.Contains(boundaries, dep) }) {
+				retained[task.ID] = true
+			}
+			if slices.Contains(boundaries, task.ID) {
 				for _, dep := range task.DependsOn {
-					connected = connected || retained[dep]
-				}
-				if !connected {
-					continue
-				}
-				for _, id := range append([]string{task.ID}, task.DependsOn...) {
-					if !retained[id] {
-						retained[id] = true
-						changed = true
-					}
+					retained[dep] = true
 				}
 			}
 		}
 	}
 	stories := map[string]*Story{}
+	present := map[string]bool{}
 	for i := range refined.Stories {
 		stories[refined.Stories[i].ID] = &refined.Stories[i]
+		for _, task := range refined.Stories[i].Tasks {
+			present[task.ID] = true
+		}
 	}
 	for _, s := range original.Stories {
 		if !slices.ContainsFunc(s.Tasks, func(task Task) bool { return retained[task.ID] }) {
@@ -102,7 +106,7 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			return fmt.Errorf("refinement removed story %s around a retained human boundary", s.ID)
 		}
 		for _, dep := range s.DependsOn {
-			if !slices.Contains(nextStory.DependsOn, dep) {
+			if _, ok := stories[dep]; ok && !slices.Contains(nextStory.DependsOn, dep) {
 				nextStory.DependsOn = append(nextStory.DependsOn, dep)
 			}
 		}
@@ -119,8 +123,10 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 				next.Mode, next.DecisionReason, next.DecisionRef = t.Mode, t.DecisionReason, t.DecisionRef
 				next.Description, next.TechnicalStrategy = t.Description, t.TechnicalStrategy
 			}
+			// An edge to work refinement was free to merge away is not restored;
+			// it would point at a task that no longer exists.
 			for _, dep := range t.DependsOn {
-				if !slices.Contains(next.DependsOn, dep) {
+				if present[dep] && !slices.Contains(next.DependsOn, dep) {
 					next.DependsOn = append(next.DependsOn, dep)
 				}
 			}

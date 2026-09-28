@@ -107,3 +107,42 @@ func TestHumanBoundaryRuleSharedAcrossPlannerPrompts(t *testing.T) {
 		}
 	}
 }
+
+func TestHumanBoundaryRefinementMayMergeWorkBeyondTheBoundary(t *testing.T) {
+	// Owner acceptance at the end of a plan is connected to nearly every task.
+	// A review asking to merge an implementation task with its verification
+	// must be satisfiable; only the boundary and its direct neighbours stay.
+	chain := func() *ProjectPlan {
+		return &ProjectPlan{Stories: []Story{{ID: "S", Title: "Deliver", Tasks: []Task{
+			{ID: "implement", Mode: TaskModeAFK},
+			{ID: "verify", Mode: TaskModeAFK, DependsOn: []string{"implement"}},
+			{ID: "integrate", Mode: TaskModeAFK, DependsOn: []string{"verify"}},
+			{ID: "accept", Mode: TaskModeHITL, DecisionReason: "Owner accepts the delivered settings", DependsOn: []string{"integrate"}},
+		}}}}
+	}
+	original, next := chain(), chain()
+	next.Stories[0].Tasks = []Task{
+		{ID: "implement", Mode: TaskModeAFK},
+		{ID: "integrate", Mode: TaskModeAFK, DependsOn: []string{"implement"}},
+		original.Stories[0].Tasks[3],
+	}
+	raw, _ := json.Marshal(next)
+	got, err := New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", original, &PlanReview{Assessment: "merge implementation and verification"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := got.Validate(); err != nil {
+		t.Fatalf("refined plan invalid: %v", err)
+	}
+	if deps := got.Stories[0].Tasks[1].DependsOn; !reflect.DeepEqual(deps, []string{"implement"}) {
+		t.Fatalf("edge to merged-away work restored: %v", deps)
+	}
+
+	// Removing the work the owner decides on is still refused.
+	next = chain()
+	next.Stories[0].Tasks = []Task{next.Stories[0].Tasks[0], next.Stories[0].Tasks[1], {ID: "accept", Mode: TaskModeHITL, DecisionReason: "Owner accepts the delivered settings", DependsOn: []string{"verify"}}}
+	raw, _ = json.Marshal(next)
+	if got, err := New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", chain(), &PlanReview{Assessment: "drop integration"}); err == nil {
+		t.Fatalf("refinement removed the boundary's direct dependency: %+v", got)
+	}
+}
