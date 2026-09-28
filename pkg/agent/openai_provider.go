@@ -427,6 +427,9 @@ func (p *OpenAIProvider) buildOpenAIRequest(req Request, stream bool) *openAICha
 	return openAIReq
 }
 
+// emptyToolResultContent stands in for a tool result that produced no output.
+const emptyToolResultContent = "(no output)"
+
 // convertToOpenAIMessage converts a unified Message to OpenAI's message format.
 func (p *OpenAIProvider) convertToOpenAIMessage(msg Message) openAIMessage {
 	openAIMsg := openAIMessage{
@@ -448,6 +451,13 @@ func (p *OpenAIProvider) convertToOpenAIMessage(msg Message) openAIMessage {
 					openAIMsg.Content = fmt.Sprintf("Error: %s", block.ToolError)
 				} else {
 					openAIMsg.Content = block.ToolOutput
+				}
+				// Content is omitempty, so an empty result (a listing of an
+				// empty directory) would go out with no content at all, and
+				// llama.cpp rejects the whole turn: "invalid message content
+				// type: <nil>".
+				if openAIMsg.Content == "" {
+					openAIMsg.Content = emptyToolResultContent
 				}
 				return openAIMsg
 			}
