@@ -47,6 +47,10 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 		wire.PlanReview.Approved = false
 		wire.Assessment += fmt.Sprintf("; verification lint refused: %v", issues)
 	}
+	if issues := LintHumanBoundaries(plan); len(issues) != 0 {
+		wire.PlanReview.Approved = false
+		wire.Assessment += fmt.Sprintf("; human boundary lint refused: %v", issues)
+	}
 	return &wire.PlanReview, nil
 }
 
@@ -73,6 +77,9 @@ func (p *Planner) RefinePlan(ctx context.Context, intent string, plan *ProjectPl
 	}
 	refined, err := p.parseResponse(response)
 	if err != nil {
+		return nil, err
+	}
+	if err := preserveHumanBoundaries(plan, refined); err != nil {
 		return nil, err
 	}
 	carryGoals(plan, refined)

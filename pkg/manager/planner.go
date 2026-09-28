@@ -402,9 +402,7 @@ func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) erro
 					Status:             release.TaskStatusPending,
 					CreatedAt:          now,
 				}
-				if t.Mode == planner.TaskModeHITL {
-					task.Metadata = map[string]interface{}{"mode": release.TaskModeHITL}
-				}
+				task.Metadata = t.ExecutionMetadata()
 
 				if err := rel.CreateTask(task); err != nil {
 					return fmt.Errorf("import task %s: %w", t.ID, err)
