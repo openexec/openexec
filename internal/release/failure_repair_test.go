@@ -103,6 +103,8 @@ func TestFailureRepairGuardsAndTransactionRollback(t *testing.T) {
 				task.AttemptCount = task.MaxAttempts
 			case "hitl":
 				task.Metadata["mode"] = TaskModeHITL
+				task.Metadata["decision_reason"] = "Owner must grant access"
+				task.Metadata["decision_ref"] = "decision:access"
 			case "branch":
 				task.Git.Branch = "other"
 			}
@@ -120,7 +122,7 @@ func TestFailureRepairGuardsAndTransactionRollback(t *testing.T) {
 			}
 			repair, err := s.CreateFailureRepair(ctx, "task", evidence, "diagnosed cause")
 			if mode == "hitl" {
-				if err != nil || repair.ExecutionMode() != TaskModeHITL {
+				if err != nil || repair.ExecutionMode() != TaskModeHITL || repair.Metadata["decision_reason"] != task.Metadata["decision_reason"] || repair.Metadata["decision_ref"] != task.Metadata["decision_ref"] {
 					t.Fatal("HITL lost", err)
 				}
 				ready, err := RunnableTasks(ctx, s, []string{"story"})

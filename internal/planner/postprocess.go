@@ -80,19 +80,15 @@ func EnforceFastTrack(plan *ProjectPlan, scope string, flow string) {
 				continue
 			}
 
-			if len(s.Tasks) > 1 {
+			if len(s.Tasks) > 1 && canCompactTasks(plan, s) {
 				// Collapse into a single Chassis task
 				var combinedDesc strings.Builder
 				var combinedStrategy strings.Builder
-				mode := ""
 
 				for _, t := range s.Tasks {
 					combinedDesc.WriteString(t.Title + ": " + t.Description + "\n")
 					combinedStrategy.WriteString(t.TechnicalStrategy + " ")
-					// If any merged task needs a human, the chassis does too.
-					if t.Mode == TaskModeHITL {
-						mode = TaskModeHITL
-					}
+
 				}
 
 				chassisTask := Task{
@@ -100,11 +96,33 @@ func EnforceFastTrack(plan *ProjectPlan, scope string, flow string) {
 					Title:              "Chassis: " + s.Title,
 					Description:        combinedDesc.String(),
 					TechnicalStrategy:  "FAST-TRACK: " + combinedStrategy.String() + " Complete implementation and verification in a single atomic loop.",
-					Mode:               mode,
+					Mode:               TaskModeAFK,
 					VerificationScript: s.VerificationScript,
 				}
 				s.Tasks = []Task{chassisTask}
 			}
 		}
 	}
+}
+
+// Compaction must not absorb a human boundary or discard a dependency edge.
+// Retaining the existing tasks is sufficient; no replacement boundary is needed.
+func canCompactTasks(plan *ProjectPlan, story *Story) bool {
+	ids := map[string]bool{}
+	for _, task := range story.Tasks {
+		if (task.Mode != "" && task.Mode != TaskModeAFK) || task.DecisionReason != "" || task.DecisionRef != "" || len(task.DependsOn) != 0 {
+			return false
+		}
+		ids[task.ID] = true
+	}
+	for _, s := range plan.Stories {
+		for _, task := range s.Tasks {
+			for _, dep := range task.DependsOn {
+				if ids[dep] {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }

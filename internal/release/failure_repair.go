@@ -93,7 +93,13 @@ func (s *SQLiteStore) CreateFailureRepair(ctx context.Context, taskID, evidenceI
 		return nil, err
 	}
 	mode := (&Task{Metadata: originalMetadata}).ExecutionMode()
-	repairMetadata, _ := json.Marshal(map[string]interface{}{"repair_of": taskID, "failure_evidence": evidenceID, "diagnosis": diagnosis, "mode": mode})
+	repairFields := map[string]interface{}{"repair_of": taskID, "failure_evidence": evidenceID, "diagnosis": diagnosis, "mode": mode}
+	for _, key := range []string{"decision_reason", "decision_ref"} {
+		if value, ok := originalMetadata[key]; ok {
+			repairFields[key] = value
+		}
+	}
+	repairMetadata, _ := json.Marshal(repairFields)
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err = tx.ExecContext(ctx, `INSERT INTO tasks(id,story_id,title,description,depends_on,task_type,priority,max_attempts,git_branch,git_pr_number,git_pr_url,needs_review,status,created_at,metadata) VALUES(?,?,?,?,?,'fix',?,?,?,?,?,?,'pending',?,?)`, id, storyID, "Repair: "+title, diagnosis, dependencies, priority, maxAttempts-attempts, branch, prNumber, prURL, needsReview, now, string(repairMetadata))
 	if err != nil {

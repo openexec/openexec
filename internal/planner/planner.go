@@ -32,6 +32,8 @@ type Task struct {
 	TechnicalStrategy  string   `json:"technical_strategy"`
 	DependsOn          []string `json:"depends_on"`
 	Mode               string   `json:"mode,omitempty"` // TaskModeAFK (default) or TaskModeHITL
+	DecisionReason     string   `json:"decision_reason,omitempty"`
+	DecisionRef        string   `json:"decision_ref,omitempty"`
 	VerificationScript string   `json:"verification_script"`
 }
 

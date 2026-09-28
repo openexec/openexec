@@ -1,0 +1,125 @@
+package planner
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
+
+// ExecutionMetadata uses the existing native task metadata in both import paths.
+// Missing reasons never convert retained legacy HITL work into automatic work.
+func (t Task) ExecutionMetadata() map[string]interface{} {
+	if t.Mode == "" && t.DecisionReason == "" && t.DecisionRef == "" {
+		return nil
+	}
+	m := map[string]interface{}{"mode": t.Mode}
+	if t.DecisionReason != "" {
+		m["decision_reason"] = t.DecisionReason
+	}
+	if t.DecisionRef != "" {
+		m["decision_ref"] = t.DecisionRef
+	}
+	return m
+}
+
+// LintHumanBoundaries checks newly reviewed plans, not retained task ledgers.
+// Whether the reason is justified still requires independent plan review.
+func LintHumanBoundaries(plan *ProjectPlan) []string {
+	var issues []string
+	for _, s := range plan.Stories {
+		for _, t := range s.Tasks {
+			switch t.Mode {
+			case TaskModeHITL:
+				if strings.TrimSpace(t.DecisionReason) == "" {
+					issues = append(issues, t.ID+": HITL requires a concrete decision_reason")
+				}
+			case "", TaskModeAFK:
+				if t.DecisionReason != "" || t.DecisionRef != "" {
+					issues = append(issues, t.ID+": decision metadata requires HITL mode")
+				}
+			default:
+				issues = append(issues, t.ID+": unknown execution mode")
+			}
+		}
+	}
+	return issues
+}
+
+// Refinement is not an owner answer. Keep retained boundary identities and the
+// graph around them; a rejected refinement cannot replace the original plan.
+func preserveHumanBoundaries(original, refined *ProjectPlan) error {
+	retained := map[string]bool{}
+	for _, story := range original.Stories {
+		for _, task := range story.Tasks {
+			if task.Mode == TaskModeHITL {
+				retained[task.ID] = true
+			}
+		}
+	}
+	if len(retained) == 0 {
+		return nil
+	}
+	// Retain the connected task graph around a boundary, while allowing
+	// unrelated work to be decomposed or removed by ordinary refinement.
+	for changed := true; changed; {
+		changed = false
+		for _, story := range original.Stories {
+			for _, task := range story.Tasks {
+				connected := retained[task.ID]
+				for _, dep := range task.DependsOn {
+					connected = connected || retained[dep]
+				}
+				if !connected {
+					continue
+				}
+				for _, id := range append([]string{task.ID}, task.DependsOn...) {
+					if !retained[id] {
+						retained[id] = true
+						changed = true
+					}
+				}
+			}
+		}
+	}
+	tasks := map[string]Task{}
+	stories := map[string]Story{}
+	for _, s := range refined.Stories {
+		stories[s.ID] = s
+		for _, t := range s.Tasks {
+			tasks[t.ID] = t
+		}
+	}
+	for _, s := range original.Stories {
+		if !slices.ContainsFunc(s.Tasks, func(task Task) bool { return retained[task.ID] }) {
+			continue
+		}
+		nextStory, ok := stories[s.ID]
+		if !ok {
+			return fmt.Errorf("refinement removed story %s around a retained human boundary", s.ID)
+		}
+		for _, dep := range s.DependsOn {
+			if !slices.Contains(nextStory.DependsOn, dep) {
+				return fmt.Errorf("refinement removed story dependency %s", dep)
+			}
+		}
+		for _, t := range s.Tasks {
+			if !retained[t.ID] {
+				continue
+			}
+			next, ok := tasks[t.ID]
+			member := slices.ContainsFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == t.ID })
+			if !ok || !member {
+				return fmt.Errorf("refinement removed task %s around a retained human boundary", t.ID)
+			}
+			if t.Mode == TaskModeHITL && (next.Mode != t.Mode || next.DecisionReason != t.DecisionReason || next.DecisionRef != t.DecisionRef || next.Description != t.Description || next.TechnicalStrategy != t.TechnicalStrategy) {
+				return fmt.Errorf("refinement changed retained human boundary %s", t.ID)
+			}
+			for _, dep := range t.DependsOn {
+				if !slices.Contains(next.DependsOn, dep) {
+					return fmt.Errorf("refinement removed dependency %s from %s", dep, t.ID)
+				}
+			}
+		}
+	}
+	return nil
+}

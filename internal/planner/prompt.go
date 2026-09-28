@@ -41,6 +41,25 @@ func CompletionContractSection(feature string, ops []contracts.Operation) string
 	return sb.String()
 }
 
+// HumanBoundaryRule is shared by generation, review and refinement. Classification
+// describes required owner input; it never grants permission for an effect.
+const HumanBoundaryRule = `EXECUTION AND HUMAN BOUNDARIES:
+Use mode "afk" for planning, ordering, implementation, automated QA, independent
+agent review, ordinary repairs and bounded experiments within the accepted goal.
+Use mode "hitl" only for an unresolved owner preference, a material goal or
+completion-criteria change, missing authority or resources, credentials/access,
+or an action only the human can perform. Planning and QA are not inherently HITL.
+For each HITL task, supply decision_reason explaining the specific unresolved
+boundary and decision_ref if an existing request is known. Never invent approval,
+credentials or a decision reference. Keep preparation runnable before the boundary;
+make only work requiring the answer depend on the HITL task. Preserve existing
+HITL task identity, reason, decision reference and dependencies during refinement,
+including legacy HITL without metadata. An agent cannot reconcile away a human
+boundary. Goal acceptance does not authorize arbitrary spend, publication,
+messages, destructive actions or privilege expansion. Check actual effect authority.
+Do not include secrets in decision reasons or references.
+`
+
 const StoryGenerationPrompt = `You are a software architect generating user stories from an intent document.
 
 Analyze the intent document below and generate a JSON array of user stories.
@@ -72,7 +91,7 @@ RULES:
 11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
 12. EXECUTION MODE: Tag every task with "mode": "afk" or "hitl".
    - "afk" (default): an agent can complete AND verify the task autonomously (code change + script verification).
-   - "hitl": the task requires a human in the loop (manual QA, taste/design judgment, external credentials, irreversible operations). The scheduler never auto-dispatches hitl tasks. Planning and manual QA tasks are ALWAYS hitl.
+` + HumanBoundaryRule + `
 
 OUTPUT FORMAT (JSON object):
 {
@@ -144,7 +163,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 2. Each task is a VERTICAL slice: it crosses every layer it needs and ends in something runnable/verifiable. No Diagnose/Implement/Verify phase tasks.
 3. Do NOT create a Codebase Study story, a Goal Validation/terminus story, or any docs/ARCHITECTURE.md task — this is a small change to an existing project, not a build-out.
 4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok').
-5. Tag each task "mode": "afk" when an agent can complete and verify it alone; "hitl" when a human must act (credentials, approvals, physical/manual steps).
+5. ` + HumanBoundaryRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
 Return ONLY valid JSON, no markdown, in this exact shape:
@@ -169,6 +188,9 @@ implementation readiness.
 
 Your goal is to ensure the stories are SUFFICIENT FOR IMPLEMENTATION and have correct
 dependency modeling for parallel execution.
+
+` + HumanBoundaryRule + `
+Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
 REVIEW THE STORIES AGAINST THESE CRITERIA:
 
@@ -244,7 +266,9 @@ Output ONLY valid JSON, no markdown or explanations.`
 
 const StoryFixPrompt = `You are a software architect fixing user stories based on detailed reviewer feedback.
 
-The reviewer has analyzed the stories and provided a refactoring plan. You MUST follow it.
+The reviewer has analyzed the stories and provided a refactoring plan. Follow it within the accepted goal and retained authority boundaries.
+
+` + HumanBoundaryRule + `
 
 ORIGINAL INTENT:
 %s

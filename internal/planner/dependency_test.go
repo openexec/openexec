@@ -433,7 +433,7 @@ func TestPlanJSON_DependsOnSerialization(t *testing.T) {
 	}
 }
 
-func TestEnforceFastTrack_ChassisInheritsHITLMode(t *testing.T) {
+func TestEnforceFastTrack_PreservesSeparateHITLBoundary(t *testing.T) {
 	plan := &ProjectPlan{
 		Goals: []Goal{{ID: "G-001"}},
 		Stories: []Story{
@@ -458,8 +458,8 @@ func TestEnforceFastTrack_ChassisInheritsHITLMode(t *testing.T) {
 
 	EnforceFastTrack(plan, "surgical", "greenfield")
 
-	if got := plan.Stories[0].Tasks[0].Mode; got != TaskModeHITL {
-		t.Errorf("chassis merging a hitl task must be hitl, got %q", got)
+	if tasks := plan.Stories[0].Tasks; len(tasks) != 2 || tasks[0].Mode != TaskModeAFK || tasks[1].Mode != TaskModeHITL {
+		t.Fatalf("compaction absorbed the human boundary: %+v", tasks)
 	}
 	if got := plan.Stories[1].Tasks[0].Mode; got == TaskModeHITL {
 		t.Errorf("chassis of afk-only tasks must not be hitl, got %q", got)

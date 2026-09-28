@@ -341,9 +341,7 @@ func reviewedPlanRows(plan *planner.ProjectPlan) ([]*release.Goal, []*release.St
 				description += "\n\nTechnical strategy:\n" + t.TechnicalStrategy
 			}
 			task := &release.Task{ID: t.ID, StoryID: s.ID, Title: t.Title, Description: description, VerificationScript: t.VerificationScript, DependsOn: t.DependsOn, Priority: j, MaxAttempts: 3}
-			if t.Mode == planner.TaskModeHITL {
-				task.Metadata = map[string]any{"mode": release.TaskModeHITL}
-			}
+			task.Metadata = t.ExecutionMetadata()
 			tasks = append(tasks, task)
 			story.Tasks = append(story.Tasks, t.ID)
 		}
