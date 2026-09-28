@@ -937,6 +937,21 @@ func TestOpenAIProvider_ConvertToOpenAIMessage(t *testing.T) {
 		}
 	})
 
+	t.Run("empty tool result still carries content", func(t *testing.T) {
+		msg := NewToolResultMessage("call_789", "", nil)
+		encoded, err := json.Marshal(provider.convertToOpenAIMessage(msg))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire map[string]any
+		if err := json.Unmarshal(encoded, &wire); err != nil {
+			t.Fatal(err)
+		}
+		if content, ok := wire["content"].(string); !ok || content == "" {
+			t.Fatalf("tool result sent without content, which llama.cpp rejects: %s", encoded)
+		}
+	})
+
 	t.Run("tool error result", func(t *testing.T) {
 		msg := NewToolResultMessage("call_456", "", fmt.Errorf("something failed"))
 		openAIMsg := provider.convertToOpenAIMessage(msg)
