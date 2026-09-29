@@ -1,6 +1,9 @@
 package planner
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLintVerificationScript(t *testing.T) {
 	falseGreen := []string{
@@ -25,6 +28,41 @@ func TestLintVerificationScript(t *testing.T) {
 	for _, s := range sound {
 		if issues := LintVerificationScript(s); len(issues) != 0 {
 			t.Errorf("sound script %q flagged: %v", s, issues)
+		}
+	}
+}
+
+func TestStaleBaseRefIssue(t *testing.T) {
+	stale := []string{
+		`git diff --name-only main...HEAD -- x | grep -vc y`,
+		`git diff --name-only master..HEAD`,
+		`git log --oneline main..HEAD | wc -l`,
+		`git diff --name-only main -- internal/`,
+		`git merge-base main HEAD`,
+		`test "$(git diff --name-only main...HEAD | wc -l)" -eq 1`,
+	}
+	for _, s := range stale {
+		issue := StaleBaseRefIssue(s)
+		if issue == "" {
+			t.Errorf("expected a stale-base issue for %q", s)
+		} else if !strings.Contains(issue, "origin/") {
+			t.Errorf("issue for %q must name the origin/ fix: %s", s, issue)
+		}
+	}
+
+	sound := []string{
+		`git diff --name-only origin/main...HEAD -- x | grep -vc y`,
+		`git diff --name-only origin/master..HEAD`,
+		`git merge-base origin/main HEAD`,
+		`git diff --name-only upstream/main...HEAD`,
+		`git diff --name-only feature-main...HEAD`,
+		`go test ./cmd/main/...`,
+		`grep -c "func main" cmd/openexec/main.go`,
+		``,
+	}
+	for _, s := range sound {
+		if issue := StaleBaseRefIssue(s); issue != "" {
+			t.Errorf("sound script %q flagged: %s", s, issue)
 		}
 	}
 }

@@ -23,6 +23,43 @@ var falseGreenPatterns = []struct {
 		regexp.MustCompile(`&&[^\n]*\|\|`)},
 }
 
+// staleBaseRefPatterns match a bare default-branch name used as a git base ref:
+// the range form (`main...HEAD`, `master..HEAD`) and a positional argument to
+// git diff/log/merge-base/rev-list. RE2 has no lookbehind, so the ref's
+// preceding context is checked by hand in StaleBaseRefIssue (group 1 is the ref).
+var staleBaseRefPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`\b(main|master)\.\.`),
+	regexp.MustCompile(`\bgit\s+(?:diff|log|merge-base|rev-list)\b[^\n|;&]*?\s(main|master)(?:\s|$|;|\||&|\))`),
+}
+
+// StaleBaseRefIssue reports a verification script that diffs against a bare
+// local `main`/`master`. OpenExec runs tasks in linked candidate worktrees
+// synced to origin/<default>, where the local branch of that name is stale or
+// missing, so such a script fails for correct work or passes for wrong work.
+// Unlike LintVerificationScript this is a hard gate, not a warning. Returns ""
+// when the script is acceptable.
+func StaleBaseRefIssue(script string) string {
+	for _, re := range staleBaseRefPatterns {
+		for _, m := range re.FindAllStringSubmatchIndex(script, -1) {
+			start, ref := m[2], script[m[2]:m[3]]
+			prefix := script[:start]
+			if strings.HasSuffix(prefix, "origin/") {
+				continue
+			}
+			if start > 0 {
+				// Part of a longer ref (upstream/main, feature-main, v1.main): not bare.
+				if c := prefix[start-1]; c == '/' || c == '-' || c == '.' || c == '_' ||
+					(c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+					continue
+				}
+			}
+			return "verification script diffs against the bare local `" + ref + "` ref; use `origin/" + ref +
+				"` — candidate worktrees are synced to origin/<default>, where the local `" + ref + "` is stale or missing"
+		}
+	}
+	return ""
+}
+
 // LintVerificationScript returns human-readable descriptions of false-green
 // anti-patterns found in a verification script. An empty result means none of
 // the known anti-patterns matched — not a guarantee of soundness.

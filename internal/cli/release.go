@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/spf13/cobra"
 )
@@ -934,6 +935,11 @@ for explicit manual imports when needed.`,
 				}
 				if goalVerifyCount[g.ID] == 0 {
 					return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script", g.ID, g.Title)
+				}
+			}
+			for _, s := range stories {
+				if issue := planner.StaleBaseRefIssue(s.VerificationScript); issue != "" {
+					return fmt.Errorf("PLANNING GATE FAILED: story %s: %s", s.ID, issue)
 				}
 			}
 			cmd.Println("✓ Planning Gate passed.")

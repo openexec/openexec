@@ -203,3 +203,58 @@ func TestGetReleaseManager(t *testing.T) {
 		t.Fatal("got nil manager")
 	}
 }
+
+// TestImport_PlanningGate_RejectsStaleBaseRef proves the planning gate refuses a
+// story verification script that diffs against a bare local default branch:
+// candidate worktrees are synced to origin/<default>, so the local branch of
+// that name is stale or missing there.
+func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldCwd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldCwd)
+	os.WriteFile(filepath.Join(tmpDir, "openexec.yaml"), []byte("project:\n  name: \"test-gate\"\n"), 0644)
+	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
+
+	runImport := func(script string) (string, error) {
+		sf := map[string]any{
+			"schema_version": "1.1",
+			"goals":          []map[string]any{{"id": "G-001", "title": "Goal", "description": "Goal"}},
+			"stories": []map[string]any{{
+				"id": "US-001", "title": "Story", "goal_id": "G-001",
+				"verification_script": script,
+				"tasks":               []any{},
+			}},
+		}
+		data, _ := json.Marshal(sf)
+		p := filepath.Join(tmpDir, "stories.json")
+		os.WriteFile(p, data, 0644)
+
+		b := bytes.NewBufferString("")
+		rootCmd.SetOut(b)
+		rootCmd.SetErr(b)
+		rootCmd.SetArgs([]string{"story", "import", p, "--dry-run"})
+		err := rootCmd.Execute()
+		return b.String(), err
+	}
+
+	t.Run("bare main is rejected", func(t *testing.T) {
+		out, err := runImport("git diff --name-only main...HEAD -- x | grep -vc y")
+		if err == nil {
+			t.Fatalf("expected the planning gate to reject a bare main ref; output: %s", out)
+		}
+		if !strings.Contains(err.Error(), "PLANNING GATE FAILED") || !strings.Contains(err.Error(), "origin/") {
+			t.Fatalf("error must name the gate and the origin/ fix, got: %v", err)
+		}
+	})
+
+	t.Run("origin/main passes", func(t *testing.T) {
+		out, err := runImport("git diff --name-only origin/main...HEAD -- x | grep -vc y")
+		if err != nil {
+			t.Fatalf("origin/main must pass the gate, got: %v", err)
+		}
+		if !strings.Contains(out, "✓ Planning Gate passed.") {
+			t.Fatalf("expected gate pass in output: %s", out)
+		}
+	})
+}
