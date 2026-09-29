@@ -119,6 +119,35 @@ func TestPlanner_GenerateCompactPlan(t *testing.T) {
 	}
 }
 
+// Task worktrees are synced to origin/<default> and never advance the local
+// branch of that name, so a verification script diffing against a bare local
+// `main` miscounts the change set. Rule 8 must steer the model to the remote
+// ref; this checks the prompt as rendered by GeneratePlan, not the constant.
+func TestStoryPrompt_RequiresOriginDefaultRef(t *testing.T) {
+	mock := &mockProvider{response: `{"schema_version": "1.1", "stories": [{"id": "US-001", "title": "S", "tasks": []}]}`}
+	if _, err := New(mock).GeneratePlan(context.Background(), "# Test Intent", nil); err != nil {
+		t.Fatalf("GeneratePlan failed: %v", err)
+	}
+	rule8 := mock.lastPrompt
+	if start := strings.Index(rule8, "8. VERIFIABILITY"); start >= 0 {
+		rule8 = rule8[start:]
+		if end := strings.Index(rule8, "\n9. "); end >= 0 {
+			rule8 = rule8[:end]
+		}
+	} else {
+		t.Fatalf("rendered prompt has no rule 8")
+	}
+	for _, want := range []string{
+		"origin/<default>",
+		"git diff --name-only origin/main...HEAD",
+		"NEVER a bare local branch name such as 'main'",
+	} {
+		if !strings.Contains(rule8, want) {
+			t.Errorf("rule 8 of the rendered prompt is missing %q", want)
+		}
+	}
+}
+
 func TestPlanner_ParseResponse(t *testing.T) {
 	p := &Planner{}
 
