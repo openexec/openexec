@@ -1,18 +1,18 @@
 # OpenExec Architecture
 
-Source-backed discovery for US-007 / T-US-007-002, 2026-09-29.
-Baseline: `e9a7336797c91c584b85d00ed80279df27feb342`.
-This replaces the obsolete CLI-only map. OpenExec has both CLI subprocess and
-API provider implementations. This document maps the accepted G-006 evidence
-and recovery work; it does not claim that the pending slices are implemented.
+Current consolidation: US-011 / T-US-011-001, 2026-09-29.
+OpenExec has both CLI subprocess and API provider implementations. This maps
+accepted G-006 evidence and recovery work. The US-007 discovery baseline was
+`e9a7336797c91c584b85d00ed80279df27feb342`; current executed evidence, repository
+blockers and external D2 status live in [delivery evidence](verification-evidence-delivery.md).
 
 ## Context and scope
 
 Outcome: preserve failed verification evidence so native repair can reproduce
 the actual check, and recover legacy diagnostic-free failures with bounded
-recapture. Current code has admitted execution, trusted failure classification,
-SQLite receipts and repair tasks, but loses returned results and does not yet
-provide the required durable private diagnostic handoff or in-loop recapture.
+recapture. Current code retains failed results, private bounded diagnostics and
+SQLite receipts, and resolves diagnostic-free failures through bounded native
+recapture. Both independently verified slices are composed by the final verifier.
 
 The existing native task loop owns implementation, verification, retries and
 repair. Console owns admission/effects, outer Goal review and delivery. Reuse
@@ -21,13 +21,14 @@ no new scheduler, recovery queue, state machine or authority concept is needed.
 Follow the [Simple Loop contract](OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md).
 Complexity delta: concepts added/removed 0; new persistent state, transitions,
 owner decisions and runtime failure modes 0; existing machinery replaced none.
-This stage changes documentation and local discovery verification only.
+This consolidation changes verification and documentation only; production behavior is unchanged.
 
 Read root and docs contributor instructions, working memory and
-[project intent](../PROJECT_INTENT.md). Console Project context was read through
-openexec_get_project(project="openexec"): accepted Goal/Ready revision 4 concerns
-Professional Portfolio Stewardship. The supplied task and candidate SQLite
-G-006 contract narrow this stage. The ledger was read with mode=ro, not edited.
+[project intent](../PROJECT_INTENT.md). Historical US-007 inspection recorded Console Project context through
+openexec_get_project(project="openexec") and read the candidate SQLite ledger
+with mode=ro. Those context observations were not repeated by US-011. The current
+supplied Goal/task contract defines this consolidation's scope; no ledger edits
+or new owner decisions are part of it.
 The older stories.json requirement labels concern another effort; the normalized
 labels below come from current US-007/008/009/011 acceptance clauses in SQLite.
 
@@ -118,7 +119,7 @@ for their separate contracts. These are not new evidence/recovery owners.
 
 The [inspection evidence](VERIFICATION_FAILURE_INSPECTION.md) contains the
 preceding task's detailed source trace and controlled native journey results.
-Those results are historical evidence, not a claim that retention now works.
+Those results are historical evidence; fresh consolidated proof is linked above.
 
 ## Accepted requirement mapping
 
@@ -178,7 +179,7 @@ All listed stories retain G-006 ownership; do not invent REQ-003.
 
 ## Evidence ownership
 
-Reserved paths below are future deliverables, not files claimed to exist today.
+The slice implementations and evidence below exist in the current candidate.
 Only serial implementation/aggregation owners edit the shared dispatcher
 `scripts/verify-retained-verification-evidence.sh`. Independent verifiers run
 standalone helpers, consume completed production/shared fixtures directly and
@@ -220,8 +221,8 @@ python3 -m unittest discover -s scripts/verification -p 'test_discovery.py' -v
 ```
 
 Discovery checks required sections, normalized mapping, exclusive verifier/test
-ownership, source declarations and local documentation links. Unknown or pending
-cases fail closed. It does not execute pending retention/recapture verification
+ownership, source declarations and local documentation links. Unknown or malformed
+cases fail closed. Discovery does not execute retention/recapture verification
 or certify D1/D2. Manually inspected both engine discard branches, admitted
 wrapper, receipt classifier, pipeline callbacks/terminal handoff, manager writes,
 atomic state transaction, repair generation and queue reconciliation at baseline.

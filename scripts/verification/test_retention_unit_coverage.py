@@ -84,5 +84,17 @@ class CoverageGateTests(unittest.TestCase):
             gate.check_tests(log(passes[1:]), required)
 
 
+class ConsolidatedScopeTests(unittest.TestCase):
+    def test_companion_scope_cannot_hide_unowned_or_missing_functions(self):
+        manifest = json.loads(gate.MANIFEST.read_text())
+        companion = json.loads((gate.ROOT / 'docs/verification/recapture-coverage-scope.json').read_text())
+        identities = set(manifest['functions']) | set(companion['functions'])
+        functions = [dict(path=s.split(':')[0], name=s.split(':')[1]) for s in identities]
+        self.assertEqual(len(gate.slice_scope(functions, manifest, companion)), len(manifest['functions']))
+        for bad in (functions[:-1], functions + [dict(path='pkg/new.go', name='unowned')]):
+            with self.assertRaises(ValueError):
+                gate.slice_scope(bad, manifest, companion)
+
+
 if __name__ == "__main__":
     unittest.main()

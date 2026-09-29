@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-011 / T-US-011-001] Final fail-closed technical composition and native
+  journeys are maintained in [delivery evidence](docs/verification-evidence-delivery.md).
+  Current baseline results, per-slice coverage, mutation proof and pending external
+  D2 are recorded there; Console retains canonical gate and delivery ownership.
+
 - [US-009 / T-US-009-005] Shared recapture dispatcher and fail-closed aggregate
   implemented. Fresh scenario, persisted boundary, coverage and protected-format
   evidence is maintained in [recapture evidence](docs/verification-evidence-recapture.md).

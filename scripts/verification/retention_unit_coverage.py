@@ -133,6 +133,19 @@ def check_scope(functions, manifest):
         raise ValueError(f"omitted or stale changed-function scope: {identities}")
 
 
+
+def slice_scope(functions, manifest, companion):
+    """Account for every changed function while measuring this slice separately."""
+    identities = {f['path'] + ':' + f['name'] for f in functions}
+    owned = set(manifest['functions'])
+    other = set(companion['functions'])
+    if not owned or not other or identities != owned | other:
+        raise ValueError('omitted or unexpected consolidated production function')
+    selected = [f for f in functions if f['path'] + ':' + f['name'] in owned]
+    check_scope(selected, manifest)
+    return selected
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--output", type=Path, default=Path("/tmp/openexec-retention-coverage"))
@@ -148,7 +161,8 @@ def main():
         helper = tmp / "inventory"
         run("go", "build", "-o", str(helper), "./scripts/verification/retentioncoverage")
         functions = scope(helper, tmp / "baseline.go")
-        check_scope(functions, manifest)
+        companion = json.loads((ROOT / "docs/verification/recapture-coverage-scope.json").read_text())
+        functions = slice_scope(functions, manifest, companion)
         (output / "scope.json").write_text(json.dumps(functions, indent=2) + "\n")
         blocks = {path: expected_blocks(path, tmp / "instrumented.go") for path in {f["path"] for f in functions}}
         # Pin selected test identities; discover every dedicated unit test as well.
