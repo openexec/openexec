@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-009 / T-US-009-001] Implemented authoritative legacy receipt recapture
+  through the native pipeline with durable task-attempt accounting and retained
+  evidence. Implementation, command-resolution limits, shared fixture interfaces
+  and executed reload/terminal/Settings/regression evidence are recorded once in
+  [legacy recapture](docs/verification/legacy-recapture.md).
+
 - [US-008 / T-US-008-005] Shared retention dispatcher and fail-closed aggregate
   complete. Fresh real-command/reopen/repair, coverage and both discard mutation
   checks passed with an explicit no-skip scenario manifest. Commands, results,

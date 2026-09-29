@@ -1,9 +1,10 @@
 package manager
 
 import (
-	"strings"
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/openexec/openexec/internal/release"
@@ -59,6 +60,7 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 		if err != nil {
 			return err
 		}
+		processedFailure := false
 		for _, task := range retained {
 			if task.Status != release.TaskStatusFailed {
 				continue
@@ -66,9 +68,16 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			id, _ := task.Metadata["verification_failure_evidence"].(string)
 			if id != "" && !isRepairTask(task) {
 				if err := m.repairTaskFromRetainedFailure(ctx, task.ID, id); err != nil {
+					if errors.Is(err, errRecaptureWaiting) {
+						continue
+					}
 					return err
 				}
+				processedFailure = true
 			}
+		}
+		if processedFailure {
+			continue
 		}
 		ready, err := rel.RunnableTasks(ctx, opts.StoryIDs)
 		if err != nil {

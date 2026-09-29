@@ -37,7 +37,9 @@ import (
 // Config controls pipeline behavior.
 type Config struct {
 	// StageExecutor supplies admitted execution; nil retains standalone execution.
-	StageExecutor        blueprint.StageExecutor
+	StageExecutor blueprint.StageExecutor
+	// RecaptureStage restricts this run to one resolved deterministic check.
+	RecaptureStage       *blueprint.Stage
 	FWUID                string
 	WorkDir              string
 	AgentsFS             fs.FS
@@ -363,7 +365,7 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 // If BlueprintID is empty, it defaults to "standard_task".
 func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Deterministic routing: classify task and set context parameters
-	if p.cfg.StageExecutor == nil && p.intentRouter != nil && p.cfg.TaskDescription != "" {
+	if p.cfg.RecaptureStage == nil && p.cfg.StageExecutor == nil && p.intentRouter != nil && p.cfg.TaskDescription != "" {
 		// Pass a real toolset registry so RoutingPlan.Toolset gets populated
 		// via intent-based lookup as well as the keyword selector. Previously
 		// nil, which forced selectToolset down its keyword-only path.
@@ -388,7 +390,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	// Pre-resolve symbols from task description (Layer 2)
-	if p.cfg.StageExecutor == nil && p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
+	if p.cfg.RecaptureStage == nil && p.cfg.StageExecutor == nil && p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
 		pr := &PreResolver{}
 		preResolved := pr.Resolve(ctx, p.cfg.TaskDescription, p.cfg.WorkDir, p.cfg.StateDB)
 		if preResolved != "" {
@@ -398,7 +400,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	// Build context using two-stage assembly
 	var contextPack *ocontext.ContextPack
-	if p.cfg.StageExecutor == nil && p.cfg.ContextTokenBudget > 0 {
+	if p.cfg.RecaptureStage == nil && p.cfg.StageExecutor == nil && p.cfg.ContextTokenBudget > 0 {
 		pack, err := ocontext.BuildContextWithRouting(
 			ctx,
 			p.cfg.WorkDir,
@@ -488,6 +490,17 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			test.Commands = projCfg.Execution.TestCommands
 			verificationStages[test] = true
 		}
+	}
+
+	if p.cfg.RecaptureStage != nil {
+		stage := *p.cfg.RecaptureStage
+		if stage.Type != types.StageTypeDeterministic || len(stage.Commands) != 1 || stage.Action != "" {
+			return fmt.Errorf("invalid verification recapture stage")
+		}
+		stage.MaxRetries, stage.OnFailure, stage.OnSuccess = 0, "", ""
+		stage.RunQualityGates, stage.CreateCheckpoint = false, false
+		bp = &blueprint.Blueprint{ID: "verification_recapture", Name: "Verification recapture", InitialStage: stage.Name, Stages: map[string]*blueprint.Stage{stage.Name: &stage}}
+		verificationStages = map[*blueprint.Stage]bool{&stage: true}
 	}
 
 	// Create executor with agentic runner

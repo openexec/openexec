@@ -109,9 +109,12 @@ for their separate contracts. These are not new evidence/recovery owners.
    Public summaries are redacted; exact argv/cwd and bounded raw streams remain
    privately resolvable. Independent coverage and mutations remain assigned to
    T-US-008-003 and T-US-008-004.
-8. Required US-009 change: detect a gate/exit_code-only legacy receipt, resolve
-   the original check authoritatively and recapture through the same admitted
-   native loop. Persist the bound; do not create repeated evidence-free repairs.
+8. T-US-009-001 implements diagnostic-free legacy receipt recognition,
+   authoritative command resolution and bounded single-stage recapture through
+   the native queue/pipeline. Existing task attempts persist the bound; unusable
+   receipts cannot repeatedly create repairs. Resolution limits, terminal/reload
+   evidence and reusable fixtures are in [legacy recapture](verification/legacy-recapture.md).
+   Independent boundary, coverage and compatibility proof remain assigned below.
 
 The [inspection evidence](VERIFICATION_FAILURE_INSPECTION.md) contains the
 preceding task's detailed source trace and controlled native journey results.

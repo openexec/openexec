@@ -92,6 +92,9 @@ func (m *Manager) repairTaskFromRetainedFailure(ctx context.Context, taskID, evi
 	if err := json.Unmarshal([]byte(step.Metadata), &artifacts); err != nil || !gates.ValidateVerificationFailureArtifacts(artifacts) {
 		return fmt.Errorf("verification failure receipt invalid")
 	}
+	if m.diagnosticFreeReceipt(artifacts) {
+		return m.recaptureTaskFailure(ctx, taskID, evidenceID, step.Phase, artifacts)
+	}
 	rel, err := m.GetInternalReleaseManager()
 	if err != nil {
 		return err

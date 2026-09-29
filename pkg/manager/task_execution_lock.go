@@ -81,6 +81,8 @@ func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Ma
 	}
 	for _, task := range tasks {
 		switch {
+		case task.Status == release.TaskStatusInProgress && task.Metadata["recapture_outcome"] == "running":
+			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='failed' WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
 		case task.Status == release.TaskStatusInProgress:
 			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='pending'
 				WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
