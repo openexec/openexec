@@ -175,8 +175,8 @@ func TestLegacyRecaptureAuthoritativeResolution(t *testing.T) {
 	ctx := context.Background()
 	task, _ := f.env.rel.TaskSnapshot(ctx, "A")
 	refs := recaptureReceipt("lint", 2)
-	if _, err := f.env.mgr.resolveRecaptureCommand(task, "lint", refs); err == nil {
-		t.Fatal("gate name inferred command from present config")
+	if command, err := f.env.mgr.resolveRecaptureCommand(task, "lint", refs); err != nil || command != "" {
+		t.Fatal("named current check was not deferred to execution boundary")
 	}
 	hash, path, err := runtime.RetainCommandEvidence(f.env.dir, runtime.CommandEvidence{Argv: []string{"sh", "-c", "printf original; exit 2"}, Cwd: f.env.dir, ExitCode: 2})
 	if err != nil {

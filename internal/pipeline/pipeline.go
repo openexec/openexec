@@ -494,8 +494,16 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	if p.cfg.RecaptureStage != nil {
 		stage := *p.cfg.RecaptureStage
-		if stage.Type != types.StageTypeDeterministic || len(stage.Commands) != 1 || stage.Action != "" {
+		namedCheck := len(stage.Commands) == 0 && (stage.Name == "lint" || stage.Name == "test")
+		if stage.Type != types.StageTypeDeterministic || (!namedCheck && len(stage.Commands) != 1) || stage.Action != "" {
 			return fmt.Errorf("invalid verification recapture stage")
+		}
+		if namedCheck && p.cfg.StageExecutor == nil {
+			definition := bp.Stages[stage.Name]
+			if definition == nil || definition.Type != types.StageTypeDeterministic || definition.Action != "" || len(definition.Commands) == 0 {
+				return fmt.Errorf("current verification check %s has no authoritative command", stage.Name)
+			}
+			stage.Commands = append([]string(nil), definition.Commands...)
 		}
 		stage.MaxRetries, stage.OnFailure, stage.OnSuccess = 0, "", ""
 		stage.RunQualityGates, stage.CreateCheckpoint = false, false
@@ -716,6 +724,9 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			for key, value := range trustedGates.terminalEvidence(bp, run) {
 				failureArtifacts[key] = value
 			}
+		}
+		if p.cfg.RecaptureStage != nil && len(p.cfg.RecaptureStage.Commands) == 0 {
+			failureArtifacts["recapture_definition"] = "current-check-definition"
 		}
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,

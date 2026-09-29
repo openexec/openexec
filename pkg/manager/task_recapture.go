@@ -42,15 +42,28 @@ func (m *Manager) diagnosticFreeReceipt(artifacts map[string]string) bool {
 	return true
 }
 
-// Resolve only explicit authoritative references. A present-day lint/test
-// configuration or text in a task description cannot identify a historical
-// command. Private content-addressed evidence preserves the original shell
-// command; a task's verification script is authoritative for its verify stage.
-// Ambiguous/multiple checks and foreign working directories fail closed.
-func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, artifacts map[string]string) (string, error) {
+// A missing legacy phase can be recovered only from one validated check.
+func recapturePhase(phase string, artifacts map[string]string) (string, error) {
 	var checks []gates.CheckFailure
-	if json.Unmarshal([]byte(artifacts[gates.VerificationFailureReceiptKey]), &checks) != nil || len(checks) != 1 || checks[0].Gate != phase {
+	if !gates.ValidateVerificationFailureArtifacts(artifacts) || json.Unmarshal([]byte(artifacts[gates.VerificationFailureReceiptKey]), &checks) != nil || len(checks) != 1 {
 		return "", fmt.Errorf("original verification identity is ambiguous")
+	}
+	if phase == "" {
+		phase = checks[0].Gate
+	}
+	if checks[0].Gate != phase {
+		return "", fmt.Errorf("original verification identity is ambiguous")
+	}
+	return phase, nil
+}
+
+// Prefer registered historical shell evidence or the task's verify script.
+// An empty command for lint/test requests the current named check definition
+// at the execution boundary; it makes no claim about historical argv.
+func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, artifacts map[string]string) (string, error) {
+	phase, err := recapturePhase(phase, artifacts)
+	if err != nil {
+		return "", err
 	}
 	command := ""
 	for hash, path := range artifacts {
@@ -65,7 +78,7 @@ func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, arti
 		if err != nil {
 			return "", fmt.Errorf("original verification reference unreadable")
 		}
-		if filepath.Clean(ev.Cwd) != filepath.Clean(m.cfg.WorkDir) || len(ev.Argv) != 3 || (ev.Argv[0] != "sh" && ev.Argv[0] != "/bin/sh") || ev.Argv[1] != "-c" {
+		if filepath.Clean(ev.Cwd) != filepath.Clean(m.cfg.WorkDir) || len(ev.Argv) != 3 || (ev.Argv[0] != "sh" && ev.Argv[0] != "/bin/sh") || ev.Argv[1] != "-c" || strings.TrimSpace(ev.Argv[2]) == "" {
 			return "", fmt.Errorf("original verification command cannot be replayed in this candidate")
 		}
 		if command != "" && command != ev.Argv[2] {
@@ -75,6 +88,9 @@ func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, arti
 	}
 	if command == "" && (phase == "verify" || phase == "verification") {
 		command = task.VerificationScript
+	}
+	if command == "" && (phase == "lint" || phase == "test") {
+		return "", nil
 	}
 	if strings.TrimSpace(command) == "" {
 		return "", fmt.Errorf("original verification command unresolved")
@@ -148,6 +164,10 @@ func (m *Manager) recaptureTaskFailure(ctx context.Context, taskID, evidenceID, 
 	if task.MaxAttempts <= 0 || task.AttemptCount >= task.MaxAttempts {
 		return terminal("exhausted", fmt.Errorf("task attempt limit reached"))
 	}
+	phase, err = recapturePhase(phase, artifacts)
+	if err != nil {
+		return terminal("unresolved", err)
+	}
 	command, err := m.resolveRecaptureCommand(task, phase, artifacts)
 	if err != nil {
 		return terminal("unresolved", err)
@@ -177,7 +197,10 @@ func (m *Manager) recaptureTaskFailure(ctx context.Context, taskID, evidenceID, 
 	if m.cfg.TaskTimeout > 0 && m.cfg.TaskTimeout < timeout {
 		timeout = m.cfg.TaskTimeout
 	}
-	stage := &blueprint.Stage{Name: phase, Type: runtime.StageTypeDeterministic, Commands: []string{command}, Timeout: timeout}
+	stage := &blueprint.Stage{Name: phase, Type: runtime.StageTypeDeterministic, Timeout: timeout}
+	if command != "" {
+		stage.Commands = []string{command}
+	}
 	err = m.start(ctx, taskID, true, WithBlueprint("standard_task"), func(cfg *pipeline.Config) { cfg.RecaptureStage = stage })
 	if err != nil {
 		return terminal("refused", err)

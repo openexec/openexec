@@ -60,8 +60,11 @@ bounded tail retention/redaction and prove a marker beyond 4096 bytes survives.
 
 ## F1 — Legacy incident recapture
 
-Disposition: accepted defect, source-inferred; repair and runtime falsifiers
-pending US-013. Existing fixtures prove verify-script recapture, not this incident.
+Disposition: accepted defect. T-US-013-001 now repairs phase inference and
+named-stage dispatch with an independent incident journey and both runtime
+falsifiers; current proof is in [named recapture](named-recapture.md). Remaining
+story-wide coverage and boundary expansion are pending US-013. The root-cause
+description below records the prerequisite baseline.
 
 - **Root cause:** `pkg/manager/task_recapture.go:resolveRecaptureCommand` requires
   exactly one gate equal to phase, then a registered original shell command or a

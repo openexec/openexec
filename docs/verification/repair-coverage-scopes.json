@@ -73,7 +73,8 @@
         "pkg/manager/task_queue.go:(*Manager).executeTaskQueue",
         "pkg/manager/task_recapture.go:(*Manager).diagnosticFreeReceipt",
         "pkg/manager/task_recapture.go:(*Manager).recaptureTaskFailure",
-        "pkg/manager/task_recapture.go:(*Manager).resolveRecaptureCommand"
+        "pkg/manager/task_recapture.go:(*Manager).resolveRecaptureCommand",
+        "pkg/manager/task_recapture.go:recapturePhase"
       ],
       "planned_functions": [],
       "external_scope": [],

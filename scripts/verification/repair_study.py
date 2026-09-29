@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 OWNERS = {f'REQ-{i:03}': f'US-{i+11:03}' for i in range(1, 5)}
 BASELINE = '09ac4feb2c7325b42f20a4663b9aa111d43fe386'
 CONTRACT_SHA256 = '91f304bb8924b72896c6158ecb8851e23bf6f265d48331063542fe1fd86b9bf8'
-SCOPE_SHA256 = '913f6f6e13bfdf53a121dcef713d76f5644aa9e7ca03f683cacd531a72baa180'
+# US-013 adds recapturePhase to the full-body denominator; no exclusions.
+SCOPE_SHA256 = '76eb5fb2da1543801b82511923eaae090d2c7a9e816d3e8d0a30a4443e711a14'
 DOC = 'docs/verification/repair-study.md'
 JSON_FILES = ('repair-study-contract.json', 'repair-study-provenance.json',
               'repair-requirements.json', 'repair-coverage-scopes.json')

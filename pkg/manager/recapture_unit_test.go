@@ -13,7 +13,7 @@ import (
 )
 
 func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
-	for _, mode := range []string{"script", "verification", "unknown", "invalid", "mismatch", "unregistered", "wrong-path", "unreadable", "foreign", "argv", "ambiguous", "private", "silent", "bad-exit", "output", "diagnostics"} {
+	for _, mode := range []string{"script", "verification", "unknown", "invalid", "mismatch", "unregistered", "wrong-path", "unreadable", "foreign", "argv", "empty-command", "ambiguous", "private", "silent", "bad-exit", "output", "diagnostics"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newRecaptureFixture(t, "exit 0")
 			task, err := f.env.rel.TaskSnapshot(context.Background(), "A")
@@ -28,7 +28,7 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 			wantError, free := false, true
 			switch mode {
 			case "unknown":
-				phase = "lint"
+				phase = "unknown"
 				refs = recaptureReceipt(phase, 2)
 				wantError = true
 			case "invalid":
@@ -49,6 +49,9 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 				if mode == "foreign" {
 					ev.Cwd = "/foreign"
 				}
+				if mode == "empty-command" {
+					ev.Argv[2] = ""
+				}
 				if mode == "argv" {
 					ev.Argv = []string{"go", "test"}
 				}
@@ -66,7 +69,7 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 					}
 				}
 				free = mode == "unregistered" || mode == "wrong-path" || mode == "unreadable" || mode == "bad-exit"
-				wantError = mode == "unregistered" || mode == "wrong-path" || mode == "unreadable" || mode == "foreign" || mode == "argv" || mode == "ambiguous"
+				wantError = mode == "unregistered" || mode == "wrong-path" || mode == "unreadable" || mode == "foreign" || mode == "argv" || mode == "empty-command" || mode == "ambiguous"
 				if mode == "wrong-path" {
 					refs[hash] = "wrong"
 				}

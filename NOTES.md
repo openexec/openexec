@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-013 / T-US-013-001] Single-gate phase inference and current named-check
+  recapture implemented in the native queue. Independent admitted incident,
+  native definition, reload/repair and both resolver negative controls are
+  recorded once in [named recapture](docs/verification/named-recapture.md).
+
 - [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test
   event-to-reload-to-repair tracer implemented. Current verification, independent
   engine/wrapper negative controls and remaining story/review boundaries live in

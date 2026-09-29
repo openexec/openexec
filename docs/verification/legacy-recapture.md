@@ -7,7 +7,10 @@ The receipt digest remains classification, not diagnostic or command authority.
 
 Command resolution accepts a registered content-addressed private shell command
 reference in the same working directory, or the task's authoritative
-`VerificationScript` for its `verify`/`verification` stage. It rejects multiple
+`VerificationScript` for its `verify`/`verification` stage. US-013 now infers a
+missing phase from a sole validated gate and uses the current admitted/native
+lint/test definition when no historical reference exists; see
+[named recapture](named-recapture.md). It rejects multiple
 checks, phase mismatches, ambiguous commands, foreign directories, unreadable
 references and unknown identities. Present-day lint/test configuration and task
 prose do not identify an unknown historical command. Non-shell argv references

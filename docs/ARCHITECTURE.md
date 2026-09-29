@@ -13,9 +13,10 @@ they do not establish the incident or actual Console integration as repaired.
 Outcome: preserve failed verification evidence so native repair can reproduce
 the actual check, and recover legacy diagnostic-free failures with bounded
 recapture. Current code retains failed results, private bounded diagnostics and
-SQLite receipts. Its recapture resolver rejects the empty-phase lint/test incident,
-the public attachment API is missing, and private files can enter target source
-commits. The study records these gaps; product repairs remain prerequisite work.
+SQLite receipts. The public attachment API and empty-phase named-check recapture
+are implemented; current proof is in [admitted evidence](verification/admitted-evidence.md)
+and [named recapture](verification/named-recapture.md). Private storage protection,
+Console adoption and aggregate delivery remain separately owned prerequisites.
 
 The existing native task loop owns implementation, verification, retries and
 repair. Console owns admission/effects, outer Goal review and delivery. Reuse
@@ -46,7 +47,7 @@ names an existing file and a declaration manually inspected for this task.
 | `pkg/runtime/evidence.go` | `RetainCommandEvidence` | Public private-capture API; typed evidence attachment still missing. |
 | `internal/execution/evidence/capture.go` | `Buffer` | Bounded prefix capture; US-012 must preserve diagnostic tails. |
 | `internal/execution/evidence/capture.go` | `Read` | Content-addressed private reader; US-014 owns safe storage and old-reference policy. |
-| `pkg/manager/task_recapture.go` | `resolveRecaptureCommand` | Registered shell/verify-script resolution; US-013 owns empty-phase named-check fallback. |
+| `pkg/manager/task_recapture.go` | `resolveRecaptureCommand` | Registered shell/verify-script resolution; single-gate phase inference and current named-check fallback. |
 | `internal/cli/init.go` | `ensureGitignore` | Target managed ignore block; currently excludes state but not sibling evidence directory. |
 | `internal/blueprint/stage.go` | `StageResult` | Output, Error, Diagnostics, Artifacts, Attempt and timing. |
 | `internal/blueprint/stage.go` | `StageExecutor` | Execute(context.Context, *Stage, *StageInput) (*StageResult, error). |
