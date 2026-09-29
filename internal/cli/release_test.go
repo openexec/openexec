@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -328,6 +329,63 @@ func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "PLANNING GATE FAILED") || !strings.Contains(err.Error(), "T-US-001-002") || !strings.Contains(err.Error(), "origin/") {
 			t.Fatalf("error must name the gate, the task ID and the origin/ fix, got: %v", err)
+		}
+	})
+
+	// Review 474755f1 MEDIUM scripts through the real import gate. Templates use
+	// REF for the default-branch name; each runs for main and master, owned by
+	// the story or by a task.
+	t.Run("reviewer_scripts", func(t *testing.T) {
+		sound := []string{
+			`git diff --exit-code origin/REF...HEAD -- REF`,
+			`grep -Fq 'REF...HEAD' docs/ARCHITECTURE.md`,
+			"# never REF...HEAD\ngit diff --exit-code origin/REF...HEAD",
+		}
+		stale := []string{
+			`git diff 'REF' HEAD`,
+			`git diff "REF..HEAD"`,
+			`git diff 'REF...HEAD'`,
+			`git diff origin/REF...HEAD && git diff REF...HEAD`,
+		}
+		// run imports script as the story's or as task T-US-001-002's script;
+		// the other owner gets a sound origin/REF script.
+		run := func(ref, owner, script string) (string, error) {
+			storyScript := script
+			tasks := []any{"T-US-001-001"}
+			if owner == "task" {
+				storyScript = strings.ReplaceAll("git diff --exit-code origin/REF...HEAD", "REF", ref)
+				tasks = append(tasks, map[string]any{"id": "T-US-001-002", "title": "Task", "verification_script": script})
+			}
+			return runImport(storyScript, tasks)
+		}
+		ownerID := map[string]string{"story": "story US-001", "task": "T-US-001-002"}
+		for _, ref := range []string{"main", "master"} {
+			for _, owner := range []string{"story", "task"} {
+				for i, tmpl := range sound {
+					script := strings.ReplaceAll(tmpl, "REF", ref)
+					t.Run(ref+"/"+owner+"/sound/"+strconv.Itoa(i), func(t *testing.T) {
+						out, err := run(ref, owner, script)
+						if err != nil {
+							t.Fatalf("sound %s script %q was refused: %v", owner, script, err)
+						}
+						if !strings.Contains(out, "✓ Planning Gate passed.") {
+							t.Fatalf("expected gate pass for %q in output: %s", script, out)
+						}
+					})
+				}
+				for i, tmpl := range stale {
+					script := strings.ReplaceAll(tmpl, "REF", ref)
+					t.Run(ref+"/"+owner+"/stale/"+strconv.Itoa(i), func(t *testing.T) {
+						out, err := run(ref, owner, script)
+						if err == nil {
+							t.Fatalf("stale %s script %q was accepted; output: %s", owner, script, out)
+						}
+						if !strings.Contains(err.Error(), ownerID[owner]) || !strings.Contains(err.Error(), "origin/"+ref) {
+							t.Fatalf("error for %q must name %s and origin/%s, got: %v", script, ownerID[owner], ref, err)
+						}
+					})
+				}
+			}
 		}
 	})
 }

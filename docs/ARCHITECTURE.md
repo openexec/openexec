@@ -412,18 +412,19 @@ Review `474755f1d4af4c2b4e1faa5240c74345` (PR #63) worked by code inspection onl
 
 | Reviewer script (each for `main` and `master`) | Expected | `TestStaleBaseRefIssue` template | CLI import (`TestImport_PlanningGate_RejectsStaleBaseRef`) |
 |------|----------|----------------------------------|------------|
-| `git diff --exit-code origin/main...HEAD -- main` | accept | sound `git diff --exit-code origin/REF...HEAD -- REF` | story level, `main` only (`origin/main passes at story and task level`) |
-| `grep -Fq 'main...HEAD' docs/ARCHITECTURE.md` | accept | sound `grep -Fq 'REF...HEAD' docs/ARCHITECTURE.md` | not exercised |
-| Comment-only mention followed by a valid assertion | accept | sound `"# never use REF...HEAD\ngit diff --exit-code origin/REF...HEAD -- internal/"` | not exercised |
-| `git diff 'main' HEAD` | reject | stale `git diff 'REF' HEAD` | not exercised |
-| Quoted two-dot/three-dot ranges | reject | stale `git diff "REF...HEAD"`, `git diff 'REF..HEAD'` | not exercised |
-| Mixed remote/bare comparison | reject | stale `git diff origin/REF...HEAD && git diff REF...HEAD` | not exercised |
+| `git diff --exit-code origin/main...HEAD -- main` | accept | sound `git diff --exit-code origin/REF...HEAD -- REF` | `reviewer_scripts/{main,master}/{story,task}/sound/0` |
+| `grep -Fq 'main...HEAD' docs/ARCHITECTURE.md` | accept | sound `grep -Fq 'REF...HEAD' docs/ARCHITECTURE.md` | `reviewer_scripts/…/sound/1` |
+| Comment-only mention followed by a valid assertion | accept | sound `"# never use REF...HEAD\ngit diff --exit-code origin/REF...HEAD -- internal/"` | `reviewer_scripts/…/sound/2` (`"# never REF...HEAD\ngit diff --exit-code origin/REF...HEAD"`) |
+| `git diff 'main' HEAD` | reject | stale `git diff 'REF' HEAD` | `reviewer_scripts/…/stale/0` |
+| Quoted two-dot/three-dot ranges | reject | stale `git diff "REF...HEAD"`, `git diff 'REF..HEAD'` | `reviewer_scripts/…/stale/1` (`"REF..HEAD"`), `…/stale/2` (`'REF...HEAD'`) |
+| Mixed remote/bare comparison | reject | stale `git diff origin/REF...HEAD && git diff REF...HEAD` | `reviewer_scripts/…/stale/3` |
 | Unquoted bare range, story and task owner | reject | stale `git diff --name-only REF...HEAD …`, `git log REF..HEAD` | story `main...HEAD`, task `master..HEAD` and `main..HEAD` (every file shape) |
+
+The `reviewer_scripts` group runs each template for `main` and `master`, owned by the story or by task `T-US-001-002`, through `storyImportCmd.RunE` (28 leaves). Stale leaves require the owner (`story US-001` or `T-US-001-002`) and `origin/<ref>` in the error; sound leaves require `✓ Planning Gate passed.`.
 
 **Remaining gaps at HEAD**
 
-1. **Reviewer's exact MEDIUM scripts through the CLI import.** `TestStaleBaseRefIssue` pins every script for both `main` and `master` at the detector. `TestImport_PlanningGate_RejectsStaleBaseRef` exercises only the unquoted ranges and the `-- main` pathspec (story level, `main`). It does not exercise the literal-text `grep -Fq`, the comment-only script, the quoted refs or the mixed comparison, and it has no `master` variants of those or task-owner variants. The CLI passes each script unchanged to the same `StaleBaseRefIssue`, so this gap is in the test matrix, not in the gate.
-2. **MEDIUM falsify controls not yet recorded.** Restoring the whole-script regexes or stubbing the detector has not been run yet; US-017 records it below. (Route 3 end to end, compact refined/retained replay and the HIGH controls were closed by US-016.)
+None. Both findings' cases are exercised at their gate, and the HIGH and MEDIUM falsify controls are recorded below.
 
 ### Review 474755f1 — HIGH negative controls
 
@@ -474,6 +475,26 @@ planner_test.go:174: rule 4 of the rendered compact prompt is missing "NEVER a b
 No CLI route gap was open for the HIGH finding (goal-less and legacy shapes were already covered), so `TestImport_PlanningGate_StaleBaseRoutes` was not added.
 
 ### Review 474755f1 — MEDIUM negative controls
+
+Run 2026-09-29 in the candidate worktree (US-017). Each mutation of `StaleBaseRefIssue` (`internal/planner/lint.go`) was applied on its own and `go test ./internal/cli/ -count=1 -run 'TestImport_PlanningGate_RejectsStaleBaseRef/reviewer_scripts' -v` was run. `git checkout -- internal/planner/lint.go` then restored the file, and `git diff --exit-code HEAD -- internal/planner/lint.go` was clean before the next step. Neither mutation is committed. Baseline and final rerun: all 28 `reviewer_scripts` leaves pass, and `go test ./internal/planner/ ./internal/cli/` → `ok`.
+
+**(a) Restore the whole-script regexes** (the pre-`e63086c9` `staleBaseRefPatterns` loop). 16 of 28 leaves fail: every sound leaf, plus `stale/0`. The quoted ranges and the mixed comparison still match the range regex, so they stay rejected:
+```
+--- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/reviewer_scripts/{main,master}/{story,task}/sound/{0,1,2}
+--- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/reviewer_scripts/{main,master}/{story,task}/stale/0
+release_test.go:369: sound story script "git diff --exit-code origin/main...HEAD -- main" was refused: PLANNING GATE FAILED: story US-001: verification script diffs against the bare local `main` ref; ...
+release_test.go:369: sound task script "grep -Fq 'master...HEAD' docs/ARCHITECTURE.md" was refused: PLANNING GATE FAILED: story US-001 task T-US-001-002: ...
+release_test.go:369: sound story script "# never main...HEAD\ngit diff --exit-code origin/main...HEAD" was refused: ...
+release_test.go:381: stale task script "git diff 'master' HEAD" was accepted; output: Note: This performs a one-time import. ...
+```
+
+**(b) `return ""`** (the detector always accepts). 16 of 28 leaves fail: every stale leaf. Every sound leaf still passes:
+```
+--- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/reviewer_scripts/{main,master}/{story,task}/stale/{0,1,2,3}
+release_test.go:381: stale story script "git diff \"main..HEAD\"" was accepted; ...
+release_test.go:381: stale task script "git diff 'master...HEAD'" was accepted; ...
+release_test.go:381: stale story script "git diff origin/main...HEAD && git diff main...HEAD" was accepted; ...
+```
 
 ---
 
