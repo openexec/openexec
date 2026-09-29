@@ -169,7 +169,18 @@ func renumbering(original, refined *ProjectPlan, present map[string]bool) (stori
 	for _, s := range original.Stories {
 		for _, t := range s.Tasks {
 			reason := strings.TrimSpace(t.DecisionReason)
-			if t.Mode != TaskModeHITL || reason == "" || present[t.ID] {
+			if t.Mode != TaskModeHITL || reason == "" {
+				continue
+			}
+			// The boundary kept its id but its story was renumbered around it
+			// ("refinement removed story US-009" for a plan that returned
+			// T-US-009-003 unchanged inside US-019).
+			if present[t.ID] {
+				for _, ns := range refined.Stories {
+					if ns.ID != s.ID && slices.ContainsFunc(ns.Tasks, func(nt Task) bool { return nt.ID == t.ID }) {
+						stories[s.ID] = ns.ID
+					}
+				}
 				continue
 			}
 			var matches [][2]string

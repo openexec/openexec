@@ -196,6 +196,26 @@ func TestHumanBoundaryRefinementMayRenumberTheBoundaryStory(t *testing.T) {
 	if got, err := refine(twice); err == nil {
 		t.Fatalf("ambiguous renumbering accepted: %+v", got)
 	}
+	// Goal 10a38d05 on fotoyks, after the fix above: refinement renumbered the
+	// story and its preparation but kept the boundary's own id, T-US-009-003,
+	// inside US-019.
+	kept := plan("US-019", reason)
+	kept.Stories[1].Tasks[2].ID = "T-US-009-003"
+	got, err = refine(kept)
+	if err != nil {
+		t.Fatalf("boundary kept under its own id in a renumbered story refused: %v", err)
+	}
+	accept = got.Stories[1].Tasks[2]
+	if accept.ID != "T-US-009-003" || accept.Description != "Owner accepts" || !reflect.DeepEqual(accept.DependsOn, []string{"T-US-019-001", "T-US-019-002"}) {
+		t.Fatalf("moved boundary not kept as planned: %+v", accept)
+	}
+	// Moving it is still not dropping the work it decides on.
+	keptDropped := plan("US-019", reason)
+	keptDropped.Stories[1].Tasks = keptDropped.Stories[1].Tasks[2:]
+	keptDropped.Stories[1].Tasks[0].ID, keptDropped.Stories[1].Tasks[0].DependsOn = "T-US-009-003", nil
+	if got, err := refine(keptDropped); err == nil {
+		t.Fatalf("moved boundary dropped its dependencies: %+v", got)
+	}
 	// Renumbering must not drop the work the owner decides on.
 	dropped := plan("US-019", reason)
 	dropped.Stories[1].Tasks = dropped.Stories[1].Tasks[1:]
