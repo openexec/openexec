@@ -32,29 +32,59 @@ dispositions preserve concurrent status changes. No schema migration is needed.
 
 ## Executed verification
 
-On 2026-09-29 in the candidate workspace:
+On 2026-09-29 in the candidate workspace, refreshed by repair task
+`repair-9d90217db3207e2ed19c0190430c1ab4`:
+
+The supplied persisted failure receipt contains only gate `test` and exit 2;
+it does not establish the historical failing assertion. Reproduction found
+`TestInjectedExecutorUsesRealQueueAndTrustedRepair/typed_failure` failing with
+`verification recapture unresolved: original verification command unresolved`.
+Its injected executor returned a bare typed exit from `false`, without command
+evidence, but expected immediate repair. That expectation conflicts with the
+accepted diagnostic-free receipt behavior. The fixture now retains the actual
+silent subprocess's argv, cwd and observed exit through the existing capture
+API. Its original repair/resume, attempt-count, no-duplicate and no-host-fallback
+assertions remain. The forged-artifact refusal remains, and a separate legacy
+receipt case proves that missing identity produces `needs_review`/`unresolved`
+without a repair or extra attempt. No production behavior or gate was changed.
+
+The focused command below failed before the fixture repair and passed afterward
+(three subcases). Local logs are `/tmp/openexec-repair-repro.log` and
+`/tmp/openexec-repair-fixed.log`.
 
 - `bash scripts/verify-retained-verification-evidence.sh --case legacy-recapture`
   passed the explicit ten-completion scenario manifest, including four terminal
   subcases. The verifier rejects missing, skipped, duplicate or unexpected test
   completions and writes fresh JSONL and result JSON under the printed temporary
-  evidence directory.
+  evidence directory. Fresh result:
+  `/tmp/openexec-legacy-recapture-cfx1o903/result.json`.
 - Targeted Go regression execution passed manager task/queue/restart/repair,
   pause/cancellation, retained-result and retention checks; release task and
   runnable selection checks; pipeline retention/classification checks; and
-  blueprint capture checks. Pattern and command are below. The selected state
+  blueprint capture checks, plus the injected-executor and cancellation cases.
+  Pattern and command are below; log: `/tmp/openexec-repair-regression.log`. The selected state
   package had no matching tests; no state-package test coverage is claimed.
 - Python verifier suite: 24 tests passed. Dispatcher discovery, shell syntax,
   and `git diff --check` passed.
 
 ```sh
 export GOCACHE=/tmp/openexec-recapture-go-cache
-go test ./pkg/manager ./internal/release ./internal/pipeline ./internal/blueprint ./pkg/db/state -run 'TestLegacyRecapture|TestTask|TestFreshTaskQueue|TestLiveWorkspace|TestPaused|TestStartRefusesTerminal|TestCancelledQueue|TestRetainedResult|TestRetention|TestConfiguredVerification|TestVerificationFailure|TestRunnable' -count=1 -timeout=90s
+go test ./pkg/manager -run '^TestInjectedExecutorUsesRealQueueAndTrustedRepair$' -count=1 -timeout=30s
+go test ./pkg/manager ./internal/release ./internal/pipeline ./internal/blueprint ./pkg/db/state -run 'TestInjected|TestCancelledInjected|TestLegacyRecapture|TestTask|TestFreshTaskQueue|TestLiveWorkspace|TestPaused|TestStartRefusesTerminal|TestCancelledQueue|TestRetainedResult|TestRetention|TestConfiguredVerification|TestVerificationFailure|TestRunnable' -count=1 -timeout=90s
 python3 -m unittest discover -s scripts/verification -p 'test_*.py' -q
 bash scripts/verify-retained-verification-evidence.sh --case discovery
 bash -n scripts/verify-retained-verification-evidence.sh
 git diff --check
 ```
+
+Broader reproduction is not a full-gate pass: `make test` was interrupted by
+sandbox refusal of provider access to `api.anthropic.com`. A direct Go run first
+encountered the read-only default cache; the writable cache above resolved that
+environment issue. The whole manager suite with `-timeout=60s` exposed the
+fixture failure before reaching its timeout during scheduler tests. These runs
+are recorded in `/tmp/openexec-repair-test.log` and
+`/tmp/openexec-repair-manager.log`. Canonical full gates remain with the
+repository runner; the targeted commands above completed successfully.
 
 Real subprocess failure recapture runs through queue → admitted stage → native
 failure persistence → database close/reopen → usable private artifact → one
