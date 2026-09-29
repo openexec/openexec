@@ -4,6 +4,23 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-008 / T-US-008-002] Implemented shared production bounded capture, private
+  artifact reads, explicit toolchain allowlisting, redacted public diagnostics,
+  and artifact-reference propagation separate from classification digests.
+  evidence-boundaries and retained-result verifiers passed real commands through
+  database reopen and persisted repair state; targeted gate/capture, engine,
+  native deterministic command, terminal receipt, atomic task failure,
+  repair/restart and admitted cancellation regressions passed. Discovery, shell
+  syntax and diff checks passed. Broader package execution attempted blocked
+  provider access; full canonical gates remain with the repository runner.
+  Adapter contract and exact bounds are maintained in docs/ARCHITECTURE.md.
+  Compatibility: no project-loading, schema or migration changes; existing
+  legacy receipt parsing and repair/restart checks passed. Complexity: reuse of
+  artifact files, run_steps and typed failures; no new scheduler concepts,
+  transitions or owner decisions. New internal capture helper/private artifact
+  payload only; capture-storage failure refuses repair authority. Independent
+  coverage and mutation verification retain their assigned task ownership.
+
 - [US-008 / T-US-008-001] Both engine APIs retain non-nil failed results.
   Pipeline terminal failure carries existing artifact references, stage identity,
   output and diagnostics; typed receipts alone authorize repair. References and
@@ -17,7 +34,7 @@ Raw capture. One line per thought, any grammar.
   Compatibility: no project loading/schema/migration changes; legacy receipt
   parsing and existing repair/restart journeys remain supported. Complexity:
   no new persistent concepts, transitions or owner decisions; existing machinery
-  reused. Privacy/boundary and independent mutation/coverage work retain their
+  reused. Independent mutation/coverage work retains its
   assigned task ownership in docs/ARCHITECTURE.md.
 
 - [US-007 / T-US-007-002] Source-backed architecture, normalized requirement

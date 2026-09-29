@@ -945,10 +945,12 @@ func (a *gateRunnerAction) terminalEvidence(bp *blueprint.Blueprint, run *bluepr
 	}
 	// The receipt is captured by the actual local gate action in this stage.
 	// Do not copy StageResult.Artifacts, which may be worker-controlled.
-	return map[string]string{
-		gates.VerificationFailureReceiptKey: a.receipt[gates.VerificationFailureReceiptKey],
-		gates.VerificationFailureDigestKey:  a.receipt[gates.VerificationFailureDigestKey],
+	// Include private references captured by this trusted runner alongside the receipt.
+	retained := make(map[string]string, len(a.receipt))
+	for key, value := range a.receipt {
+		retained[key] = value
 	}
+	return retained
 }
 
 func (a *gateRunnerAction) Execute(ctx context.Context, req actions.ActionRequest) (actions.ActionResponse, error) {

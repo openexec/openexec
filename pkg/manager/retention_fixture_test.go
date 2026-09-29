@@ -1,21 +1,19 @@
 package manager
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/openexec/openexec/pkg/runtime"
 )
 
 const retentionMarker = "RETAINED_EXIT_TWO"
-const retentionLimit = 4096
+const retentionLimit = runtime.EvidenceStreamLimit
 
 // retentionFixture exercises the admitted StageExecutor seam with a real
 // process and an existing content-addressed evidence file, without a provider.
@@ -25,27 +23,12 @@ type retentionFixture struct {
 	argv       []string
 	hash, path string
 	last       *runtime.StageResult
+	secrets    []string
+	toolchain  map[string]string
+	mode       string
 }
 
-type retentionEvidence struct {
-	Argv           []string
-	Cwd            string
-	ExitCode       int
-	Stdout, Stderr string
-}
-
-type retentionBuffer struct{ buffer bytes.Buffer }
-
-func (b *retentionBuffer) Write(p []byte) (int, error) {
-	n := len(p)
-	if remaining := retentionLimit - b.buffer.Len(); remaining > 0 {
-		if len(p) > remaining {
-			p = p[:remaining]
-		}
-		_, _ = b.buffer.Write(p)
-	}
-	return n, nil
-}
+type retentionEvidence = runtime.CommandEvidence
 
 func newRetentionFixture(t *testing.T, dir string) *retentionFixture {
 	t.Helper()
@@ -61,28 +44,67 @@ func (f *retentionFixture) Execute(ctx context.Context, stage *runtime.Stage, _ 
 	if stage.Name != "test" {
 		return result, nil
 	}
+	switch f.mode {
+	case "nil-error":
+		return nil, errors.New("transport token=NIL_ERROR_SENTINEL")
+	case "refusal":
+		return result, errors.New("admission refused token=REFUSAL_SENTINEL")
+	case "cancel":
+		cancelled, cancel := context.WithCancel(ctx)
+		cancel()
+		cmd := exec.CommandContext(cancelled, f.argv[0], f.argv[1:]...)
+		err := cmd.Run()
+		result.Status = runtime.StageStatusFailed
+		return result, runtime.VerificationCommandFailure(cancelled, stage.Name, err)
+	}
 	cmd := exec.CommandContext(ctx, f.argv[0], f.argv[1:]...)
 	cmd.Dir = f.dir
-	var stdout, stderr retentionBuffer
+	var stdout, stderr runtime.EvidenceBuffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
-	if cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 2 {
+	execErr := cmd.Run()
+	err := execErr
+	expected := 2
+	if f.mode == "success" {
+		expected = 0
+	}
+	if cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != expected {
 		f.t.Fatalf("fixture exit: %v", err)
 	}
-	raw, marshalErr := json.Marshal(retentionEvidence{f.argv, cmd.Dir, cmd.ProcessState.ExitCode(), stdout.buffer.String(), stderr.buffer.String()})
-	if marshalErr != nil {
-		f.t.Fatal(marshalErr)
-	}
-	hash := sha256.Sum256(raw)
-	f.hash = hex.EncodeToString(hash[:])
-	f.path = filepath.Join(f.dir, f.hash+".log")
-	if writeErr := os.WriteFile(f.path, raw, 0600); writeErr != nil {
-		f.t.Fatal(writeErr)
+	f.hash, f.path, err = runtime.RetainCommandEvidence(f.dir, retentionEvidence{
+		Argv: f.argv, Cwd: cmd.Dir, ExitCode: cmd.ProcessState.ExitCode(), Stdout: stdout.String(), Stderr: stderr.String(),
+		StdoutTruncated: stdout.Truncated, StderrTruncated: stderr.Truncated, Toolchain: f.toolchain,
+	})
+	if err != nil {
+		f.t.Fatal(err)
 	}
 	result.Status = runtime.StageStatusFailed
-	result.Output, result.Diagnostics = stdout.buffer.String(), stderr.buffer.String()
-	result.Error = "verification fixture exited 2"
+	if f.mode == "success" {
+		result.Status = runtime.StageStatusCompleted
+	}
+	result.Output, result.Diagnostics = runtime.PublicVerificationStream(&stdout, f.secrets), runtime.PublicVerificationStream(&stderr, f.secrets)
+	if execErr != nil {
+		result.Error = "verification fixture exited 2"
+	}
 	result.Artifacts = map[string]string{f.hash: f.path}
 	f.last = result
-	return result, runtime.VerificationCommandFailure(ctx, stage.Name, err)
+	return result, runtime.VerificationCommandFailure(ctx, stage.Name, execErr)
+}
+
+// Shared boundary inputs are consumed independently by coverage and mutation tests.
+func newRetentionBoundaryFixture(t *testing.T, dir, mode string) *retentionFixture {
+	f := newRetentionFixture(t, dir)
+	f.mode = mode
+	f.secrets = []string{"COMMAND_VALUE_SENTINEL", "DIAGNOSTIC_VALUE_SENTINEL"}
+	f.argv = append(f.argv, "--token=COMMAND_VALUE_SENTINEL")
+	f.toolchain = map[string]string{"go_version": strings.Repeat("v", 200), "PATH": "ENVIRONMENT_SENTINEL", "unlisted_version": "UNLISTED_SENTINEL"}
+	exit := "2"
+	if mode == "success" {
+		exit = "0"
+	}
+	script := "printf 'RETAINED_EXIT_TWO token=COMMAND_VALUE_SENTINEL\\n'; printf 'RETAINED_EXIT_TWO DIAGNOSTIC_VALUE_SENTINEL\\n' >&2\n" +
+		"i=0; while [ $i -lt 6000 ]; do printf x; printf y >&2; i=$((i+1)); done\nexit " + exit + "\n"
+	if err := os.WriteFile(f.argv[1], []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return f
 }

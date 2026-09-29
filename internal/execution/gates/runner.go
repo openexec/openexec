@@ -1,16 +1,18 @@
 package gates
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/openexec/openexec/internal/execution/evidence"
 )
 
 // GateResult holds the result of running a single gate.
 type GateResult struct {
+	artifacts    map[string]string
 	verifiedExit bool          // Set only by the local command runner, never report JSON.
 	Name         string        `json:"name"`
 	Passed       bool          `json:"passed"`
@@ -127,20 +129,35 @@ func (r *Runner) RunGate(ctx context.Context, name string) GateResult {
 	cmd := exec.CommandContext(gateCtx, "bash", "-c", gate.Command) // #nosec G204
 	cmd.Dir = r.projectDir
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr evidence.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	result.Duration = time.Since(startTime)
+	exitCode := -1
+	if cmd.ProcessState != nil {
+		exitCode = cmd.ProcessState.ExitCode()
+	}
+	hash, path, captureErr := evidence.Write(r.projectDir, evidence.Command{
+		Argv: cmd.Args, Cwd: cmd.Dir, ExitCode: exitCode,
+		Stdout: stdout.String(), Stderr: stderr.String(),
+		StdoutTruncated: stdout.Truncated, StderrTruncated: stderr.Truncated,
+	})
+	if captureErr != nil {
+		result.Error = "private verification evidence could not be retained"
+		result.ExitCode = -1
+		return result
+	}
+	result.artifacts = map[string]string{hash: path}
 
 	// Combine stdout and stderr for output
-	output := stdout.String()
+	output := evidence.PublicStream(&stdout, evidence.CommandSecrets(gate.Command))
 	if stderr.Len() > 0 {
 		if output != "" {
 			output += "\n"
 		}
-		output += stderr.String()
+		output += evidence.PublicStream(&stderr, evidence.CommandSecrets(gate.Command))
 	}
 	result.Output = output
 
@@ -150,7 +167,7 @@ func (r *Runner) RunGate(ctx context.Context, name string) GateResult {
 		} else {
 			result.ExitCode = -1
 		}
-		result.Error = err.Error()
+		result.Error = evidence.Public(err.Error(), evidence.CommandSecrets(gate.Command))
 		result.verifiedExit = gateCtx.Err() == nil && result.ExitCode > 0 && result.ExitCode < 126
 
 		// Check if warning mode

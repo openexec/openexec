@@ -99,8 +99,16 @@ for their separate contracts. These are not new evidence/recovery owners.
 7. T-US-008-001's retained-result verifier runs an admitted exit-2 fixture through
    both engine APIs and pipeline persistence, then closes/reopens the database
    before repair creation. It checks exact argv/cwd, bounded stdout/stderr,
-   a diagnostic marker and a usable artifact reference. Production privacy,
-   redaction and boundary coverage remain assigned to subsequent US-008 tasks.
+   a diagnostic marker and a usable artifact reference. T-US-008-002 adds
+   production bounded capture and private artifact access through
+   internal/execution/evidence, exposed to admitted adapters by pkg/runtime.
+   Native configured checks and gates use the same helper. The evidence-boundaries
+   verifier covers secret-bearing oversized streams, fixed toolchain version
+   keys, owner-only file/directory modes, tamper/path/symlink refusal, and
+   failure/success/refusal/cancellation/nil-result outcomes after database reopen.
+   Public summaries are redacted; exact argv/cwd and bounded raw streams remain
+   privately resolvable. Independent coverage and mutations remain assigned to
+   T-US-008-003 and T-US-008-004.
 8. Required US-009 change: detect a gate/exit_code-only legacy receipt, resolve
    the original check authoritatively and recapture through the same admitted
    native loop. Persist the bound; do not create repeated evidence-free repairs.
@@ -137,8 +145,17 @@ All listed stories retain G-006 ownership; do not invent REQ-003.
 - Private diagnostic evidence is separate from classification fingerprints.
   Exact private command identity must remain resolvable without exposing secret
   values publicly. Bound stdout/stderr; redact command values and diagnostics;
-  explicitly allowlist toolchain metadata, never dump the environment. These
-  are US-008 obligations, not claims about current capture implementation.
+  explicitly allowlist toolchain metadata, never dump the environment.
+  Capture retains 4096 bytes per stream with truncation flags; toolchain input
+  accepts only go_version, node_version, npm_version, python_version and
+  rustc_version, each capped at 128 bytes. Admitted adapters use EvidenceBuffer,
+  RetainCommandEvidence and PublicVerificationStream; they supply known secret
+  values from admission/configuration because arbitrary prose secrets cannot be
+  inferred reliably. Common credential assignments are additionally redacted.
+  Truncated public streams omit the incomplete final line. Exact private payloads
+  live in ignored .openexec-verification (0700), with content-addressed files
+  (0600); ReadCommandEvidence requires matching hashes and rejects public modes,
+  traversal and symlinks. No public evidence-content endpoint is introduced.
 - Engine stage retry counters/MaxTotalRetries differ from persisted task attempts.
   Fresh-queue reconciliation already reopens eligible receipt-free failures once
   under the lock; it is broader than diagnostic-free recapture. Do not reset
