@@ -63,9 +63,9 @@ class DiscoveryTests(unittest.TestCase):
         self.change('(LIGHT_MODE.md)', '(missing.md)')
         self.assertIn("broken documentation link", "\n".join(verify(self.root)[0]))
 
-    def test_dispatcher_refuses_unknown_pending_and_malformed_cases(self):
+    def test_dispatcher_refuses_unknown_and_malformed_cases(self):
         script = ROOT / "scripts/verify-retained-verification-evidence.sh"
-        for args in ([], ['--case'], ['--case', 'unknown'], ['--case', 'retention-story'],
+        for args in ([], ['--case'], ['--case', 'unknown'],
                      ['--case', 'discovery', 'extra']):
             with self.subTest(args=args):
                 result = subprocess.run(['bash', str(script), *args], cwd=self.root,

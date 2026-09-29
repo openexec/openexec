@@ -4,10 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-008 / T-US-008-005] Shared retention dispatcher and fail-closed aggregate
+  complete. Fresh real-command/reopen/repair, coverage and both discard mutation
+  checks passed with an explicit no-skip scenario manifest. Commands, results,
+  reload assertions and runner-owned gates are recorded once in
+  [retention evidence](docs/verification-evidence-retention.md).
+
 - [US-008 / T-US-008-004] Standalone isolated discard mutation verification
   and dedicated admitted repair fixtures are complete. Results and verifier
   controls are maintained in [mutation evidence](docs/verification/retention-mutations.md).
-  Shared verifier composition remains with T-US-008-005.
+  Shared composition is recorded in the T-US-008-005 evidence above.
 
 - [US-008 / T-US-008-003] Added dedicated retained-evidence unit tests and the
   standalone full-body coverage gate. Scope, baseline, executed results and
