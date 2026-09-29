@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-007 inspection] Current execution/repair source trace and verification:
+  [inspection evidence](docs/VERIFICATION_FAILURE_INSPECTION.md). Inspection only;
+  the broader implementation and delivery remain outside this task.
+
 - [Simple Loop contract, 2026-09-14] `fix/native-reviewed-planning` exposes
   existing compact generation through `Manager.Plan`; native reviewed-plan
   replay/refinement/import and task execution remain canonical. Compact
@@ -85,6 +89,11 @@ Raw capture. One line per thought, any grammar.
 - [task] Supply OpenExec's read-only evidence dependency for Agent Console's
   external advisory MCP plan: complete V2.1 freshness and V2.3 secured graph
   access, then expose typed checkout-bound reads with body provenance.
+
+## Questions
+
+- US-007 implementation interface questions are maintained in the
+  [inspection evidence](docs/VERIFICATION_FAILURE_INSPECTION.md#unresolved-interface-questions-for-implementation).
 
 ## For me
 - [me] Laki env for Juha
