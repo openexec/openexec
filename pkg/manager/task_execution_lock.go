@@ -63,19 +63,33 @@ func entryFinished(e *entry) bool {
 // restart. A live manager cannot be displaced by merely constructing another.
 // Unknown interrupted work resumes with a new, counted task attempt; no prior
 // resource consumption or completion evidence is refunded or fabricated.
+//
+// A failed task with attempts left is reopened the same way. A fresh queue is
+// a fresh attempt: whoever started it (a diagnosis that changed the candidate,
+// a delivered repair, the owner pressing resume) did so because something may
+// have changed. Leaving the task failed answered every such attempt with "no
+// executable work" before it ran anything, so each one needed a hand-edited
+// ledger to mean anything. Bounded by the task's own max_attempts, reopened
+// once per queue and never inside it; a failed check keeps its repair path.
 func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Manager, storyIDs []string) error {
 	tasks, err := rel.TasksInStories(ctx, storyIDs)
 	if err != nil {
 		return err
 	}
 	for _, task := range tasks {
-		if task.Status != release.TaskStatusInProgress {
+		switch {
+		case task.Status == release.TaskStatusInProgress:
+			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='pending'
+				WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
+		case task.Status == release.TaskStatusFailed && task.AttemptCount < task.MaxAttempts &&
+			task.Metadata["verification_failure_evidence"] == nil && task.ExecutionMode() != release.TaskModeHITL:
+			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='pending'
+				WHERE id=? AND status='failed' AND attempt_count=? AND attempt_count < max_attempts`, task.ID, task.AttemptCount)
+		default:
 			continue
 		}
-		_, err := m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='pending'
-			WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
 		if err != nil {
-			return fmt.Errorf("reconcile interrupted task %s: %w", task.ID, err)
+			return fmt.Errorf("reconcile retained task %s: %w", task.ID, err)
 		}
 	}
 	return nil
