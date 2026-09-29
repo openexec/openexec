@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-008 / T-US-008-004] Standalone isolated discard mutation verification
+  and dedicated admitted repair fixtures are complete. Results and verifier
+  controls are maintained in [mutation evidence](docs/verification/retention-mutations.md).
+  Shared verifier composition remains with T-US-008-005.
+
 - [US-008 / T-US-008-003] Added dedicated retained-evidence unit tests and the
   standalone full-body coverage gate. Scope, baseline, executed results and
   aggregation artifact contract are maintained in
