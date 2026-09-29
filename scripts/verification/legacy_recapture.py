@@ -17,6 +17,7 @@ REQUIRED = [
     'TestLegacyRecaptureTerminalReload/cancel',
     'TestLegacyRecaptureSuccessQueueConverges',
     'TestLegacyRecaptureInterruptedBudgetReload',
+    'TestLegacyRecaptureInterruptedRemainingBudgetReload',
     'TestLegacyRecaptureAuthoritativeResolution',
 ]
 

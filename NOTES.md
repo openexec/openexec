@@ -4,13 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [US-009 / T-US-009-001] Implemented authoritative legacy receipt recapture
-  through the native pipeline with durable task-attempt accounting and retained
-  evidence. Reproduced and repaired the injected-executor fixture's outdated
-  bare-receipt repair expectation; retained real command evidence and added an
-  explicit unresolved legacy refusal assertion. Implementation, repair diagnosis,
-  command-resolution limits and refreshed reload/terminal/Settings/regression
-  evidence are recorded once in
+- [US-009 / T-US-009-001] Existing authoritative recapture implementation and
+  injected-executor repair verified on continuation. Added the remaining-budget
+  interrupted restart journey to the required verifier manifest: exactly one
+  remaining dispatch, durable exhaustion, no repair or restart refund, Settings
+  still waiting. Current verification and implementation evidence live once in
   [legacy recapture](docs/verification/legacy-recapture.md).
 
 - [US-008 / T-US-008-005] Shared retention dispatcher and fail-closed aggregate

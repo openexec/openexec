@@ -198,3 +198,41 @@ func TestLegacyRecaptureAuthoritativeResolution(t *testing.T) {
 		t.Fatal("mismatched check accepted")
 	}
 }
+
+func TestLegacyRecaptureInterruptedRemainingBudgetReload(t *testing.T) {
+	f := newRecaptureFixture(t, "exit 2")
+	f.mode = "exhausted"
+	task, err := f.env.rel.TaskSnapshot(context.Background(), "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	task.Status = release.TaskStatusInProgress
+	task.AttemptCount = task.MaxAttempts - 1
+	task.Metadata["recapture_outcome"] = "running"
+	if err := f.env.rel.UpdateTask(task); err != nil {
+		t.Fatal(err)
+	}
+	f.restart(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := f.env.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); err == nil {
+		t.Fatal("remaining attempt did not reach exhaustion")
+	}
+	if f.calls != 1 {
+		t.Fatalf("remaining budget dispatched %d checks, want 1", f.calls)
+	}
+	f.restart(t)
+	f.assertTerminal(t, "exhausted", task.MaxAttempts)
+	tasks, err := f.env.rel.TasksInStories(context.Background(), []string{"S"})
+	if err != nil || len(tasks) != 2 {
+		t.Fatalf("diagnostic-free exhaustion invented repair: %+v %v", tasks, err)
+	}
+	if err := f.env.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); err == nil {
+		t.Fatal("exhausted restart accepted")
+	}
+	f.restart(t)
+	f.assertTerminal(t, "exhausted", task.MaxAttempts)
+	if f.calls != 1 {
+		t.Fatal("restart refunded an interrupted or exhausted attempt")
+	}
+}
