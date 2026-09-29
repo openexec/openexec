@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-009 / T-US-009-002] Dedicated native recapture boundary journeys and
+  standalone verifier complete. Persisted retry/terminal/repair and Settings
+  completion-obligation evidence lives once in
+  [recapture boundaries](docs/verification/recapture-boundaries.md).
+  Shared dispatcher composition remains T-US-009-005.
+
 - [US-009 / T-US-009-001] Existing authoritative recapture implementation and
   injected-executor repair verified on continuation. Added the remaining-budget
   interrupted restart journey to the required verifier manifest: exactly one
