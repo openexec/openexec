@@ -370,7 +370,7 @@ stages:
 - **`importBoundPlan`** (`pkg/manager/planner.go`) calls `PlanStaleBaseRefError` first, before `preparePlanIDs` and any `rel.Create*` write (routes 2–3).
 - **`replayReviewedPlan`** (`pkg/manager/planner_replay.go`) calls it at two steps: the **refinement step**, on the `RefinePlan` result when `AutoImport` is set, before `preparePlanIDs`/`ValidatePlanIdentities` (route 5); and the **retained/import step**, on the approved `result.Plan` immediately before `rel.ImportReviewedPlan`, which covers fresh, compact and retained-receipt replays alike and refuses without rewriting the receipt or plan artifact (routes 4, 6).
 
-**Plan import routes.** Every code path that persists planner-generated goal/story/task rows, and which of the call sites above guards it. `TestManagerPlan_RejectsStaleBaseRef` (`pkg/manager/planner_stale_base_test.go`) covers routes 2 and 4–6 at story and task level. Its `reviewed` subtests use `replayRequest()`, which sets a `RequestID`, so they exercise route 4, not route 3. Route 3 is guarded by the two call sites that are tested separately (`ReviewPlan`, and `importBoundPlan` via route 2), but no test drives it end to end. `TestImport_PlanningGate_RejectsStaleBaseRef` and the e2e binary test cover 1a/1b.
+**Plan import routes.** Every code path that persists planner-generated goal/story/task rows, and which of the call sites above guards it. `TestManagerPlan_RejectsStaleBaseRef` (`pkg/manager/planner_stale_base_test.go`) covers routes 2–6 at story and task level, each for full and compact generation: `{full,compact}/native` (route 2), `/reviewed-direct` (route 3: `Review` + `AutoImport`, no `RequestID`), `/reviewed` (route 4, via `replayRequest()`), `/refined` (route 5) and `/retained` (route 6). `TestImport_PlanningGate_RejectsStaleBaseRef` and the e2e binary test cover 1a/1b.
 
 | # | Route | Entry points | Row writer | Script checks before write | `StaleBaseRefIssue` |
 |---|-------|--------------|------------|----------------------------|---------------------|
@@ -400,8 +400,9 @@ Review `474755f1d4af4c2b4e1faa5240c74345` (PR #63) worked by code inspection onl
 | Compact native planning gets no deterministic rejection | `importBoundPlan` → `PlanStaleBaseRefError` before `preparePlanIDs` | `TestManagerPlan_RejectsStaleBaseRef/compact/native/{story,task}` |
 | Full native planning imports a response that ignores the instruction | same `importBoundPlan` check | `…/full/native/{story,task}` |
 | Reviewer-approved plan with `main...HEAD` through `replayReviewedPlan` (Agent Console's `Review`+`AutoImport`+`RequestID` route), full and compact | `ReviewPlan` forces `Approved=false`; `PlanStaleBaseRefError` runs again before `rel.ImportReviewedPlan` | `…/{full,compact}/reviewed/{story,task}`, `TestReviewPlanRefusesStaleBaseRefDespiteApproval` |
-| Refined plan | `PlanStaleBaseRefError(refined)` before `preparePlanIDs`/`ValidatePlanIdentities` and before re-review | `…/refined/{story,task}` (asserts no re-review) |
-| Retained-plan replay, refused without rewriting accepted artifacts | `PlanStaleBaseRefError(result.Plan)` before `ImportReviewedPlan`; the receipt is not rewritten | `…/retained/{story,task}` (compares receipt metadata and plan artifact bytes before and after) |
+| Reviewed `Manager.Plan` without a `RequestID` (route 3), full and compact | `ReviewPlan` refusal; `importBoundPlan` re-checks | `…/{full,compact}/reviewed-direct/{story,task}` |
+| Refined plan | `PlanStaleBaseRefError(refined)` before `preparePlanIDs`/`ValidatePlanIdentities` and before re-review | `…/{full,compact}/refined/{story,task}` (asserts no re-review) |
+| Retained-plan replay, refused without rewriting accepted artifacts | `PlanStaleBaseRefError(result.Plan)` before `ImportReviewedPlan`; the receipt is not rewritten | `…/{full,compact}/retained/{story,task}` (compares receipt metadata and plan artifact bytes before and after) |
 | Manual import of a goal-less object or legacy bare array, story and task level | `storyImportCmd.RunE` runs `PlanStaleBaseRefIssues` outside `if len(sf.Goals) > 0` | `TestImport_PlanningGate_RejectsStaleBaseRef` (`goal-less object:`/`legacy array:` subtests), `TestStoryImportBinaryStaleBaseGate` |
 | Rule 8 in full generation | `StoryGenerationPrompt` rule 8 | `TestStoryPrompt_RequiresOriginDefaultRef` |
 | Owner and `origin/` fix in the diagnostic; nothing imported after reopening the DB; `origin/main` persists | — | `requireStaleRefusal` + `importedTaskCount` (reopens `release.Manager` on the same DB) in every `TestManagerPlan_RejectsStaleBaseRef` subtest; each subtest also runs `origin/main` and requires persisted tasks |
@@ -422,11 +423,55 @@ Review `474755f1d4af4c2b4e1faa5240c74345` (PR #63) worked by code inspection onl
 **Remaining gaps at HEAD**
 
 1. **Reviewer's exact MEDIUM scripts through the CLI import.** `TestStaleBaseRefIssue` pins every script for both `main` and `master` at the detector. `TestImport_PlanningGate_RejectsStaleBaseRef` exercises only the unquoted ranges and the `-- main` pathspec (story level, `main`). It does not exercise the literal-text `grep -Fq`, the comment-only script, the quoted refs or the mixed comparison, and it has no `master` variants of those or task-owner variants. The CLI passes each script unchanged to the same `StaleBaseRefIssue`, so this gap is in the test matrix, not in the gate.
-2. **Route 3 end to end.** No `Manager.Plan` test combines `Review` + `AutoImport` with an empty `RequestID` (see **Plan import routes**).
-3. **Refined/retained replay with `Compact: true`.** The refined and retained subtests generate with the full prompt only. After generation, compact and full share the same `replayReviewedPlan` steps, so this is also a test-matrix gap.
-4. **Falsify controls not yet recorded.** The review asks for proof that removing the shared validation, restoring the goals-only CLI condition, removing the compact clause, restoring the whole-script regexes or stubbing the detector makes the tests fail. No run of these negative controls has been recorded yet. US-016 (HIGH) and US-017 (MEDIUM) record them in the two subsections below.
+2. **MEDIUM falsify controls not yet recorded.** Restoring the whole-script regexes or stubbing the detector has not been run yet; US-017 records it below. (Route 3 end to end, compact refined/retained replay and the HIGH controls were closed by US-016.)
 
 ### Review 474755f1 — HIGH negative controls
+
+Run 2026-09-29 in the candidate worktree (US-016). Each mutation was applied on its own, the matching tests were run with `-v`, and the production file was restored with `git checkout -- <file>` before the next one. None of these mutations is committed. Baseline and final rerun: `go test ./internal/planner/ ./internal/cli/ ./pkg/manager/` → `ok` for all three packages, and every stale-base test passes (including the 20 `TestManagerPlan_RejectsStaleBaseRef` subtests).
+
+**(a) Remove the shared validation** — delete the `PlanStaleBaseRefError` calls in `importBoundPlan` (`pkg/manager/planner.go`) and at both steps of `replayReviewedPlan` (`pkg/manager/planner_replay.go`). `go test ./pkg/manager/ -run TestManagerPlan_RejectsStaleBaseRef -v`:
+```
+--- FAIL: TestManagerPlan_RejectsStaleBaseRef
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/full/native/story
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/full/refined/story
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/full/retained/story
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/compact/native/story
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/compact/refined/story
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/compact/retained/story
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/full/native/task
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/full/refined/task
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/full/retained/task
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/compact/native/task
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/compact/refined/task
+    --- FAIL: TestManagerPlan_RejectsStaleBaseRef/compact/retained/task
+planner_stale_base_test.go:98: stale base ref plan was accepted: &{... Valid:true Issues:[] ...}
+planner_stale_base_test.go:181: stale refined plan was not refused: &{... Valid:false Issues:[Required verification represented; stale base ref refused: story US-1: ...] ...}
+planner_stale_base_test.go:229: retained stale plan was not refused: &{... Valid:true Issues:[] ...}
+```
+The `{full,compact}/reviewed/*` and `/reviewed-direct/*` subtests still pass under (a) because `ReviewPlan` refuses the approved stale plan on its own (`TestReviewPlanRefusesStaleBaseRefDespiteApproval`); the import-side check is the second layer there. On the refined route the stale plan now reaches re-review (refused there, but with no error before re-review, which the subtest forbids).
+
+**(b) Restore the goals-only CLI condition** — move the `PlanStaleBaseRefIssues` block in `storyImportCmd.RunE` (`internal/cli/release.go`) inside `if len(sf.Goals) > 0`. `go test ./internal/cli/ -run TestImport_PlanningGate -v`:
+```
+--- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef
+    --- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/goal-less_object:_story-level_bare_main_is_rejected
+    --- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/goal-less_object:_task-level_bare_master_is_rejected
+    --- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/legacy_array:_story-level_bare_main_is_rejected
+    --- FAIL: TestImport_PlanningGate_RejectsStaleBaseRef/legacy_array:_task-level_bare_master_is_rejected
+release_test.go:266: expected the planning gate to reject a bare main ref; output: Note: This performs a one-time import. ...
+release_test.go:278: expected the planning gate to reject a task-level bare master ref; output: Note: This performs a one-time import. ...
+```
+The with-goals subtests (`bare_main_is_rejected`, `task-level_bare_main_is_rejected_with_the_task_ID`) still pass, as they should: the check still runs when goals are present.
+
+**(c) Remove the compact clause** — delete the `origin/<default>` sentence from `CompactStoryGenerationPrompt` rule 4 (`internal/planner/prompt.go`). `go test ./internal/planner/ -run 'OriginDefaultRef|RemoteBaseRef' -v`:
+```
+--- FAIL: TestCompactPromptRequiresRemoteBaseRef
+planner_test.go:174: rule 4 of the rendered compact prompt is missing "origin/<default>"
+planner_test.go:174: rule 4 of the rendered compact prompt is missing "git diff --name-only origin/main...HEAD"
+planner_test.go:174: rule 4 of the rendered compact prompt is missing "NEVER a bare local branch name such as 'main'"
+```
+`TestStoryPrompt_RequiresOriginDefaultRef` (full-prompt rule 8) still passes.
+
+No CLI route gap was open for the HIGH finding (goal-less and legacy shapes were already covered), so `TestImport_PlanningGate_StaleBaseRoutes` was not added.
 
 ### Review 474755f1 — MEDIUM negative controls
 

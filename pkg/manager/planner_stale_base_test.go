@@ -128,96 +128,122 @@ func TestManagerPlan_RejectsStaleBaseRef(t *testing.T) {
 					}
 				}
 			})
+			// reviewed-direct: Review + AutoImport without a RequestID (route 3),
+			// so ReviewPlan and importBoundPlan are the gates, not replay.
+			t.Run(path+"/reviewed-direct/"+level, func(t *testing.T) {
+				for _, base := range []string{"main", "origin/main"} {
+					e := newSchedulerTestEnv(t)
+					if err := os.WriteFile(filepath.Join(e.dir, "INTENT.md"), []byte("Deliver editing."), 0600); err != nil {
+						t.Fatal(err)
+					}
+					e.mgr.cfg.PlanGenerator = fixedPlanCompletion(staleBasePlan(t, level, base))
+					e.mgr.cfg.PlanReviewer = approvingReviewer()
+					result, err := e.mgr.Plan(context.Background(), PlanRequest{IntentFile: "INTENT.md", NoValidate: true, Review: true, AutoImport: true, Compact: compact})
+					if base == "main" {
+						requireStaleRefusal(t, result, err, owner)
+						if n := importedTaskCount(t, e); n != 0 {
+							t.Fatalf("refused plan imported %d tasks", n)
+						}
+						continue
+					}
+					if err != nil || !result.Valid || importedTaskCount(t, e) < 2 {
+						t.Fatalf("origin/main plan not persisted: %+v %v", result, err)
+					}
+				}
+			})
+
+			// refined: a rejected review is repaired into a stale plan; the gate
+			// after refinement refuses it before identities are validated.
+			t.Run(path+"/refined/"+level, func(t *testing.T) {
+				for _, base := range []string{"main", "origin/main"} {
+					e := newSchedulerTestEnv(t)
+					e.mgr.cfg.MaxReviewCycles = 2
+					generated, reviewed := 0, 0
+					e.mgr.cfg.PlanGenerator = planCompletionFunc(func(context.Context, string) (string, error) {
+						generated++
+						if generated == 1 {
+							return replayPlanFixture, nil
+						}
+						return staleBasePlan(t, level, base), nil
+					})
+					e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) {
+						reviewed++
+						if reviewed == 1 {
+							return rejectedReplayReview, nil
+						}
+						return replayReviewFixture, nil
+					})
+					req := replayRequest()
+					req.Compact = compact
+					result, err := e.mgr.Plan(context.Background(), req)
+					if base == "main" {
+						if err == nil {
+							t.Fatalf("stale refined plan was not refused: %+v", result)
+						}
+						requireStaleRefusal(t, nil, err, owner)
+						if reviewed != 1 {
+							t.Fatal("stale refined plan reached re-review")
+						}
+						if n := importedTaskCount(t, e); n != 0 {
+							t.Fatalf("refused plan imported %d tasks", n)
+						}
+						continue
+					}
+					if err != nil || !result.Valid || reviewed != 2 || importedTaskCount(t, e) != 2 {
+						t.Fatalf("origin/main refinement not persisted: %+v %v", result, err)
+					}
+				}
+			})
+
+			// retained: a receipt approved before the rule existed must be refused
+			// on replay without rewriting the receipt or the plan artifact.
+			t.Run(path+"/retained/"+level, func(t *testing.T) {
+				for _, base := range []string{"main", "origin/main"} {
+					e := newSchedulerTestEnv(t)
+					e.mgr.cfg.PlanGenerator = fixedPlanCompletion(staleBasePlan(t, level, base))
+					interrupted := errors.New("reviewer interrupted")
+					e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) { return "", interrupted })
+					req := replayRequest()
+					req.Compact = compact
+					if _, err := e.mgr.Plan(context.Background(), req); !errors.Is(err, interrupted) {
+						t.Fatalf("expected interrupted review: %v", err)
+					}
+					stepID := "plan-request-" + planDigest(req.RequestID) + "-review"
+					artifact := retainApprovalWithoutReview(t, e, stepID)
+					before := receiptMetadata(t, e, stepID)
+					artifactBefore, err := os.ReadFile(artifact)
+					if err != nil {
+						t.Fatal(err)
+					}
+					e.mgr.cfg.PlanGenerator = planCompletionFunc(func(context.Context, string) (string, error) {
+						t.Fatal("retained plan regenerated")
+						return "", nil
+					})
+					e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) {
+						t.Fatal("retained approval re-reviewed")
+						return "", nil
+					})
+					result, err := e.mgr.Plan(context.Background(), req)
+					if base == "main" {
+						if err == nil {
+							t.Fatalf("retained stale plan was not refused: %+v", result)
+						}
+						requireStaleRefusal(t, nil, err, owner)
+						if n := importedTaskCount(t, e); n != 0 {
+							t.Fatalf("refused plan imported %d tasks", n)
+						}
+						artifactAfter, err := os.ReadFile(artifact)
+						if err != nil || string(artifactAfter) != string(artifactBefore) || receiptMetadata(t, e, stepID) != before {
+							t.Fatal("refusal mutated the retained receipt or artifact")
+						}
+						continue
+					}
+					if err != nil || !result.Valid || importedTaskCount(t, e) != 2 {
+						t.Fatalf("retained origin/main plan not persisted: %+v %v", result, err)
+					}
+				}
+			})
 		}
-
-		// refined: a rejected review is repaired into a stale plan; the gate
-		// after refinement refuses it before identities are validated.
-		t.Run("refined/"+level, func(t *testing.T) {
-			for _, base := range []string{"main", "origin/main"} {
-				e := newSchedulerTestEnv(t)
-				e.mgr.cfg.MaxReviewCycles = 2
-				generated, reviewed := 0, 0
-				e.mgr.cfg.PlanGenerator = planCompletionFunc(func(context.Context, string) (string, error) {
-					generated++
-					if generated == 1 {
-						return replayPlanFixture, nil
-					}
-					return staleBasePlan(t, level, base), nil
-				})
-				e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) {
-					reviewed++
-					if reviewed == 1 {
-						return rejectedReplayReview, nil
-					}
-					return replayReviewFixture, nil
-				})
-				result, err := e.mgr.Plan(context.Background(), replayRequest())
-				if base == "main" {
-					if err == nil {
-						t.Fatalf("stale refined plan was not refused: %+v", result)
-					}
-					requireStaleRefusal(t, nil, err, owner)
-					if reviewed != 1 {
-						t.Fatal("stale refined plan reached re-review")
-					}
-					if n := importedTaskCount(t, e); n != 0 {
-						t.Fatalf("refused plan imported %d tasks", n)
-					}
-					continue
-				}
-				if err != nil || !result.Valid || reviewed != 2 || importedTaskCount(t, e) != 2 {
-					t.Fatalf("origin/main refinement not persisted: %+v %v", result, err)
-				}
-			}
-		})
-
-		// retained: a receipt approved before the rule existed must be refused
-		// on replay without rewriting the receipt or the plan artifact.
-		t.Run("retained/"+level, func(t *testing.T) {
-			for _, base := range []string{"main", "origin/main"} {
-				e := newSchedulerTestEnv(t)
-				e.mgr.cfg.PlanGenerator = fixedPlanCompletion(staleBasePlan(t, level, base))
-				interrupted := errors.New("reviewer interrupted")
-				e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) { return "", interrupted })
-				req := replayRequest()
-				if _, err := e.mgr.Plan(context.Background(), req); !errors.Is(err, interrupted) {
-					t.Fatalf("expected interrupted review: %v", err)
-				}
-				stepID := "plan-request-" + planDigest(req.RequestID) + "-review"
-				artifact := retainApprovalWithoutReview(t, e, stepID)
-				before := receiptMetadata(t, e, stepID)
-				artifactBefore, err := os.ReadFile(artifact)
-				if err != nil {
-					t.Fatal(err)
-				}
-				e.mgr.cfg.PlanGenerator = planCompletionFunc(func(context.Context, string) (string, error) {
-					t.Fatal("retained plan regenerated")
-					return "", nil
-				})
-				e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) {
-					t.Fatal("retained approval re-reviewed")
-					return "", nil
-				})
-				result, err := e.mgr.Plan(context.Background(), req)
-				if base == "main" {
-					if err == nil {
-						t.Fatalf("retained stale plan was not refused: %+v", result)
-					}
-					requireStaleRefusal(t, nil, err, owner)
-					if n := importedTaskCount(t, e); n != 0 {
-						t.Fatalf("refused plan imported %d tasks", n)
-					}
-					artifactAfter, err := os.ReadFile(artifact)
-					if err != nil || string(artifactAfter) != string(artifactBefore) || receiptMetadata(t, e, stepID) != before {
-						t.Fatal("refusal mutated the retained receipt or artifact")
-					}
-					continue
-				}
-				if err != nil || !result.Valid || importedTaskCount(t, e) != 2 {
-					t.Fatalf("retained origin/main plan not persisted: %+v %v", result, err)
-				}
-			}
-		})
 	}
 }
 
