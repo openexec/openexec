@@ -4,9 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [US-007 inspection] Current execution/repair source trace and verification:
-  [inspection evidence](docs/VERIFICATION_FAILURE_INSPECTION.md). Inspection only;
-  the broader implementation and delivery remain outside this task.
+- [US-007 / T-US-007-002] Source-backed architecture, normalized requirement
+  mapping and independent test/helper ownership are in
+  [ARCHITECTURE.md](docs/ARCHITECTURE.md). Discovery passed (22 source declarations); nine verifier tests, shell syntax
+  and diff checks passed. Full gates and live product delivery were not run; pending retention, recapture and delivery evidence belong to the
+  task owners in that map. Earlier source inspection remains in
+  [inspection evidence](docs/VERIFICATION_FAILURE_INSPECTION.md).
 
 - [Simple Loop contract, 2026-09-14] `fix/native-reviewed-planning` exposes
   existing compact generation through `Manager.Plan`; native reviewed-plan
