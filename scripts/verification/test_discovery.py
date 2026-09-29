@@ -48,11 +48,11 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIn("required source references omitted", verify(self.root)[0])
 
     def test_mapping_wrong_owner(self):
-        self.change('| US-008 |', '| US-009 |')
+        self.change('| US-012 |', '| US-013 |')
         self.assertIn("wrong owner: REQ-001", "\n".join(verify(self.root)[0]))
 
     def test_duplicate_mapping(self):
-        self.change('## Accepted requirement mapping', '| REQ-001 | duplicate | US-008 |\n\n## Accepted requirement mapping')
+        self.change('## Accepted requirement mapping', '| REQ-001 | duplicate | US-012 |\n\n## Accepted requirement mapping')
         self.assertIn("duplicate mapping", "\n".join(verify(self.root)[0]))
 
     def test_shared_helper(self):

@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-010 / T-US-010-001] Current G-007 review study and exact provenance live in
+  [repair study](docs/verification/repair-study.md). All three source defects are
+  accepted provisionally; repair proofs remain with US-012/013/014, aggregate
+  and external D2 with US-015/Console. Historical G-006 fixture passes do not
+  cover the empty-phase incident or actual Console adapter adoption.
+
 - [US-011 / T-US-011-001] Final fail-closed technical composition and native
   journeys are maintained in [delivery evidence](docs/verification-evidence-delivery.md).
   Current baseline results, per-slice coverage, mutation proof and pending external
@@ -180,6 +186,11 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- US-010 concrete integration/evidence gaps are maintained once in the
+  [study resource boundary](docs/verification/repair-study.md#resources-authority-and-delivery):
+  authorized Console writes/adapter execution, binary attestation and canonical
+  gate/Settings reconciliation command mapping. No new owner decision requested.
 
 - US-007 implementation interface questions are maintained in the
   [inspection evidence](docs/VERIFICATION_FAILURE_INSPECTION.md#unresolved-interface-questions-for-implementation).

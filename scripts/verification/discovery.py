@@ -36,8 +36,8 @@ def verify(root):
     for section in SECTIONS:
         if body.count(f"## {section}\n") != 1:
             errors.append(f"missing or duplicate section: {section}")
-    for label, owner in (("REQ-001", "US-008"), ("REQ-002", "US-009"),
-                         ("D1", "US-011"), ("D2", "US-011")):
+    for label, owner in (("REQ-001", "US-012"), ("REQ-002", "US-013"),
+                         ("REQ-003", "US-014"), ("REQ-004", "US-015")):
         rows = re.findall(rf"^\| {label} \| (.+)$", body, re.M)
         if len(rows) != 1 or owner not in rows[0].split("|")[-2]:
             errors.append(f"missing/duplicate mapping or wrong owner: {label}")

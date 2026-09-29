@@ -1,18 +1,21 @@
 # OpenExec Architecture
 
-Current consolidation: US-011 / T-US-011-001, 2026-09-29.
-OpenExec has both CLI subprocess and API provider implementations. This maps
-accepted G-006 evidence and recovery work. The US-007 discovery baseline was
-`e9a7336797c91c584b85d00ed80279df27feb342`; current executed evidence, repository
-blockers and external D2 status live in [delivery evidence](verification-evidence-delivery.md).
+Current study: US-010 / T-US-010-001, 2026-09-29, accepted G-007.
+Exact candidate/Console identities, evidence limits, all review checklists and
+required implementation proofs live in [repair study](verification/repair-study.md).
+The [requirement register](verification/repair-requirements.json) preserves exact
+accepted clauses, backed by the [read-only contract snapshot](verification/repair-study-contract.json).
+Earlier US-007/008/009/011 reports describe G-006 and their own fixture scopes;
+they do not establish the incident or actual Console integration as repaired.
 
 ## Context and scope
 
 Outcome: preserve failed verification evidence so native repair can reproduce
 the actual check, and recover legacy diagnostic-free failures with bounded
 recapture. Current code retains failed results, private bounded diagnostics and
-SQLite receipts, and resolves diagnostic-free failures through bounded native
-recapture. Both independently verified slices are composed by the final verifier.
+SQLite receipts. Its recapture resolver rejects the empty-phase lint/test incident,
+the public attachment API is missing, and private files can enter target source
+commits. The study records these gaps; product repairs remain prerequisite work.
 
 The existing native task loop owns implementation, verification, retries and
 repair. Console owns admission/effects, outer Goal review and delivery. Reuse
@@ -21,16 +24,13 @@ no new scheduler, recovery queue, state machine or authority concept is needed.
 Follow the [Simple Loop contract](OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md).
 Complexity delta: concepts added/removed 0; new persistent state, transitions,
 owner decisions and runtime failure modes 0; existing machinery replaced none.
-This consolidation changes verification and documentation only; production behavior is unchanged.
+This study changes verification and documentation only; production behavior is unchanged.
 
-Read root and docs contributor instructions, working memory and
-[project intent](../PROJECT_INTENT.md). Historical US-007 inspection recorded Console Project context through
-openexec_get_project(project="openexec") and read the candidate SQLite ledger
-with mode=ro. Those context observations were not repeated by US-011. The current
-supplied Goal/task contract defines this consolidation's scope; no ledger edits
-or new owner decisions are part of it.
-The older stories.json requirement labels concern another effort; the normalized
-labels below come from current US-007/008/009/011 acceptance clauses in SQLite.
+Read root/docs instructions, NOTES and [project intent](../PROJECT_INTENT.md).
+Fresh Console Project context reports accepted Goal/Ready revision 4 and
+interpretation 10 (Professional Portfolio Stewardship). The selected G-007 and
+US-010 ledger contract narrow this work to the study. The candidate ledger was
+read via SQLite mode=ro; no tasks, decisions or runtime state were changed.
 
 ## Module map and APIs
 
@@ -43,10 +43,15 @@ names an existing file and a declaration manually inspected for this task.
 | `pkg/manager/scheduler.go` | `ExecuteTasks` | RunOptions selects the task-oriented route. |
 | `pkg/manager/manager.go` | `Config` | StageExecutor injection into pipeline configuration. |
 | `pkg/runtime/execution.go` | `VerificationCommandFailure` | Public admitted interface and typed command classification. |
+| `pkg/runtime/evidence.go` | `RetainCommandEvidence` | Public private-capture API; typed evidence attachment still missing. |
+| `internal/execution/evidence/capture.go` | `Buffer` | Bounded prefix capture; US-012 must preserve diagnostic tails. |
+| `internal/execution/evidence/capture.go` | `Read` | Content-addressed private reader; US-014 owns safe storage and old-reference policy. |
+| `pkg/manager/task_recapture.go` | `resolveRecaptureCommand` | Registered shell/verify-script resolution; US-013 owns empty-phase named-check fallback. |
+| `internal/cli/init.go` | `ensureGitignore` | Target managed ignore block; currently excludes state but not sibling evidence directory. |
 | `internal/blueprint/stage.go` | `StageResult` | Output, Error, Diagnostics, Artifacts, Attempt and timing. |
 | `internal/blueprint/stage.go` | `StageExecutor` | Execute(context.Context, *Stage, *StageInput) (*StageResult, error). |
-| `internal/blueprint/engine.go` | `ExecuteStage` | Single-stage call; currently discards non-nil result on error. |
-| `internal/blueprint/engine.go` | `Execute` | Full blueprint; currently replaces result on error. |
+| `internal/blueprint/engine.go` | `ExecuteStage` | Single-stage call; retains non-nil result on error. |
+| `internal/blueprint/engine.go` | `Execute` | Full blueprint; retains non-nil result on error. |
 | `internal/pipeline/admitted_executor.go` | `Execute` | Passes result/error and captures trusted error receipt separately. |
 | `internal/pipeline/pipeline.go` | `terminalEvidence` | Terminal deterministic failure receipt, distinct from worker artifacts. |
 | `internal/execution/gates/failure.go` | `CheckFailure` | Classification consists of gate and exit_code only. |
@@ -119,20 +124,20 @@ for their separate contracts. These are not new evidence/recovery owners.
 
 The [inspection evidence](VERIFICATION_FAILURE_INSPECTION.md) contains the
 preceding task's detailed source trace and controlled native journey results.
-Those results are historical evidence; fresh consolidated proof is linked above.
+Those results are historical evidence. Current study findings and proof gaps are
+linked above; no fresh product-repair proof is claimed by this stage.
 
 ## Accepted requirement mapping
 
-These labels normalize accepted clauses, not additional requirements. D1 is
-technical proof; D2 is externally verified default-branch merge completion.
-All listed stories retain G-006 ownership; do not invent REQ-003.
+G-007 supersedes the old normalized G-006 mapping. Each exact clause has one
+owner in the linked requirement register; D1 and D2 belong to REQ-004.
 
 | Label | Accepted clauses and proof | Owner |
 | --- | --- | --- |
-| REQ-001 | Preserve non-nil failed StageResult in both engine APIs; actual admitted exit-2 check; exact argv/cwd, marker, bounded stdout/stderr and usable verification reference survive database reload and repair creation. Private access/redaction, allowlisted bounded toolchain metadata and receipt fingerprint exclusion; nil-result, success, refusal and cancellation semantics preserved. | US-008 |
-| REQ-002 | Gate/exit_code-only legacy evidence is insufficient; resolve original command from authoritative references; deterministic bounded native recapture reuses retained evidence. Failed and successful checks, durable exhaustion across restart, unresolved identity, refusal and cancellation have explicit outcomes. Preserve protected formats and dependent Settings waiting. | US-009 |
-| D1 | US-008 proves retention, privacy/bounds, boundary semantics and independent sensitivity to both restored discard branches. US-009 proves recapture, termination/restart, dependency waiting and compatibility. Each slice enforces strictly greater than 90% aggregate statement coverage over full bodies of all added/modified production functions, with no missing instrumentation, empty/omitted scope or skipped required tests. US-011 consolidates executed scenario manifests, native journey and required gates. | US-008, US-009; consolidation US-011 |
-| D2 | Agent Console supplies actual evidence of merge to OpenExec's default branch after canonical gate, independent review and the exact owner decision. Local checks, commits, task completion and process observations cannot certify it. | US-011, external Console delivery |
+| REQ-001 | Exact US-012 contract: preserve failed results, admitted command identity/cwd and usable repair reference; actual Console adoption and tails required. | US-012 |
+| REQ-002 | Exact US-013 contract: bounded native recapture of diagnostic-free legacy receipts; no new loop/state machine or owner decision. | US-013 |
+| REQ-003 | Exact US-014 contract: classification/provenance separate from private diagnostics; no indiscriminate environment or secret logging. | US-014 |
+| REQ-004 | Exact US-015 contract: D1 reproduces and fixes failure; D2 verifies merge to default branch. Local study does not satisfy either. | US-015 |
 
 ## Boundaries and conventions
 
@@ -157,7 +162,8 @@ All listed stories retain G-006 ownership; do not invent REQ-003.
   values from admission/configuration because arbitrary prose secrets cannot be
   inferred reliably. Common credential assignments are additionally redacted.
   Truncated public streams omit the incomplete final line. Exact private payloads
-  live in ignored .openexec-verification (0700), with content-addressed files
+  currently live in .openexec-verification (0700), ignored only by this repository,
+  with content-addressed files
   (0600); ReadCommandEvidence requires matching hashes and rejects public modes,
   traversal and symlinks. No public evidence-content endpoint is introduced.
 - Engine stage retry counters/MaxTotalRetries differ from persisted task attempts.
@@ -174,12 +180,14 @@ All listed stories retain G-006 ownership; do not invent REQ-003.
 - Console owns publication, canonical gate, independent review, owner presentation
   and merge execution after the queue. Preserve T-US-011-002 and its dependency
   on T-US-011-001 verbatim. No new delivery/approval task or decision_ref.
-  The observed Console revision bcd2b229/start time identifies that process only;
-  no OpenExec deployment or D2 completion has been verified by this stage.
+  Current Console source/dependency and the separately supplied process observation
+  are recorded once in the study provenance; deployment and D2 remain unverified.
 
 ## Evidence ownership
 
-The slice implementations and evidence below exist in the current candidate.
+The historical G-006 slice implementations and evidence below exist in the candidate.
+Current G-007 repair ownership is US-012/013/014; US-015 owns final aggregation.
+US-010 owns the study dispatcher, documentation and study verifier tests.
 Only serial implementation/aggregation owners edit the shared dispatcher
 `scripts/verify-retained-verification-evidence.sh`. Independent verifiers run
 standalone helpers, consume completed production/shared fixtures directly and
@@ -223,7 +231,7 @@ python3 -m unittest discover -s scripts/verification -p 'test_discovery.py' -v
 Discovery checks required sections, normalized mapping, exclusive verifier/test
 ownership, source declarations and local documentation links. Unknown or malformed
 cases fail closed. Discovery does not execute retention/recapture verification
-or certify D1/D2. Manually inspected both engine discard branches, admitted
+or certify D1/D2. Historically inspected both engine discard branches, admitted
 wrapper, receipt classifier, pipeline callbacks/terminal handoff, manager writes,
 atomic state transaction, repair generation and queue reconciliation at baseline.
 Remaining module declarations were checked against their source definitions.
