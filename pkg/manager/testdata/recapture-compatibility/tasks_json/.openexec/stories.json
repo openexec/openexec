@@ -1,0 +1,13 @@
+{
+  "stories": [
+    {
+      "id": "S",
+      "title": "Protected project",
+      "status": "pending",
+      "tasks": [
+        "A",
+        "Settings"
+      ]
+    }
+  ]
+}

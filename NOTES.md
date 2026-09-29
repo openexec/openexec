@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-009 / T-US-009-004] Protected-format recapture journeys and standalone
+  verifier implemented. Exact verification results and source-backed limits
+  live in [recapture compatibility](docs/verification/recapture-compatibility.md).
+  Production behavior is unchanged; full canonical gates remain runner-owned.
+
 - [US-009 / T-US-009-003] Dedicated recovery unit tests and the full-body
   fail-closed coverage verifier are complete. Scope, verification results and
   aggregation contract live in
