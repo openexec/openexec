@@ -313,6 +313,11 @@ func (m *Manager) preparePlanIDs(plan *planner.ProjectPlan) error {
 }
 
 func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) error {
+	// Last step before persistence on the native and non-reviewed routes: a
+	// reviewer's approval does not exempt a plan from the stale-base rule.
+	if err := planner.PlanStaleBaseRefError(plan); err != nil {
+		return err
+	}
 	before, err := json.Marshal(plan)
 	if err != nil {
 		return err

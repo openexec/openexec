@@ -1,6 +1,10 @@
 package planner
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // PlanStaleBaseRefIssues applies StaleBaseRefIssue to every story and task
 // verification script in plan. It is the single stale-base rule shared by every
@@ -36,4 +40,21 @@ func StaleBaseRefOwners(issues map[string]string) []string {
 	}
 	sort.Strings(owners)
 	return owners
+}
+
+// PlanStaleBaseRefError is PlanStaleBaseRefIssues as a refusal: nil when every
+// script is acceptable, else one error naming every owner and its origin/<ref>
+// fix, in StaleBaseRefOwners order. Import paths call it at the last step
+// before persistence, so an approved or retained plan cannot bypass it.
+func PlanStaleBaseRefError(plan *ProjectPlan) error {
+	issues := PlanStaleBaseRefIssues(plan)
+	if len(issues) == 0 {
+		return nil
+	}
+	owners := StaleBaseRefOwners(issues)
+	parts := make([]string, len(owners))
+	for i, owner := range owners {
+		parts[i] = owner + ": " + issues[owner]
+	}
+	return fmt.Errorf("stale base ref refused: %s", strings.Join(parts, "; "))
 }
