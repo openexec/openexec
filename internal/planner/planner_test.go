@@ -148,6 +148,34 @@ func TestStoryPrompt_RequiresOriginDefaultRef(t *testing.T) {
 	}
 }
 
+// The compact prompt is a separate constant, so rule 4 must carry the same
+// remote-ref clause as the full prompt's rule 8; checked as rendered by
+// GenerateCompactPlan.
+func TestCompactPromptRequiresRemoteBaseRef(t *testing.T) {
+	mock := &mockProvider{response: `{"schema_version": "1.1", "stories": [{"id": "US-001", "title": "S", "tasks": []}]}`}
+	if _, err := New(mock).GenerateCompactPlan(context.Background(), "# Test Intent"); err != nil {
+		t.Fatalf("GenerateCompactPlan failed: %v", err)
+	}
+	rule4 := mock.lastPrompt
+	if start := strings.Index(rule4, "\n4. "); start >= 0 {
+		rule4 = rule4[start:]
+		if end := strings.Index(rule4, "\n5. "); end >= 0 {
+			rule4 = rule4[:end]
+		}
+	} else {
+		t.Fatalf("rendered compact prompt has no rule 4")
+	}
+	for _, want := range []string{
+		"origin/<default>",
+		"git diff --name-only origin/main...HEAD",
+		"NEVER a bare local branch name such as 'main'",
+	} {
+		if !strings.Contains(rule4, want) {
+			t.Errorf("rule 4 of the rendered compact prompt is missing %q", want)
+		}
+	}
+}
+
 func TestPlanner_ParseResponse(t *testing.T) {
 	p := &Planner{}
 

@@ -163,7 +163,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 1. The single story carries 1-3 tasks, no more. Prefer ONE "Chassis" task that diagnoses, implements, and verifies in a single cohesive unit; use 2-3 tasks only when the change genuinely crosses layers that must land separately.
 2. Each task is a VERTICAL slice: it crosses every layer it needs and ends in something runnable/verifiable. No Diagnose/Implement/Verify phase tasks.
 3. Do NOT create a Codebase Study story, a Goal Validation/terminus story, or any docs/ARCHITECTURE.md task — this is a small change to an existing project, not a build-out.
-4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok').
+4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok'). A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 5. ` + HumanBoundaryRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
