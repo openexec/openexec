@@ -216,14 +216,14 @@ func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "openexec.yaml"), []byte("project:\n  name: \"test-gate\"\n"), 0644)
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 
-	runImport := func(script string) (string, error) {
+	runImport := func(script string, tasks []any) (string, error) {
 		sf := map[string]any{
 			"schema_version": "1.1",
 			"goals":          []map[string]any{{"id": "G-001", "title": "Goal", "description": "Goal"}},
 			"stories": []map[string]any{{
 				"id": "US-001", "title": "Story", "goal_id": "G-001",
 				"verification_script": script,
-				"tasks":               []any{},
+				"tasks":               tasks,
 			}},
 		}
 		data, _ := json.Marshal(sf)
@@ -239,7 +239,7 @@ func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
 	}
 
 	t.Run("bare main is rejected", func(t *testing.T) {
-		out, err := runImport("git diff --name-only main...HEAD -- x | grep -vc y")
+		out, err := runImport("git diff --name-only main...HEAD -- x | grep -vc y", []any{})
 		if err == nil {
 			t.Fatalf("expected the planning gate to reject a bare main ref; output: %s", out)
 		}
@@ -249,12 +249,28 @@ func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
 	})
 
 	t.Run("origin/main passes", func(t *testing.T) {
-		out, err := runImport("git diff --name-only origin/main...HEAD -- x | grep -vc y")
+		out, err := runImport("git diff --name-only origin/main...HEAD -- x | grep -vc y", []any{
+			"T-US-001-001",
+			map[string]any{"id": "T-US-001-002", "title": "Task", "verification_script": "git diff origin/main..HEAD"},
+		})
 		if err != nil {
 			t.Fatalf("origin/main must pass the gate, got: %v", err)
 		}
 		if !strings.Contains(out, "✓ Planning Gate passed.") {
 			t.Fatalf("expected gate pass in output: %s", out)
+		}
+	})
+
+	t.Run("task-level bare main is rejected with the task ID", func(t *testing.T) {
+		out, err := runImport("git diff --name-only origin/main...HEAD -- x | grep -vc y", []any{
+			"T-US-001-001",
+			map[string]any{"id": "T-US-001-002", "title": "Task", "verification_script": "git diff main..HEAD"},
+		})
+		if err == nil {
+			t.Fatalf("expected the planning gate to reject a task-level bare main ref; output: %s", out)
+		}
+		if !strings.Contains(err.Error(), "PLANNING GATE FAILED") || !strings.Contains(err.Error(), "T-US-001-002") || !strings.Contains(err.Error(), "origin/") {
+			t.Fatalf("error must name the gate, the task ID and the origin/ fix, got: %v", err)
 		}
 	})
 }

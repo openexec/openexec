@@ -941,6 +941,17 @@ for explicit manual imports when needed.`,
 				if issue := planner.StaleBaseRefIssue(s.VerificationScript); issue != "" {
 					return fmt.Errorf("PLANNING GATE FAILED: story %s: %s", s.ID, issue)
 				}
+				for _, tRaw := range s.Tasks {
+					v, ok := tRaw.(map[string]any)
+					if !ok {
+						continue
+					}
+					script, _ := v["verification_script"].(string)
+					if issue := planner.StaleBaseRefIssue(script); issue != "" {
+						id, _ := v["id"].(string)
+						return fmt.Errorf("PLANNING GATE FAILED: story %s task %s: %s", s.ID, id, issue)
+					}
+				}
 			}
 			cmd.Println("✓ Planning Gate passed.")
 		}
