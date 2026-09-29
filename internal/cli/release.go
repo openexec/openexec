@@ -835,6 +835,27 @@ type GeneratedStory struct {
 	Tasks              []any    `json:"tasks"`
 }
 
+// generatedStoriesPlan projects imported stories onto a planner.ProjectPlan
+// carrying only what plan-wide script validation reads: IDs and verification
+// scripts. Tasks given as bare ID strings have no script.
+func generatedStoriesPlan(stories []GeneratedStory) *planner.ProjectPlan {
+	plan := &planner.ProjectPlan{}
+	for _, s := range stories {
+		ps := planner.Story{ID: s.ID, VerificationScript: s.VerificationScript}
+		for _, tRaw := range s.Tasks {
+			v, ok := tRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := v["id"].(string)
+			script, _ := v["verification_script"].(string)
+			ps.Tasks = append(ps.Tasks, planner.Task{ID: id, VerificationScript: script})
+		}
+		plan.Stories = append(plan.Stories, ps)
+	}
+	return plan
+}
+
 // storyImportCmd imports stories from JSON into SQLite.
 //
 // JSON IMPORT GUARD:
@@ -937,22 +958,14 @@ for explicit manual imports when needed.`,
 					return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script", g.ID, g.Title)
 				}
 			}
-			for _, s := range stories {
-				if issue := planner.StaleBaseRefIssue(s.VerificationScript); issue != "" {
-					return fmt.Errorf("PLANNING GATE FAILED: story %s: %s", s.ID, issue)
-				}
-				for _, tRaw := range s.Tasks {
-					v, ok := tRaw.(map[string]any)
-					if !ok {
-						continue
-					}
-					script, _ := v["verification_script"].(string)
-					if issue := planner.StaleBaseRefIssue(script); issue != "" {
-						id, _ := v["id"].(string)
-						return fmt.Errorf("PLANNING GATE FAILED: story %s task %s: %s", s.ID, id, issue)
-					}
-				}
-			}
+		}
+		// The stale-base rule covers every file shape — goal-less objects and
+		// legacy bare arrays included — so it runs outside the goal-coverage branch.
+		if issues := planner.PlanStaleBaseRefIssues(generatedStoriesPlan(stories)); len(issues) > 0 {
+			owner := planner.StaleBaseRefOwners(issues)[0]
+			return fmt.Errorf("PLANNING GATE FAILED: %s: %s", owner, issues[owner])
+		}
+		if len(sf.Goals) > 0 {
 			cmd.Println("✓ Planning Gate passed.")
 		}
 

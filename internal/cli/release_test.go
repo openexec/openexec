@@ -216,15 +216,31 @@ func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
 	os.WriteFile(filepath.Join(tmpDir, "openexec.yaml"), []byte("project:\n  name: \"test-gate\"\n"), 0644)
 	os.MkdirAll(filepath.Join(tmpDir, ".openexec"), 0755)
 
-	runImport := func(script string, tasks []any) (string, error) {
-		sf := map[string]any{
-			"schema_version": "1.1",
-			"goals":          []map[string]any{{"id": "G-001", "title": "Goal", "description": "Goal"}},
-			"stories": []map[string]any{{
-				"id": "US-001", "title": "Story", "goal_id": "G-001",
-				"verification_script": script,
-				"tasks":               tasks,
-			}},
+	// Three file shapes reach the import: an object with goals, a goal-less
+	// object, and a legacy bare array of stories.
+	const (
+		shapeGoals    = "goals"
+		shapeGoalless = "goal-less object"
+		shapeLegacy   = "legacy array"
+	)
+	runImportShape := func(shape, script string, tasks []any) (string, error) {
+		stories := []map[string]any{{
+			"id": "US-001", "title": "Story", "goal_id": "G-001",
+			"verification_script": script,
+			"tasks":               tasks,
+		}}
+		var sf any
+		switch shape {
+		case shapeGoals:
+			sf = map[string]any{
+				"schema_version": "1.1",
+				"goals":          []map[string]any{{"id": "G-001", "title": "Goal", "description": "Goal"}},
+				"stories":        stories,
+			}
+		case shapeGoalless:
+			sf = map[string]any{"schema_version": "1.1", "stories": stories}
+		case shapeLegacy:
+			sf = stories
 		}
 		data, _ := json.Marshal(sf)
 		p := filepath.Join(tmpDir, "stories.json")
@@ -236,6 +252,47 @@ func TestImport_PlanningGate_RejectsStaleBaseRef(t *testing.T) {
 		rootCmd.SetArgs([]string{"story", "import", p, "--dry-run"})
 		err := rootCmd.Execute()
 		return b.String(), err
+	}
+	runImport := func(script string, tasks []any) (string, error) {
+		return runImportShape(shapeGoals, script, tasks)
+	}
+
+	// Goal-less objects and legacy arrays skip goal coverage but must still pass
+	// the stale-base rule, at story and at task level.
+	for _, shape := range []string{shapeGoalless, shapeLegacy} {
+		t.Run(shape+": story-level bare main is rejected", func(t *testing.T) {
+			out, err := runImportShape(shape, "git diff --exit-code main...HEAD", []any{})
+			if err == nil {
+				t.Fatalf("expected the planning gate to reject a bare main ref; output: %s", out)
+			}
+			if !strings.Contains(err.Error(), "PLANNING GATE FAILED") || !strings.Contains(err.Error(), "story US-001") || !strings.Contains(err.Error(), "origin/") {
+				t.Fatalf("error must name the gate, the story ID and the origin/ fix, got: %v", err)
+			}
+		})
+		t.Run(shape+": task-level bare master is rejected", func(t *testing.T) {
+			out, err := runImportShape(shape, "git diff --exit-code origin/main...HEAD", []any{
+				"T-US-001-001",
+				map[string]any{"id": "T-US-001-002", "title": "Task", "verification_script": "git log master..HEAD"},
+			})
+			if err == nil {
+				t.Fatalf("expected the planning gate to reject a task-level bare master ref; output: %s", out)
+			}
+			if !strings.Contains(err.Error(), "PLANNING GATE FAILED") || !strings.Contains(err.Error(), "T-US-001-002") || !strings.Contains(err.Error(), "origin/") {
+				t.Fatalf("error must name the gate, the task ID and the origin/ fix, got: %v", err)
+			}
+		})
+		t.Run(shape+": origin/main passes at story and task level", func(t *testing.T) {
+			out, err := runImportShape(shape, "git diff --exit-code origin/main...HEAD -- main", []any{
+				"T-US-001-001",
+				map[string]any{"id": "T-US-001-002", "title": "Task", "verification_script": "git log origin/master..HEAD"},
+			})
+			if err != nil {
+				t.Fatalf("origin/ refs must pass the gate, got: %v", err)
+			}
+			if !strings.Contains(out, "Would import") {
+				t.Fatalf("expected the dry-run listing in output: %s", out)
+			}
+		})
 	}
 
 	t.Run("bare main is rejected", func(t *testing.T) {
