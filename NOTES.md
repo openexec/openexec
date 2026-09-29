@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test
+  event-to-reload-to-repair tracer implemented. Current verification, independent
+  engine/wrapper negative controls and remaining story/review boundaries live in
+  [admitted evidence](docs/verification/admitted-evidence.md).
+
 - [US-010 / T-US-010-001] Current G-007 review study and exact provenance live in
   [repair study](docs/verification/repair-study.md). All three source defects are
   accepted provisionally; repair proofs remain with US-012/013/014, aggregate

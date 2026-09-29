@@ -110,8 +110,11 @@ Do not infer the historical lint cause from current knip or Settings hook state.
 
 ## F2 — Public admitted evidence attachment
 
-Disposition: accepted defect, source-inferred; runtime proof and actual Console
-integration pending US-012. Source availability is not write authority.
+Disposition: accepted defect. The public attachment and silent persisted tracer
+are now implemented by T-US-012-001; current proof is in
+[admitted evidence](admitted-evidence.md). Remaining diagnostics, coverage and
+actual Console integration are pending US-012. Source availability is not write
+authority. The root-cause description below records the prerequisite baseline.
 
 - **Root cause:** `pkg/runtime/execution.go:VerificationCommandFailure` delegates
   only to NewCommandFailure. RetainCommandEvidence is public, but attachment to
@@ -216,9 +219,9 @@ bodies, including shared functions in each relevant story. US-012 covers result
 preservation, attachment, buffering, classification and persisted repair; US-013
 covers resolution, attempts, queue ownership, dependencies and compatibility;
 US-014 covers write/read, nested path validation, private modes, staging and
-legacy refs. Planned public attachment is explicitly pending, not asserted to
-exist by study. US-012 separately requires actual Console adapter execution and
-coverage evidence in that repository. Existing manifests are starting inventories,
+legacy refs. Public attachment is now implemented and traced by T-US-012-001; the
+full-body coverage obligation remains pending. US-012 separately requires actual
+Console adapter execution and coverage evidence in that repository. Existing manifests are starting inventories,
 not exemptions for new/changed functions.
 
 Each implementation story must exceed 90% statement coverage, not equal it.
