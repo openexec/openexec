@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-009 / T-US-009-003] Dedicated recovery unit tests and the full-body
+  fail-closed coverage verifier are complete. Scope, verification results and
+  aggregation contract live in
+  [recapture unit coverage](docs/verification/recapture-unit-coverage.md).
+  Production behavior is unchanged; canonical gates remain runner-owned.
+
 - [US-009 / T-US-009-002] Dedicated native recapture boundary journeys and
   standalone verifier complete. Persisted retry/terminal/repair and Settings
   completion-obligation evidence lives once in
