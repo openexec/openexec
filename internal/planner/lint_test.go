@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -33,36 +34,116 @@ func TestLintVerificationScript(t *testing.T) {
 }
 
 func TestStaleBaseRefIssue(t *testing.T) {
+	// Templates use REF for the default-branch name; each runs for main and master.
 	stale := []string{
-		`git diff --name-only main...HEAD -- x | grep -vc y`,
-		`git diff --name-only master..HEAD`,
-		`git log --oneline main..HEAD | wc -l`,
-		`git diff --name-only main -- internal/`,
-		`git merge-base main HEAD`,
-		`test "$(git diff --name-only main...HEAD | wc -l)" -eq 1`,
+		// Acceptance criteria (US-012).
+		`git diff --name-only REF...HEAD -- x | grep -vc y`,
+		`git log REF..HEAD`,
+		`git diff 'REF' HEAD`,
+		`git diff "REF...HEAD"`,
+		`git diff 'REF..HEAD'`,
+		`git merge-base REF HEAD`,
+		`git diff origin/REF...HEAD && git diff REF...HEAD`,
+		// Further revision positions and shell contexts.
+		`git diff --name-only REF..HEAD`,
+		`git log --oneline REF..HEAD | wc -l`,
+		`git diff --name-only REF -- internal/`,
+		`test "$(git diff --name-only REF...HEAD | wc -l)" -eq 1`,
+		"test -z \"`git diff REF...HEAD`\"",
+		`(cd sub && git diff REF...HEAD)`,
+		`git -C sub -c core.pager=cat diff REF...HEAD`,
+		`git --no-pager log -n 5 REF..HEAD`,
+		`git rev-list --count ^REF HEAD`,
+		`git rev-parse --verify REF~1`,
+		`git show REF:README.md`,
+		`git diff REF@{u}...HEAD`,
+		`git cherry REF`,
+		`git range-diff REF...HEAD`,
+		`LC_ALL=C git diff REF...HEAD`,
+		`! git diff --quiet REF...HEAD`,
+		`git diff REF...HEAD 2>&1 | grep -q x`,
+		"# a comment\ngit diff REF...HEAD",
+		"git diff \\\n  REF...HEAD",
 	}
-	for _, s := range stale {
-		issue := StaleBaseRefIssue(s)
-		if issue == "" {
-			t.Errorf("expected a stale-base issue for %q", s)
-		} else if !strings.Contains(issue, "origin/") {
-			t.Errorf("issue for %q must name the origin/ fix: %s", s, issue)
-		}
-	}
-
 	sound := []string{
-		`git diff --name-only origin/main...HEAD -- x | grep -vc y`,
-		`git diff --name-only origin/master..HEAD`,
-		`git merge-base origin/main HEAD`,
-		`git diff --name-only upstream/main...HEAD`,
-		`git diff --name-only feature-main...HEAD`,
-		`go test ./cmd/main/...`,
-		`grep -c "func main" cmd/openexec/main.go`,
+		// Acceptance criteria (US-012).
+		`git diff --exit-code origin/REF...HEAD -- REF`,
+		`grep -Fq 'REF...HEAD' docs/ARCHITECTURE.md`,
+		"# never use REF...HEAD\ngit diff --exit-code origin/REF...HEAD -- internal/",
+		`git diff upstream/REF...HEAD`,
+		`git diff feature-REF..HEAD`,
+		// Further non-revision mentions.
+		`git diff --name-only origin/REF...HEAD -- x | grep -vc y`,
+		`git diff --name-only origin/REF..HEAD`,
+		`git merge-base origin/REF HEAD`,
+		`git diff HEAD -- REF/`,
+		`git log --grep REF origin/REF..HEAD`,
+		`git checkout REF`,
+		`echo "git diff REF...HEAD"`,
+		`echo git diff REF...HEAD`,
+		`git diff origin/REF...HEAD # not REF...HEAD`,
+		`git diff origin/REF...HEAD > REF`,
+		`go test ./cmd/REF/...`,
+		`grep -c "func REF" cmd/openexec/REF.go`,
 		``,
 	}
-	for _, s := range sound {
-		if issue := StaleBaseRefIssue(s); issue != "" {
-			t.Errorf("sound script %q flagged: %s", s, issue)
+	for _, ref := range []string{"main", "master"} {
+		for _, tmpl := range stale {
+			s := strings.ReplaceAll(tmpl, "REF", ref)
+			issue := StaleBaseRefIssue(s)
+			if issue == "" {
+				t.Errorf("expected a stale-base issue for %q", s)
+			} else if !strings.Contains(issue, "`"+ref+"`") || !strings.Contains(issue, "`origin/"+ref+"`") {
+				t.Errorf("issue for %q must name %s and the origin/%s fix: %s", s, ref, ref, issue)
+			}
+		}
+		for _, tmpl := range sound {
+			s := strings.ReplaceAll(tmpl, "REF", ref)
+			if issue := StaleBaseRefIssue(s); issue != "" {
+				t.Errorf("sound script %q flagged: %s", s, issue)
+			}
+		}
+	}
+}
+
+func TestShellCommands(t *testing.T) {
+	cases := []struct {
+		script string
+		want   [][]string
+	}{
+		{`a 'b c' "d e" f\ g`, [][]string{{"a", "b c", "d e", "f g"}}},
+		{`a;b&&c||d|e&f`, [][]string{{"a"}, {"b"}, {"c"}, {"d"}, {"e"}, {"f"}}},
+		{"a # b c\nd", [][]string{{"a"}, {"d"}}},
+		{`a#b`, [][]string{{"a#b"}}},
+		// The quoted word around a substitution splits into empty halves; only
+		// the substitution's own argv matters.
+		{`x "$(y 'z')" w`, [][]string{{"x", ""}, {"y", "z"}, {"", "w"}}},
+		{"x `y z` w", [][]string{{"x"}, {"y", "z"}, {"w"}}},
+		{`a '' b`, [][]string{{"a", "", "b"}}},
+		{`a 2>&1 > out b`, [][]string{{"a", "b"}}},
+		{`"a\"b\$c\d"`, [][]string{{`a"b$c\d`}}},
+	}
+	for _, c := range cases {
+		if got := shellCommands(c.script); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("shellCommands(%q) = %q, want %q", c.script, got, c.want)
+		}
+	}
+}
+
+func TestRevisionEndpoints(t *testing.T) {
+	cases := map[string][]string{
+		"main...HEAD":      {"main", "HEAD"},
+		"main..HEAD":       {"main", "HEAD"},
+		"^main":            {"main"},
+		"main~2":           {"main"},
+		"main^{commit}":    {"main"},
+		"master@{u}..HEAD": {"master", "HEAD"},
+		"main:path/x.go":   {"main"},
+		"origin/main":      {"origin/main"},
+	}
+	for rev, want := range cases {
+		if got := revisionEndpoints(rev); !reflect.DeepEqual(got, want) {
+			t.Errorf("revisionEndpoints(%q) = %q, want %q", rev, got, want)
 		}
 	}
 }
