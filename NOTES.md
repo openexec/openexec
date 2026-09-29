@@ -4,6 +4,14 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-008 / T-US-008-003] Added dedicated retained-evidence unit tests and the
+  standalone full-body coverage gate. Scope, baseline, executed results and
+  aggregation artifact contract are maintained in
+  [retention unit coverage](docs/verification/retention-unit-coverage.md).
+  Real command, persisted repair/reopen, negative cases and verifier controls
+  passed. No production behavior changed; canonical gates remain with the
+  repository runner. Shared dispatcher and mutation ownership are unchanged.
+
 - [US-008 / T-US-008-002] Implemented shared production bounded capture, private
   artifact reads, explicit toolchain allowlisting, redacted public diagnostics,
   and artifact-reference propagation separate from classification digests.
