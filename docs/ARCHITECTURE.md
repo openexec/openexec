@@ -328,6 +328,38 @@ stages:
 
 ---
 
+### 10. Planner prompt rules & planning gate (`internal/planner/`, `internal/cli/release.go`)
+
+**Purpose:** Turn an intent document into goals/stories/tasks, and keep unverifiable plans out of the backlog.
+
+**Module map:**
+| File | Role |
+|------|------|
+| `internal/planner/prompt.go` | Prompt constants: `StoryGenerationPrompt` (full plan, rules 1–12), `CompactStoryGenerationPrompt` (one story, rules 1–6), `StoryReviewPrompt`, `StoryFixPrompt`, `WizardSystemPrompt` |
+| `internal/planner/planner.go` | `Planner.GeneratePlan` / `GenerateCompactPlan` render the prompts and parse the JSON response |
+| `internal/planner/lint.go` | `LintVerificationScript`, `LintPlanVerification` — deterministic false-green detector |
+| `internal/planner/lint_test.go` | `TestLintVerificationScript` (false-green vs sound samples), `TestLintPlanVerification` (keyed by story/task id) |
+| `pkg/runtime/runtime.go` | Public wrappers `LintPlanVerification`, `RemapPlanIDs` for embedders |
+| `pkg/manager/planner.go` | `Manager.Plan`: intent validation → `GeneratePlan` → plan artifact → `importPlan` (`RemapPlanIDs`) |
+| `internal/cli/release.go` | `storyImportCmd` (`openexec story import [file]`) — hosts the PLANNING GATE |
+| `internal/cli/release_test.go` | `TestReleaseCmd` drives `release create/show/finish`, `story create/list`, `task create/approve`, `goal verify`; plus `statusIcon`, config loading and `getReleaseManager` — it has **no** coverage of `story import` or the planning gate |
+
+**Rule rendering.** The prompts are static Go raw strings filled with `fmt.Sprintf`: `GeneratePlan` renders `StoryGenerationPrompt` with two `%s` slots (optional PRD block, then the intent text); `GenerateCompactPlan` renders `CompactStoryGenerationPrompt` with one `%s` (intent). No project configuration reaches the prompt — rules are identical for every repository.
+
+**Rule 8 (VERIFIABILITY)** in `StoryGenerationPrompt` requires every story to carry an executable `verification_script` that checks its linked goal and exits non-zero on failure, and forbids false-green shapes: `|| <fallback>` after a test/assertion, `A && B || C`, `2>/dev/null` on the checked command, `grep -q` piped into another command, and non-specific assertions. The compact prompt's rule 4 is a short form of the same requirement. Neither prompt says anything about which git ref a diff-scoped script should compare against.
+
+**`LintVerificationScript(script string) []string`** matches four regexes (`falseGreenPatterns`): a test/grep command followed by `||`; `2>/dev/null`; `grep -q… |`; and `&& … ||`. Empty scripts return nil; an empty result means "no known anti-pattern", not "sound". **`LintPlanVerification(plan) map[string][]string`** runs it over every story and task script and returns issues keyed by story/task id. It is **warning-only**: it never fails planning or import, and no code in this repository calls it — it is exported through `pkg/runtime` for embedders (e.g. Agent Console) to show before approval.
+
+**PLANNING GATE (hard fail)** lives in `storyImportCmd.RunE`, after schema-version checks (accepted: `1.0`, `1.1`, `legacy` bare array; missing version only warns) and before the dry-run print or any DB write. It runs only when the file has `goals`; for each goal it returns an error when:
+1. `PLANNING GATE FAILED: Primary goal <id> (<title>) has no supporting stories` — no story has that `goal_id`;
+2. `PLANNING GATE FAILED: Primary goal <id> (<title>) has no stories with a verification_script` — none of those stories has a non-empty script.
+
+The gate checks presence only; it never inspects script content (that is the linter's job, and it only warns). `openexec plan` (`internal/cli/plan.go`) prints its own `PLANNING GATE FAILED:` banner, but that one reports intent-validation issues from `Manager.Plan`, which imports via `importPlan` and does not run the goal-coverage gate.
+
+**Default branch threading.** None: `grep -rniE 'DefaultBranch|default_branch'` over the Go sources finds nothing. The only related setting is `base_branch` (`project.ProjectConfig.BaseBranch`, `release.Config.BaseBranch`, default `"main"`), consumed by the release manager and `safe_commit`; it is never passed to `planner.GeneratePlan`/`GenerateCompactPlan`, so the planner cannot name the remote default branch (`origin/<default>`) in the scripts it writes.
+
+---
+
 ## Data Flow
 
 ### Typical Execution Flow
