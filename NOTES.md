@@ -4,6 +4,22 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-008 / T-US-008-001] Both engine APIs retain non-nil failed results.
+  Pipeline terminal failure carries existing artifact references, stage identity,
+  output and diagnostics; typed receipts alone authorize repair. References and
+  evidence are persisted before repair generation. The retained-result verifier
+  passed an actual admitted exit-2 process, both engine branches, database reopen
+  and repair creation with exact argv/cwd, bounded streams and diagnostic marker.
+  Existing forged-artifact, cancellation, atomic failure binding and repair/restart
+  journeys passed, as did targeted engine/pipeline/gate tests, discovery, shell
+  syntax and diff checks. Broader package execution attempted provider network
+  access and was blocked by the sandbox; canonical gates remain with the runner.
+  Compatibility: no project loading/schema/migration changes; legacy receipt
+  parsing and existing repair/restart journeys remain supported. Complexity:
+  no new persistent concepts, transitions or owner decisions; existing machinery
+  reused. Privacy/boundary and independent mutation/coverage work retain their
+  assigned task ownership in docs/ARCHITECTURE.md.
+
 - [US-007 / T-US-007-002] Source-backed architecture, normalized requirement
   mapping and independent test/helper ownership are in
   [ARCHITECTURE.md](docs/ARCHITECTURE.md). Discovery passed (22 source declarations); nine verifier tests, shell syntax

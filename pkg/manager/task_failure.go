@@ -32,13 +32,32 @@ func (m *Manager) persistTaskVerificationFailure(taskID string, event loop.Event
 	if started == "" {
 		return ""
 	}
-	data, err := json.Marshal(event.Artifacts)
+	retainedArtifacts := make(map[string]string, len(event.Artifacts)+2)
+	for key, value := range event.Artifacts {
+		retainedArtifacts[key] = value
+	}
+	retainedArtifacts["stage_output"] = event.Text
+	retainedArtifacts["stage_error"] = event.ErrText
+	if event.Result != nil {
+		retainedArtifacts["stage_diagnostics"] = event.Result.Diagnostics
+	}
+	data, err := json.Marshal(retainedArtifacts)
 	if err != nil {
 		return ""
 	}
 	hash := sha256.Sum256([]byte(taskID + "\x00" + started + "\x00" + string(data)))
 	id := "verification-failure-" + hex.EncodeToString(hash[:])
 	ctx := context.Background()
+	// Retain references synchronously before publishing a repair-eligible step.
+	// The payload remains at the executor's existing artifact location.
+	for hash, path := range event.Artifacts {
+		if hash == gates.VerificationFailureReceiptKey || hash == gates.VerificationFailureDigestKey || hash == "" || path == "" {
+			continue
+		}
+		if err := m.state.RecordArtifact(ctx, hash, "test_log", path, 0); err != nil {
+			return ""
+		}
+	}
 	if queueOwned {
 		err = m.state.RecordTaskFailureStep(ctx, state.RunStepData{
 			ID: id, RunID: taskID, TraceID: event.TraceID, Phase: event.StageName,
@@ -77,7 +96,7 @@ func (m *Manager) repairTaskFromRetainedFailure(ctx context.Context, taskID, evi
 	if err != nil {
 		return err
 	}
-	diagnosis := fmt.Sprintf("Diagnose and repair the failed verification for task %s. Evidence: run step %s; checks: %s. Preserve the original task/candidate and accepted scope. Reproduce the failing check, determine its cause, repair it, and verify it; this receipt proves failure, not a particular code defect. Do not weaken the check or cross effect boundaries.", taskID, evidenceID, artifacts[gates.VerificationFailureReceiptKey])
+	diagnosis := fmt.Sprintf("Diagnose and repair the failed verification for task %s. Evidence: run step %s; retained verification evidence and artifact references: %s. Preserve the original task/candidate and accepted scope. Reproduce the failing check, determine its cause, repair it, and verify it; this receipt proves failure, not a particular code defect. Do not weaken the check or cross effect boundaries.", taskID, evidenceID, step.Metadata)
 	_, err = rel.CreateFailureRepair(ctx, taskID, evidenceID, diagnosis)
 	return err
 }

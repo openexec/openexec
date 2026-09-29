@@ -686,14 +686,32 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	execErr := engine.Execute(ctx, run, input)
 
 	if execErr != nil {
-		var failureArtifacts map[string]string
+		failureArtifacts := make(map[string]string)
+		last := run.GetLastResult()
+		stageName, output, diagnostics := "", "", ""
+		attempt := 0
+		if last != nil {
+			stageName, output, diagnostics, attempt = last.StageName, last.Output, last.Diagnostics, last.Attempt
+			for key, value := range last.Artifacts {
+				// References are evidence, never authority to create repair work.
+				if key != gates.VerificationFailureReceiptKey && key != gates.VerificationFailureDigestKey {
+					failureArtifacts[key] = value
+				}
+			}
+		}
 		if trustedGates != nil && ctx.Err() == nil {
-			failureArtifacts = trustedGates.terminalEvidence(bp, run)
+			for key, value := range trustedGates.terminalEvidence(bp, run) {
+				failureArtifacts[key] = value
+			}
 		}
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
 			FWUID:       p.cfg.FWUID,
 			BlueprintID: bp.ID,
+			StageName:   stageName,
+			Attempt:     attempt,
+			Text:        output,
+			Result:      &loop.StepResult{Status: "failed", Diagnostics: diagnostics},
 			ErrText:     execErr.Error(),
 			Artifacts:   failureArtifacts,
 		})

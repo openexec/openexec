@@ -75,26 +75,32 @@ for their separate contracts. These are not new evidence/recovery owners.
 2. Manager Config.StageExecutor reaches pipeline.Config.StageExecutor and the
    admitted wrapper. The public runtime aliases expose the blueprint types.
    With injection enabled, native executor/host-gate fallback is bypassed.
-3. The executor returns a StageResult and possibly an error. Engine.ExecuteStage
-   returns nil on any error without recording the supplied result. Engine.Execute
-   instead creates a new failed result, losing supplied output/artifacts/timing.
-   Both discard branches require independent regression mutations in US-008.
+3. The executor returns a StageResult and possibly an error. Both engine APIs
+   retain non-nil results on error and mark them failed, preserving supplied
+   output, artifacts, diagnostics and timing. Execute synthesizes missing
+   results; ExecuteStage preserves its nil-result error return. ExecuteStage
+   records and returns non-nil failed results alongside the error.
 4. Engine.Execute adds its result to Run.Results and PreviousStages before the
-   completion callback. Pipeline emits status, attempt, output, error and
-   artifacts, but not Diagnostics or timing. Its terminal failure event takes
-   only the private trusted receipt; cancellation suppresses that propagation.
+   completion callback. Pipeline terminal failure events carry the last stage's
+   identity, output, diagnostics and artifact references. Receipt keys are
+   stripped from those artifacts; only the private trusted receipt authorizes
+   repair, and cancellation suppresses that receipt.
 5. consumeEvents synchronously invokes persistTaskVerificationFailure before
    exposing terminal status. RecordTaskFailureStep commits run_steps metadata
    and tasks.metadata.verification_failure_evidence atomically for the matching
-   in-progress attempt. The manager reads the row back. Async stage telemetry
+   in-progress attempt. Artifact references are saved synchronously first;
+   the manager reads the step back. Async stage telemetry
    excludes stage-failed events and cannot substitute for this handoff.
 6. repairTaskFromRetainedFailure validates task ownership, failed status, agent
-   and receipt, then builds a diagnosis from gate/exit codes. CreateFailureRepair
+   and receipt, then includes retained evidence and artifact references in the
+   diagnosis. CreateFailureRepair
    preserves story/candidate identity and makes repair a prerequisite of the
    original task. RunnableTasks selects repair before ordinary pending work.
-7. Required US-008 change: persist bounded private diagnostics and resolvable
-   exact command/cwd with the existing evidence path before deriving repair;
-   reloaded repair context must contain a usable check or authoritative reference.
+7. T-US-008-001's retained-result verifier runs an admitted exit-2 fixture through
+   both engine APIs and pipeline persistence, then closes/reopens the database
+   before repair creation. It checks exact argv/cwd, bounded stdout/stderr,
+   a diagnostic marker and a usable artifact reference. Production privacy,
+   redaction and boundary coverage remain assigned to subsequent US-008 tasks.
 8. Required US-009 change: detect a gate/exit_code-only legacy receipt, resolve
    the original check authoritatively and recapture through the same admitted
    native loop. Persist the bound; do not create repeated evidence-free repairs.
