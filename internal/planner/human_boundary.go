@@ -97,15 +97,29 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			present[task.ID] = true
 		}
 	}
+	storyIDs, taskIDs := renumbering(original, refined, present)
+	storyID := func(id string) string {
+		if next, ok := storyIDs[id]; ok {
+			return next
+		}
+		return id
+	}
+	taskID := func(id string) string {
+		if next, ok := taskIDs[id]; ok {
+			return next
+		}
+		return id
+	}
 	for _, s := range original.Stories {
 		if !slices.ContainsFunc(s.Tasks, func(task Task) bool { return retained[task.ID] }) {
 			continue
 		}
-		nextStory, ok := stories[s.ID]
+		nextStory, ok := stories[storyID(s.ID)]
 		if !ok {
 			return fmt.Errorf("refinement removed story %s around a retained human boundary", s.ID)
 		}
 		for _, dep := range s.DependsOn {
+			dep = storyID(dep)
 			if _, ok := stories[dep]; ok && !slices.Contains(nextStory.DependsOn, dep) {
 				nextStory.DependsOn = append(nextStory.DependsOn, dep)
 			}
@@ -114,7 +128,7 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			if !retained[t.ID] {
 				continue
 			}
-			i := slices.IndexFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == t.ID })
+			i := slices.IndexFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == taskID(t.ID) })
 			if i < 0 {
 				return fmt.Errorf("refinement removed task %s around a retained human boundary", t.ID)
 			}
@@ -126,6 +140,7 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			// An edge to work refinement was free to merge away is not restored;
 			// it would point at a task that no longer exists.
 			for _, dep := range t.DependsOn {
+				dep = taskID(dep)
 				if present[dep] && !slices.Contains(next.DependsOn, dep) {
 					next.DependsOn = append(next.DependsOn, dep)
 				}
@@ -133,4 +148,61 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 		}
 	}
 	return nil
+}
+
+// renumbering finds a retained boundary that refinement only renumbered. A
+// review may ask for new ids, for instance when the plan reuses story ids
+// already committed on the branch for different work, and renaming the story
+// renames every task in it ("refinement removed story US-009" for a plan whose
+// owner acceptance came back unchanged as US-019). The boundary is the same
+// when exactly one new HITL task carries its decision_reason word for word; the
+// other tasks of its story are followed through the same id prefix. Anything
+// less certain stays a removal.
+func renumbering(original, refined *ProjectPlan, present map[string]bool) (stories, tasks map[string]string) {
+	stories, tasks = map[string]string{}, map[string]string{}
+	known := map[string]bool{}
+	for _, s := range original.Stories {
+		for _, t := range s.Tasks {
+			known[t.ID] = true
+		}
+	}
+	for _, s := range original.Stories {
+		for _, t := range s.Tasks {
+			reason := strings.TrimSpace(t.DecisionReason)
+			if t.Mode != TaskModeHITL || reason == "" || present[t.ID] {
+				continue
+			}
+			var matches [][2]string
+			for _, ns := range refined.Stories {
+				for _, nt := range ns.Tasks {
+					if nt.Mode == TaskModeHITL && !known[nt.ID] && strings.TrimSpace(nt.DecisionReason) == reason {
+						matches = append(matches, [2]string{ns.ID, nt.ID})
+					}
+				}
+			}
+			if len(matches) != 1 {
+				continue
+			}
+			tasks[t.ID] = matches[0][1]
+			if matches[0][0] != s.ID {
+				stories[s.ID] = matches[0][0]
+			}
+		}
+	}
+	for _, s := range original.Stories {
+		next, ok := stories[s.ID]
+		if !ok {
+			continue
+		}
+		for _, t := range s.Tasks {
+			if _, mapped := tasks[t.ID]; mapped || present[t.ID] {
+				continue
+			}
+			candidate := strings.Replace(t.ID, "-"+s.ID+"-", "-"+next+"-", 1)
+			if candidate != t.ID && present[candidate] && !known[candidate] {
+				tasks[t.ID] = candidate
+			}
+		}
+	}
+	return stories, tasks
 }

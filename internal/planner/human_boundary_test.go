@@ -146,3 +146,61 @@ func TestHumanBoundaryRefinementMayMergeWorkBeyondTheBoundary(t *testing.T) {
 		t.Fatalf("refinement removed the boundary's direct dependency: %+v", got)
 	}
 }
+
+func TestHumanBoundaryRefinementMayRenumberTheBoundaryStory(t *testing.T) {
+	// Review c7e97959 on fotoyks: the repair plan reused story ids already
+	// committed on the branch, review asked for fresh ids, and refinement
+	// returned owner acceptance unchanged as US-019. That is not removal.
+	plan := func(story string, reason string) *ProjectPlan {
+		id := func(n string) string { return "T-" + story + "-" + n }
+		return &ProjectPlan{Stories: []Story{
+			{ID: "US-010", Title: "Build", Tasks: []Task{{ID: "T-US-010-001", Mode: TaskModeAFK}}},
+			{ID: story, Title: "Goal Validation", DependsOn: []string{"US-010"}, Tasks: []Task{
+				{ID: id("001"), Mode: TaskModeAFK},
+				{ID: id("002"), Mode: TaskModeAFK, DependsOn: []string{id("001")}},
+				{ID: id("003"), Mode: TaskModeHITL, DecisionReason: reason, Description: "Owner accepts", DependsOn: []string{id("001"), id("002")}},
+			}},
+		}}
+	}
+	const reason = "Accepting the result is the owner's decision"
+	refine := func(next *ProjectPlan) (*ProjectPlan, error) {
+		raw, _ := json.Marshal(next)
+		return New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", plan("US-009", reason), &PlanReview{Assessment: "story ids collide with earlier commits"})
+	}
+
+	next := plan("US-019", reason)
+	next.Stories[1].Tasks[2].Description = "Reworded"
+	next.Stories[1].Tasks[2].DependsOn = []string{"T-US-019-002"}
+	got, err := refine(next)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accept := got.Stories[1].Tasks[2]
+	if accept.ID != "T-US-019-003" || accept.Description != "Owner accepts" {
+		t.Fatalf("renumbered boundary not kept as planned: %+v", accept)
+	}
+	if !reflect.DeepEqual(accept.DependsOn, []string{"T-US-019-002", "T-US-019-001"}) {
+		t.Fatalf("edge not restored under the new ids: %v", accept.DependsOn)
+	}
+	if err := got.Validate(); err != nil {
+		t.Fatalf("refined plan invalid: %v", err)
+	}
+
+	// A renumbered story whose decision changed is a different boundary.
+	if got, err := refine(plan("US-019", "Owner approves a production release")); err == nil {
+		t.Fatalf("changed decision accepted as a renumbering: %+v", got)
+	}
+	// Two candidates for the same decision is a guess, not a renumbering.
+	twice := plan("US-019", reason)
+	twice.Stories[0].Tasks = append(twice.Stories[0].Tasks, Task{ID: "T-US-010-002", Mode: TaskModeHITL, DecisionReason: reason})
+	if got, err := refine(twice); err == nil {
+		t.Fatalf("ambiguous renumbering accepted: %+v", got)
+	}
+	// Renumbering must not drop the work the owner decides on.
+	dropped := plan("US-019", reason)
+	dropped.Stories[1].Tasks = dropped.Stories[1].Tasks[1:]
+	dropped.Stories[1].Tasks[0].DependsOn = nil
+	if got, err := refine(dropped); err == nil {
+		t.Fatalf("renumbering dropped the boundary's dependency: %+v", got)
+	}
+}
