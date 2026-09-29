@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run the implementation-owned legacy recapture journeys, rejecting skips."""
+import argparse
 import json
 from pathlib import Path
 import subprocess
@@ -23,7 +24,12 @@ REQUIRED = [
 
 
 def main():
-    output = Path(tempfile.mkdtemp(prefix='openexec-legacy-recapture-'))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args()
+    output = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix='openexec-legacy-recapture-'))
+    if args.output:
+        output.mkdir(parents=True, exist_ok=False)
     command = ['go', 'test', './pkg/manager', '-run', '^TestLegacyRecapture',
                '-count=1', '-timeout=60s', '-json']
     log = output / 'tests.jsonl'

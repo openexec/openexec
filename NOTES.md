@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-009 / T-US-009-005] Shared recapture dispatcher and fail-closed aggregate
+  implemented. Fresh scenario, persisted boundary, coverage and protected-format
+  evidence is maintained in [recapture evidence](docs/verification-evidence-recapture.md).
+  Canonical gates and delivery remain Console/runner-owned.
+
 - [US-009 / T-US-009-004] Protected-format recapture journeys and standalone
   verifier implemented. Exact verification results and source-backed limits
   live in [recapture compatibility](docs/verification/recapture-compatibility.md).
@@ -19,7 +24,7 @@ Raw capture. One line per thought, any grammar.
   standalone verifier complete. Persisted retry/terminal/repair and Settings
   completion-obligation evidence lives once in
   [recapture boundaries](docs/verification/recapture-boundaries.md).
-  Shared dispatcher composition remains T-US-009-005.
+  Shared composition is recorded in the T-US-009-005 evidence above.
 
 - [US-009 / T-US-009-001] Existing authoritative recapture implementation and
   injected-executor repair verified on continuation. Added the remaining-budget
