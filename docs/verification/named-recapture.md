@@ -40,20 +40,39 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 
 Verified 2026-09-29 with a writable Go cache under /tmp:
 
-- `bash scripts/verify-verification-repair.sh --case named-recapture`: passed all
+- `bash scripts/verify-verification-repair.sh --case legacy-incident`: passed all
   four incident cases. In isolated source copies, separately removing phase
   inference and named fallback each failed the incident assertion with calls=0,
   status=needs_review and recapture_outcome=unresolved. Compiler errors, skips,
   unrelated assertions or missing test completions are rejected by the verifier.
 - `go test ./pkg/manager ./internal/pipeline ./internal/release ./internal/validation -run 'Test(NamedRecapture|LegacyRecapture|Recapture)|Compatibility' -count=1 -timeout=60s`:
   passed, including native definitions and .openexec/.uaos/tasks.json journeys.
-- `python3 -m unittest discover -s scripts/verification -p 'test_*.py' -q`: 74 tests passed.
+- `python3 -m unittest discover -s scripts/verification -p 'test_*.py' -q`: 75 tests passed.
 - `bash scripts/verify-verification-repair.sh --case study`: passed the source,
   ownership and saved-document checks (not a product-completion certificate).
 - `bash -n scripts/verify-verification-repair.sh` and `git diff --check`: passed.
 
 The added phase helper is included in the US-013 full-function scope manifest;
 no statement-coverage result is claimed in this implementation stage.
+
+## Failed task verification repair
+
+Repair `repair-2d2a8484fad9be3b0170c225126befce` preserves T-US-013-001's
+accepted command from the retained plan: `--case legacy-incident`. Before this
+repair that exact command returned exit 2 with `unimplemented or unknown
+verification case: legacy-incident`; the previously documented `named-recapture`
+command passed. The supplied test/exit-2 receipt contains no command diagnostics,
+so it alone does not prove a Go defect. The concrete reproduced defect was the
+missing dispatcher entry for the task's verification script.
+
+Both names now invoke the same unchanged incident verifier, preserving its real
+queue/reload/repair assertions and both resolver mutations. A new public-command
+regression test invokes the retained command from /tmp and checks its baseline
+and mutation results. Removing only the dispatcher alias made this test fail on
+the original unknown-case exit-2 diagnostic; restoring it passed. Unknown and
+unimplemented cases still fail closed. No task plan or runtime behavior changed;
+complexity delta: one command alias and its test, no persistent state,
+transitions, owner decisions or new execution machinery.
 
 ## Review and delivery boundary
 
