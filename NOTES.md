@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Planner schema replay / US-008 / T-US-008-003] Public-runtime and manager
+  correction journeys, strict discovery/no-skip replay verification and database
+  reopen/import accounting evidence live once in
+  [schema replay](docs/verification/planner-schema-replay.md).
+
 - [Planner schema coverage / US-008 / T-US-008-002] Added parser/prompt/failure
   cases and a complete changed-function coverage gate. Scope, negative controls
   and current verification live in
