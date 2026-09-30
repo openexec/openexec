@@ -73,7 +73,7 @@ func TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct(t *testing.T)
 	for _, task := range []*release.Task{
 		{ID: "legacy-human", Status: release.TaskStatusPending, MaxAttempts: 3, Metadata: map[string]interface{}{"mode": release.TaskModeHITL}},
 		{ID: "limit", Status: release.TaskStatusPending, MaxAttempts: 2, AttemptCount: 2},
-		{ID: "failed", Status: release.TaskStatusFailed, MaxAttempts: 3},
+		{ID: "failed", Status: release.TaskStatusFailed, MaxAttempts: 3, AttemptCount: 3},
 		{ID: "review", Status: release.TaskStatusNeedsReview, MaxAttempts: 3},
 	} {
 		task.StoryID, task.Title = "S", task.ID

@@ -1,0 +1,6 @@
+{
+  "name": "recapture-openexec",
+  "execution": {
+    "exec_mode": "workspace-write"
+  }
+}

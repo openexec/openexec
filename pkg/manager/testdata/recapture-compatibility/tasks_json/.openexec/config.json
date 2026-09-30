@@ -1,0 +1,6 @@
+{
+  "name": "recapture-tasks_json",
+  "execution": {
+    "exec_mode": "workspace-write"
+  }
+}

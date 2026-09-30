@@ -1,0 +1,241 @@
+{
+  "task": "T-US-015-001",
+  "story": "US-015",
+  "candidate": {
+    "revision": "7c27eff7c28a633ef81e0ab34bf0171b08bcf821",
+    "worktree_changes": " M scripts/verification/delivery.py\n M scripts/verification/repair_study.py\n M scripts/verification/retention_story.py\n M scripts/verification/retention_unit_coverage.py\n M scripts/verification/test_delivery.py\n M scripts/verification/test_retention_unit_coverage.py\n M scripts/verify-retained-verification-evidence.sh\n",
+    "candidate_files_sha256": "4679ded4d85b571fede7c05cbf8bc5d5b121573f3205b281469f76ae5cb9b5b9",
+    "patch": "/tmp/us015-verified.patch",
+    "patch_sha256": "a05977ec43cc8abfc7dc135533d43956b0306adffd1af87b441f7a380a846338"
+  },
+  "aggregate": {
+    "command": [
+      "python3",
+      "scripts/verification/delivery.py",
+      "--case",
+      "delivery-ready",
+      "--output",
+      "/tmp/openexec-us015-verified"
+    ],
+    "exit_code": 0,
+    "passed": true,
+    "cases": {
+      "retained-result": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/retained-result/result.json",
+        "sha256": "4765ebb85ed12266be28d02cc7f0ae9d8fc6cf32b5d9bd2a7a499a0f92d17aee"
+      },
+      "evidence-boundaries": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/evidence-boundaries/result.json",
+        "sha256": "2bc575acfaa9fdbd376055c5044740360498c65acbe4ebd91b0bde6409fe2263"
+      },
+      "retention-unit-coverage": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/retention-unit-coverage/result.json",
+        "sha256": "bee6f403df89a0f55e135581faa99d64bf6dac8a6ed3b9bbcc0f3cd7ee0a3725"
+      },
+      "retention-mutations": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/retention-mutations/result.json",
+        "sha256": "6010e38632609d4d62f120056b66503020548d91b68e9fb51dfc44b898751924"
+      },
+      "legacy-recapture": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/legacy-recapture/result.json",
+        "sha256": "011355a195d540517cdab1d40623ae6e7ad3a032bb4a338c1d6a7a0a9c1fff16"
+      },
+      "recapture-boundaries": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/recapture-boundaries/result.json",
+        "sha256": "f919c2235534a6b05443c472559c9009fb5e56bfbb46e258f3d30adedbfc8458"
+      },
+      "recapture-unit-coverage": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/recapture-unit-coverage/result.json",
+        "sha256": "7fab9334b52c532a10944a61780bbe90b07b126059855315e1b4edd5a6eebc0a"
+      },
+      "recapture-compatibility": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/recapture-compatibility/result.json",
+        "sha256": "6057f13a0b20d50fff544ae413548c07d5a34b69b9cb0762a5883d6a54427afc"
+      },
+      "admitted-all": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/admitted-all/result.json",
+        "sha256": "dda14dfd63e4e6c953f8a364d578bafc2c802736ea739e02ffa9b6ead0d8e198"
+      },
+      "named-recapture": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/named-recapture/result.json",
+        "sha256": "6afe8698cc07ba37b764a7aee03ff40f4941ae3f419fc4777d77d1a55d340269"
+      },
+      "recapture-variants": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/recapture-variants/result.json",
+        "sha256": "1d37114b4cad13fbb4656e21ce558de47913492e93fbab4644696a5d950cb422"
+      },
+      "private-storage": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/private-storage/result.json",
+        "sha256": "12fd2782fe11d131b9e2404f468379c268461e25ddd13207a1a5b6104704aaf1"
+      },
+      "storage-unit-coverage": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/storage-unit-coverage/result.json",
+        "sha256": "0020659ba3e90e5e636d43327f80ba652ebdecad9782a5e054628823aa15c7a0"
+      },
+      "native-journey": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/native-journey/result.json",
+        "sha256": "6b85b72cd303d5d637123241af21455a669ee50aae73b01b56bd4434b4bfe52e"
+      },
+      "discovery": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/discovery/result.json",
+        "sha256": "4e28eb8a326c259f79da04c7e793f01f43ea711e71953dcb06e5641bf6f3f0a7"
+      },
+      "verifier-controls": {
+        "passed": true,
+        "exit_code": 0,
+        "result": "/tmp/openexec-us015-verified/verifier-controls/result.json",
+        "sha256": "fb6fe7f8ae36f46970ab2789f2298d4cf5d514e77e2cd80300d4524ebdfdfe25"
+      }
+    }
+  },
+  "coverage": {
+    "retention": {
+      "covered": 543,
+      "statements": 601,
+      "percent": 90.34941763727122,
+      "report": "/tmp/openexec-us015-verified/retention-unit-coverage/coverage/result.json"
+    },
+    "recapture": {
+      "covered": 473,
+      "statements": 525,
+      "percent": 90.0952380952381,
+      "report": "/tmp/openexec-us015-verified/recapture-unit-coverage/recapture-unit-coverage/result.json"
+    },
+    "admitted": {
+      "covered": 598,
+      "statements": 659,
+      "percent": 90.74355083459787,
+      "report": "/tmp/openexec-us015-verified/admitted-all/admitted/coverage/result.json"
+    },
+    "storage": {
+      "covered": 183,
+      "statements": 192,
+      "percent": 95.3125,
+      "report": "/tmp/openexec-us015-verified/storage-unit-coverage/coverage/result.json"
+    }
+  },
+  "d2": "incomplete",
+  "adapter_adoption": "deferred_after_merge",
+  "checks": {
+    "host-test": {
+      "exit_code": 0,
+      "log": "/tmp/us015-host-test.json",
+      "sha256": "75a000912121d021a84973ec78e9389d06aa30cf713ac80295adfd334ba70d20"
+    },
+    "host-lint": {
+      "exit_code": 0,
+      "log": "/tmp/us015-host-lint.json",
+      "sha256": "a18227f97557e37f914dc5957b00926516803d586c55a09e4dcd05028f591964"
+    },
+    "compatibility": {
+      "exit_code": 0,
+      "log": "/tmp/us015-compat.log",
+      "sha256": "9ea4e9d4a41a1df9e3d03f981d1ebb6e5137be09688510b872375dfe734da8f1"
+    },
+    "type-check": {
+      "exit_code": 0,
+      "log": "/tmp/us015-types.log",
+      "sha256": "dfd762321feed9eaf9d5f4cf8c5198e6e035e901bf7e82edb57567dd85474a33"
+    }
+  },
+  "console_source": {
+    "revision": "4c819427643655fc85d830b3a79f337488bd3fc0",
+    "files": {
+      "internal/server/openexec_checks.go": "a7094a264d44a369574e938cf74133c0cfc6ef652abdadc7287e35f5c7447017",
+      "go.mod": "7c03c602ad132a9ac794804a3e37e3c078f8165dd8331c8b9e3c685bbbb2c8c7"
+    }
+  },
+  "verified_files": {
+    "scripts/verification/admitted_evidence.py": "c81452190d9f12167aae9cc5c182a3fca3aa209286dce64432e06b5cabba8e12",
+    "scripts/verification/admitted_story.py": "08c5e3855364cb540177d5257e656533d1b33d459a095a820cf344fec3726eaa",
+    "scripts/verification/admitted_unit_coverage.py": "859493d5db1b60b343f80ad9322694c202d7ea88702578ade8ef9f6867670ddc",
+    "scripts/verification/delivery.py": "fede2b5fdb119f53e7ccdde4ace69364ffa4ad7fcb6c1bde876fdceff0394a16",
+    "scripts/verification/discovery.py": "ce3181add28f1770366466fe83d01932b1a1d907c3033429ead894d81f783593",
+    "scripts/verification/legacy_recapture.py": "b860a65bee07994a7d9d4d94b8cbd01f026f00f05565ccd8d880566f4cea5508",
+    "scripts/verification/named_recapture.py": "59efdba091592fe3bcfdbf96708cd01ab54259d298cfa7ef35308ddbad5dcb0d",
+    "scripts/verification/private_storage.py": "04559499703350a9bc9bdd8c568d238c357803037f7f6e32cebbe512d9333422",
+    "scripts/verification/recapture-boundaries.sh": "d63ff6fcd8a96b2a73ff6779da26e910cd8965a36866d1bcd88afbb33c65e72e",
+    "scripts/verification/recapture-compatibility.sh": "b7ccd7de12b631443b09cfaf16c7ec863665f09f0c319eed40f3935708acd78f",
+    "scripts/verification/recapture-unit-coverage.sh": "daea381d2790eb0410d86696ca9e7f3204653d764dfb497451e5144721d20e46",
+    "scripts/verification/recapture_boundaries.py": "8a9e5c8b1b91fa34273e48a0f8a17f719211b74029d57c747ff8a6e06c14ac54",
+    "scripts/verification/recapture_compatibility.py": "72e7580d722e9653f51057ae9a41d2cb84f88e78e5975d33d77ef39f6619f2b8",
+    "scripts/verification/recapture_story.py": "d61d960bec2911ffea1087a77e254c03c07c95a96b1a1610198d5955366def12",
+    "scripts/verification/recapture_unit_coverage.py": "b320e1aede27b026d3b2020907fba3368b9d4f8ac89527b662ae2a600fba3ad0",
+    "scripts/verification/recapture_variants.py": "1d35a59f280767dfe1ef4a92159bb6b8c1deeaf315dbd86d9d370425e40b3552",
+    "scripts/verification/repair_study.py": "a5043abad38ba97ff1ffae6b3b441cdece86f8263acd265f16d6ac12d907b460",
+    "scripts/verification/retention-mutations.sh": "76e3c444c3ad82cc578a9f9b84e58de2c383241b980394b02009c0015f28861b",
+    "scripts/verification/retention-unit-coverage.sh": "7ea14746e54953d02638ffe6eaa99e4c000f23d5d688c02478372a483772f5e6",
+    "scripts/verification/retention_mutations.py": "f9442174d13968598d71c0031e906b3ff5ab98d1327df47c2b9b52f8d51bd746",
+    "scripts/verification/retention_story.py": "cd53be40f7d13fc529327a22f8a82fc09d0612bc424976fdbb4e03db005c90e7",
+    "scripts/verification/retention_unit_coverage.py": "215a9ddc26738b762f14431ac329b15f985e64be645405a3e473f97c9c558aee",
+    "scripts/verification/retentioncoverage/main.go": "750adba975ac607042d282054ffd4260f05d6653bbaa2f2f3d43f6107af7a059",
+    "scripts/verification/storage_unit_coverage.py": "67b2582210f56b69d00aa4261e2d7b2c882ab04201ed0fafcf7876b2180e8460",
+    "scripts/verification/test_admitted_story.py": "f8f19e571486bd4c22b8388ccf28db93e5f8a90a159fc6b01b36145ab280ba64",
+    "scripts/verification/test_admitted_unit_coverage.py": "22b0833885a02e5acee1bbb68c1debb7cfb82bbed32244182f932e48f221b458",
+    "scripts/verification/test_delivery.py": "4e1f38561684cb93f3faebf6b6ce59f882816d753217646c330ab44368a142eb",
+    "scripts/verification/test_discovery.py": "609e05475fd009a456df2d58f6fabc4e13801c46dd4eee5c9cb08fc71f24dbfe",
+    "scripts/verification/test_named_recapture_dispatch.py": "4fedb4b8f73247eb235e525312e8b436aeed49f8e75cd14f7cb8a3d9b9f0ac12",
+    "scripts/verification/test_private_storage.py": "bfe4bb968a6e56e8de9531c97760e4ef61c3ac987ae413469f37c054ccc3c76c",
+    "scripts/verification/test_recapture_boundaries.py": "5ba66af3b5ddabb668eeba69e60c8005d46c08c614c2bfdb7a1b0c66918c41cd",
+    "scripts/verification/test_recapture_compatibility.py": "912873ef8e3e49ac957091128db5915e4899a6ebd61dda8365308737c60c7665",
+    "scripts/verification/test_recapture_story.py": "69447ad75b57aeccab80527e8d4633c42b2ff0c787d254b7e17ae89499716017",
+    "scripts/verification/test_recapture_unit_coverage.py": "404d2820479fafbf1388df88bbba056a9d0d1f02abea7cb8e641fc5f8ca48151",
+    "scripts/verification/test_recapture_variants.py": "fa212d23fda94aa317ce000b58ba854686bd35aac436ffa51cf8165d561ffcf5",
+    "scripts/verification/test_repair_study.py": "29d2addb5539127712cf4199b3f7529548abcea261fab78b69714e39e8fd6da4",
+    "scripts/verification/test_retention_mutations.py": "f50aabbaffee70de014e6f37474befbd28109dc39160e8ca5d2e22566df6c13a",
+    "scripts/verification/test_retention_story.py": "302068a30cb2294e13d97675aa604ba62861954a01cd53ebae2c7c688ecc69d6",
+    "scripts/verification/test_retention_unit_coverage.py": "a560dcdb4cecb5f6033758d51909dd3525d960c3039251d8efa486ea0ecc4af7",
+    "scripts/verification/test_storage_unit_coverage.py": "ec062ff0444f800714289db231a58ad3c9efa9c2bc46854fe39d07e281bfe62c",
+    "scripts/verify-retained-verification-evidence.sh": "0d41ebe192f438ea23c75585ddbfd67afaddca25859d46357bfce33755cd0de2"
+  },
+  "goal_complete_negative": {
+    "command": [
+      "python3",
+      "scripts/verification/delivery.py",
+      "--case",
+      "goal-complete",
+      "--output",
+      "/tmp/openexec-us015-goal"
+    ],
+    "exit_code": 1,
+    "all_16_local_cases_passed": true,
+    "error": "D2 incomplete: candidate-matched Console merge evidence required",
+    "report": "/tmp/openexec-us015-goal/result.json",
+    "sha256": "c6b27e296afaf4d9cb35450b68b8fa8fa18bdac4c2d1028b28da31f3566bbee4"
+  },
+  "verifier_controls": {
+    "tests": 127,
+    "exit_code": 0,
+    "log": "/tmp/openexec-us015-verified/verifier-controls/command.log"
+  }
+}

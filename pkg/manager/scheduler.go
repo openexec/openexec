@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"errors"
 	"context"
 	"fmt"
 	"log"
@@ -18,7 +19,18 @@ type RunOptions struct {
 	MaxParallel  int      `json:"worker_count"` // Fix mismatch: CLI sends worker_count
 	IsStudy      bool     `json:"is_study"`
 	Mode         string   `json:"mode"`
+	// Yield, when set, is asked before each task of a task-oriented queue
+	// starts. Answering true ends the queue there with ErrQueueYielded: the
+	// task that finished stays finished, the next one is not started and
+	// spends no attempt. A caller uses it to let more urgent work — a repair
+	// other work is waiting for, a deployment of a fix — take the machine at a
+	// task boundary instead of cancelling a task halfway through.
+	Yield func() bool `json:"-"`
 }
+
+// ErrQueueYielded ends a task-oriented queue whose caller asked it to yield.
+// Nothing failed and every remaining task is retained as it was.
+var ErrQueueYielded = errors.New("task queue yielded at a task boundary; remaining work retained")
 
 // filterAutoDispatchable splits pending tasks into auto-dispatchable tasks and
 // held-back tasks. A task is held back when it is marked hitl (human in the

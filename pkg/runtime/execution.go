@@ -25,3 +25,17 @@ const (
 func VerificationCommandFailure(ctx context.Context, name string, err error) error {
 	return gates.NewCommandFailure(ctx, name, err)
 }
+
+// VerificationCommandFailureWithOutput also records the command that ran and
+// the tail of its output, which is what a repair needs to reproduce it.
+func VerificationCommandFailureWithOutput(ctx context.Context, name string, err error, command, output string) error {
+	return gates.NewCommandFailureWithOutput(ctx, name, err, command, output)
+}
+
+// VerificationCommandFailureWithEvidence attaches the reference returned by
+// RetainCommandEvidence to an observed verification failure. Admitted executors
+// must retain evidence before calling this function. References do not classify
+// cancellation, launch or transport failures as repairable check failures.
+func VerificationCommandFailureWithEvidence(ctx context.Context, name string, err error, hash, path string) error {
+	return gates.CommandFailureWithEvidence(ctx, name, err, hash, path)
+}

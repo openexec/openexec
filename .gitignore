@@ -28,6 +28,7 @@ desktop.ini
 
 # OpenExec specific
 .openexec/
+.openexec-verification/
 !.openexec/config.example.json
 *.db
 *.sqlite

@@ -1,7 +1,6 @@
 package blueprint
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/openexec/openexec/internal/actions"
 	"github.com/openexec/openexec/internal/contracts"
+	"github.com/openexec/openexec/internal/execution/evidence"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/skills"
@@ -151,7 +151,7 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			defer cancel()
 
 			if e.OnCommandStart != nil {
-				e.OnCommandStart(stage, cmdStr)
+				e.OnCommandStart(stage, evidence.Public(cmdStr, evidence.CommandSecrets(cmdStr)))
 			}
 
 			checkName := ""
@@ -162,7 +162,7 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			outputs = append(outputs, output)
 
 			if e.OnCommandComplete != nil {
-				e.OnCommandComplete(stage, cmdStr, output, err)
+				e.OnCommandComplete(stage, evidence.Public(cmdStr, evidence.CommandSecrets(cmdStr)), output, err)
 			}
 
 			if err != nil {
@@ -170,7 +170,7 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 					e.OnVerificationFailure(stage, err)
 				}
 				result.Output = strings.Join(outputs, "\n---\n")
-				result.Fail(fmt.Sprintf("command failed: %s: %v", cmdStr, err))
+				result.Fail(fmt.Sprintf("command failed: %v", err))
 				return result, nil
 			}
 		}
@@ -248,24 +248,35 @@ func (e *DefaultExecutor) runCommandWithCheck(ctx context.Context, cmdStr, check
 	// Propagate environment
 	cmd.Env = os.Environ()
 
-	var stdout, stderr bytes.Buffer
+	var stdout, stderr evidence.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
 	if checkName != "" {
-		err = gates.NewCommandFailure(ctx, checkName, err)
+		exitCode := -1
+		if cmd.ProcessState != nil {
+			exitCode = cmd.ProcessState.ExitCode()
+		}
+		hash, path, captureErr := evidence.Write(workDir, evidence.Command{
+			Argv: cmd.Args, Cwd: cmd.Dir, ExitCode: exitCode, Stdout: stdout.String(), Stderr: stderr.String(),
+			StdoutTruncated: stdout.Truncated, StderrTruncated: stderr.Truncated,
+		})
+		if captureErr != nil {
+			return "", fmt.Errorf("private verification evidence could not be retained")
+		}
+		err = gates.CommandFailureWithEvidence(ctx, checkName, err, hash, path)
 	}
 
-	output := stdout.String()
+	output := evidence.PublicStream(&stdout, evidence.CommandSecrets(cmdStr))
 	if stderr.Len() > 0 {
-		output += "\n[stderr]\n" + stderr.String()
+		output += "\n[stderr]\n" + evidence.PublicStream(&stderr, evidence.CommandSecrets(cmdStr))
 	}
 
 	if err != nil {
 		// Include stderr in error for better diagnostics
 		if stderr.Len() > 0 {
-			return output, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+			return output, fmt.Errorf("%w: %s", err, strings.TrimSpace(evidence.PublicStream(&stderr, evidence.CommandSecrets(cmdStr))))
 		}
 		return output, err
 	}

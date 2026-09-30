@@ -1,332 +1,269 @@
 # OpenExec Architecture
 
-**Version:** 1.0  
-**Last Updated:** 2026-03-31
+Current validation: US-015 / T-US-015-001, 2026-09-30, accepted G-007.
+Final evidence and finding dispositions: [delivery evidence](verification-evidence-delivery.md).
+Prerequisite study: US-010 / T-US-010-001.
+Exact candidate/Console identities, evidence limits, all review checklists and
+required implementation proofs live in [repair study](verification/repair-study.md).
+The [requirement register](verification/repair-requirements.json) preserves exact
+accepted clauses, backed by the [read-only contract snapshot](verification/repair-study-contract.json).
+Earlier US-007/008/009/011 reports describe G-006 and their own fixture scopes;
+they do not establish the incident or actual Console integration as repaired.
 
-**Status:** built, but **incomplete as a map of the current system.** What it
-describes — the orchestration model, the blueprint engine, provider adapters —
-is accurate. What it predates is everything shipped since 2026-03-31, none of
-which appears below. If you are looking for one of these, this is not the file:
+## Context and scope
 
-| Subsystem | Where it is documented |
-|---|---|
-| Light mode: the story backlog over MCP (`openexec mcp-serve`, `backlog_*` tools) | [LIGHT_MODE.md](LIGHT_MODE.md) |
-| Skills, and the propose-then-approve trust boundary (`skill_propose`, `openexec skills approve`) | [SKILLS_SYSTEM.md](SKILLS_SYSTEM.md), [SKILLS_QUICKSTART.md](SKILLS_QUICKSTART.md) |
-| SRE/infra command registry (`ansible_run_playbook`, `terraform_plan`/`terraform_apply`, approval gate) | [SRE_ORCHESTRATION_ROADMAP.md](SRE_ORCHESTRATION_ROADMAP.md), [SECURITY_MODEL.md](SECURITY_MODEL.md) |
-| Repository symbol tools and the pointer graph (`symbol_find`, `symbol_read`, `symbol_relations`) | [SYMBOL_TOOLS_REVIEW.md](SYMBOL_TOOLS_REVIEW.md), [REPOSITORY_POINTER_GRAPH_PLAN.md](REPOSITORY_POINTER_GRAPH_PLAN.md), [KNOWLEDGE_V2_PLAN.md](KNOWLEDGE_V2_PLAN.md), [KNOWLEDGE_V3_PLAN.md](KNOWLEDGE_V3_PLAN.md) |
-| Vertical slices, afk/hitl execution modes, project phases, smart-zone budget | `CLAUDE.md` at the repository root |
+Outcome: preserve failed verification evidence so native repair can reproduce
+the actual check, and recover legacy diagnostic-free failures with bounded
+recapture. Current code retains failed results, private bounded diagnostics and
+SQLite receipts. The public attachment API and empty-phase named-check recapture
+are implemented; current proof is in [admitted evidence](verification/admitted-evidence.md)
+and [named recapture](verification/named-recapture.md). Private storage and the
+strict 16-member aggregate are locally verified. Actual Console adoption is
+deferred until this API merges; D2 remains incomplete pending a candidate-matched
+Console merge receipt. Source inspection is distinct from runtime attestation.
 
-Two consequences worth stating plainly. `CLAUDE.md` makes this file the one a
-study story must write, so an agent is told to trust it — the gaps above are
-therefore load-bearing, not cosmetic. And a reader who takes this document as
-the whole system will conclude that several shipped subsystems do not exist.
+The existing native task loop owns implementation, verification, retries and
+repair. Console owns admission/effects, outer Goal review and delivery. Reuse
+StageResult, run_steps/artifacts, counted task attempts and CreateFailureRepair;
+no new scheduler, recovery queue, state machine or authority concept is needed.
+Follow the [Simple Loop contract](OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md).
+Complexity delta: concepts added/removed 0; new persistent state, transitions,
+owner decisions and runtime failure modes 0; existing machinery replaced none.
+This validation stage changes verification and documentation only; production behavior is unchanged.
 
-## Executive Summary
+Read root/docs instructions, NOTES and [project intent](../PROJECT_INTENT.md).
+Fresh Console Project context reports accepted Goal/Ready revision 4 and
+interpretation 10 (Professional Portfolio Stewardship). The selected G-007 and
+US-010 ledger contract narrow this work to the study. The candidate ledger was
+read via SQLite mode=ro; no tasks, decisions or runtime state were changed.
 
-OpenExec is an **AI CLI orchestration platform**, not an LLM client. It wraps existing AI CLI tools (Claude Code, Codex CLI, Gemini CLI) with production-grade infrastructure for deterministic, reliable, and safe AI-assisted development.
+## Module map and APIs
 
-**Key Principle:** OpenExec doesn't implement LLM clients - it orchestrates them.
+The table is also the discovery verifier's source-reference manifest. Each row
+names an existing file and a declaration manually inspected for this task.
 
----
+| Source | Declaration | Responsibility |
+| --- | --- | --- |
+| `cmd/openexec/main.go` | `main` | CLI entry; commands live in internal/cli. |
+| `pkg/manager/scheduler.go` | `ExecuteTasks` | RunOptions selects the task-oriented route. |
+| `pkg/manager/manager.go` | `Config` | StageExecutor injection into pipeline configuration. |
+| `pkg/runtime/execution.go` | `VerificationCommandFailure` | Public admitted interface and typed command classification. |
+| `pkg/runtime/evidence.go` | `RetainCommandEvidence` | Public private-capture API; typed evidence attachment still missing. |
+| `internal/execution/evidence/capture.go` | `Buffer` | Bounded prefix/tail capture; US-012 exercises persisted diagnostic tails. |
+| `internal/execution/evidence/capture.go` | `Read` | Content-addressed private reader; US-014 owns safe storage and old-reference policy. |
+| `pkg/manager/task_recapture.go` | `resolveRecaptureCommand` | Registered shell/verify-script resolution; single-gate phase inference and current named-check fallback. |
+| `internal/cli/init.go` | `ensureGitignore` | Target managed ignore block; currently excludes state but not sibling evidence directory. |
+| `internal/blueprint/stage.go` | `StageResult` | Output, Error, Diagnostics, Artifacts, Attempt and timing. |
+| `internal/blueprint/stage.go` | `StageExecutor` | Execute(context.Context, *Stage, *StageInput) (*StageResult, error). |
+| `internal/blueprint/engine.go` | `ExecuteStage` | Single-stage call; retains non-nil result on error. |
+| `internal/blueprint/engine.go` | `Execute` | Full blueprint; retains non-nil result on error. |
+| `internal/pipeline/admitted_executor.go` | `Execute` | Passes result/error and captures trusted error receipt separately. |
+| `internal/pipeline/pipeline.go` | `terminalEvidence` | Terminal deterministic failure receipt, distinct from worker artifacts. |
+| `internal/execution/gates/failure.go` | `CheckFailure` | Classification consists of gate and exit_code only. |
+| `internal/execution/gates/failure.go` | `NewCommandFailure` | Only direct normal failed command exits qualify. |
+| `pkg/manager/events.go` | `consumeEvents` | Persist terminal evidence before publishing terminal state. |
+| `pkg/manager/events.go` | `writeRunStepAsync` | Activity telemetry; not the synchronous repair handoff. |
+| `pkg/manager/task_failure.go` | `persistTaskVerificationFailure` | Persist and re-read evidence bound to the task attempt. |
+| `pkg/db/state/task_failure.go` | `RecordTaskFailureStep` | Atomic run_steps insertion and task failure/evidence binding. |
+| `pkg/manager/task_failure.go` | `repairTaskFromRetainedFailure` | Re-fetch and validate retained evidence before repair generation. |
+| `internal/release/failure_repair.go` | `CreateFailureRepair` | Idempotent same-story prerequisite and original-task continuation. |
+| `internal/release/failure_repair.go` | `RunnableTasks` | Dependency, story scope, HITL and attempt eligibility. |
+| `pkg/manager/task_queue.go` | `executeTaskQueue` | Sequential queue; durable attempt charged before dispatch. |
+| `pkg/manager/task_execution_lock.go` | `reconcileInterruptedTasks` | Fresh-queue reconciliation under exclusive workspace ownership. |
+| `pkg/agent/openai_provider.go` | `OpenAIProvider` | API provider implementation; execution is not CLI-only. |
 
-## Core Architecture
+Other subsystems: internal/loop manages native execution and subprocesses;
+pkg/db/state stores runtime records; internal/release owns tasks/dependencies;
+ui/src is the React UI and ui/e2e its browser tests. See
+[light mode](LIGHT_MODE.md), [skills](SKILLS_SYSTEM.md),
+[security](SECURITY_MODEL.md) and [symbol tools](SYMBOL_TOOLS_REVIEW.md)
+for their separate contracts. These are not new evidence/recovery owners.
 
-### High-Level Flow
+## Data flow and observed gaps
 
+1. Manager.ExecuteTasks selects explicitly scoped runnable tasks, acquires the
+   workspace lock and persists an incremented task attempt before dispatch.
+2. Manager Config.StageExecutor reaches pipeline.Config.StageExecutor and the
+   admitted wrapper. The public runtime aliases expose the blueprint types.
+   With injection enabled, native executor/host-gate fallback is bypassed.
+3. The executor returns a StageResult and possibly an error. Both engine APIs
+   retain non-nil results on error and mark them failed, preserving supplied
+   output, artifacts, diagnostics and timing. Execute synthesizes missing
+   results; ExecuteStage preserves its nil-result error return. ExecuteStage
+   records and returns non-nil failed results alongside the error.
+4. Engine.Execute adds its result to Run.Results and PreviousStages before the
+   completion callback. Pipeline terminal failure events carry the last stage's
+   identity, output, diagnostics and artifact references. Receipt keys are
+   stripped from those artifacts; only the private trusted receipt authorizes
+   repair, and cancellation suppresses that receipt.
+5. consumeEvents synchronously invokes persistTaskVerificationFailure before
+   exposing terminal status. RecordTaskFailureStep commits run_steps metadata
+   and tasks.metadata.verification_failure_evidence atomically for the matching
+   in-progress attempt. Artifact references are saved synchronously first;
+   the manager reads the step back. Async stage telemetry
+   excludes stage-failed events and cannot substitute for this handoff.
+6. repairTaskFromRetainedFailure validates task ownership, failed status, agent
+   and receipt, then includes retained evidence and artifact references in the
+   diagnosis. CreateFailureRepair
+   preserves story/candidate identity and makes repair a prerequisite of the
+   original task. RunnableTasks selects repair before ordinary pending work.
+7. T-US-008-001's retained-result verifier runs an admitted exit-2 fixture through
+   both engine APIs and pipeline persistence, then closes/reopens the database
+   before repair creation. It checks exact argv/cwd, bounded stdout/stderr,
+   a diagnostic marker and a usable artifact reference. T-US-008-002 adds
+   production bounded capture and private artifact access through
+   internal/execution/evidence, exposed to admitted adapters by pkg/runtime.
+   Native configured checks and gates use the same helper. The evidence-boundaries
+   verifier covers secret-bearing oversized streams, fixed toolchain version
+   keys, owner-only file/directory modes, tamper/path/symlink refusal, and
+   failure/success/refusal/cancellation/nil-result outcomes after database reopen.
+   Public summaries are redacted; exact argv/cwd and bounded raw streams remain
+   privately resolvable. Independent coverage and mutations remain assigned to
+   T-US-008-003 and T-US-008-004.
+8. T-US-009-001 implements diagnostic-free legacy receipt recognition,
+   authoritative command resolution and bounded single-stage recapture through
+   the native queue/pipeline. Existing task attempts persist the bound; unusable
+   receipts cannot repeatedly create repairs. Resolution limits, terminal/reload
+   evidence and reusable fixtures are in [legacy recapture](verification/legacy-recapture.md).
+   Independent boundary, coverage and compatibility proof remain assigned below.
+
+The [inspection evidence](VERIFICATION_FAILURE_INSPECTION.md) contains the
+preceding task's detailed source trace and controlled native journey results.
+Those results are historical evidence. Current study findings and proof gaps are
+linked above; no fresh product-repair proof is claimed by this stage.
+
+## Accepted requirement mapping
+
+G-007 supersedes the old normalized G-006 mapping. Each exact clause has one
+owner in the linked requirement register; D1 and D2 belong to REQ-004.
+
+| Label | Accepted clauses and proof | Owner |
+| --- | --- | --- |
+| REQ-001 | Exact US-012 contract: preserve failed results, admitted command identity/cwd and usable repair reference; actual Console adoption and tails required. | US-012 |
+| REQ-002 | Exact US-013 contract: bounded native recapture of diagnostic-free legacy receipts; no new loop/state machine or owner decision. | US-013 |
+| REQ-003 | Exact US-014 contract: classification/provenance separate from private diagnostics; no indiscriminate environment or secret logging. | US-014 |
+| REQ-004 | Exact US-015 contract: D1 reproduces and fixes failure; D2 verifies merge to default branch. D1 local proofs and finding dispositions are in the delivery evidence; D2 remains incomplete. | US-015 |
+
+## Boundaries and conventions
+
+- Classification is not diagnosis: CheckFailure and its digest prove a recorded
+  normal exit, not its cause or provenance. Only the trusted configured command
+  boundary may originate a receipt; worker prose/artifacts cannot authorize repair.
+  Missing knip or present-day Settings hook drift cannot establish the historical
+  unknown lint exit-2 cause.
+- NewCommandFailure accepts direct exec.ExitError codes 1–125 with live context;
+  launch/transport/refusal, cancellation, unknown errors and mixed error trees
+  do not become verification repair authority. Preserve nil-result errors and
+  success semantics. Nil/nil is not a documented successful adapter contract;
+  resolve it explicitly before changing behavior.
+- Private diagnostic evidence is separate from classification fingerprints.
+  Exact private command identity must remain resolvable without exposing secret
+  values publicly. Bound stdout/stderr; redact command values and diagnostics;
+  explicitly allowlist toolchain metadata, never dump the environment.
+  Capture retains 4096 bytes per stream (first/last 2048 on overflow) with truncation flags; toolchain input
+  accepts only go_version, node_version, npm_version, python_version and
+  rustc_version, each capped at 128 bytes. Admitted adapters use EvidenceBuffer,
+  RetainCommandEvidence and PublicVerificationStream; they supply known secret
+  values from admission/configuration because arbitrary prose secrets cannot be
+  inferred reliably. Common credential assignments are additionally redacted.
+  Truncated public streams omit cut lines at both sides of the omitted middle
+  and the incomplete final line, reserving space for the truncation marker. Exact private payloads
+  live in .openexec/data/verification (0700), covered by initialization’s data ignore,
+  with content-addressed files
+  (0600); ReadCommandEvidence requires matching hashes and rejects public modes,
+  traversal and symlinks at every nested component. Recapture requires a registered
+  reference to that exact location. Root-level legacy files are explicitly refused
+  without deleting their files or ledger references; see
+  [private storage policy](verification/private-storage.md).
+  No public evidence-content endpoint is introduced.
+- Engine stage retry counters/MaxTotalRetries differ from persisted task attempts.
+  Fresh-queue reconciliation already reopens eligible receipt-free failures once
+  under the lock; it is broader than diagnostic-free recapture. Do not reset
+  attempts, create another retry budget or bypass Stop/pause, HITL, admission,
+  candidate branch, spent attempts, dependencies or selected story scope.
+- Keep Settings waiting until its existing dependency completion conditions hold.
+  Preserve `.openexec`, legacy `.uaos` and `.openexec/tasks.json` fallbacks.
+- Go uses gofmt, lowercase packages and colocated *_test.go files; UI uses
+  TypeScript/React, PascalCase components and camelCase helpers. Tests use Go
+  testing, Vitest and Playwright. Stable symbol references are preferable to
+  stale line numbers. SQLite is durable task truth; generated reports are evidence.
+- Console owns publication, canonical gate, independent review, owner presentation
+  and merge execution after the queue. Preserve T-US-011-002 and its dependency
+  on T-US-011-001 verbatim. No new delivery/approval task or decision_ref.
+  Current Console source/dependency and the separately supplied process observation
+  are recorded once in the study provenance; deployment and D2 remain unverified.
+
+## Evidence ownership
+
+The historical G-006 slice implementations and evidence below exist in the candidate.
+Current G-007 repair ownership is US-012/013/014; US-015 owns final aggregation.
+US-010 owns the study dispatcher, documentation and study verifier tests.
+Only serial implementation/aggregation owners edit the shared dispatcher
+`scripts/verify-retained-verification-evidence.sh`. Independent verifiers run
+standalone helpers, consume completed production/shared fixtures directly and
+never require sibling reports. Dedicated test names and helper functions must
+also be unique within a Go package. Additional package-local unit files use the
+same reserved basename; do not edit another owner's tests to share helpers.
+
+| Task | Owned test files / fixture namespace | Owned verifier helper or dispatcher cases | Evidence |
+| --- | --- | --- | --- |
+| T-US-007-002 | `scripts/verification/test_discovery.py` | `scripts/verification/discovery.py`; discovery | This document; NOTES.md |
+| T-US-008-001 | `pkg/manager/retention_journey_test.go`; `pkg/manager/retention_fixture_test.go` | retained-result | Integrated admitted exit-2 fixture and reload assertions |
+| T-US-008-002 | `pkg/manager/retention_boundaries_test.go`; extends retention_fixture_test.go serially | evidence-boundaries | Shared completed privacy/boundary inputs for both independent consumers |
+| T-US-008-003 | `internal/blueprint/retention_unit_test.go`; `pkg/manager/retention_unit_test.go`; package-local retention_unit_test.go | `scripts/verification/retention-unit-coverage.sh` | `docs/verification/retention-unit-coverage.md`; baseline and all changed functions |
+| T-US-008-004 | `pkg/manager/retention_mutation_test.go` | `scripts/verification/retention-mutations.sh` | `docs/verification/retention-mutations.md`; isolated mutations, expected assertion failures only |
+| T-US-008-005 | No sibling test edits | retention-unit-coverage, retention-mutations, retention-story | docs/verification-evidence-retention.md; manifest and aggregate |
+| T-US-009-001 | `pkg/manager/recapture_journey_test.go`; `pkg/manager/recapture_fixture_test.go` | legacy-recapture | Shared restart, resolution, receipt and terminal-state fixtures |
+| T-US-009-002 | `pkg/manager/recapture_boundaries_test.go` | `scripts/verification/recapture-boundaries.sh` | `docs/verification/recapture-boundaries.md`; persisted termination/restart and Settings waiting |
+| T-US-009-003 | `pkg/manager/recapture_unit_test.go`; package-local recapture_unit_test.go | `scripts/verification/recapture-unit-coverage.sh` | `docs/verification/recapture-unit-coverage.md`; full-function scope/results |
+| T-US-009-004 | `internal/validation/recapture_compatibility_test.go`; `pkg/manager/recapture_compatibility_test.go` | `scripts/verification/recapture-compatibility.sh` | `docs/verification/recapture-compatibility.md`; isolated protected-format fixtures/results |
+| T-US-009-005 | No sibling test edits | recapture-boundaries, recapture-unit-coverage, recapture-compatibility, recapture-story | docs/verification-evidence-recapture.md; manifest and aggregate |
+| T-US-011-001 | Earlier composed native journey | Historical full, delivery-ready | Superseded by US-015 aggregate below |
+| T-US-015-001 | Strict aggregate and external receipt controls | full, delivery-ready, goal-complete | docs/verification-evidence-delivery.md; 16 members, four strict coverage slices, deferred adoption and incomplete external D2 |
+
+Retention unit coverage and mutations independently consume T-US-008-002.
+Recapture boundaries, unit coverage and compatibility independently consume
+T-US-009-001. Each helper exits nonzero on failure, absent instrumentation or
+missing/skipped required scenarios; no echo-based soft success. Mutation proof
+rejects compilation/unrelated failures. Aggregators compose their own slice's
+helpers only after completion and preserve every subprocess failure. Per-slice
+reports must map all criteria to exact commands, statuses, assertions, coverage,
+reload/restart evidence and blockers. Aggregation cannot defer essential proof.
+
+## Discovery verification
+
+Run from any directory:
+
+```sh
+bash scripts/verify-retained-verification-evidence.sh --case discovery
+python3 -m unittest discover -s scripts/verification -p 'test_discovery.py' -v
 ```
-User Intent
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  OpenExec Orchestration Layer                                    │
-│  ├─ Input Processing (intent parsing)                            │
-│  ├─ Context Assembly (knowledge index, file pruning)            │
-│  ├─ Quality Gates (lint/test/format validation)                 │
-│  ├─ Blueprint Execution (deterministic workflows)               │
-│  │   ├─ Stage 1: Gather Context                                │
-│  │   ├─ Stage 2: Implement (spawn AI CLI)                      │
-│  │   ├─ Stage 3: Validate (lint/test)                          │
-│  │   └─ Stage 4: Review (secondary AI)                         │
-│  ├─ Checkpointing (crash recovery)                              │
-│  ├─ Memory Extraction (pattern learning)                        │
-│  └─ Multi-Agent Coordination (parallel execution)               │
-└─────────────────────────────────────────────────────────────────┘
-    │
-    │ Spawns subprocess via exec.Command()
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  External AI CLI Process                                         │
-│  ├─ Claude Code CLI (claude)                                    │
-│  ├─ OpenAI Codex CLI (codex)                                    │
-│  └─ Google Gemini CLI (gemini)                                  │
-└─────────────────────────────────────────────────────────────────┘
-    │
-    │ Communicates with
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  LLM Provider API (cloud)                                        │
-│  ├─ Anthropic API                                               │
-│  ├─ OpenAI API                                                  │
-│  └─ Google API                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
 
----
-
-## Subsystem Details
-
-### 1. Model Routing (`internal/runner/`)
-
-**Status: Active, always-on** — Deterministic routing runs on every execution.
-
-**Purpose:** Map abstract model names to concrete CLI commands.
-
-**Key Files:**
-- `internal/runner/runner.go` - Model resolution logic
-- `internal/runner/runner_test.go` - Resolution tests
-
-**Resolution Logic:**
-
-```go
-// Pseudo-code from internal/runner/runner.go
-func Resolve(model string) (cmd string, args []string, err error) {
-    model = strings.ToLower(model)
-    
-    // Claude family → "claude" CLI
-    if strings.Contains(model, "claude") || 
-       strings.Contains(model, "sonnet") ||
-       strings.Contains(model, "opus") ||
-       strings.Contains(model, "haiku") {
-        return "claude", defaultClaudeArgs(), nil
-    }
-    
-    // OpenAI/Codex family → "codex" CLI
-    if strings.Contains(model, "gpt") ||
-       strings.Contains(model, "codex") ||
-       strings.Contains(model, "openai") {
-        return "codex", defaultCodexArgs(), nil
-    }
-    
-    // Gemini family → "gemini" CLI
-    if strings.Contains(model, "gemini") {
-        return "gemini", defaultGeminiArgs(), nil
-    }
-    
-    return "", nil, fmt.Errorf("unknown model: %s", model)
-}
-```
-
-**Supported Models:**
-
-| Model Name | Resolves To | CLI Required |
-|------------|-------------|--------------|
-| `claude`, `claude-3`, `sonnet`, `opus`, `haiku` | `claude` | `@anthropic-ai/claude-code` |
-| `gpt-4`, `gpt-3.5-turbo`, `codex` | `codex` | `@openai/codex` |
-| `gemini`, `gemini-pro`, `gemini-ultra` | `gemini` | Google Gemini CLI |
-
----
-
-### 2. Process Management (`internal/loop/`)
-
-**Purpose:** Spawn and manage AI CLI subprocesses.
-
-**Key Files:**
-- `internal/loop/process.go` - Process spawning
-- `internal/loop/loop.go` - Main execution loop
-
-**Process Spawning:**
-
-```go
-// From internal/loop/process.go
-func StartProcess(ctx context.Context, cfg Config) (*Process, error) {
-    // Resolve model to CLI command
-    name, args := buildCommand(cfg)
-    
-    // Spawn subprocess
-    cmd := exec.CommandContext(ctx, name, args...)
-    cmd.Dir = cfg.WorkDir
-    
-    // Set up pipes for stdout/stderr
-    stdoutPipe, _ := cmd.StdoutPipe()
-    stderrPipe, _ := cmd.StderrPipe()
-    
-    // Start the process
-    if err := cmd.Start(); err != nil {
-        return nil, fmt.Errorf("start process: %w", err)
-    }
-    
-    return &Process{
-        cmd:    cmd,
-        Stdout: stdoutPipe,
-        Stderr: stderrPipe,
-    }, nil
-}
-```
-
-**Key Point:** OpenExec does NOT implement LLM APIs. It shells out to the CLIs.
-
----
-
-### 3. Blueprint Engine (`internal/blueprint/`)
-
-**Status: Active, always-on** — Runs on every blueprint-mode execution.
-
-**Purpose:** Deterministic workflow execution.
-
-**Key Files:**
-- `internal/blueprint/engine.go` - Core engine
-- `internal/blueprint/stage.go` - Stage definitions
-
-**Blueprint Structure:**
-
-```yaml
-# Example blueprint
-name: feature-implementation
-stages:
-  - name: gather_context
-    agent: claude-3-sonnet
-    task: "Analyze codebase and identify relevant files"
-    
-  - name: implement
-    agent: claude-3-sonnet  
-    task: "Implement the feature"
-    depends_on: [gather_context]
-    
-  - name: lint
-    command: "go vet ./..."
-    blocking: true
-    
-  - name: test
-    command: "go test ./..."
-    blocking: true
-    
-  - name: review
-    agent: codex
-    task: "Review implementation for bugs"
-    depends_on: [test]
-```
-
----
-
-### 4. Quality Gates (`internal/quality/`)
-
-**Status: Opt-in** — Enabled via `quality_gates_v2` in config.json.
-
-**Purpose:** Block execution on lint/test/format failures.
-
-**Key Files:**
-- `internal/quality/gates.go` - Gate definitions and execution
-
-**Gate Types:**
-- **Lint:** Static analysis (go vet, eslint, flake8)
-- **Test:** Test suites (go test, pytest, jest)
-- **Format:** Format checkers (gofmt, black, prettier)
-- **Security:** Security scans (gosec, bandit)
-- **Custom:** Arbitrary commands
-
-**Gate Modes:**
-- **Block:** Prevent execution on failure
-- **Warn:** Allow execution with warning
-- **Ignore:** Silently ignore failures
-
----
-
-### 5. Checkpointing (`internal/checkpoint/`)
-
-**Status: Opt-in** — Enabled via `checkpoint_enabled` in config.json.
-
-**Purpose:** Crash recovery and state persistence.
-
-**Key Files:**
-- `internal/checkpoint/manager.go` - Checkpoint management
-
-**Features:**
-- Automatic checkpoint after each stage
-- File state hashing (SHA256)
-- Stale detection (detects file changes)
-- Corruption detection (checksum verification)
-- Resume from last valid checkpoint
-
----
-
-### 6. Context Pruning (`internal/context/`)
-
-**Status: Active, always-on** — Runs after context assembly on every execution.
-
-**Purpose:** Intelligent file selection to reduce token usage.
-
-**Key Files:**
-- `internal/context/pruner.go` - Pruning logic
-
-**Algorithm:**
-1. Score files by relevance to task
-2. Apply token budget
-3. Select top-N most relevant files
-
-**Scoring Factors:**
-- Symbol matching (10x weight)
-- Content similarity (5x weight)
-- Path relevance (3x weight)
-- Recency (2x weight)
-
-**Results:** 70-95% token reduction
-
----
-
-### 7. Predictive Loading (`internal/predictive/`)
-
-**Status: Opt-in** — Enabled via `predictive_load` in config.json.
-
-**Purpose:** Pre-load files before LLM asks for them.
-
-**Key Files:**
-- `internal/predictive/loader.go` - Loading logic
-
-**How It Works:**
-1. Analyze task description
-2. Extract symbols (CamelCase, snake_case)
-3. Match symbols to files
-4. Pre-load likely files into cache
-5. Serve from cache when LLM requests
-
-**Benefit:** Eliminates round-trips between LLM and filesystem.
-
----
-
-### 8. Memory System (`internal/memory/`)
-
-**Status: Opt-in** — Enabled via `memory_enabled` in config.json.
-
-**Purpose:** Learn and apply patterns across sessions.
-
-**Key Files:**
-- `internal/memory/system.go` - Memory management
-- `internal/memory/manager.go` - Entry management
-
-**Layers:**
-1. **Managed Memory:** System-curated patterns
-2. **User Memory:** User-defined preferences
-3. **Project Memory:** Project-specific patterns
-4. **Local Memory:** Session-only context
-
----
-
-### 9. Caching (`internal/cache/`)
-
-**Status: Opt-in** — Enabled via `cache_enabled` in config.json.
-
-**Purpose:** Avoid redundant computation.
-
-**Key Files:**
-- `internal/cache/knowledge.go` - Knowledge cache
-- `internal/cache/tools.go` - Tool result cache
-
-**Cache Levels:**
-- Knowledge cache (symbol lookups)
-- Tool result cache (idempotent tools)
-- SQLite-backed with TTL
-
----
+Discovery checks required sections, normalized mapping, exclusive verifier/test
+ownership, source declarations and local documentation links. Unknown or malformed
+cases fail closed. Discovery does not execute retention/recapture verification
+or certify D1/D2. Historically inspected both engine discard branches, admitted
+wrapper, receipt classifier, pipeline callbacks/terminal handoff, manager writes,
+atomic state transaction, repair generation and queue reconciliation at baseline.
+Remaining module declarations were checked against their source definitions.
+The discovery run passed with 22 declarations; all nine verifier tests passed,
+including missing source/declaration, omitted source, incorrect/duplicate mapping,
+shared helper, broken link and unknown/pending/malformed dispatcher refusals.
+Bash syntax validation and git diff --check passed. Tests re-read isolated files
+from disk, and discovery re-read the saved candidate documents. The first run
+caught an incorrect StageExecutor source path; the manifest now points to its
+actual declaration in stage.go.
+
+Repository commands include make build, make lint, make test, make compat-test
+and make type-check. Recovery/legacy product changes require targeted regression
+and compatibility coverage plus required repository checks. Canonical gates run
+later in Console's socket-capable repository runner. This checkout has no
+make check or make pr-gate target; delivery must record the actual command mapping.
+This documentation/script-only stage changes no project loader, schema or runtime
+behavior, so protected-format support is unchanged. Full repository gates and
+live Console-to-OpenExec delivery are not claimed here.
+
+## Planner verification
 
 ### 10. Planner prompt rules & planning gate (`internal/planner/`, `internal/cli/release.go`)
 
@@ -513,225 +450,6 @@ release_test.go:381: stale story script "git diff origin/main...HEAD && git diff
 
 ---
 
-## Data Flow
-
-### Typical Execution Flow
-
-```
-1. User: "openexec run --task 'Add auth middleware'"
-   │
-   ▼
-2. OpenExec CLI parses intent
-   │
-   ▼
-3. Quality Gates run (go vet, go test -short)
-   │   ├─ Pass → Continue
-   │   └─ Fail → Block (if GateModeBlock)
-   │
-   ▼
-4. Context Assembly
-   │   ├─ Load knowledge index
-   │   ├─ Predict and preload files
-   │   └─ Prune to relevant subset
-   │
-   ▼
-5. Blueprint Execution
-   │   ├─ Stage 1: gather_context
-   │   │   └─ Spawn: claude --prompt "Analyze auth patterns..."
-   │   │
-   │   ├─ Stage 2: implement  
-   │   │   └─ Spawn: claude --prompt "Implement middleware..."
-   │   │
-   │   ├─ Stage 3: lint
-   │   │   └─ Run: go vet ./...
-   │   │
-   │   ├─ Stage 4: test
-   │   │   └─ Run: go test ./...
-   │   │
-   │   └─ Stage 5: review
-   │       └─ Spawn: codex --prompt "Review for bugs..."
-   │
-   ▼
-6. Checkpoint created after each stage
-   │
-   ▼
-7. Memory extraction (patterns, decisions)
-   │
-   ▼
-8. Results returned to user
-```
-
----
-
-## Common Misconceptions
-
-### ❌ "OpenExec implements LLM clients"
-
-**✅ Reality:** OpenExec shells out to existing CLIs (claude, codex, gemini). It doesn't implement LLM APIs directly.
-
-**Evidence:**
-- `internal/loop/process.go:37` - `exec.CommandContext(ctx, name, args...)`
-- `internal/runner/runner.go` - Maps models to CLI commands
-
----
-
-### ❌ "pkg/agent/ contains LLM implementations"
-
-**✅ Reality:** `pkg/agent/` contains abstraction interfaces and types. Actual execution is in `internal/loop/`.
-
-**Evidence:**
-- `pkg/agent/provider.go` - Interface definitions only
-- `internal/loop/process.go` - Actual process spawning
-
----
-
-### ❌ "OpenExec replaces Claude Code/Codex"
-
-**✅ Reality:** OpenExec **enhances** Claude Code/Codex with orchestration, safety, and reliability features.
-
-**Analogy:**
-- Claude Code = Engine
-- OpenExec = Car (engine + chassis + safety systems + navigation)
-
----
-
-### ❌ "OpenExec relies on the AI CLI's tool support"
-
-**✅ Reality:** OpenExec provides its own tools via MCP (Model Context Protocol) server!
-
-**How it works:**
-1. OpenExec starts an MCP server (`internal/mcp/server.go`)
-2. MCP server exposes 20+ tools (read_file, write_file, git_apply_patch, run_shell_command, etc.)
-3. AI CLI connects to MCP server via stdio or HTTP
-4. AI CLI requests tool calls through MCP
-5. OpenExec executes tools and returns results
-
-**This means:** Any AI client that speaks MCP can use OpenExec's tools, regardless of whether the AI has native tool support!
-
-**Tools provided by OpenExec:**
-- `read_file` - Read file contents
-- `write_file` - Write file contents  
-- `git_apply_patch` - Apply git patches
-- `run_shell_command` - Execute shell commands
-- `git_status` - Check git status
-- `git_diff` - Get git diffs
-- `git_log` - View git history
-- `glob` - File globbing
-- `grep` - Text search
-- `list_directory` - Directory listing
-- And more...
-
----
-
-## Integration Points
-
-### Adding a New AI CLI
-
-To add support for a new AI CLI (e.g., `mistral`):
-
-1. **Update Model Resolution** (`internal/runner/runner.go`):
-```go
-func isMistralModel(model string) bool {
-    return strings.Contains(model, "mistral")
-}
-
-// In Resolve():
-if isMistralModel(model) {
-    return "mistral", defaultMistralArgs(), nil
-}
-```
-
-2. **Add CLI Detection** (`internal/runner/runner_test.go`):
-```go
-func TestResolve_MistralModels(t *testing.T) {
-    if _, err := exec.LookPath("mistral"); err != nil {
-        t.Skip("mistral CLI not in PATH")
-    }
-    // Test resolution
-}
-```
-
-3. **Document** (`docs/MODELS.md`):
-Add installation and usage instructions.
-
----
-
-### BitNet Routing (Opt-in)
-
-**Status: Opt-in** — Enabled via `bitnet_routing` in config.json.
-
-OpenExec includes an optional **BitNet Router** that uses a local 1-bit LLM for intent-based tool selection.
-
-**Key behaviors:**
-- The model **auto-downloads on first use** to `~/.openexec/models/`.
-- Any GGUF model can be used, but the routing prompt is tuned for the default model.
-- **Falls back to deterministic routing** if the model is unavailable or fails to load.
-
-When enabled, BitNet can classify user intent and select tools locally, reducing round-trips to the cloud LLM. When disabled (the default), deterministic routing handles all classification.
-
----
-
-## Performance Characteristics
-
-| Subsystem | Overhead | Bottleneck |
-|-----------|----------|------------|
-| Model Routing | <1ms | N/A |
-| Process Spawning | ~100-500ms | CLI startup time |
-| Quality Gates | 5-30s | Lint/test execution |
-| Context Pruning | ~50ms | SQLite queries |
-| Checkpointing | ~10-100ms | File hashing |
-| Predictive Loading | ~100ms | File I/O |
-
-**Note:** Actual LLM inference time ( Claude/Codex/Gemini) dominates execution time.
-
----
-
-## Security Model
-
-### Local-First Design
-
-- All orchestration happens locally
-- No cloud service dependencies (except LLM APIs)
-- User controls all data
-
-### CLI Isolation
-
-- Each AI CLI runs in separate subprocess
-- Sandboxed by OS process boundaries
-- Environment variables controlled by OpenExec
-- Working directory restricted
-
----
-
-## Future Directions
-
-### Potential Enhancements
-
-1. **Local Model Support**
-   - Ollama integration
-   - LM Studio support
-   - Fully offline operation
-
-2. **Advanced Routing**
-   - Cost-based model selection
-   - Capability-based routing
-   - A/B testing between models
-
----
-
-## References
-
-- [README.md](../README.md) - Project overview
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- `internal/runner/runner.go` - Model resolution
-- `internal/loop/process.go` - Process spawning
-- `pkg/agent/provider.go` - Provider abstractions
-
----
-
-**Document Maintainer:** OpenExec Core Team  
-**Questions?** Open an issue or discussion on GitHub.
-
 ## origin/main sync map
 
 Observed 2026-09-30 for US-019 / T-US-019-001 at candidate HEAD `92e3d48a`.
@@ -739,10 +457,11 @@ Observed 2026-09-30 for US-019 / T-US-019-001 at candidate HEAD `92e3d48a`.
 `git rev-parse origin/main` resolved to `2fc03214`.
 `git merge-tree --write-tree --name-only HEAD origin/main` exited 1 with
 one content conflict: `docs/ARCHITECTURE.md`. This was a merge probe only;
-the sync itself belongs to the next task.
+that historical probe preceded the US-019 NOTES addition. The actual US-020
+merge also conflicted in NOTES.md; both note sets were retained. No code conflicted.
 
-Keep the shared `# OpenExec Architecture` title and both sides' content under
-these exact headings when resolving that conflict:
+The US-020 resolution uses the upstream rewrite as its base and preserves the
+candidate additions under these headings (within the Planner verification section):
 
 | Side | Keep-list |
 | --- | --- |
@@ -755,7 +474,7 @@ scripts, sorts owners and builds refusal errors. The CLI import gate calls it
 outside goal coverage; manager imports check it before persistence in
 `importBoundPlan`, refined auto-import and retained/approved replay.
 
-Fresh D1 checks passed (all `-count=1`): `go test ./internal/planner/ -run
+US-019 discovery checks passed (all `-count=1`): `go test ./internal/planner/ -run
 OriginDefaultRef`, `go test ./internal/planner/ -run RemoteBaseRef`, and
 `go test ./internal/planner/ ./internal/cli/ ./pkg/manager/ -run StaleBase`.
 These exercise remote-ref acceptance and bare-ref refusal, including manager
@@ -766,3 +485,43 @@ After `go build -o bin/openexec ./cmd/openexec`, `go test -tags e2e -count=1
 goal-less objects and legacy arrays, and previewed the remote-ref import.
 The task's verification script also passed, re-reading the saved sync map.
 No production code or tests changed; project-format compatibility is unchanged.
+
+### US-020 merged-tree verification
+
+Merged `origin/main` at `2fc032141ccc1b34b71110247cc781b82468941a`
+with `--no-ff`, retaining the candidate history. Only ARCHITECTURE.md and
+NOTES.md conflicted; no code conflicted. The upstream architecture is preserved
+verbatim as the base, followed by the complete candidate planner section,
+finding map, HIGH/MEDIUM controls and stale-base coverage notes. The US-019
+sync map remains above, with its historical probe distinguished from this merge.
+Both sets of working notes are retained. No production code or tests were
+changed by the resolution; no new abstraction or runtime behavior was added.
+
+Fresh checks on 2026-09-30:
+
+- `go build ./...` and `go build -o bin/openexec ./cmd/openexec`: exit 0.
+- D1: `go test ./internal/planner/ -run OriginDefaultRef -count=1`,
+  `go test ./internal/planner/ -run RemoteBaseRef -count=1`, and
+  `go test ./internal/planner/ ./internal/cli/ ./pkg/manager/ -run StaleBase -count=1`:
+  exit 0, including refusal/acceptance and persisted-state reload checks.
+- `go test -tags e2e -count=1 ./internal/cli/ -run StaleBase -v`: exit 0;
+  built CLI refuses bare refs in goal-less objects/legacy arrays and accepts
+  the remote-ref import preview.
+- Host declared `lint`: exit 0 (`go vet ./...` and UI ESLint).
+- Host declared `test`: exit 0 (all Go packages; 40 UI files, 635 tests).
+  UI output includes non-failing WebSocket port and React warnings.
+- The task verification script, read from the task ledger and run after the
+  merge commit, exits 0: pinned ancestry, marker scan, build, D1, compatibility
+  and required architecture headings. An additional marker scan uses separate
+  `-e` patterns in an `if ...; then exit 1; fi` guard, without alternation.
+- `make compat-test`: exit 0; current `.openexec`, legacy `.uaos`, legacy
+  config and `.openexec/tasks.json` fallback checks pass.
+- Discovery dispatcher: exit 0, 27 declarations; all nine discovery tests pass.
+- Saved-file comparison confirms the complete upstream base and candidate
+  planner/review section, with exactly one sync map. Conflict-marker scan and
+  `git diff --check` pass.
+
+Local Go commands use a writable `/tmp` build cache after the default cache
+was refused by the sandbox. Go emitted a read-only module-stat-cache warning,
+but the subsequent builds and checks exited 0. Canonical delivery remains
+Console-owned; these results do not claim deployment or PR acceptance.

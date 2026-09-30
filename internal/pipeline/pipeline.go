@@ -37,7 +37,9 @@ import (
 // Config controls pipeline behavior.
 type Config struct {
 	// StageExecutor supplies admitted execution; nil retains standalone execution.
-	StageExecutor        blueprint.StageExecutor
+	StageExecutor blueprint.StageExecutor
+	// RecaptureStage restricts this run to one resolved deterministic check.
+	RecaptureStage       *blueprint.Stage
 	FWUID                string
 	WorkDir              string
 	AgentsFS             fs.FS
@@ -363,7 +365,7 @@ func (p *Pipeline) GetHealth() (loop.LoopHealth, bool) {
 // If BlueprintID is empty, it defaults to "standard_task".
 func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Deterministic routing: classify task and set context parameters
-	if p.cfg.StageExecutor == nil && p.intentRouter != nil && p.cfg.TaskDescription != "" {
+	if p.cfg.RecaptureStage == nil && p.cfg.StageExecutor == nil && p.intentRouter != nil && p.cfg.TaskDescription != "" {
 		// Pass a real toolset registry so RoutingPlan.Toolset gets populated
 		// via intent-based lookup as well as the keyword selector. Previously
 		// nil, which forced selectToolset down its keyword-only path.
@@ -388,7 +390,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	// Pre-resolve symbols from task description (Layer 2)
-	if p.cfg.StageExecutor == nil && p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
+	if p.cfg.RecaptureStage == nil && p.cfg.StageExecutor == nil && p.cfg.LocalPreResolveEnabled && p.cfg.TaskDescription != "" && p.cfg.StateDB != nil {
 		pr := &PreResolver{}
 		preResolved := pr.Resolve(ctx, p.cfg.TaskDescription, p.cfg.WorkDir, p.cfg.StateDB)
 		if preResolved != "" {
@@ -398,7 +400,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 
 	// Build context using two-stage assembly
 	var contextPack *ocontext.ContextPack
-	if p.cfg.StageExecutor == nil && p.cfg.ContextTokenBudget > 0 {
+	if p.cfg.RecaptureStage == nil && p.cfg.StageExecutor == nil && p.cfg.ContextTokenBudget > 0 {
 		pack, err := ocontext.BuildContextWithRouting(
 			ctx,
 			p.cfg.WorkDir,
@@ -488,6 +490,25 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			test.Commands = projCfg.Execution.TestCommands
 			verificationStages[test] = true
 		}
+	}
+
+	if p.cfg.RecaptureStage != nil {
+		stage := *p.cfg.RecaptureStage
+		namedCheck := len(stage.Commands) == 0 && (stage.Name == "lint" || stage.Name == "test")
+		if stage.Type != types.StageTypeDeterministic || (!namedCheck && len(stage.Commands) != 1) || stage.Action != "" {
+			return fmt.Errorf("invalid verification recapture stage")
+		}
+		if namedCheck && p.cfg.StageExecutor == nil {
+			definition := bp.Stages[stage.Name]
+			if definition == nil || definition.Type != types.StageTypeDeterministic || definition.Action != "" || len(definition.Commands) == 0 {
+				return fmt.Errorf("current verification check %s has no authoritative command", stage.Name)
+			}
+			stage.Commands = append([]string(nil), definition.Commands...)
+		}
+		stage.MaxRetries, stage.OnFailure, stage.OnSuccess = 0, "", ""
+		stage.RunQualityGates, stage.CreateCheckpoint = false, false
+		bp = &blueprint.Blueprint{ID: "verification_recapture", Name: "Verification recapture", InitialStage: stage.Name, Stages: map[string]*blueprint.Stage{stage.Name: &stage}}
+		verificationStages = map[*blueprint.Stage]bool{&stage: true}
 	}
 
 	// Create executor with agentic runner
@@ -686,14 +707,35 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	execErr := engine.Execute(ctx, run, input)
 
 	if execErr != nil {
-		var failureArtifacts map[string]string
+		failureArtifacts := make(map[string]string)
+		last := run.GetLastResult()
+		stageName, output, diagnostics := "", "", ""
+		attempt := 0
+		if last != nil {
+			stageName, output, diagnostics, attempt = last.StageName, last.Output, last.Diagnostics, last.Attempt
+			for key, value := range last.Artifacts {
+				// References are evidence, never authority to create repair work.
+				if key != gates.VerificationFailureReceiptKey && key != gates.VerificationFailureDigestKey {
+					failureArtifacts[key] = value
+				}
+			}
+		}
 		if trustedGates != nil && ctx.Err() == nil {
-			failureArtifacts = trustedGates.terminalEvidence(bp, run)
+			for key, value := range trustedGates.terminalEvidence(bp, run) {
+				failureArtifacts[key] = value
+			}
+		}
+		if p.cfg.RecaptureStage != nil && len(p.cfg.RecaptureStage.Commands) == 0 {
+			failureArtifacts["recapture_definition"] = "current-check-definition"
 		}
 		p.emit(loop.Event{
 			Type:        loop.EventBlueprintFailed,
 			FWUID:       p.cfg.FWUID,
 			BlueprintID: bp.ID,
+			StageName:   stageName,
+			Attempt:     attempt,
+			Text:        output,
+			Result:      &loop.StepResult{Status: "failed", Diagnostics: diagnostics},
 			ErrText:     execErr.Error(),
 			Artifacts:   failureArtifacts,
 		})
@@ -927,10 +969,12 @@ func (a *gateRunnerAction) terminalEvidence(bp *blueprint.Blueprint, run *bluepr
 	}
 	// The receipt is captured by the actual local gate action in this stage.
 	// Do not copy StageResult.Artifacts, which may be worker-controlled.
-	return map[string]string{
-		gates.VerificationFailureReceiptKey: a.receipt[gates.VerificationFailureReceiptKey],
-		gates.VerificationFailureDigestKey:  a.receipt[gates.VerificationFailureDigestKey],
+	// Include private references captured by this trusted runner alongside the receipt.
+	retained := make(map[string]string, len(a.receipt))
+	for key, value := range a.receipt {
+		retained[key] = value
 	}
+	return retained
 }
 
 func (a *gateRunnerAction) Execute(ctx context.Context, req actions.ActionRequest) (actions.ActionResponse, error) {

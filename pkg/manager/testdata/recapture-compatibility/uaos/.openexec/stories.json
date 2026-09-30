@@ -1,0 +1,30 @@
+{
+  "stories": [
+    {
+      "id": "S",
+      "title": "Protected project",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "A",
+          "title": "Protected verification",
+          "story_id": "S",
+          "status": "in_progress",
+          "attempt_count": 1,
+          "max_attempts": 3,
+          "verification_script": "printf 'PROTECTED_RECAPTURE\\n' >&2; exit 2"
+        },
+        {
+          "id": "Settings",
+          "title": "Waiting settings",
+          "story_id": "S",
+          "status": "pending",
+          "max_attempts": 3,
+          "depends_on": [
+            "A"
+          ]
+        }
+      ]
+    }
+  ]
+}

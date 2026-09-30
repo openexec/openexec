@@ -2,6 +2,8 @@ package manager
 
 import (
 	"context"
+	"errors"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,8 +124,13 @@ func TestTaskOrientedQueueFailureDoesNotCascadeOrInventRepair(t *testing.T) {
 	}
 	a, _ := e.rel.TaskSnapshot(context.Background(), "A")
 	b, _ := e.rel.TaskSnapshot(context.Background(), "B")
-	if a.Status != release.TaskStatusFailed || a.AttemptCount != 1 || b.Status != release.TaskStatusPending || b.AttemptCount != 0 {
+	// A missing verifier fails every attempt the same way: the queue retries
+	// once with the reason, sees it repeat, and stops with an attempt left.
+	if a.Status != release.TaskStatusFailed || a.AttemptCount != 2 || b.Status != release.TaskStatusPending || b.AttemptCount != 0 {
 		t.Fatal("failure lost accounting or cascaded", a, b)
+	}
+	if reason, _ := a.Metadata["previous_attempt_stop"].(string); !strings.Contains(reason, "missing_verifier_command_98312") {
+		t.Fatalf("the stop reason was not kept for the next attempt: %+v", a.Metadata)
 	}
 	tasks, _ := e.rel.TasksInStories(context.Background(), []string{"S"})
 	if len(tasks) != 2 {
@@ -177,5 +184,75 @@ func TestTaskOrientedQueueDiscoversTaskAddedAfterFirstDispatch(t *testing.T) {
 	}
 	if _, err := e.mgr.Status("dynamic"); err != nil {
 		t.Fatal("dynamic task did not execute actual pipeline", err)
+	}
+}
+
+// A task that stops with attempts left is tried again in the same queue, told
+// why the previous attempt stopped, instead of ending the run and waiting for
+// another one to take a single further step.
+func TestTaskOrientedQueueRetriesAStoppedAttemptInTheSameRun(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	createStory(t, e.rel, "S", nil)
+	createQueueTask(t, e, "A", nil)
+	count := filepath.Join(e.dir, "lint-count")
+	// The first run of the verifier finds something; the second finds it gone.
+	lint := `n=$(cat ` + count + ` 2>/dev/null || echo 0); n=$((n+1)); echo $n > ` + count + `; ` +
+		`[ $n -ge 2 ] && exit 0; echo "found defect $n" >&2; exit 127`
+	cfg, _ := json.Marshal(map[string]any{"execution": map[string]any{"lint_commands": []string{lint}, "test_commands": []string{"true"}}})
+	if err := os.WriteFile(filepath.Join(e.dir, ".openexec", "config.json"), cfg, 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := e.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); err != nil {
+		t.Fatalf("a stop with attempts left ended the run: %v", err)
+	}
+	a, _ := e.rel.TaskSnapshot(context.Background(), "A")
+	if a.Status != release.TaskStatusDone || a.AttemptCount != 2 {
+		t.Fatalf("want done on the second attempt of one run: %+v", a)
+	}
+}
+
+func TestAnAttemptIsToldWhyThePreviousOneStopped(t *testing.T) {
+	task := &release.Task{Description: "Move the header", Metadata: map[string]interface{}{}}
+	if got := attemptDescription(task); got != "Move the header" {
+		t.Fatalf("a first attempt changed its description: %q", got)
+	}
+	task.Metadata[previousAttemptStop] = "ten assertions expect the previous header"
+	got := attemptDescription(task)
+	for _, want := range []string{"Move the header", "ten assertions expect the previous header", "remove the cause"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("attempt description lacks %q: %q", want, got)
+		}
+	}
+}
+
+// A queue asked to yield stops between tasks: the task that finished stays
+// done, the next is not started and spends no attempt.
+func TestTaskOrientedQueueYieldsAtATaskBoundary(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	createStory(t, e.rel, "S", nil)
+	createQueueTask(t, e, "A", nil)
+	createQueueTask(t, e, "B", []string{"A"})
+	asked := 0
+	yield := func() bool { asked++; return asked > 1 } // after A, before B
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	err := e.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}, Yield: yield})
+	if !errors.Is(err, ErrQueueYielded) {
+		t.Fatalf("want a yield, got %v", err)
+	}
+	a, _ := e.rel.TaskSnapshot(context.Background(), "A")
+	b, _ := e.rel.TaskSnapshot(context.Background(), "B")
+	if a.Status != release.TaskStatusDone || b.Status != release.TaskStatusPending || b.AttemptCount != 0 {
+		t.Fatalf("yield lost work or spent an attempt: A=%s B=%s/%d", a.Status, b.Status, b.AttemptCount)
+	}
+	// And the queue resumes where it yielded.
+	if err := e.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); err != nil {
+		t.Fatalf("resume after yield: %v", err)
+	}
+	b, _ = e.rel.TaskSnapshot(context.Background(), "B")
+	if b.Status != release.TaskStatusDone || b.AttemptCount != 1 {
+		t.Fatalf("B did not run once after the yield: %s/%d", b.Status, b.AttemptCount)
 	}
 }

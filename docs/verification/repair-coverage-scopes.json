@@ -1,0 +1,121 @@
+{
+  "baseline": "09ac4feb2c7325b42f20a4663b9aa111d43fe386",
+  "scopes": {
+    "US-012": {
+      "areas": [
+        "result preservation",
+        "evidence attachment",
+        "buffering",
+        "classification",
+        "persistence and repair"
+      ],
+      "functions": [
+        "internal/blueprint/engine.go:(*Engine).Execute",
+        "internal/blueprint/engine.go:(*Engine).ExecuteStage",
+        "internal/blueprint/engine.go:failedStageResult",
+        "internal/blueprint/executor.go:(*DefaultExecutor).executeDeterministic",
+        "internal/blueprint/executor.go:(*DefaultExecutor).runCommandWithCheck",
+        "internal/execution/evidence/capture.go:(*Buffer).Len",
+        "internal/execution/evidence/capture.go:(*Buffer).String",
+        "internal/execution/evidence/capture.go:(*Buffer).Write",
+        "internal/execution/evidence/capture.go:CommandSecrets",
+        "internal/execution/evidence/capture.go:Public",
+        "internal/execution/evidence/capture.go:PublicStream",
+        "internal/execution/evidence/capture.go:Read",
+        "internal/execution/evidence/capture.go:Toolchain",
+        "internal/execution/evidence/capture.go:Write",
+        "internal/execution/evidence/capture.go:bounded",
+        "internal/execution/gates/failure.go:CommandFailureWithEvidence",
+        "internal/execution/gates/failure.go:NewCommandFailure",
+        "internal/execution/gates/failure.go:NewFailure",
+        "internal/execution/gates/failure.go:ValidateVerificationFailureArtifacts",
+        "internal/execution/gates/failure.go:VerificationFailureArtifacts",
+        "internal/execution/gates/runner.go:(*Runner).RunGate",
+        "internal/pipeline/admitted_executor.go:(admittedStageExecutor).Execute",
+        "internal/pipeline/admitted_executor.go:(publicExecutionError).Error",
+        "internal/pipeline/admitted_executor.go:(publicExecutionError).Unwrap",
+        "internal/pipeline/pipeline.go:(*Pipeline).runBlueprintMode",
+        "internal/pipeline/pipeline.go:(*gateRunnerAction).terminalEvidence",
+        "pkg/db/state/task_failure.go:(*Store).RecordTaskFailureStep",
+        "pkg/manager/task_failure.go:(*Manager).persistTaskVerificationFailure",
+        "pkg/manager/task_failure.go:(*Manager).repairTaskFromRetainedFailure",
+        "pkg/runtime/evidence.go:PublicVerificationStream",
+        "pkg/runtime/evidence.go:ReadCommandEvidence",
+        "pkg/runtime/evidence.go:RetainCommandEvidence",
+        "pkg/runtime/execution.go:VerificationCommandFailure"
+      ],
+      "planned_functions": [
+        "pkg/runtime/execution.go:VerificationCommandFailureWithEvidence"
+      ],
+      "external_scope": [
+        "internal/server/openexec_checks.go:executeOpenExecCheck",
+        "internal/server/openexec_checks.go:openExecCheckOutput.Write",
+        "internal/server/openexec_check_conventions.go:taskCheckCommand"
+      ],
+      "minimum_statement_percent_exclusive": 90,
+      "measurement": "Entire bodies of all declared and added/modified production functions; no uncovered-block exclusion. Union checked against candidate diff and baseline; denominator/instrumentation recomputed independently. Missing profile/file/function/block, skipped test, stale source hash, threshold <=90 or unowned change fails."
+    },
+    "US-013": {
+      "areas": [
+        "recapture resolution",
+        "budgets",
+        "queue ownership",
+        "dependencies",
+        "compatibility"
+      ],
+      "functions": [
+        "internal/pipeline/pipeline.go:(*Pipeline).runBlueprintMode",
+        "internal/release/failure_repair.go:(*Manager).RecaptureEligible",
+        "internal/release/failure_repair.go:RunnableTasks",
+        "internal/release/failure_repair.go:runnableTasks",
+        "pkg/manager/task_execution_lock.go:(*Manager).reconcileInterruptedTasks",
+        "pkg/manager/task_failure.go:(*Manager).repairTaskFromRetainedFailure",
+        "pkg/manager/task_queue.go:(*Manager).executeTaskQueue",
+        "pkg/manager/task_recapture.go:(*Manager).diagnosticFreeReceipt",
+        "pkg/manager/task_recapture.go:(*Manager).recaptureTaskFailure",
+        "pkg/manager/task_recapture.go:(*Manager).resolveRecaptureCommand",
+        "pkg/manager/task_recapture.go:recapturePhase",
+        "pkg/manager/task_execution_lock.go:isRepairTask",
+        "pkg/manager/task_queue.go:attemptDescription",
+        "pkg/manager/task_queue.go:retryWithStopReason"
+      ],
+      "planned_functions": [],
+      "external_scope": [],
+      "minimum_statement_percent_exclusive": 90,
+      "measurement": "Entire bodies of all declared and added/modified production functions; no uncovered-block exclusion. Union checked against candidate diff and baseline; denominator/instrumentation recomputed independently. Missing profile/file/function/block, skipped test, stale source hash, threshold <=90 or unowned change fails."
+    },
+    "US-014": {
+      "areas": [
+        "storage",
+        "path validation",
+        "permissions",
+        "legacy compatibility",
+        "source staging",
+        "secrecy"
+      ],
+      "functions": [
+        "internal/blueprint/executor.go:(*DefaultExecutor).runCommandWithCheck",
+        "internal/cli/init.go:ensureGitignore",
+        "internal/execution/evidence/capture.go:(*Buffer).Len",
+        "internal/execution/evidence/capture.go:(*Buffer).String",
+        "internal/execution/evidence/capture.go:(*Buffer).Write",
+        "internal/execution/evidence/capture.go:CommandSecrets",
+        "internal/execution/evidence/capture.go:Public",
+        "internal/execution/evidence/capture.go:PublicStream",
+        "internal/execution/evidence/capture.go:Read",
+        "internal/execution/evidence/capture.go:Toolchain",
+        "internal/execution/evidence/capture.go:Write",
+        "internal/execution/evidence/capture.go:bounded",
+        "internal/execution/gates/runner.go:(*Runner).RunGate",
+        "pkg/manager/task_recapture.go:(*Manager).resolveRecaptureCommand",
+        "pkg/runtime/evidence.go:PublicVerificationStream",
+        "pkg/runtime/evidence.go:ReadCommandEvidence",
+        "pkg/runtime/evidence.go:RetainCommandEvidence"
+      ],
+      "planned_functions": [],
+      "external_scope": [],
+      "minimum_statement_percent_exclusive": 90,
+      "measurement": "Entire bodies of all declared and added/modified production functions; no uncovered-block exclusion. Union checked against candidate diff and baseline; denominator/instrumentation recomputed independently. Missing profile/file/function/block, skipped test, stale source hash, threshold <=90 or unowned change fails."
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "feature": "a8afdf3e98e69cffb4703cb41e39b86d",
+  "review": "3942433c4242399f83195ad01d0a6748",
+  "pull_request": 66,
+  "task": "T-US-010-001",
+  "story": "US-010",
+  "goal": "G-007",
+  "candidate": {
+    "path": "/mnt/data1/projects/openexec/.openexec/outcome-candidates/a8afdf3e98e69cffb4703cb41e39b86d",
+    "branch": "outcome/a8afdf3e98e69cffb4703cb41e39b86d",
+    "revision": "09ac4feb2c7325b42f20a4663b9aa111d43fe386",
+    "tree": "10db97a9e95eb79e0b16fea5f436b0665e852f2a",
+    "initial_status": ""
+  },
+  "console": {
+    "path": "/mnt/data1/ac-probe",
+    "revision": "b5071d896d59b26f79cb9344dcb6b710f175a8c1",
+    "status": "",
+    "files": {
+      "internal/server/openexec_checks.go": "52affec396da48d395c5329b4193ed7545c7bdaff5993a6a5fe63396cd36508e",
+      "internal/server/openexec_check_conventions.go": "a9fd858bcc07148ee0302c146389ae8e3cff5d5cbf0b705927b7f95fbdc0f3ff",
+      "go.mod": "326e0a319b4eb340ab49e5b8212fae61bc2771bc4072041e366260c1fe0b530e",
+      "go.sum": "684455aceb6759505c54aa1da4bd47d914cc0077b35a00691035f3fc3f6211da"
+    },
+    "dependency": "v0.13.2-0.20260929072823-e5d026ab6196",
+    "replace": false,
+    "observed_process": {
+      "revision": "b5071d89",
+      "started": "2026-09-29T19:40:08Z",
+      "source": "owner-supplied observation; process not independently inspected"
+    },
+    "adoption": "missing in inspected source",
+    "deployment": "unverified"
+  },
+  "secondary_console": {
+    "path": "/mnt/data1/projects/agent-console",
+    "revision": "1d8aa1d8f120c8347d0431210c92475085182a2a",
+    "status": "dirty; unrelated edits not touched",
+    "dependency": "v0.13.2-0.20260919194104-cbdbbf5f26aa"
+  },
+  "contract_sha256": "91f304bb8924b72896c6158ecb8851e23bf6f265d48331063542fe1fd86b9bf8"
+}
