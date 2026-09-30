@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-014 / T-US-014-002] Storage and registered-reference coverage is enforced
+  by the fail-closed standalone gate. Scope, controls and current verification
+  live in [storage unit coverage](docs/verification/storage-unit-coverage.md).
+
 - [US-014 / T-US-014-001] Protected evidence storage, exact recapture references,
   explicit legacy refusal and source-staging journeys are implemented. Current
   policy, verification and limits live in
