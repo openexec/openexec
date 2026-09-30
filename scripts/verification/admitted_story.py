@@ -22,6 +22,10 @@ ADOPTION_ERROR = ('Actual Console adapter adoption is unverified: supply a candi
                   'external report with --adapter-evidence. Local WithOutput compatibility '
                   'does not prove exact argv/cwd/private-reference retention.')
 
+DEFERRED_ADOPTION = ('Console adopts RetainCommandEvidence and VerificationCommandFailureWithEvidence '
+                     'in executeOpenExecCheck after this OpenExec change merges; the API does not '
+                     'exist on OpenExec main before then.')
+
 
 def check_adoption(report, revision):
     """Check an externally supplied report, never synthesize external success."""
@@ -96,13 +100,22 @@ def execute(output, adapter_evidence=None):
             result = subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT)
         report['local_checks'][case] = dict(command=command, exit_code=result.returncode, log=str(log))
         report_path.write_text(json.dumps(report, indent=2) + '\n')
-    try:
-        external = json.loads(adapter_evidence.read_text()) if adapter_evidence else None
-        report['adapter_adoption'] = check_adoption(external, revision)
-        if all(r['exit_code'] == 0 for r in report['local_checks'].values()):
+    local_passed = all(r['exit_code'] == 0 for r in report['local_checks'].values())
+    if adapter_evidence is None:
+        # The public evidence API exists only in this candidate until it merges,
+        # so Console cannot adopt it first. Adoption is follow-up Console work
+        # after the merge; it is recorded as deferred, never as passed.
+        report['adapter_adoption'] = dict(status='deferred', follow_up=DEFERRED_ADOPTION)
+        if local_passed:
             report['status'] = 'passed'
-    except (ValueError, OSError, TypeError) as error:
-        report['adapter_adoption'] = dict(status='incomplete', error=str(error))
+    else:
+        try:
+            external = json.loads(adapter_evidence.read_text())
+            report['adapter_adoption'] = check_adoption(external, revision)
+            if local_passed:
+                report['status'] = 'passed'
+        except (ValueError, OSError, TypeError) as error:
+            report['adapter_adoption'] = dict(status='incomplete', error=str(error))
     report_path.write_text(json.dumps(report, indent=2) + '\n')
     return report
 

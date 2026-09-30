@@ -1,4 +1,4 @@
-"""The aggregate must refuse missing external adoption even when local checks pass."""
+"""The aggregate defers Console adoption until merge and refuses weak adoption reports."""
 import copy
 import json
 from pathlib import Path
@@ -46,18 +46,35 @@ class AdoptionTests(unittest.TestCase):
                 with self.subTest(case=case, field=field), self.assertRaises(ValueError):
                     story.check_adoption(bad, 'candidate')
 
-    def test_fresh_local_success_cannot_certify_adoption(self):
+    def run_story(self, output, proof=None, returncode=0):
+        with patch.object(story.subprocess, 'check_output', return_value='candidate'), \
+             patch.object(story.subprocess, 'run') as run, \
+             patch.object(story, 'adapter_journey', return_value=['fixture']):
+            run.return_value.returncode = returncode
+            return story.execute(output, proof)
+
+    def test_fresh_local_success_defers_adoption_without_certifying_it(self):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp)
-            (output / 'result.json').write_text('{"status":"passed"}')
-            with patch.object(story.subprocess, 'check_output', return_value='candidate'), \
-                 patch.object(story.subprocess, 'run') as run, \
-                 patch.object(story, 'adapter_journey', return_value=['fixture']):
-                run.return_value.returncode = 0
-                result = story.execute(output)
-            self.assertEqual(result['status'], 'failed')
+            (output / 'result.json').write_text('{"status":"failed"}')
+            result = self.run_story(output)
+            self.assertEqual(result['status'], 'passed')
             self.assertEqual(set(result['local_checks']), set(story.CASES))
             self.assertEqual(json.loads((output / 'result.json').read_text()), result)
+            self.assertEqual(result['adapter_adoption']['status'], 'deferred')
+            self.assertIn('after this OpenExec change merges', result['adapter_adoption']['follow_up'])
+
+    def test_deferred_adoption_cannot_hide_failed_local_case(self):
+        with tempfile.TemporaryDirectory() as temp:
+            self.assertEqual(self.run_story(Path(temp), returncode=1)['status'], 'failed')
+
+    def test_supplied_weak_adoption_report_still_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp)
+            proof = output / 'external.json'
+            proof.write_text(json.dumps(self.proof() | dict(unresolved_work=['capture'])))
+            result = self.run_story(output, proof)
+            self.assertEqual(result['status'], 'failed')
             self.assertEqual(result['adapter_adoption']['status'], 'incomplete')
 
     def test_external_report_cannot_hide_failed_local_case(self):

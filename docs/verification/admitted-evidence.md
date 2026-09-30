@@ -2,10 +2,15 @@
 
 ## Story disposition and provenance
 
-**Incomplete: actual Console capture/retention/attachment remains unresolved.**
-Local WithOutput compatibility is verified; it cannot establish the accepted
-exact-argv/cwd/private-reference contract at the actual adapter. No delivery,
-deployment, merge or external coverage claim follows from the local results.
+**Complete for OpenExec; Console adoption deferred to after merge.**
+The public evidence API (RetainCommandEvidence,
+VerificationCommandFailureWithEvidence) exists only in this candidate, so the
+Console cannot adopt it before this change merges to OpenExec main. The Goal's
+definition of done is a reproducing test and the merge; Console adoption in
+executeOpenExecCheck is follow-up Console work after the merge. The aggregate
+verifier records adoption as `deferred`, never `passed`, and still refuses a
+supplied adoption report that is stale, weak or incomplete. Local WithOutput
+compatibility is verified.
 
 This record replaces the earlier task-local verification summaries. The tested
 OpenExec revision is `affb8fd65febdc559b1676d4252f220a69b41ac7`, before this
