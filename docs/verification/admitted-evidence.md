@@ -63,7 +63,7 @@ Executed in this candidate on 2026-09-30:
 
 ### Source evidence
 
-Read-only inspection on 2026-09-30 resolved the owner-reported Console revision
+Read-only reinspection on 2026-09-30 at 09:26 UTC resolved the owner-reported Console revision
 with `git -C /mnt/data1/projects/agent-console rev-parse 4c819427` to
 `4c819427643655fc85d830b3a79f337488bd3fc0`. Files were read with
 `git show <revision>:<path>`, independently of the stale main checkout at
@@ -93,8 +93,8 @@ and output into NewCommandFailureWithOutput. It lacks this candidate's
 VerificationCommandFailureWithEvidence API. A dependency-only bump would leave
 the Console call incompatible: this candidate does not expose WithOutput.
 
-OpenExec prerequisite source inspected and tested here is candidate parent
-`2bbcb16ccffb5e7b3faaf994e845a70c81a64220`. Its public runtime exposes the
+OpenExec prerequisite source inspected and tested here is candidate baseline
+`f5b436739d1e9c9803a3cc412f6d68e109ac6109`. Its public runtime exposes the
 EvidenceBuffer alias, RetainCommandEvidence and
 VerificationCommandFailureWithEvidence. Availability in this candidate is not
 proof that Console has updated its dependency or binary.
@@ -104,13 +104,16 @@ proof that Console has updated its dependency or binary.
 The owner reports a serving process start of 2026-09-30T08:52:05Z for the
 Console revision above. This is an owner observation, not independently read
 binary build-info or a deployment receipt. No deployment claim follows from
-source inspection.
+source inspection. The sandbox's `/proc/*/comm` scan found no process with
+`console` in its name; it supplied no independent serving-binary evidence.
 
-Fresh checks in this OpenExec candidate on 2026-09-30:
+Fresh checks rerun in this OpenExec candidate on 2026-09-30, completed by
+09:26 UTC (the host test log uses local time):
 
 - `run_declared_check(check="lint")`: exit 0, Go vet and UI ESLint.
 - `run_declared_check(check="test")`: exit 0, Go suite and 635 UI tests across
-  40 files. Non-failing React act warnings remain in the output.
+  40 files. Non-failing React act/style warnings and a WebSocket port-in-use
+  message remain in the output; the check returned success.
 - `bash scripts/verify-verification-repair.sh --case admitted-tracer`: exit 0,
   16 diagnostic-boundary and 16 silent/classification completions; both engine
   discard controls and the wrapper discard control rejected at their expected
@@ -125,6 +128,11 @@ OpenExec fixture, not executeOpenExecCheck. Actual Console silent exit 2,
 long-tail lint/test failures and exact command/cwd reference reload remain
 **unverified and incomplete**. No currently failing repository check was
 reproduced: both declared checks passed.
+
+The previous implement stage stopped on this cross-repository integration
+boundary, not a failing lint/test command. Re-reading the exact Console blobs
+and rerunning both declared checks and the tracer confirms that distinction;
+there is no OpenExec check failure to repair in this stage.
 
 ### Required integration and effect boundary
 
