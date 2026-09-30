@@ -14,7 +14,7 @@ import (
 )
 
 func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
-	for _, mode := range []string{"script", "verification", "unknown", "invalid", "mismatch", "unregistered", "wrong-path", "legacy-path", "unreadable", "foreign", "argv", "empty-command", "ambiguous", "private", "silent", "bad-exit", "output", "diagnostics"} {
+	for _, mode := range []string{"script", "verification", "lint", "test", "lint-empty", "test-empty", "unknown", "invalid", "mismatch", "unregistered", "wrong-path", "legacy-path", "unreadable", "foreign", "argv", "empty-command", "ambiguous", "private", "silent", "bad-exit", "output", "diagnostics"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newRecaptureFixture(t, "exit 0")
 			task, err := f.env.rel.TaskSnapshot(context.Background(), "A")
@@ -22,10 +22,14 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 			phase := "verify"
-			if mode == "verification" {
-				phase = mode
+			named := mode == "lint" || mode == "test" || strings.HasSuffix(mode, "-empty")
+			if mode == "verification" || named {
+				phase = strings.TrimSuffix(mode, "-empty")
 			}
 			refs := recaptureReceipt(phase, 2)
+			if strings.HasSuffix(mode, "-empty") {
+				phase = ""
+			}
 			wantError, free := false, true
 			switch mode {
 			case "unknown":
@@ -44,7 +48,7 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 			case "diagnostics":
 				refs["stage_diagnostics"] = "observed diagnostic"
 				free = false
-			case "script", "verification":
+			case "script", "verification", "lint", "test", "lint-empty", "test-empty":
 			default:
 				ev := runtime.CommandEvidence{Argv: []string{"sh", "-c", "exit 2"}, Cwd: f.env.dir, ExitCode: 2}
 				if mode == "foreign" {
@@ -98,7 +102,10 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 			if (err != nil) != wantError {
 				t.Fatalf("resolution %q: %v, want error %v", got, err, wantError)
 			}
-			if !wantError && strings.TrimSpace(got) == "" {
+			if named && got != "" {
+				t.Fatal("named check incorrectly used the task verification script", got)
+			}
+			if !wantError && !named && strings.TrimSpace(got) == "" {
 				t.Fatal("empty authority")
 			}
 			if actual := f.env.mgr.diagnosticFreeReceipt(refs); actual != free {

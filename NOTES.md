@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-013 / T-US-013-002] Added named-check legacy/restart matrix and strict
+  task verifier. Current scope and executed evidence live once in
+  [bounded recapture variants](docs/verification/recapture-variants.md).
+
 - [US-012 / T-US-012-005] Consolidated story verification and refusal of
   fixture-only adoption are recorded in
   [admitted evidence](docs/verification/admitted-evidence.md). Actual Console
