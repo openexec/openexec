@@ -4,6 +4,54 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Planner schema delivery / US-008 / T-US-008-004] Isolated repair-disabled
+  regression, restored full verifier, host test/lint and compatibility/type checks
+  passed. Exact commands, coverage, reopened import/accounting, refusal scope and
+  delivery limitations live once in
+  [schema delivery evidence](docs/verification/planner-schema-delivery.md).
+
+- [Planner schema replay / US-008 / T-US-008-003] Public-runtime and manager
+  correction journeys, strict discovery/no-skip replay verification and database
+  reopen/import accounting evidence live once in
+  [schema replay](docs/verification/planner-schema-replay.md).
+
+- [Planner schema coverage / US-008 / T-US-008-002] Added parser/prompt/failure
+  cases and a complete changed-function coverage gate. Scope, negative controls
+  and current verification live in
+  [schema unit coverage](docs/verification/planner-schema-unit-coverage.md).
+
+- [Planner schema correction / US-008 / T-US-008-001] Strict scalar decoding,
+  concrete diagnostics and bounded correction now reuse native refinement and
+  durable reviewed-plan receipts. Fresh verification, restart/import evidence,
+  changed-test rationale and check-dispatch limits live once in
+  [schema correction evidence](docs/verification/planner-schema-correction.md).
+
+- [Compact delivery / US-011 / T-US-011-001] D2 assessment, evidence limits,
+  G-007 distinction and Console-owned candidate/PR75 delivery plus later
+  agent-console parent retry live in the existing
+  [compact delivery record](docs/verification/compact-requirement-evidence.md#pr73-and-delivery-evidence).
+  Delivery mode checks that record structurally; it cannot certify an unobserved merge.
+
+- [Compact planning / US-009 / T-US-009-001] Frozen discovery scope and
+  [US-010 / T-US-010-001 repair evidence](docs/verification/compact-requirement-evidence.md)
+  share one authoritative record. Compact output now declares scalar requirement_id;
+  real compact generation/rejection/refinement/approval and manager database reopen
+  preserve REQ-001. Both named reviewer mutations restore exact source. The recorded
+  ten-function coverage is 365/384 statements (95.052083%); final command receipts,
+  per-function counts, finding qualifications and runner limits live in that record.
+  Targeted/package/compatibility/type/lint checks pass; full make test was interrupted
+  by sandbox denial of api.anthropic.com, with no process exit code. The advertised
+  host-check tool is absent; runner test verification and D2 remain outstanding.
+  No decoder/authority/migration behavior changed; Console retains delivery.
+
+- [Planner schema evidence / US-007 / T-US-007-003] Dependency inspection and
+  fixture provenance are historical baseline evidence in
+  [inspection](docs/verification/planner-schema-inspection.md) and
+  [discovery](docs/verification/planner-schema-discovery.md). Their pre-repair
+  array-coercion observations and missing-accounting findings are superseded by
+  the US-008 implementation record above. They do not describe current behavior
+  or prove deployment. Console retains delivery ownership.
+
 - [US-020 / T-US-020-001] Merge origin/main while preserving the US-019 sync
   map and candidate planner/review documentation. Resolution and verification
   results are recorded in `docs/ARCHITECTURE.md` under the sync map.
@@ -222,6 +270,9 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Compact planning: unverified D2 delivery and canonical runner checks
+  are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).
 
 - US-010 concrete integration/evidence gaps are maintained once in the
   [study resource boundary](docs/verification/repair-study.md#resources-authority-and-delivery):

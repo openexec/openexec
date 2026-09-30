@@ -2,6 +2,9 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/openexec/openexec/internal/planner"
+	"github.com/openexec/openexec/pkg/db/state"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,5 +107,70 @@ func TestCompactPlanExecutesNativeTaskWithoutGoalController(t *testing.T) {
 	}
 	if implementations != 1 {
 		t.Fatal("completed small work repeated")
+	}
+}
+
+func TestCompactRequirementIdentityPersistsAcrossManagerReopen(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	req := replayRequest()
+	req.Compact = true
+	req.Intent = "REQ-001: implement edit and verify reload"
+	generated, reviewed := 0, 0
+	fixture := strings.Replace(replayPlanFixture, `"goal_id":`, `"requirement_id":"REQ-001","goal_id":`, 1)
+	e.mgr.cfg.PlanGenerator = planCompletionFunc(func(_ context.Context, prompt string) (string, error) {
+		generated++
+		if !strings.Contains(prompt, `"requirement_id"`) || !strings.Contains(prompt, "REQ-001") {
+			t.Fatal("generation/refinement prompt lost identity")
+		}
+		if generated == 1 {
+			if !strings.Contains(prompt, "SMALL, well-scoped change") {
+				t.Fatal("not compact")
+			}
+			return fixture, nil
+		}
+		if !strings.Contains(prompt, "Missing reload evidence") {
+			t.Fatal("missing independent findings")
+		}
+		return strings.Replace(fixture, "Verify the running editing journey", "Verify saved reload", 1), nil
+	})
+	e.mgr.cfg.PlanReviewer = planCompletionFunc(func(_ context.Context, prompt string) (string, error) {
+		reviewed++
+		if !strings.Contains(prompt, `"requirement_id":"REQ-001"`) {
+			t.Fatal("review prompt lost identity")
+		}
+		if reviewed == 1 {
+			return rejectedReplayReview, nil
+		}
+		return replayReviewFixture, nil
+	})
+	result, err := e.mgr.Plan(context.Background(), req)
+	if err != nil || !result.Valid || generated != 2 || reviewed != 2 {
+		t.Fatalf("compact refinement failed: %+v %v %d/%d", result, err, generated, reviewed)
+	}
+	raw, err := os.ReadFile(result.ArtifactPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved planner.ProjectPlan
+	if err := json.Unmarshal(raw, &saved); err != nil || saved.Stories[0].RequirementID != "REQ-001" {
+		t.Fatalf("persisted identity lost: %s %v", raw, err)
+	}
+	e.mgr.Close()
+	e.closeState()
+	reopened, err := state.NewStore(filepath.Join(e.dir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	cfg := e.mgr.cfg
+	cfg.StateStore = reopened
+	fresh := &Manager{cfg: cfg, state: reopened}
+	again, err := fresh.Plan(context.Background(), req)
+	if err != nil || !again.Valid || again.Plan.Stories[0].RequirementID != "REQ-001" || generated != 2 || reviewed != 2 {
+		t.Fatalf("reopened receipt lost identity or replayed provider: %+v %v", again, err)
+	}
+	var imports int
+	if err := reopened.GetDB().QueryRow(`SELECT COUNT(*) FROM run_steps WHERE agent='reviewed-plan-import'`).Scan(&imports); err != nil || imports != 1 {
+		t.Fatalf("import repeated: %d %v", imports, err)
 	}
 }

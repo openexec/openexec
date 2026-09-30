@@ -51,34 +51,6 @@ type Story struct {
 	Tasks              []Task   `json:"tasks"`
 }
 
-// UnmarshalJSON accepts requirement_id as a string, null, or a list of
-// strings. Models asked to refine a plan sometimes answer the list form, and a
-// single mistyped optional field must not discard every story in the plan.
-func (s *Story) UnmarshalJSON(data []byte) error {
-	type story Story
-	var raw struct {
-		story
-		RequirementID json.RawMessage `json:"requirement_id"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*s = Story(raw.story)
-	s.RequirementID = ""
-	if len(raw.RequirementID) == 0 || string(raw.RequirementID) == "null" {
-		return nil
-	}
-	if err := json.Unmarshal(raw.RequirementID, &s.RequirementID); err == nil {
-		return nil
-	}
-	var ids []string
-	if err := json.Unmarshal(raw.RequirementID, &ids); err != nil {
-		return fmt.Errorf("requirement_id: want a string or a list of strings: %w", err)
-	}
-	s.RequirementID = strings.Join(ids, ", ")
-	return nil
-}
-
 // PlanSchemaVersion is the current version of the plan artifact schema.
 const PlanSchemaVersion = "1.0.0"
 
@@ -184,31 +156,20 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 	}
 
 	plan := &ProjectPlan{}
-	// Try parsing as ProjectPlan object
-	objectErr := json.Unmarshal([]byte(jsonText), plan)
-	if objectErr == nil && len(plan.Stories) > 0 {
-		return plan, nil
+	var err error
+	if strings.HasPrefix(strings.TrimSpace(jsonText), "[") {
+		plan.SchemaVersion = "1.1"
+		err = json.Unmarshal([]byte(jsonText), &plan.Stories)
+	} else {
+		err = json.Unmarshal([]byte(jsonText), plan)
 	}
-
-	// Fallback: try parsing as an array of stories directly
-	var stories []Story
-	arrayErr := json.Unmarshal([]byte(jsonText), &stories)
-	if arrayErr == nil && len(stories) > 0 {
-		return &ProjectPlan{
-			SchemaVersion: "1.1",
-			Stories:       stories,
-		}, nil
+	if err != nil {
+		return nil, &ResponseDecodeError{Diagnostic: err, Response: response}
 	}
-
-	// Name the decode error of the shape the response actually has, so a
-	// mistyped field is not reported as a response without stories.
-	reason := "no stories found"
-	if strings.HasPrefix(jsonText, "[") && arrayErr != nil {
-		reason = arrayErr.Error()
-	} else if strings.HasPrefix(jsonText, "{") && objectErr != nil {
-		reason = objectErr.Error()
+	if len(plan.Stories) == 0 {
+		return nil, fmt.Errorf("failed to parse LLM response as JSON: no stories found\nResponse was: %s", response)
 	}
-	return nil, fmt.Errorf("failed to parse LLM response as JSON: %s\nResponse was: %s", reason, response)
+	return plan, nil
 }
 
 // ProcessWizardMessage handles one turn of the interactive interview
@@ -249,3 +210,15 @@ func (p *Planner) RenderIntent(ctx context.Context, state string) (string, error
 	}
 	return intentState.RenderIntentMD(), nil
 }
+
+// ResponseDecodeError retains both the concrete JSON diagnostic and the complete
+// rejected output. No partially decoded plan may leave the parser.
+type ResponseDecodeError struct {
+	Diagnostic error
+	Response   string
+}
+
+func (e *ResponseDecodeError) Error() string {
+	return fmt.Sprintf("failed to parse LLM response as JSON: %v\nResponse was: %s", e.Diagnostic, e.Response)
+}
+func (e *ResponseDecodeError) Unwrap() error { return e.Diagnostic }

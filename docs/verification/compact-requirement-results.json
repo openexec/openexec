@@ -1,0 +1,199 @@
+{
+  "status": "completed",
+  "mode": "repair",
+  "functions": 10,
+  "fixtures": 25,
+  "compact_output_declares_requirement_id": true,
+  "repair_verified": true,
+  "delivery_verified": false,
+  "coverage": {
+    "baseline": "b17e136dab39bfccd4104bb9264e30595ea9118e",
+    "functions": [
+      {
+        "path": "internal/planner/planner.go",
+        "name": "(*Story).UnmarshalJSON",
+        "change": "frozen scope",
+        "covered": 15,
+        "statements": 15
+      },
+      {
+        "path": "internal/planner/planner.go",
+        "name": "(*ProjectPlan).Validate",
+        "change": "frozen scope",
+        "covered": 12,
+        "statements": 12
+      },
+      {
+        "path": "internal/planner/planner.go",
+        "name": "(*Planner).GeneratePlan",
+        "change": "frozen scope",
+        "covered": 9,
+        "statements": 9
+      },
+      {
+        "path": "internal/planner/planner.go",
+        "name": "(*Planner).GenerateCompactPlan",
+        "change": "frozen scope",
+        "covered": 4,
+        "statements": 4
+      },
+      {
+        "path": "internal/planner/planner.go",
+        "name": "(*Planner).parseResponse",
+        "change": "frozen scope",
+        "covered": 25,
+        "statements": 25
+      },
+      {
+        "path": "internal/planner/review.go",
+        "name": "(*Planner).ReviewPlan",
+        "change": "frozen scope",
+        "covered": 23,
+        "statements": 24
+      },
+      {
+        "path": "internal/planner/review.go",
+        "name": "(*Planner).RefinePlan",
+        "change": "frozen scope",
+        "covered": 19,
+        "statements": 20
+      },
+      {
+        "path": "internal/planner/review.go",
+        "name": "carryGoals",
+        "change": "frozen scope",
+        "covered": 25,
+        "statements": 25
+      },
+      {
+        "path": "pkg/manager/planner.go",
+        "name": "(*Manager).Plan",
+        "change": "frozen scope",
+        "covered": 74,
+        "statements": 80
+      },
+      {
+        "path": "pkg/manager/planner_replay.go",
+        "name": "(*Manager).replayReviewedPlan",
+        "change": "frozen scope",
+        "covered": 159,
+        "statements": 170
+      }
+    ],
+    "covered": 365,
+    "statements": 384,
+    "percent": 95.05208333333333,
+    "passed": true,
+    "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4"
+  },
+  "mutations": {
+    "mutations": [
+      {
+        "mutation": "output-key",
+        "assertion": "TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact",
+        "diagnostic": "output format omits scalar requirement_id",
+        "exit_code": 1,
+        "output": "=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact\n    contract_consistency_test.go:80: output format omits scalar requirement_id\n--- FAIL: TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact (0.00s)\n"
+      },
+      {
+        "mutation": "identity-rule",
+        "assertion": "TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact",
+        "diagnostic": "provider prompt omits canonical empty requirement semantics",
+        "exit_code": 1,
+        "output": "=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact\n    contract_consistency_test.go:78: provider prompt omits canonical empty requirement semantics\n--- FAIL: TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact (0.00s)\n"
+      }
+    ],
+    "restored": true,
+    "restored_sha256": "08e997e0b5c5ec7e47e5089da1b178b231fa5298085e271dca667362fc448af0",
+    "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4"
+  },
+  "task": "T-US-010-001",
+  "story": "US-010",
+  "verification_base_head": "af99d8d5156065dbe74525b9c2e27162bee0c87b",
+  "finding": {
+    "review_id": "308b33886fe7b51a19c503f324c7387a",
+    "disposition": "accepted",
+    "summary": "Compact output lacked the scalar requirement_id required by its own rule; repaired next to goal_id."
+  },
+  "story_commands": [
+    {
+      "command": "go test ./internal/planner/ -run 'TestAllPlanningPathsRespectSchemaAndCommitOwnership|TestEnablingRequirementSurvivesRefinementAndReview|TestCompactRequirementIdentityThroughReviewAndRefinement' -count=1 -v",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "=== RUN   TestEnablingRequirementSurvivesRefinementAndReview\n--- PASS: TestEnablingRequirementSurvivesRefinementAndReview (0.00s)\n=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership\n=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership/generation\n=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact\n=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership/review\n=== RUN   TestAllPlanningPathsRespectSchemaAndCommitOwnership/refinement\n--- PASS: TestAllPlanningPathsRespectSchemaAndCommitOwnership (0.00s)\n    --- PASS: TestAllPlanningPathsRespectSchemaAndCommitOwnership/generation (0.00s)\n    --- PASS: TestAllPlanningPathsRespectSchemaAndCommitOwnership/compact (0.00s)\n    --- PASS: TestAllPlanningPathsRespectSchemaAndCommitOwnership/review (0.00s)\n    --- PASS: TestAllPlanningPathsRespectSchemaAndCommitOwnership/refinement (0.00s)\n=== RUN   TestCompactRequirementIdentityThroughReviewAndRefinement\n--- PASS: TestCompactRequirementIdentityThroughReviewAndRefinement (0.00s)\nPASS\nok  \tgithub.com/openexec/openexec/internal/planner\t0.003s\n"
+    },
+    {
+      "command": "bash scripts/verify-compact-requirement-coverage.sh",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "See coverage/mutations below or command exit-code receipt."
+    },
+    {
+      "command": "bash scripts/verify-compact-requirement-mutations.sh",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "See coverage/mutations below or command exit-code receipt."
+    },
+    {
+      "command": "go test ./internal/planner/ ./pkg/manager/ -count=1",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "ok  \tgithub.com/openexec/openexec/internal/planner\t0.006s\nok  \tgithub.com/openexec/openexec/pkg/manager\t113.202s\n"
+    },
+    {
+      "command": "make test",
+      "status": "sandbox-blocked",
+      "exit_code": null,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "tool_error": "Network access to \"api.anthropic.com\" was blocked: domain is not on the allowlist for the current sandbox mode.",
+      "output": "\ud83e\uddea Running Go tests...\ngo test ./...\n?   \tgithub.com/openexec/openexec\t[no test files]\n?   \tgithub.com/openexec/openexec/cmd/openexec\t[no test files]\n?   \tgithub.com/openexec/openexec/internal\t[no test files]\n?   \tgithub.com/openexec/openexec/internal/actions\t[no test files]\nok  \tgithub.com/openexec/openexec/internal/agent\t0.292s\n"
+    },
+    {
+      "command": "make compat-test",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "See coverage/mutations below or command exit-code receipt."
+    },
+    {
+      "command": "make type-check",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "See coverage/mutations below or command exit-code receipt."
+    },
+    {
+      "command": "bash scripts/verify-compact-requirement-evidence.sh repair",
+      "status": "finished",
+      "exit_code": 0,
+      "source_sha256": "deef6486183676f898abbfb0117f6e31511658de4b8e574afd0dd98fbc66b6b4",
+      "output": "See coverage/mutations below or command exit-code receipt."
+    }
+  ],
+  "extra_checks": [
+    {
+      "command": "make lint (writable GOCACHE)",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts/verification -p 'compact_requirement*test.py'",
+      "exit_code": 0,
+      "tests": 11
+    },
+    {
+      "command": "bash -n scripts/verify-compact-requirement-{coverage,mutations,evidence,story}.sh",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "full_story_verified": false,
+  "host_check_available": false,
+  "remaining_verification": "Host test check: make test was sandbox-interrupted without a process exit code; run_declared_check was not exposed. Canonical gate and D2 belong to Console/runner."
+}
