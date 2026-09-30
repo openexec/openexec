@@ -4,17 +4,76 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Planner schema fixtures / US-007 / T-US-007-002] Sanitized fixtures, public
-  runtime observations, scalar controls and strict candidate discovery are in
-  [planner schema discovery](docs/verification/planner-schema-discovery.md).
-  This is the planner task, distinct from the historical verification-failure
-  study below. Current array coercion is reported, not certified as recovery.
+- [Planner schema evidence / US-007 / T-US-007-003] Working-memory consolidation,
+  verified 2026-10-01. Candidate root:
+  `/mnt/data1/projects/openexec/.openexec/outcome-candidates/a2c7daf0a875c10027e2d680305633d0`;
+  pre-documentation HEAD `bf187856873a3494f68e13b7f3de06314d4479e1`, initially clean.
+  `git rev-parse HEAD` and the discovery verifier identify this checkout, not a
+  deployed product. The supplied Console revision/start observation concerns
+  Console only; no OpenExec deployment was inspected or inferred.
+  Earlier planner inspection and fixture work are maintained in
+  [inspection](docs/verification/planner-schema-inspection.md) and
+  [discovery](docs/verification/planner-schema-discovery.md). Their executed
+  commands are historical evidence, distinct from this fresh run and from the
+  older verification-failure study that reused these story/task numbers.
 
-- [Planner schema discovery / US-007 / T-US-007-001] Candidate and pinned-runtime
-  offline reproduction, scalar controls, source paths and accounting gaps are
-  recorded once in [planner schema inspection](docs/verification/planner-schema-inspection.md).
-  This is the G-006 planner task, distinct from the historical verification-failure
-  study using the same task ID. Recovery implementation remains with US-008.
+  Executed from this root:
+  `scripts/verify-planner-schema-recovery.sh --case discovery` (exit 0;
+  JSON captured at `/tmp/t-us-007-003-discovery.json`, an ephemeral diagnostic,
+  not required for future runs). The verifier resolves this candidate's module
+  and public runtime, disables ambient Go workspace/settings/flags, hashes 36
+  candidate inputs and validates the sanitized fixture manifest. It passed all
+  57 required nodes, with four declared scalar-schema rejections and 32 public
+  array-acceptance observations across decode/generate/compact/refine and both
+  envelopes. Observed diagnostic:
+  `json: cannot unmarshal array into Go struct field discoveryScalarStory.requirement_id of type string`.
+  This is the method-free scalar control, not today's public decoder error.
+  Public scalar controls preserved story fields and refinement goals and
+  round-tripped complete plans through saved files. Current public arrays are
+  coerced; discovery does not certify scalar enforcement or bounded recovery.
+  The historical pinned-engine `no stories found` report and stale original
+  reproducer assertion are documented in inspection; neither was rerun here
+  or represented as current behavior. Fixture source/digests and synthetic
+  mapping-control limitations remain in the committed provenance manifest,
+  `pkg/runtime/testdata/planner-schema/provenance.json`.
+
+  `python3 -m unittest discover -s scripts/verification -p planner_schema_discovery_test.py -v`
+  exited 0: eight negative controls passed (candidate substitution, tampering,
+  wrong root/package, missing/duplicate/absent tests, skips/failures and nonzero
+  commands). Host `run_declared_check(check="lint")` exited 0: Go vet and UI
+  ESLint. No tests or production code were changed. Saved notes were re-read,
+  owner-reserved bytes compared with HEAD, discovery rerun and
+  `git diff --check` passed before commit. Full canonical gates and delivery
+  remain Console/runner-owned.
+
+  Source rechecked with `sed` and `rg`: `internal/planner/planner.go` owns
+  Story's scalar field/custom array decoder and response parsing;
+  `internal/planner/prompt.go`, `review.go` and `human_boundary.go` own existing
+  generation/refinement, review and retained human boundaries.
+  `pkg/runtime/runtime.go` directly delegates without manager persistence.
+  `pkg/manager/planner.go` selects reviewed replay for RequestID;
+  `pkg/manager/planner_replay.go` owns retained request identity, exact artifact
+  checks, review history and metadata compare-and-swap in `run_steps` (schema:
+  `pkg/db/state/schema.go`). ReviewRound starts at one; ReviewLimit retains
+  MaxReviewCycles (default three). Lower configuration restricts a retained
+  limit; raising it must not replenish it. Legacy zero limits initialize on
+  rejection. Source still increments the round only after successful refinement,
+  validation and artifact persistence: failed attempts are not consumed, and
+  there is no persisted schema-correction counter or malformed-response record.
+  Accepted recovery must consume its bounded attempts before dispatch and retain
+  diagnostics in this existing machinery; this note does not claim that repair.
+
+  Import constraints: changed plans require fresh independent review, retained
+  HITL metadata/dependencies and goals must survive refinement, and unchanged
+  retries are refused. `internal/release/reviewed_plan_import.go` provides
+  rollback-only identity validation and transactional goals/stories/tasks plus
+  import receipt, including conflict/idempotency checks. Replay invokes it only
+  after approval and stale-base checks. Legacy incremental `importBoundPlan`
+  must not be called atomic. These are source-backed constraints, not fresh
+  database restart/import test evidence. Later recovery verification must close
+  and reopen state, exhaust failed attempts without refunds, and re-read receipts.
+  This documentation-only change alters no loading/migration or runtime behavior
+  (.openexec, .uaos and tasks.json remain untouched); complexity delta is zero.
 
 - [US-020 / T-US-020-001] Merge origin/main while preserving the US-019 sync
   map and candidate planner/review documentation. Resolution and verification
@@ -234,6 +293,12 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Planner recovery evidence gap: discovery observes current coercion but cannot
+  prove bounded correction, restart accounting or atomic import durability.
+  Those remain with the accepted US-008 implementation/verification tasks;
+  reuse the retained planning boundary described above. No owner decision or
+  expanded execution grant is requested by this documentation task.
 
 - US-010 concrete integration/evidence gaps are maintained once in the
   [study resource boundary](docs/verification/repair-study.md#resources-authority-and-delivery):
