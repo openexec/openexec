@@ -1,166 +1,148 @@
-# Compact requirement discovery — US-009 / T-US-009-001
+# Compact requirement identity — US-010 / T-US-010-001
 
 ## Scope and provenance
 
-This establishes the baseline, not completion of US-010's repair or G-007.
-Inspected candidate HEAD is `b17e136dab39bfccd4104bb9264e30595ea9118e`.
-The retained plan is
-`.openexec/artifacts/plans/f350fbd52b02bf28e883aec989bca57bf4022c732a092a1e7a1d6ecbe9a12bcd.json`;
-its US-009 contract and US-010 complete verification command are copied verbatim
-into `compact-requirement-scope.json`, because the artifact is local ignored state.
-Earlier US-009 recapture evidence concerns a different story and remains historical.
-Only this checkout and its git objects/refs were inspected for product evidence;
-no retained temporary artifacts or sibling checkout supplied evidence.
+Discovery US-009 / T-US-009-001 froze baseline
+`b17e136dab39bfccd4104bb9264e30595ea9118e`, the completion contract, complete
+verification commands and ten executable function bodies in
+[the scope manifest](compact-requirement-scope.json). This repair uses only this
+candidate's source, local deterministic providers and fresh test output.
+Historical recapture stories with reused task numbers are unrelated.
 
-Outcome: consistent scalar requirement identity across compact planning.
-Observed state: compact schema omission, reusable native planner/review/replay.
-Owning loop: OpenExec planning; deterministic delivery belongs to Console.
-Reuse GenerateCompactPlan, parseResponse, ReviewPlan, RefinePlan and replayReviewedPlan.
-No new runtime abstraction is needed. Complexity delta: zero product concepts,
-state, transitions, owner decisions or replaced machinery; only discovery tooling.
-Project context was read; its broader current Goal does not expand this selected task.
+Outcome: preserve accepted requirement identity through compact planning.
+Observed defect: compact rules require a field absent from their output example.
+OpenExec's existing GenerateCompactPlan, parseResponse, ReviewPlan, RefinePlan and
+manager replay own this boundary. Console owns delivery after the task queue.
+Project context and the Simple Loop contract were read. No new product concepts,
+persistent state, transitions, owner decisions or runtime helpers were added;
+complexity delta is zero. Verification tooling reuses the existing Go AST inventory
+and full-body coverage evaluator.
 
 ## Finding decisions
 
-- **Root cause — accepted.** `internal/planner/prompt.go:48` defines
-  RequirementIdentityRule, including preservation and “never add fields” guidance.
-  CompactStoryGenerationPrompt at line 211 includes that rule at line 221 but its
-  exact JSON shape at lines 225–235 omits requirement_id. This is a source-proven
-  contradiction, not an observed stochastic model failure.
-- **Normal — accepted as a reachable risk.** `Planner.GenerateCompactPlan`
-  (`internal/planner/planner.go:157`) selects that shape; `parseResponse` at 165
-  uses Story.UnmarshalJSON at 57, which sets omitted/null identity to empty.
-  Existing `TestPlanner_GenerateCompactPlan` checks shape selection, not REQ-001
-  retention. The parser does not itself require accepted requirement coverage.
-- **Review — accepted as an inference, not inevitable rejection.**
-  `pkg/manager/planner.go:142–178` sends compact plans to independent ReviewPlan;
-  `internal/planner/review.go:21–59` serializes the empty identity and applies
-  reviewer and deterministic lint results. Requirement coverage is model guidance,
-  not a deterministic rejection in this function. RequestID takes the replay path
-  at planner.go:64 instead; it too uses compact generation and independent review.
-- **Refinement — qualified agreement.** `RefinePlan` (review.go:65–95) sends the
-  rejected plan and findings through StoryFixPrompt; that prompt already lists
-  requirement_id at prompt.go:357. It inherits a possibly missing *input identity*,
-  not the compact output-shape omission. A corrected answer can recover the ID
-  from intent, but no deterministic code guarantees it. `carryGoals` at 100 retains
-  goals; `preserveHumanBoundaries` protects retained HITL work.
-- **Test gap — accepted.** `contract_consistency_test.go:62–84` asserts null
-  semantics and conditional commit ownership on all four prompts, never their
-  output shapes. The existing tests pass on the contradictory baseline.
-- **Fix — accepted for US-010.** Add scalar requirement_id beside compact goal_id;
-  assert output-format fields in generation, compact and refinement separately
-  from rule prose. Review outputs approval metadata, not stories, so it must retain
-  the shared-rule assertion but must not be required to output requirement_id.
-- **Prove — accepted, with contract additions.** US-010 must exercise actual compact
-  REQ-001 generation, decoding, independent rejection, refinement and fresh approval,
-  plus the complete verification command retained in the scope manifest.
-- **Falsify — accepted, pending US-010.** Remove only the compact output key: the
-  compact format subtest must fail. Separately remove only its identity-rule
-  insertion: the existing null-sentence assertion must fail. Restore source and
-  rerun the complete verifier. Discovery does not claim these repairs or mutations.
+Review `308b33886fe7b51a19c503f324c7387a`, single LOW finding: **accepted**.
+
+- **Root cause — accepted and repaired.** Baseline compact rules prohibited unlisted
+  fields while requiring identity preservation. Its story example now declares
+  scalar `requirement_id` beside `goal_id`.
+- **Normal — verified.** TestCompactRequirementIdentityThroughReviewAndRefinement
+  invokes GenerateCompactPlan with numbered intent, inspects the actual compact
+  provider prompt and round-trips the decoded accepted identity.
+- **Review — verified, with qualification.** A separate deterministic reviewer
+  receives the serialized identity and explicitly rejects the first plan. Missing
+  identity does not inevitably cause rejection: coverage is model guidance, not a
+  deterministic requirement check. We do not claim that stronger behavior.
+- **Refinement — verified, with qualification.** StoryFixPrompt already declared
+  the field; the defect was potentially missing input identity. The test checks
+  retained findings and identity, decodes the replacement bare array, retains the
+  goal, and requires fresh independent approval of the changed plan.
+- **Test gap — repaired.** TestAllPlanningPathsRespectSchemaAndCommitOwnership now
+  decodes only each generation/compact/refinement output example using a scalar
+  string field. Rule prose, intent and current-story input cannot satisfy it.
+  Review still checks rules but is not asked to output a story. Existing canonical
+  null/omission and CandidateCommitRule assertions remain unchanged.
+- **Fix — verified.** One production prompt-line change; no decoder, manager,
+  import, authority or compatibility behavior was replaced.
+- **Prove — core cases verified; full make test sandbox-blocked.** The planner journey is supplemented
+  by TestCompactRequirementIdentityPersistsAcrossManagerReopen: actual compact
+  manager selection, independent rejection/refinement/approval, artifact re-read,
+  SQLite close/reopen, receipt replay, retained identity and exactly one import.
+- **Falsify — verified.** The output-key and identity-rule mutations run separately.
+  Each requires exit 1, the named compact subtest failure and its specific diagnostic;
+  compilation or unrelated assertion failures are refused. Both restore exact bytes
+  in finally blocks, including command failures and catchable termination signals.
 
 ## Reusable fixtures and protected behavior
 
-The scope manifest names existing executable tests and verifies their presence.
-`mockProvider` in internal/planner/planner_test.go captures the last prompt and
-returns controlled JSON/errors. Extend it or use response sequences for REQ-001;
-use separate reviewer and generator providers to preserve independence.
-`TestEnablingRequirementSurvivesRefinementAndReview` checks null-to-empty wire
-round-trip, retained goals, conditional commit ownership and explicit rejection;
-it uses full generation, not compact accepted-identifier coverage.
-`TestPlanner_ParseResponse` covers markdown, both envelopes, array coercion and
-named malformed-field errors. The schema-discovery fixtures and provenance in
-`pkg/runtime/testdata/planner-schema/` provide sanitized empty/single/multiple
-mapping responses and scalar controls; current public acceptance is not bounded repair.
+The manifest inventories existing array decoding/discovery, human-boundary, goal
+retention, commit ownership, manager replay, cancellation, import atomicity and
+retained-limit regressions, plus the new journey and refusal tests. Coverage executes
+all listed planner/manager tests and fails if any required test is missing or skipped.
+The original array symptom remains fixed by Story.UnmarshalJSON accepting string,
+null and string lists; parseResponse preserves the actual envelope's diagnostics.
+No test was weakened to replace this compatibility behavior.
 
-Manager fixtures: `replayPlanFixture`, `replayReviewFixture`, `replayRequest`
-(pkg/manager/planner_replay_test.go:10–15), `rejectedReplayReview`
-(planner_refinement_replay_test.go:10), `planCompletionFunc` and
-`newSchedulerTestEnv`. Reuse these for independently rejected then approved plans,
-artifact digests, run_steps review history, task progress and exactly one import.
-Preserve cancellation resumption, changed-request refusal, missing-adapter refusal,
-atomic import rollback, goal/identity conflicts, unchanged-refinement refusal,
-retained review limit (raising config does not replenish it), goal retention,
-HITL metadata/dependencies, stale-base checks and conditional commit ownership.
+Added failure tests cover malformed scalar identity, invalid plans, provider errors,
+local native-provider fallback, invalid intent, failed artifact storage, concurrent
+receipt mutation, failed database writes, tampered hashes/paths/reviews/history,
+unchanged refinement, legacy zero limits, negative limits and lowered limits.
+They assert specific refusals and no task import after failure. The native fallback
+uses a newly written local shell fixture, never an ambient model provider.
 
-Limits: the “Restart” test creates a fresh Manager over the same state handle;
-it does not close/reopen SQLite. planner_replay.go:240–272 increments ReviewRound
-only after successful refinement/validation/artifact persistence. No consumed
-schema-correction attempt is persisted before dispatch, and failed refinements can
-repeat. Do not describe these tests as proving bounded array correction or durable
-failed-attempt accounting. The accepted schema-recovery work remains a prerequisite;
-US-010 must recheck its presence and protect it rather than silently replacing it.
-No production or compatibility behavior changes here: .openexec, .uaos and tasks.json
-loading remain untouched. Discovery does not prove new compatibility behavior.
+The discovery note's stronger scalar-enforcement/bounded-schema-repair prerequisite
+is not a requirement of this prompt repair and is not implemented at this baseline.
+In particular failed refinement attempts do not consume a persisted schema budget.
+We preserve existing recovery/coercion and retained successful-review limits without
+claiming a new durable failed-attempt accounting guarantee. This qualifies the
+historical discovery inference rather than inventing extra production machinery.
+Existing .openexec, .uaos and tasks.json loaders and migration code are untouched.
 
 ## Executable coverage scope
 
-`compact-requirement-scope.json` is the nonempty, additive manifest frozen before
-repair. Each function has its path, symbol, baseline line, area and inclusion reason.
-Measure whole bodies (including error paths) with statement-weighted Go coverage,
-strictly greater than 90 percent across this scope; do not average function rates,
-count prompt constants, or drop orchestration because it lowers coverage.
-New production helpers in planner/manager must be added before reporting coverage.
-Dependencies not changed by the repair remain protected through the named regressions;
-changed/new production helpers extend the manifest. Discovery validates symbols,
-minimum scope and new helpers against the baseline. It measures no coverage itself.
+The ten frozen full function bodies remain in scope; no functions or error branches
+were removed. No production helper was introduced. Python-only verification helpers
+are tested independently as specified by the frozen scope policy.
+The coverage script generates a fresh count profile, inventories Go bodies with the
+existing AST helper, independently instruments expected blocks, and rejects absent
+functions, missing/mismatched profile blocks and empty denominators. Its threshold
+is statement-weighted `10 * covered > 9 * total`, not rounded percentages or averaged
+function percentages. Per-function counts are retained in the repair result.
+Initial measurement was 301/384 (78.39%); refusal coverage raised it to 365/384
+(95.052083%). The final source-bound result is recorded below.
 
 ## G-007 completion and verification
 
-The authoritative completion wording and full implementation verification script
-are retained verbatim in the scope manifest. Required repository outcome: generation,
-compact and refinement formats declare scalar requirement_id; deterministic REQ-001
-survives generation/rejection/refinement/approval; both targeted mutations fail for
-their intended reasons; affected executable statement coverage is >90%; protected
-schema-recovery, human-boundary, commit-ownership and retained-budget regressions pass.
-Run the US-010 complete script on restored source, including targeted tests, coverage,
-mutations, planner/manager tests, make test, make compat-test, make type-check and
-repair evidence validation. Discovery passing satisfies only this prerequisite.
+The scope manifest retains the authoritative completion contract and full verification
+script verbatim. `scripts/verify-compact-requirement-story.sh` executes those exact
+commands, with `--step 1` through `--step 8` supporting separate runner dispatch.
+Every command gets an exit-code receipt and log under the candidate-local ignored
+`.openexec/compact-requirement-checks/` directory. Mutations precede final clean-source
+package/full/compatibility/type checks. Coverage and mutation receipts bind the
+production/test/verifier source digest; repair evidence refuses stale receipts.
+Discovery mode still certifies discovery only. Repair mode certifies the local
+prompt/journey/coverage/mutation slice, never remote delivery or the canonical gate.
 
 ## PR73 and delivery evidence
 
-`git show be19a5b695db31b9b2146b15bd01e613be55e4c6` records the #73-labeled fix:
-Story accepts string/null/list and parseResponse reports the decode error for the
-actual envelope. Its planner tests still assert joined multiple IDs. This supports
-agreement that the original array-decode symptom was fixed at this base; it does
-**not** support a claim that scalar enforcement and bounded schema repair already exist.
-`git merge-base --is-ancestor be19a5b6 HEAD` and the same command against the locally
-cached `origin/main` both exit 0. At inspection origin/HEAD names origin/main and
-origin/main is `3fe65016736b86c59710a350dbf7ab5fa0c36bdd` (#74).
-This is local commit content and cached-ref evidence only; ancestry and a #73 subject
-are not an independently observed hosted merge receipt or current remote state.
-
-D2 status: **unverified**. No hosted merge/deployment was checked. Earlier notes and
-the observed Console revision `6dbeb1fc` are not OpenExec default-branch delivery
-proof. Console owns publication to the retained PR75, canonical gate, review
-308b33886fe7b51a19c503f324c7387a disposition submission and exact merge decision.
-The later agent-console parent retry is external. No replacement PR, review request,
-publish, merge, deployment or Navigator task selection belongs to this stage.
+Local base ancestry contains #73's array-coercion and decode-diagnostic repair
+`be19a5b695db31b9b2146b15bd01e613be55e4c6`. This supports agreement that the original
+array failure is already fixed in code. It is not a hosted merge/deployment receipt.
+D2 status: **unverified**. The observed Console process revision is not OpenExec
+production evidence. Publication to retained PR75, canonical gate, review-disposition
+submission and the exact merge decision remain Console-owned. This stage uses an
+ordinary candidate-worktree commit; it does not publish or request another review.
 
 ## Verification and outstanding questions
 
-Fresh local baseline command (exit 0):
-`go test ./internal/planner/ -run 'TestAllPlanningPathsRespectSchemaAndCommitOwnership|TestEnablingRequirementSurvivesRefinementAndReview|TestPlanner_ParseResponse|TestRejectedPlanRefinesThroughExistingPromptAndRequiresFreshReview' -count=1 -v`.
-This proves the current test gap and preserved covered behavior, not the new repair.
-Fresh manager baseline command (exit 0):
-`go test ./pkg/manager/ -run 'TestCompactReviewedPlanUsesExistingPlannerAndReplay|TestReviewedPlanRefinesRejectedReviewAndImportsOnce|TestReviewedPlanRestartResumesRefinementWithinRetainedLimit|TestReviewedPlanReplay' -count=1`.
+Final command receipts and repair evidence are recorded in
+[compact requirement results](compact-requirement-results.json).
+The Python verifier suite checks absent/narrowed/duplicate scope, missing helper,
+missing fixture/disposition, stale proof, exact 90% refusal, empty denominator,
+missing profile blocks, unrelated mutation failures and restoration after command
+failure. The unknown-mode test now uses an actually unsupported mode because repair
+is deliberately supported. No existing product assertion was relaxed.
 
-Task verification: `bash scripts/verify-compact-requirement-evidence.sh discovery`
-exited 0 with 10 functions, 19 fixtures, compact output field absent, repair_verified
-false and delivery_verified false. The command re-reads saved files, verifies
-baseline ancestry/source facts and owner-reserved notes, and reports current HEAD.
-`python3 -m unittest discover -s scripts/verification -p compact_requirement_evidence_test.py -v`
-exited 0 (five tests, including table-driven negative controls): invocation outside
-the working directory, empty/duplicate/missing/nonlocal scope, missing reasons,
-changed contract/verification, absent fixtures/dispositions, false delivery,
-omitted newly introduced helpers and unsupported modes. `git diff --check` passed.
-No existing test assertions were changed; new tests validate discovery fail-closed
-behavior. Discovery's own initial fixture-name and newline-comparison errors were
-corrected and the full discovery suite rerun. The user's two product prompt
-mutations remain explicitly assigned to US-010, not represented by these controls.
-The advertised run_declared_check tool is absent from this session's callable catalog;
-no host lint/test result is claimed. Canonical full gates remain runner-owned.
+The advertised `run_declared_check` tool was not present in this session's callable
+catalog (searched by name and check capabilities); no host check result is invented.
+Full canonical gates and external D2 remain runner/Console responsibilities.
 
-Outstanding: US-010 must reconcile the stronger scalar/recovery prerequisite with
-current coercion, then prove the complete repair checklist. D2 needs supported
-external delivery evidence; neither requires inventing owner approval in this task.
+Final local checks: targeted planner contract/journey, whole planner and manager
+packages, strict coverage, both mutations, 11 Python verifier controls, `make lint`,
+`make compat-test`, `make type-check`, shell syntax and `git diff --check` pass.
+The eight-command story script was dispatched with its step interface;
+all commands were attempted. `make test` was interrupted twice by the execution
+sandbox with `Network access to "api.anthropic.com" was blocked: domain is not on
+the allowlist for the current sandbox mode.` The interrupted command has no exit
+code; its streamed log and started receipt are retained, and the committed result
+marks it sandbox-blocked, not passed. Remaining commands were still executed.
+A host `test` check is needed to complete this broad verification; no credential,
+owner judgment, publication or expanded effect was requested for the local repair.
+The sandbox refusal is not represented as a product regression or delivery failure.
+
+The initial 90-second whole-manager coverage timeout was corrected by selecting
+all relevant named planning regressions for coverage (full function scope unchanged)
+and keeping the separate whole-package test. An initial legacy-limit test fixture
+was corrected to update its synthetic history consistently with its seeded retained
+receipt; production history-conflict protection remains asserted in its own case.
+Default Go cache writes were refused; reruns use a writable temporary Go cache.
+No altered expected behavior or skipped product tests were used to obtain coverage.

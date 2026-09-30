@@ -73,7 +73,7 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_unknown_mode_cannot_pass(self):
         result = subprocess.run(['bash', str(verifier.ROOT / 'scripts/verify-compact-requirement-evidence.sh'),
-                                 'repair'], capture_output=True, text=True)
+                                 'unknown'], capture_output=True, text=True)
         self.assertEqual(result.returncode, 2)
 
 

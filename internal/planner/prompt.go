@@ -226,7 +226,7 @@ Return ONLY valid JSON, no markdown, in this exact shape:
   "schema_version": "1.0.0",
   "goals": [{"id":"G-001","title":"...","description":"..."}],
   "stories": [{
-    "id":"US-001","title":"...","goal_id":"G-001",
+    "id":"US-001","title":"...","goal_id":"G-001","requirement_id":"REQ-001",
     "description":"...",
     "acceptance_criteria":["..."],
     "verification_script":"...",

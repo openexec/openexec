@@ -130,9 +130,41 @@ CONTRACT_HASH = '9232f399a4e9c170e3544ed0e7a60a4d437c31ff99c452233a92009fc6b0f29
 VERIFY_HASH = '0bb289f5db59a0674355c80cd4d75b7016665b835adb3fc56d983c73398daba4'
 
 
+def source_digest():
+    # Bind proofs to production, tests, scripts and the frozen scope, not prose.
+    paths = set()
+    for folder in ('internal/planner', 'pkg/manager', 'scripts/verification'):
+        paths.update(p for p in (ROOT / folder).rglob('*') if p.suffix in ('.go', '.py', '.sh'))
+    paths.update((ROOT / 'scripts').glob('verify-compact-requirement-*.sh'))
+    paths.add(ROOT / MANIFEST)
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        digest.update(str(path.relative_to(ROOT)).encode() + b'\0' + path.read_bytes())
+    return digest.hexdigest()
+
+
+def repair(result):
+    output = ROOT / '.openexec/compact-requirement-checks'
+    coverage = json.loads((output / 'coverage.json').read_text())
+    mutations = json.loads((output / 'mutations.json').read_text())
+    require(result['compact_output_declares_requirement_id'], 'compact output field absent')
+    for proof in (coverage, mutations):
+        require(proof['source_sha256'] == source_digest(), 'stale repair proof')
+    require(coverage['statements'] > 0 and 10 * coverage['covered'] > 9 * coverage['statements'], 'insufficient coverage')
+    require(len(coverage['functions']) == result['functions'], 'missing measured functions')
+    require(mutations['restored'] and mutations['restored_sha256'] == hashlib.sha256(
+        (ROOT / 'internal/planner/prompt.go').read_bytes()).hexdigest(), 'source not restored')
+    require({m['mutation'] for m in mutations['mutations']} == {'output-key', 'identity-rule'}
+        and len(mutations['mutations']) == 2 and all(m['exit_code'] == 1 for m in mutations['mutations']), 'missing mutations')
+    result.update(mode='repair', repair_verified=True, coverage=coverage, mutations=mutations)
+    return result
+
+
 def main():
     try:
         result = validate(json.loads(read_local(MANIFEST)), read_local(EVIDENCE))
+        if len(sys.argv) > 1 and sys.argv[1] == 'repair':
+            result = repair(result)
         print(json.dumps(result, sort_keys=True))
     except (ValueError, KeyError, IndexError, OSError, subprocess.CalledProcessError) as error:
         print(json.dumps({'status': 'failed', 'error': str(error)}), file=sys.stderr)

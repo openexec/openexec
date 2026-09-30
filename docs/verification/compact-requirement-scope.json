@@ -154,6 +154,30 @@
     {
       "path": "pkg/runtime/planner_schema_discovery_test.go",
       "symbol": "TestPlannerSchemaDiscoveryRuntime"
+    },
+    {
+      "path": "internal/planner/contract_consistency_test.go",
+      "symbol": "TestCompactRequirementIdentityThroughReviewAndRefinement"
+    },
+    {
+      "path": "internal/planner/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementFailureBoundaries"
+    },
+    {
+      "path": "pkg/manager/planner_compact_test.go",
+      "symbol": "TestCompactRequirementIdentityPersistsAcrossManagerReopen"
+    },
+    {
+      "path": "pkg/manager/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementFileRouteFailures"
+    },
+    {
+      "path": "pkg/manager/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementReplayFailureBoundaries"
+    },
+    {
+      "path": "pkg/manager/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementRetainedEvidenceAndLegacyLimits"
     }
   ]
 }

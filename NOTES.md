@@ -4,10 +4,17 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Compact planning / US-009 / T-US-009-001] Discovery and frozen executable
-  scope live in [compact requirement evidence](docs/verification/compact-requirement-evidence.md).
-  This is the compact-planning prerequisite, distinct from historical recapture
-  tasks with reused IDs below. Repair and delivery remain separate contract work.
+- [Compact planning / US-009 / T-US-009-001] Frozen discovery scope and
+  [US-010 / T-US-010-001 repair evidence](docs/verification/compact-requirement-evidence.md)
+  share one authoritative record. Compact output now declares scalar requirement_id;
+  real compact generation/rejection/refinement/approval and manager database reopen
+  preserve REQ-001. Both named reviewer mutations restore exact source. The recorded
+  ten-function coverage is 365/384 statements (95.052083%); final command receipts,
+  per-function counts, finding qualifications and runner limits live in that record.
+  Targeted/package/compatibility/type/lint checks pass; full make test was interrupted
+  by sandbox denial of api.anthropic.com, with no process exit code. The advertised
+  host-check tool is absent; runner test verification and D2 remain outstanding.
+  No decoder/authority/migration behavior changed; Console retains delivery.
 
 - [Planner schema evidence / US-007 / T-US-007-003] Working-memory consolidation,
   verified 2026-10-01. Candidate root:
@@ -299,8 +306,8 @@ Raw capture. One line per thought, any grammar.
 
 ## Questions
 
-- Compact planning: current scalar/recovery prerequisite and unverified D2
-  delivery are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).
+- Compact planning: unverified D2 delivery and canonical runner checks
+  are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).
 
 - Planner recovery evidence gap: discovery observes current coercion but cannot
   prove bounded correction, restart accounting or atomic import durability.
