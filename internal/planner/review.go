@@ -47,6 +47,12 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 		wire.PlanReview.Approved = false
 		wire.Assessment += fmt.Sprintf("; verification lint refused: %v", issues)
 	}
+	// Refusing here, rather than only at import, gives the refinement loop the
+	// diagnostic so it can repair a fresh plan to origin/<default>.
+	if err := PlanStaleBaseRefError(plan); err != nil {
+		wire.PlanReview.Approved = false
+		wire.Assessment += "; " + err.Error()
+	}
 	if issues := LintHumanBoundaries(plan); len(issues) != 0 {
 		wire.PlanReview.Approved = false
 		wire.Assessment += fmt.Sprintf("; human boundary lint refused: %v", issues)

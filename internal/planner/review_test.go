@@ -26,6 +26,36 @@ func TestReviewPlanUsesExistingDiscipline(t *testing.T) {
 	}
 }
 
+func TestReviewPlanRefusesStaleBaseRefDespiteApproval(t *testing.T) {
+	provider := &mockProvider{response: `{"approved":true,"assessment":"Verification compares against the default branch"}`}
+	for _, level := range []string{"story", "task"} {
+		for _, base := range []string{"main", "origin/main"} {
+			script := "git diff --exit-code " + base + "...HEAD -- src"
+			story := Story{ID: "US-1", Title: "Edit", VerificationScript: "go test ./...", Tasks: []Task{{ID: "T-1", Title: "Implement edit"}}}
+			owner := "story US-1:"
+			if level == "story" {
+				story.VerificationScript = script
+			} else {
+				story.Tasks[0].VerificationScript = script
+				owner = "story US-1 task T-1:"
+			}
+			review, err := New(provider).ReviewPlan(context.Background(), "intent", &ProjectPlan{Stories: []Story{story}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if base == "origin/main" {
+				if !review.Approved {
+					t.Fatalf("%s: origin/main refused: %s", level, review.Assessment)
+				}
+				continue
+			}
+			if review.Approved || !strings.Contains(review.Assessment, owner) || !strings.Contains(review.Assessment, "origin/main") {
+				t.Fatalf("%s: model approval bypassed the stale-base rule: %#v", level, review)
+			}
+		}
+	}
+}
+
 func TestReviewPlanRefusesMissingOrMalformedEvidence(t *testing.T) {
 	plan := &ProjectPlan{Stories: []Story{{ID: "US-1", Title: "Keep records"}}}
 	for _, response := range []string{`{}`, `{"assessment":"fine"}`, `{"approved":true}`, `{"approved":null,"assessment":"fine"}`, `approved`, `{"approved":"yes","assessment":"fine"}`} {

@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-020 / T-US-020-001] Merge origin/main while preserving the US-019 sync
+  map and candidate planner/review documentation. Resolution and verification
+  results are recorded in `docs/ARCHITECTURE.md` under the sync map.
+
 - [US-015 / T-US-015-001] Strict aggregate, exact-candidate receipt validation,
   finding dispositions and completed evidence live once in
   [delivery evidence](docs/verification-evidence-delivery.md). D2 remains incomplete;

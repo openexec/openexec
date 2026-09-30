@@ -246,6 +246,9 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 				return nil, err
 			}
 			if req.AutoImport {
+				if err := planner.PlanStaleBaseRefError(refined); err != nil {
+					return nil, err
+				}
 				if err := m.preparePlanIDs(refined); err != nil {
 					return nil, err
 				}
@@ -269,6 +272,12 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			continue
 		}
 		if req.AutoImport && result.Valid {
+			// A retained receipt may carry an approval recorded before this rule
+			// existed. Refuse it as-is: rewriting the receipt or artifact would
+			// forge the reviewed evidence.
+			if err := planner.PlanStaleBaseRefError(result.Plan); err != nil {
+				return nil, err
+			}
 			goals, stories, tasks := reviewedPlanRows(result.Plan)
 			if err := rel.ImportReviewedPlan(ctx, goals, stories, tasks, runID+"-import", runID, digest, raw); err != nil {
 				return nil, err

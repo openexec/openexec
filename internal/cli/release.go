@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/openexec/openexec/internal/planner"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/spf13/cobra"
 )
@@ -834,6 +835,27 @@ type GeneratedStory struct {
 	Tasks              []any    `json:"tasks"`
 }
 
+// generatedStoriesPlan projects imported stories onto a planner.ProjectPlan
+// carrying only what plan-wide script validation reads: IDs and verification
+// scripts. Tasks given as bare ID strings have no script.
+func generatedStoriesPlan(stories []GeneratedStory) *planner.ProjectPlan {
+	plan := &planner.ProjectPlan{}
+	for _, s := range stories {
+		ps := planner.Story{ID: s.ID, VerificationScript: s.VerificationScript}
+		for _, tRaw := range s.Tasks {
+			v, ok := tRaw.(map[string]any)
+			if !ok {
+				continue
+			}
+			id, _ := v["id"].(string)
+			script, _ := v["verification_script"].(string)
+			ps.Tasks = append(ps.Tasks, planner.Task{ID: id, VerificationScript: script})
+		}
+		plan.Stories = append(plan.Stories, ps)
+	}
+	return plan
+}
+
 // storyImportCmd imports stories from JSON into SQLite.
 //
 // JSON IMPORT GUARD:
@@ -936,6 +958,14 @@ for explicit manual imports when needed.`,
 					return fmt.Errorf("PLANNING GATE FAILED: Primary goal %s (%s) has no stories with a verification_script", g.ID, g.Title)
 				}
 			}
+		}
+		// The stale-base rule covers every file shape — goal-less objects and
+		// legacy bare arrays included — so it runs outside the goal-coverage branch.
+		if issues := planner.PlanStaleBaseRefIssues(generatedStoriesPlan(stories)); len(issues) > 0 {
+			owner := planner.StaleBaseRefOwners(issues)[0]
+			return fmt.Errorf("PLANNING GATE FAILED: %s: %s", owner, issues[owner])
+		}
+		if len(sf.Goals) > 0 {
 			cmd.Println("✓ Planning Gate passed.")
 		}
 

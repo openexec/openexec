@@ -86,6 +86,7 @@ RULES:
    - NEVER redirect the checked command's stderr to /dev/null to "clean up" output; a hidden error is a hidden failure.
    - Do not pipe an assertion like 'grep -q' into another command (e.g. '| head') — the pipe discards grep's exit status, so the check can never fail.
    - Make assertions specific: match the exact expected token or line (e.g. verify 'MAX_BYTES = 40', not a bare '40' that matches unrelated content).
+   - A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 9. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
 10. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories. The terminus MUST include a task that writes or updates docs/ARCHITECTURE.md (module map, key APIs, conventions) so later lightweight sessions inherit this build's understanding.
 11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
@@ -162,7 +163,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 1. The single story carries 1-3 tasks, no more. Prefer ONE "Chassis" task that diagnoses, implements, and verifies in a single cohesive unit; use 2-3 tasks only when the change genuinely crosses layers that must land separately.
 2. Each task is a VERTICAL slice: it crosses every layer it needs and ends in something runnable/verifiable. No Diagnose/Implement/Verify phase tasks.
 3. Do NOT create a Codebase Study story, a Goal Validation/terminus story, or any docs/ARCHITECTURE.md task — this is a small change to an existing project, not a build-out.
-4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok').
+4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok'). A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 5. ` + HumanBoundaryRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
