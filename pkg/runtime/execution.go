@@ -25,3 +25,9 @@ const (
 func VerificationCommandFailure(ctx context.Context, name string, err error) error {
 	return gates.NewCommandFailure(ctx, name, err)
 }
+
+// VerificationCommandFailureWithOutput also records the command that ran and
+// the tail of its output, which is what a repair needs to reproduce it.
+func VerificationCommandFailureWithOutput(ctx context.Context, name string, err error, command, output string) error {
+	return gates.NewCommandFailureWithOutput(ctx, name, err, command, output)
+}
