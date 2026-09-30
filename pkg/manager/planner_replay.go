@@ -21,11 +21,13 @@ import (
 )
 
 type retainedPlanRequest struct {
-	RequestID   string      `json:"request_id"`
-	InputDigest string      `json:"input_digest"`
-	Result      *PlanResult `json:"result,omitempty"`
-	ReviewRound int         `json:"review_round,omitempty"`
-	ReviewLimit int         `json:"review_limit,omitempty"`
+	RequestID          string      `json:"request_id"`
+	InputDigest        string      `json:"input_digest"`
+	Result             *PlanResult `json:"result,omitempty"`
+	ReviewRound        int         `json:"review_round,omitempty"`
+	ReviewLimit        int         `json:"review_limit,omitempty"`
+	RefinementAttempts int         `json:"refinement_attempts,omitempty"`
+	SchemaCorrection   string      `json:"schema_correction,omitempty"` // retained diagnostic + rejected response; nonempty consumes the single correction
 }
 
 func planDigest(v any) string {
@@ -230,15 +232,34 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			}
 		}
 		archiveID := fmt.Sprintf("%s-round-%d", stepID, retained.ReviewRound)
-		if err := m.archivePlanReview(ctx, archiveID, runID, digest, raw); err != nil {
+		// Dispatch accounting changes independently of the immutable reviewed version.
+		archive := retained
+		archive.RefinementAttempts = 0
+		archive.SchemaCorrection = ""
+		archiveRaw, _ := json.Marshal(archive)
+		if err := m.archivePlanReview(ctx, archiveID, runID, digest, string(archiveRaw)); err != nil {
 			return nil, err
 		}
 		limit := retained.ReviewLimit
 		if m.cfg.MaxReviewCycles > 0 && m.cfg.MaxReviewCycles < limit {
 			limit = m.cfg.MaxReviewCycles
 		}
-		if !result.Valid && retained.ReviewRound < limit {
-			refined, err := planner.New(m.cfg.PlanGenerator).RefinePlan(ctx, content, result.Plan, result.Review)
+		// Legacy receipts already spent one refinement per completed review round.
+		if retained.RefinementAttempts < retained.ReviewRound-1 {
+			retained.RefinementAttempts = retained.ReviewRound - 1
+		}
+		if !result.Valid && retained.RefinementAttempts < limit-1 {
+			retained.RefinementAttempts++
+			if err := save(); err != nil {
+				return nil, err
+			}
+			refined, err := planner.New(m.cfg.PlanGenerator).RefinePlanWithSchemaCorrection(ctx, content, result.Plan, result.Review, func(decode *planner.ResponseDecodeError) error {
+				if retained.SchemaCorrection != "" {
+					return fmt.Errorf("retained schema correction budget exhausted")
+				}
+				retained.SchemaCorrection = decode.Error()
+				return save()
+			})
 			if err != nil {
 				return nil, err
 			}

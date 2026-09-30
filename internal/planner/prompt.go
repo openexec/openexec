@@ -46,6 +46,11 @@ func CompletionContractSection(feature string, ops []contracts.Operation) string
 // dropped before review, so a reviewer demanding an alias table the planner
 // cannot deliver rejects every refinement (openexec 94baf180, three plans).
 const RequirementIdentityRule = `REQUIREMENT IDENTITY:
+requirement_id MUST be a scalar JSON string, never an array, even when reviewer
+prose requests multiple structured references. The declared schema takes
+precedence. Preserve every requirement's coverage in the stories and their
+acceptance criteria; do not drop mappings or concatenate IDs into a fake ID.
+Split stories where necessary to represent distinct requirement identities.
 A story's "requirement_id" is the identifier the intent itself gives that
 requirement, copied verbatim: a REQ-XXX where the intent numbers requirements,
 otherwise its accepted condition id (for example "routing"). Never invent
