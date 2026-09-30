@@ -19,14 +19,11 @@ Raw capture. One line per thought, any grammar.
   [private storage](docs/verification/private-storage.md); coverage scope lives in
   [storage unit coverage](docs/verification/storage-unit-coverage.md).
 
-- [US-013 / T-US-013-001] Task verifier, resolver negative controls,
-  public-command regression and targeted recapture/compatibility tests pass.
-  Continuation from c9447aa2 reconfirms diagnostic-free receipts and their
-  timing across the dispatcher fix; neither records the executed revision.
-  Historical receipts cannot identify their executed revision. Console checks
-  are now available; current passing storage/story results are recorded
-  under US-014 above. Historical incident evidence remains in
-  [named recapture](docs/verification/named-recapture.md).
+- [US-013 / T-US-013-001] Requested resolver and admitted end-to-end fixture
+  are present. Current task verifier and both resolver negative controls pass;
+  refreshed host, dispatcher and compatibility evidence is maintained once in
+  [named recapture](docs/verification/named-recapture.md). Historical receipts
+  do not identify their executed command/revision; no deployment claim is made.
 
 - [US-010 / T-US-010-001] Current G-007 review study and exact provenance live in
   [repair study](docs/verification/repair-study.md). All three source defects are

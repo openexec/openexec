@@ -41,77 +41,50 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 
 ## Current verification and repair diagnosis
 
-On 2026-09-30 at 06:27 UTC, repair
-`repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd` resumed from candidate baseline
-`c9447aa2` and reran the checks below. The Console project context was read
-again; this stage retains the supplied repair scope and delivery boundary.
-Read-only SQLite inspection confirmed that T-US-013-001 still specifies
-`bash scripts/verify-verification-repair.sh --case legacy-incident` and that
-its run used this candidate as `project_path` (`worktree_path` is null).
-The run is keyed by `runs.id = T-US-013-001`; its `task_id` is null, so
-filtering runs by task_id alone would incorrectly report no run. The run error is
-`stage "test" failed: exit status 2`.
+On 2026-09-30, this implementation stage resumed from candidate baseline
+`0c0f4b49`. The Console project context and the local architecture contract were
+read; the supplied task scope and delivery boundary remain authoritative.
+The requested resolver, independent admitted fixture, native command handling,
+provenance and dispatcher fix are already present. No additional runtime change
+is necessary.
 
-The selected receipt,
-`verification-failure-f13d13cc4ea054bdaa2b09622c97c7976f34357007d6e6daebc898c8d989c0ac`,
-has an empty phase and only the test/exit-2 receipt and its digest in metadata.
-It contains no command, stdout/stderr, or private evidence reference. Thus the
-stored failure cannot establish that the task verification script was the
-command that failed, or identify a source defect. The original task, receipt,
-plan and runtime database were not modified. The task is currently pending.
-A fresh read of the test-phase and failure run_steps found only the running
-`T-US-013-001-11` test-stage start marker and two diagnostic-free receipts.
-The selected receipt still has no terminal command output. Its persisted start
-is 2026-09-30 05:45:28 UTC, after dispatcher fix `cd9171a3` at
-2026-09-29 20:31:07 UTC. The earlier receipt starts at 20:29:05 UTC,
-before that fix. Both receipts have the same check/digest, but neither binds
-the executed source revision or command; timing alone cannot establish that
-the later execution used the fix or that it merely repeated stale evidence.
-The local
-`.openexec/openexec.yaml` declares only a custom `go vet ./...` lint gate,
-so it supplies no missing test-command mapping. The checkpoint file contains
-only gather-context markers and receipt/digest entries, without diagnostics.
+The earlier repair corrected the public dispatcher: `legacy-incident` formerly
+returned unknown-case exit 2; it now invokes the same verifier as
+`named-recapture`. Historical diagnostic-free receipts do not identify their
+executed command or revision and cannot establish a current failure. Fresh host
+checks are available now; the old check-availability limitation is removed.
 
-The Console check interface refused execution during this US-013 attempt.
-That availability limitation is superseded: T-US-014-001 ran the declared host
-checks and reproduced and corrected a current test failure; see
-[private storage verification](private-storage.md). The historical receipts
-still do not identify their executed command or revision, so they cannot prove
-that the current failure was the historical one.
+Current checks:
 
-Fresh checks in this attempt (all exit 0):
-
-- `bash scripts/verify-verification-repair.sh --case legacy-incident`: all four
-  lint/test × empty/matching cases passed, including real failing subprocess,
-  exact retained command/streams, unchanged original receipt, SQLite reopen,
-  persisted same-story repair and pending Settings assertions. Both isolated
-  resolver mutations failed at the required unresolved/needs_review assertion
-  with zero executions. The verifier rejects compilation failures, skips and
-  unrelated failures as mutation evidence.
+- `bash scripts/verify-verification-repair.sh --case legacy-incident`: exit 0.
+  All four lint/test × empty/matching phase cases passed through real shell
+  execution, SQLite reload and persisted repair creation. Both isolated resolver
+  negative controls were rejected at unresolved/needs_review with zero
+  executions. Compilation failures, skips and unrelated failures are not
+  accepted as negative-control evidence.
 - `python3 -m unittest discover -s scripts/verification -p test_named_recapture_dispatch.py -v`:
-  one test passed, invoking the public command from /tmp and checking the
-  baseline and both mutation reports.
+  exit 0; the public-command regression passed from outside the repository,
+  checking the baseline and both mutation reports.
 - `go test ./pkg/manager ./internal/pipeline ./internal/release ./internal/validation -run 'Test(NamedRecapture|LegacyRecapture|Recapture)|Compatibility' -count=1 -timeout=60s`:
-  all four packages passed using `GOCACHE=/tmp/openexec-retention-go-cache`,
-  set through the subprocess environment. This includes native command
-  definitions and protected .openexec/.uaos/tasks.json journeys.
-- `bash -n scripts/verify-verification-repair.sh` and `git diff --check`: passed.
+  exit 0 for all four packages, with the Go cache set to
+  `/tmp/openexec-retention-go-cache` through the subprocess environment. This
+  exercises native definitions, queue boundaries and protected project formats.
+- Host `run_declared_check(lint)`: exit 0, including Go vet and UI ESLint.
+- Host `run_declared_check(test)`: exit 0; `go test ./...` passed and UI
+  Vitest passed all 635 tests in 40 files. UI emitted non-failing React test
+  warnings. The earlier test-stage exit 2 did not recur.
+- `bash -n scripts/verify-verification-repair.sh` and `git diff --check`: exit 0.
 
-The earlier repair `repair-2d2a8484fad9be3b0170c225126befce` fixed a
-reproduced dispatcher defect: the retained `legacy-incident` case returned
-unknown-case exit 2 while `named-recapture` passed. Both names now invoke the
-same incident verifier. That fix is already present in the baseline and does
-not explain this later receipt. No fresh failure was reproduced by the task's
-own verification or the targeted tests, so this attempt makes no speculative
-runtime or verifier change and does not claim the new failure repaired.
-Diagnosing the failed test stage still requires its actual command and output
-from the execution owner. Canonical repository gates remain runner-owned;
-no sandbox gate refusal is being treated as a blocker.
+The journey deliberately stops at ordinary repair execution. It proves exactly
+one named check, actionable retained evidence, a non-unresolved recapture outcome,
+one persisted repair, and Settings pending; it does not claim the overall Goal
+or repair implementation is complete. No Console process, deployment, or merge
+claim follows from these checks.
 
-Compatibility evaluation: this attempt changes documentation only; no loader,
-schema, migration, execution or check behavior changes. Complexity delta: zero.
-The added phase helper remains in the US-013 full-function scope manifest;
-no new statement-coverage result is claimed.
+Compatibility evaluation: this continuation updates evidence only. Existing
+`.openexec`, `.uaos` and tasks.json behavior is unchanged. Complexity delta: zero
+new concepts, persistent state, transitions, owner decisions or failure modes;
+no existing execution machinery replaced.
 
 ## Review and delivery boundary
 
