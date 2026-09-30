@@ -24,12 +24,14 @@ type namedRecaptureExecutor struct {
 	calls int
 }
 
+const namedRecaptureCommand = "printf 'NAMED_CHECK_DIAGNOSTIC\\n' >&2; exit 2"
+
 func (f *namedRecaptureExecutor) Execute(ctx context.Context, stage *runtime.Stage, _ *runtime.StageInput) (*runtime.StageResult, error) {
 	if stage.Name != f.gate {
 		return nil, fmt.Errorf("fixture stops at repair execution")
 	}
 	f.calls++
-	command := "printf 'NAMED_CHECK_DIAGNOSTIC\\n' >&2; exit 2"
+	command := namedRecaptureCommand
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Dir = f.dir
 	var stdout, stderr runtime.EvidenceBuffer
@@ -118,6 +120,10 @@ func TestNamedRecaptureIncident(t *testing.T) {
 				if task.AttemptCount != 2 || task.VerificationScript != "" {
 					t.Fatalf("unexpected task: %+v", task)
 				}
+				original, err := e.mgr.state.GetRunStep(ctx, "incident")
+				if err != nil || original == nil || original.Phase != phase || original.Metadata != string(data) {
+					t.Fatalf("original receipt changed after recapture: %+v %v", original, err)
+				}
 				id, _ := task.Metadata["verification_failure_evidence"].(string)
 				if id == "" || id == "incident" {
 					t.Fatal("fresh receipt missing")
@@ -146,7 +152,7 @@ func TestNamedRecaptureIncident(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					usable = ev.Cwd == e.dir && ev.ExitCode == 2 && len(ev.Argv) == 3 && ev.Argv[0] == "sh" && strings.Contains(ev.Argv[2], "exit 2") && strings.Contains(ev.Stderr, "NAMED_CHECK_DIAGNOSTIC")
+					usable = ev.Cwd == e.dir && ev.ExitCode == 2 && len(ev.Argv) == 3 && ev.Argv[0] == "sh" && ev.Argv[1] == "-c" && ev.Argv[2] == namedRecaptureCommand && ev.Stdout == "" && ev.Stderr == "NAMED_CHECK_DIAGNOSTIC\n"
 				}
 				if !usable {
 					t.Fatal("actual command identity lost")

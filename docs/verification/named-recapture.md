@@ -27,7 +27,8 @@ the reference. Four cases seed empty/matching phases for lint/test with empty
 verification scripts and no diagnostics/private refs. Each reopens SQLite,
 walks ExecuteTasks → executeTaskQueue → recapture → next-iteration repair,
 then closes/reopens SQLite again. Assertions require exactly one check execution,
-a fresh phase-correct receipt, registered readable command evidence and current
+a fresh phase-correct receipt, unchanged original receipt metadata and phase,
+registered readable command evidence with exact argv/stdout/stderr and current
 provenance, one same-story repair containing the stderr marker and receipt ID,
 recapture outcome failed (not unresolved), and Settings pending with zero attempts.
 The fixture intentionally stops when the generated repair reaches ordinary work;
@@ -38,7 +39,7 @@ commands and verifies their typed failure, stderr and current provenance; missin
 native definitions refuse. Existing recapture tests exercise success, attempts,
 restart, ownership, dependency/refusal boundaries and protected project formats.
 
-Verified 2026-09-29 with a writable Go cache under /tmp:
+Verified 2026-09-30 with a writable Go cache under /tmp:
 
 - `bash scripts/verify-verification-repair.sh --case legacy-incident`: passed all
   four incident cases. In isolated source copies, separately removing phase
@@ -47,7 +48,10 @@ Verified 2026-09-29 with a writable Go cache under /tmp:
   unrelated assertions or missing test completions are rejected by the verifier.
 - `go test ./pkg/manager ./internal/pipeline ./internal/release ./internal/validation -run 'Test(NamedRecapture|LegacyRecapture|Recapture)|Compatibility' -count=1 -timeout=60s`:
   passed, including native definitions and .openexec/.uaos/tasks.json journeys.
-- `python3 -m unittest discover -s scripts/verification -p 'test_*.py' -q`: 75 tests passed.
+- `python3 -m unittest discover -s scripts/verification -p test_named_recapture_dispatch.py -v`: passed; invokes the retained `legacy-incident` command from /tmp,
+  including all four strengthened incident cases and both resolver negative controls.
+- `bash scripts/verify-verification-repair.sh --case named-recapture`: passed
+  baseline and both negative controls before the fixture assertions were tightened.
 - `bash scripts/verify-verification-repair.sh --case study`: passed the source,
   ownership and saved-document checks (not a product-completion certificate).
 - `bash -n scripts/verify-verification-repair.sh` and `git diff --check`: passed.

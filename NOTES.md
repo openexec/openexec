@@ -6,8 +6,8 @@ Raw capture. One line per thought, any grammar.
 
 - [US-013 / T-US-013-001] Single-gate phase inference and current named-check
   recapture implemented in the native queue. Independent admitted incident,
-  native definition, reload/repair, both resolver negative controls and the
-  repaired retained `legacy-incident` verification entry point are
+  native definition, reload/repair, exact retained command and original receipt,
+  both resolver negative controls and the repaired retained `legacy-incident` verification entry point are
   recorded once in [named recapture](docs/verification/named-recapture.md).
 
 - [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test
