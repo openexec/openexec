@@ -8,7 +8,7 @@ exact-argv/cwd/private-reference contract at the actual adapter. No delivery,
 deployment, merge or external coverage claim follows from the local results.
 
 This record replaces the earlier task-local verification summaries. The tested
-OpenExec revision is `320a39e0c04716ddf82e17449684a9b90b513c96`, before this
+OpenExec revision is `304ab2127d3940a8543199100d205e8cd99e6d77`, before this
 continuation's evidence-only update, on 2026-09-30. Production code is unchanged. Local
 commands below ran in the supplied candidate worktree. Console source was read
 at the owner-supplied serving revision, not inferred from another checkout's HEAD.
@@ -54,8 +54,13 @@ attestation. The separate Console checkout HEAD was
 evidence. Fresh permitted Git reads reproduced both source hashes and the
 dependency above. The failure is confirmed missing adapter behavior at the
 supplied revision, not a sandbox socket refusal or an unrun local check.
-Removing it requires the capture/attachment change and actual adapter reload
-proof in the Console workspace; this stage cannot write that repository.
+Removing it requires changing executeOpenExecCheck in the Console workspace:
+retain bounded separate streams with exact argv and cmd.Dir through the public
+RetainCommandEvidence API, attach the returned reference through
+VerificationCommandFailureWithEvidence, and prove all eight actual adapter
+reload journeys plus its unit coverage. This stage cannot write that repository;
+rerunning OpenExec checks or changing the aggregate cannot supply the missing
+capture data. The allowed host checks were both exercised successfully.
 
 ## Acceptance criteria and reviewer cases
 
@@ -109,7 +114,7 @@ Verified in this candidate on 2026-09-30:
   were non-fatal; the declared check returned exit 0.
 - `bash scripts/verify-verification-repair.sh --case admitted-all`: exit 1,
   correctly refusing absent actual adapter evidence after all three local members
-  exited 0. Fresh report: `/tmp/openexec-admitted-story-hnxvutr7/result.json`.
+  exited 0. Fresh report: `/tmp/openexec-admitted-story-40_ag_x7/result.json`.
   This report was reread from disk; status remained failed with all local results
   and the explicit incomplete-adoption reason retained.
 - `admitted-tracer`: 16 diagnostic-boundary and 16 silent/classification
@@ -126,7 +131,7 @@ Verified in this candidate on 2026-09-30:
   and omission/refusal controls passed. Its result.json was reread from disk.
 - `python3 -m unittest discover -s scripts/verification -p 'test_*.py'`:
   111 tests passed, including aggregate missing/stale/incomplete adoption,
-  failed-local-member and stale-success replacement controls (5.724 seconds).
+  failed-local-member and stale-success replacement controls (6.753 seconds).
 - Shell syntax and `git diff --check`: passed.
 
 The continuation reproduced the previous failure after successful host checks

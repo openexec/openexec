@@ -8,7 +8,8 @@ Raw capture. One line per thought, any grammar.
   fixture-only adoption are recorded in
   [admitted evidence](docs/verification/admitted-evidence.md). Actual Console
   source at the supplied serving revision still lacks private capture/attachment;
-  continuation reverified the failure and local passes; completion is refused.
+  fresh host checks and the aggregate reconfirmed the failure and local passes;
+  completion is refused. The concrete remaining adapter change is recorded there.
   Local strict coverage lives in
   [admitted unit coverage](docs/verification/admitted-unit-coverage.md).
 
