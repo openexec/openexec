@@ -136,17 +136,8 @@ func TestPlanner_ParseResponse(t *testing.T) {
 	t.Run("Requirement ID As List", func(t *testing.T) {
 		resp := `[{"id": "US-3", "title": "T", "requirement_id": ["REQ-1", "REQ-2"], "tasks": [{"id": "T-1"}]}, {"id": "US-4", "title": "U", "requirement_id": null}]`
 		plan, err := p.parseResponse(resp)
-		if err != nil {
-			t.Fatalf("parseResponse failed: %v", err)
-		}
-		if len(plan.Stories) != 2 || plan.Stories[0].ID != "US-3" || plan.Stories[0].Tasks[0].ID != "T-1" {
-			t.Fatalf("stories = %+v", plan.Stories)
-		}
-		if got := plan.Stories[0].RequirementID; got != "REQ-1, REQ-2" {
-			t.Errorf("requirement_id = %q, want REQ-1, REQ-2", got)
-		}
-		if got := plan.Stories[1].RequirementID; got != "" {
-			t.Errorf("null requirement_id = %q, want empty", got)
+		if err == nil || plan != nil || !strings.Contains(err.Error(), "json: cannot unmarshal array into Go struct field Story.requirement_id of type string") {
+			t.Fatalf("expected scalar schema rejection, got %+v, %v", plan, err)
 		}
 	})
 

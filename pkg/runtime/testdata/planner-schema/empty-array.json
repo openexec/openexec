@@ -1,0 +1,19 @@
+[
+  {
+    "id": "US-001",
+    "title": "Sanitized planning example",
+    "description": "Deterministic schema discovery fixture.",
+    "requirement_id": [],
+    "goal_id": "G-001",
+    "tasks": [
+      {
+        "id": "T-US-001-001",
+        "title": "Check fixture",
+        "description": "Verify the synthetic example.",
+        "technical_strategy": "Use a deterministic local test.",
+        "verification_script": "true",
+        "mode": "afk"
+      }
+    ]
+  }
+]

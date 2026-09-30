@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "story": "US-009",
+  "task": "T-US-009-001",
+  "baseline": "b17e136dab39bfccd4104bb9264e30595ea9118e",
+  "contract": "This enabling story has no independent accepted requirement identifier and contributes to G-007. G-007 succeeds when generation, compact generation, and refinement output formats consistently declare scalar requirement_id; deterministic compact generation, independent rejection, refinement, and independent approval preserve the accepted identifier; both reviewer negative controls fail for their intended reasons; scoped executable statement coverage exceeds 90 percent; and protected schema-recovery, human-boundary, commit-ownership, and retained-budget regressions pass. Verify that repository outcome through the implementation story's complete verification script and repository-local evidence. Account separately for D2 with supported delivery evidence: documentation or passing repository checks cannot satisfy an unverified default-branch merge. Inspect and verify only this OpenExec checkout. Do not read retained /tmp artifacts or another checkout. Do not declare D2 satisfied solely from reviewer prose, checkout notes, or the observed Agent Console revision. Preserve native candidate provenance and existing human boundaries.",
+  "repair_verification": "set -eu\ngo test ./internal/planner/ -run 'TestAllPlanningPathsRespectSchemaAndCommitOwnership|TestEnablingRequirementSurvivesRefinementAndReview|TestCompactRequirementIdentityThroughReviewAndRefinement' -count=1 -v\nbash scripts/verify-compact-requirement-coverage.sh\nbash scripts/verify-compact-requirement-mutations.sh\ngo test ./internal/planner/ ./pkg/manager/ -count=1\nmake test\nmake compat-test\nmake type-check\nbash scripts/verify-compact-requirement-evidence.sh repair",
+  "scope_policy": "Additive only: full executable function bodies; never remove functions or branches to obtain >90% statement coverage. Include newly introduced production helpers in planner and manager. Prompt constants use separate format assertions and both negative controls. Verification-only Python helpers are tested separately, not included in product Go coverage.",
+  "functions": [
+    {
+      "path": "internal/planner/planner.go",
+      "symbol": "Story.UnmarshalJSON",
+      "baseline_line": 57,
+      "area": "parsing",
+      "reason": "Defines scalar/null/omitted identity and current array coercion."
+    },
+    {
+      "path": "internal/planner/planner.go",
+      "symbol": "ProjectPlan.Validate",
+      "baseline_line": 94,
+      "area": "parsing",
+      "reason": "Guards plans before review and refinement."
+    },
+    {
+      "path": "internal/planner/planner.go",
+      "symbol": "Planner.GeneratePlan",
+      "baseline_line": 132,
+      "area": "selection",
+      "reason": "Full-generation control for the shared identity contract."
+    },
+    {
+      "path": "internal/planner/planner.go",
+      "symbol": "Planner.GenerateCompactPlan",
+      "baseline_line": 157,
+      "area": "selection",
+      "reason": "Selects compact prompt and decodes its provider response."
+    },
+    {
+      "path": "internal/planner/planner.go",
+      "symbol": "Planner.parseResponse",
+      "baseline_line": 165,
+      "area": "parsing",
+      "reason": "Both object and bare-story envelopes share this decoder and diagnostics."
+    },
+    {
+      "path": "internal/planner/review.go",
+      "symbol": "Planner.ReviewPlan",
+      "baseline_line": 21,
+      "area": "review",
+      "reason": "Serializes identity to the reviewer and refuses malformed approval and lint violations."
+    },
+    {
+      "path": "internal/planner/review.go",
+      "symbol": "Planner.RefinePlan",
+      "baseline_line": 65,
+      "area": "refinement",
+      "reason": "Requires rejection, sends findings, parses replacement, retains human boundaries."
+    },
+    {
+      "path": "internal/planner/review.go",
+      "symbol": "carryGoals",
+      "baseline_line": 100,
+      "area": "refinement",
+      "reason": "Preserves goals and story goal links after bare-array refinement."
+    },
+    {
+      "path": "pkg/manager/planner.go",
+      "symbol": "Manager.Plan",
+      "baseline_line": 62,
+      "area": "selection",
+      "reason": "Public compact selection, independent review and import orchestration; include full function."
+    },
+    {
+      "path": "pkg/manager/planner_replay.go",
+      "symbol": "Manager.replayReviewedPlan",
+      "baseline_line": 37,
+      "area": "refinement",
+      "reason": "Request-bound compact generation, rejection/refinement/rereview, retained limits and import; include full function."
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "internal/planner/planner_test.go",
+      "symbol": "TestPlanner_GenerateCompactPlan"
+    },
+    {
+      "path": "internal/planner/planner_test.go",
+      "symbol": "TestPlanner_ParseResponse"
+    },
+    {
+      "path": "internal/planner/contract_consistency_test.go",
+      "symbol": "TestAllPlanningPathsRespectSchemaAndCommitOwnership"
+    },
+    {
+      "path": "internal/planner/contract_consistency_test.go",
+      "symbol": "TestEnablingRequirementSurvivesRefinementAndReview"
+    },
+    {
+      "path": "internal/planner/review_test.go",
+      "symbol": "TestReviewPlanRefusesMissingOrMalformedEvidence"
+    },
+    {
+      "path": "internal/planner/review_test.go",
+      "symbol": "TestRejectedPlanRefinesThroughExistingPromptAndRequiresFreshReview"
+    },
+    {
+      "path": "internal/planner/review_test.go",
+      "symbol": "TestRefinedPlanKeepsTheGoalsItsStoriesCite"
+    },
+    {
+      "path": "internal/planner/human_boundary_test.go",
+      "symbol": "TestHumanBoundaryRefinementCannotRemoveOrAuthorizeRetainedWork"
+    },
+    {
+      "path": "internal/planner/human_boundary_test.go",
+      "symbol": "TestHumanBoundaryMetadataRoundTrip"
+    },
+    {
+      "path": "pkg/manager/planner_compact_test.go",
+      "symbol": "TestCompactReviewedPlanUsesExistingPlannerAndReplay"
+    },
+    {
+      "path": "pkg/manager/planner_refinement_replay_test.go",
+      "symbol": "TestReviewedPlanRefinesRejectedReviewAndImportsOnce"
+    },
+    {
+      "path": "pkg/manager/planner_refinement_replay_test.go",
+      "symbol": "TestReviewedPlanRestartResumesRefinementWithinRetainedLimit"
+    },
+    {
+      "path": "pkg/manager/planner_refinement_replay_test.go",
+      "symbol": "TestReviewedPlanRefinementConflictRefusesBeforeRereview"
+    },
+    {
+      "path": "pkg/manager/planner_refinement_replay_test.go",
+      "symbol": "TestReviewedPlanRefinementKeepsCitedGoalsFromABareStoryArray"
+    },
+    {
+      "path": "pkg/manager/planner_replay_test.go",
+      "symbol": "TestReviewedPlanReplaySurvivesCancelledReviewAndCompletedImport"
+    },
+    {
+      "path": "pkg/manager/planner_replay_test.go",
+      "symbol": "TestReviewedPlanReplayAtomicImportFailure"
+    },
+    {
+      "path": "pkg/manager/planner_replay_test.go",
+      "symbol": "TestReviewedPlanReplayRefusesConflictAndMissingAdapters"
+    },
+    {
+      "path": "pkg/runtime/planner_schema_discovery_test.go",
+      "symbol": "TestPlannerSchemaDiscoverySchema"
+    },
+    {
+      "path": "pkg/runtime/planner_schema_discovery_test.go",
+      "symbol": "TestPlannerSchemaDiscoveryRuntime"
+    },
+    {
+      "path": "internal/planner/contract_consistency_test.go",
+      "symbol": "TestCompactRequirementIdentityThroughReviewAndRefinement"
+    },
+    {
+      "path": "internal/planner/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementFailureBoundaries"
+    },
+    {
+      "path": "pkg/manager/planner_compact_test.go",
+      "symbol": "TestCompactRequirementIdentityPersistsAcrossManagerReopen"
+    },
+    {
+      "path": "pkg/manager/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementFileRouteFailures"
+    },
+    {
+      "path": "pkg/manager/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementReplayFailureBoundaries"
+    },
+    {
+      "path": "pkg/manager/compact_requirement_failures_test.go",
+      "symbol": "TestCompactRequirementRetainedEvidenceAndLegacyLimits"
+    }
+  ]
+}

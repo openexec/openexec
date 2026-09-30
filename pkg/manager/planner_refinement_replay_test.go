@@ -57,7 +57,7 @@ func TestReviewedPlanRefinesRejectedReviewAndImportsOnce(t *testing.T) {
 	}
 }
 
-func TestReviewedPlanRestartResumesRefinementWithinRetainedLimit(t *testing.T) {
+func TestReviewedPlanRestartDoesNotRefundInterruptedRefinement(t *testing.T) {
 	e := newSchedulerTestEnv(t)
 	e.mgr.cfg.MaxReviewCycles = 2
 	generated := 0
@@ -86,13 +86,13 @@ func TestReviewedPlanRestartResumesRefinementWithinRetainedLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Valid || refinements != 1 {
+	if result.Valid || refinements != 0 {
 		t.Fatal("retained review bound lost")
 	}
 	if _, err := fresh.Plan(context.Background(), replayRequest()); err != nil {
 		t.Fatal(err)
 	}
-	if refinements != 1 {
+	if refinements != 0 {
 		t.Fatal("exhausted request refined again")
 	}
 	var tasks int

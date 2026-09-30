@@ -1,0 +1,29 @@
+{
+  "functions": [
+    "internal/planner/planner.go:(*Planner).parseResponse",
+    "internal/planner/planner.go:(*ResponseDecodeError).Error",
+    "internal/planner/planner.go:(*ResponseDecodeError).Unwrap",
+    "internal/planner/review.go:(*Planner).RefinePlan",
+    "internal/planner/review.go:(*Planner).RefinePlanWithSchemaCorrection",
+    "pkg/manager/planner_replay.go:(*Manager).replayReviewedPlan"
+  ],
+  "removed": [
+    "internal/planner/planner.go:(*Story).UnmarshalJSON"
+  ],
+  "tests": [
+    "internal/planner:TestSchemaDecodeDiagnostic",
+    "internal/planner:TestSchemaCorrectionAdmissionFailurePreservesDiagnostic",
+    "internal/planner:TestSchemaCorrectionIsBoundedAndOptional",
+    "internal/planner:TestSchemaSupportedEnvelopes",
+    "internal/planner:TestSchemaScalarPromptRequirements",
+    "internal/planner:TestSchemaCorrectionFailurePaths",
+    "pkg/runtime:TestPlannerSchemaRecoveryPublicRuntime",
+    "pkg/manager:TestReviewedPlanSchemaCorrection",
+    "pkg/manager:TestReviewedPlanSchemaCorrection/approved",
+    "pkg/manager:TestReviewedPlanSchemaCorrection/rejected",
+    "pkg/manager:TestReviewedPlanSchemaCorrection/malformed",
+    "pkg/manager:TestReviewedPlanSchemaCorrection/interrupted",
+    "pkg/manager:TestReviewedPlanSchemaCorrection/boundary-removed",
+    "pkg/manager:TestReviewedPlanSchemaCorrection/remaining-budget"
+  ]
+}
