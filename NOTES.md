@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Planner schema discovery / US-007 / T-US-007-001] Candidate and pinned-runtime
+  offline reproduction, scalar controls, source paths and accounting gaps are
+  recorded once in [planner schema inspection](docs/verification/planner-schema-inspection.md).
+  This is the G-006 planner task, distinct from the historical verification-failure
+  study using the same task ID. Recovery implementation remains with US-008.
+
 - [US-020 / T-US-020-001] Merge origin/main while preserving the US-019 sync
   map and candidate planner/review documentation. Resolution and verification
   results are recorded in `docs/ARCHITECTURE.md` under the sync map.
