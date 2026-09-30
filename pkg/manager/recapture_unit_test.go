@@ -2,6 +2,8 @@ package manager
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/pkg/runtime"
 )
@@ -105,8 +108,14 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 			if named && got != "" {
 				t.Fatal("named check incorrectly used the task verification script", got)
 			}
-			if !wantError && !named && strings.TrimSpace(got) == "" {
-				t.Fatal("empty authority")
+			if !wantError && !named {
+				want := "exit 2"
+				if mode == "script" || mode == "verification" || mode == "output" || mode == "diagnostics" {
+					want = task.VerificationScript
+				}
+				if got != want {
+					t.Fatalf("command provenance lost: got %q want %q", got, want)
+				}
 			}
 			if actual := f.env.mgr.diagnosticFreeReceipt(refs); actual != free {
 				t.Fatalf("diagnostic free=%v want %v", actual, free)
@@ -418,5 +427,66 @@ func TestRecaptureUnitInvalidReceipt(t *testing.T) {
 	e.closeState()
 	if err := e.mgr.repairTaskFromRetainedFailure(ctx, "A", "wrong-run"); err == nil {
 		t.Fatal("unreadable store")
+	}
+}
+
+// Only one validated check can supply a missing phase; public classification
+// strings and ambiguous receipts never become command authority.
+func TestRecaptureUnitPhaseIdentity(t *testing.T) {
+	for _, gate := range []string{"lint", "test", "verify", "verification"} {
+		for _, phase := range []string{"", gate, "conflicting"} {
+			t.Run(gate+"/"+phase, func(t *testing.T) {
+				got, err := recapturePhase(phase, recaptureReceipt(gate, 2))
+				if phase == "conflicting" {
+					if err == nil || got != "" {
+						t.Fatalf("conflicting phase accepted: %q %v", got, err)
+					}
+				} else if err != nil || got != gate {
+					t.Fatalf("phase=%q err=%v want=%q", got, err, gate)
+				}
+			})
+		}
+	}
+	for _, raw := range []string{"null", "[]", "{", `[{"gate":"lint","exit_code":2},{"gate":"test","exit_code":2}]`} {
+		t.Run(raw, func(t *testing.T) {
+			hash := sha256.Sum256([]byte(raw))
+			refs := map[string]string{gates.VerificationFailureReceiptKey: raw, gates.VerificationFailureDigestKey: hex.EncodeToString(hash[:])}
+			if got, err := recapturePhase("", refs); err == nil || got != "" {
+				t.Fatalf("invalid identity accepted: %q %v", got, err)
+			}
+		})
+	}
+	refs := recaptureReceipt("lint", 2)
+	refs[gates.VerificationFailureDigestKey] = strings.Repeat("0", 64)
+	if _, err := recapturePhase("", refs); err == nil {
+		t.Fatal("forged digest accepted")
+	}
+	if _, err := recapturePhase("", nil); err == nil {
+		t.Fatal("absent receipt accepted")
+	}
+}
+
+func TestRecaptureUnitRetryPersistenceRefusal(t *testing.T) {
+	f := newRecaptureFixture(t, "exit 0")
+	ctx := context.Background()
+	if retry, err := retryWithStopReason(ctx, f.env.rel, "missing", "stopped"); err == nil || retry {
+		t.Fatalf("missing task allowed retry: %v %v", retry, err)
+	}
+	if _, err := f.env.mgr.state.GetDB().Exec("CREATE TRIGGER refusal BEFORE UPDATE ON tasks BEGIN SELECT RAISE(ABORT, 'write refused'); END"); err != nil {
+		t.Fatal(err)
+	}
+	if retry, err := retryWithStopReason(ctx, f.env.rel, "A", "stopped"); err == nil || retry {
+		t.Fatalf("unpersisted retry accepted: %v %v", retry, err)
+	}
+	if _, err := f.env.mgr.state.GetDB().Exec("DROP TRIGGER refusal"); err != nil {
+		t.Fatal(err)
+	}
+	f.restart(t)
+	task, err := f.env.rel.TaskSnapshot(ctx, "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.AttemptCount != 1 || task.Status != release.TaskStatusFailed || task.Metadata[previousAttemptStop] != nil || task.Metadata["verification_failure_evidence"] != "legacy" {
+		t.Fatalf("failed retry changed persisted task: %+v", task)
 	}
 }

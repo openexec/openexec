@@ -15,19 +15,20 @@ class AdmittedProfileTests(controls.StorageProfileTests):
 
 
 class AdmittedScopeTests(unittest.TestCase):
+    story = "US-012"
     def inventory(self, names, changed=(), declared=None):
-        study = {'baseline': gate.BASELINE, 'scopes': {'US-012': {
+        study = {'baseline': gate.BASELINE, 'scopes': {self.story: {
             'functions': ['pkg/example.go:Original'], 'planned_functions': ['pkg/example.go:Attachment'],
             'minimum_statement_percent_exclusive': 90}}}
         if declared:
-            study['scopes']['US-012'].update(declared)
+            study['scopes'][self.story].update(declared)
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / 'study.json'
             source.write_text(json.dumps(study))
             functions = [dict(name=n, source='body') for n in names]
             with patch.object(gate, 'STUDY', source), patch.object(gate.shared, 'scope', return_value=list(changed)), \
                     patch.object(gate.shared, 'run', return_value=json.dumps(functions)):
-                return gate.inventory(Path('helper'), {'functions': ['pkg/example.go:Original', 'pkg/example.go:Attachment']}, Path(temp)/'baseline.go')
+                return gate.inventory(Path('helper'), {'functions': ['pkg/example.go:Original', 'pkg/example.go:Attachment']}, Path(temp)/'baseline.go', self.story)
 
     def test_declared_and_planned_bodies_required(self):
         for names in ([], ['Original'], ['Attachment']):

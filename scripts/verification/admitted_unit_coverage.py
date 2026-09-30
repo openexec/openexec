@@ -19,16 +19,16 @@ STUDY = ROOT / "docs/verification/repair-coverage-scopes.json"
 BASELINE = "09ac4feb2c7325b42f20a4663b9aa111d43fe386"
 
 
-def inventory(helper, manifest, temp):
+def inventory(helper, manifest, temp, story="US-012"):
     study = json.loads(STUDY.read_text())
-    declared = study["scopes"]["US-012"]
+    declared = study["scopes"][story]
     if study["baseline"] != BASELINE or declared["minimum_statement_percent_exclusive"] != 90:
         raise ValueError("stale baseline or weakened threshold")
     identities = declared["functions"] + declared["planned_functions"]
     if not identities or len(identities) != len(set(identities)):
         raise ValueError("empty/duplicate declared scope")
     if sorted(identities) != sorted(manifest["functions"]):
-        raise ValueError("study scope omitted or drifted from admitted inventory")
+        raise ValueError("study scope omitted or drifted from coverage inventory")
     sources = {identity.split(":", 1)[0] for identity in identities}
     # Include every added/modified body in a declared source, including new
     # helpers. Never use the old inventory as an exemption for new branches.

@@ -1,73 +1,38 @@
-# Legacy recovery unit coverage — US-009 / T-US-009-003
+# Recapture unit coverage — US-013 / T-US-013-003
 
-This slice verifies the existing native recovery loop, using the receipt and
-restart fixture from T-US-009-001. It adds no production behavior, persistent
-concepts, schedulers, transitions or owner decisions. Compatibility evaluation:
-production sources, project loading, migrations and schemas are unchanged.
-Existing native queue/restart/repair regressions execute alongside the new tests.
-No recapture boundary verifier, boundary test, or compatibility result is consumed.
+The current gate supersedes the historical US-009 coverage measurement.
+The declared baseline is `09ac4feb2c7325b42f20a4663b9aa111d43fe386`.
+[Study ownership](repair-coverage-scopes.json) and the
+[pinned inventory](recapture-coverage-scope.json) declare 14 full function bodies:
+the original ten recapture functions, phase inference, repair-task recognition,
+retry stop-reason persistence and attempt description. Closures and unchanged
+branches count. Production sources, loaders, migrations and schemas are unchanged.
 
-## Scope against the pre-slice baseline
+The gate reuses the study inventory implementation already used by US-012.
+It includes added/modified helpers in declared sources and refuses unowned
+production sources, missing bodies, inventory drift or a weakened threshold.
+The shared admitted inventory retains its original default story; both story
+selections have negative controls. No new runtime abstraction is introduced.
 
-The baseline is `c00aa9e11535f3498c1acbd750c2ab125d6f49e6`, immediately before
-T-US-009-001. The pinned machine inventory and required test identities live in
-[recapture-coverage-scope.json](recapture-coverage-scope.json).
+Expected statement blocks are independently reconstructed by `go tool cover`.
+Missing/mismatched instrumentation, partial profiles, stale source hashes,
+duplicate/skipped/failed/absent test completions and empty scopes fail.
+Package profiles are combined without counting statements twice. The integer
+threshold remains `10 * covered > 9 * statements`; exactly 90% fails.
 
-All ten added or modified production functions are measured over their **entire
-bodies**, including closures and unchanged branches:
+## Current measurement
 
-| File | Function | Change | Responsibility |
-| --- | --- | --- | --- |
-| internal/pipeline/pipeline.go | (*Pipeline).runBlueprintMode | modified | Restrict recapture to a validated deterministic command, retaining admission and evidence handling; ordinary pipeline paths remain in scope. |
-| internal/release/failure_repair.go | RunnableTasks | modified | Delegate ordinary selection to the shared predicate. |
-| internal/release/failure_repair.go | runnableTasks | added | Apply scope, dependency, priority and attempt rules with a failed-task substitution for recapture selection. |
-| internal/release/failure_repair.go | (*Manager).RecaptureEligible | added | Check eligibility without writing task status. |
-| pkg/manager/task_execution_lock.go | (*Manager).reconcileInterruptedTasks | modified | Restore interrupted recapture to failed without refunding attempts. |
-| pkg/manager/task_failure.go | (*Manager).repairTaskFromRetainedFailure | modified | Validate retained receipts and route insufficient diagnostics to recapture. |
-| pkg/manager/task_queue.go | (*Manager).executeTaskQueue | modified | Process recapture in the existing queue and wait for dependencies. |
-| pkg/manager/task_recapture.go | (*Manager).diagnosticFreeReceipt | added | Distinguish classification from usable public or registered private evidence. |
-| pkg/manager/task_recapture.go | (*Manager).resolveRecaptureCommand | added | Resolve authoritative script/private command identity, refusing ambiguous or unavailable references. |
-| pkg/manager/task_recapture.go | (*Manager).recaptureTaskFailure | added | Claim persisted attempts, run the check and persist success, failure or terminal disposition. |
+**473 / 525 statements (90.095238%)**, across all 14 functions, measured on
+2026-09-30. Both resolver functions have every statement covered.
+No blocks were excluded to reach the threshold. The initial expanded
+measurement failed below the threshold; retry persistence refusal coverage
+closed the gap.
 
-The verifier inventories parsed Go function bodies against the baseline; a
-manifest omission, extra identity, removed function, or empty scope fails.
-It derives expected instrumentation independently with `go tool cover`.
-Missing or mismatched blocks fail, even when a partial profile would exceed
-the threshold. Duplicate package instrumentation is combined without counting
-statements twice. The integer comparison is `10 * covered > 9 * statements`;
-exactly 90% fails. Required tests and pinned recovery subtests must pass; any
-skip or failure in the run fails the gate.
-
-## Executed verification
-
-On 2026-09-29:
-
-- `scripts/verification/recapture-unit-coverage.sh` passed: **427 / 471
-  statements (90.658174%)** across the full scope.
-- The dedicated unit tests exercised authoritative and unresolved identity,
-  public/private evidence sufficiency, invalid receipts, dependency selection,
-  ownership guards, failed/ignored SQLite writes, persisted attempt claims,
-  interrupted restart with one remaining attempt, fresh failure binding,
-  successful receipt removal, and terminal restart refusal.
-- Implementation journeys exercised real shell commands through persisted
-  evidence, database reopen, same-story repair and queue completion; Settings
-  remained blocked while prerequisites were incomplete.
-- `python3 -m unittest discover -s scripts/verification -p 'test_recapture_unit_coverage.py'`
-  passed all seven verifier controls: threshold weighting, missing/wrong
-  instrumentation, partial bodies, empty scope, omitted functions, duplicate
-  package blocks and skipped/failed/absent tests.
-- Shell syntax and `git diff --check` passed.
-
-## Aggregation interface
-
-Run `scripts/verification/recapture-unit-coverage.sh --output DIRECTORY`.
-It replaces its four artifacts before verification, so stale success cannot
-survive failure: `scope.json`, `coverage.out`, `tests.jsonl`, and `result.json`.
-The result includes the baseline, revision, production source hashes,
-per-function statement totals, aggregate result, exact command and required
-test identities. A threshold failure records `passed: false` and exits nonzero;
-earlier failures leave no success result. The executed artifacts are at
-`/tmp/openexec-recapture-coverage`.
-
-Full canonical gates and delivery remain with the socket-capable repository
-runner and Agent Console; neither was performed in this stage.
+Run `bash scripts/verify-verification-repair.sh --case recapture-unit-coverage`
+or `bash scripts/verification/recapture-unit-coverage.sh --output DIRECTORY`.
+The verifier replaces `scope.json`, `coverage.out`, `tests.jsonl` and
+`result.json` before starting. Results record exact commands, required tests,
+baseline, revision, source hashes, per-function totals and the threshold result.
+The legacy aggregate independently rechecks those artifacts against its exact
+scenario manifest. Current commands and persisted-state evidence are retained
+once in the [story evidence](../verification-evidence-recapture.md).

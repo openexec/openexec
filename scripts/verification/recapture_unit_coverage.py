@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full-body, fail-closed US-009 statement coverage. No provider or network tests."""
+"""Full-body, fail-closed US-013 statement coverage. No provider or network tests."""
 import argparse
 import hashlib
 import json
@@ -12,7 +12,7 @@ import tempfile
 os.environ.setdefault("GOCACHE", str(Path(tempfile.gettempdir()) / "openexec-retention-go-cache"))
 
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = "c00aa9e1"
+BASELINE = "09ac4feb2c7325b42f20a4663b9aa111d43fe386"
 MODULE = "github.com/openexec/openexec/"
 MANIFEST = ROOT / "docs/verification/recapture-coverage-scope.json"
 PACKAGES = ["internal/pipeline", "internal/release", "pkg/manager"]
@@ -23,30 +23,10 @@ def run(*args, **kwargs):
 
 
 def scope(helper, temp):
-    # Include tracked edits, deletions and newly created production sources.
-    changed = set(run("git", "diff", "--name-only", BASELINE, "--", "*.go").splitlines())
-    changed.update(run("git", "ls-files", "--others", "--exclude-standard", "--", "*.go").splitlines())
-    result = []
-    for path in sorted(changed):
-        if path.endswith("_test.go") or not path.startswith(("internal/", "pkg/", "cmd/")):
-            continue
-        old = subprocess.run(["git", "show", f"{BASELINE}:{path}"], cwd=ROOT, text=True, capture_output=True)
-        previous = {}
-        if old.returncode == 0:
-            temp.write_text(old.stdout)
-            previous = {f["name"]: f for f in json.loads(run(str(helper), str(temp)))}
-        current = json.loads(run(str(helper), path)) if (ROOT / path).exists() else []
-        for fn in current:
-            before = previous.pop(fn["name"], None)
-            if before is None or before["source"] != fn["source"]:
-                fn.update(path=path, change="added" if before is None else "modified")
-                fn.pop("source")
-                result.append(fn)
-        if previous:
-            raise ValueError(f"removed production functions require scope review: {path}: {list(previous)}")
-    if not result:
-        raise ValueError("empty production scope")
-    return result
+    # Reuse the study-owned inventory: full declared bodies plus every changed
+    # helper in those sources, with unowned production changes refused.
+    import admitted_unit_coverage as inventory
+    return inventory.inventory(helper, json.loads(MANIFEST.read_text()), temp, "US-013")
 
 
 def expected_blocks(path, instrumented):
@@ -116,7 +96,10 @@ def check_tests(events, required):
             raise ValueError(f"required test execution {action}: {event}")
         if action == "pass":
             if "Test" in event:
-                passed.add(event["Package"].removeprefix(MODULE) + ":" + event["Test"])
+                identity = event["Package"].removeprefix(MODULE) + ":" + event["Test"]
+                if identity in passed:
+                    raise ValueError("duplicate test completion: " + identity)
+                passed.add(identity)
             else:
                 package_passed.add(event["Package"].removeprefix(MODULE))
     missing = set(required) - passed
@@ -149,6 +132,7 @@ def main():
         functions = scope(helper, tmp / "baseline.go")
         check_scope(functions, manifest)
         (output / "scope.json").write_text(json.dumps(functions, indent=2) + "\n")
+        hashes = {f["path"]: hashlib.sha256((ROOT / f["path"]).read_bytes()).hexdigest() for f in functions}
         blocks = {path: expected_blocks(path, tmp / "instrumented.go") for path in {f["path"] for f in functions}}
         # Pin selected test identities; discover every dedicated unit test as well.
         required = manifest["tests"]
@@ -169,9 +153,10 @@ def main():
             subprocess.run(command, cwd=ROOT, stdout=log, check=True)
         check_tests((output / "tests.jsonl").read_text(), required)
         result = evaluate(functions, blocks, output / "coverage.out")
+        from admitted_unit_coverage import check_sources
+        check_sources(hashes)
         result.update(required_tests=required, command=command, revision=run("git", "rev-parse", "HEAD").strip(),
-                      source_sha256={path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
-                                     for path in sorted(blocks)})
+                      source_sha256=hashes)
         (output / "result.json").write_text(json.dumps(result, indent=2) + "\n")
         print(json.dumps(result, indent=2))
         if not result["passed"]:

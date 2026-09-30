@@ -1,16 +1,20 @@
 {
-  "baseline": "c00aa9e1",
+  "baseline": "09ac4feb2c7325b42f20a4663b9aa111d43fe386",
   "functions": [
     "internal/pipeline/pipeline.go:(*Pipeline).runBlueprintMode",
+    "internal/release/failure_repair.go:(*Manager).RecaptureEligible",
     "internal/release/failure_repair.go:RunnableTasks",
     "internal/release/failure_repair.go:runnableTasks",
-    "internal/release/failure_repair.go:(*Manager).RecaptureEligible",
     "pkg/manager/task_execution_lock.go:(*Manager).reconcileInterruptedTasks",
     "pkg/manager/task_failure.go:(*Manager).repairTaskFromRetainedFailure",
     "pkg/manager/task_queue.go:(*Manager).executeTaskQueue",
     "pkg/manager/task_recapture.go:(*Manager).diagnosticFreeReceipt",
+    "pkg/manager/task_recapture.go:(*Manager).recaptureTaskFailure",
     "pkg/manager/task_recapture.go:(*Manager).resolveRecaptureCommand",
-    "pkg/manager/task_recapture.go:(*Manager).recaptureTaskFailure"
+    "pkg/manager/task_recapture.go:recapturePhase",
+    "pkg/manager/task_execution_lock.go:isRepairTask",
+    "pkg/manager/task_queue.go:attemptDescription",
+    "pkg/manager/task_queue.go:retryWithStopReason"
   ],
   "tests": [
     "internal/pipeline:TestRetentionUnitNativePipelinePaths",
@@ -95,6 +99,21 @@
     "pkg/manager:TestRecaptureUnitAttemptRoundTrip/exhausted",
     "pkg/manager:TestRecaptureUnitAttemptRoundTrip/refusal",
     "pkg/manager:TestRecaptureUnitAttemptRoundTrip/cancel",
-    "pkg/manager:TestRecaptureUnitInvalidReceipt"
+    "pkg/manager:TestRecaptureUnitInvalidReceipt",
+    "pkg/manager:TestRecaptureUnitPhaseIdentity",
+    "pkg/manager:TestNamedRecaptureIncident",
+    "pkg/manager:TestNamedRecaptureVariants",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence/lint",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence/test",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence/lint-empty",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence/test-empty",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence/legacy-path",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence/empty-command",
+    "pkg/manager:TestRecaptureUnitRetryPersistenceRefusal",
+    "pkg/manager:TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation",
+    "pkg/manager:TestTaskOrientedQueueRetriesAStoppedAttemptInTheSameRun",
+    "pkg/manager:TestAnAttemptIsToldWhyThePreviousOneStopped",
+    "pkg/manager:TestPublicSilentFailureReloadAndRepair",
+    "pkg/manager:TestPublicDiagnosticFailureReloadAndRepair"
   ]
 }

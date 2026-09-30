@@ -73,8 +73,8 @@ class RecaptureStoryTests(unittest.TestCase):
 
     def test_incomplete_coverage_scope(self):
         required = self.manifest[story.CASES[2]]
-        events = [dict(Action='pass', Package='github.com/openexec/openexec/' + s.split(':')[0],
-                       Test=s.split(':')[1]) for s in required]
+        events = [dict(Action='pass', Package='github.com/openexec/openexec/' + s.split(':', 1)[0],
+                       Test=s.split(':', 1)[1]) for s in required]
         events.extend(dict(Action='pass', Package='github.com/openexec/openexec/' + p)
                       for p in story.coverage.PACKAGES)
         with tempfile.TemporaryDirectory() as tmp:

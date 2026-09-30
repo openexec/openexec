@@ -1,84 +1,59 @@
-# Recapture verification — US-009 / T-US-009-005
+# Recapture story evidence — US-013 / T-US-013-003
 
-Verified 2026-09-29 in the candidate worktree. This stage composes the existing
-native recapture helpers; it changes no production execution, loading, migration
-or schema behavior. Complexity delta: no production concepts, state transitions,
-retry budgets or owner decisions. The existing dispatcher, Go journeys, JSONL
-proof and coverage inventory are reused.
+Verified in the candidate worktree on 2026-09-30. This replaces the historical
+US-009 aggregate summary. The requested outcome is bounded native recapture
+with durable evidence, refusal and restart behavior. Existing manager queue,
+attempt ledger, admitted deterministic executor, receipt storage and coverage
+inventory are reused. Production behavior is unchanged; complexity delta is
+zero runtime concepts, transitions, retry budgets or owner decisions.
 
-## Criteria and proof
+## Criterion-by-criterion evidence
 
-The explicit [scenario manifest](verification/recapture-scenarios.json) pins
-137 completions (including suite/subtest parents), partitioned by helper.
-The aggregate requires every completion exactly once, the expected package
-completions, and zero skipped or failed tests. Missing members and duplicate
-manifest entries fail. Coverage includes 21 existing regression subtests beyond
-the independent helper's required identities, so these cannot silently vanish.
-
-| Criterion | Case and evidence | Assertions |
+| Criterion | Executed proof | Persisted assertions |
 | --- | --- | --- |
-| REQ-002: resolve and recapture legacy failures within the native budget | `legacy-recapture`; 11 completions; [implementation report](verification/legacy-recapture.md) | Real command through admitted executor, persisted receipt, database reopen, fresh repair reference; successful recheck resumes original task and Settings. Authoritative resolution refuses unsupported identity. |
-| REQ-002: durable termination and dependencies | `recapture-boundaries`; 9 completions; [boundary report](verification/recapture-boundaries.md) | Six terminal leaves each require terminal/restart/stable snapshots. Failure requires repair/restart snapshots. Success requires waiting/completed snapshots. Both task and Settings records must be present; aggregate revalidates raw checkpoints and their report copies. |
-| D1: comprehensive unit coverage strictly above 90% | `recapture-unit-coverage`; 104 completions; [coverage scope and report](verification/recapture-unit-coverage.md) | All ten changed production functions, entire bodies against baseline c00aa9e1; independently reconstructed instrumentation, exact function scope, source hashes and measured report totals. Empty/partial scope, missing blocks and exactly 90% fail. |
-| REQ-002: protected formats | `recapture-compatibility`; 13 completions; [compatibility report](verification/recapture-compatibility.md) | Nine leaf journeys: failure, success and unresolved identity for `.openexec`, legacy `.uaos` configuration, and `.openexec/tasks.json` import. Exact parents/leaves and package completion required. |
+| Phase and command resolution | `TestRecaptureUnitPhaseIdentity`, `TestRecaptureUnitResolutionAndEvidence`, four incident journeys | Empty/matching lint/test phases resolve the named check without borrowing the task script; exact historical command takes precedence. Conflicting, ambiguous, missing, malformed and forged identity is refused. |
+| Provenance | Resolution table, invalid-receipt tests, public silent/diagnostic evidence journeys | Registered private path, hash, argv and cwd required; foreign, unreadable, unregistered and legacy-directory references refused. Fresh failure binds new evidence; usable evidence produces one repair without recapture. |
+| Attempt accounting | `TestRecaptureUnitAttemptRoundTrip`, ownership and persistence refusals, 48 named-check variants | Reopening SQLite preserves claims. Budgets with one, two or three attempts spent permit only two, one or zero further recaptures. A rejected retry write preserves failed status, count, original receipt and absence of stop-reason metadata. |
+| Success transition | Legacy success/convergence and named variants | Successful recheck clears obsolete failure binding and returns A to pending. Ordinary execution then completes A and Settings; subsequent reload/resume does not execute again. |
+| Reload/resume | Legacy failure/restart, interrupted budget and named variants | Fresh evidence creates one same-story repair; repeated resumes do not duplicate it. Interrupted attempts are never refunded. Named variants reopen before execution and after each of three queue invocations. |
+| Refusal boundaries | Boundary helper, queue guards, SQLite write-fault tests, variants | Ambiguity, review/HITL, exhaustion, launch refusal and cancellation remain terminal across restart; Settings stays pending. Pre-claim refusal dispatches nothing; admitted cancellation/refusal retains its debit. |
+| Protected formats and complete legacy suite | Four-member `recapture-story` aggregate | Real config/import journeys cover `.openexec`, `.uaos` and `.openexec/tasks.json`; reopened ledger wins over replaced tasks export. Boundary proof requires task and Settings snapshots for terminal/restart/stable and waiting/completed states. |
+| Strict unit coverage | [Current full-body measurement](verification/recapture-unit-coverage.md) | Scope, every expected block, source hashes, test completions and threshold are checked; no partial profile or stale success is accepted. |
+| Both isolated resolver negative controls | `legacy-incident` | Independently removing phase inference and named fallback makes the lint/empty incident fail specifically at unresolved/needs_review, with zero executions. Each mutation starts from original source in a temporary copy. |
 
-Terminal journeys cover exhaustion, restart with remaining/spent budget,
-unresolved command, launch refusal and cancellation. Reopened ledgers retain
-attempt counts; restarting cannot refund attempts, dispatch again, create repair
-or run Settings. Failed recapture binds readable private command evidence to one
-repair. Successful recapture removes obsolete failure evidence but cannot bypass
-the completion obligation: Settings has no attempt until supported completion of
-its prerequisite. These are executed native queue/database journeys, with real
-local subprocess checks and fixture executors for other stages; they do not
-claim deployed service behavior.
+The [scenario manifest](verification/recapture-scenarios.json) pins every
+aggregate completion exactly once. Real shell checks traverse native queue,
+admitted executor and persisted SQLite receipt paths; ordinary non-check stages
+use fixtures. This proves local native behavior, not deployed Console adapter
+adoption or external repair delivery.
 
-Compatibility journeys enter through real config/import paths, reopen SQLite
-before execution and reread it afterward. Separate tasks JSON is replaced with
-an empty export before reopen to prove durable ledger state wins over stale
-exports. Failure/refusal leaves Settings pending; success completes the queue.
-Production format support is unchanged by this verifier-only composition.
+## Commands and results
 
-## Fresh commands and results
+- `bash scripts/verify-retained-verification-evidence.sh --case recapture-story`:
+  exit 0; all four helpers and all 226 pinned completions passed.
+  Final result: `/tmp/openexec-recapture-story-nva6l4rm/result.json`.
+- `bash scripts/verify-verification-repair.sh --case recapture-unit-coverage`:
+  exit 0; task dispatcher invokes the strict gate; artifacts at
+  `/tmp/openexec-recapture-coverage`.
+- `bash scripts/verify-verification-repair.sh --case legacy-incident`: exit 0;
+  all incident journeys and both expected mutation refusals passed.
+  Output: `/tmp/us013-negative.log`.
+- `python3 -m unittest discover -s scripts/verification -p 'test_recapture*.py'`:
+  exit 0, 33 tests.
+- `python3 -m unittest discover -s scripts/verification -p 'test_admitted_unit_coverage.py'`:
+  exit 0, 16 tests; shared inventory behavior preserved.
+- Host `run_declared_check(lint)`: exit 0, Go vet and UI ESLint.
+- Host `run_declared_check(test)`: initial and final exit 0, all Go packages (final manager run: 105.755s)
+  and 635 UI tests across 40 files; existing non-failing React warnings.
+- Shell syntax and `git diff --check`: exit 0.
 
-All commands below ran from the workspace; helpers use a writable temporary Go
-cache and fresh evidence directories. Raw logs are temporary artifacts; the
-committed manifest and runnable helpers reproduce the checks.
+The first local gate reproduced a stale ten-function inventory that compared
+all intervening stories against the old baseline. Study-owned scope fixes that
+cause while retaining unowned-change refusal. The aggregate subsequently
+refused newly executed but unlisted subtests; its manifest was updated, without
+weakening exact completion checks. A Go module stat-cache write warning in the
+sandbox did not prevent builds or tests.
 
-| Command | Exit | Result / evidence directory |
-| --- | --- | --- |
-| `bash scripts/verify-retained-verification-evidence.sh --case recapture-story` | 0 | All four helpers exit 0; `/tmp/openexec-recapture-story-xdqdnwq4/result.json` |
-| `bash scripts/verify-retained-verification-evidence.sh --case recapture-boundaries` | 0 | `/tmp/openexec-recapture-story-c0q5nn4q/result.json` |
-| `bash scripts/verify-retained-verification-evidence.sh --case recapture-unit-coverage` | 0 | `/tmp/openexec-recapture-story-_qeezhw8/result.json` |
-| `bash scripts/verify-retained-verification-evidence.sh --case recapture-compatibility` | 0 | `/tmp/openexec-recapture-story-dx05o95f/result.json` |
-| `python3 -m unittest discover -s scripts/verification -p 'test_*.py' -q` | 0 | 48 verifier tests passed, including six new aggregate controls |
-| `bash -n scripts/verify-retained-verification-evidence.sh` | 0 | Shell syntax passed |
-| `git diff --check` | 0 | Whitespace check passed |
-
-Full-body coverage: **427 / 471 statements (90.658174%)**. The aggregate rereads
-`scope.json`, `coverage.out`, `tests.jsonl` and `result.json`, recomputes measured
-coverage against source instrumentation and compares the source hashes. A
-helper's exit-zero or claimed percentage alone cannot establish success.
-
-Negative controls reject missing aggregate members/scenarios, duplicate manifest
-entries, skipped/failed protected formats, absent reports, missing persisted
-snapshots and incomplete function scope. An injected helper exit 7 stays failed
-in the reloaded aggregate result while the remaining cases still execute.
-The first real aggregate run also refused 21 unlisted coverage subtests despite
-all helpers exiting zero; the pinned manifest was corrected before the passing
-run above. Its failed proof remains at
-`/tmp/openexec-recapture-story-knu9x3se/result.json`.
-
-Each invocation allocates a fresh directory. Every helper's command, exit status
-and combined log is retained; the aggregate writes `passed: false` on helper or
-proof failure and continues collecting the other cases. Successful reports
-include revalidated scenarios and the underlying reports. No stale success
-artifact is reused. The legacy helper adds only an optional fresh output path
-so the aggregate can consume its existing proof directly.
-
-## Blockers and delivery limits
-
-No stage-local blocker remains. Canonical full repository gates (`make check`,
-`make pr-gate`), independent review, publication and delivery belong to the
-socket-capable repository runner and Agent Console; they were not run here.
-Earlier sibling attempts and their environment limitations remain documented
-in their own reports and are not substituted for this fresh aggregate evidence.
+Compatibility evaluation: only tests, verification tooling and evidence changed.
+Canonical gates, publication, independent review and exact merge decision remain
+owned by Agent Console and the repository runner.

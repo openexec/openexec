@@ -6,6 +6,14 @@ import unittest
 from unittest.mock import patch
 
 import recapture_unit_coverage as gate
+from test_admitted_unit_coverage import AdmittedScopeTests as ScopeControls
+
+
+class RecaptureScopeTests(ScopeControls):
+    story = "US-013"
+
+
+del ScopeControls
 
 
 class CoverageGateTests(unittest.TestCase):
@@ -78,6 +86,8 @@ class CoverageGateTests(unittest.TestCase):
             events = passes + [dict(Action=action, Package=gate.MODULE + "pkg/sample", Test="TestRequired/branch")]
             with self.assertRaises(ValueError):
                 gate.check_tests(log(events), required)
+        with self.assertRaises(ValueError):
+            gate.check_tests(log(passes + [passes[-1]]), required)
         with self.assertRaises(ValueError):
             gate.check_tests(log(passes[:-1]), required)
         with self.assertRaises(ValueError):

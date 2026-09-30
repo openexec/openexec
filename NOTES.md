@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-013 / T-US-013-003] Expanded recapture scope, strict coverage and story
+  proof are maintained once in [recapture evidence](docs/verification-evidence-recapture.md).
+  Native runtime behavior is unchanged; canonical delivery remains Console-owned.
+
 - [US-013 / T-US-013-002] Added named-check legacy/restart matrix and strict
   task verifier. Current scope and executed evidence live once in
   [bounded recapture variants](docs/verification/recapture-variants.md).
