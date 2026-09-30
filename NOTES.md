@@ -8,6 +8,80 @@ Raw capture. One line per thought, any grammar.
   map and candidate planner/review documentation. Resolution and verification
   results are recorded in `docs/ARCHITECTURE.md` under the sync map.
 
+- [PR #67 conflict repair] Rebased onto main including PRs #66 and #68–71.
+  Preserve terminal binding validation, private evidence/redaction, command output,
+  and recapture together. Pre-sync 21f20c0f has six passing persisted preparation
+  checks. Combined recovery fails after sync: TestPersistedExitOneRecovery
+  reaches "verification recapture exhausted: task attempt limit reached"; terminal
+  fixtures lack diagnostic evidence now required upstream. Refusal fixtures also
+  assume pre-PR70 retry behavior. Nil-input legacy receipt compatibility was
+  restored without admitting unbound structured receipts. No publication or merge
+  retry performed. Full task verification is the next diagnostic runner check.
+
+- [T-US-010-001] Goal-validation, isolated owner-decision verification and external
+  module fixture are implemented. All 78 Python harness tests and architecture
+  command pass; unconfigured real owner acceptance refuses. Final recovery,
+  coverage, consumer and make checks await an authorized runner submission and
+  completion; the latest Console submission was refused for server-minted or unknown
+  turn provenance, and no collectable job/result record exists. Exact candidate, status and reproduction live in
+  docs/runtime-verification-handoff.md. Keep T-US-010-002 and Console delivery,
+  downstream checks and default-branch merge pending; no real decision exists.
+
+- [T-US-008-005] Aggregate native-recovery, engine-recovery and story-evidence
+  reuse the existing behavioral, compatibility and unit-coverage verifiers.
+  Candidate-bound results and all US-008 acceptance criteria are recorded in
+  scripts/autonomy-contract/evidence/story-evidence/README.md. Console
+  integration, canonical gates and delivery require separate evidence.
+
+- [T-US-008-004] Compatibility/refusal verification and protected-project
+  reload evidence are recorded in
+  scripts/autonomy-contract/evidence/compatibility-refusal/README.md.
+  Reuses admitted execution, native repair and reopened storage checks;
+  no production changes or coverage-report dependency. Delivery remains
+  with Agent Console.
+
+- [T-US-008-003] Changed-implementation unit coverage and its reproducible
+  baseline/final inventories are recorded in
+  scripts/autonomy-contract/evidence/implementation-unit-coverage/README.md.
+  The verifier requires every complete changed function and the combined scope
+  to exceed 90%; the recovery matrix is rerun separately, not counted as unit
+  coverage. Product source is unchanged; delivery remains with Agent Console.
+
+- [T-US-008-002] Recovery matrix implementation and verification are recorded in
+  scripts/autonomy-contract/evidence/recovery-matrix/README.md. This extends the
+  existing US-008 slice; canonical delivery remains owned by Agent Console.
+
+- [T-US-008-001] Implemented the persisted exit-1 slice using the restored
+  runtime/admitted executor and existing native failure receipt/repair queue.
+  The mandatory pre-fix behavioral test ran an actual exit 1, persisted and
+  reloaded completion, and reopened failed A with no repair. Its source,
+  revision and failing log are retained in
+  scripts/autonomy-contract/evidence/exit-1/. Structured completions now enter
+  through a trusted caller-owned loader and are independently matched against
+  the native task/stage attempts. Continuous and receipt-boundary restart
+  journeys execute A -> repair -> A -> B and reopen receipts/completed tasks.
+  See that evidence directory's README.md for verification and limitations.
+  Earlier missing-runtime observations are superseded by this checkout.
+
+- [T-US-007-003] Aggregate architecture verifier and 46 isolated command tests
+  pass. Revision-bound commands, results and unresolved findings for all six
+  discovery criteria are in docs/ARCHITECTURE.md. Product source is unchanged;
+  the earlier missing-runtime observation is historical; T-US-008-001 now
+  exercises the restored native execution and repair primitives.
+
+- [T-US-007-002] Added accepted-goal/D1/D2 evidence ownership and retained
+  final HITL boundary to docs/ARCHITECTURE.md. Traceability command passes
+  (eight obligations, 27 declarations); 17 traceability command tests and nine
+  existing contracts tests pass. No product behavior changed; downstream
+  integration, owner decision and default-branch merge remain unverified.
+
+- [T-US-007-001] Historical execution/state discovery is recorded in
+  docs/ARCHITECTURE.md for its named source baseline. Its missing-resource
+  claims do not describe this restored candidate; use the T-US-008-001
+  behavioral evidence for current native repair behavior. That discovery
+  changed no product code and established no deployment evidence.
+
+
 - [US-015 / T-US-015-001] Strict aggregate, exact-candidate receipt validation,
   finding dispositions and completed evidence live once in
   [delivery evidence](docs/verification-evidence-delivery.md). D2 remains incomplete;
