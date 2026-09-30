@@ -104,17 +104,46 @@ prompt/journey/coverage/mutation slice, never remote delivery or the canonical g
 
 ## PR73 and delivery evidence
 
-Local base ancestry contains #73's array-coercion and decode-diagnostic repair
-`be19a5b695db31b9b2146b15bd01e613be55e4c6`. This supports agreement that the original
-array failure is already fixed in code. It is not a hosted merge/deployment receipt.
-D2 status: **unverified**. The observed Console process revision is not OpenExec
-production evidence. Publication to retained PR75, canonical gate, review-disposition
-submission and the exact merge decision remain Console-owned. This stage uses an
-ordinary candidate-worktree commit; it does not publish or request another review.
+D2 status: **unverified**.
+
+US-011 / T-US-011-001 assessed repository-local evidence only. Prior satisfaction
+of D2 is not established; this is an evidence limit, not proof that delivery never
+happened. The review is right about the original array repair being present in
+code and about the compact contradiction at the discovery baseline. Its claim
+that D1/D2 was already fixed **and merged** at #73 goes beyond what this checkout
+can independently establish for D2.
+
+| Evidence | What it establishes and its limit |
+| --- | --- |
+| `be19a5b695db31b9b2146b15bd01e613be55e4c6` (#73) | Local commit subject names the array/decode repair; its diff changes Story.UnmarshalJSON and parseResponse. It is an ancestor of the discovery baseline. Ancestry and a PR number in a commit subject do not prove a default-branch merge or deployment. |
+| `af99d8d5156065dbe74525b9c2e27162bee0c87b` (discovery) and [scope manifest](compact-requirement-scope.json) | Pin baseline `b17e136dab39bfccd4104bb9264e30595ea9118e`, the compact contradiction and the frozen verification scope. Historical notes are supporting context, not delivery receipts. |
+| `65d800426c2ef16ee1a3e0d8224a3161f4982828` (compact repair) and [repair results](compact-requirement-results.json) | Record the new scalar output field, normal/review/refinement and persistence tests, and both negative controls. These are repository repair evidence, not D2 delivery evidence. |
+| [Earlier delivery assessment](../verification-evidence-delivery.md) and [delivery result](delivery-result.json), `goal_complete_negative` | The recorded local aggregate passed 16 cases but goal-complete exited 1 with “D2 incomplete: candidate-matched Console merge evidence required”. That historical refusal does not prove current remote non-delivery. No candidate-matched authenticated default-branch merge receipt is available in these records. |
+| Console observation `6dbeb1fc`, started `2026-09-30T22:28:05Z` | Supplied observation concerns the Agent Console serving revision only. It is not an OpenExec serving revision, merge receipt or deployment proof; this stage did not inspect another repository or a running deployment. |
+
+The following retained obligations are authoritative for this compact evidence
+record; none is discharged by a successful structural check.
+
+| Obligation | Status | Owner and next evidence |
+| --- | --- | --- |
+| D2 delivery | unverified; retained | Agent Console must obtain an authenticated candidate-matched default-branch merge receipt, including the exact owner decision, review and canonical gate references. |
+| G-007 repository verification | distinct from D2; incomplete full-story verification | The committed repair results report the local slice passed, but full make test was sandbox-interrupted without an exit code. The repository runner must supply the remaining host test and canonical gate evidence. |
+| Existing candidate and PR75 delivery | external follow-up; pending | Agent Console owns delivery to candidate a2c7daf0a875c10027e2d680305633d0, branch outcome/a2c7daf0a875c10027e2d680305633d0 and https://github.com/openexec/openexec/pull/75 after the task queue finishes: publication, canonical gate, review disposition 308b33886fe7b51a19c503f324c7387a and the exact owner merge decision. No replacement PR or extra review is requested. |
+| Later agent-console parent retry | external follow-up; pending | Agent Console owns the later agent-console parent retry after OpenExec delivery and required dependency/adapter adoption, with fresh parent-run evidence. This repository stage neither performs nor certifies that retry. |
+
+Delivery mode validates required status, evidence references, limitations and
+external ownership structurally. Structural evidence validation cannot establish
+an unobserved merge. Its successful result always retains delivery_verified=false;
+it does not authenticate remote receipts, rerun G-007, or promote historical repair
+results to current source-bound verification. Verifier changes invalidate the older
+source digest for fresh repair mode; the committed repair result remains a dated
+record of its own source, not a fresh run of this stage. Product behavior and
+compatibility are unchanged; the existing evidence verifier is reused, with no
+new runtime state, transitions or delivery machinery (complexity delta: zero).
 
 ## Verification and outstanding questions
 
-Final command receipts and repair evidence are recorded in
+Historical US-010 command receipts and repair evidence are recorded in
 [compact requirement results](compact-requirement-results.json).
 The Python verifier suite checks absent/narrowed/duplicate scope, missing helper,
 missing fixture/disposition, stale proof, exact 90% refusal, empty denominator,
@@ -126,7 +155,7 @@ The advertised `run_declared_check` tool was not present in this session's calla
 catalog (searched by name and check capabilities); no host check result is invented.
 Full canonical gates and external D2 remain runner/Console responsibilities.
 
-Final local checks: targeted planner contract/journey, whole planner and manager
+Historical US-010 local checks: targeted planner contract/journey, whole planner and manager
 packages, strict coverage, both mutations, 11 Python verifier controls, `make lint`,
 `make compat-test`, `make type-check`, shell syntax and `git diff --check` pass.
 The eight-command story script was dispatched with its step interface;
@@ -146,3 +175,18 @@ was corrected to update its synthetic history consistently with its seeded retai
 receipt; production history-conflict protection remains asserted in its own case.
 Default Go cache writes were refused; reruns use a writable temporary Go cache.
 No altered expected behavior or skipped product tests were used to obtain coverage.
+
+Fresh US-011 verification (2026-10-01):
+`bash scripts/verify-compact-requirement-evidence.sh delivery` and `discovery`
+each exited 0 after the saved record was re-read. Delivery returned
+assessment_validated=true, d2_status=unverified and delivery_verified=false.
+`python3 -m unittest discover -s scripts/verification -p 'compact_requirement*test.py' -v`
+exited 0 (14 tests). Three new delivery tests cover the CLI, missing/duplicate or
+contradictory obligations, reference availability and changed historical evidence;
+existing tests retain their assertions. A real CLI negative control replaced the
+D2 status with verified: exit 1, “discovery cannot certify delivery”. Exact bytes
+were restored in finally, re-read and delivery mode passed again. Shell syntax and
+`git diff --check` exited 0. No production or Go tests changed in this stage.
+The current callable tool catalog again lacks run_declared_check, so no fresh host
+lint/test result is claimed. This does not prevent completing the local assessment;
+the remaining host/full-story and delivery obligations above stay open.

@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Compact delivery / US-011 / T-US-011-001] D2 assessment, evidence limits,
+  G-007 distinction and Console-owned candidate/PR75 delivery plus later
+  agent-console parent retry live in the existing
+  [compact delivery record](docs/verification/compact-requirement-evidence.md#pr73-and-delivery-evidence).
+  Delivery mode checks that record structurally; it cannot certify an unobserved merge.
+
 - [Compact planning / US-009 / T-US-009-001] Frozen discovery scope and
   [US-010 / T-US-010-001 repair evidence](docs/verification/compact-requirement-evidence.md)
   share one authoritative record. Compact output now declares scalar requirement_id;

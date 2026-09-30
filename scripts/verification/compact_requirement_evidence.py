@@ -1,4 +1,4 @@
-"""Validate discovery artifacts against this candidate; never certify repair/delivery."""
+"""Validate local discovery/repair evidence and delivery obligations, never a merge."""
 import hashlib
 import json
 from pathlib import Path
@@ -160,11 +160,78 @@ def repair(result):
     return result
 
 
+def delivery(result, evidence):
+    """Check the retained assessment's structure, not remote delivery truth."""
+    section = evidence.split('## PR73 and delivery evidence\n', 1)[1].split('\n## ', 1)[0]
+    require(evidence.count('D2 status:') == 1 and
+            'D2 status: **unverified**.' in section, 'missing/duplicate unverified D2 status')
+    obligations = {
+        'D2 delivery': ('unverified; retained', 'Agent Console',
+                        'authenticated candidate-matched default-branch merge receipt'),
+        'G-007 repository verification': ('distinct from D2; incomplete full-story verification',
+                                        'repository runner', 'host test and canonical gate'),
+        'Existing candidate and PR75 delivery': ('external follow-up; pending', 'Agent Console',
+            'a2c7daf0a875c10027e2d680305633d0',
+            'outcome/a2c7daf0a875c10027e2d680305633d0',
+            'https://github.com/openexec/openexec/pull/75',
+            '308b33886fe7b51a19c503f324c7387a', 'after the task queue finishes'),
+        'Later agent-console parent retry': ('external follow-up; pending', 'Agent Console',
+                                           'after OpenExec delivery', 'fresh parent-run evidence'),
+    }
+    for label, required in obligations.items():
+        rows = [line for line in section.splitlines() if line.startswith(f'| {label} |')]
+        require(len(rows) == 1 and all(value in rows[0] for value in required),
+                f'missing/duplicate obligation, status or external ownership: {label}')
+    for limitation in (
+        'Prior satisfaction\nof D2 is not established',
+        'Ancestry and a PR number in a commit subject do not prove a default-branch merge',
+        'Historical notes are supporting context, not delivery receipts',
+        'not an OpenExec serving revision, merge receipt or deployment proof',
+        'historical refusal does not prove current remote non-delivery',
+        'Structural evidence validation cannot establish\nan unobserved merge',
+        'not a fresh run of this stage',
+    ):
+        require(limitation in section, f'missing delivery limitation: {limitation}')
+    references = [MANIFEST, 'docs/verification/compact-requirement-results.json',
+                  'docs/verification-evidence-delivery.md', 'docs/verification/delivery-result.json']
+    for path in references:
+        require(Path(path).name in section and bool(read_local(path).strip()),
+                f'missing local evidence reference: {path}')
+    require('`6dbeb1fc`' in section and '`2026-09-30T22:28:05Z`' in section,
+            'missing supplied Console observation reference')
+    commits = ['be19a5b695db31b9b2146b15bd01e613be55e4c6',
+               'af99d8d5156065dbe74525b9c2e27162bee0c87b',
+               '65d800426c2ef16ee1a3e0d8224a3161f4982828']
+    for commit in commits:
+        require(commit in section and git('cat-file', '-t', commit) == 'commit',
+                f'missing local commit reference: {commit}')
+    historical = json.loads(read_local(references[-1]))['goal_complete_negative']
+    require(historical['exit_code'] == 1 and historical['all_16_local_cases_passed']
+            and historical['error'] == 'D2 incomplete: candidate-matched Console merge evidence required',
+            'historical delivery assessment changed; reassess D2')
+    historical_repair = json.loads(read_local(references[1]))
+    require(historical_repair['repair_verified'] is True
+            and historical_repair['delivery_verified'] is False
+            and historical_repair['full_story_verified'] is False,
+            'historical repair assessment changed; reassess G-007 distinction')
+    result.update(mode='delivery', assessment_validated=True, d2_status='unverified',
+                  delivery_verified=False, repair_verified=False,
+                  validation_scope='structural repository evidence only; cannot establish an unobserved merge',
+                  external_followups=list(obligations), evidence_references=references,
+                  commit_references=commits)
+    return result
+
+
 def main():
     try:
-        result = validate(json.loads(read_local(MANIFEST)), read_local(EVIDENCE))
-        if len(sys.argv) > 1 and sys.argv[1] == 'repair':
+        require(len(sys.argv) == 2 and sys.argv[1] in ('discovery', 'repair', 'delivery'),
+                'expected discovery|repair|delivery')
+        evidence = read_local(EVIDENCE)
+        result = validate(json.loads(read_local(MANIFEST)), evidence)
+        if sys.argv[1] == 'repair':
             result = repair(result)
+        elif sys.argv[1] == 'delivery':
+            result = delivery(result, evidence)
         print(json.dumps(result, sort_keys=True))
     except (ValueError, KeyError, IndexError, OSError, subprocess.CalledProcessError) as error:
         print(json.dumps({'status': 'failed', 'error': str(error)}), file=sys.stderr)
