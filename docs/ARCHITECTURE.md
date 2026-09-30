@@ -525,3 +525,69 @@ Local Go commands use a writable `/tmp` build cache after the default cache
 was refused by the sandbox. Go emitted a read-only module-stat-cache warning,
 but the subsequent builds and checks exited 0. Canonical delivery remains
 Console-owned; these results do not claim deployment or PR acceptance.
+
+### Validation on origin/main 2fc03214
+
+US-021 / T-US-021-001, verified 2026-09-30 on merged HEAD
+`67e5e16b3ec5d96167016c16f3fdb652a192f552`.
+`git merge-base --is-ancestor 2fc03214 HEAD` exited 0. The outcome is
+fresh D1 evidence on the merged candidate; the existing planner validator and
+CLI import gate own refusal, and Console owns subsequent delivery. No new
+abstraction, runtime behavior, schema, or test expectation is introduced.
+Only this documentation change is persisted.
+
+Commands below ran in this candidate worktree. Local Go commands used
+`export GOCACHE=/tmp/openexec-go-cache` for writable build output.
+
+| Check | Observed result |
+| --- | --- |
+| `go test -count=1 ./internal/planner/ ./internal/cli/ ./pkg/manager/` | Exit 0; all three complete package suites passed (0.013s, 1.540s, 117.910s). |
+| `make compat-test` | Exit 0; current `.openexec`, legacy `.uaos`, legacy config and `.openexec/tasks.json` fallback passed. |
+| `make build` | Exit 0; UI TypeScript/Vite build and Go `ui_dist` binary build passed, embedding commit `67e5e16b`. |
+| `go test -tags e2e -count=1 ./internal/cli/ -run TestStoryImportBinaryStaleBaseGate -v` | Exit 0 against that built binary. Goal-less object and legacy array with `main...HEAD` both failed with `PLANNING GATE FAILED: story US-001 task T-US-001-001` and the `origin/main` remedy. The remote-ref variant printed `Would import 0 goals and 1 stories`. |
+| Host `run_declared_check` named `test` (default, then `args=["GOCACHE=/tmp/openexec-go-cache"]`) | Both exited 0; all Go packages passed (mostly cached), plus 40 UI files / 635 tests. Non-failing WebSocket port and React warnings appeared. |
+| Restored D1: `go test -count=1 ./internal/planner/ ./internal/cli/ ./pkg/manager/ -run 'StaleBase\|OriginDefaultRef\|RemoteBaseRef\|PlanningGate'` | Exit 0 for all three packages after both negative controls were restored. Manager cases reopen the DB to check refused tasks are absent and remote-ref tasks persist. |
+
+The task's exact `verification_script`, extracted from its plan artifact and
+run with `bash /tmp/us021-verify.sh`, exited 0: clean production-file diff,
+`go test ./internal/planner/... ./internal/cli/... ./pkg/manager/... -count=1`,
+`make compat-test`, and the saved validation-heading assertion all passed.
+A final built-binary rerun also exited 0 before restoring `bin/openexec`.
+`git diff --check` passed, and rereading the document confirmed one validation
+section. No tests were added, removed, or weakened.
+
+**Temporary negative controls.** Each mutation was applied separately to the
+working tree; tests were unchanged. Removing only the full prompt rule-8
+remote-ref bullet in `internal/planner/prompt.go`, then running
+`go test -count=1 ./internal/planner/ -run TestStoryPrompt_RequiresOriginDefaultRef -v`,
+exited 1: the rendered rule lacked `origin/<default>`,
+`git diff --name-only origin/main...HEAD`, and the prohibition on bare `main`.
+The compact rule-4 clause remained intact. `git restore -- internal/planner/prompt.go`
+restored the original immediately afterward.
+
+Replacing the CLI gate initializer
+`planner.PlanStaleBaseRefIssues(generatedStoriesPlan(stories))` with
+`map[string]string(nil)` in `internal/cli/release.go`, then running
+`go test -count=1 ./internal/cli/ -run TestImport_PlanningGate_RejectsStaleBaseRef -v`,
+exited 1: story/task bare refs were accepted in full, goal-less and legacy plans,
+and stale reviewer-script cases were accepted. This bypass leaves the goal
+coverage branch intact, isolating the stale-base gate.
+`git restore -- internal/cli/release.go` restored the original immediately afterward.
+`git diff --exit-code -- internal/planner/prompt.go internal/cli/release.go`
+then exited 0 with no output. The restored D1 rerun above passed.
+
+**Stale-base module map.** The canonical file/API entries are in the Planner
+verification module map above: `internal/planner/lint.go` owns the shell-aware
+`StaleBaseRefIssue`; `internal/planner/stale_base.go` owns
+`PlanStaleBaseRefIssues`, sorted `StaleBaseRefOwners`, and `PlanStaleBaseRefError`.
+The CLI entry is `storyImportCmd` in `internal/cli/release.go`, outside goal
+coverage. Other consumers are `ReviewPlan` in `internal/planner/review.go`,
+`importBoundPlan` in `pkg/manager/planner.go`, and refined/retained replay in
+`pkg/manager/planner_replay.go`. Their route and persistence assertions remain
+in the existing test entries and route table; no duplicate validator is added.
+
+Compatibility evaluation: no production or test files change, so existing
+project-format support is preserved; compatibility tests exercise it directly.
+The built binary is verification output and is restored before committing.
+Canonical gate, publication, independent review and owner acceptance remain
+Console-owned; these checks make no deployment claim.
