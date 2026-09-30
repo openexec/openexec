@@ -18,7 +18,7 @@ import (
 const StreamLimit = 4096
 const metadataLimit = 128
 const maxEvidenceBytes = 4 << 20
-const directory = ".openexec-verification"
+const directory = ".openexec/data/verification"
 
 // Buffer drains the entire stream while retaining a bounded prefix.
 // Use one buffer per stream; exec.Cmd serializes writes to each writer.
@@ -128,17 +128,7 @@ func Write(projectDir string, command Command) (hash, path string, err error) {
 		return "", "", err
 	}
 	defer root.Close()
-	if err = root.Mkdir(directory, 0700); err != nil && !os.IsExist(err) {
-		return "", "", err
-	}
-	info, err := root.Lstat(directory)
-	if err != nil {
-		return "", "", err
-	}
-	if !info.IsDir() || info.Mode().Perm() != 0700 {
-		return "", "", fmt.Errorf("private evidence directory required")
-	}
-	private, err := root.OpenRoot(directory)
+	private, err := openDirectory(root, true)
 	if err != nil {
 		return "", "", err
 	}
@@ -163,7 +153,7 @@ func Write(projectDir string, command Command) (hash, path string, err error) {
 	if err = private.Rename(temp, hash+".json"); err != nil {
 		return "", "", err
 	}
-	return hash, filepath.Join(projectDir, directory, hash+".json"), nil
+	return hash, Path(projectDir, hash), nil
 }
 
 // Read is an explicit private read for the executing owner, not a public API.
@@ -178,22 +168,20 @@ func Read(projectDir, hash string) (*Command, error) {
 		return nil, err
 	}
 	defer root.Close()
-	dir, err := root.Lstat(directory)
+	private, err := openDirectory(root, false)
 	if err != nil {
 		return nil, err
 	}
-	if !dir.IsDir() || dir.Mode().Perm() != 0700 {
-		return nil, fmt.Errorf("private evidence directory required")
-	}
-	name := filepath.Join(directory, hash+".json")
-	info, err := root.Lstat(name)
+	defer private.Close()
+	name := hash + ".json"
+	info, err := private.Lstat(name)
 	if err != nil {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 {
 		return nil, fmt.Errorf("private evidence file required")
 	}
-	file, err := root.Open(name)
+	file, err := private.Open(name)
 	if err != nil {
 		return nil, err
 	}
@@ -212,4 +200,43 @@ func Read(projectDir, hash string) (*Command, error) {
 		return nil, err
 	}
 	return &command, nil
+}
+
+// Path is the sole supported reference location. Legacy root-level references
+// are deliberately not migrated or read; their persisted ledger remains intact.
+func Path(projectDir, hash string) string {
+	return filepath.Join(projectDir, directory, hash+".json")
+}
+
+// Walk one component at a time so even symlinks within the project are refused.
+// Existing state parents may be public; the evidence directory must be private.
+func openDirectory(root *os.Root, create bool) (*os.Root, error) {
+	current := root
+	for _, component := range []string{".openexec", "data", "verification"} {
+		next, err := openComponent(current, component, create)
+		if current != root {
+			current.Close()
+		}
+		if err != nil {
+			return nil, err
+		}
+		current = next
+	}
+	return current, nil
+}
+
+func openComponent(parent *os.Root, name string, create bool) (*os.Root, error) {
+	if create {
+		if err := parent.Mkdir(name, 0700); err != nil && !os.IsExist(err) {
+			return nil, err
+		}
+	}
+	info, err := parent.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() || (name == "verification" && info.Mode().Perm() != 0700) {
+		return nil, fmt.Errorf("private evidence directory required")
+	}
+	return parent.OpenRoot(name)
 }

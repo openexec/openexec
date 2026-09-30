@@ -4,13 +4,18 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-014 / T-US-014-001] Protected evidence storage, exact recapture references,
+  explicit legacy refusal and source-staging journeys are implemented. Current
+  policy, verification and limits live in
+  [private storage](docs/verification/private-storage.md).
+
 - [US-013 / T-US-013-001] Task verifier, resolver negative controls,
   public-command regression and targeted recapture/compatibility tests pass.
   Continuation from c9447aa2 reconfirms diagnostic-free receipts and their
   timing across the dispatcher fix; neither records the executed revision.
-  Local config and Console still expose no runnable test-command mapping.
-  The recorded failure remains unreproduced. Current evidence and the required
-  execution-owner command/output are in
+  Historical receipts cannot identify their executed revision. Console checks
+  are now available; the current test failure and its correction are recorded
+  under US-014 above. Historical incident evidence remains in
   [named recapture](docs/verification/named-recapture.md).
 
 - [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test

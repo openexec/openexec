@@ -163,10 +163,14 @@ owner in the linked requirement register; D1 and D2 belong to REQ-004.
   values from admission/configuration because arbitrary prose secrets cannot be
   inferred reliably. Common credential assignments are additionally redacted.
   Truncated public streams omit the incomplete final line. Exact private payloads
-  currently live in .openexec-verification (0700), ignored only by this repository,
+  live in .openexec/data/verification (0700), covered by initialization’s data ignore,
   with content-addressed files
   (0600); ReadCommandEvidence requires matching hashes and rejects public modes,
-  traversal and symlinks. No public evidence-content endpoint is introduced.
+  traversal and symlinks at every nested component. Recapture requires a registered
+  reference to that exact location. Root-level legacy files are explicitly refused
+  without deleting their files or ledger references; see
+  [private storage policy](verification/private-storage.md).
+  No public evidence-content endpoint is introduced.
 - Engine stage retry counters/MaxTotalRetries differ from persisted task attempts.
   Fresh-queue reconciliation already reopens eligible receipt-free failures once
   under the lock; it is broader than diagnostic-free recapture. Do not reset

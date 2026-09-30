@@ -84,6 +84,7 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 			}
 			repaired := false
 			calls := 0
+			legacyChecks := 0
 			e.mgr.cfg.StageExecutor = admittedFixture(func(ctx context.Context, s *runtime.Stage, i *runtime.StageInput) (*runtime.StageResult, error) {
 				calls++
 				if i.RunID != "A" {
@@ -102,6 +103,10 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 					err := cmd.Run()
 					failure := runtime.VerificationCommandFailure(ctx, s.Name, err)
 					if mode == "legacy_receipt" {
+						legacyChecks++
+						if legacyChecks > 1 && len(s.Commands) != 0 {
+							return nil, fmt.Errorf("named recapture acquired host commands")
+						}
 						return nil, failure
 					}
 					// Silent checks still need exact command evidence. A bare exit
@@ -139,8 +144,8 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 			}
 			if mode == "legacy_receipt" {
 				tasks, listErr := e.rel.TasksInStories(ctx, []string{"S"})
-				if err == nil || repaired || current.Status != release.TaskStatusNeedsReview || current.AttemptCount != 1 || current.Metadata["recapture_outcome"] != "unresolved" || listErr != nil || len(tasks) != 1 {
-					t.Fatalf("unresolved legacy receipt authorized repair or replay: %v %#v repaired=%v tasks=%d listErr=%v", err, current, repaired, len(tasks), listErr)
+				if err == nil || repaired || current.Status != release.TaskStatusNeedsReview || current.AttemptCount != current.MaxAttempts || legacyChecks != current.MaxAttempts || current.Metadata["recapture_outcome"] != "exhausted" || listErr != nil || len(tasks) != 1 {
+					t.Fatalf("diagnostic-free named recapture escaped attempt bound: %v %#v repaired=%v tasks=%d listErr=%v", err, current, repaired, len(tasks), listErr)
 				}
 				return
 			}

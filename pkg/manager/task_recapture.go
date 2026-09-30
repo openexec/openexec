@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/openexec/openexec/internal/blueprint"
+	"github.com/openexec/openexec/internal/execution/evidence"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/pipeline"
 	"github.com/openexec/openexec/internal/release"
@@ -31,7 +32,7 @@ func (m *Manager) diagnosticFreeReceipt(artifacts map[string]string) bool {
 			continue
 		}
 		ref, err := m.state.GetArtifact(context.Background(), hash)
-		if err != nil || ref == nil || ref.Path != path {
+		if err != nil || ref == nil || ref.Path != path || path != evidence.Path(m.cfg.WorkDir, hash) {
 			continue
 		}
 		ev, err := runtime.ReadCommandEvidence(m.cfg.WorkDir, hash)
@@ -71,7 +72,7 @@ func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, arti
 			continue
 		}
 		registered, err := m.state.GetArtifact(context.Background(), hash)
-		if err != nil || registered == nil || registered.Path != path {
+		if err != nil || registered == nil || registered.Path != path || path != evidence.Path(m.cfg.WorkDir, hash) {
 			return "", fmt.Errorf("original verification reference unavailable")
 		}
 		ev, err := runtime.ReadCommandEvidence(m.cfg.WorkDir, hash)

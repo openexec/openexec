@@ -72,12 +72,12 @@ The local
 so it supplies no missing test-command mapping. The checkpoint file contains
 only gather-context markers and receipt/digest entries, without diagnostics.
 
-A fresh Console `run_declared_check({"check":"test"})` call returned: “openexec/openexec
-declares no checks a stage can run. Its owner adds them beside lint and test
-in AGENT_CONSOLE_TASK_CHECKS.” Consequently this stage cannot recapture the
-owner-configured test through that interface. This is a fresh refusal in this
-attempt, not an inference from earlier checkout notes. This is distinct from a
-sandbox socket refusal; no canonical gate was attempted or weakened.
+The Console check interface refused execution during this US-013 attempt.
+That availability limitation is superseded: T-US-014-001 ran the declared host
+checks and reproduced and corrected a current test failure; see
+[private storage verification](private-storage.md). The historical receipts
+still do not identify their executed command or revision, so they cannot prove
+that the current failure was the historical one.
 
 Fresh checks in this attempt (all exit 0):
 
@@ -121,7 +121,7 @@ rejected: cancellation, admission refusal, unsafe evidence and stale ownership
 must preserve their existing boundaries. These are not permission to repair code.
 F2's public typed-error helper already exists in this candidate from US-012;
 Console adoption is separate and not established by this fixture. F3 storage
-privacy remains US-014 work. Remaining US-013 story-wide coverage/boundary proof,
+implementation and verification are now recorded in [US-014](private-storage.md). Remaining US-013 story-wide coverage/boundary proof,
 US-015 aggregate evidence and D2 are not claimed complete. No Console source,
 process, deployment or merge status was inferred from this local test.
 

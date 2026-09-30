@@ -147,7 +147,7 @@ func TestRetentionUnitNativeCallbacksAndStorageRefusal(t *testing.T) {
 	if err != nil || result.Status != types.StageStatusFailed || calls != 3 {
 		t.Fatal("callbacks", calls, err)
 	}
-	if err := os.Chmod(filepath.Join(dir, ".openexec-verification"), 0755); err != nil {
+	if err := os.Chmod(filepath.Join(dir, ".openexec", "data", "verification"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := executor.runCommandWithCheck(context.Background(), "exit 2", "verify"); err == nil || gates.VerificationFailureArtifacts(err) != nil {

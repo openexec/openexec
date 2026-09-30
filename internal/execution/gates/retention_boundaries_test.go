@@ -56,7 +56,7 @@ func TestRetentionBoundariesGateCapture(t *testing.T) {
 		t.Fatal("cancellation became repair authority")
 	}
 	// A refusal to retain private evidence cannot mint an authoritative receipt.
-	if err := os.Chmod(filepath.Join(dir, ".openexec-verification"), 0755); err != nil {
+	if err := os.Chmod(filepath.Join(dir, ".openexec", "data", "verification"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	if refs := VerificationFailureArtifacts(NewFailure(runner.RunAll(context.Background()))); refs != nil {

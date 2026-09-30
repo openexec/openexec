@@ -32,6 +32,9 @@ func TestRetentionBoundariesCapture(t *testing.T) {
 		t.Fatal("command or diagnostic secret exposed", public)
 	}
 	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".openexec", "data"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Symlink(t.TempDir(), filepath.Join(dir, directory)); err != nil {
 		t.Fatal(err)
 	}

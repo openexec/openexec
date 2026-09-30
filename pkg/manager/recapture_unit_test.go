@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
-	for _, mode := range []string{"script", "verification", "unknown", "invalid", "mismatch", "unregistered", "wrong-path", "unreadable", "foreign", "argv", "empty-command", "ambiguous", "private", "silent", "bad-exit", "output", "diagnostics"} {
+	for _, mode := range []string{"script", "verification", "unknown", "invalid", "mismatch", "unregistered", "wrong-path", "legacy-path", "unreadable", "foreign", "argv", "empty-command", "ambiguous", "private", "silent", "bad-exit", "output", "diagnostics"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newRecaptureFixture(t, "exit 0")
 			task, err := f.env.rel.TaskSnapshot(context.Background(), "A")
@@ -62,14 +63,17 @@ func TestRecaptureUnitResolutionAndEvidence(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				if mode == "legacy-path" {
+					path = filepath.Join(f.env.dir, ".openexec-verification", hash+".json")
+				}
 				refs[hash] = path
 				if mode != "unregistered" {
 					if err := f.env.mgr.state.RecordArtifact(context.Background(), hash, "test_log", path, 0); err != nil {
 						t.Fatal(err)
 					}
 				}
-				free = mode == "unregistered" || mode == "wrong-path" || mode == "unreadable" || mode == "bad-exit"
-				wantError = mode == "unregistered" || mode == "wrong-path" || mode == "unreadable" || mode == "foreign" || mode == "argv" || mode == "empty-command" || mode == "ambiguous"
+				free = mode == "unregistered" || mode == "wrong-path" || mode == "legacy-path" || mode == "unreadable" || mode == "bad-exit"
+				wantError = mode == "unregistered" || mode == "wrong-path" || mode == "legacy-path" || mode == "unreadable" || mode == "foreign" || mode == "argv" || mode == "empty-command" || mode == "ambiguous"
 				if mode == "wrong-path" {
 					refs[hash] = "wrong"
 				}
