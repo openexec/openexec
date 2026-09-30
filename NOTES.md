@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Planner schema delivery / US-008 / T-US-008-004] Isolated repair-disabled
+  regression, restored full verifier, host test/lint and compatibility/type checks
+  passed. Exact commands, coverage, reopened import/accounting, refusal scope and
+  delivery limitations live once in
+  [schema delivery evidence](docs/verification/planner-schema-delivery.md).
+
 - [Planner schema replay / US-008 / T-US-008-003] Public-runtime and manager
   correction journeys, strict discovery/no-skip replay verification and database
   reopen/import accounting evidence live once in
