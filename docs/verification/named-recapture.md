@@ -42,7 +42,7 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 ## Current verification and repair diagnosis
 
 On 2026-09-30, repair `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd`
-resumed from candidate baseline `9e1e7d24` and reran the checks below.
+resumed from candidate baseline `11e2c752` and reran the checks below.
 Read-only SQLite inspection confirmed that T-US-013-001 still specifies
 `bash scripts/verify-verification-repair.sh --case legacy-incident` and that
 its run used this candidate as `project_path` (`worktree_path` is null).
@@ -57,10 +57,15 @@ It contains no command, stdout/stderr, or private evidence reference. Thus the
 stored failure cannot establish that the task verification script was the
 command that failed, or identify a source defect. The original task, receipt,
 plan and runtime database were not modified. The task is currently pending.
-The checkpoint file still contains only gather-context markers and the same
-receipt/digest, without command diagnostics. The prior attempt also inspected
-the artifact registry and repository logs without finding a command log; that
-historical search is not substituted for fresh execution evidence.
+The selected receipt was last stored at 2026-09-30 05:45:28. A fresh read of
+all run_steps for this run found no completed test-stage output: the test
+stage has a start marker only. The preceding lint stage does retain its
+owner-configured `make lint` invocation and successful output. That identifies
+lint's command, not test's; neither `make test` nor the task verifier can be
+attributed to the failed test stage from these records. The local
+`.openexec/openexec.yaml` declares only a custom `go vet ./...` lint gate,
+so it supplies no missing test-command mapping. The checkpoint file contains
+only gather-context markers and receipt/digest entries, without diagnostics.
 
 A fresh Console `run_declared_check({"check":"test"})` call returned: “openexec/openexec
 declares no checks a stage can run.” Consequently this stage cannot recapture

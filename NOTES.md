@@ -4,12 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [US-013 / T-US-013-001] Current task verifier, resolver negative controls,
+- [US-013 / T-US-013-001] Task verifier, resolver negative controls,
   public-command regression and targeted recapture/compatibility tests pass.
-  The resumed repair re-read the pending task and empty-phase receipt, and
-  confirmed Console still exposes no declared test check to this stage. It could not reproduce the test
-  failure; fresh evidence and the unresolved command/output requirement replace
-  earlier verification notes in [named recapture](docs/verification/named-recapture.md).
+  Read-only inspection finds only a test-stage start marker and diagnostic-free
+  failure receipt; local config and Console expose no test-command mapping.
+  The recorded failure remains unreproduced. Current evidence and the required
+  execution-owner command/output are in
+  [named recapture](docs/verification/named-recapture.md).
 
 - [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test
   event-to-reload-to-repair tracer implemented. Current verification, independent
