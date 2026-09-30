@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Planner schema coverage / US-008 / T-US-008-002] Added parser/prompt/failure
+  cases and a complete changed-function coverage gate. Scope, negative controls
+  and current verification live in
+  [schema unit coverage](docs/verification/planner-schema-unit-coverage.md).
+
 - [Planner schema correction / US-008 / T-US-008-001] Strict scalar decoding,
   concrete diagnostics and bounded correction now reuse native refinement and
   durable reviewed-plan receipts. Fresh verification, restart/import evidence,

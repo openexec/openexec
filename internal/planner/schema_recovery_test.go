@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -77,4 +78,88 @@ type planProviderFunc func(context.Context, string) (string, error)
 
 func (f planProviderFunc) Complete(ctx context.Context, prompt string) (string, error) {
 	return f(ctx, prompt)
+}
+
+func TestSchemaSupportedEnvelopes(t *testing.T) {
+	for _, body := range []string{
+		`[{"id":"S","requirement_id":"REQ-1"}]`,
+		`{"schema_version":"1.0.0","stories":[{"id":"S","requirement_id":"REQ-1"}]}`,
+	} {
+		for _, wrap := range []string{"%s", "```json\n%s\n```", "Plan follows:\n%s\nEnd."} {
+			response := fmt.Sprintf(wrap, body)
+			plan, err := New(nil).parseResponse(response)
+			if err != nil || len(plan.Stories) != 1 || plan.Stories[0].RequirementID != "REQ-1" {
+				t.Fatalf("envelope %q: %+v %v", response, plan, err)
+			}
+		}
+	}
+	for _, response := range []string{`null`, `{}`, `{"stories":null}`, `[]`} {
+		plan, err := New(nil).parseResponse(response)
+		var decode *ResponseDecodeError
+		if plan != nil || err == nil || errors.As(err, &decode) || !strings.Contains(err.Error(), "no stories found") {
+			t.Fatalf("empty response %q: %+v %v", response, plan, err)
+		}
+	}
+	for _, response := range []string{"not JSON", "[", "{", `{"stories":[{"id":"good"},{"requirement_id":[]}]}`} {
+		plan, err := New(nil).parseResponse(response)
+		var decode *ResponseDecodeError
+		if plan != nil || !errors.As(err, &decode) || !strings.Contains(err.Error(), response) {
+			t.Fatalf("partial or malformed response escaped: %+v %v", plan, err)
+		}
+	}
+}
+
+func TestSchemaScalarPromptRequirements(t *testing.T) {
+	for name, prompt := range map[string]string{"generate": StoryGenerationPrompt, "compact": CompactStoryGenerationPrompt, "review": StoryReviewPrompt, "refine": StoryFixPrompt} {
+		t.Run(name, func(t *testing.T) {
+			for _, rule := range []string{"requirement_id MUST be a scalar JSON string, never an array", "do not drop mappings or concatenate IDs", "Split stories where necessary"} {
+				if !strings.Contains(prompt, rule) {
+					t.Fatalf("missing scalar requirement: %q", rule)
+				}
+			}
+		})
+	}
+}
+
+func TestSchemaCorrectionFailurePaths(t *testing.T) {
+	original := &ProjectPlan{Stories: []Story{{ID: "S", Title: "Original"}}}
+	failure := errors.New("provider failed")
+	for _, stage := range []string{"nil-review", "approved-review", "invalid-plan", "invalid-evidence", "initial-provider", "correction-provider"} {
+		t.Run(stage, func(t *testing.T) {
+			plan := original
+			review := &PlanReview{Assessment: "retained"}
+			switch stage {
+			case "nil-review":
+				review = nil
+			case "approved-review":
+				review.Approved = true
+			case "invalid-plan":
+				plan = nil
+			case "invalid-evidence":
+				review.KeyIssues = json.RawMessage(`{`)
+			}
+			calls := 0
+			p := New(planProviderFunc(func(context.Context, string) (string, error) {
+				calls++
+				if stage == "correction-provider" && calls == 1 {
+					return `[{"requirement_id":[]}]`, nil
+				}
+				return "", failure
+			}))
+			got, err := p.RefinePlan(context.Background(), "intent", plan, review)
+			wantCalls := 0
+			if stage == "initial-provider" {
+				wantCalls = 1
+			}
+			if stage == "correction-provider" {
+				wantCalls = 2
+			}
+			if got != nil || err == nil || calls != wantCalls {
+				t.Fatalf("%+v %v calls=%d", got, err, calls)
+			}
+			if wantCalls > 0 && !errors.Is(err, failure) {
+				t.Fatalf("lost provider cause: %v", err)
+			}
+		})
+	}
 }
