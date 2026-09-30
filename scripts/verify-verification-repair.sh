@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ $# != 2 || $1 != --case ]]; then
-    echo 'usage: verify-verification-repair.sh --case study|admitted-adapter|admitted-tracer|legacy-incident|named-recapture|private-storage|storage-unit-coverage' >&2
+    echo 'usage: verify-verification-repair.sh --case study|admitted-adapter|admitted-tracer|legacy-incident|named-recapture|private-storage|storage-unit-coverage|admitted-unit-coverage' >&2
     exit 2
 fi
 case "$2" in
@@ -12,6 +12,7 @@ case "$2" in
         go build ./...
         go test ./pkg/runtime/... ./internal/execution/gates/... ./pkg/manager/...
         ;;
+    admitted-unit-coverage) exec python3 "$root/scripts/verification/admitted_unit_coverage.py" ;;
     storage-unit-coverage) exec python3 "$root/scripts/verification/storage_unit_coverage.py" ;;
     private-storage) exec python3 "$root/scripts/verification/private_storage.py" ;;
     legacy-incident|named-recapture) exec python3 "$root/scripts/verification/named_recapture.py" ;;

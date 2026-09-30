@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-012 / T-US-012-004] Standalone admitted-path coverage and omission/refusal
+  controls are implemented. Scope, measured evidence and independent invocation
+  live in [admitted unit coverage](docs/verification/admitted-unit-coverage.md).
+
 - [US-012 / T-US-012-003] Preserve the Console WithOutput adapter through native
   receipt reload and repair; redact credential values without hiding command names.
   Implementation and verification are maintained in

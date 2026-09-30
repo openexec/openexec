@@ -224,7 +224,8 @@ preservation, attachment, buffering, classification and persisted repair; US-013
 covers resolution, attempts, queue ownership, dependencies and compatibility;
 US-014 covers write/read, nested path validation, private modes, staging and
 legacy refs. Public attachment is now implemented and traced by T-US-012-001; the
-full-body coverage obligation remains pending. US-012 separately requires actual
+OpenExec full-body coverage obligation is implemented by T-US-012-004 in
+[admitted unit coverage](admitted-unit-coverage.md). US-012 separately requires actual
 Console adapter execution and coverage evidence in that repository. Existing manifests are starting inventories,
 not exemptions for new/changed functions.
 
