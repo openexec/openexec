@@ -59,43 +59,101 @@ Executed in this candidate on 2026-09-30:
   events for slash-separated names; corrected the manifest to the actual named
   tests. No production assertion was weakened.
 
-## Current Console adoption and precise remaining work
+## Console adoption — US-012 / T-US-012-003 (incomplete)
 
-Read-only source inspection distinguishes the local Console checkout
-`1d8aa1d8f120c8347d0431210c92475085182a2a` from the owner-supplied serving
-revision `4c819427` (reported process start 2026-09-30T08:52:05Z). The stale
-checkout uses `VerificationCommandFailure` and pins an older dependency; it is
-not evidence of serving behavior. Inspected serving-revision source with
-`git show 4c819427:go.mod` and
-`git show 4c819427:internal/server/openexec_checks.go` in the Console repository.
-That revision pins OpenExec `v0.13.2-0.20260930061734-4290c0d23b00` and calls
-`VerificationCommandFailureWithOutput`. Inspection of that dependency's
-`pkg/runtime/execution.go` and `internal/execution/gates/failure.go` confirms
-joined command text and combined output enter CheckFailure and its digest.
-Console uses one `openExecCheckOutput` for both streams and includes joined argv
-in public StageResult.Output. It does retain an output tail; claiming it has no
-output attachment would be incorrect. This is source-backed adoption evidence,
-not independent attestation of the running binary or a live persisted repair.
+### Source evidence
 
-Remaining Console integration is concrete and **not completed by this note**:
+Read-only inspection on 2026-09-30 resolved the owner-reported Console revision
+with `git -C /mnt/data1/projects/agent-console rev-parse 4c819427` to
+`4c819427643655fc85d830b3a79f337488bd3fc0`. Files were read with
+`git show <revision>:<path>`, independently of the stale main checkout at
+`1d8aa1d8f120c8347d0431210c92475085182a2a`. SHA-256 of those exact blobs:
 
-1. Upgrade the Console dependency to the delivered OpenExec revision exposing
-   the private-reference APIs. Replace its WithOutput call; this candidate does
-   not expose that dependency's WithOutput API, so a dependency-only bump is
-   insufficient.
-2. In `executeOpenExecCheck`, use separate runtime EvidenceBuffers, retain exact
-   argv/cwd/exit and explicitly collected allowlisted version context privately,
-   then attach the returned reference with VerificationCommandFailureWithEvidence.
-   Preserve admission, candidate locking, process-tree cancellation and refusal
-   checks; storage failure must not authorize repair.
-3. Replace public joined argv/raw output with PublicVerificationStream summaries
-   using known admission/configuration secrets. Keep command/output out of the
-   public classification receipt and digest.
-4. Exercise the real Console adapter on the upgraded candidate: silent and noisy
-   failures through persisted native repair/reload, nil result, cancellation,
-   launch/storage refusal, and secret exclusion. Attest the serving build and
-   dependency after Console-owned delivery. This workspace grants no Console
-   source writes or deployment; no integration completion is claimed here.
+| Path | SHA-256 |
+| --- | --- |
+| go.mod | 7c03c602ad132a9ac794804a3e37e3c078f8165dd8331c8b9e3c685bbbb2c8c7 |
+| go.sum | 7cac86654ac1fb3b805b01e37bbe30c805972245e9b0f08f92834d7d5970ff4c |
+| internal/server/openexec_checks.go | a7094a264d44a369574e938cf74133c0cfc6ef652abdadc7287e35f5c7447017 |
+
+`executeOpenExecCheck` uses one `openExecCheckOutput` for both streams and
+`VerificationCommandFailureWithOutput`; public StageResult.Output includes
+joined argv and combined output. It retains an output tail, so saying it has
+no output attachment would be incorrect. `git grep` at that revision finds
+its call in `internal/server/openexec_task_loop.go:221`, but no adoption of
+runtime.EvidenceBuffer, RetainCommandEvidence or the evidence-bearing API in
+internal/server. The expected dedicated openexec_checks_test.go does not exist
+at that revision; this alone does not establish absence of indirect coverage.
+
+### Dependency evidence
+
+Console go.mod pins OpenExec `v0.13.2-0.20260930061734-4290c0d23b00`, with no
+replace directive; go.sum contains both module and go.mod checksums. Reading
+that dependency's pkg/runtime/execution.go confirms WithOutput passes command
+and output into NewCommandFailureWithOutput. It lacks this candidate's
+VerificationCommandFailureWithEvidence API. A dependency-only bump would leave
+the Console call incompatible: this candidate does not expose WithOutput.
+
+OpenExec prerequisite source inspected and tested here is candidate parent
+`2bbcb16ccffb5e7b3faaf994e845a70c81a64220`. Its public runtime exposes the
+EvidenceBuffer alias, RetainCommandEvidence and
+VerificationCommandFailureWithEvidence. Availability in this candidate is not
+proof that Console has updated its dependency or binary.
+
+### Runtime evidence
+
+The owner reports a serving process start of 2026-09-30T08:52:05Z for the
+Console revision above. This is an owner observation, not independently read
+binary build-info or a deployment receipt. No deployment claim follows from
+source inspection.
+
+Fresh checks in this OpenExec candidate on 2026-09-30:
+
+- `run_declared_check(check="lint")`: exit 0, Go vet and UI ESLint.
+- `run_declared_check(check="test")`: exit 0, Go suite and 635 UI tests across
+  40 files. Non-failing React act warnings remain in the output.
+- `bash scripts/verify-verification-repair.sh --case admitted-tracer`: exit 0,
+  16 diagnostic-boundary and 16 silent/classification completions; both engine
+  discard controls and the wrapper discard control rejected at their expected
+  assertions. These execute real shell failures through the public OpenExec
+  runtime, persisted step/artifact reload and repair generation, requiring exact
+  argv/cwd and late diagnostic markers as described above.
+
+The declared checks execute this repository's actual lint/test commands on the
+host. Their successful returns do not exercise a failed Console adapter or
+establish its private-reference persistence. The tracer uses an admitted
+OpenExec fixture, not executeOpenExecCheck. Actual Console silent exit 2,
+long-tail lint/test failures and exact command/cwd reference reload remain
+**unverified and incomplete**. No currently failing repository check was
+reproduced: both declared checks passed.
+
+### Required integration and effect boundary
+
+The available Console source is outside this stage's writable roots. The only
+repository write grant is this OpenExec candidate and its specified git paths;
+/tmp does not grant authority to change or deliver a different product. No
+Console source/dependency writes, copied substitute adapter, deployment or
+approval request was attempted. This is a source-write boundary, not a missing
+credential or a sandbox socket failure. Host checks close the OpenExec
+verification gap but cannot update Console through this grant.
+
+Retain T-US-012-003 and its affected adoption criteria as incomplete:
+
+1. Update Console to the delivered OpenExec dependency and replace WithOutput.
+2. Use separate runtime EvidenceBuffers and RetainCommandEvidence with exact
+   argv/cwd/exit and explicitly collected allowlisted toolchain context. Attach
+   its returned reference with VerificationCommandFailureWithEvidence.
+3. Render PublicVerificationStream summaries with known secrets; keep command
+   and output out of classification/digests. Preserve candidate locking,
+   admission, process-tree cancellation and refusal behavior. Storage failure
+   must not authorize repair.
+4. Exercise actual Console lint/test silent and noisy failures through native
+   persistence, close/reopen and repair, plus nil results, cancellation,
+   launch/storage refusal and secret exclusion. Record the adopted dependency
+   separately from any serving-binary evidence.
+
+Only this dependent Console integration waits for an authorized Console source
+workspace. OpenExec prerequisite verification above is complete. This note is
+not integration completion; delivery remains Console-owned after the queue.
 
 F2 public attachment is repaired in OpenExec. F1 recapture remains US-013, private
 storage US-014, aggregate evidence US-015; independent story-wide coverage and

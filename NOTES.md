@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-012 / T-US-012-003] Incomplete: inspected Console adapter still uses
+  WithOutput and its older dependency. Host lint/test and OpenExec tracer pass;
+  actual Console integration needs a Console source write grant. Source,
+  dependency, runtime evidence and affected criteria are maintained once in
+  [admitted evidence](docs/verification/admitted-evidence.md#console-adoption--us-012--t-us-012-003-incomplete).
+
 - [US-014 / T-US-014-002] Storage and registered-reference coverage is enforced
   by the fail-closed standalone gate. Scope, controls and current verification
   live in [storage unit coverage](docs/verification/storage-unit-coverage.md).
