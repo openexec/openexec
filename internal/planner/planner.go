@@ -51,6 +51,34 @@ type Story struct {
 	Tasks              []Task   `json:"tasks"`
 }
 
+// UnmarshalJSON accepts requirement_id as a string, null, or a list of
+// strings. Models asked to refine a plan sometimes answer the list form, and a
+// single mistyped optional field must not discard every story in the plan.
+func (s *Story) UnmarshalJSON(data []byte) error {
+	type story Story
+	var raw struct {
+		story
+		RequirementID json.RawMessage `json:"requirement_id"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*s = Story(raw.story)
+	s.RequirementID = ""
+	if len(raw.RequirementID) == 0 || string(raw.RequirementID) == "null" {
+		return nil
+	}
+	if err := json.Unmarshal(raw.RequirementID, &s.RequirementID); err == nil {
+		return nil
+	}
+	var ids []string
+	if err := json.Unmarshal(raw.RequirementID, &ids); err != nil {
+		return fmt.Errorf("requirement_id: want a string or a list of strings: %w", err)
+	}
+	s.RequirementID = strings.Join(ids, ", ")
+	return nil
+}
+
 // PlanSchemaVersion is the current version of the plan artifact schema.
 const PlanSchemaVersion = "1.0.0"
 
@@ -157,20 +185,30 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 
 	plan := &ProjectPlan{}
 	// Try parsing as ProjectPlan object
-	if err := json.Unmarshal([]byte(jsonText), plan); err == nil && len(plan.Stories) > 0 {
+	objectErr := json.Unmarshal([]byte(jsonText), plan)
+	if objectErr == nil && len(plan.Stories) > 0 {
 		return plan, nil
 	}
 
 	// Fallback: try parsing as an array of stories directly
 	var stories []Story
-	if err := json.Unmarshal([]byte(jsonText), &stories); err == nil && len(stories) > 0 {
+	arrayErr := json.Unmarshal([]byte(jsonText), &stories)
+	if arrayErr == nil && len(stories) > 0 {
 		return &ProjectPlan{
 			SchemaVersion: "1.1",
 			Stories:       stories,
 		}, nil
 	}
 
-	return nil, fmt.Errorf("failed to parse LLM response as JSON: no stories found\nResponse was: %s", response)
+	// Name the decode error of the shape the response actually has, so a
+	// mistyped field is not reported as a response without stories.
+	reason := "no stories found"
+	if strings.HasPrefix(jsonText, "[") && arrayErr != nil {
+		reason = arrayErr.Error()
+	} else if strings.HasPrefix(jsonText, "{") && objectErr != nil {
+		reason = objectErr.Error()
+	}
+	return nil, fmt.Errorf("failed to parse LLM response as JSON: %s\nResponse was: %s", reason, response)
 }
 
 // ProcessWizardMessage handles one turn of the interactive interview
