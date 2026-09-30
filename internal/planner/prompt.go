@@ -41,6 +41,33 @@ func CompletionContractSection(feature string, ops []contracts.Operation) string
 	return sb.String()
 }
 
+// RequirementIdentityRule is shared by generation, review and refinement. A
+// plan has one requirement field per story; fields outside the output format are
+// dropped before review, so a reviewer demanding an alias table the planner
+// cannot deliver rejects every refinement (openexec 94baf180, three plans).
+const RequirementIdentityRule = `REQUIREMENT IDENTITY:
+A story's "requirement_id" is the identifier the intent itself gives that
+requirement, copied verbatim: a REQ-XXX where the intent numbers requirements,
+otherwise its accepted condition id (for example "routing"). Never invent
+REQ-XXX aliases for identifiers the intent already has, and never add fields
+the output format does not list (an alias table, "maps_to"): they are dropped
+before review. A requirement_id equal to the intent's identifier IS the
+structured mapping; do not ask for another.
+`
+
+// RepositoryScopeRule is shared by every planning path. A plan runs in one
+// repository's candidate; a task whose files live in another repository can
+// neither be done nor verified there, and three Goals stopped on one
+// (openexec a8afdf3e twice, 21d181ed US-015 asking for agent-console changes).
+const RepositoryScopeRule = `REPOSITORY SCOPE:
+Every task changes and verifies files in THIS repository only; its
+verification_script reads nothing from another checkout. Work the intent
+needs in another repository is not a task here: name it in the owning story's
+contract as a follow-up for that repository, and plan this repository's side
+so it is complete and verifiable on its own. Reject any task that edits,
+builds or verifies another repository.
+`
+
 // HumanBoundaryRule is shared by generation, review and refinement. Classification
 // describes required owner input; it never grants permission for an effect.
 const HumanBoundaryRule = `EXECUTION AND HUMAN BOUNDARIES:
@@ -65,7 +92,7 @@ const StoryGenerationPrompt = `You are a software architect generating user stor
 Analyze the intent document below and generate a JSON array of user stories.
 
 RULES:
-1. Create ONE story per requirement (REQ-XXX) in the document.
+1. Create ONE story per requirement in the document (see REQUIREMENT IDENTITY below).
 2. PROJECT CONTEXT EVALUATOR: Determine if this is a Greenfield (new) or Existing project based on the intent.
 3. MANDATORY STUDY PHASE (Existing Projects): If the intent is for an existing project (fixing, refactoring, or adding a feature to an existing codebase), the VERY FIRST story MUST be a "Codebase Study & Mapping" story. 
    - This Study story must depend on nothing.
@@ -93,7 +120,8 @@ RULES:
 12. EXECUTION MODE: Tag every task with "mode": "afk" or "hitl".
    - "afk" (default): an agent can complete AND verify the task autonomously (code change + script verification).
 ` + HumanBoundaryRule + `
-
+` + RequirementIdentityRule + `
+` + RepositoryScopeRule + `
 OUTPUT FORMAT (JSON object):
 {
   "schema_version": "1.1",
@@ -165,6 +193,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 3. Do NOT create a Codebase Study story, a Goal Validation/terminus story, or any docs/ARCHITECTURE.md task — this is a small change to an existing project, not a build-out.
 4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok'). A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 5. ` + HumanBoundaryRule + `
+` + RepositoryScopeRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
 Return ONLY valid JSON, no markdown, in this exact shape:
@@ -191,11 +220,14 @@ Your goal is to ensure the stories are SUFFICIENT FOR IMPLEMENTATION and have co
 dependency modeling for parallel execution.
 
 ` + HumanBoundaryRule + `
+` + RequirementIdentityRule + `
+` + RepositoryScopeRule + `
 Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
 REVIEW THE STORIES AGAINST THESE CRITERIA:
 
-1. **Requirement Coverage**: Each REQ-XXX in the intent must map to exactly ONE story.
+1. **Requirement Coverage**: Each requirement in the intent must map to exactly ONE story
+   through its requirement_id.
    No requirements should be missing or buried.
 
 2. **Goal Convergence & Verifiability**: Every story must link to a Goal ID. Most importantly:
@@ -270,7 +302,8 @@ const StoryFixPrompt = `You are a software architect fixing user stories based o
 The reviewer has analyzed the stories and provided a refactoring plan. Follow it within the accepted goal and retained authority boundaries.
 
 ` + HumanBoundaryRule + `
-
+` + RequirementIdentityRule + `
+` + RepositoryScopeRule + `
 ORIGINAL INTENT:
 %s
 

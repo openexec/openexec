@@ -224,3 +224,27 @@ func TestHumanBoundaryRefinementMayRenumberTheBoundaryStory(t *testing.T) {
 		t.Fatalf("renumbering dropped the boundary's dependency: %+v", got)
 	}
 }
+
+func TestRequirementIdentityRuleSharedAcrossPlannerPrompts(t *testing.T) {
+	// Without it the planner invents REQ aliases for the intent's condition
+	// ids and the reviewer rejects every refinement for a mapping the story
+	// format cannot carry.
+	for name, prompt := range map[string]string{"generation": StoryGenerationPrompt, "review": StoryReviewPrompt, "fix": StoryFixPrompt} {
+		if !strings.Contains(prompt, RequirementIdentityRule) {
+			t.Fatalf("%s prompt lacks the requirement identity rule", name)
+		}
+	}
+	if strings.Contains(StoryReviewPrompt, "Each REQ-XXX in the intent") {
+		t.Fatal("review still requires REQ-XXX identifiers the intent may not use")
+	}
+}
+
+func TestRepositoryScopeRuleSharedAcrossPlannerPrompts(t *testing.T) {
+	// Without it a single-repository Goal is planned a task in another
+	// repository, which no stage in this candidate can do or verify.
+	for name, prompt := range map[string]string{"generation": StoryGenerationPrompt, "compact": CompactStoryGenerationPrompt, "review": StoryReviewPrompt, "fix": StoryFixPrompt} {
+		if !strings.Contains(prompt, RepositoryScopeRule) {
+			t.Fatalf("%s prompt lacks the repository scope rule", name)
+		}
+	}
+}
