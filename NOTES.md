@@ -9,21 +9,18 @@ Raw capture. One line per thought, any grammar.
   Implementation and verification are maintained in
   [admitted evidence](docs/verification/admitted-evidence.md#console-adapter--us-012--t-us-012-003).
 
-- [US-014 / T-US-014-002] Storage and registered-reference coverage is enforced
-  by the fail-closed standalone gate. Scope, controls and current verification
-  live in [storage unit coverage](docs/verification/storage-unit-coverage.md).
-
-- [US-014 / T-US-014-001] Protected evidence storage, exact recapture references,
-  explicit legacy refusal and source-staging journeys are implemented. Current
-  policy, verification and limits live in
-  [private storage](docs/verification/private-storage.md).
+- [US-014 / T-US-014-003] Storage checklist, strict coverage, isolated old-directory
+  source/staging negative control and host checks verified. Consolidated commands,
+  permissions, round trips and legacy policy live in
+  [private storage](docs/verification/private-storage.md); coverage scope lives in
+  [storage unit coverage](docs/verification/storage-unit-coverage.md).
 
 - [US-013 / T-US-013-001] Task verifier, resolver negative controls,
   public-command regression and targeted recapture/compatibility tests pass.
   Continuation from c9447aa2 reconfirms diagnostic-free receipts and their
   timing across the dispatcher fix; neither records the executed revision.
   Historical receipts cannot identify their executed revision. Console checks
-  are now available; the current test failure and its correction are recorded
+  are now available; current passing storage/story results are recorded
   under US-014 above. Historical incident evidence remains in
   [named recapture](docs/verification/named-recapture.md).
 

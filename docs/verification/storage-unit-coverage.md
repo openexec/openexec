@@ -30,20 +30,7 @@ reopen and refuse registered legacy paths even if the same hash exists in
 protected storage. The separate private-storage journey exercises actual
 commands, reload, and Git staging exclusion.
 
-Verified in this candidate:
-
-- Storage gate: exit 0, 175/185 statements (94.59%); all 12 required Go test
-  identities passed. Its 12 Python verifier controls passed, including missing
-  profiles, absent files/blocks, strict threshold, skipped tests, scope failures
-  and removal of stale success artifacts.
-- `bash scripts/verify-verification-repair.sh --case private-storage`: exit 0,
-  all 15 required journey/refusal identities passed without skips.
-- Host declared `lint`: exit 0, Go vet and UI ESLint.
-- Host declared `test`: exit 0, full Go suite and 40 UI files / 635 tests passed.
-- Shell syntax and `git diff --check`: exit 0.
-
-Compatibility evaluation: only tests, coverage tooling and documentation
-changed. Production storage, registered legacy refusal, project loading,
-`.openexec`, `.uaos` and tasks-JSON migration behavior are unchanged. No new
-runtime abstraction, loop, transition or owner decision is introduced.
-Canonical delivery gates and publication remain Console-owned.
+Current commands, coverage totals, negative control, compatibility checks and
+host results are retained once in the consolidated
+[US-014 story evidence](private-storage.md). This scope document defines the
+coverage contract; it does not retain a separate run result.
