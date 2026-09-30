@@ -4,11 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [US-012 / T-US-012-003] Incomplete: inspected Console adapter still uses
-  WithOutput and its older dependency. Host lint/test and OpenExec tracer pass;
-  actual Console integration needs a Console source write grant. Source,
-  dependency, runtime evidence and affected criteria are maintained once in
-  [admitted evidence](docs/verification/admitted-evidence.md#console-adoption--us-012--t-us-012-003-incomplete).
+- [US-012 / T-US-012-003] Preserve the Console WithOutput adapter through native
+  receipt reload and repair; redact credential values without hiding command names.
+  Implementation and verification are maintained in
+  [admitted evidence](docs/verification/admitted-evidence.md#console-adapter--us-012--t-us-012-003).
 
 - [US-014 / T-US-014-002] Storage and registered-reference coverage is enforced
   by the fail-closed standalone gate. Scope, controls and current verification
@@ -30,7 +29,7 @@ Raw capture. One line per thought, any grammar.
 
 - [US-012 / T-US-012-002] Bounded diagnostic tails and public silent/diagnostic
   lint/test event-to-reload-to-repair journeys implemented, including nil results
-  and refusal checks. Verification and current Console dependency/adapter gaps live in
+  and refusal checks. Verification and Console adapter compatibility live in
   [admitted evidence](docs/verification/admitted-evidence.md).
 
 - [US-010 / T-US-010-001] Current G-007 review study and exact provenance live in

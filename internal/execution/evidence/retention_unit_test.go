@@ -37,7 +37,7 @@ func TestRetentionUnitCaptureAndRedaction(t *testing.T) {
 		for _, value := range []string{"sentinel", `"sentinel with spaces"`, "'sentinel with spaces'"} {
 			command := key + "=" + value
 			secrets := CommandSecrets(command)
-			if len(secrets) != 2 || strings.Contains(Public(command+" "+secrets[1], append(secrets, "")), "sentinel") {
+			if len(secrets) != 1 || strings.Contains(Public(command+" "+secrets[0], append(secrets, "")), "sentinel") {
 				t.Fatal("redaction", command)
 			}
 		}
@@ -45,8 +45,11 @@ func TestRetentionUnitCaptureAndRedaction(t *testing.T) {
 	if Public(strings.Repeat("x", StreamLimit+1), nil) != strings.Repeat("x", StreamLimit) {
 		t.Fatal("public limit")
 	}
-	if len(CommandSecrets("echo safe")) != 1 {
+	if len(CommandSecrets("echo safe")) != 0 {
 		t.Fatal("unexpected secret")
+	}
+	if got := Public("missing_verifier_command_98312: not found", CommandSecrets("missing_verifier_command_98312")); got != "missing_verifier_command_98312: not found" {
+		t.Fatal("command name redacted", got)
 	}
 	values := map[string]string{"go_version": strings.Repeat("v", 200), "node_version": "v22", "npm_version": "10", "python_version": "3", "rustc_version": "1", "PATH": "private"}
 	got := Toolchain(values)

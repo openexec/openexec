@@ -85,7 +85,7 @@ var credential = regexp.MustCompile(`(?i)((?:password|passwd|token|secret|api[_-
 // CommandSecrets identifies credential assignment values for redaction when a
 // shell command echoes a value without its key. It never reads the environment.
 func CommandSecrets(command string) []string {
-	secrets := []string{command}
+	var secrets []string
 	for _, match := range credential.FindAllStringSubmatch(command, -1) {
 		secrets = append(secrets, strings.Trim(match[2], "\"'"))
 	}

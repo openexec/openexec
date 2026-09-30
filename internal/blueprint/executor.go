@@ -151,7 +151,7 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			defer cancel()
 
 			if e.OnCommandStart != nil {
-				e.OnCommandStart(stage, evidence.Public(cmdStr, evidence.CommandSecrets(cmdStr)[1:]))
+				e.OnCommandStart(stage, evidence.Public(cmdStr, evidence.CommandSecrets(cmdStr)))
 			}
 
 			checkName := ""
@@ -162,7 +162,7 @@ func (e *DefaultExecutor) executeDeterministic(ctx context.Context, stage *Stage
 			outputs = append(outputs, output)
 
 			if e.OnCommandComplete != nil {
-				e.OnCommandComplete(stage, evidence.Public(cmdStr, evidence.CommandSecrets(cmdStr)[1:]), output, err)
+				e.OnCommandComplete(stage, evidence.Public(cmdStr, evidence.CommandSecrets(cmdStr)), output, err)
 			}
 
 			if err != nil {

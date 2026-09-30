@@ -25,6 +25,20 @@ func (m *Manager) diagnosticFreeReceipt(artifacts map[string]string) bool {
 	if strings.TrimSpace(artifacts["stage_output"]) != "" || strings.TrimSpace(artifacts["stage_diagnostics"]) != "" {
 		return false
 	}
+	// The Console's WithOutput adapter retains its joined argv in the trusted
+	// receipt. A silent normal exit still has a reproducible command; it must
+	// not be treated as a legacy classification-only failure needing recapture.
+	var checks []gates.CheckFailure
+	if gates.ValidateVerificationFailureArtifacts(artifacts) &&
+		json.Unmarshal([]byte(artifacts[gates.VerificationFailureReceiptKey]), &checks) == nil {
+		complete := true
+		for _, check := range checks {
+			complete = complete && strings.TrimSpace(check.Command) != ""
+		}
+		if complete {
+			return false
+		}
+	}
 	// Modern capture also supplies usable context for silent checks (for
 	// example test -f): exact argv/cwd and the observed exit survive privately.
 	for hash, path := range artifacts {
