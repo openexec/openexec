@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Compact planning / US-009 / T-US-009-001] Discovery and frozen executable
+  scope live in [compact requirement evidence](docs/verification/compact-requirement-evidence.md).
+  This is the compact-planning prerequisite, distinct from historical recapture
+  tasks with reused IDs below. Repair and delivery remain separate contract work.
+
 - [Planner schema evidence / US-007 / T-US-007-003] Working-memory consolidation,
   verified 2026-10-01. Candidate root:
   `/mnt/data1/projects/openexec/.openexec/outcome-candidates/a2c7daf0a875c10027e2d680305633d0`;
@@ -293,6 +298,9 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Compact planning: current scalar/recovery prerequisite and unverified D2
+  delivery are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).
 
 - Planner recovery evidence gap: discovery observes current coercion but cannot
   prove bounded correction, restart accounting or atomic import durability.
