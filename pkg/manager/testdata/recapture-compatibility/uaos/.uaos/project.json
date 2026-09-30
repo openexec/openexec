@@ -1,0 +1,6 @@
+{
+  "name": "recapture-uaos",
+  "execution": {
+    "exec_mode": "workspace-write"
+  }
+}

@@ -467,8 +467,7 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 		attempt := run.GetRetries(stage.Name) + 1
 		result, err := e.executor.Execute(ctx, stage, input)
 		if err != nil {
-			result = NewStageResult(stage.Name, attempt)
-			result.Fail(err.Error())
+			result = failedStageResult(result, stage.Name, attempt, err)
 		}
 
 		run.AddResult(result)
@@ -531,11 +530,14 @@ func (e *Engine) ExecuteStage(ctx context.Context, run *Run, stageName string, i
 	run.CurrentStage = stageName
 	result, err := e.executor.Execute(ctx, stage, input)
 	if err != nil {
-		return nil, err
+		if result == nil {
+			return nil, err
+		}
+		result = failedStageResult(result, stage.Name, run.GetRetries(stage.Name)+1, err)
 	}
 
 	run.AddResult(result)
-	return result, nil
+	return result, err
 }
 
 // Pause pauses the run execution.
@@ -590,4 +592,19 @@ func (e *Engine) Cancel(runID string) error {
 
 	run.Cancel()
 	return nil
+}
+
+// failedStageResult retains executor evidence and timing even when an error
+// accompanies the result. Only missing results need to be synthesized.
+func failedStageResult(result *StageResult, name string, attempt int, err error) *StageResult {
+	if result == nil {
+		result = NewStageResult(name, attempt)
+		result.Fail(err.Error())
+		return result
+	}
+	result.Status = types.StageStatusFailed
+	if result.Error == "" {
+		result.Error = err.Error()
+	}
+	return result
 }

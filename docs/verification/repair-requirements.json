@@ -1,0 +1,26 @@
+[
+  {
+    "id": "REQ-001",
+    "owner": "US-012",
+    "source": "stories/US-012/contract",
+    "exact_clause": "REQ-001 derives from: 'Preserve non-nil failed StageResult through existing engine/pipeline error paths and persist bounded diagnostic output plus exact command identity/working directory from the admitted verification boundary before deriving repair work' and 'Include a usable verification command/reference in repair context.' Reuse run_steps, artifacts and repair generation. A public-runtime fixture proves the API contract, not adoption by the actual Console adapter. Confirmed unresolved integration prevents story completion and delivery-ready. Source and deployment claims require distinct evidence."
+  },
+  {
+    "id": "REQ-002",
+    "owner": "US-013",
+    "source": "stories/US-013/contract",
+    "exact_clause": "REQ-002 derives from: 'For legacy diagnostic-free receipts use a bounded deterministic recapture within the same native loop rather than requesting repeated implementation against the same empty receipt' and 'No new loop/state machine or owner decision.' Preserve existing HITL identity, reason, decision reference and dependencies, including legacy HITL without metadata. Use independently available executor fixtures so US-013 remains parallel with US-012. Do not infer the historic lint cause from missing UI knip."
+  },
+  {
+    "id": "REQ-003",
+    "owner": "US-014",
+    "source": "stories/US-014/contract",
+    "exact_clause": "REQ-003 derives from: 'keep classification/provenance separate from private diagnostic evidence, do not indiscriminately log environment or secrets.' Reuse the existing ignored state tree rather than this repository's ignore file alone or mandatory reinitialization of target repositories. Legacy compatibility must not weaken path validation or expose raw evidence."
+  },
+  {
+    "id": "REQ-004",
+    "owner": "US-015",
+    "source": "stories/US-015/contract",
+    "exact_clause": "REQ-004 derives from D1, 'A test reproduces the failure and passes with the fix,' and D2, 'The fix is merged to openexec's default branch.' US-015 exclusively owns aggregate validation and delivery-evidence assessment; implementation stories provide prerequisite evidence. Delivery-ready establishes D1 and handoff readiness, not D2. Console owns candidate commit/publication, canonical delivery gate, review resolution and merge execution under actual authority. Keep the existing PR and retained candidate provenance; do not request another advisory review or create a replacement PR. The final HITL task is an owner decision boundary, not a task-queue operation that invokes delivery tools."
+  }
+]

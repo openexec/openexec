@@ -125,6 +125,10 @@ func (s *SQLiteStore) CreateFailureRepair(ctx context.Context, taskID, evidenceI
 // repairs participate without rebuilding a manager's in-memory task list.
 // This is selection only; execution still needs its ordinary claim/effect gates.
 func RunnableTasks(ctx context.Context, store Store, storyIDs []string) ([]*Task, error) {
+	return runnableTasks(ctx, store, storyIDs, "")
+}
+
+func runnableTasks(ctx context.Context, store Store, storyIDs []string, recaptureID string) ([]*Task, error) {
 	scope := map[string]bool{}
 	for _, id := range storyIDs {
 		scope[id] = true
@@ -143,6 +147,9 @@ func RunnableTasks(ctx context.Context, store Store, storyIDs []string) ([]*Task
 	taskByID := map[string]*Task{}
 	storyByID := map[string]*Story{}
 	for _, task := range tasks {
+		if task.ID == recaptureID && task.Status == TaskStatusFailed {
+			task.Status = TaskStatusPending
+		}
 		taskByID[task.ID] = task
 	}
 	for _, story := range stories {
@@ -261,4 +268,20 @@ func (m *Manager) CreateFailureRepair(ctx context.Context, taskID, evidenceID, d
 	}
 	m.tasks[original.ID], m.tasks[repair.ID], m.stories[story.ID] = original, repair, story
 	return repair, nil
+}
+
+// RecaptureEligible applies ordinary selection without changing durable status.
+func (m *Manager) RecaptureEligible(ctx context.Context, task *Task) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	tasks, err := runnableTasks(ctx, m.store, []string{task.StoryID}, task.ID)
+	if err != nil {
+		return false, err
+	}
+	for _, next := range tasks {
+		if next.ID == task.ID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

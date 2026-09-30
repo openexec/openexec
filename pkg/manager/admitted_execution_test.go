@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,8 +70,8 @@ func TestCancelledInjectedTaskRemainsResumable(t *testing.T) {
 }
 
 func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
-	for _, forged := range []bool{false, true} {
-		t.Run(map[bool]string{false: "typed_failure", true: "untrusted_artifacts"}[forged], func(t *testing.T) {
+	for _, mode := range []string{"typed_failure", "untrusted_artifacts", "legacy_receipt"} {
+		t.Run(mode, func(t *testing.T) {
 			e := newSchedulerTestEnv(t)
 			createStory(t, e.rel, "S", nil)
 			createQueueTask(t, e, "A", nil)
@@ -83,6 +84,7 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 			}
 			repaired := false
 			calls := 0
+			legacyChecks := 0
 			e.mgr.cfg.StageExecutor = admittedFixture(func(ctx context.Context, s *runtime.Stage, i *runtime.StageInput) (*runtime.StageResult, error) {
 				calls++
 				if i.RunID != "A" {
@@ -90,14 +92,37 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 				}
 				result := &runtime.StageResult{StageName: s.Name, Status: runtime.StageStatusCompleted, Attempt: 1}
 				if i.RunID == "A" && s.Name == "test" && !repaired {
-					if forged {
+					if mode == "untrusted_artifacts" {
 						result.Status = runtime.StageStatusFailed
 						result.Artifacts = gates.VerificationFailureArtifacts(runtime.VerificationCommandFailure(ctx, s.Name, exec.CommandContext(ctx, "false").Run()))
 						return result, nil
 					}
 					// An actual deterministic subprocess error, not a fabricated worker report.
-					err := exec.CommandContext(ctx, "false").Run()
-					return nil, runtime.VerificationCommandFailure(ctx, s.Name, err)
+					cmd := exec.CommandContext(ctx, "false")
+					cmd.Dir = e.dir
+					err := cmd.Run()
+					failure := runtime.VerificationCommandFailure(ctx, s.Name, err)
+					if mode == "legacy_receipt" {
+						legacyChecks++
+						if legacyChecks > 1 && len(s.Commands) != 0 {
+							return nil, fmt.Errorf("named recapture acquired host commands")
+						}
+						return nil, failure
+					}
+					// Silent checks still need exact command evidence. A bare exit
+					// classification now takes the bounded legacy recapture path.
+					if cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 1 {
+						return nil, fmt.Errorf("fixture did not exit 1: %v", err)
+					}
+					hash, path, captureErr := runtime.RetainCommandEvidence(e.dir, runtime.CommandEvidence{
+						Argv: cmd.Args, Cwd: cmd.Dir, ExitCode: cmd.ProcessState.ExitCode(),
+					})
+					if captureErr != nil {
+						return nil, captureErr
+					}
+					result.Status = runtime.StageStatusFailed
+					result.Artifacts = map[string]string{hash: path}
+					return result, failure
 				}
 				return result, nil
 			})
@@ -111,9 +136,16 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 				t.Fatal("host command executed", statErr)
 			}
 			current, _ := e.rel.TaskSnapshot(ctx, "A")
-			if forged {
+			if mode == "untrusted_artifacts" {
 				if err == nil || repaired || current.Status == release.TaskStatusDone {
 					t.Fatal("untrusted output authorized repair/completion")
+				}
+				return
+			}
+			if mode == "legacy_receipt" {
+				tasks, listErr := e.rel.TasksInStories(ctx, []string{"S"})
+				if err == nil || repaired || current.Status != release.TaskStatusNeedsReview || current.AttemptCount != current.MaxAttempts || legacyChecks != current.MaxAttempts || current.Metadata["recapture_outcome"] != "exhausted" || listErr != nil || len(tasks) != 1 {
+					t.Fatalf("diagnostic-free named recapture escaped attempt bound: %v %#v repaired=%v tasks=%d listErr=%v", err, current, repaired, len(tasks), listErr)
 				}
 				return
 			}

@@ -1,0 +1,30 @@
+{
+  "sources": {
+    "internal/execution/evidence/capture.go": "*",
+    "pkg/runtime/evidence.go": "*",
+    "pkg/manager/task_recapture.go": [
+      "(*Manager).diagnosticFreeReceipt",
+      "recapturePhase",
+      "(*Manager).resolveRecaptureCommand"
+    ]
+  },
+  "dedicated_tests": [
+    "internal/execution/evidence/storage_unit_test.go",
+    "internal/execution/evidence/private_storage_test.go",
+    "pkg/manager/private_storage_test.go"
+  ],
+  "tests": [
+    "internal/execution/evidence:TestStorageUnitIdentityAndPermissions",
+    "internal/execution/evidence:TestStorageUnitWriteFailureCleanup",
+    "internal/execution/evidence:TestStorageUnitMalformedIdentities",
+    "internal/execution/evidence:TestPrivateStorageLegacyRefusal",
+    "internal/execution/evidence:TestPrivateStorageNestedPathRefusals",
+    "internal/execution/evidence:TestRetentionUnitCaptureAndRedaction",
+    "internal/execution/evidence:TestRetentionUnitPrivateRoundTripAndRefusals",
+    "internal/execution/evidence:TestRetentionBoundariesCapture",
+    "pkg/runtime:TestRetentionUnitPublicEvidenceAPI",
+    "pkg/manager:TestPrivateStorageReferenceReload",
+    "pkg/manager:TestRecaptureUnitResolutionAndEvidence",
+    "pkg/manager:TestRecaptureUnitInvalidReceipt"
+  ]
+}

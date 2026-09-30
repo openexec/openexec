@@ -1,0 +1,97 @@
+{
+  "source": ".openexec/openexec.db read-only snapshot 2026-09-29",
+  "goal": {
+    "id": "G-007",
+    "title": "Retain actionable verification evidence and recover legacy failures",
+    "description": "Preserve failed stage results and private command evidence through admitted execution, persistence and repair generation, and recapture legacy diagnostic-free failures within the existing native loop.",
+    "success_criteria": "A real exit-2 admitted check retains exact command identity, cwd, bounded diagnostics and a usable verification reference after database reload; incident-shaped legacy receipts recapture once and produce actionable repair work without bypassing refusal, cancellation or human boundaries; private evidence remains outside source commits.",
+    "verification_method": "Run end-to-end native queue fixtures, database round-trip assertions, every review checklist case and mutation-based negative controls, followed by required OpenExec compatibility and quality gates.",
+    "created_at": "2026-09-29 20:00:59"
+  },
+  "stories": [
+    {
+      "id": "US-010",
+      "goal_id": "G-007",
+      "acceptance_criteria": [
+        "Read Project context, repository instructions and NOTES.md; record tasks under Now and questions under Questions without executing For me items.",
+        "Trace the exact retained candidate through engine results, admitted execution, pipeline events, run_steps, artifacts, evidence readers and repair generation.",
+        "Inspect available Console source, dependency revisions and runtime evidence before concluding adapter adoption is missing; distinguish source adoption from the observed serving revision b5071d89 and from deployment.",
+        "Create a derived requirement register with exact accepted-contract source clauses and exactly one owning story: REQ-001 evidence preservation belongs to US-012, REQ-002 bounded recapture belongs to US-013, REQ-003 private evidence belongs to US-014, and REQ-004 D1 aggregation and D2 delivery evidence belongs to US-015.",
+        "Record preliminary accepted or rejected assessments for all three findings, distinguishing source inference, executed reproduction and unresolved evidence.",
+        "Define comprehensive unit-test scopes for US-012, US-013 and US-014 and strict checks requiring greater than 90% statement coverage for each declared scope; reject missing profiles, missing scoped files or denominator changes that hide uncovered behavior.",
+        "Write docs/ARCHITECTURE.md and the available knowledge base with module ownership, APIs, persistence flow, compatibility paths, recapture policy, required gates and Console-owned delivery boundaries before implementation."
+      ],
+      "contract": "This is prerequisite discovery, not an additional product requirement or proof of D1. Preserve existing story and task identities, especially the retained HITL boundary. No implementation begins before the durable architecture map and strict study verifier pass. Do not discover Navigator tasks or create a replacement workflow."
+    },
+    {
+      "id": "US-012",
+      "goal_id": "G-007",
+      "acceptance_criteria": [
+        "Preserve non-nil failed StageResult values through both Engine.ExecuteStage and Engine.Execute error paths and through pipeline persistence.",
+        "Expose runtime.VerificationCommandFailureWithEvidence(ctx, name, err, hash, path), delegating to the existing evidence-bearing failure mechanism without requiring external adapters to import internal packages.",
+        "A fixture using only public runtime APIs executes a real silent exit-2 lint command and emits EventBlueprintFailed with a 64-hex evidence reference; persistence registers the artifact and retains it after database reload.",
+        "ReadCommandEvidence returns exact argv, cwd equal to WorkDir, exit code 2 and bounded stdout/stderr; diagnosticFreeReceipt is false and repair context contains a usable verification command or reference.",
+        "A real admitted failure with a diagnostic marker retains that marker through engine, pipeline, database reload and repair creation, including relevant diagnostic tails beyond 4096 bytes.",
+        "Nil-result errors, cancellation and launch refusal preserve their classifications and execution boundaries.",
+        "Capture toolchain context only through an explicit non-secret allowlist; public events, repair-visible summaries and receipt fingerprints exclude credentials and private incidental environment values.",
+        "Verify actual Console adapter adoption and its OpenExec dependency. Complete confirmed missing capture, retention and evidence attachment at the actual admitted boundary where authorized; a recorded blocker does not satisfy this criterion.",
+        "Comprehensive unit tests achieve greater than 90% statement coverage over the declared relevant implementation scope.",
+        "Negative controls restoring each result-discarding branch or removing evidence attachment fail the intended regression assertions.",
+        "A durable story-level evidence record maps every criterion to candidate-specific commands, results, coverage, database reload assertions, negative controls and integration evidence."
+      ],
+      "contract": "REQ-001 derives from: 'Preserve non-nil failed StageResult through existing engine/pipeline error paths and persist bounded diagnostic output plus exact command identity/working directory from the admitted verification boundary before deriving repair work' and 'Include a usable verification command/reference in repair context.' Reuse run_steps, artifacts and repair generation. A public-runtime fixture proves the API contract, not adoption by the actual Console adapter. Confirmed unresolved integration prevents story completion and delivery-ready. Source and deployment claims require distinct evidence."
+    },
+    {
+      "id": "US-013",
+      "goal_id": "G-007",
+      "acceptance_criteria": [
+        "Seed the exact incident shape: Phase empty, receipt containing only lint with exit_code 2, no stage_output, no evidence reference and empty VerificationScript.",
+        "Infer an empty phase from exactly one receipt gate; support lint and test with empty or matching phases.",
+        "Without historical references or a verification script, execute the named check through the same admitted StageExecutor or authoritative blueprint definition, including an executor that resolves stage.Name and ignores stage.Commands.",
+        "Persist provenance identifying fallback execution as the current check definition, never historical argv, and retain exact identity obtained from the recaptured execution.",
+        "The incident queue fixture observes exactly one lint stage executing a real exit-2 command with stderr; reloaded verification_failure_evidence contains diagnostics or a registered reference, and the next queue iteration creates repair work with the marker and usable verification reference.",
+        "Settings remains pending while its failure-repair dependency is incomplete.",
+        "Successful recapture continues the existing workflow without an endless repair task; database reload and resume preserve the attempt budget.",
+        "Multi-check ambiguity, retained HITL boundaries and exhausted budgets stop safely; cancellation and launch refusal preserve their existing boundaries.",
+        "Comprehensive unit tests achieve greater than 90% statement coverage over the declared recapture implementation scope.",
+        "Removing phase inference or restoring unconditional empty-command refusal causes the incident assertion to fail with zero check executions and unresolved recapture.",
+        "A durable story evidence record connects every legacy variant, success, restart, boundary and negative-control case to its command and observed result."
+      ],
+      "contract": "REQ-002 derives from: 'For legacy diagnostic-free receipts use a bounded deterministic recapture within the same native loop rather than requesting repeated implementation against the same empty receipt' and 'No new loop/state machine or owner decision.' Preserve existing HITL identity, reason, decision reference and dependencies, including legacy HITL without metadata. Use independently available executor fixtures so US-013 remains parallel with US-012. Do not infer the historic lint cause from missing UI knip."
+    },
+    {
+      "id": "US-014",
+      "goal_id": "G-007",
+      "acceptance_criteria": [
+        "Write new evidence under .openexec/data/verification with directory mode 0700 and file mode 0600; registration, reading and authoritative recapture references continue to work.",
+        "Verify fresh initialized repositories, previously initialized repositories already ignoring .openexec/data/, and Console-style repositories ignoring the whole .openexec/ tree.",
+        "In a temporary Git repository with committed initialization files, a real failing gate emits token=abc to stderr; git status --porcelain --untracked-files=all remains empty while the private reader returns the retained stderr.",
+        "Exercise deterministic command checks and gate execution; git add . or the safe_commit staging path excludes diagnostic files and credential-bearing argv.",
+        "Define and test a bounded compatibility policy for registered old evidence paths that preserves path validation, private permissions and protection against accidental source staging.",
+        "Public events, repair-visible summaries and receipt fingerprints exclude fixture secrets.",
+        "Comprehensive unit tests achieve greater than 90% statement coverage over the declared storage, path-validation, permission and legacy-compatibility scope.",
+        "Restoring the old unignored directory makes the clean-worktree or staging assertion fail.",
+        "A durable story evidence summary covers every storage, reader, recapture, compatibility, permission, secret-exclusion and staging criterion."
+      ],
+      "contract": "REQ-003 derives from: 'keep classification/provenance separate from private diagnostic evidence, do not indiscriminately log environment or secrets.' Reuse the existing ignored state tree rather than this repository's ignore file alone or mandatory reinitialization of target repositories. Legacy compatibility must not weaken path validation or expose raw evidence."
+    },
+    {
+      "id": "US-015",
+      "goal_id": "G-008",
+      "acceptance_criteria": [
+        "Run the integrated admitted failure-to-persisted-repair journey and exact legacy incident journey after all implementation stories are integrated.",
+        "Require complete story-level evidence and greater than 90% unit coverage for every declared implementation scope; reject missing tests, skipped cases, stale candidate identities and incomplete evidence.",
+        "Exercise every Root cause/Cases/Fix/Prove/Falsify checklist item for each finding and record one accepted or rejected disposition with concrete repair evidence or correctness or frozen-scope reasons.",
+        "Run negative controls in isolated temporary copies, verify failures occur for intended assertions and confirm the retained candidate remains unchanged.",
+        "Run the required OpenExec gate, make test, make compat-test, make type-check, go vet ./... and bash scripts/verify-settings-baseline.sh --case reconciliation. Report hook drift separately from the historic lint exit 2.",
+        "Use the repository job runner for checks expected to take more than a few minutes and require actual completion evidence; job submission is not a passing result.",
+        "Update docs/ARCHITECTURE.md with final module ownership, APIs, data flow, evidence storage, compatibility, recapture behavior and verified Console integration status.",
+        "Delivery-ready rejects confirmed unresolved admitted-boundary integration requirements; a public-runtime fixture alone does not prove actual adapter adoption.",
+        "Prepare an exact-candidate evidence package for review 3942433c4242399f83195ad01d0a6748 and existing pull request 66 without queue tasks publishing, requesting another review, resolving the review, merging or deploying.",
+        "Preserve the single existing owner acceptance task and its dependencies and decision reason; do not invent a decision reference.",
+        "Goal-complete rejects absent, invalid or candidate-mismatched Console-provided default-branch merge evidence. D2 remains incomplete until the fix is verifiably merged."
+      ],
+      "contract": "REQ-004 derives from D1, 'A test reproduces the failure and passes with the fix,' and D2, 'The fix is merged to openexec's default branch.' US-015 exclusively owns aggregate validation and delivery-evidence assessment; implementation stories provide prerequisite evidence. Delivery-ready establishes D1 and handoff readiness, not D2. Console owns candidate commit/publication, canonical delivery gate, review resolution and merge execution under actual authority. Keep the existing PR and retained candidate provenance; do not request another advisory review or create a replacement PR. The final HITL task is an owner decision boundary, not a task-queue operation that invokes delivery tools."
+    }
+  ]
+}

@@ -32,6 +32,16 @@ func NewCommandFailureWithOutput(ctx context.Context, name string, err error, co
 	return &verificationFailure{message: err.Error(), checks: []CheckFailure{{Gate: name, ExitCode: exit.ExitCode(), Command: command, Output: output}}}
 }
 
+// CommandFailureWithEvidence attaches private references only after normal-exit
+// classification. References never grant authority and never enter its digest.
+func CommandFailureWithEvidence(ctx context.Context, name string, err error, hash, path string) error {
+	classified := NewCommandFailure(ctx, name, err)
+	if failure, ok := classified.(*verificationFailure); ok {
+		failure.artifacts = map[string]string{hash: path}
+	}
+	return classified
+}
+
 const VerificationFailureReceiptKey = "verification_failure_receipt"
 const VerificationFailureDigestKey = "verification_failure_digest"
 
@@ -52,8 +62,9 @@ type CheckFailure struct {
 const maxFailureOutput = 6000
 
 type verificationFailure struct {
-	message string
-	checks  []CheckFailure
+	message   string
+	checks    []CheckFailure
+	artifacts map[string]string
 }
 
 func (f *verificationFailure) Error() string { return f.message }
@@ -66,6 +77,7 @@ func NewFailure(report *GateReport) error {
 		return errors.New("missing gate report")
 	}
 	var checks []CheckFailure
+	artifacts := map[string]string{}
 	for _, result := range report.Results {
 		if result.Passed || result.IsWarning {
 			continue
@@ -74,17 +86,21 @@ func NewFailure(report *GateReport) error {
 			return errors.New(report.Summary)
 		}
 		checks = append(checks, CheckFailure{Gate: result.Name, ExitCode: result.ExitCode})
+		for hash, path := range result.artifacts {
+			artifacts[hash] = path
+		}
 	}
 	if report.Passed || len(checks) == 0 {
 		return errors.New(report.Summary)
 	}
-	return &verificationFailure{message: report.Summary, checks: checks}
+	return &verificationFailure{message: report.Summary, checks: checks, artifacts: artifacts}
 }
 
 // VerificationFailureArtifacts refuses mixed error trees: wrapping or joining
 // a check failure with an unclassified refusal cannot authorize repair work.
 func VerificationFailureArtifacts(err error) map[string]string {
 	var checks []CheckFailure
+	artifacts := map[string]string{}
 	var visit func(error) bool
 	visit = func(e error) bool {
 		if e == nil {
@@ -92,6 +108,9 @@ func VerificationFailureArtifacts(err error) map[string]string {
 		}
 		if f, ok := e.(*verificationFailure); ok {
 			checks = append(checks, f.checks...)
+			for hash, path := range f.artifacts {
+				artifacts[hash] = path
+			}
 			return len(f.checks) > 0
 		}
 		if u, ok := e.(interface{ Unwrap() []error }); ok {
@@ -116,7 +135,9 @@ func VerificationFailureArtifacts(err error) map[string]string {
 	}
 	payload, _ := json.Marshal(checks)
 	digest := sha256.Sum256(payload)
-	return map[string]string{VerificationFailureReceiptKey: string(payload), VerificationFailureDigestKey: hex.EncodeToString(digest[:])}
+	artifacts[VerificationFailureReceiptKey] = string(payload)
+	artifacts[VerificationFailureDigestKey] = hex.EncodeToString(digest[:])
+	return artifacts
 }
 
 // Validation checks integrity/shape, not provenance. Callers must obtain these
