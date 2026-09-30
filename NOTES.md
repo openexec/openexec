@@ -6,7 +6,7 @@ Raw capture. One line per thought, any grammar.
 
 - [US-013 / T-US-013-001] Task verifier, resolver negative controls,
   public-command regression and targeted recapture/compatibility tests pass.
-  Continuation from 2174a871 reconfirms diagnostic-free receipts and their
+  Continuation from c9447aa2 reconfirms diagnostic-free receipts and their
   timing across the dispatcher fix; neither records the executed revision.
   Local config and Console still expose no runnable test-command mapping.
   The recorded failure remains unreproduced. Current evidence and the required

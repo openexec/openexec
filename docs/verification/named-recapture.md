@@ -41,9 +41,9 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 
 ## Current verification and repair diagnosis
 
-On 2026-09-30 at 06:26 UTC, repair
+On 2026-09-30 at 06:27 UTC, repair
 `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd` resumed from candidate baseline
-`2174a871` and reran the checks below. The Console project context was read
+`c9447aa2` and reran the checks below. The Console project context was read
 again; this stage retains the supplied repair scope and delivery boundary.
 Read-only SQLite inspection confirmed that T-US-013-001 still specifies
 `bash scripts/verify-verification-repair.sh --case legacy-incident` and that
