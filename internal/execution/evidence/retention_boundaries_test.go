@@ -42,3 +42,39 @@ func TestRetentionBoundariesCapture(t *testing.T) {
 		t.Fatal("symlink evidence directory accepted")
 	}
 }
+
+func TestDiagnosticTailCapture(t *testing.T) {
+	input := "first\n" + strings.Repeat("0123456789\n", 2000) + "token=PRIVATE_SECRET\nDIAGNOSTIC_TAIL\n"
+	want := input[:StreamLimit/2] + input[len(input)-StreamLimit/2:]
+	for _, chunk := range []int{1, 17, 2048, 4096, len(input)} {
+		var b Buffer
+		for i := 0; i < len(input); i += chunk {
+			part := input[i:min(i+chunk, len(input))]
+			if n, err := b.Write([]byte(part)); err != nil || n != len(part) {
+				t.Fatal("stream not drained")
+			}
+		}
+		if b.String() != want || b.Len() != StreamLimit || !b.Truncated {
+			t.Fatalf("chunk %d lost prefix/tail", chunk)
+		}
+		public := PublicStream(&b, []string{"PRIVATE_SECRET"})
+		if len(public) > StreamLimit || strings.Contains(public, "PRIVATE_SECRET") || !strings.HasPrefix(public, "first\n") || !strings.HasSuffix(public, "DIAGNOSTIC_TAIL\n") {
+			t.Fatalf("unsafe or missing public tail: %q", public)
+		}
+	}
+	dir := t.TempDir()
+	hash, _, err := Write(dir, Command{Stdout: input, Stderr: input})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Read(dir, hash)
+	if err != nil || got.Stdout != want || got.Stderr != want || !got.StdoutTruncated || !got.StderrTruncated {
+		t.Fatal("direct retention lost tail", err)
+	}
+	// A tail starting inside a secret must never publish the unmatched suffix.
+	var b Buffer
+	b.Write([]byte(strings.Repeat("x", StreamLimit) + "token=" + strings.Repeat("S", StreamLimit) + "\nTAIL\n"))
+	if public := PublicStream(&b, nil); strings.Contains(public, "S") || !strings.HasSuffix(public, "TAIL\n") {
+		t.Fatal("split secret exposed", public)
+	}
+}

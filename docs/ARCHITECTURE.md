@@ -45,7 +45,7 @@ names an existing file and a declaration manually inspected for this task.
 | `pkg/manager/manager.go` | `Config` | StageExecutor injection into pipeline configuration. |
 | `pkg/runtime/execution.go` | `VerificationCommandFailure` | Public admitted interface and typed command classification. |
 | `pkg/runtime/evidence.go` | `RetainCommandEvidence` | Public private-capture API; typed evidence attachment still missing. |
-| `internal/execution/evidence/capture.go` | `Buffer` | Bounded prefix capture; US-012 must preserve diagnostic tails. |
+| `internal/execution/evidence/capture.go` | `Buffer` | Bounded prefix/tail capture; US-012 exercises persisted diagnostic tails. |
 | `internal/execution/evidence/capture.go` | `Read` | Content-addressed private reader; US-014 owns safe storage and old-reference policy. |
 | `pkg/manager/task_recapture.go` | `resolveRecaptureCommand` | Registered shell/verify-script resolution; single-gate phase inference and current named-check fallback. |
 | `internal/cli/init.go` | `ensureGitignore` | Target managed ignore block; currently excludes state but not sibling evidence directory. |
@@ -156,13 +156,14 @@ owner in the linked requirement register; D1 and D2 belong to REQ-004.
   Exact private command identity must remain resolvable without exposing secret
   values publicly. Bound stdout/stderr; redact command values and diagnostics;
   explicitly allowlist toolchain metadata, never dump the environment.
-  Capture retains 4096 bytes per stream with truncation flags; toolchain input
+  Capture retains 4096 bytes per stream (first/last 2048 on overflow) with truncation flags; toolchain input
   accepts only go_version, node_version, npm_version, python_version and
   rustc_version, each capped at 128 bytes. Admitted adapters use EvidenceBuffer,
   RetainCommandEvidence and PublicVerificationStream; they supply known secret
   values from admission/configuration because arbitrary prose secrets cannot be
   inferred reliably. Common credential assignments are additionally redacted.
-  Truncated public streams omit the incomplete final line. Exact private payloads
+  Truncated public streams omit cut lines at both sides of the omitted middle
+  and the incomplete final line, reserving space for the truncation marker. Exact private payloads
   live in .openexec/data/verification (0700), covered by initialization’s data ignore,
   with content-addressed files
   (0600); ReadCommandEvidence requires matching hashes and rejects public modes,

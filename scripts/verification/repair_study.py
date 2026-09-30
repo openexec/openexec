@@ -78,10 +78,12 @@ def verify(root):
         for link in re.findall(r'\]\(([^)]+)\)', path.read_text()):
             if '://' not in link:
                 require((path.parent / link.split('#')[0]).is_file(), f'broken documentation link: {link}')
-    for token in ('pending US-012', 'pending US-013', 'pending US-014', 'D2',
+    for token in ('pending US-012', 'pending US-013', 'D2',
                   'safe_commit usage:', 'ordinary', 'Console retains', 'mode=ro',
                   'not independently', 'outside supplied', 'No measured'):
         require(token in body, f'missing evidence/authority limitation: {token}')
+    require('pending US-014' in body or 'repaired by T-US-014-001' in body,
+            'missing storage repair status: US-014')
     contract = read_json(root, JSON_FILES[0])
     provenance = read_json(root, JSON_FILES[1])
     requirements = read_json(root, JSON_FILES[2])

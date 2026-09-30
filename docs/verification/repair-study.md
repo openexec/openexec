@@ -163,11 +163,11 @@ repaired merely by keeping text. A public wrapper alone cannot complete US-012.
 
 ## F3 — Private evidence enters source commits
 
-Disposition: reproduced and repaired by T-US-014-001. Current storage policy,
+Disposition: accepted, reproduced and repaired by T-US-014-001. Current storage policy,
 staging reproduction and verification are recorded in
 [private storage](private-storage.md). Unix permission bits do not prevent Git publication.
 
-- **Original root cause:** evidence.Write created .openexec-verification at the repository
+- **Root cause:** originally, evidence.Write created .openexec-verification at the repository
   root. Only this repository ignores it. ensureGitignore manages .openexec/data,
   logs and cache; old initialized targets and Console-style .openexec ignores
   do not cover the sibling directory. safe_commit stages `git add .`, so raw

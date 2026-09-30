@@ -73,6 +73,40 @@ def check(root, mutated=False):
             'assertions': list(EXPECTED.values()) if mutated else []}
 
 
+
+def boundaries(root):
+    env = os.environ.copy()
+    env.setdefault('GOCACHE', str(Path(tempfile.gettempdir()) / 'openexec-retention-go-cache'))
+    env['GOWORK'] = 'off'
+    names = {
+        'github.com/openexec/openexec/internal/execution/evidence': ['TestDiagnosticTailCapture'],
+        PIPELINE: ['TestPublicDiagnosticFailureEvent', 'TestPublicDiagnosticFailureEvent/nil=false',
+                   'TestPublicDiagnosticFailureEvent/nil=true', 'TestPublicNilResultRefusals',
+                   *('TestPublicNilResultRefusals/' + c for c in ('launch', 'cancelled', 'transport'))],
+        MANAGER: ['TestPublicDiagnosticFailureReloadAndRepair',
+                  *('TestPublicDiagnosticFailureReloadAndRepair/' + g + '/nil=' + n
+                    for g in ('lint', 'test') for n in ('false', 'true'))],
+    }
+    result = subprocess.run(['go', 'test', './internal/execution/evidence', './internal/pipeline',
+        './pkg/manager', '-json', '-count=1', '-timeout=60s', '-run',
+        '^Test(DiagnosticTailCapture|PublicDiagnosticFailure(Event|ReloadAndRepair)|PublicNilResultRefusals)$'],
+        cwd=root, env=env, capture_output=True, text=True, timeout=120)
+    expected = {(p, n) for p, tests in names.items() for n in ['', *tests]}
+    passed = set()
+    for line in result.stdout.splitlines():
+        event = json.loads(line)
+        if event.get('Action') in ('fail', 'skip'):
+            raise ValueError(result.stdout)
+        if event.get('Action') == 'pass':
+            key = event.get('Package'), event.get('Test', '')
+            if key in passed:
+                raise ValueError('duplicate boundary completion')
+            passed.add(key)
+    if result.returncode or result.stderr.strip() or passed != expected:
+        raise ValueError('boundary verification failed: ' + result.stdout + result.stderr)
+    return {'status': 'passed', 'completed': len(passed)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path)
@@ -90,7 +124,7 @@ def main():
                 target = baseline / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
-        report = {'public_baseline': check(baseline), 'engine_baseline': retained.check(baseline, {})}
+        report = {'diagnostic_boundaries': boundaries(baseline), 'public_baseline': check(baseline), 'engine_baseline': retained.check(baseline, {})}
         for branch, (_, _, expected) in retained.MUTATIONS.items():
             clone = Path(temp) / branch
             shutil.copytree(baseline, clone)

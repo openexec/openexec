@@ -18,9 +18,9 @@ Raw capture. One line per thought, any grammar.
   under US-014 above. Historical incident evidence remains in
   [named recapture](docs/verification/named-recapture.md).
 
-- [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test
-  event-to-reload-to-repair tracer implemented. Current verification, independent
-  engine/wrapper negative controls and remaining story/review boundaries live in
+- [US-012 / T-US-012-002] Bounded diagnostic tails and public silent/diagnostic
+  lint/test event-to-reload-to-repair journeys implemented, including nil results
+  and refusal checks. Verification and current Console dependency/adapter gaps live in
   [admitted evidence](docs/verification/admitted-evidence.md).
 
 - [US-010 / T-US-010-001] Current G-007 review study and exact provenance live in

@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -21,18 +22,36 @@ func assertPublicSilentEvidence(t *testing.T, f *admittedevidence.Executor) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(command.Argv, f.Argv) || command.Cwd != f.Dir || command.ExitCode != 2 || command.Stdout != "" || command.Stderr != "" {
+	if f.Diagnostic {
+		if !strings.HasSuffix(command.Stdout, "DIAGNOSTIC_TAIL\n") || !strings.HasSuffix(command.Stderr, "STDERR_TAIL\n") || !command.StdoutTruncated || !command.StderrTruncated || len(command.Stdout) != runtime.EvidenceStreamLimit || len(command.Stderr) != runtime.EvidenceStreamLimit {
+			t.Fatal("bounded private diagnostic tails lost")
+		}
+	} else if command.Stdout != "" || command.Stderr != "" {
+		t.Fatal("silent command produced output")
+	}
+	if !reflect.DeepEqual(command.Toolchain, map[string]string{"go_version": "fixture-go"}) {
+		t.Fatal("toolchain allowlist lost")
+	}
+	if !reflect.DeepEqual(command.Argv, f.Argv) || command.Cwd != f.Dir || command.ExitCode != 2 {
 		t.Fatalf("silent command identity lost: %+v", command)
 	}
 }
 
 func TestPublicSilentFailureReloadAndRepair(t *testing.T) {
 	for _, gate := range []string{"lint", "test"} {
-		t.Run(gate, func(t *testing.T) { testPublicSilentFailureReloadAndRepair(t, gate) })
+		t.Run(gate, func(t *testing.T) { testPublicFailureReloadAndRepair(t, gate, false, false) })
 	}
 }
 
-func testPublicSilentFailureReloadAndRepair(t *testing.T, gate string) {
+func TestPublicDiagnosticFailureReloadAndRepair(t *testing.T) {
+	for _, gate := range []string{"lint", "test"} {
+		for _, nilResult := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/nil=%t", gate, nilResult), func(t *testing.T) { testPublicFailureReloadAndRepair(t, gate, true, nilResult) })
+		}
+	}
+}
+
+func testPublicFailureReloadAndRepair(t *testing.T, gate string, diagnostic, nilResult bool) {
 	e := newSchedulerTestEnv(t)
 	createStory(t, e.rel, "S", nil)
 	createQueueTask(t, e, "A", nil)
@@ -41,7 +60,7 @@ func testPublicSilentFailureReloadAndRepair(t *testing.T, gate string) {
 	if err := e.rel.UpdateTask(&task); err != nil {
 		t.Fatal(err)
 	}
-	f := &admittedevidence.Executor{Dir: e.dir, Gate: gate}
+	f := &admittedevidence.Executor{Dir: e.dir, Gate: gate, Diagnostic: diagnostic, NilResult: nilResult}
 	e.mgr.cfg.StageExecutor = f
 	e.mgr.mu.Lock()
 	e.mgr.taskQueueActive = true
@@ -89,7 +108,14 @@ func testPublicSilentFailureReloadAndRepair(t *testing.T, gate string) {
 	if err := json.Unmarshal([]byte(step.Metadata), &artifacts); err != nil {
 		t.Fatal(err)
 	}
-	if artifacts["stage_output"] != "" || artifacts["stage_diagnostics"] != "" || f.Calls != 1 {
+	if diagnostic && !nilResult {
+		if !strings.Contains(artifacts["stage_output"], "DIAGNOSTIC_TAIL") || !strings.Contains(artifacts["stage_diagnostics"], "STDERR_TAIL") || strings.Contains(step.Metadata, "SENTINEL") {
+			t.Fatal("public diagnostic tails lost or secret exposed")
+		}
+	} else if artifacts["stage_output"] != "" || artifacts["stage_diagnostics"] != "" {
+		t.Fatal("unexpected public diagnostics")
+	}
+	if f.Calls != 1 {
 		t.Fatal("silent fixture produced diagnostics or repeated execution")
 	}
 	diagnosticFree := fresh.diagnosticFreeReceipt(artifacts)
@@ -126,6 +152,9 @@ func testPublicSilentFailureReloadAndRepair(t *testing.T, gate string) {
 	if err != nil || !strings.Contains(repair.Description, evidenceID) || !strings.Contains(repair.Description, f.Hash) ||
 		!strings.Contains(repair.Description, f.Path) || !strings.Contains(repair.Description, "Reproduce the failing check") {
 		t.Fatal("repair has no usable authoritative verification reference", err)
+	}
+	if strings.Contains(repair.Description, "SENTINEL") {
+		t.Fatal("repair exposed private secret")
 	}
 	// The referenced artifact contains the exact executable argv and cwd,
 	// including whitespace, and remains readable after repair persistence.

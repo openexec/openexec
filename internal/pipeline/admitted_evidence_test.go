@@ -3,8 +3,11 @@ package pipeline
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -83,6 +86,76 @@ func TestPublicEvidenceFailureClassification(t *testing.T) {
 			}
 			if gates.VerificationFailureArtifacts(errors.Join(failure, refusal)) != nil {
 				t.Fatal("mixed typed failure authorized repair")
+			}
+		})
+	}
+}
+
+func TestPublicDiagnosticFailureEvent(t *testing.T) {
+	var fingerprint string
+	for _, nilResult := range []bool{false, true} {
+		t.Run(fmt.Sprintf("nil=%t", nilResult), func(t *testing.T) {
+			f := &admittedevidence.Executor{Dir: t.TempDir(), Gate: "test", Diagnostic: true, NilResult: nilResult}
+			p, events := New(Config{FWUID: "diagnostic", WorkDir: f.Dir, BlueprintID: "standard_task", StageExecutor: f})
+			defer p.Close()
+			if err := p.runBlueprintMode(context.Background()); err == nil {
+				t.Fatal("failed check accepted")
+			}
+			var terminal *loop.Event
+			for len(events) > 0 {
+				e := <-events
+				if e.Type == loop.EventBlueprintFailed {
+					terminal = &e
+				}
+			}
+			if terminal == nil || terminal.Artifacts[f.Hash] != f.Path || !gates.ValidateVerificationFailureArtifacts(terminal.Artifacts) {
+				t.Fatal("missing diagnostic evidence")
+			}
+			receipt := terminal.Artifacts[gates.VerificationFailureReceiptKey]
+			if receipt != `[{"gate":"test","exit_code":2}]` {
+				t.Fatal("classification contains command diagnostics", receipt)
+			}
+			digest := terminal.Artifacts[gates.VerificationFailureDigestKey]
+			if fingerprint != "" && digest != fingerprint {
+				t.Fatal("private capture changed public fingerprint")
+			}
+			fingerprint = digest
+			raw, err := json.Marshal(terminal)
+			if err != nil || strings.Contains(string(raw), "SENTINEL") {
+				t.Fatal("public event exposed secret", err)
+			}
+			if !nilResult && (!strings.Contains(terminal.Text, "DIAGNOSTIC_TAIL") || !strings.Contains(terminal.Result.Diagnostics, "STDERR_TAIL")) {
+				t.Fatal("terminal lost diagnostic tails")
+			}
+		})
+	}
+}
+
+func TestPublicNilResultRefusals(t *testing.T) {
+	for _, name := range []string{"launch", "cancelled", "transport"} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var original error
+			switch name {
+			case "launch":
+				original = exec.Command(filepath.Join(t.TempDir(), "missing")).Run()
+			case "cancelled":
+				cmd := exec.CommandContext(ctx, "/bin/sh", "-c", "while :; do :; done")
+				if err := cmd.Start(); err != nil {
+					t.Fatal(err)
+				}
+				cancel()
+				original = cmd.Wait()
+			default:
+				original = errors.New("admission refused token=PRIVATE_SENTINEL")
+			}
+			classified := runtime.VerificationCommandFailureWithEvidence(ctx, "test", original, strings.Repeat("a", 64), "/private/reference")
+			runner := &gateRunnerAction{}
+			adapter := admittedStageExecutor{executor: retentionBoundaryExecutor{nil, classified}, evidence: runner}
+			result, err := adapter.Execute(ctx, &runtime.Stage{Name: "test", Type: runtime.StageTypeDeterministic}, nil)
+			if result != nil || err == nil || !errors.Is(err, original) || runner.receipt != nil || strings.Contains(err.Error(), "SENTINEL") {
+				t.Fatal("nil result refusal lost identity, leaked, or authorized repair")
 			}
 		})
 	}

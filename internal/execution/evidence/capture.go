@@ -2,7 +2,6 @@
 package evidence
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,23 +19,37 @@ const metadataLimit = 128
 const maxEvidenceBytes = 4 << 20
 const directory = ".openexec/data/verification"
 
-// Buffer drains the entire stream while retaining a bounded prefix.
+// Buffer drains the entire stream, retaining its first and last halves on overflow.
 // Use one buffer per stream; exec.Cmd serializes writes to each writer.
 type Buffer struct {
-	buffer    bytes.Buffer
+	data      []byte
 	Truncated bool
 }
 
-func (b *Buffer) Len() int       { return b.buffer.Len() }
-func (b *Buffer) String() string { return b.buffer.String() }
+func (b *Buffer) Len() int       { return len(b.data) }
+func (b *Buffer) String() string { return string(b.data) }
 func (b *Buffer) Write(p []byte) (int, error) {
 	n := len(p)
-	remaining := StreamLimit - b.Len()
-	if len(p) > remaining {
-		p = p[:remaining]
-		b.Truncated = true
+	if n <= StreamLimit-b.Len() {
+		b.data = append(b.data, p...)
+		return n, nil
 	}
-	_, _ = b.buffer.Write(p)
+	b.Truncated = true
+	const half = StreamLimit / 2
+	// Fill the prefix once. Keep only the latest half of the suffix without
+	// allocating in proportion to the incoming write.
+	if len(b.data) < half {
+		take := half - len(b.data)
+		b.data = append(b.data, p[:take]...)
+		p = p[take:]
+	}
+	if len(p) >= half {
+		b.data = append(b.data[:half], p[len(p)-half:]...)
+	} else {
+		start := len(b.data) - (half - len(p))
+		copy(b.data[half:], b.data[start:])
+		b.data = append(b.data[:StreamLimit-len(p)], p...)
+	}
 	return n, nil
 }
 
@@ -92,19 +105,31 @@ func Public(value string, secrets []string) string {
 	return bounded(value, StreamLimit)
 }
 
-// PublicStream avoids exposing a partial secret at the capture boundary by
-// dropping the final possibly incomplete line of a truncated stream.
+// PublicStream redacts complete retained lines on each side of the omitted
+// middle. Drop cut lines before redaction: neither half of a split credential
+// can safely be matched against the original secret.
 func PublicStream(b *Buffer, secrets []string) string {
-	value := b.String()
-	if b.Truncated {
-		if end := strings.LastIndexByte(value, '\n'); end >= 0 {
-			value = value[:end+1]
-		} else {
-			value = ""
-		}
-		value += "[truncated]"
+	if !b.Truncated {
+		return Public(b.String(), secrets)
 	}
-	return Public(value, secrets)
+	value := b.String()
+	head, tail := value[:StreamLimit/2-len("[truncated]")], value[StreamLimit/2:]
+	if end := strings.LastIndexByte(head, '\n'); end >= 0 {
+		head = head[:end+1]
+	} else {
+		head = ""
+	}
+	if start := strings.IndexByte(tail, '\n'); start >= 0 {
+		tail = tail[start+1:]
+	} else {
+		tail = ""
+	}
+	if end := strings.LastIndexByte(tail, '\n'); end >= 0 {
+		tail = tail[:end+1]
+	} else {
+		tail = ""
+	}
+	return Public(head+"[truncated]"+tail, secrets)
 }
 
 // Write stores exact argv/cwd and bounded raw diagnostics in an owner-only file.
@@ -112,7 +137,10 @@ func PublicStream(b *Buffer, secrets []string) string {
 func Write(projectDir string, command Command) (hash, path string, err error) {
 	command.StdoutTruncated = command.StdoutTruncated || len(command.Stdout) > StreamLimit
 	command.StderrTruncated = command.StderrTruncated || len(command.Stderr) > StreamLimit
-	command.Stdout, command.Stderr = bounded(command.Stdout, StreamLimit), bounded(command.Stderr, StreamLimit)
+	var stdout, stderr Buffer
+	stdout.Write([]byte(command.Stdout))
+	stderr.Write([]byte(command.Stderr))
+	command.Stdout, command.Stderr = stdout.String(), stderr.String()
 	command.Toolchain = Toolchain(command.Toolchain)
 	raw, err := json.Marshal(command)
 	if err != nil {
