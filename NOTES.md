@@ -6,8 +6,8 @@ Raw capture. One line per thought, any grammar.
 
 - [US-013 / T-US-013-001] Current task verifier, resolver negative controls,
   public-command regression and targeted recapture/compatibility tests pass.
-  The resumed repair found no command diagnostics in checkpoints/artifacts and
-  no Console-declared check available to stages. It could not reproduce the test
+  The resumed repair re-read the pending task and empty-phase receipt, and
+  confirmed Console still exposes no declared test check to this stage. It could not reproduce the test
   failure; fresh evidence and the unresolved command/output requirement replace
   earlier verification notes in [named recapture](docs/verification/named-recapture.md).
 

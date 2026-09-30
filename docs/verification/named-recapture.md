@@ -42,10 +42,12 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 ## Current verification and repair diagnosis
 
 On 2026-09-30, repair `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd`
-resumed from candidate baseline `4325bfc9` and reran the checks below.
+resumed from candidate baseline `9e1e7d24` and reran the checks below.
 Read-only SQLite inspection confirmed that T-US-013-001 still specifies
 `bash scripts/verify-verification-repair.sh --case legacy-incident` and that
-its run used this candidate worktree. The run error is
+its run used this candidate as `project_path` (`worktree_path` is null).
+The run is keyed by `runs.id = T-US-013-001`; its `task_id` is null, so
+filtering runs by task_id alone would incorrectly report no run. The run error is
 `stage "test" failed: exit status 2`.
 
 The selected receipt,
@@ -54,12 +56,13 @@ has an empty phase and only the test/exit-2 receipt and its digest in metadata.
 It contains no command, stdout/stderr, or private evidence reference. Thus the
 stored failure cannot establish that the task verification script was the
 command that failed, or identify a source defect. The original task, receipt,
-plan and runtime database were not modified. Read-only inspection of the run
-checkpoints also found empty message histories and tool-call logs; the artifact
-registry contains only receipt/digest placeholders, not a registered command log.
-The repository daemon/log search found no matching task or receipt diagnostics.
+plan and runtime database were not modified. The task is currently pending.
+The checkpoint file still contains only gather-context markers and the same
+receipt/digest, without command diagnostics. The prior attempt also inspected
+the artifact registry and repository logs without finding a command log; that
+historical search is not substituted for fresh execution evidence.
 
-The Console `run_declared_check` discovery call returned: “openexec/openexec
+A fresh Console `run_declared_check({"check":"test"})` call returned: “openexec/openexec
 declares no checks a stage can run.” Consequently this stage cannot recapture
 the owner-configured test through that interface. This is distinct from a
 sandbox socket refusal; no canonical gate was attempted or weakened.
