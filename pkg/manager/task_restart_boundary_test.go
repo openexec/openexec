@@ -161,3 +161,43 @@ func TestFreshTaskQueueReopensFailedTaskWithAttemptsLeft(t *testing.T) {
 		t.Fatalf("reopening widened beyond scope: %+v, %v", outside, err)
 	}
 }
+
+func TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	createStory(t, e.rel, "S", nil)
+	for _, task := range []*release.Task{
+		{ID: "original", StoryID: "S", Status: release.TaskStatusDone, AttemptCount: 1, MaxAttempts: 3},
+		{ID: "repair-retry", StoryID: "S", Status: release.TaskStatusFailed, AttemptCount: 1, MaxAttempts: 2,
+			Metadata: map[string]interface{}{"repair_of": "original", "verification_failure_evidence": "verification-failure-retry"}},
+		{ID: "repair-spent", StoryID: "S", Status: release.TaskStatusFailed, AttemptCount: 2, MaxAttempts: 2,
+			Metadata: map[string]interface{}{"repair_of": "original", "verification_failure_evidence": "verification-failure-spent"}},
+	} {
+		task.Title, task.Description = task.ID, "Resume the retained bounded fixture"
+		if err := e.rel.CreateTask(task); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.mgr.Close()
+	fresh := freshQueueManager(t, e)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	var boundary *TaskQueueBoundary
+	if err := fresh.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); !errors.As(err, &boundary) {
+		t.Fatalf("want only the spent repair retained, not a recursive repair refusal: %v", err)
+	}
+	if want := []TaskBoundary{{TaskID: "repair-spent", Status: release.TaskStatusFailed, Kind: BoundaryFailed}}; !reflect.DeepEqual(boundary.Tasks, want) {
+		t.Fatalf("boundary = %+v", boundary.Tasks)
+	}
+	rel, err := fresh.GetInternalReleaseManager()
+	if err != nil {
+		t.Fatal(err)
+	}
+	retried, err := rel.TaskSnapshot(ctx, "repair-retry")
+	if err != nil || retried.Status != release.TaskStatusDone || retried.AttemptCount != 2 {
+		t.Fatalf("failed repair with attempts left did not run again: %+v, %v", retried, err)
+	}
+	tasks, err := rel.TasksInStories(ctx, []string{"S"})
+	if err != nil || len(tasks) != 3 {
+		t.Fatalf("a repair of a repair was created: %d tasks, %v", len(tasks), err)
+	}
+}

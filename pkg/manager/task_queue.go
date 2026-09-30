@@ -61,7 +61,7 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 				continue
 			}
 			id, _ := task.Metadata["verification_failure_evidence"].(string)
-			if id != "" {
+			if id != "" && !isRepairTask(task) {
 				if err := m.repairTaskFromRetainedFailure(ctx, task.ID, id); err != nil {
 					return err
 				}
