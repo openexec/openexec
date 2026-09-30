@@ -441,6 +441,8 @@ func (e *Engine) GetRun(runID string) (*Run, bool) {
 // Execute runs the full blueprint for a given run.
 func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error {
 	totalRetries := 0
+	originalTask := input.TaskDescription
+	defer func() { input.TaskDescription = originalTask }()
 
 	for run.CurrentStage != "complete" && run.CurrentStage != "" {
 		// Check context cancellation
@@ -502,6 +504,10 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 					run.Fail("exceeded maximum total retries")
 					return fmt.Errorf("exceeded maximum total retries")
 				}
+
+				// Give the existing failure handler a correction request, not unchanged inputs.
+				failure := fmt.Sprintf("Stage: %s\nError: %s\nOutput: %s\nDiagnostics: %s", stage.Name, result.Error, result.Output, result.Diagnostics)
+				input.TaskDescription = CorrectionRequest(originalTask, failure, "")
 
 				// Move to failure handler (which might be same stage for retry)
 				run.CurrentStage = stage.OnFailure

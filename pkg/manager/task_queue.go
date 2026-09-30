@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/release"
 )
 
@@ -299,15 +300,12 @@ func retryWithStopReason(ctx context.Context, rel *release.Manager, id, reason s
 	return retry, nil
 }
 
-// attemptDescription is what one attempt of task is told: its description
-// and, when an earlier attempt stopped, why — framed as the problem to remove,
-// not as a boundary to respect.
+// attemptDescription gives the next execution the original task and observed
+// failure, delegating the correction rather than prescribing the same approach.
 func attemptDescription(task *release.Task) string {
 	previous, _ := task.Metadata[previousAttemptStop].(string)
 	if strings.TrimSpace(previous) == "" {
 		return task.Description
 	}
-	return task.Description + "\n\nThe previous attempt at this task stopped with:\n" + previous +
-		"\n\nStart there: find out why it stopped and remove the cause, then finish the task and verify it. " +
-		"What it found is the work that remains, not a reason to stop again."
+	return blueprint.CorrectionRequest(task.Description, previous, task.VerificationScript)
 }

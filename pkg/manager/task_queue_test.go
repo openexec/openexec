@@ -2,8 +2,8 @@ package manager
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -220,7 +220,7 @@ func TestAnAttemptIsToldWhyThePreviousOneStopped(t *testing.T) {
 	}
 	task.Metadata[previousAttemptStop] = "ten assertions expect the previous header"
 	got := attemptDescription(task)
-	for _, want := range []string{"Move the header", "ten assertions expect the previous header", "remove the cause"} {
+	for _, want := range []string{"Move the header", "ten assertions expect the previous header", "Could you fix this?", "Use your judgment", "preserve completed work", "scope and authority"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("attempt description lacks %q: %q", want, got)
 		}
