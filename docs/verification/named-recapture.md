@@ -41,9 +41,9 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 
 ## Current verification and repair diagnosis
 
-On 2026-09-30 at 06:24 UTC, repair
+On 2026-09-30 at 06:26 UTC, repair
 `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd` resumed from candidate baseline
-`d9f477f1` and reran the checks below. The Console project context was read
+`2174a871` and reran the checks below. The Console project context was read
 again; this stage retains the supplied repair scope and delivery boundary.
 Read-only SQLite inspection confirmed that T-US-013-001 still specifies
 `bash scripts/verify-verification-repair.sh --case legacy-incident` and that
@@ -61,7 +61,13 @@ command that failed, or identify a source defect. The original task, receipt,
 plan and runtime database were not modified. The task is currently pending.
 A fresh read of the test-phase and failure run_steps found only the running
 `T-US-013-001-11` test-stage start marker and two diagnostic-free receipts.
-The selected receipt still has no terminal command output. The local
+The selected receipt still has no terminal command output. Its persisted start
+is 2026-09-30 05:45:28 UTC, after dispatcher fix `cd9171a3` at
+2026-09-29 20:31:07 UTC. The earlier receipt starts at 20:29:05 UTC,
+before that fix. Both receipts have the same check/digest, but neither binds
+the executed source revision or command; timing alone cannot establish that
+the later execution used the fix or that it merely repeated stale evidence.
+The local
 `.openexec/openexec.yaml` declares only a custom `go vet ./...` lint gate,
 so it supplies no missing test-command mapping. The checkpoint file contains
 only gather-context markers and receipt/digest entries, without diagnostics.

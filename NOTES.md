@@ -6,9 +6,9 @@ Raw capture. One line per thought, any grammar.
 
 - [US-013 / T-US-013-001] Task verifier, resolver negative controls,
   public-command regression and targeted recapture/compatibility tests pass.
-  Continuation from d9f477f1 reconfirms the test-stage start marker and
-  diagnostic-free receipts; local config and Console still expose no runnable
-  test-command mapping.
+  Continuation from 2174a871 reconfirms diagnostic-free receipts and their
+  timing across the dispatcher fix; neither records the executed revision.
+  Local config and Console still expose no runnable test-command mapping.
   The recorded failure remains unreproduced. Current evidence and the required
   execution-owner command/output are in
   [named recapture](docs/verification/named-recapture.md).
