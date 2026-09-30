@@ -731,3 +731,38 @@ When enabled, BitNet can classify user intent and select tools locally, reducing
 
 **Document Maintainer:** OpenExec Core Team  
 **Questions?** Open an issue or discussion on GitHub.
+
+## origin/main sync map
+
+Observed 2026-09-30 for US-019 / T-US-019-001 at candidate HEAD `92e3d48a`.
+`git merge-base HEAD origin/main` returned fork point `45f1c1fe`;
+`git rev-parse origin/main` resolved to `2fc03214`.
+`git merge-tree --write-tree --name-only HEAD origin/main` exited 1 with
+one content conflict: `docs/ARCHITECTURE.md`. This was a merge probe only;
+the sync itself belongs to the next task.
+
+Keep the shared `# OpenExec Architecture` title and both sides' content under
+these exact headings when resolving that conflict:
+
+| Side | Keep-list |
+| --- | --- |
+| origin/main (264-line rewrite) | `## Context and scope`; `## Module map and APIs`; `## Data flow and observed gaps`; `## Accepted requirement mapping`; `## Boundaries and conventions`; `## Evidence ownership`; `## Discovery verification` |
+| Candidate additions since the fork | ``### 10. Planner prompt rules & planning gate (`internal/planner/`, `internal/cli/release.go`)``; `### Review 474755f1 finding map`; `### Review 474755f1 — HIGH negative controls`; `### Review 474755f1 — MEDIUM negative controls` |
+
+Inspection confirms full prompt rule 8 and compact rule 4 require
+`origin/<default>`. `internal/planner/stale_base.go` checks story and task
+scripts, sorts owners and builds refusal errors. The CLI import gate calls it
+outside goal coverage; manager imports check it before persistence in
+`importBoundPlan`, refined auto-import and retained/approved replay.
+
+Fresh D1 checks passed (all `-count=1`): `go test ./internal/planner/ -run
+OriginDefaultRef`, `go test ./internal/planner/ -run RemoteBaseRef`, and
+`go test ./internal/planner/ ./internal/cli/ ./pkg/manager/ -run StaleBase`.
+These exercise remote-ref acceptance and bare-ref refusal, including manager
+reload assertions for persisted/absent tasks and retained-artifact preservation.
+Host `run_declared_check` named `lint` exited 0 (Go vet and UI ESLint).
+After `go build -o bin/openexec ./cmd/openexec`, `go test -tags e2e -count=1
+./internal/cli/ -run StaleBase -v` passed: the actual CLI refused bare refs in
+goal-less objects and legacy arrays, and previewed the remote-ref import.
+The task's verification script also passed, re-reading the saved sync map.
+No production code or tests changed; project-format compatibility is unchanged.

@@ -4,6 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-019 / T-US-019-001] Sync discovery complete; conflict inventory and fresh
+  check results are recorded in `docs/ARCHITECTURE.md` under the sync map.
+  The subsequent sync task owns conflict resolution.
+
 - [Simple Loop contract, 2026-09-14] `fix/native-reviewed-planning` exposes
   existing compact generation through `Manager.Plan`; native reviewed-plan
   replay/refinement/import and task execution remain canonical. Compact
