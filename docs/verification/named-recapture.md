@@ -42,7 +42,7 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 ## Current verification and repair diagnosis
 
 On 2026-09-30, repair `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd`
-rechecked candidate baseline `d1204abdd19c5be3e73c27e6330e8fbd99b47d13`.
+resumed from candidate baseline `4325bfc9` and reran the checks below.
 Read-only SQLite inspection confirmed that T-US-013-001 still specifies
 `bash scripts/verify-verification-repair.sh --case legacy-incident` and that
 its run used this candidate worktree. The run error is
@@ -54,7 +54,15 @@ has an empty phase and only the test/exit-2 receipt and its digest in metadata.
 It contains no command, stdout/stderr, or private evidence reference. Thus the
 stored failure cannot establish that the task verification script was the
 command that failed, or identify a source defect. The original task, receipt,
-plan and runtime database were not modified.
+plan and runtime database were not modified. Read-only inspection of the run
+checkpoints also found empty message histories and tool-call logs; the artifact
+registry contains only receipt/digest placeholders, not a registered command log.
+The repository daemon/log search found no matching task or receipt diagnostics.
+
+The Console `run_declared_check` discovery call returned: “openexec/openexec
+declares no checks a stage can run.” Consequently this stage cannot recapture
+the owner-configured test through that interface. This is distinct from a
+sandbox socket refusal; no canonical gate was attempted or weakened.
 
 Fresh checks in this attempt (all exit 0):
 
