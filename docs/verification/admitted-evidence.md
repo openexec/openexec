@@ -63,7 +63,7 @@ Executed in this candidate on 2026-09-30:
 
 ### Source evidence
 
-Read-only reinspection on 2026-09-30 at 09:26 UTC resolved the owner-reported Console revision
+Read-only reinspection on 2026-09-30 at 09:28 UTC resolved the owner-reported Console revision
 with `git -C /mnt/data1/projects/agent-console rev-parse 4c819427` to
 `4c819427643655fc85d830b3a79f337488bd3fc0`. Files were read with
 `git show <revision>:<path>`, independently of the stale main checkout at
@@ -94,7 +94,7 @@ VerificationCommandFailureWithEvidence API. A dependency-only bump would leave
 the Console call incompatible: this candidate does not expose WithOutput.
 
 OpenExec prerequisite source inspected and tested here is candidate baseline
-`f5b436739d1e9c9803a3cc412f6d68e109ac6109`. Its public runtime exposes the
+`a673630cd2327c7305bda2841b8735b386666bb3`. Its public runtime exposes the
 EvidenceBuffer alias, RetainCommandEvidence and
 VerificationCommandFailureWithEvidence. Availability in this candidate is not
 proof that Console has updated its dependency or binary.
@@ -108,7 +108,7 @@ source inspection. The sandbox's `/proc/*/comm` scan found no process with
 `console` in its name; it supplied no independent serving-binary evidence.
 
 Fresh checks rerun in this OpenExec candidate on 2026-09-30, completed by
-09:26 UTC (the host test log uses local time):
+09:29 UTC (the host test log uses local time):
 
 - `run_declared_check(check="lint")`: exit 0, Go vet and UI ESLint.
 - `run_declared_check(check="test")`: exit 0, Go suite and 635 UI tests across
@@ -142,7 +142,13 @@ repository write grant is this OpenExec candidate and its specified git paths;
 Console source/dependency writes, copied substitute adapter, deployment or
 approval request was attempted. This is a source-write boundary, not a missing
 credential or a sandbox socket failure. Host checks close the OpenExec
-verification gap but cannot update Console through this grant.
+verification gap but cannot update Console through this grant. Fresh Console
+project-context lookup lists agent-console with repositories:read and
+repository-documents:write (docs/ only); it supplies no additional source-write
+authority. The declared lint/test checks run this OpenExec candidate, not a
+Console candidate. Repeating this stage with the same effect roots cannot
+remove the confirmed dependency/adapter gap; the dependent integration needs
+an authorized Console source workspace, not another OpenExec test retry.
 
 Retain T-US-012-003 and its affected adoption criteria as incomplete:
 
