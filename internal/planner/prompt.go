@@ -55,6 +55,19 @@ before review. A requirement_id equal to the intent's identifier IS the
 structured mapping; do not ask for another.
 `
 
+// RepositoryScopeRule is shared by every planning path. A plan runs in one
+// repository's candidate; a task whose files live in another repository can
+// neither be done nor verified there, and three Goals stopped on one
+// (openexec a8afdf3e twice, 21d181ed US-015 asking for agent-console changes).
+const RepositoryScopeRule = `REPOSITORY SCOPE:
+Every task changes and verifies files in THIS repository only; its
+verification_script reads nothing from another checkout. Work the intent
+needs in another repository is not a task here: name it in the owning story's
+contract as a follow-up for that repository, and plan this repository's side
+so it is complete and verifiable on its own. Reject any task that edits,
+builds or verifies another repository.
+`
+
 // HumanBoundaryRule is shared by generation, review and refinement. Classification
 // describes required owner input; it never grants permission for an effect.
 const HumanBoundaryRule = `EXECUTION AND HUMAN BOUNDARIES:
@@ -108,6 +121,7 @@ RULES:
    - "afk" (default): an agent can complete AND verify the task autonomously (code change + script verification).
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
+` + RepositoryScopeRule + `
 OUTPUT FORMAT (JSON object):
 {
   "schema_version": "1.1",
@@ -179,6 +193,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 3. Do NOT create a Codebase Study story, a Goal Validation/terminus story, or any docs/ARCHITECTURE.md task — this is a small change to an existing project, not a build-out.
 4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok'). A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 5. ` + HumanBoundaryRule + `
+` + RepositoryScopeRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
 Return ONLY valid JSON, no markdown, in this exact shape:
@@ -206,6 +221,7 @@ dependency modeling for parallel execution.
 
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
+` + RepositoryScopeRule + `
 Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
 REVIEW THE STORIES AGAINST THESE CRITERIA:
@@ -287,6 +303,7 @@ The reviewer has analyzed the stories and provided a refactoring plan. Follow it
 
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
+` + RepositoryScopeRule + `
 ORIGINAL INTENT:
 %s
 

@@ -238,3 +238,13 @@ func TestRequirementIdentityRuleSharedAcrossPlannerPrompts(t *testing.T) {
 		t.Fatal("review still requires REQ-XXX identifiers the intent may not use")
 	}
 }
+
+func TestRepositoryScopeRuleSharedAcrossPlannerPrompts(t *testing.T) {
+	// Without it a single-repository Goal is planned a task in another
+	// repository, which no stage in this candidate can do or verify.
+	for name, prompt := range map[string]string{"generation": StoryGenerationPrompt, "compact": CompactStoryGenerationPrompt, "review": StoryReviewPrompt, "fix": StoryFixPrompt} {
+		if !strings.Contains(prompt, RepositoryScopeRule) {
+			t.Fatalf("%s prompt lacks the repository scope rule", name)
+		}
+	}
+}
