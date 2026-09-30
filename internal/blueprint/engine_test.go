@@ -3,6 +3,7 @@ package blueprint
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -187,9 +188,23 @@ func TestEngine_Execute_WithRetry(t *testing.T) {
 	customExecutor := &customMockExecutor{
 		execute: func(ctx context.Context, stage *Stage, input *StageInput) (*StageResult, error) {
 			failCount++
+			if failCount == 1 && input.TaskDescription != "test task" {
+				t.Fatal("first execution changed")
+			}
+			if failCount > 1 {
+				for _, want := range []string{"test task", "Could you fix this?", "temporary failure", "diagnostic detail"} {
+					if !strings.Contains(input.TaskDescription, want) {
+						t.Errorf("stage retry missing %q: %s", want, input.TaskDescription)
+					}
+				}
+				if strings.Count(input.TaskDescription, "Could you fix this?") != 1 {
+					t.Error("retry instructions accumulated")
+				}
+			}
 			result := NewStageResult(stage.Name, failCount)
 			if failCount <= 2 {
 				result.Fail("temporary failure")
+				result.Diagnostics = "diagnostic detail"
 			} else {
 				result.Complete("success after retries")
 			}
@@ -207,6 +222,9 @@ func TestEngine_Execute_WithRetry(t *testing.T) {
 
 	run, _ := engine.StartRun(ctx, "run1", input)
 	err = engine.Execute(ctx, run, input)
+	if input.TaskDescription != "test task" {
+		t.Error("retry mutated original task after execution")
+	}
 
 	if err != nil {
 		t.Fatalf("Execute should succeed after retries: %v", err)

@@ -4,6 +4,19 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [repair-oriented retry, 2026-09-30] Owner requested “Could you fix this?”
+  with original task and observed error, delegating investigation/correction.
+  OpenExec task and blueprint retries use the correction request; Console Goal
+  diagnosis uses the accepted Goal text and bounded failure evidence. Existing
+  attempt limits, authority, and queues remain. Focused queue/SQLite reopen and
+  refusal tests pass; removed-instruction negative controls fail as expected.
+  Full validation workflow: openexec-repair-oriented-retry-validation finished.
+  Persisted /tmp/repair-oriented-retry-validation/results.json and logs report
+  OpenExec make test (635 UI tests), compat-test and type-check exit 0; Console
+  make check exit 0 (visual suite 47 passed, 3 skipped). Re-read all six results
+  and verified implementation/test SHA-256 hashes still match.
+  Changes live in the two fix/repair-oriented-retry worktrees; not deployed.
+
 - [US-020 / T-US-020-001] Merge origin/main while preserving the US-019 sync
   map and candidate planner/review documentation. Resolution and verification
   results are recorded in `docs/ARCHITECTURE.md` under the sync map.
