@@ -42,7 +42,7 @@ restart, ownership, dependency/refusal boundaries and protected project formats.
 ## Current verification and repair diagnosis
 
 On 2026-09-30, repair `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd`
-resumed from candidate baseline `11e2c752` and reran the checks below.
+resumed from candidate baseline `0d802067` and reran the checks below.
 Read-only SQLite inspection confirmed that T-US-013-001 still specifies
 `bash scripts/verify-verification-repair.sh --case legacy-incident` and that
 its run used this candidate as `project_path` (`worktree_path` is null).
@@ -68,8 +68,10 @@ so it supplies no missing test-command mapping. The checkpoint file contains
 only gather-context markers and receipt/digest entries, without diagnostics.
 
 A fresh Console `run_declared_check({"check":"test"})` call returned: “openexec/openexec
-declares no checks a stage can run.” Consequently this stage cannot recapture
-the owner-configured test through that interface. This is distinct from a
+declares no checks a stage can run. Its owner adds them beside lint and test
+in AGENT_CONSOLE_TASK_CHECKS.” Consequently this stage cannot recapture the
+owner-configured test through that interface. This is a fresh refusal in this
+attempt, not an inference from earlier checkout notes. This is distinct from a
 sandbox socket refusal; no canonical gate was attempted or weakened.
 
 Fresh checks in this attempt (all exit 0):
