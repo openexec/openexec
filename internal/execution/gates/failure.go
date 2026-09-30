@@ -13,6 +13,12 @@ import (
 // NewCommandFailure is called at a configured verification command boundary.
 // Unknown process and cancellation errors retain their original classification.
 func NewCommandFailure(ctx context.Context, name string, err error) error {
+	return NewCommandFailureWithOutput(ctx, name, err, "", "")
+}
+
+// NewCommandFailureWithOutput is NewCommandFailure carrying the command that
+// ran and its output, so the evidence a repair is built from can be reproduced.
+func NewCommandFailureWithOutput(ctx context.Context, name string, err error, command, output string) error {
 	if err == nil {
 		return nil
 	}
@@ -20,7 +26,10 @@ func NewCommandFailure(ctx context.Context, name string, err error) error {
 	if !ok || ctx.Err() != nil || exit.ExitCode() <= 0 || exit.ExitCode() >= 126 {
 		return err
 	}
-	return &verificationFailure{message: err.Error(), checks: []CheckFailure{{Gate: name, ExitCode: exit.ExitCode()}}}
+	if len(output) > maxFailureOutput {
+		output = "…" + output[len(output)-maxFailureOutput:]
+	}
+	return &verificationFailure{message: err.Error(), checks: []CheckFailure{{Gate: name, ExitCode: exit.ExitCode(), Command: command, Output: output}}}
 }
 
 const VerificationFailureReceiptKey = "verification_failure_receipt"
@@ -30,7 +39,18 @@ const VerificationFailureDigestKey = "verification_failure_digest"
 type CheckFailure struct {
 	Gate     string `json:"gate"`
 	ExitCode int    `json:"exit_code"`
+	// Command and Output are what the failure looked like: the argv that ran
+	// and the tail of what it printed. Without them a repair task was handed
+	// "test, exit 2" and nothing to reproduce, and stopped on "stored evidence
+	// lacks the test command and diagnostics".
+	Command string `json:"command,omitempty"`
+	Output  string `json:"output,omitempty"`
 }
+
+// maxFailureOutput bounds the output a receipt carries: the tail, where the
+// failing test and its assertion are.
+const maxFailureOutput = 6000
+
 type verificationFailure struct {
 	message string
 	checks  []CheckFailure
