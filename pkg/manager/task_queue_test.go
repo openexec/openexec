@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -223,5 +224,35 @@ func TestAnAttemptIsToldWhyThePreviousOneStopped(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("attempt description lacks %q: %q", want, got)
 		}
+	}
+}
+
+// A queue asked to yield stops between tasks: the task that finished stays
+// done, the next is not started and spends no attempt.
+func TestTaskOrientedQueueYieldsAtATaskBoundary(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	createStory(t, e.rel, "S", nil)
+	createQueueTask(t, e, "A", nil)
+	createQueueTask(t, e, "B", []string{"A"})
+	asked := 0
+	yield := func() bool { asked++; return asked > 1 } // after A, before B
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	err := e.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}, Yield: yield})
+	if !errors.Is(err, ErrQueueYielded) {
+		t.Fatalf("want a yield, got %v", err)
+	}
+	a, _ := e.rel.TaskSnapshot(context.Background(), "A")
+	b, _ := e.rel.TaskSnapshot(context.Background(), "B")
+	if a.Status != release.TaskStatusDone || b.Status != release.TaskStatusPending || b.AttemptCount != 0 {
+		t.Fatalf("yield lost work or spent an attempt: A=%s B=%s/%d", a.Status, b.Status, b.AttemptCount)
+	}
+	// And the queue resumes where it yielded.
+	if err := e.mgr.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); err != nil {
+		t.Fatalf("resume after yield: %v", err)
+	}
+	b, _ = e.rel.TaskSnapshot(context.Background(), "B")
+	if b.Status != release.TaskStatusDone || b.AttemptCount != 1 {
+		t.Fatalf("B did not run once after the yield: %s/%d", b.Status, b.AttemptCount)
 	}
 }

@@ -49,6 +49,9 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		if opts.Yield != nil && opts.Yield() {
+			return ErrQueueYielded
+		}
 		// A crash after receipt persistence but before repair insertion must not
 		// require the owner to recreate that disposition. Repair insertion itself
 		// is idempotent and keeps all work in the same existing task ledger.
