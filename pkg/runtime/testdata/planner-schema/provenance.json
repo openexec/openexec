@@ -1,0 +1,12 @@
+{
+  "source_sha256": "c02f1f38f893717faa92d34bdacc136c3c1a820ff8791c93e0c3dd2a79e1df0c",
+  "source_evidence": "docs/verification/planner-schema-inspection.md",
+  "sanitization": "Retained story IDs, order and exact requirement_id values. Replaced all prose and tasks with synthetic local examples; removed paths, original commands and owner decisions. Isolated cases select one incident story. Scalar control changes only requirement_id; REQ-001 is selected synthetically, not a production mapping repair.",
+  "fixtures": {
+    "incident-array.json": "0316d86cdd55d03b18a8dc067d88b22d058e20a4a8433d65b7a6b875e1b9fb99",
+    "empty-array.json": "d0e1018b61b9af29a331c0dee126e5cb8f2c3942688dab95ed494487c5ad11a4",
+    "multi-array.json": "db98fc04aa95bd55feff0c5e3b46240108c304d94e56b27849a859db395a8037",
+    "single-array.json": "6e8ddf54f88b9b0888d6938e33468b5bc62eb923613acec9054104339273a0e1",
+    "scalar.json": "c1e9634252b103f470bebcf19c2eb4cb834781bc86ac73777ea97c20734b0d31"
+  }
+}

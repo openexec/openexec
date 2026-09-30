@@ -164,6 +164,7 @@ future accounting changes must explain their updated expected consumption.
 
 Compatibility evaluation: documentation-only changes cannot alter .openexec,
 .uaos or tasks.json loading/migration, schemas or execution. Full canonical
-gates, discovery fixtures/verifier, recovery coverage and repair-disabled proof
-remain with their assigned later tasks/Console runner. No publication, review
+gates, recovery coverage and repair-disabled proof remain with their assigned
+later tasks/Console runner. Discovery fixtures/verifier are now recorded in
+[planner schema discovery](planner-schema-discovery.md). No publication, review
 approval, merge or deployment is claimed.

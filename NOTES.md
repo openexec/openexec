@@ -4,6 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Planner schema fixtures / US-007 / T-US-007-002] Sanitized fixtures, public
+  runtime observations, scalar controls and strict candidate discovery are in
+  [planner schema discovery](docs/verification/planner-schema-discovery.md).
+  This is the planner task, distinct from the historical verification-failure
+  study below. Current array coercion is reported, not certified as recovery.
+
 - [Planner schema discovery / US-007 / T-US-007-001] Candidate and pinned-runtime
   offline reproduction, scalar controls, source paths and accounting gaps are
   recorded once in [planner schema inspection](docs/verification/planner-schema-inspection.md).
