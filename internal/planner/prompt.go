@@ -53,6 +53,28 @@ REQ-XXX aliases for identifiers the intent already has, and never add fields
 the output format does not list (an alias table, "maps_to"): they are dropped
 before review. A requirement_id equal to the intent's identifier IS the
 structured mapping; do not ask for another.
+For an enabling story with no accepted requirement of its own, use the empty
+string "". The schema normalizes null and an omitted requirement_id to "" before
+review and persistence. These mean the same absence of a requirement mapping;
+do not reject an enabling story merely because null became "", and do not
+request JSON null as a correction to that canonical empty string. Keep the
+story's contract consistent with this representation. Real accepted requirement
+identifiers must still be preserved and covered.
+`
+
+// CandidateCommitRule keeps task planning within the caller's existing commit
+// policy. The Console commits its candidate; standalone workflows may delegate
+// safe_commit to a task. A universal commit mandate contradicts the former.
+const CandidateCommitRule = `CANDIDATE COMMIT OWNERSHIP:
+Follow the commit policy of the supplied intent and execution workflow. When
+Agent Console or another coordinator owns candidate commits, tasks implement
+and verify changes and leave candidate commits to that coordinator. Do not
+instruct those tasks to call safe_commit or make any other commit, including
+preparation commits. When the workflow delegates task commits and safe_commit
+is available, use it with the actual owning story_id and task_id for verified
+changes. Never invent commit authority or an owning story. Complete autonomous
+preparation before a retained human acceptance boundary; the acceptance task
+must not mutate or commit the exact candidate it asks the owner to accept.
 `
 
 // RepositoryScopeRule is shared by every planning path. A plan runs in one
@@ -116,12 +138,13 @@ RULES:
    - A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 9. Task IDs: T-US-XXX-YYY format. Only add depends_on between tasks when there is a true dependency (e.g., task B needs output from task A). Independent tasks within the same story should have empty depends_on to enable parallel execution.
 10. GOAL VALIDATION: Every project MUST conclude with a dedicated 'Goal Validation' story (terminus) that depends on ALL implementation stories. The terminus MUST include a task that writes or updates docs/ARCHITECTURE.md (module map, key APIs, conventions) so later lightweight sessions inherit this build's understanding.
-11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint). It must conclude with a mandate to use 'safe_commit' with the appropriate 'story_id' and 'task_id' to persist verified changes to the local story branch.
+11. TECHNICAL STRATEGY: Every task MUST include a "technical_strategy" (2-sentence blueprint) for implementation and verification within the supplied execution workflow's commit policy.
 12. EXECUTION MODE: Tag every task with "mode": "afk" or "hitl".
    - "afk" (default): an agent can complete AND verify the task autonomously (code change + script verification).
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
+` + CandidateCommitRule + `
 OUTPUT FORMAT (JSON object):
 {
   "schema_version": "1.1",
@@ -194,6 +217,8 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok'). A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 5. ` + HumanBoundaryRule + `
 ` + RepositoryScopeRule + `
+` + RequirementIdentityRule + `
+` + CandidateCommitRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
 Return ONLY valid JSON, no markdown, in this exact shape:
@@ -222,6 +247,7 @@ dependency modeling for parallel execution.
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
+` + CandidateCommitRule + `
 Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
 REVIEW THE STORIES AGAINST THESE CRITERIA:
@@ -304,6 +330,7 @@ The reviewer has analyzed the stories and provided a refactoring plan. Follow it
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
+` + CandidateCommitRule + `
 ORIGINAL INTENT:
 %s
 
