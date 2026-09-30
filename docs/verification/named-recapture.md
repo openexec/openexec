@@ -39,44 +39,56 @@ commands and verifies their typed failure, stderr and current provenance; missin
 native definitions refuse. Existing recapture tests exercise success, attempts,
 restart, ownership, dependency/refusal boundaries and protected project formats.
 
-Verified 2026-09-30 with a writable Go cache under /tmp:
+## Current verification and repair diagnosis
 
-- `bash scripts/verify-verification-repair.sh --case legacy-incident`: passed all
-  four incident cases. In isolated source copies, separately removing phase
-  inference and named fallback each failed the incident assertion with calls=0,
-  status=needs_review and recapture_outcome=unresolved. Compiler errors, skips,
-  unrelated assertions or missing test completions are rejected by the verifier.
+On 2026-09-30, repair `repair-7e6a9ed05d68f1a437dfc9fc2e1dccfd`
+rechecked candidate baseline `d1204abdd19c5be3e73c27e6330e8fbd99b47d13`.
+Read-only SQLite inspection confirmed that T-US-013-001 still specifies
+`bash scripts/verify-verification-repair.sh --case legacy-incident` and that
+its run used this candidate worktree. The run error is
+`stage "test" failed: exit status 2`.
+
+The selected receipt,
+`verification-failure-f13d13cc4ea054bdaa2b09622c97c7976f34357007d6e6daebc898c8d989c0ac`,
+has an empty phase and only the test/exit-2 receipt and its digest in metadata.
+It contains no command, stdout/stderr, or private evidence reference. Thus the
+stored failure cannot establish that the task verification script was the
+command that failed, or identify a source defect. The original task, receipt,
+plan and runtime database were not modified.
+
+Fresh checks in this attempt (all exit 0):
+
+- `bash scripts/verify-verification-repair.sh --case legacy-incident`: all four
+  lint/test × empty/matching cases passed, including real failing subprocess,
+  exact retained command/streams, unchanged original receipt, SQLite reopen,
+  persisted same-story repair and pending Settings assertions. Both isolated
+  resolver mutations failed at the required unresolved/needs_review assertion
+  with zero executions. The verifier rejects compilation failures, skips and
+  unrelated failures as mutation evidence.
+- `python3 -m unittest discover -s scripts/verification -p test_named_recapture_dispatch.py -v`:
+  one test passed, invoking the public command from /tmp and checking the
+  baseline and both mutation reports.
 - `go test ./pkg/manager ./internal/pipeline ./internal/release ./internal/validation -run 'Test(NamedRecapture|LegacyRecapture|Recapture)|Compatibility' -count=1 -timeout=60s`:
-  passed, including native definitions and .openexec/.uaos/tasks.json journeys.
-- `python3 -m unittest discover -s scripts/verification -p test_named_recapture_dispatch.py -v`: passed; invokes the retained `legacy-incident` command from /tmp,
-  including all four strengthened incident cases and both resolver negative controls.
-- `bash scripts/verify-verification-repair.sh --case named-recapture`: passed
-  baseline and both negative controls before the fixture assertions were tightened.
-- `bash scripts/verify-verification-repair.sh --case study`: passed the source,
-  ownership and saved-document checks (not a product-completion certificate).
+  all four packages passed using `GOCACHE=/tmp/openexec-retention-go-cache`,
+  set through the subprocess environment. This includes native command
+  definitions and protected .openexec/.uaos/tasks.json journeys.
 - `bash -n scripts/verify-verification-repair.sh` and `git diff --check`: passed.
 
-The added phase helper is included in the US-013 full-function scope manifest;
-no statement-coverage result is claimed in this implementation stage.
+The earlier repair `repair-2d2a8484fad9be3b0170c225126befce` fixed a
+reproduced dispatcher defect: the retained `legacy-incident` case returned
+unknown-case exit 2 while `named-recapture` passed. Both names now invoke the
+same incident verifier. That fix is already present in the baseline and does
+not explain this later receipt. No fresh failure was reproduced by the task's
+own verification or the targeted tests, so this attempt makes no speculative
+runtime or verifier change and does not claim the new failure repaired.
+Diagnosing the failed test stage still requires its actual command and output
+from the execution owner. Canonical repository gates remain runner-owned;
+no sandbox gate refusal is being treated as a blocker.
 
-## Failed task verification repair
-
-Repair `repair-2d2a8484fad9be3b0170c225126befce` preserves T-US-013-001's
-accepted command from the retained plan: `--case legacy-incident`. Before this
-repair that exact command returned exit 2 with `unimplemented or unknown
-verification case: legacy-incident`; the previously documented `named-recapture`
-command passed. The supplied test/exit-2 receipt contains no command diagnostics,
-so it alone does not prove a Go defect. The concrete reproduced defect was the
-missing dispatcher entry for the task's verification script.
-
-Both names now invoke the same unchanged incident verifier, preserving its real
-queue/reload/repair assertions and both resolver mutations. A new public-command
-regression test invokes the retained command from /tmp and checks its baseline
-and mutation results. Removing only the dispatcher alias made this test fail on
-the original unknown-case exit-2 diagnostic; restoring it passed. Unknown and
-unimplemented cases still fail closed. No task plan or runtime behavior changed;
-complexity delta: one command alias and its test, no persistent state,
-transitions, owner decisions or new execution machinery.
+Compatibility evaluation: this attempt changes documentation only; no loader,
+schema, migration, execution or check behavior changes. Complexity delta: zero.
+The added phase helper remains in the US-013 full-function scope manifest;
+no new statement-coverage result is claimed.
 
 ## Review and delivery boundary
 

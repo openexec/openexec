@@ -4,11 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [US-013 / T-US-013-001] Single-gate phase inference and current named-check
-  recapture implemented in the native queue. Independent admitted incident,
-  native definition, reload/repair, exact retained command and original receipt,
-  both resolver negative controls and the repaired retained `legacy-incident` verification entry point are
-  recorded once in [named recapture](docs/verification/named-recapture.md).
+- [US-013 / T-US-013-001] Current task verifier, resolver negative controls,
+  public-command regression and targeted recapture/compatibility tests pass.
+  The latest repair could not reproduce or diagnose the diagnostic-free test
+  failure; fresh evidence and the unresolved command/output requirement replace
+  earlier verification notes in [named recapture](docs/verification/named-recapture.md).
 
 - [US-012 / T-US-012-001] Public typed-error attachment and silent lint/test
   event-to-reload-to-repair tracer implemented. Current verification, independent
