@@ -1,6 +1,8 @@
 # OpenExec Architecture
 
-Current study: US-010 / T-US-010-001, 2026-09-29, accepted G-007.
+Current validation: US-015 / T-US-015-001, 2026-09-30, accepted G-007.
+Final evidence and finding dispositions: [delivery evidence](verification-evidence-delivery.md).
+Prerequisite study: US-010 / T-US-010-001.
 Exact candidate/Console identities, evidence limits, all review checklists and
 required implementation proofs live in [repair study](verification/repair-study.md).
 The [requirement register](verification/repair-requirements.json) preserves exact
@@ -15,8 +17,10 @@ the actual check, and recover legacy diagnostic-free failures with bounded
 recapture. Current code retains failed results, private bounded diagnostics and
 SQLite receipts. The public attachment API and empty-phase named-check recapture
 are implemented; current proof is in [admitted evidence](verification/admitted-evidence.md)
-and [named recapture](verification/named-recapture.md). Private storage protection,
-Console adoption and aggregate delivery remain separately owned prerequisites.
+and [named recapture](verification/named-recapture.md). Private storage and the
+strict 16-member aggregate are locally verified. Actual Console adoption is
+deferred until this API merges; D2 remains incomplete pending a candidate-matched
+Console merge receipt. Source inspection is distinct from runtime attestation.
 
 The existing native task loop owns implementation, verification, retries and
 repair. Console owns admission/effects, outer Goal review and delivery. Reuse
@@ -25,7 +29,7 @@ no new scheduler, recovery queue, state machine or authority concept is needed.
 Follow the [Simple Loop contract](OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md).
 Complexity delta: concepts added/removed 0; new persistent state, transitions,
 owner decisions and runtime failure modes 0; existing machinery replaced none.
-This study changes verification and documentation only; production behavior is unchanged.
+This validation stage changes verification and documentation only; production behavior is unchanged.
 
 Read root/docs instructions, NOTES and [project intent](../PROJECT_INTENT.md).
 Fresh Console Project context reports accepted Goal/Ready revision 4 and
@@ -138,7 +142,7 @@ owner in the linked requirement register; D1 and D2 belong to REQ-004.
 | REQ-001 | Exact US-012 contract: preserve failed results, admitted command identity/cwd and usable repair reference; actual Console adoption and tails required. | US-012 |
 | REQ-002 | Exact US-013 contract: bounded native recapture of diagnostic-free legacy receipts; no new loop/state machine or owner decision. | US-013 |
 | REQ-003 | Exact US-014 contract: classification/provenance separate from private diagnostics; no indiscriminate environment or secret logging. | US-014 |
-| REQ-004 | Exact US-015 contract: D1 reproduces and fixes failure; D2 verifies merge to default branch. Local study does not satisfy either. | US-015 |
+| REQ-004 | Exact US-015 contract: D1 reproduces and fixes failure; D2 verifies merge to default branch. D1 local proofs and finding dispositions are in the delivery evidence; D2 remains incomplete. | US-015 |
 
 ## Boundaries and conventions
 
@@ -214,7 +218,8 @@ same reserved basename; do not edit another owner's tests to share helpers.
 | T-US-009-003 | `pkg/manager/recapture_unit_test.go`; package-local recapture_unit_test.go | `scripts/verification/recapture-unit-coverage.sh` | `docs/verification/recapture-unit-coverage.md`; full-function scope/results |
 | T-US-009-004 | `internal/validation/recapture_compatibility_test.go`; `pkg/manager/recapture_compatibility_test.go` | `scripts/verification/recapture-compatibility.sh` | `docs/verification/recapture-compatibility.md`; isolated protected-format fixtures/results |
 | T-US-009-005 | No sibling test edits | recapture-boundaries, recapture-unit-coverage, recapture-compatibility, recapture-story | docs/verification-evidence-recapture.md; manifest and aggregate |
-| T-US-011-001 | Final composed native journey | full, delivery-ready | docs/verification-evidence-delivery.md; consolidated D1 and pending external D2 |
+| T-US-011-001 | Earlier composed native journey | Historical full, delivery-ready | Superseded by US-015 aggregate below |
+| T-US-015-001 | Strict aggregate and external receipt controls | full, delivery-ready, goal-complete | docs/verification-evidence-delivery.md; 16 members, four strict coverage slices, deferred adoption and incomplete external D2 |
 
 Retention unit coverage and mutations independently consume T-US-008-002.
 Recapture boundaries, unit coverage and compatibility independently consume

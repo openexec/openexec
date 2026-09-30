@@ -134,12 +134,13 @@ def check_scope(functions, manifest):
 
 
 
-def slice_scope(functions, manifest, companion):
+def slice_scope(functions, manifest, companion, successors=()):
     """Account for every changed function while measuring this slice separately."""
     identities = {f['path'] + ':' + f['name'] for f in functions}
     owned = set(manifest['functions'])
     other = set(companion['functions'])
-    if not owned or not other or identities != owned | other:
+    allowed = set(successors)
+    if not owned or not other or not (owned | other).issubset(identities) or identities - owned - other - allowed:
         raise ValueError('omitted or unexpected consolidated production function')
     selected = [f for f in functions if f['path'] + ':' + f['name'] in owned]
     check_scope(selected, manifest)
@@ -162,7 +163,16 @@ def main():
         run("go", "build", "-o", str(helper), "./scripts/verification/retentioncoverage")
         functions = scope(helper, tmp / "baseline.go")
         companion = json.loads((ROOT / "docs/verification/recapture-coverage-scope.json").read_text())
-        functions = slice_scope(functions, manifest, companion)
+        # Newer stories measure these bodies independently against their study baseline.
+        import admitted_unit_coverage as admitted
+        successors = {f['path'] + ':' + f['name'] for f in admitted.inventory(
+            helper, json.loads(admitted.MANIFEST.read_text()), tmp / 'admitted-baseline.go')}
+        import storage_unit_coverage as storage
+        successors.update(f['path'] + ':' + f['name'] for f in storage.inventory(
+            helper, json.loads(storage.MANIFEST.read_text())))
+        # This shared fixture is test support, never deployed production scope.
+        functions = [f for f in functions if f['path'] != 'internal/testutil/admittedevidence/executor.go']
+        functions = slice_scope(functions, manifest, companion, successors)
         (output / "scope.json").write_text(json.dumps(functions, indent=2) + "\n")
         blocks = {path: expected_blocks(path, tmp / "instrumented.go") for path in {f["path"] for f in functions}}
         # Pin selected test identities; discover every dedicated unit test as well.

@@ -85,6 +85,15 @@ class CoverageGateTests(unittest.TestCase):
 
 
 class ConsolidatedScopeTests(unittest.TestCase):
+    def test_successor_scope_only_allows_independently_owned_additions(self):
+        manifest = dict(baseline=gate.BASELINE, functions=['a.go:A'])
+        companion = dict(functions=['b.go:B'])
+        functions = [dict(path=p + '.go', name=p.upper()) for p in ('a', 'b', 'c')]
+        self.assertEqual(gate.slice_scope(functions, manifest, companion, ['c.go:C']), functions[:1])
+        for bad in (functions[1:], functions + [dict(path='d.go', name='D')]):
+            with self.assertRaises(ValueError):
+                gate.slice_scope(bad, manifest, companion, ['c.go:C'])
+
     def test_companion_scope_cannot_hide_unowned_or_missing_functions(self):
         manifest = json.loads(gate.MANIFEST.read_text())
         companion = json.loads((gate.ROOT / 'docs/verification/recapture-coverage-scope.json').read_text())

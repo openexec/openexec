@@ -4,6 +4,11 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [US-015 / T-US-015-001] Strict aggregate, exact-candidate receipt validation,
+  finding dispositions and completed evidence live once in
+  [delivery evidence](docs/verification-evidence-delivery.md). D2 remains incomplete;
+  actual Console adapter adoption is deferred until this API merges.
+
 - [US-013 / T-US-013-003] Expanded recapture scope, strict coverage and story
   proof are maintained once in [recapture evidence](docs/verification-evidence-recapture.md).
   Native runtime behavior is unchanged; canonical delivery remains Console-owned.
@@ -12,12 +17,10 @@ Raw capture. One line per thought, any grammar.
   task verifier. Current scope and executed evidence live once in
   [bounded recapture variants](docs/verification/recapture-variants.md).
 
-- [US-012 / T-US-012-005] Consolidated story verification and refusal of
-  fixture-only adoption are recorded in
-  [admitted evidence](docs/verification/admitted-evidence.md). Actual Console
-  source at the supplied serving revision still lacks private capture/attachment;
-  fresh host checks and the aggregate reconfirmed the failure and local passes;
-  completion is refused. The concrete remaining adapter change is recorded there.
+- [US-012 / T-US-012-005] Admitted API and fixture proof live in
+  [admitted evidence](docs/verification/admitted-evidence.md); current aggregate
+  and deferred Console adoption disposition supersede earlier completion claims
+  in [delivery evidence](docs/verification-evidence-delivery.md).
   Local strict coverage lives in
   [admitted unit coverage](docs/verification/admitted-unit-coverage.md).
 

@@ -1,5 +1,6 @@
 """Delivery composition refuses dropped failures, absent and skipped journeys."""
 import json
+import copy
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,6 +11,58 @@ import delivery
 
 
 class DeliveryTests(unittest.TestCase):
+    def setUp(self):
+        mock = patch.object(delivery, 'candidate_files', return_value='b' * 64)
+        mock.start()
+        self.addCleanup(mock.stop)
+
+    def test_merge_receipt_requires_each_obligation_and_exact_candidate(self):
+        report = dict(status='merged', candidate_revision='a' * 40,
+                      candidate_files_sha256='b' * 64, console_revision='c' * 40,
+                      merge_revision='d' * 40, default_branch_revision='e' * 40,
+                      repository='openexec', default_branch='main', pull_request='pr:1',
+                      owner_decision_ref='decision:1', independent_review_ref='review:1',
+                      canonical_gate_ref='gate:1', merge_ref='merge:1',
+                      candidate_in_default_branch=True, exact_candidate_reviewed=True,
+                      exact_candidate_approved=True, canonical_gates_passed=True,
+                      unresolved_findings=[])
+        self.assertEqual(delivery.check_merge(report, 'a' * 40, 'b' * 64), report)
+        for field in report:
+            with self.subTest(field=field):
+                bad = copy.deepcopy(report)
+                del bad[field]
+                with self.assertRaises(ValueError):
+                    delivery.check_merge(bad, 'a' * 40, 'b' * 64)
+        for field, value in [('candidate_revision', 'f' * 40),
+                             ('candidate_files_sha256', 'f' * 64),
+                             ('repository', 'other'), ('unresolved_findings', ['open']),
+                             ('canonical_gates_passed', 1)]:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                delivery.check_merge(dict(report, **{field: value}), 'a' * 40, 'b' * 64)
+
+    def test_goal_complete_refuses_absent_merge_even_when_local_checks_pass(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(delivery, 'run_case', return_value=dict(passed=True)), patch.object(delivery.subprocess, 'check_output', return_value='fixture'):
+            result = delivery.execute('goal-complete', Path(tmp))
+            self.assertFalse(result['passed'])
+            self.assertEqual(result['d2'], 'externally_pending')
+            self.assertIn('D2 incomplete', result['error'])
+
+    def test_adapter_report_is_forwarded_and_failure_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            evidence = output / 'adoption.json'
+            evidence.write_text('{}')
+            with patch.object(delivery, 'command_result', return_value=dict(passed=False, exit_code=1)) as run:
+                result = delivery.run_case('admitted-all', output, evidence)
+                self.assertEqual(run.call_args.args[0][-2:], ['--adapter-evidence', str(evidence)])
+                self.assertFalse(result['passed'])
+
+    def test_candidate_changed_during_checks_refuses_success(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(delivery, 'run_case', return_value=dict(passed=True)), patch.object(delivery.subprocess, 'check_output', return_value='fixture'), patch.object(delivery, 'candidate_files', side_effect=['before', 'after']):
+            result = delivery.execute('delivery-ready', Path(tmp))
+            self.assertFalse(result['passed'])
+            self.assertIn('changed', result['error'])
+
     def test_modes_require_every_member_and_preserve_failure(self):
         for mode in ('full', 'delivery-ready'):
             required = delivery.TECHNICAL if mode == 'delivery-ready' else (*delivery.TECHNICAL, *delivery.GATES)

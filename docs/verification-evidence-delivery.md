@@ -1,114 +1,110 @@
-# Delivery preparation — US-011 / T-US-011-001
+# Exact-candidate delivery evidence — US-015 / T-US-015-001
 
-Current candidate evidence, 2026-09-29. Source parent is
-`47c998821248dfbce16e7385c1ec7d6f75959f31`; this task changes only verifiers and
-documentation. Earlier slice reports describe their own checkouts and are not
-current execution proof. The supplied Console process observation is revision
-`bcd2b229`, started `2026-09-29T17:28:25Z`. It identifies Console only; no OpenExec
-product deployment, default-branch merge or external D2 was observed here.
+This replaces the earlier US-011 delivery summary. The authoritative local run
+and retained evidence inventory are in [delivery result](verification/delivery-result.json).
+The executed candidate is identified by its parent revision, worktree file digest
+and verifier/source hashes; the subsequent commit adds this evidence documentation.
+No report here proves a merge, publication, deployment or actual Console adoption.
+D2 is explicitly incomplete.
 
 ## Verification contract
 
-Run `bash scripts/verify-retained-verification-evidence.sh --case delivery-ready`
-for fresh local technical preparation. It composes all eight slice helpers, the
-native repair/resume journeys, architecture discovery and verifier negative
-controls. Every required scenario must execute, including parent/subtest and
-package completion; skipped, missing, failed, duplicate or unexpected scenarios
-fail closed. Each invocation creates new output, records commands, preserves
-nonzero exits and continues collecting other cases after a failure. The JSON
-report records revision, uncommitted paths and externally pending D2. Its local
-success does not certify repository gates, publication or owner acceptance.
+`python3 scripts/verification/delivery.py --case delivery-ready --output <empty-directory>`
+executes all 16 required members: four retention proofs, four recapture proofs,
+admitted-all, named-recapture, recapture-variants, private-storage,
+storage-unit-coverage, native-journey, discovery and verifier-controls. Every
+member must succeed; remaining cases still execute after failures. Helpers reject
+missing/skipped/duplicate scenarios, missing instrumentation, weak coverage and
+mutation failures at unexpected assertions. Output directories cannot reuse old
+success. Start/end file hashes detect candidate changes during a run.
 
-`--case full` additionally requires `make test`, `make compat-test`,
-`make type-check`, `make lint`, `make ui-build`, `make check` and `make pr-gate`.
-There is no fallback that silently drops unavailable gates. Use the repository
-runner for this potentially long-running mode. Both modes have failure-injection
-controls proving every member's nonzero exit prevents success without dropping
-remaining evidence. Missing/skipped/duplicate native scenario controls exercise
-the actual report validation. Neither mode certifies D2.
+All four full-body coverage slices require strictly greater than 90%, independently.
+The old retention baseline now accounts for the newer independently measured
+admitted/storage scopes. Only the shared non-deployed test fixture is excluded.
+Unknown production functions and missing original functions still fail closed.
+The study checksum now includes the three helper bodies added by T-US-013-003;
+the previous checksum incorrectly rejected that expanded denominator.
 
-## Requirement and journey mapping
+`--adapter-evidence <file>` forwards an external report to the existing strict
+adoption validator. Wrong candidate, missing provenance, missing lint/test ×
+silent/diagnostic × nil/non-nil cases, missing reload assertions, failed commands,
+unresolved work and coverage at or below 90% are rejected. Omission records
+**deferred after merge**, never adopted. The evidence API exists only in this
+candidate until merge; Console must update its dependency and adapter afterward.
 
-| Requirement | Fresh proof | User-visible outcome / refusal |
-| --- | --- | --- |
-| REQ-001 | retained-result, evidence-boundaries | Real admitted failed process; both engine result branches; exact private argv/cwd and bounded streams persist across SQLite reopen; one repair binds readable evidence. Success, nil/error, cancellation, launch refusal, forged references, unsafe artifact access and public secret leakage are checked. |
-| REQ-002 | legacy-recapture, recapture-boundaries | Authoritative command recapture, fresh failure receipt and one repair; successful recheck resumes A. Six terminal leaves persist across restart: exhaustion, remaining-budget exhaustion, already-spent budget, unresolved identity, refusal and cancellation. No repeated dispatch, attempt refund, repair or Settings execution. |
-| REQ-002 | recapture-boundaries success/completion-obligation | Real successful check cannot complete A without its supported claim. After reopen Settings has zero attempts. Adding the supported claim permits A completion; reopening the native queue then completes Settings. All 22 persisted checkpoints are required. |
-| REQ-001 / REQ-002 | native-journey | Controlled-provider real file checks fail, priority repair writes the missing feature, A resumes and remaining task B finishes. Separate journey closes manager/SQLite before repair, then resumes A from persisted failure. Admitted executor journeys verify trusted repair/resume and reject untrusted artifacts and unresolved legacy identity without host fallback. |
-| REQ-002 compatibility | recapture-compatibility | Failure, success and unresolved identity for each of `.openexec`, `.uaos`, `.openexec/tasks.json`; nine leaf journeys and exact package completion. |
-| D1 coverage | retention-unit-coverage, recapture-unit-coverage | Each slice independently exceeds 90% over entire changed function bodies; instrumentation and explicit function/test scope are mandatory. |
-| D1 mutation | retention-mutations | Unchanged candidate passes. Restoring ExecuteStage discard fails its engine assertion and persisted-evidence journey. Restoring Execute discard fails history plus original and both dedicated persisted-evidence journeys. Compilation failure or unrelated assertion cannot count as mutation detection. |
-| D2 | External Console evidence required | Publication, canonical gate, independent review, exact owner merge decision and actual default-branch merge remain outside this stage. Preserve existing T-US-011-002 and its dependency; no new approval task or decision reference. |
+`--case goal-complete --merge-evidence <file>` reruns the same local checks and
+requires the Console receipt schema enforced by `delivery.check_merge`: exact
+candidate revision and file digest; Console, merge and default-branch revisions;
+repository/default branch/PR; owner decision, independent review, canonical gate
+and merge references; true exact-candidate approval/review/default-branch and gate
+assertions; no unresolved findings. Missing or stale evidence refuses completion.
+This validates an externally authenticated Console receipt, not its authenticity
+or remote Git state independently. Console must obtain and authenticate those
+references. Local fixtures must never be submitted as real external evidence.
+No validator performs merge or publication. `full` additionally runs the canonical
+command map, with no fallback for unavailable gates; that gate is Console-owned.
 
-These are running backend workflows through public native entry points, real
-local child processes and reopened persistent stores. They are not a browser,
-live provider or deployed-service demonstration. Injected admission refusals
-exercise the native boundary; they do not claim to exercise Console admission.
+## Requirement traceability and finding dispositions
 
-## Current verification results
-
-Final `delivery-ready` exited 0. Fresh evidence is
-`/tmp/openexec-delivery-3u0a2ed4/result.json`; raw logs and per-member reports are
-in its sibling directories. These temporary artifacts are local, not publication
-artifacts. All eleven members passed. Required completions: retention result 4,
-evidence boundaries 12, retention coverage 74, mutation 8 per copy, legacy
-recapture 11, recapture boundaries 9, recapture coverage 104, protected formats
-13, and native journey 6. Counts include parent tests. Discovery checked 22
-source declarations; all 54 Python verifier controls passed.
-
-| Executed command | Exact result |
+| Requirement / finding | Evidence and disposition for Console |
 | --- | --- |
-| `bash scripts/verify-retained-verification-evidence.sh --case delivery-ready` | Exit 0, all eleven members passed; no skipped required scenario. |
-| Retention full-body coverage helper, invoked by aggregate | 530/582 statements = 91.06529209621993%, 29 current function bodies. |
-| Recapture full-body coverage helper, invoked by aggregate | 427/471 statements = 90.65817409766454%, ten current function bodies. |
-| Retention mutation helper, invoked by aggregate | Candidate passed; both independent restored discard branches rejected at required engine and persisted-evidence assertions. |
-| `timeout 120 make compat-test` | Exit 0; protected compatibility suite passed. |
-| `timeout 120 make type-check` | Exit 0; Go build and UI TypeScript passed. |
-| `timeout 90 make lint` | Exit 0; Go vet and UI ESLint passed. Optional golangci-lint was absent and did not execute. |
-| `timeout 90 make ui-lint` | Exit 0; current UI lint baseline is clean. |
-| `timeout 90 make ui-build` | Exit 0; TypeScript and Vite build passed. |
-| `timeout 90 make ui-test` | Exit 0; 40 files, 635 tests passed. |
-| `timeout 120 make test` | Sandbox interrupted execution: network access to `api.anthropic.com` blocked by allowlist. No completed exit status was returned; no timeout or pass is inferred. UI checks were run separately above. |
-| `timeout 90 make check` | Exit 2: `No rule to make target 'check'.` |
-| `timeout 90 make pr-gate` | Exit 2: `No rule to make target 'pr-gate'.` |
-| `python3 -m unittest discover -s scripts/verification -p 'test_*.py' -q` | Exit 0; 54 tests passed after final script edits. |
-| `bash -n scripts/verify-retained-verification-evidence.sh` | Exit 0. |
-| `git diff --check` | Exit 0. |
+| REQ-001 / F2 public admitted evidence | OpenExec fix verified locally: admitted-all plus retained-result and native-journey preserve non-nil failed results, exact argv/cwd, bounded diagnostic tails and private repair references. Eight real admitted command variants reopen SQLite, reload failure and repair, and check redaction. Actual Console adapter adoption is deferred until this API merges; update dependency, call RetainCommandEvidence and VerificationCommandFailureWithEvidence, then supply the strict external report. |
+| REQ-002 / F1 legacy incident recapture | Fixed locally: named-recapture reproduces sole lint/test exit-2 receipts with empty or matching phase and no historical command. Forty-eight recapture-variants cover success, existing evidence, historical identity, fresh/remaining/spent budget, ambiguity, mismatch, HITL, review, cancellation and launch refusal. Removing inference or named fallback fails at unresolved/needs_review with zero executions. |
+| REQ-003 / F3 private evidence in source commits | Fixed locally: private-storage proves ignored state-tree storage, source-context exclusion, staging exclusion, path/symlink refusal and readable registered evidence after reopen. The isolated old-directory mutation must fail both source and staging assertions. Storage coverage includes full file bodies. Unregistered legacy artifacts remain refused; compatibility does not authorize unsafe paths. |
+| REQ-004 / F4 D2 delivery | Local D1 reproductions, positive fixes and isolated regression controls are prepared. D2 remains incomplete: no candidate-matched external merge receipt exists. Console owns canonical gate, existing-PR delivery, independent review, finding disposition and exact owner merge decision after the queue finishes. No replacement PR or delivery task is created. |
 
-Baseline logs and exact command JSON are in `/tmp/openexec-delivery-baseline/`.
-The sandbox aborted `make test` before that command could write its exit JSON;
-its partial log is not a successful full-suite result. `--case full` was tested
-with injected pass/failure results, but not run end to end here: canonical gates
-are runner-owned, the targets are absent locally, and unrestricted repository
-tests require capabilities unavailable here. These failures were not waived by
-the verifier. Console must resolve canonical command mapping and run full gates.
-Current lint success does not explain the historical unknown lint exit-2 cause;
-no `knip` entry exists in the current UI package or lockfile.
+The requirement register preserves the original accepted wording as history.
+For this stage, the owner's explicit instruction defers actual adapter adoption
+until after merge; it does not relabel that adoption as verified.
 
+## Persisted journeys and controls
 
-## Coverage consolidation and compatibility evaluation
+The aggregate walks real local admitted commands through StageExecutor, engine,
+pipeline, SQLite failure recording, native repair creation and queue continuation.
+It closes and reopens the database before asserting task status, attempt counts,
+original/repair dependency, readable evidence and diagnostic tail. Successful
+recapture alone cannot complete A without a supported completion claim; Settings
+remains unattempted after reopen until that claim permits continuation. Terminal
+refusal, cancellation, ambiguous identity and spent/interrupted budgets persist
+without refund, duplicate dispatch or unauthorized repair.
 
-The first composed run correctly refused retention's old scope because the
-later recapture slice added functions relative to retention's baseline. The fix
-accounts for the exact union of both pinned function manifests, rejecting any
-unowned or missing function, then measures all 29 retention function bodies in
-the current candidate. Shared functions remain counted in each slice. Recapture
-independently measures its ten full bodies. No production function is excluded
-from the union, no threshold is lowered, and no historical coverage is reused.
-A negative control removes a function and adds an unowned function; both fail.
+Protected `.openexec`, `.uaos` and `.openexec/tasks.json` formats exercise failure,
+success and unresolved journeys. Restoring either engine result-discard branch
+fails the required engine and persisted-evidence assertions. Named resolver and
+old-directory mutations use isolated replacements, leave candidate sources intact,
+and require expected assertion failures rather than arbitrary process failure.
+Verifier controls also remove members, drop/duplicate/skip scenarios, damage
+coverage profiles, weaken thresholds and remove receipt fields.
 
-Only Python/shell verification and documentation changed. No project loading,
-migration, schema, receipt classification, retry or admission behavior changed.
-Protected-format journey reruns and compatibility tests cover existing `.openexec`,
-legacy `.uaos` and tasks.json fallback support. Complexity delta: no production
-concepts, persistent state, transitions, owner decisions or replacement machinery;
-one deterministic verifier composition reuses existing helpers.
+## Source versus runtime integration
 
-## Delivery boundary and blockers
+Read the supplied Console revision directly with `git show` from the Console
+repository, without trusting its working tree. Source revision
+`4c819427643655fc85d830b3a79f337488bd3fc0` uses
+VerificationCommandFailureWithOutput in executeOpenExecCheck and pins OpenExec
+`v0.13.2-0.20260930061734-4290c0d23b00`. It does not call the evidence-bearing API.
+Source hashes are recorded in the result inventory. The owner-supplied process
+observation started at `2026-09-30T08:52:05Z`; it is not binary-module attestation,
+a runtime adapter journey or proof of an OpenExec deployment. No such claims are
+made from checkout notes or historical reports.
 
-Canonical full repository success remains unverified here; exact current
-baseline failures belong in the results above. Resolve command mapping and rerun
-in Console's repository runner before declaring full D1 repository readiness.
-D2 is externally pending, regardless of local checks or this candidate commit.
-No publication, review request, owner presentation, merge or deployment was
-attempted. The retained owner boundary remains with Console after the task queue.
+## Resources, compatibility and complexity
+
+Declared host lint/test results are retained with exit codes and output. The
+host generic command runner refused this stage and directed sandbox execution;
+its message explicitly says an OpenExec stage has no job_runner.py lane. The
+aggregate therefore ran in the stage's sandbox with retained completed results.
+No asynchronous start or partial output is called a pass. The Go module stat
+cache emitted a read-only warning; the writable `/tmp` build cache allowed checks
+to complete. UI tests emitted existing React warnings but passed. Canonical
+`make check`/`make pr-gate` remain for the later socket-capable repository runner.
+No deployment/host-port test is substituted with source inspection.
+
+Only verification and documentation change. Runtime, loaders, migration schemas,
+receipt classification, admission and retry behavior are unchanged; protected
+format journeys and `make compat-test` corroborate compatibility. Project context
+was read before this work (Goal/Ready 4, interpretation 10); this task follows the
+specific accepted verification-repair Goal and effect restrictions.
+Complexity delta: zero new runtime concepts, persistent state, transitions,
+owner decisions or replacement machinery. Existing deterministic verification
+helpers are composed; Console's delivery boundary remains intact.

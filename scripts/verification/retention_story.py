@@ -71,7 +71,8 @@ def run_case(case, output, manifest):
     if case == 'retention-unit-coverage':
         directory = output / 'coverage'
         command = ['bash', 'scripts/verification/retention-unit-coverage.sh', '--output', str(directory)]
-        subprocess.run(command, cwd=ROOT, check=True)
+        with (output / 'helper.log').open('w') as stream:
+            subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, check=True)
         report = json.loads((directory / 'result.json').read_text())
         if report.get('passed') is not True or not (report['statements'] > 0 and 10 * report['covered'] > 9 * report['statements']):
             raise ValueError('absent or insufficient coverage')
@@ -79,7 +80,8 @@ def run_case(case, output, manifest):
         return dict(command=command, report=report)
     report_path = output / 'mutations.json'
     command = ['bash', 'scripts/verification/retention-mutations.sh', '--output', str(report_path)]
-    subprocess.run(command, cwd=ROOT, check=True)
+    with (output / 'helper.log').open('w') as stream:
+        subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, check=True)
     report = json.loads(report_path.read_text())
     check_mutations(report)
     if sorted(report['candidate']['tests']) != manifest[case]:
