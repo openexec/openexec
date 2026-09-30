@@ -7,7 +7,8 @@ Raw capture. One line per thought, any grammar.
 - [US-012 / T-US-012-005] Consolidated story verification and refusal of
   fixture-only adoption are recorded in
   [admitted evidence](docs/verification/admitted-evidence.md). Actual Console
-  source still lacks private capture/attachment; story completion is refused.
+  source at the supplied serving revision still lacks private capture/attachment;
+  continuation reverified the failure and local passes; completion is refused.
   Local strict coverage lives in
   [admitted unit coverage](docs/verification/admitted-unit-coverage.md).
 

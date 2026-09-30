@@ -8,8 +8,8 @@ exact-argv/cwd/private-reference contract at the actual adapter. No delivery,
 deployment, merge or external coverage claim follows from the local results.
 
 This record replaces the earlier task-local verification summaries. The tested
-OpenExec base is `4911fbe65a851e2db6ea2a619d0ada5319d5aa88`, plus this task's
-verification-only diff, on 2026-09-30. Production code is unchanged. Local
+OpenExec revision is `320a39e0c04716ddf82e17449684a9b90b513c96`, before this
+continuation's evidence-only update, on 2026-09-30. Production code is unchanged. Local
 commands below ran in the supplied candidate worktree. Console source was read
 at the owner-supplied serving revision, not inferred from another checkout's HEAD.
 
@@ -49,9 +49,13 @@ writable roots. No sibling source, dependency, runtime or deployment was changed
 
 The supplied serving-process observation is revision/start-time context only;
 this stage inspected that revision's source, not the process executable/module
-attestation. The separate Console checkout HEAD was older and was not used as
-serving-source evidence. The Console inspection MCP call was refused under the
-never-approval policy; permitted local Git reads supplied the source evidence.
+attestation. The separate Console checkout HEAD was
+`1d8aa1d8f120c8347d0431210c92475085182a2a` and was not used as serving-source
+evidence. Fresh permitted Git reads reproduced both source hashes and the
+dependency above. The failure is confirmed missing adapter behavior at the
+supplied revision, not a sandbox socket refusal or an unrun local check.
+Removing it requires the capture/attachment change and actual adapter reload
+proof in the Console workspace; this stage cannot write that repository.
 
 ## Acceptance criteria and reviewer cases
 
@@ -101,10 +105,11 @@ Verified in this candidate on 2026-09-30:
 
 - Declared host `lint`: exit 0 (Go vet and UI ESLint).
 - Declared host `test`: exit 0 (all Go packages; 635 UI tests in 40 files).
-  Existing React act/style warnings were non-fatal.
+  Existing React act/style warnings and a WebSocket port-in-use diagnostic
+  were non-fatal; the declared check returned exit 0.
 - `bash scripts/verify-verification-repair.sh --case admitted-all`: exit 1,
   correctly refusing absent actual adapter evidence after all three local members
-  exited 0. Fresh report: `/tmp/openexec-admitted-story-stggchnj/result.json`.
+  exited 0. Fresh report: `/tmp/openexec-admitted-story-hnxvutr7/result.json`.
   This report was reread from disk; status remained failed with all local results
   and the explicit incomplete-adoption reason retained.
 - `admitted-tracer`: 16 diagnostic-boundary and 16 silent/classification
@@ -121,17 +126,14 @@ Verified in this candidate on 2026-09-30:
   and omission/refusal controls passed. Its result.json was reread from disk.
 - `python3 -m unittest discover -s scripts/verification -p 'test_*.py'`:
   111 tests passed, including aggregate missing/stale/incomplete adoption,
-  failed-local-member and stale-success replacement controls. A documentation
-  update first tripped the study's required `pending US-012` wording; restored
-  that truthful integration status and reran the suite successfully.
+  failed-local-member and stale-success replacement controls (5.724 seconds).
 - Shell syntax and `git diff --check`: passed.
 
-The first aggregate attempt reused the standalone adapter command's broad
-manager package run; it stalled in the sandbox and was interrupted (exit 130).
-The aggregate now runs the exact bounded eight-case journey; broad package
-validation is supplied by the successful declared host test above. That
-interrupted attempt is not positive evidence. Full canonical gates were not run
-in the sandbox.
+The continuation reproduced the previous failure after successful host checks
+and fresh local journeys. No local verification failure remains to repair.
+The aggregate must continue refusing completion until actual adapter work is
+resolved; substituting the passing fixture would weaken the accepted criterion.
+Full canonical gates were not run in the sandbox.
 Canonical full gates, actual Console proof, review and publication remain with
 their existing owners. Complexity delta: no runtime concepts, transitions,
 execution loops or owner decisions; verification composition only. Ordinary Git
