@@ -107,6 +107,55 @@ def boundaries(root):
     return {'status': 'passed', 'completed': len(passed)}
 
 
+def tail_check(root, assertion=None):
+    env = os.environ.copy()
+    env.setdefault('GOCACHE', str(Path(tempfile.gettempdir()) / 'openexec-retention-go-cache'))
+    env['GOWORK'] = 'off'
+    result = subprocess.run(['go', 'test', './internal/execution/evidence', '-json', '-count=1',
+        '-timeout=60s', '-run', '^TestDiagnosticTailCapture$'], cwd=root, env=env,
+        capture_output=True, text=True, timeout=120)
+    events = [json.loads(line) for line in result.stdout.splitlines()]
+    status = 'fail' if assertion else 'pass'
+    endings = [(e.get('Test', ''), e['Action']) for e in events if e.get('Action') in ('pass', 'fail', 'skip')]
+    if result.stderr.strip() or result.returncode != int(bool(assertion)) or endings != [('TestDiagnosticTailCapture', status), ('', status)]:
+        raise ValueError('unexpected tail-control outcome: ' + result.stdout + result.stderr)
+    output = ''.join(e.get('Output', '') for e in events if e.get('Test') == 'TestDiagnosticTailCapture')
+    if assertion and (assertion not in output or 'panic:' in output):
+        raise ValueError('wrong tail assertion: ' + output)
+    return dict(status='rejected_at_expected_assertions' if assertion else 'passed', assertion=assertion)
+
+
+def tail_mutations(baseline, temp):
+    path = Path('internal/execution/evidence/capture.go')
+    source = (baseline / path).read_text()
+    start = source.index('func (b *Buffer) Write(p []byte) (int, error) {')
+    end = source.index('\n// Command is private:', start)
+    prefix_only = """func (b *Buffer) Write(p []byte) (int, error) {
+        n := len(p)
+        remaining := StreamLimit - len(b.data)
+        if n > remaining { b.Truncated = true; p = p[:remaining] }
+        b.data = append(b.data, p...)
+        return n, nil
+    }
+"""
+    public = 'return Public(head+"[truncated]"+tail, secrets)'
+    if source.count(public) != 1:
+        raise ValueError('expected exactly one public tail site')
+    variants = {
+        'prefix_capture': (source[:start] + prefix_only + source[end:], 'lost prefix/tail'),
+        'prefix_public': (source.replace(public, 'return Public(head+"[truncated]", secrets)', 1), 'unsafe or missing public tail'),
+    }
+    report = {'baseline': tail_check(baseline)}
+    for name, (mutant, assertion) in variants.items():
+        clone = temp / name
+        shutil.copytree(baseline, clone)
+        (clone / path).write_text(mutant)
+        report[name] = tail_check(clone, assertion)
+    if (ROOT / path).read_text() != source:
+        raise ValueError('candidate capture changed during verification')
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path)
@@ -124,7 +173,7 @@ def main():
                 target = baseline / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
-        report = {'diagnostic_boundaries': boundaries(baseline), 'public_baseline': check(baseline), 'engine_baseline': retained.check(baseline, {})}
+        report = {'tail_controls': tail_mutations(baseline, Path(temp)), 'diagnostic_boundaries': boundaries(baseline), 'public_baseline': check(baseline), 'engine_baseline': retained.check(baseline, {})}
         for branch, (_, _, expected) in retained.MUTATIONS.items():
             clone = Path(temp) / branch
             shutil.copytree(baseline, clone)

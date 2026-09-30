@@ -1,104 +1,138 @@
-# Admitted evidence — US-012 / T-US-012-002
+# Admitted evidence — US-012 / T-US-012-005
 
-## Implementation and exercised path
+## Story disposition and provenance
 
-The existing runtime helper `VerificationCommandFailureWithEvidence` attaches
-private references independently of classification. The shared `EvidenceBuffer`
-now drains every write while keeping at most 4096 bytes per stream: the first
-2048 and last 2048 when truncated. Direct `RetainCommandEvidence` calls apply the
-same bound. Untruncated streams remain exact. Public rendering removes cut lines
-on both sides of the omitted middle and the incomplete final line, redacts known
-secrets and credential assignments, and reserves room for `[truncated]`.
-Private capture retains partial lines; public output conservatively omits them.
+**Incomplete: actual Console capture/retention/attachment remains unresolved.**
+Local WithOutput compatibility is verified; it cannot establish the accepted
+exact-argv/cwd/private-reference contract at the actual adapter. No delivery,
+deployment, merge or external coverage claim follows from the local results.
 
-The public-runtime-only fixture executes real shell commands at the candidate
-WorkDir. The silent exit-2 journey still has no StageResult artifact fallback.
-The diagnostic variant emits more than 32 KiB on each stream, ending in distinct
-stdout/stderr markers, with a private credential sentinel. Both lint and test
-run with populated and nil results. The manager journey closes the producing
-manager and SQLite connection, reopens the store, reads the failed step and
-registered private artifact, derives one repair, rereads its persisted description,
-and resolves the artifact again. Assertions require exact argv/cwd/exit, bounded
-streams and diagnostic tails, truncation flags, and only the allowlisted toolchain
-field. The repair contains the authoritative reference, never the raw secret.
-A missing evidence identity is refused.
-
-Pipeline journeys require the terminal typed reference, retained public markers
-when a result exists, and no secret sentinel anywhere in the serialized event.
-The classification receipt contains only gate and exit code; changing private
-artifact identity or returning a nil result does not change its digest. Actual
-launch failure and cancellation of a started process, plus admission refusal, preserve
-nil result/error identity without granting repair authority. Existing public
-classification cases cover reserved exits, mixed errors and success. Existing
-manager cancellation/restart tests remain part of the full test check.
-
-Toolchain filtering already existed and is exercised after artifact reload:
-only go_version, node_version, npm_version, python_version and rustc_version
-are accepted, each capped at 128 bytes. No environment dump is collected.
-
-## Verification
-
-Executed in this candidate on 2026-09-30:
-
-- Declared host `test` before changes: exit 0 (Go suite and 635 UI tests).
-- Declared host `lint` after implementation: exit 0 (Go vet and UI ESLint).
-- Declared host `test` after implementation: exit 0 (all Go packages and 635 UI
-  tests). The subsequent started-process cancellation refinement also passed
-  the task verifier on the final test source.
-- Python verifier suite: 75 passed. Its first run exposed a pre-existing stale
-  study contract demanding pending US-014 after the storage repair was recorded.
-  Restored canonical disposition/root-cause labels and made that status check
-  accept the explicit recorded repair, without reintroducing a false pending claim.
-- `git diff --check`: passed.
-- Task verifier passed: `bash scripts/verify-verification-repair.sh --case admitted-tracer`.
-  All 16 diagnostic-boundary completions and 16 silent/classification completions
-  passed; both engine-discard and wrapper-discard mutants were rejected at the
-  required assertions. It requires exact non-skipped diagnostic-boundary test completions, the silent
-  public journeys, and independent engine/result and wrapper-discard controls.
-  The initial extended manifest incorrectly expected intermediate Go subtest
-  events for slash-separated names; corrected the manifest to the actual named
-  tests. No production assertion was weakened.
+This record replaces the earlier task-local verification summaries. The tested
+OpenExec base is `4911fbe65a851e2db6ea2a619d0ada5319d5aa88`, plus this task's
+verification-only diff, on 2026-09-30. Production code is unchanged. Local
+commands below ran in the supplied candidate worktree. Console source was read
+at the owner-supplied serving revision, not inferred from another checkout's HEAD.
 
 ## Console adapter — US-012 / T-US-012-003
 
-The earlier claim that this candidate lacked WithOutput and required Console
-source changes was stale. This rebased candidate exports both WithOutput and
-WithEvidence. The owner supplied Console revision 4c819427 and dependency
-a7327a560c4f; these are context, not a deployment verification by this stage.
-No Console source or dependency change is required or made here.
+Read-only commands against `/mnt/data1/projects/agent-console`:
 
-WithOutput keeps its public signature and its existing command/6000-byte output
-tail receipt. The native manager now recognizes a validated command-bearing
-receipt as useful evidence even for silent exits and nil StageResults. It uses
-existing synchronous run-step persistence and repair generation, without
-inventing argv boundaries, cwd or private artifact references unavailable to
-that API. WithEvidence continues to support separate private command artifacts.
-CommandSecrets now extracts credential values only; a missing executable name
-survives in previous_attempt_stop while credential values remain redacted.
+```sh
+git rev-parse 4c819427
+git show 4c819427:internal/server/openexec_checks.go
+git show 4c819427:go.mod
+```
 
-The admitted-adapter verifier runs TestAdmittedAdapterFailureReloadAndRepair,
-go build ./..., and go test ./pkg/runtime/... ./internal/execution/gates/...
-./pkg/manager/.... The regression uses the public WithOutput API with the
-Console argument shape (gate, process error, joined argv, combined output).
-Eight journeys cover lint/test, silent exit 2/long diagnostic tails, and
-populated/nil results. Each closes and reopens SQLite before deriving a repair,
-checks the command and bounded tail, rereads the persisted repair context,
-and refuses invalid-digest or missing evidence. Existing classification-only
-receipts retain their recapture path. No schema, loading or migration changes.
+Resolved Console revision: `4c819427643655fc85d830b3a79f337488bd3fc0`.
+Its go.mod requires OpenExec `v0.13.2-0.20260930061734-4290c0d23b00`.
+Source SHA-256 for openexec_checks.go:
+`a7094a264d44a369574e938cf74133c0cfc6ef652abdadc7287e35f5c7447017`;
+go.mod SHA-256:
+`7c03c602ad132a9ac794804a3e37e3c078f8165dd8331c8b9e3c685bbbb2c8c7`.
 
-Verification on 2026-09-30:
+`executeOpenExecCheck` sets cmd.Dir to the candidate path, combines both streams
+in openExecCheckOutput, and calls VerificationCommandFailureWithOutput with
+strings.Join(argv, " ") and output.String(). It does not use EvidenceBuffer,
+RetainCommandEvidence or VerificationCommandFailureWithEvidence. Exact argv
+boundaries, cwd and separate private streams are therefore not attached by this
+source path. The earlier assertion that no Console change was required was
+incorrect for the accepted story contract and is removed.
 
-- Declared host `test`: exit 0, all Go packages and 635 UI tests in 40 files.
-  Earlier runs failed; the final redaction change also required removing the
-  old first-entry slice from both blueprint command callbacks.
-- Declared host `lint`: exit 0 (Go vet and UI ESLint). A transient candidate
-  origin lookup refusal cleared on retry without repository changes.
-- `bash scripts/verify-verification-repair.sh --case admitted-adapter`: exit 0;
-  all eight adapter journeys, build and the required package suites passed.
-- Focused manager adapter/missing-command regressions, blueprint suite,
-  runtime refusal cases and evidence redaction tests passed.
-- Shell syntax and `git diff --check` passed.
+The native WithOutput API remains compatible: command/6000-byte output-tail
+receipts survive run-step reload and authorize useful repair even for silent
+exits and nil StageResults. That benefit does not invent a private reference or
+recover exact argv/cwd absent from the receipt. Local tests use a separate
+Console-shaped executor; they do not execute Console's function. Actual adapter
+journeys and its coverage are still required after the capture/attachment change
+in an authorized Console workspace. Console is readable but outside this stage's
+writable roots. No sibling source, dependency, runtime or deployment was changed.
 
-Deployment, canonical gates, review and publication remain Console-owned. Complexity delta: no new
-persistent concepts, transitions, owner decisions or execution loops; reuse of
-existing receipts, run_steps and repair tasks.
+The supplied serving-process observation is revision/start-time context only;
+this stage inspected that revision's source, not the process executable/module
+attestation. The separate Console checkout HEAD was older and was not used as
+serving-source evidence. The Console inspection MCP call was refused under the
+never-approval policy; permitted local Git reads supplied the source evidence.
+
+## Acceptance criteria and reviewer cases
+
+| Criterion / F2 checklist | Executed proof and persisted assertions | Disposition |
+| --- | --- | --- |
+| 1. Both engine APIs preserve failed results; F2-results | admitted-tracer engine baseline and isolated ExecuteStage/Execute discard controls check exact result/error preservation and persisted stage evidence. | Local pass |
+| 2. Public evidence-bearing wrapper | Public-runtime-only silent tracer uses VerificationCommandFailureWithEvidence; wrapper-removal control fails the missing-reference and diagnostic-free assertions. | Local pass |
+| 3. Silent exit 2 and terminal reference; F2-silent | Real lint/test shell processes emit EventBlueprintFailed with a typed 64-hex ref, no StageResult artifact fallback. Manager closes/reopens SQLite and re-reads registered evidence. | Local pass |
+| 4. Exact command/cwd/exit and usable repair | Public reload journeys assert argv, cwd==WorkDir, exit 2, bounded separate streams, diagnosticFreeReceipt=false, artifact resolution and persisted repair description after fresh manager/store creation. | Local pass |
+| 5. Late diagnostic marker; F2-tail | Oversized stdout/stderr survive bounded head/tail capture, terminal event, store reopen and repair reload. Independent prefix-only capture and public-summary mutants fail their named tail assertions. | Local pass |
+| 6. Nil-result/errors, cancellation, launch; F2-results/F2-boundaries | Diagnostic lint/test journeys cover populated/nil results. Public classification/refusal tests cover success, reserved exits, mixed errors, actual launch failure, cancellation of a started process and admission/transport refusal. Unit matrix checks nil/nil pair preservation at the adapter boundary, not arbitrary full-blueprint success. | Local pass |
+| 7. Allowlist and secret exclusion; F2-boundaries | Reload tests accept only allowlisted version context; redacted events/repair summaries exclude credential sentinel. Artifact hashes remain separate from classification digest. Unit scope covers forged artifacts, storage refusal, malformed receipts, token-bearing command/output, redaction and authority reset. | Local pass |
+| 8. Actual Console adoption; F2-lint-test/F2-adoption | Source/dependency audit above confirms WithOutput but missing private capture/attachment. Eight local compatibility journeys are not actual Console execution. | Incomplete |
+| 9. Strict >90% whole-body unit coverage | admitted-unit-coverage instruments the declared scope, including changed/added bodies; rejects missing/altered blocks, profiles, source hashes, required tests and scope omissions. External Console scope is explicitly not measured. | Local pass; external incomplete |
+| 10. Isolated discard/attachment negative controls | Each independent temporary source copy must fail the intended assertion after its baseline passes; compile failures, skipped tests and unrelated failures are refused. Candidate sources remain unchanged. | Local pass |
+| 11. Consolidated evidence | This record, coverage record and fresh aggregate JSON retain commands, outcomes, reload assertions, limitations and non-completion. | Recorded; not story completion |
+
+Shared capture drains every write and keeps 4096 bytes per stream (first/last
+2048 on overflow); direct retention applies the same limit. Public output removes
+cut/partial lines, redacts credential values and reserves a truncation marker.
+Private capture retains partial lines. Toolchain allowlisting admits only
+go_version, node_version, npm_version, python_version and rustc_version, each
+capped at 128 bytes; no incidental environment dump is captured. Missing or
+invalid evidence never grants repair authority. Protected format compatibility
+is unchanged: this task modifies only verification scripts/tests and documents,
+not loaders, schema, receipt formats or runtime behavior.
+
+## Commands and results
+
+The original task command `bash scripts/verify-verification-repair.sh --case
+admitted-all` reproduced exit 2: the dispatch case did not exist. It now runs
+all local members, validates the eight non-skipped WithOutput fixture journeys,
+and **exits 1 if actual adapter evidence is missing, stale or incomplete**.
+It writes fresh progress/failure evidence before checking external adoption.
+`admitted-diagnostics` now dispatches the existing diagnostic/tracer verifier.
+
+The optional external adapter report is passed directly to
+`python3 scripts/verification/admitted_story.py --adapter-evidence FILE`.
+`check_adoption` documents its schema: exact candidate revision, Console source
+revision/hashes and dependency, actual command/exit, no unresolved work, all eight
+lint/test × silent/diagnostic × populated/nil scenario assertions (including
+private reference and database/repair reload), and >90% actual adapter coverage.
+This is an externally supplied verification artifact, not authentication or
+binary attestation. The aggregate never fabricates it from fixture results.
+
+Verified in this candidate on 2026-09-30:
+
+- Declared host `lint`: exit 0 (Go vet and UI ESLint).
+- Declared host `test`: exit 0 (all Go packages; 635 UI tests in 40 files).
+  Existing React act/style warnings were non-fatal.
+- `bash scripts/verify-verification-repair.sh --case admitted-all`: exit 1,
+  correctly refusing absent actual adapter evidence after all three local members
+  exited 0. Fresh report: `/tmp/openexec-admitted-story-stggchnj/result.json`.
+  This report was reread from disk; status remained failed with all local results
+  and the explicit incomplete-adoption reason retained.
+- `admitted-tracer`: 16 diagnostic-boundary and 16 silent/classification
+  completions, plus the engine baseline. Both engine discard mutants, wrapper
+  attachment removal, prefix-only capture and prefix-only public summary were
+  rejected at their intended assertions. Exact tail failures were
+  `lost prefix/tail` and `unsafe or missing public tail`.
+- Aggregate adapter compatibility command:
+  `go test ./pkg/manager -run '^TestAdmittedAdapterFailureReloadAndRepair$' -count=1 -timeout=60s -json`:
+  all eight journeys and their top-level test passed, with strict no-skip event
+  validation. Their store reopen and persisted repair assertions are in the table.
+- Fresh unit measurement matched the totals in
+  [admitted unit coverage](admitted-unit-coverage.md); all required scoped tests
+  and omission/refusal controls passed. Its result.json was reread from disk.
+- `python3 -m unittest discover -s scripts/verification -p 'test_*.py'`:
+  111 tests passed, including aggregate missing/stale/incomplete adoption,
+  failed-local-member and stale-success replacement controls. A documentation
+  update first tripped the study's required `pending US-012` wording; restored
+  that truthful integration status and reran the suite successfully.
+- Shell syntax and `git diff --check`: passed.
+
+The first aggregate attempt reused the standalone adapter command's broad
+manager package run; it stalled in the sandbox and was interrupted (exit 130).
+The aggregate now runs the exact bounded eight-case journey; broad package
+validation is supplied by the successful declared host test above. That
+interrupted attempt is not positive evidence. Full canonical gates were not run
+in the sandbox.
+Canonical full gates, actual Console proof, review and publication remain with
+their existing owners. Complexity delta: no runtime concepts, transitions,
+execution loops or owner decisions; verification composition only. Ordinary Git
+in this candidate is the explicitly authorized substitute for safe_commit.

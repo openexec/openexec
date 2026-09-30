@@ -2,10 +2,12 @@
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ $# != 2 || $1 != --case ]]; then
-    echo 'usage: verify-verification-repair.sh --case study|admitted-adapter|admitted-tracer|legacy-incident|named-recapture|private-storage|storage-unit-coverage|admitted-unit-coverage' >&2
+    echo 'usage: verify-verification-repair.sh --case study|admitted-all|admitted-diagnostics|admitted-adapter|admitted-tracer|legacy-incident|named-recapture|private-storage|storage-unit-coverage|admitted-unit-coverage' >&2
     exit 2
 fi
 case "$2" in
+    admitted-all) exec python3 "$root/scripts/verification/admitted_story.py" ;;
+    admitted-diagnostics) exec python3 "$root/scripts/verification/admitted_evidence.py" ;;
     admitted-adapter)
         cd "$root"
         go test ./pkg/manager/... -run '^TestAdmittedAdapterFailureReloadAndRepair$' -count=1

@@ -115,9 +115,10 @@ Do not infer the historical lint cause from current knip or Settings hook state.
 
 Disposition: accepted defect. The public attachment and silent persisted tracer
 are now implemented by T-US-012-001; current proof is in
-[admitted evidence](admitted-evidence.md). Remaining diagnostics, coverage and
-actual Console integration are pending US-012. Source availability is not write
-authority. The root-cause description below records the prerequisite baseline.
+[admitted evidence](admitted-evidence.md). Local diagnostics and coverage are
+verified; actual Console private capture/attachment remains pending US-012.
+Source availability is not write authority. The root-cause description below
+records the prerequisite baseline.
 
 - **Root cause:** `pkg/runtime/execution.go:VerificationCommandFailure` delegates
   only to NewCommandFailure. RetainCommandEvidence is public, but attachment to

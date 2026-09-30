@@ -41,9 +41,9 @@ Verified on 2026-09-30:
 
 - Standalone task gate: exit 0; 598 / 659 statements, **90.74355%**, across
   39 whole production functions and 68 required top-level tests.
-- Python verifier suite: 107 passed, including 16 admitted profile/scope controls.
-  The initial combined suite exposed leaked shared baseline configuration;
-  the gate now restores shared configuration after each call.
+- All 16 admitted profile/scope controls passed. Current combined verifier-suite
+  results are recorded in [admitted evidence](admitted-evidence.md).
+  The gate restores shared baseline configuration after each call.
 - Declared host `test`: exit 0, Go suite and 635 UI tests in 40 files.
 - Declared host `lint`: exit 0, Go vet and UI ESLint.
 - Shell syntax and `git diff --check`: passed.

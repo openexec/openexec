@@ -4,14 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [US-012 / T-US-012-004] Standalone admitted-path coverage and omission/refusal
-  controls are implemented. Scope, measured evidence and independent invocation
-  live in [admitted unit coverage](docs/verification/admitted-unit-coverage.md).
-
-- [US-012 / T-US-012-003] Preserve the Console WithOutput adapter through native
-  receipt reload and repair; redact credential values without hiding command names.
-  Implementation and verification are maintained in
-  [admitted evidence](docs/verification/admitted-evidence.md#console-adapter--us-012--t-us-012-003).
+- [US-012 / T-US-012-005] Consolidated story verification and refusal of
+  fixture-only adoption are recorded in
+  [admitted evidence](docs/verification/admitted-evidence.md). Actual Console
+  source still lacks private capture/attachment; story completion is refused.
+  Local strict coverage lives in
+  [admitted unit coverage](docs/verification/admitted-unit-coverage.md).
 
 - [US-014 / T-US-014-003] Storage checklist, strict coverage, isolated old-directory
   source/staging negative control and host checks verified. Consolidated commands,
@@ -27,11 +25,6 @@ Raw capture. One line per thought, any grammar.
   are now available; current passing storage/story results are recorded
   under US-014 above. Historical incident evidence remains in
   [named recapture](docs/verification/named-recapture.md).
-
-- [US-012 / T-US-012-002] Bounded diagnostic tails and public silent/diagnostic
-  lint/test event-to-reload-to-repair journeys implemented, including nil results
-  and refusal checks. Verification and Console adapter compatibility live in
-  [admitted evidence](docs/verification/admitted-evidence.md).
 
 - [US-010 / T-US-010-001] Current G-007 review study and exact provenance live in
   [repair study](docs/verification/repair-study.md). All three source defects are
