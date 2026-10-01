@@ -348,7 +348,10 @@ discovery stage; delivery stays with Console after native preparation.
 ## Planning, story completion and delivery
 
 `internal/planner/prompt.go` separates repository scope, candidate commit
-ownership and human boundaries. AFK covers preparation, checks and ordinary
+ownership and human boundaries. T-US-010-003 subsequently repaired the
+unqualified Goal-verification instruction with a shared post-queue delivery
+rule; its current contract and regressions are in
+[the runnable records contract](verification/exhausted-task-records.md). AFK covers preparation, checks and ordinary
 repairs; HITL represents an actual unresolved human requirement. Keep preparation
 runnable before any retained acceptance task. Do not create native tasks for
 Console publication, merge or deployment. This stage's explicit ordinary-Git

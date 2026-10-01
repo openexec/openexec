@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "task_id": "T-US-010-003",
+  "story_id": "US-010",
+  "matrix": "scripts/verification/exhausted-task-review-cases.json",
+  "scope": "scripts/exhausted-task-coverage-scope.json",
+  "dependencies": [
+    {
+      "task": "T-US-010-002",
+      "consumes": [
+        "scripts/verification/exhausted-task-review-cases.json",
+        "scripts/exhausted-task-coverage-scope.json"
+      ]
+    }
+  ],
+  "checklists": {
+    "F1": {
+      "root_cause": [
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "reconcileTaskCorrection"
+        },
+        {
+          "path": "pkg/manager/task_queue.go",
+          "symbol": "executeTaskQueue"
+        },
+        {
+          "path": "internal/release/task_correction.go",
+          "symbol": "AuthorizeTaskCorrection"
+        }
+      ],
+      "fix": [
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "reconcileTaskCorrection"
+        },
+        {
+          "path": "pkg/manager/task_queue.go",
+          "symbol": "executeTaskQueue"
+        },
+        {
+          "path": "internal/release/task_correction.go",
+          "symbol": "AuthorizeTaskCorrection"
+        }
+      ],
+      "prove": [
+        "candidate_edit",
+        "candidate_commit",
+        "candidate_output",
+        "branch",
+        "state",
+        "plan",
+        "graph",
+        "binding",
+        "malformed_metadata",
+        "receipt",
+        "restart",
+        "independent_candidate_change",
+        "concurrency",
+        "reauthorization",
+        "store_io"
+      ],
+      "falsify": [
+        "candidate_edit",
+        "candidate_commit",
+        "candidate_output",
+        "branch",
+        "state",
+        "plan",
+        "graph",
+        "binding",
+        "malformed_metadata",
+        "receipt",
+        "restart",
+        "independent_candidate_change",
+        "concurrency",
+        "reauthorization",
+        "store_io"
+      ]
+    },
+    "F2": {
+      "root_cause": [
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "AuthorizeTaskCorrection"
+        },
+        {
+          "path": "internal/cli/approve_local.go",
+          "symbol": "localApprovalManager"
+        }
+      ],
+      "fix": [
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "AuthorizeTaskCorrection"
+        },
+        {
+          "path": "internal/cli/approve_local.go",
+          "symbol": "localApprovalManager"
+        }
+      ],
+      "prove": [
+        "public_operator",
+        "public_legacy",
+        "public_agent_denied",
+        "public_missing_decision",
+        "public_decision_binding"
+      ],
+      "falsify": [
+        "public_operator",
+        "public_legacy",
+        "public_agent_denied",
+        "public_missing_decision",
+        "public_decision_binding"
+      ]
+    },
+    "F3": {
+      "root_cause": [
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "correctionPlan"
+        },
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "correctionCheck"
+        },
+        {
+          "path": "pkg/manager/task_recapture.go",
+          "symbol": "resolveRecaptureCommand"
+        }
+      ],
+      "fix": [
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "correctionPlan"
+        },
+        {
+          "path": "pkg/manager/task_correction.go",
+          "symbol": "correctionCheck"
+        },
+        {
+          "path": "pkg/manager/task_recapture.go",
+          "symbol": "resolveRecaptureCommand"
+        }
+      ],
+      "prove": [
+        "no_plan_success",
+        "no_plan_failure",
+        "planned_script_failure",
+        "planned_success",
+        "unsupported_argv",
+        "supported_argv",
+        "empty_obligations"
+      ],
+      "falsify": [
+        "no_plan_success",
+        "no_plan_failure",
+        "planned_script_failure",
+        "planned_success",
+        "unsupported_argv",
+        "supported_argv",
+        "empty_obligations"
+      ]
+    },
+    "F4": {
+      "root_cause": [
+        {
+          "path": "pkg/manager/task_boundary.go",
+          "symbol": "retainedTaskBoundary"
+        }
+      ],
+      "fix": [
+        {
+          "path": "pkg/manager/task_boundary.go",
+          "symbol": "retainedTaskBoundary"
+        }
+      ],
+      "prove": [
+        "boundary_no_authority",
+        "boundary_restart",
+        "boundary_ordinary_failure",
+        "boundary_human_reason_privacy"
+      ],
+      "falsify": [
+        "boundary_no_authority",
+        "boundary_restart",
+        "boundary_ordinary_failure",
+        "boundary_human_reason_privacy"
+      ]
+    }
+  },
+  "delivery": {
+    "native_preparation": "unverified",
+    "D1": "outstanding",
+    "D2": "outstanding",
+    "goal_complete": false,
+    "owner": "agent-console"
+  }
+}

@@ -88,6 +88,12 @@ Console owns publication, canonical gates, review resolution and exact owner
 merge acceptance after native preparation. An ordinary local Git commit preserves
 this selected stage. D1/D2 and PR delivery are not established by definitions.
 
+## Runnable record consumer
+
+T-US-010-003 adds the [records verifier and delivery boundary](exhausted-task-records.md).
+It consumes this unchanged definition contract; it does not promote definitions
+to repair evidence or resolve the provisional findings.
+
 ## Verification
 
 Run `bash scripts/verify-exhausted-task-review-contract.sh` for this stage.

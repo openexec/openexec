@@ -4,6 +4,28 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Exhausted runnable records / US-010 / T-US-010-003]
+  Current implementation and evidence schema: [records contract](docs/verification/exhausted-task-records.md).
+  Structured source/checklist references consume the existing case matrix and
+  coverage scope. Records validation is separate from native preparation and
+  actual coordinator merge proof; D1/D2 remain outstanding for this candidate.
+  Repaired shared planning semantics before verifier implementation; reused
+  story contract and native queue without a runtime schema or lifecycle change.
+  Fresh `python3 scripts/verify-exhausted-task-records.py --self-test` exited 0:
+  14 self-tests passed, including actual native queue checks, SQLite reopen,
+  planning round trips and three compiled source-overlay refusal controls with
+  restored-source positive reruns. CLI reread validates 35 required cases and
+  a source-derived denominator of 49 whole functions / 1434 statements; this is
+  scope, not measured repair coverage. Upstream contract verifier also passed.
+  Host declared lint and test both exited 0; compatibility, Go/UI type checks
+  and git diff --check passed. Final strengthened native fixture was rerun by
+  the self-test after the host suite started; no production change followed it.
+  Four review findings remain provisional/unrepaired in this selected stage;
+  evidence intake refuses missing native runs, falsifiers and coordinator merge.
+  No existing assertions weakened. Existing/legacy loading remains unchanged.
+  Ordinary Git preserves this stage; Console retains publication, canonical gate,
+  review resolution and the owner's external merge decision. No delivery claim.
+
 - [Exhausted correction review contract / US-010 / T-US-010-002]
   Single contract: [review checklist and scope](docs/verification/exhausted-task-review-contract.md).
   Four source-supported provisional accepted dispositions have explicit
