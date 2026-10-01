@@ -4,145 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Empty-list identity repair and compatibility / US-011 / T-US-011-001, T-US-011-002, T-US-011-003, 2026-10-01]
-  Consolidated evidence for repair, unit coverage and compatibility verification.
-  Disposition for the single MEDIUM finding in review
-  f320866fc267dc32777060cc8c16c646: ACCEPTED. Removing native writer and
-  retained-side comparison normalization reproduces the reported duplication;
-  removing SQL normalization reproduces the legacy reviewed refusal. Native constructors copy DependsOn;
-  omitted lists become nil, rather than the fields being absent as the review
-  suggested. The dependency commit 8715b6c5 already repaired native writes,
-  Go comparison, text/SQL-null predicates and nullable readers in this candidate.
-  No current remote PR/merge/deployment state is inferred from historical notes.
-  Delivery and formal review disposition remain Console-owned after the queue.
-
-  Read live Project context (Goal/Ready 4, Interpretation 10), local agreements
-  and Simple Loop contract. Outcome: exact native/reviewed replay preserves
-  identities and retained evidence. Boundary: native preparation/import. Reuse:
-  importBoundPlan, existing comparisons, SQLite transactions/readers, test
-  fixtures/snapshots, discovery inventory and Go coverage evaluator. Complexity
-  delta: no new runtime concepts, persistent state, transitions or owner decisions.
-
-  Dependency reproduction: before repair, identical native Plan replay moved
-  US-001 to US-002 and duplicated stories/tasks. Native writes now normalize
-  story acceptance/dependency lists and task dependencies to []; Go comparison
-  normalizes both sides. Readers use sql.NullString. No retained data is migrated.
-  CLAUDE.md describes full-content identity rather than title matching.
-
-  This stage's new SQL matrix exposed another real legacy case: CreateStory and
-  CreateTask pass marshaled []byte to SQLite, so old native nulls are BLOB values.
-  column='null' did not recognize these. A focused nil/nil case failed with
-  "reviewed stories US-list conflicts with retained content" even though the
-  loaded lists matched. The SQL predicate now checks json(column)='null', covering
-  text and BLOB representations while preserving malformed JSON errors and real
-  content conflicts. All other predicates remain intact.
-
-  New TestReviewedIdentityListMatrix crosses six retained/incoming values across
-  all four list fields (144 cases): nil, empty, equal nonempty, changed values,
-  reversed order and duplicates. Each reaches both Go comparison and SQL validation
-  using local file databases. SQL uses text and BLOB JSON plus SQL NULL only where
-  schema permits; raw retained values are re-read after acceptance and refusal.
-  TestReviewedIdentitySQLFields checks every scalar importer identity field,
-  including existing alternate goal/story parents and mode. Parent rows really
-  exist, so an FK error cannot masquerade as a content refusal.
-
-  Expanded TestNativeIdenticalReimportCanonicalStorage into nil/empty cases;
-  its raw SQL [] assertions cannot be hidden by tolerant comparators. It calls
-  the writer directly so provider JSON omitempty cannot collapse empty into nil;
-  the separate public Plan journeys remain mandatory.
-  Expanded TestReviewedIdentityLegacyEmptyLists to 18 cases crossing three
-  columns, text/BLOB null and SQL NULL, native/reviewed routes. Existing public
-  journeys retain sibling tasks, completed metadata/commits, full-row snapshots,
-  close/reopen, rollback-only ValidatePlanIdentities, repeated Plan calls and
-  receipt counts/bytes. Existing changed US-001/US-005 lifecycle and concurrent
-  post-review atomic conflict retry remain mandatory. No assertion was weakened.
-  The dependency's two nil-inequality expectations were intentionally changed
-  to equality; significant content/order/duplicate assertions remain.
-
-  scripts/verify-plan-identity-unit-coverage.sh consumes the discovery inventory
-  through the existing coverage evaluator. Fresh instrumented Go tests must
-  execute every mandatory test. Whole functions including closures must each
-  exceed 90%; missing functions/anchors/instrumentation, empty execution,
-  omitted changed production logic and skipped tests refuse. Python controls
-  exercise these failures, including exactly 90% and unrelated mutation failures.
-  The old reviewed verifier still runs its public-path selection.
-
-  Behavioral mutations run in a disposable source copy beneath this repository,
-  with GOWORK=off and GOENV=off, unmodified positive
-  controls, exact replacement anchors, separate successful compilation, exit 1
-  and the expected assertion tied to the named test. Controls cover native
-  writer+comparator, writer alone, comparator alone, SQL normalization,
-  text-only BLOB predicate, both nullable readers, allocation and atomic refusal.
-  The candidate itself is never mutated.
-
-  T-US-011-003 adds scripts/verify-plan-identity-compat.sh. Default execution is
-  fail-fast: targeted public journeys, coverage, make test, make compat-test,
-  make type-check, mutations, then restored targeted journeys. Each selected
-  phase can run separately for bounded diagnosis; no individual phase claims
-  the complete gate passed. Mandatory named tests cannot silently disappear or
-  skip. Compatibility output must contain all three named compatibility tests.
-  Mutation checks now require the expected diagnostic in every failing leaf,
-  reject unrelated sibling failures/skips and prove disposable-copy cleanup.
-  Separate SQL/BLOB controls select their exact reviewed legacy fixture.
-  Python controls exercise shell failure propagation, missing execution,
-  skipped compatibility journeys and invalid arguments. No Go regression test
-  changed in this stage; prior nil-inequality updates are explained above.
-
-  Fresh compatibility-stage verification on this candidate (2026-10-01):
-  - [x] `bash scripts/verify-plan-identity-compat.sh targeted`: exit 0;
-    22 mandatory manager/release/planner tests executed and passed, no skips.
-    Public Manager.Plan covers native repeat import and reviewed import,
-    identity validation, refusal/atomic retry, saved artifacts, full-row SQL
-    snapshots and actual store close/reopen. Legacy cases include parent/sibling
-    cascade protection and byte-exact completed-task evidence and receipts.
-  - [x] `bash scripts/verify-plan-identity-compat.sh coverage`: exit 0;
-    all 21 whole functions exceeded 90%; aggregate 413/428 statements.
-    Lowest: getTaskInternal 31/34 (91.18%); native importer 49/53 (92.45%);
-    atomic importer 100/106 (94.34%). Fourteen Python coverage/discovery controls
-    passed. A read-only Go module stat-cache warning did not prevent execution.
-  - [x] `bash scripts/verify-plan-identity-compat.sh mutations`: exit 0;
-    all nine mutations independently compiled and produced their expected
-    assertion failure (exit 1). Required native writer+comparator mutation:
-    "identical native replay moved US-001"; SQL-only normalization mutation:
-    "reviewed stories US-001 conflicts with retained content"; allocation
-    removal: original changed-content refusal on that same retained story.
-    Additional writer, comparator, BLOB, nullable-reader and refusal controls
-    passed. Unmodified positives passed first; copies removed afterward.
-    During verifier development, the BLOB control accidentally selected text
-    null and correctly refused its unexpected success. Corrected to the BLOB
-    fixture and reran all controls; no production behavior was weakened.
-  - [x] `bash scripts/verify-plan-identity-compat.sh compat-test`: exit 0;
-    executes make compat-test and asserts all three tests ran, covering current
-    .openexec, legacy .uaos and tasks.json fallback. No project-loading,
-    schema or migration production code changed in this stage.
-  - [x] `bash scripts/verify-plan-identity-compat.sh type-check`: exit 0;
-    make type-check compiled Go packages and UI TypeScript.
-  - [x] `python3 scripts/verification/plan_identity_compat_test.py`: exit 0;
-    three driver controls passed. Shell stubs prove fail-fast wiring; these
-    controls do not substitute for the real Go journeys above.
-  - [x] `bash scripts/verify-plan-identity-compat.sh restored`: exit 0 after
-    mutation cleanup; all 22 mandatory tests passed again on unchanged production
-    sources. `bash -n scripts/verify-plan-identity-compat.sh` and
-    `git diff --check` also passed.
-  - [x] `make lint` with GOCACHE=/tmp/openexec-identity-go-cache and GOWORK=off:
-    exit 0, Go vet and UI ESLint.
-  - [ ] `timeout 180 bash scripts/verify-plan-identity-compat.sh test`: attempted
-    make test, but the execution tool refused network access to api.anthropic.com
-    (domain outside sandbox allowlist). No successful make-test exit or UI test
-    completion is claimed. Host run_declared_check is absent from this session's
-    tool catalog; there is no host lint/test receipt for this stage.
-  - [ ] Full default verifier, canonical repository gate, D2 publication/merge
-    and formal review resolution: incomplete, Console-owned. Local accepted
-    disposition and repair evidence do not establish delivery. No inference
-    about PR state or product deployment follows from Console's serving revision.
-
-  Full verification can exceed a few minutes. On the repository runner, dispatch
-  it using `python3 /mnt/data1/projects/owner-model/job_runner.py start --name
-  "US-011 identity compatibility" --project openexec --cwd "$PWD" -- bash
-  scripts/verify-plan-identity-compat.sh`, then end the turn; the runner reports
-  to the inbox. This sandbox did not start that job: its .jobs/.attention state
-  is outside the supplied writable roots. Individual local diagnostic phases
-  above were bounded; the full gate remains explicitly incomplete.
+- [Candidate-linked identity delivery evidence / US-012 / T-US-012-001]
+  The consolidated current repair, compatibility and delivery record is
+  docs/verification/plan-identity-delivery.md, with its reproducible content
+  manifest alongside it. This replaces the US-011 evidence entry; earlier
+  reviewed-wave entries below are historical stage reports, not current delivery
+  attestations. The record separates fresh local checks from supplied context
+  and retains Console's external follow-up and completion boundary.
 
 - [Reviewed-wave delivery preparation / US-009 / T-US-009-001, 2026-10-01]
   Authoritative consolidated repair and delivery evidence, including dependency
@@ -821,9 +689,8 @@ Raw capture. One line per thought, any grammar.
 
 ## Questions
 
-- Empty-list replay repair is verified above; Console delivery/D2 and the later
-  native queue's remaining delivery operations stay Console-owned; compatibility
-  implementation and fresh verification are recorded above for T-US-011-003. Do not infer merge from the Console serving revision.
+- Identity delivery evidence and the remaining coordinator requirement are tracked
+  in [the delivery record](docs/verification/plan-identity-delivery.md#completion-boundary-and-external-follow-up).
 
 - Compact planning: unverified D2 delivery and canonical runner checks
   are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).
