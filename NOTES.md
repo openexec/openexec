@@ -34,23 +34,25 @@ Raw capture. One line per thought, any grammar.
   numbers. Console claims in older notes are historical; publication, canonical
   gates, independent review, owner acceptance and merge remain Console-owned.
 
-- [Native exhaustion discovery / US-007 / T-US-007-001, T-US-007-002]
-  Baseline reproduction/provenance remains in
-  [the reproduction record](docs/verification/exhausted-task-discovery.md).
-  [Native integration discovery](docs/exhausted-task-discovery.md) now records
-  concrete persisted fields, source-inspected boundaries, required repository
-  checks and the initial function inventory, since expanded by reconciliation finalization.
-  Fresh `scripts/verify-exhausted-task-discovery.sh` exited 0: real timeout,
-  completed prerequisite, same-candidate correction, exhausted queue refusal,
-  SQLite close/reopen and unchanged receipt/task snapshots. Five verifier test
-  methods passed, including missing/duplicate inventory, wrong source symbols,
-  missing documentation sections and stale baseline provenance refusals.
-  Host `run_declared_check(check="lint")` exited 0 (Go vet and UI ESLint).
-  The persisted JSON result was replaced and reread, not appended. No production
-  behavior or existing Go tests changed; two Python control tests were added
-  to enforce this discovery contract. Current/legacy loading is unchanged.
-  Console tests, Settings commit and hooks drift are historical context only.
-  Full canonical gates and delivery remain Console-owned, not claimed here.
+- [Exhausted correction review discovery / US-010 / T-US-010-001]
+  Current source assessment and all four review completion checklists live once
+  in [native integration discovery](docs/exhausted-task-discovery.md).
+  Replaced stale pre-implementation assertions; distinguished source observations,
+  frozen baseline evidence, proposed repairs and cross-repository uncertainty.
+  Read repository instructions, working memory, Simple Loop contract and live
+  Project context; its portfolio roadmap does not expand this selected stage.
+  Production search finds only the manager-to-store AuthorizeTaskCorrection call,
+  with no shipped caller of the manager API. Findings remain unrepaired here:
+  this stage is discovery, not the later implementation or review-resolution gate.
+  Fresh task verifier `bash scripts/verify-exhausted-task-discovery.sh` exited 0:
+  five verifier-control tests passed, the frozen native journey passed, and its
+  replacement JSON was reread and validated. This reproduces the baseline, not
+  the four newly reviewed repair scenarios. Host run_declared_check(lint) exited
+  0 with Go vet and UI ESLint; git diff --check passed. Full gates, new correction
+  regression/negative controls and operator scratch journey were not run here.
+  No production code or tests changed; current/legacy loading is unchanged.
+  Ordinary Git preserves this stage; Console retains publication, canonical gate,
+  review resolution, owner acceptance and default-branch merge evidence.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
@@ -778,6 +780,13 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Exhausted correction: operator transport in Console, actual incident bindings,
+  no-plan verification and terminal-refusal lifecycle questions are maintained in
+  [the current discovery](docs/exhausted-task-discovery.md#hypotheses-and-cross-repository-uncertainty)
+  and its review checklist. Another checkout was not read. Required future
+  integration and merge evidence remain unverified; no new owner decision is
+  requested by this discovery stage.
 
 - Identity delivery evidence and the remaining coordinator requirement are tracked
   in [the delivery record](docs/verification/plan-identity-delivery.md#completion-boundary-and-external-follow-up).
