@@ -102,6 +102,14 @@ func TestHandleStartRunDuplicate(t *testing.T) {
 	}
 
 	mgr.Stop("RUN-01")
+	// Stop reports the run stopped before its goroutine stops writing into
+	// the temp work dir, whose cleanup then failed "directory not empty"
+	// (openexec PR #78 CI, 2026-10-01).
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := mgr.Wait(ctx, "RUN-01"); err != nil {
+		t.Fatalf("Wait(RUN-01): %v", err)
+	}
 }
 
 func TestHandleGetRunFound(t *testing.T) {
