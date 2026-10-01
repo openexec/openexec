@@ -61,9 +61,9 @@ adds exactly one bound receipt while every retained row stays byte-identical.
 set each to SQL NULL. Use the same equivalent-empty cases as JSON null, including
 the empty-story tasks variant. Assert raw SQL IS NULL, then ValidatePlanIdentities,
 new-receipt import, real close/reopen and public Plan reuse. Do not rebuild tables
-or relax schema constraints to manufacture reachability. Current SQLite readers
-scan these columns into string and can fail before comparison on SQL NULL. The
-repair must cover native storage loading as well as SQL predicate normalization;
+or relax schema constraints to manufacture reachability. The repaired SQLite readers
+scan these columns into sql.NullString. Verification covers native storage
+loading as well as SQL predicate normalization;
 a SQL-only comparison test cannot establish reopen support. Preserve stored NULL
 bytes; normalization at read/compare time must not silently migrate retained rows.
 
@@ -114,11 +114,16 @@ nothing, a new reviewed import adds one receipt, validation and refusal add none
    must fail. Remove atomic retained-content refusal: concurrent-conflict test
    must fail. Keep these separate from empty-value compatibility controls.
 
-Restore each mutation before the next, prove it applied, record nonzero exit and
-expected assertion, then rerun restored tests. A compile error is not a successful
-negative control. Later repair evidence must run the native/reviewed targeted Go
-suite, compatibility checks and coverage; discovery completion alone claims none
-of those new lifecycle or mutation results.
+Run these controls with `scripts/verify-plan-identity-unit-coverage.sh --mutations`.
+The runner copies repository sources into a disposable directory, requires a
+passing unmodified test, applies each exact mutation, separately requires
+successful compilation, then requires exit 1 and the named behavioral assertion
+in that test's Go JSON events. Sources are restored between controls. Build
+errors, panics, missing execution and unrelated test failures cannot qualify.
+Additional controls independently remove old-side comparison and revert the SQL
+predicate to text-only null matching. The latter catches legacy native BLOB
+`null`, which a direct column='null' comparison misses. Coverage and compatibility
+results are recorded once in NOTES.md; discovery alone claims no runtime result.
 
 ## Coverage inventory
 
@@ -133,9 +138,17 @@ retentioncoverage plus retention_unit_coverage.expected_blocks/evaluate and the
 baseline diff completeness check in reviewed_plan_identity.py. Any newly changed
 helper must join the inventory; do not narrow it to make coverage green. Named
 source blocks are additional audit anchors within their whole-function scope.
-This stage validates inventory existence/completeness, not achieved coverage.
-The later coverage runner must extend its test selection to TestNativeIdenticalReimport
-and new legacy/SQL-null cases; the existing reviewed-only selection is insufficient.
+The discovery script validates inventory existence/completeness.
+`scripts/verify-plan-identity-unit-coverage.sh` measures this inventory with fresh
+Go coverage profiles and requires every named test to pass without skips. It
+retains public Plan/reopen/receipt journeys and adds list and SQL scalar matrices.
+Its fail-closed controls reject missing functions, source anchors, coverage
+blocks, zero executed tests, omitted changed logic, and coverage at or below the
+threshold for any function. Native raw JSON assertions cover nil and empty
+inputs independently of comparator tolerance. SQL list matrices include native
+BLOB and text JSON, SQL NULL only in nullable columns, equal nonempty lists,
+different values, order and duplicates; refused validation is re-read to prove
+the retained value was not rewritten.
 
 ## Console follow-up and delivery boundary
 

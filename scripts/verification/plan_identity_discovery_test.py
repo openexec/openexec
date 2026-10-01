@@ -47,6 +47,16 @@ class DiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'inventory'):
                 validate(ROOT, m, self.helper)
 
+    def test_missing_function_and_source_anchor(self):
+        m = copy.deepcopy(self.manifest)
+        m['functions'].append('internal/release/reviewed_identity.go:MissingIdentityFunction')
+        with self.assertRaisesRegex(ValueError, 'missing or ambiguous source declaration'):
+            validate(ROOT, m, self.helper)
+        m = copy.deepcopy(self.manifest)
+        m['blocks'][0]['anchors'].append('missing source block')
+        with self.assertRaisesRegex(ValueError, 'missing source block'):
+            validate(ROOT, m, self.helper)
+
     def test_threshold_cannot_be_weakened(self):
         for key, value in [('operator', '>='), ('percent', 89), ('scope', 'edited lines')]:
             m = copy.deepcopy(self.manifest)

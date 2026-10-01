@@ -69,7 +69,7 @@ func TestReviewedIdentityLegacyEmptyLists(t *testing.T) {
 		{"stories", "depends_on", "US-001"},
 		{"tasks", "depends_on", "T-US-001-001"},
 	} {
-		for _, value := range []string{"'null'", "NULL"} {
+		for _, value := range []string{"'null'", "NULL", "CAST('null' AS BLOB)"} {
 			for _, reviewed := range []bool{false, true} {
 				name := column.table + "/" + column.name + "/" + value
 				if reviewed {
@@ -173,37 +173,42 @@ func TestReviewedIdentityLegacyEmptyLists(t *testing.T) {
 }
 
 func TestNativeIdenticalReimportCanonicalStorage(t *testing.T) {
-	e := newSchedulerTestEnv(t)
-	var p planner.ProjectPlan
-	if err := json.Unmarshal([]byte(identityFixture(t, "retained")), &p); err != nil {
-		t.Fatal(err)
-	}
-	p.Stories[0].AcceptanceCriteria = nil
-	p.Stories[1].DependsOn = []string{"US-001"}
-	p.Stories[1].Tasks[0].DependsOn = []string{"T-US-001-001"}
-	raw, err := json.Marshal(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.mgr.cfg.PlanGenerator = fixedPlanCompletion(string(raw))
-	if _, err := e.mgr.Plan(context.Background(), nativeIdentityRequest(t, e.mgr)); err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range []struct{ query, want string }{
-		{"SELECT acceptance_criteria FROM stories WHERE id='US-001'", "[]"},
-		{"SELECT depends_on FROM stories WHERE id='US-001'", "[]"},
-		{"SELECT depends_on FROM tasks WHERE id='T-US-001-001'", "[]"},
-		{"SELECT acceptance_criteria FROM stories WHERE id='US-005'", `["Verified"]`},
-		{"SELECT depends_on FROM stories WHERE id='US-005'", `["US-001"]`},
-		{"SELECT depends_on FROM tasks WHERE id='T-US-005-001'", `["T-US-001-001"]`},
-	} {
-		var got string
-		if err := e.mgr.state.GetDB().QueryRow(c.query).Scan(&got); err != nil {
-			t.Fatal(err)
-		}
-		if got != c.want {
-			t.Errorf("%s: got %s want %s", c.query, got, c.want)
-		}
+	for name, lists := range map[string][]string{"nil": nil, "empty": {}} {
+		t.Run(name, func(t *testing.T) {
+			e := newSchedulerTestEnv(t)
+			var p planner.ProjectPlan
+			if err := json.Unmarshal([]byte(identityFixture(t, "retained")), &p); err != nil {
+				t.Fatal(err)
+			}
+			p.Stories[0].AcceptanceCriteria = lists
+			p.Stories[0].DependsOn = lists
+			p.Stories[0].Tasks[0].DependsOn = lists
+			p.Stories[1].DependsOn = []string{"US-001"}
+			p.Stories[1].Tasks[0].DependsOn = []string{"T-US-001-001"}
+			// Call the native writer directly so omitempty in provider JSON cannot
+			// collapse the explicit empty case into the nil case. Public Plan
+			// replay is independently exercised above.
+			if err := e.mgr.importBoundPlan(&p, false); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, c := range []struct{ query, want string }{
+				{"SELECT acceptance_criteria FROM stories WHERE id='US-001'", "[]"},
+				{"SELECT depends_on FROM stories WHERE id='US-001'", "[]"},
+				{"SELECT depends_on FROM tasks WHERE id='T-US-001-001'", "[]"},
+				{"SELECT acceptance_criteria FROM stories WHERE id='US-005'", `["Verified"]`},
+				{"SELECT depends_on FROM stories WHERE id='US-005'", `["US-001"]`},
+				{"SELECT depends_on FROM tasks WHERE id='T-US-005-001'", `["T-US-001-001"]`},
+			} {
+				var got string
+				if err := e.mgr.state.GetDB().QueryRow(c.query).Scan(&got); err != nil {
+					t.Fatal(err)
+				}
+				if got != c.want {
+					t.Errorf("%s: got %s want %s", c.query, got, c.want)
+				}
+			}
+		})
 	}
 }
 

@@ -85,7 +85,9 @@
     "pkg/manager:TestNativeIdenticalReimportCanonicalStorage",
     "pkg/manager:TestReviewedIdentityLegacyEmptyLists",
     "pkg/manager:TestNativeIdenticalReimportWriteRefusals",
-    "internal/release:TestReviewedIdentityNullableStoryMembership"
+    "internal/release:TestReviewedIdentityNullableStoryMembership",
+    "internal/release:TestReviewedIdentityListMatrix",
+    "internal/release:TestReviewedIdentitySQLFields"
   ],
   "required_sections": [
     "Fixtures and public boundaries",
