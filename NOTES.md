@@ -4,6 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Trusted operator correction / US-011 / T-US-011-003]
+  Shipped `openexec task correct` reuses the operator-session boundary and native
+  manager authorization, requiring explicit correction authority and a decision
+  reference. Implementation, scratch transcript, mutation proof, compatibility
+  evaluation and Console transport follow-up live once in
+  [the operator interface record](docs/verification/task-correct.md).
+
 - [Required correction task scripts / US-011 / T-US-011-002]
   Implementation and verification contract: [task-script record](docs/verification/correction-task-scripts.md).
   Native correction now enforces task scripts alongside applicable plan checks,
@@ -129,9 +136,9 @@ Raw capture. One line per thought, any grammar.
   frozen baseline evidence, proposed repairs and cross-repository uncertainty.
   Read repository instructions, working memory, Simple Loop contract and live
   Project context; its portfolio roadmap does not expand this selected stage.
-  Production search finds only the manager-to-store AuthorizeTaskCorrection call,
-  with no shipped caller of the manager API. Findings remain unrepaired here:
-  this stage is discovery, not the later implementation or review-resolution gate.
+  The discovery-time absence of a shipped correction caller is superseded by
+  T-US-011-003 and its operator interface record. That earlier stage recorded
+  discovery rather than implementation or review-resolution evidence.
   Fresh task verifier `bash scripts/verify-exhausted-task-discovery.sh` exited 0:
   five verifier-control tests passed, the frozen native journey passed, and its
   replacement JSON was reread and validated. This reproduces the baseline, not
