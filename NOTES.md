@@ -4,6 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Exhausted task correction / US-008 / T-US-008-001]
+  Implemented the native candidate-bound, single-pass correction path and its
+  persistence/queue tests. The authoritative implementation and verification
+  record is [exhausted-task reconciliation](docs/verification/exhausted-task-reconciliation.md).
+  This entry concerns exhaustion, not the older identity story with the same
+  task numbering. Console owns publication, canonical gates, review and merge.
+
 - [Native exhaustion discovery / US-007 / T-US-007-001, T-US-007-002]
   Baseline reproduction/provenance remains in
   [the reproduction record](docs/verification/exhausted-task-discovery.md).

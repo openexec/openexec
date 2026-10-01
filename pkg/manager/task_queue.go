@@ -65,6 +65,16 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			if task.Status != release.TaskStatusFailed {
 				continue
 			}
+			if task.Metadata["task_correction"] != nil {
+				if err := m.reconcileTaskCorrection(ctx, task); err != nil {
+					if errors.Is(err, errRecaptureWaiting) {
+						continue
+					}
+					return err
+				}
+				processedFailure = true
+				continue
+			}
 			id, _ := task.Metadata["verification_failure_evidence"].(string)
 			if id != "" && !isRepairTask(task) {
 				if err := m.repairTaskFromRetainedFailure(ctx, task.ID, id); err != nil {
