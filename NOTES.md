@@ -4,122 +4,72 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Empty-list fixture discovery / US-010 / T-US-010-002, 2026-10-01]
-  Discovery contract: docs/verification/plan-identity-discovery.md; machine-readable
-  function/source-block inventory: scripts/verification/plan-identity-discovery.json.
-  Reuses retained/subsequent fixtures and actual Plan/release/SQLite boundaries.
-  Defines native replay, JSON null, nullable SQL NULL, changed-content allocation,
-  atomic concurrent refusal, full-row snapshots, reopen, receipts and independent
-  mutations. Includes native storage, SQL predicates and SQL NULL readers in the
-  required whole-function statement coverage >90%; coverage is a future repair
-  obligation, not measured by discovery. Current readers scan nullable arrays
-  into string, so SQL-only normalization would not prove reopen support.
-  Live Project context read: Goal/Ready 4, Interpretation 10. No runtime change,
-  new abstraction, other task selection or other checkout access. For me untouched.
-  Console goal-mode mismatch and D2 ownership are recorded in the discovery
-  contract; neither external delivery nor completed advisory repair is claimed.
-  Verification: bash scripts/verify-plan-identity-discovery.sh passed, including
-  six negative-control tests; shell syntax and git diff --check passed. The first
-  run correctly rejected an abbreviated fixture path in the evidence; corrected
-  to the complete local reference and reran. run_declared_check is absent from
-  the exposed catalog, so no host lint/test result is claimed. Production Go
-  behavior is unchanged; compatibility regression execution belongs to repair.
+- [Empty-list replay repair / US-011 / T-US-011-001, 2026-10-01]
+  Accepted the advisory's empty-list identity finding after reproducing it in
+  this retained candidate. Correction to the review: native constructors copy
+  DependsOn; omitted lists become nil, rather than the fields being absent.
+  No claim about current remote PR/merge/deployment state is made here.
+  Delivery and review disposition remain Console-owned after the native queue.
 
-- [Empty-list identity inspection / US-010 / T-US-010-001, 2026-10-01]
-  Selected stage: inspect current identity handling and bound the repair; no
-  production/test edits or other native tasks. Read AGENTS.md, AGENTS.local.md,
-  this memory, PROJECT_INTENT.md and the Simple Loop architecture contract.
-  Live openexec_get_project(openexec) returned accepted Goal revision 4,
-  Ready revision 4 and current Interpretation revision 10 (portfolio stewardship).
-  The supplied identity Goal and retained plan artifact
-  `.openexec/artifacts/plans/d716497f0b746af9d26daac8f0a2a45d97b79c84f692fb5df935f2936451d8c4.json`
-  bound this narrower inspection; its task verification is `git diff --check`.
-  The discovery script belongs to the next task, not this one. For me untouched.
+  Read live Project context (Goal/Ready 4, Interpretation 10), local agreements
+  and Simple Loop contract. Outcome: exact native/reviewed replay preserves
+  identities and retained evidence. Owning boundary: native preparation/import.
+  Reused importBoundPlan, canonical comparisons, SQLite readers/transactions,
+  identityFixture, identitySnapshot and real close/reopen. Complexity delta:
+  zero new concepts, persistent state, transitions, owner decisions or loops.
 
-  Provenance: initial worktree clean, HEAD
-  `4b406941` (US-009 evidence), containing implementation `74f5b0b9` and
-  discovery `38d20b42`; branch is
-  `outcome/6fbdb8c642f3b58c1788c74e84fa0860` in the supplied candidate directory.
-  The retained fix is present here, not missing in another repository.
-  Local main is `186646ee320886726512b6468f229d53da1d7714`;
-  `git merge-base --is-ancestor 74f5b0b9 main` returned 1. This proves only local
-  ancestry, not current GitHub PR or default-branch state. PR #78 and review
-  f320866fc267dc32777060cc8c16c646 are supplied delivery bindings. No merge or
-  deployment is established. The Console serving revision is not OpenExec
-  deployment evidence. Ordinary candidate Git persistence is required by the
-  stage wrapper, superseding the retained task's older no-commit instruction;
-  external publication, gate, disposition and merger remain Console-owned.
+  First added TestNativeIdenticalReimportPreservesIdentities with the local
+  retained fixture (US-001 and T-US-001-001 have no dependencies). Its first
+  harness run correctly refused in-memory intent without a stable request ID;
+  changed the harness to the native file-based intent route. Before production
+  edits, the same test exited 1: identical native replay moved US-001 to US-002,
+  changed story/task identities/counts/bytes, and imported two extra stories
+  and two extra tasks. This is executed behavioral evidence, not inference.
 
-  Source-verified mechanism and qualifications:
-  - `pkg/manager/planner.go:63,201,285,330`: ordinary Plan with empty RequestID,
-    Review=false and AutoImport=true reaches importBoundPlan(false), which
-    prepares identities after generation. preparePlanIDs reloads retained state
-    and supplies the full-content conflict callback for every route. Nonempty
-    RequestID instead selects the durable reviewed replay path.
-  - `pkg/manager/planner_identity.go:9` converts through
-    `pkg/manager/planner_replay.go:413` and checks goals, stories and tasks with
-    ReviewedGoalEqual/ReviewedStoryEqual/ReviewedTaskEqual. Canonical identity
-    includes parent IDs, ordered task membership, priorities, expanded strategy
-    descriptions, max attempts and mode; lifecycle/evidence is excluded.
-  - `pkg/manager/planner.go:383,409` DOES copy story/task DependsOn. The advisory's
-    wording that these fields are absent is inaccurate: nil is copied when
-    input omits them. AcceptanceCriteria is likewise copied without normalization.
-    `internal/release/manager.go:484,639,674,1070` caches rows, appends task IDs
-    to parent membership and saves through store Create/Update operations.
-    `internal/release/sqlite_store.go:508,750,853,1087` marshals nil lists to JSON
-    null; story/task readers at 645-653 and 981 unmarshal valid JSON null to nil.
-    Thus the native persistence/load path preserves the mismatch described.
-  - `internal/release/reviewed_identity.go:10` normalizes only incoming nil to
-    empty; reflect.DeepEqual distinguishes retained nil. The existing
-    `internal/release/reviewed_identity_test.go:51` explicitly expects that
-    distinction. `internal/release/reviewed_plan_import.go:64-100` separately
-    compares json(column)=json(?) while writing incoming nil as []. Both
-    preparation and atomic validation therefore need compatible empty semantics.
-    ValidatePlanIdentities uses the same transaction in rollback-only mode;
-    matching import receipts return early, so receipt replay alone is not proof
-    of existing-row predicate compatibility.
-  - `internal/planner/remap_content.go:10` reevaluates conflicts to a fixed point:
-    moving a task changes story membership, then moves its parent and siblings.
-    Story conflicts are considered before tasks, so a nil story dependency can
-    also cause a direct story move. The advisory's cascade is plausible, not the
-    only ordering. Identical native replay duplication is supported by source
-    tracing here, not yet demonstrated with an executed native regression.
-  - `CLAUDE.md:109` still describes same-title identity. That is obsolete for
-    native preparation's full-content callback; the exported legacy title-only
-    lookup remains available, so avoid claiming title matching ceased everywhere.
+  Repair: native stories canonicalize nil acceptance/dependency lists; native
+  tasks canonicalize nil dependencies. Both sides of reviewedArrayEqual
+  normalize nil. SQL existing-row list predicates normalize JSON null and SQL
+  NULL without changing other predicates. Nullable list readers use
+  sql.NullString so reopening those schema-supported rows succeeds. No retained
+  rows are migrated or rewritten. Nonempty values/order remain significant.
+  CLAUDE.md now describes full-content identity and exact replay.
 
-  Existing executed evidence: `bash scripts/verify-reviewed-plan-identity.sh`
-  exited 0 on this unchanged executable candidate. Its two Python controls and
-  all 15 mandatory tests passed without skips; every scoped function exceeded
-  90% statement coverage (lowest 92.45%). A read-only Go module stat-cache warning
-  did not fail the run. `pkg/manager/planner_identity_lifecycle_test.go:22` checks
-  changed same-title US-001/US-005, references, full-column snapshots, exact
-  receipts, real close/reopen and exact distinct-request reuse. At line 272 the
-  reviewer injects a genuine Goal conflict: no partial rows/receipt, then retry
-  after reopen without regeneration or rereview. These execute the actual
-  Manager.Plan/SQLite boundary with deterministic adapters. They seed reviewed
-  imports, not the native writer; their success does not refute the advisory.
+  Tests: new native replay and direct storage tests; 12 legacy cases crossing
+  story acceptance, story dependency and single-task dependency with JSON null,
+  SQL NULL, native and reviewed routes. Each uses persisted completed metadata,
+  commits, full-column snapshots, sibling tasks, nonempty dependent references,
+  real close/reopen, rollback-only ValidatePlanIdentities, repeated Plan calls
+  and byte-identical retained receipts. Reviewed imports mint one new receipt
+  and replay it unchanged. Nullable empty story membership is also validated,
+  and changed membership refuses. Native write-failure triggers, stale review,
+  closed-store refusal, unknown-goal clearing and strategy retention are tested.
+  Original US-001/US-005 changed-content lifecycle and post-review concurrent
+  atomic retry tests remain unchanged. The two old nil-inequality expectations
+  in TestReviewedCanonicalNormalizationAndRetention intentionally became true;
+  order/duplicate/content inequality assertions remain intact.
 
-  Bounded repair recommendation (not implemented in this inspection): reuse
-  importBoundPlan and both existing comparators. Canonicalize native empty story
-  acceptance/dependency lists and task dependencies to []; normalize retained
-  nil in Go and legacy JSON null/schema-supported SQL NULL in SQL list predicates.
-  Preserve meaningful list values/order/duplicates, all other content checks,
-  receipt binding, atomic refusal and retained bytes; do not migrate old rows.
-  Update CLAUDE.md and the two obsolete nil-inequality assertions intentionally.
-  Reuse identityFixture, identitySnapshot and freshQueueManager for public native
-  replay, legacy reviewed validation/import and isolated task-null cascade cases.
-  Keep literal US-001, US-005 and T-US-001-001 independent of task numbering.
-  Required later evidence: direct stored arrays, full snapshots and reopen;
-  native replay mutation removing writer/old-side normalization; independent SQL
-  predicate mutation producing the exact retained-story refusal; original
-  content-allocation mutation; restored targeted suite, compatibility and coverage.
-  Include importBoundPlan and SQL predicate construction in the coverage inventory;
-  the current manifest omits the native writer. No new schema, runtime loop,
-  persistent concept or authority abstraction is needed (complexity delta zero).
-  Advisory mechanism merits repair; this inspection is not a completed repair
-  disposition. Agent Console goal-mode verifier mismatch remains an external
-  follow-up; no other checkout was inspected, edited, built or verified.
+  Negative controls (all compiled, exited 1 with the intended assertion, then
+  sources restored): remove native writer plus old-side normalization -> native
+  replay moves US-001; remove only writer normalization -> stored null versus [];
+  remove only SQL CASE -> reviewed stories US-001 conflicts with retained
+  content; remove content-allocation callback -> original lifecycle fails with
+  the same retained-story refusal. Commands were focused go test runs against
+  TestNativeIdenticalReimportPreservesIdentities, CanonicalStorage,
+  TestReviewedIdentityLegacyEmptyLists and TestReviewedIdentityLifecycle.
+
+  Verification: task command go test ./pkg/manager/... -run
+  'TestNativeIdenticalReimport|TestReviewedIdentity' -count=1 -v; release package
+  tests; make compat-test (current .openexec, legacy .uaos and tasks.json
+  fallbacks); and existing reviewed identity verifier passed. Expanded that
+  verifier's manifest/test selection because it correctly refused omission of
+  the newly changed readers/writer. All scoped functions exceed the unchanged
+  90% threshold: importBoundPlan 49/53, story reader 35/36, task reader 31/34;
+  atomic importer 99/106. Targeted go vet and git diff --check passed.
+  The six-control discovery verifier passed after synchronizing its retained
+  test inventory with the expanded regression manifest. Discovery is in
+  docs/verification/plan-identity-discovery.md. No host lint/test receipt:
+  run_declared_check is absent from the exposed tool catalog. Full canonical
+  delivery gate remains with the socket-capable repository runner.
 
 - [Reviewed-wave delivery preparation / US-009 / T-US-009-001, 2026-10-01]
   Authoritative consolidated repair and delivery evidence, including dependency
@@ -151,7 +101,7 @@ Raw capture. One line per thought, any grammar.
   duplicate/empty source IDs. The lookup compares all importer columns for
   Goals, stories and tasks, including ordered task membership, parent IDs,
   priorities, technical-strategy-expanded descriptions, max attempts and mode.
-  Incoming nil arrays normalize to []; retained JSON null remains distinct.
+  Nil and empty arrays now compare equally, including retained JSON/SQL null.
   Strings and array order/duplicates remain significant. Absent/non-string mode
   defaults to afk; explicit empty mode remains distinct. Lifecycle, commit,
   approval and unrelated metadata do not participate in content equality.
@@ -228,7 +178,7 @@ Raw capture. One line per thought, any grammar.
   | remapContentIDs | 59 / 59 | 100.00% |
   | rewritePlanRefs | 31 / 31 | 100.00% |
   | ReviewedGoalEqual | 1 / 1 | 100.00% |
-  | reviewedArrayEqual | 3 / 3 | 100.00% |
+  | reviewedArrayEqual | 5 / 5 | 100.00% |
   | ReviewedStoryEqual | 1 / 1 | 100.00% |
   | reviewedMode | 3 / 3 | 100.00% |
   | ReviewedTaskEqual | 1 / 1 | 100.00% |
@@ -798,12 +748,9 @@ Raw capture. One line per thought, any grammar.
 
 ## Questions
 
-- Empty-list identity inspection: native duplication and legacy-null reuse remain
-  source-supported but not executed regressions; schema-supported SQL NULL must
-  be checked before promising that case. US-011 owns repair/mutation evidence.
-  Current remote merger evidence is absent, so D2 remains unverified. The named
-  run_declared_check tool was not in this session's callable catalog; no host
-  lint/test receipt is claimed. The local scoped verifier above passed.
+- Empty-list replay repair is verified above; Console delivery/D2 and the later
+  native queue's dedicated coverage/compatibility/delivery scripts remain
+  outside T-US-011-001. Do not infer merge from the Console serving revision.
 
 - Compact planning: unverified D2 delivery and canonical runner checks
   are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).

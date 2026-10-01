@@ -18,7 +18,10 @@
     "pkg/manager/planner_replay.go:reviewedPlanRows",
     "internal/release/reviewed_plan_import.go:(*Manager).ImportReviewedPlan",
     "internal/release/reviewed_plan_import.go:(*Manager).ValidatePlanIdentities",
-    "internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan"
+    "internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan",
+    "pkg/manager/planner.go:(*Manager).importBoundPlan",
+    "internal/release/sqlite_store.go:(*SQLiteStore).getStoryInternal",
+    "internal/release/sqlite_store.go:(*SQLiteStore).getTaskInternal"
   ],
   "tests": [
     "pkg/manager:TestReviewedIdentityLifecycle",
@@ -35,6 +38,11 @@
     "internal/planner:TestRemapContentReservationsAndReplay",
     "internal/planner:TestRewritePlanRefsAllFields",
     "internal/release:TestReviewedCanonicalFields",
-    "internal/release:TestReviewedCanonicalNormalizationAndRetention"
+    "internal/release:TestReviewedCanonicalNormalizationAndRetention",
+    "pkg/manager:TestNativeIdenticalReimportPreservesIdentities",
+    "pkg/manager:TestNativeIdenticalReimportCanonicalStorage",
+    "pkg/manager:TestReviewedIdentityLegacyEmptyLists",
+    "pkg/manager:TestNativeIdenticalReimportWriteRefusals",
+    "internal/release:TestReviewedIdentityNullableStoryMembership"
   ]
 }

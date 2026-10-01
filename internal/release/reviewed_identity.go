@@ -3,11 +3,14 @@ package release
 import "reflect"
 
 // Canonical comparisons mirror the reviewed importer columns, excluding lifecycle
-// and evidence. Incoming nil arrays are stored as []; retained JSON null is not [].
+// and evidence. Nil and empty arrays are equivalent, including retained legacy JSON/SQL null.
 func ReviewedGoalEqual(old, next *Goal) bool {
 	return old.Title == next.Title && old.Description == next.Description && old.SuccessCriteria == next.SuccessCriteria && old.VerificationMethod == next.VerificationMethod
 }
 func reviewedArrayEqual(old, next []string) bool {
+	if old == nil {
+		old = []string{}
+	}
 	if next == nil {
 		next = []string{}
 	}

@@ -80,7 +80,12 @@
     "internal/planner:TestRemapContentReservationsAndReplay",
     "internal/planner:TestRewritePlanRefsAllFields",
     "internal/release:TestReviewedCanonicalFields",
-    "internal/release:TestReviewedCanonicalNormalizationAndRetention"
+    "internal/release:TestReviewedCanonicalNormalizationAndRetention",
+    "pkg/manager:TestNativeIdenticalReimportPreservesIdentities",
+    "pkg/manager:TestNativeIdenticalReimportCanonicalStorage",
+    "pkg/manager:TestReviewedIdentityLegacyEmptyLists",
+    "pkg/manager:TestNativeIdenticalReimportWriteRefusals",
+    "internal/release:TestReviewedIdentityNullableStoryMembership"
   ],
   "required_sections": [
     "Fixtures and public boundaries",

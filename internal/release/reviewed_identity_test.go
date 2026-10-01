@@ -53,7 +53,7 @@ func TestReviewedCanonicalNormalizationAndRetention(t *testing.T) {
 		old, next []string
 		want      bool
 	}{
-		{[]string{}, nil, true}, {[]string{}, []string{}, true}, {nil, nil, false}, {nil, []string{}, false},
+		{[]string{}, nil, true}, {[]string{}, []string{}, true}, {nil, nil, true}, {nil, []string{}, true},
 		{[]string{"a", "b"}, []string{"b", "a"}, false}, {[]string{"a"}, []string{"a", "a"}, false},
 	} {
 		if got := reviewedArrayEqual(c.old, c.next); got != c.want {

@@ -47,7 +47,7 @@ def main():
         blocks = {p: expected_blocks(p, temp / 'instrumented.go') for p in inventories}
         profile = temp / 'coverage.out'
         command = ['go', 'test', './internal/planner', './internal/release', './pkg/manager',
-                   '-count=1', '-timeout=120s', '-run', 'TestRemap|TestRewrite|TestNextFree|TestReviewed|TestIdentity|TestPlanReview|TestImportPlan|TestPlanner',
+                   '-count=1', '-timeout=120s', '-run', 'TestRemap|TestRewrite|TestNextFree|TestReviewed|TestIdentity|TestPlanReview|TestImportPlan|TestPlanner|TestNativeIdenticalReimport|TestSQLiteStore',
                    '-json', '-covermode=count', '-coverpkg=./internal/planner,./internal/release,./pkg/manager', '-coverprofile=' + str(profile)]
         result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
         if result.returncode:

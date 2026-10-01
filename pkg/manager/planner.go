@@ -394,6 +394,12 @@ func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) erro
 				Status:             release.StoryStatusPending,
 				CreatedAt:          now,
 			}
+			if st.AcceptanceCriteria == nil {
+				st.AcceptanceCriteria = []string{}
+			}
+			if st.DependsOn == nil {
+				st.DependsOn = []string{}
+			}
 			if err := rel.CreateStory(st); err != nil {
 				return fmt.Errorf("import story %s: %w", s.ID, err)
 			}
@@ -417,6 +423,9 @@ func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) erro
 					MaxAttempts:        3,
 					Status:             release.TaskStatusPending,
 					CreatedAt:          now,
+				}
+				if task.DependsOn == nil {
+					task.DependsOn = []string{}
 				}
 				task.Metadata = t.ExecutionMetadata()
 

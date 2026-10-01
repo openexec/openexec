@@ -608,7 +608,7 @@ func (s *SQLiteStore) getStoryInternal(ctx context.Context, id string) (*Story, 
 
 	var story Story
 	var epicID, goalID sql.NullString
-	var acceptanceCriteriaJSON, tasksJSON, dependsOnJSON string
+	var acceptanceCriteriaJSON, tasksJSON, dependsOnJSON sql.NullString
 	var gitBranch, gitBaseBranch, gitMergedTo, gitMergeCommit sql.NullString
 	var gitMergedAt sql.NullString
 	var gitCommitCount sql.NullInt64
@@ -642,13 +642,13 @@ func (s *SQLiteStore) getStoryInternal(ctx context.Context, id string) (*Story, 
 	}
 
 	// Parse JSON arrays
-	if err := json.Unmarshal([]byte(acceptanceCriteriaJSON), &story.AcceptanceCriteria); err != nil {
+	if err := json.Unmarshal([]byte(acceptanceCriteriaJSON.String), &story.AcceptanceCriteria); err != nil {
 		story.AcceptanceCriteria = []string{}
 	}
-	if err := json.Unmarshal([]byte(tasksJSON), &story.Tasks); err != nil {
+	if err := json.Unmarshal([]byte(tasksJSON.String), &story.Tasks); err != nil {
 		story.Tasks = []string{}
 	}
-	if err := json.Unmarshal([]byte(dependsOnJSON), &story.DependsOn); err != nil {
+	if err := json.Unmarshal([]byte(dependsOnJSON.String), &story.DependsOn); err != nil {
 		story.DependsOn = []string{}
 	}
 
@@ -953,7 +953,8 @@ func (s *SQLiteStore) getTaskInternal(ctx context.Context, id string) (*Task, er
 	`
 
 	var task Task
-	var dependsOnJSON, gitCommitsJSON, metadataJSON string
+	var dependsOnJSON sql.NullString
+	var gitCommitsJSON, metadataJSON string
 	var gitBranch, gitPRUrl sql.NullString
 	var gitPRNumber sql.NullInt64
 	var approvalStatus, approvalApprovedBy, approvalComments, approvalRejectionReason sql.NullString
@@ -978,7 +979,7 @@ func (s *SQLiteStore) getTaskInternal(ctx context.Context, id string) (*Task, er
 	}
 
 	// Parse JSON arrays
-	if err := json.Unmarshal([]byte(dependsOnJSON), &task.DependsOn); err != nil {
+	if err := json.Unmarshal([]byte(dependsOnJSON.String), &task.DependsOn); err != nil {
 		task.DependsOn = []string{}
 	}
 	if err := json.Unmarshal([]byte(metadataJSON), &task.Metadata); err != nil {
