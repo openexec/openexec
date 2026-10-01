@@ -1,0 +1,62 @@
+{
+  "goals": [
+    {
+      "id": "G-001",
+      "title": "Delivery",
+      "description": "Retained goal"
+    },
+    {
+      "id": "G-002",
+      "title": "Verification",
+      "description": "Verify"
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "goal_id": "G-002",
+      "title": "Story 001",
+      "description": "Changed content for US-001",
+      "acceptance_criteria": [
+        "Verified"
+      ],
+      "verification_script": "true",
+      "contract": "Changed contract",
+      "tasks": [
+        {
+          "id": "T-US-001-002",
+          "title": "Implement",
+          "description": "Deliver US-001",
+          "mode": "afk",
+          "technical_strategy": "Verify G-002 and US-001"
+        }
+      ]
+    },
+    {
+      "id": "US-005",
+      "goal_id": "G-002",
+      "title": "Story 005",
+      "description": "Changed content for US-005",
+      "acceptance_criteria": [
+        "Verified"
+      ],
+      "verification_script": "true",
+      "contract": "Changed contract",
+      "tasks": [
+        {
+          "id": "T-US-005-002",
+          "title": "Implement",
+          "description": "Deliver US-005",
+          "mode": "afk",
+          "technical_strategy": "Verify G-002 and US-005",
+          "depends_on": [
+            "T-US-001-002"
+          ]
+        }
+      ],
+      "depends_on": [
+        "US-001"
+      ]
+    }
+  ]
+}

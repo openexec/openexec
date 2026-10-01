@@ -4,8 +4,152 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Reviewed-wave identity / US-008 / T-US-008-001, 2026-10-01]
+  Authoritative implementation/evidence entry for this task; older US-008
+  retention work below is a different story. Baseline:
+  `38d20b4255926d311b295ff944b82e3673a89ac4`. Used the US-007 discovery entry
+  below to construct `pkg/manager/testdata/reviewed-identity/{retained,subsequent}.json`.
+  These are repository-local reproductions of its documented incident shape,
+  not a claim to possess the original owner's database or deployed artifacts.
+  Both same-title stories US-001 and US-005 change content, parent and task
+  membership. In particular, US-001 moves from G-001 to G-002 and from retained
+  T-US-001-001 to proposed T-US-001-002. A separate lifecycle case changes a
+  same-title Goal and changes only task technical strategy to exercise propagation.
+
+  Outcome: reviewed waves allocate compatible identities before persistence and
+  import, while completed work and exact reviewed replay remain intact. Observed
+  defect: title-only Goal/story matching disagreed with the importer's full-row
+  equality, and occupied tasks moved even on exact content replay. OpenExec's
+  native preparation/import boundary owns the repair. Reused ExistingLookup,
+  RemapPlanIDs, next-free allocation, reviewedPlanRows, SQLite transactions,
+  artifact persistence and import receipts. Read the Simple Loop contract and
+  live Project context (accepted portfolio Goal revision 4); that wider context
+  does not expand this selected identity task. No new architectural abstraction
+  is needed. Complexity: zero new persistent concepts, transitions, owner
+  decisions or runtime loops; replace the one-pass remapper with fixed-point
+  resolution over its existing transient ID maps. Existing machinery retained.
+
+  Implementation: preparation reloads retained state and refuses ambiguous
+  duplicate/empty source IDs. The lookup compares all importer columns for
+  Goals, stories and tasks, including ordered task membership, parent IDs,
+  priorities, technical-strategy-expanded descriptions, max attempts and mode.
+  Incoming nil arrays normalize to []; retained JSON null remains distinct.
+  Strings and array order/duplicates remain significant. Absent/non-string mode
+  defaults to afk; explicit empty mode remains distinct. Lifecycle, commit,
+  approval and unrelated metadata do not participate in content equality.
+  Iteration resolves changes propagated through structured dependencies and
+  prose, rendering from the original bytes each time to prevent cascading
+  substitutions. Allocations reserve incoming and retained IDs, including task
+  prefix destinations. Exact task content can be reused. The exported legacy
+  title-only lookup remains supported; native preparation supplies full content.
+  The atomic importer's conflict/receipt enforcement was not relaxed.
+
+  Regression and negative control:
+  - Before production edits, `go test ./pkg/manager -run
+    '^TestReviewedIdentityLifecycle$' -count=1` exited 1 with
+    `reviewed stories US-001 conflicts with retained content`.
+  - After implementation, temporarily removed only the Conflicts callback from
+    preparePlanIDs, restoring title-only matching. The same command again
+    exited 1 with that exact error (lifecycle test line 53 at that revision).
+    Host `run_declared_check(check="test")` with that mutation returned
+    `test exited 2`, `FAIL .../pkg/manager`, and make's test-target error. The host
+    output was truncated; exact-error evidence comes from the focused command.
+    Restored the saved source in a finally block, then reran the verifier.
+  - The initial coverage measurement refused preparePlanIDs at 89.47% and the
+    importer at 86.79%. Added real closed-store, cancellation, corrupt-metadata,
+    incompatible-mode, malformed-JSON and receipt-FK refusal cases, verifying
+    rollback rather than reducing the threshold. A newly written conversion
+    assertion incorrectly expected an explicit afk metadata key; corrected it
+    to assert the existing absent-key representation (the importer defaults it).
+    That interim host run exited 2; the corrected assertion passed the dedicated
+    verifier and final host test rerun.
+
+  End-to-end evidence (real Manager.Plan, artifact files and SQLite): initial
+  reviewed import; completed tasks with retained timestamp, attempts, branch,
+  commit list and metadata; second-wave preparation/review/persistence/import;
+  whole-column retained-record snapshots; artifact reread and canonical import
+  validation; actual manager/store close and state.db reopen; both request
+  replays without provider/reviewer calls; unchanged full-table/receipt snapshots;
+  exact allocated-plan preparation; distinct request with exact allocated
+  content and no duplicate rows. Initial import receipt remains byte-exact
+  through subsequent waves; mismatched receipt bytes, input digest and run ID
+  each refuse. Goal/story/task references, all supported prose fields, story
+  and task dependencies and reserved IDs are asserted. Titles/decision metadata
+  retain their established non-rewriting behavior; longer numeric tokens remain
+  unchanged. Another journey injects a genuine post-review Goal conflict,
+  proves no partial stories/tasks/receipt, restores the conflicting record and
+  resumes the persisted approved plan after reopen without regeneration. Existing
+  late-task-trigger rollback/retry and interrupted-review replay tests also run.
+
+  Deliberately updated existing test:
+  `TestReviewedPlanRefinementConflictRefusesBeforeRereview` is now
+  `TestReviewedPlanRefinementAllocatesBeforeRereview`. Same-title changed content
+  seen before rereview must receive fresh IDs and reach review, while rollback-only
+  preflight persists no stories and the retained Goal stays unchanged. Genuine
+  post-review conflicts still refuse in their separate atomic tests.
+
+  Verification gate: `scripts/verify-reviewed-plan-identity.sh` runs two Python
+  fail-closed controls and fresh instrumented Go tests, then requires all 15
+  named tests in `scripts/verification/reviewed-plan-identity-scope.json` to
+  execute/pass with no skips. The explicit 18-function manifest is nonempty,
+  rejects omitted changed production functions against the baseline, and checks
+  every expected instrumentation block. Each full function body must exceed
+  90%, independently of aggregate coverage. Observed final statement coverage:
+
+  | Scoped function | Covered / statements |
+  | --- | --- |
+  | RemapPlanIDs | 15 / 15 |
+  | rewriteIDRefs | 6 / 6 |
+  | nextFreeID | 4 / 4 |
+  | nextFreeTaskID | 8 / 8 |
+  | remapContentIDs | 59 / 59 |
+  | rewritePlanRefs | 31 / 31 |
+  | ReviewedGoalEqual | 1 / 1 |
+  | reviewedArrayEqual | 3 / 3 |
+  | ReviewedStoryEqual | 1 / 1 |
+  | reviewedMode | 3 / 3 |
+  | ReviewedTaskEqual | 1 / 1 |
+  | preparePlanIDs | 18 / 19 |
+  | reviewedIdentityConflicts | 12 / 12 |
+  | uniquePlanIDs | 15 / 15 |
+  | reviewedPlanRows | 17 / 17 |
+  | ImportReviewedPlan | 1 / 1 |
+  | ValidatePlanIdentities | 1 / 1 |
+  | importReviewedPlan | 98 / 106 |
+
+  Commands and observed results:
+  - `scripts/verify-reviewed-plan-identity.sh`: exit 0,
+    `Reviewed identity verification PASS`; all manifest tests passed, none skipped.
+    Lowest function coverage 92.45%. Python controls explicitly refuse absent
+    coverage blocks and empty instrumentation. Temporary empty-manifest and
+    omitted-RemapPlanIDs-manifest mutations both exited nonzero with their
+    expected diagnostics; restored the manifest and reran successfully.
+  - Host `run_declared_check(check="lint")`: `lint exited 0`, Go vet and UI ESLint.
+  - Final host `run_declared_check(check="test")`: `test exited 0`; this
+    executes `make test` (Go `go test ./...` plus UI Vitest). Manager passed
+    in 114.879s; UI reported 40 files and 635 tests passed.
+  - `make compat-test`: exit 0; existing `.openexec` and legacy `.uaos` status
+    CLI journeys, LegacyProjectConfigFallback and LegacyTasksJSONFallback passed.
+  - `make type-check`: exit 0; Go build and UI `tsc --noEmit` passed.
+  - `git diff --check`: exit 0. Local Go commands use writable
+    `GOCACHE=/tmp/openexec-identity-go-cache` via export, not command prefixes.
+
+  Compatibility evaluation: no schema, migration, project discovery or fallback
+  code changed. The protected current/legacy/JSON compatibility tests passed;
+  full retained SQL rows, metadata and receipts survive new waves and reopen.
+  Changed content intentionally obtains fresh IDs before review. Exact allocated
+  content and same-request replay reuse existing identities. A new request that
+  again supplies different content under historical occupied IDs is a new wave;
+  this is not a cross-ID content-deduplication index. Canonical comparison tests
+  cover every compared field and normalization distinction. No deployed-product
+  claim is made from the Console serving revision. Ordinary candidate commit is
+  required by the current stage wrapper; publication, canonical gate, independent
+  review and owner merge decision remain with Agent Console.
+
 - [Reviewed-plan identity discovery / US-007 / T-US-007-001, 2026-10-01]
   Inspection baseline: `e33bab1d3551da1236c9075dc153766c991e3467`.
+  Implementation observations below are historical baseline findings; the
+  reviewed-wave US-008 entry above records the repaired behavior and verification.
   This entry is the authoritative record for this discovery task; similarly
   numbered schema/evidence stories below concern other work. Read root
   `AGENTS.md`, `AGENTS.local.md`, this memory, and
