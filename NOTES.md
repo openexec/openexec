@@ -4,6 +4,27 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Empty-list fixture discovery / US-010 / T-US-010-002, 2026-10-01]
+  Discovery contract: docs/verification/plan-identity-discovery.md; machine-readable
+  function/source-block inventory: scripts/verification/plan-identity-discovery.json.
+  Reuses retained/subsequent fixtures and actual Plan/release/SQLite boundaries.
+  Defines native replay, JSON null, nullable SQL NULL, changed-content allocation,
+  atomic concurrent refusal, full-row snapshots, reopen, receipts and independent
+  mutations. Includes native storage, SQL predicates and SQL NULL readers in the
+  required whole-function statement coverage >90%; coverage is a future repair
+  obligation, not measured by discovery. Current readers scan nullable arrays
+  into string, so SQL-only normalization would not prove reopen support.
+  Live Project context read: Goal/Ready 4, Interpretation 10. No runtime change,
+  new abstraction, other task selection or other checkout access. For me untouched.
+  Console goal-mode mismatch and D2 ownership are recorded in the discovery
+  contract; neither external delivery nor completed advisory repair is claimed.
+  Verification: bash scripts/verify-plan-identity-discovery.sh passed, including
+  six negative-control tests; shell syntax and git diff --check passed. The first
+  run correctly rejected an abbreviated fixture path in the evidence; corrected
+  to the complete local reference and reran. run_declared_check is absent from
+  the exposed catalog, so no host lint/test result is claimed. Production Go
+  behavior is unchanged; compatibility regression execution belongs to repair.
+
 - [Empty-list identity inspection / US-010 / T-US-010-001, 2026-10-01]
   Selected stage: inspect current identity handling and bound the repair; no
   production/test edits or other native tasks. Read AGENTS.md, AGENTS.local.md,
