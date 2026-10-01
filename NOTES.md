@@ -4,12 +4,20 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Exhausted task delivery preparation / US-009 / T-US-009-001]
-  Current package: [delivery preparation](docs/exhausted-task-delivery.md) and
-  its JSON companion. Candidate/source-bound host lint/test, native acceptance,
-  persisted reload controls, compatibility and type checks passed. Preparation
-  verifier and eleven persisted refusal fixtures passed; no production behavior
-  changed. Ordinary stage commit preserves work; Console delivery and D2 pending.
+- [Exhausted task delivery handoff / US-009 / T-US-009-001, T-US-009-002]
+  Single current package: [delivery preparation](docs/exhausted-task-delivery.md)
+  and its JSON companion. Preparation complete; D2 and delivery pending until
+  Console supplies actual OpenExec default-branch merge evidence. The package
+  specifies verified-source → candidate/PR head → merged revision and target
+  branch evidence, including squash/rebase equivalence. Missing evidence does
+  not establish non-delivery; Console serving revision establishes neither.
+  Console owns candidate commits, publication, canonical gate, independent
+  review and requesting the owner's exact merge decision. Preparation is not
+  approval. No decision or delivery references were fabricated.
+  Persisted package reread, preparation verifier and three boundary test methods
+  (eleven persisted refusal fixtures) passed. Fresh host lint exited 0. Native
+  checks remain preparation-stage evidence. No tests/production behavior changed;
+  no acceptance or delivery action taken; handoff edits remain uncommitted.
 
 - [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002, T-US-008-003]
   Native correction/disposition interfaces remain documented in

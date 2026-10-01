@@ -1,6 +1,7 @@
 # Exhausted-task delivery preparation
 
-US-009 / T-US-009-001. **Preparation complete; delivery and D2 pending.**
+US-009 / T-US-009-001 preparation; T-US-009-002 delivery handoff.
+**Preparation complete; delivery and D2 pending.**
 The authoritative machine-readable companion is
 [exhausted-task-delivery.json](exhausted-task-delivery.json). This is the
 exhausted-task correction story, not earlier identity/retention stories that
@@ -12,7 +13,8 @@ Candidate branch: `outcome/ad5a70cd0924dae18de345dbdf74e623`.
 Preparation base revision: `dbfec11b6934dec8b1fa72c50cc6f871f44043a6`.
 Implementation comparison base: `ca2bdf8c254cfa95d7140064b177f54e7529a763`.
 These are fixed ancestry anchors, not a claim that HEAD remains at the base.
-The ordinary stage commit preserves the work; it does not publish or merge it.
+The preparation-stage commit preserved evidence only. This handoff stage leaves
+its changes uncommitted; Console owns candidate commits after queue completion.
 
 The companion's `source_files` and `source_sha256` bind 1,336 repository files,
 including implementation, tests, fixtures, verifier and relevant documentation.
@@ -51,7 +53,7 @@ No existing behavioral tests were changed in this stage.
 
 ## Required checks and outcomes
 
-Every row has exit 0, a content-bound command/result entry in the companion and
+The preparation-stage checks below each have exit 0, a content-bound command/result entry in the companion and
 stored output. The first two outputs are the actual host tool responses.
 
 | Command | Evidence / outcome |
@@ -111,7 +113,7 @@ failure/exhaustion payloads: original `legacy` receipt, fresh failed receipt,
 continuing-failure reason/disposition and no-authority `attempt_limit` survive.
 The preparation verifier parses these persisted payloads again. CLI fixtures are
 written, closed/read by a new verifier process and refused for their intended
-reason; the valid package is reread again after committing.
+reason; the valid package is reread from disk after the handoff edits.
 
 ## Remaining limitations
 
@@ -135,10 +137,45 @@ started `2026-10-01T14:36:52Z`. It is not independently reverified here and is n
 OpenExec deployment evidence. Earlier Console tests, Settings commits and hooks
 drift are historical claims, not current completion proof.
 
-Console owns publication to the durable feature PR, canonical gate, independent
-review and the exact owner merge decision after the queue finishes. D2 requires
-subsequent merge into OpenExec's default branch and remains pending. No PR,
-review verdict, acceptance, merge or deployment is claimed by this package.
+Console owns candidate commits, publication to the durable feature PR, the
+canonical gate, independent review and asking the owner for the exact merge
+decision after the queue finishes. The owner supplies that decision; neither
+preparation readiness nor task completion supplies approval. No PR, review
+verdict, acceptance, merge or deployment is claimed by this package.
 Console-repository authority transport, Settings presentation and running-revision
 verification need separate scoped evidence; they are not implemented or certified
 by this OpenExec task.
+
+## Pending D2 merge evidence
+
+D2 stays pending until Console supplies actual OpenExec default-branch merge
+evidence. Missing evidence is not a claim that a merge has or has not occurred.
+The handoff requires a traceable chain:
+
+- Identify the OpenExec repository and its actual target default branch from
+  current repository-host evidence; do not assume a branch name.
+- Bind the verified source manifest/digest and preparation base to Console's
+  candidate commit(s) and published PR head. If relevant source changes, refresh
+  verification; a matching branch name or preparation base alone is insufficient.
+- Supply canonical gate results and independent review references for that exact
+  candidate revision, plus the owner's actual exact merge decision and its scope
+  (repository, PR, candidate revision and target branch). These references are
+  currently absent, not placeholders for an invented approval.
+- Supply the repository-host merged PR record, merged revision and merge time,
+  naming the target default branch. Re-fetch that branch and prove the merged
+  revision is in its history and contains the verified fix. For squash or rebase,
+  record the source-to-merged-revision mapping and content comparison; candidate
+  ancestry alone cannot establish equivalence.
+
+Record these facts and durable evidence references together when Console obtains
+then verifies them. A green preparation verifier only establishes candidate
+readiness; a published PR, passing gate, favorable review or owner decision alone
+is not a merge. Console's serving revision cannot establish OpenExec delivery.
+This stage performs no acceptance, publication, merge, deployment or lifecycle
+mutation. No runtime concepts, transitions or owner decisions were added.
+
+Handoff verification: persisted package reread, preparation verifier and all
+three boundary test methods (including eleven persisted refusal fixtures) passed.
+Fresh host `run_declared_check(check="lint")` exited 0 (Go vet and UI ESLint).
+Native checks in the table remain preparation-stage evidence, not fresh runs
+claimed by this documentation-only handoff. No tests or production files changed.

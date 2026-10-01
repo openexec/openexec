@@ -6711,14 +6711,14 @@
     "Preparation evidence is local candidate evidence, not publication, independent review, owner acceptance, merge or deployment. D2 requires subsequent Console-coordinated default-branch merge.",
     "Coverage is aggregate whole-function statement coverage strictly above 90%, not a per-function 90% claim. Native fixtures exercise a real queue and SQLite with synthetic retained receipts, not the owner database or live Console UI.",
     "Host Go suite may use Go cache; focused acceptance uses count=1. Existing React act warnings and read-only Go module stat-cache warning did not fail checks. Logs are hashed local evidence, not externally signed attestations.",
-    "Full canonical gate runs later in Console repository runner. Prior-stage discovery and embedded build results remain dependency evidence; this stage freshly reruns the six named checks."
+    "Full canonical gate runs later in Console repository runner. Six named check outputs are preparation-stage evidence. T-US-009-002 rereads the package, reruns boundary fixtures and preparation verification, and runs fresh host lint; it does not repeat native acceptance or take delivery actions."
   ],
   "historical_console_evidence": [
     "Supplied observation: Agent Console revision f7bf25d5 started 2026-10-01T14:36:52Z. This is Console provenance, not independently reverified OpenExec deployment evidence.",
     "Earlier Settings commits, Console tests and hooks-drift notes are historical context only; no current Console delivery or transport success is inferred."
   ],
   "console_followups": [
-    "After queue completion, Console owns publication to the durable feature PR, canonical gate, independent review and exact owner merge decision; D2 remains pending until default-branch merge evidence exists.",
+    "After queue completion, Console owns candidate commits, PR publication, canonical gate, independent review and asking the owner for the exact merge decision. Only the owner supplies that decision; preparation is not approval. D2 stays pending until actual OpenExec default-branch merge evidence is supplied and verified.",
     "Console-repository authority transport, Settings presentation and serving-revision verification need their own scoped evidence; this OpenExec stage neither implements nor certifies them."
   ],
   "checks": {
@@ -7145,7 +7145,16 @@
     },
     {
       "path": "docs/exhausted-task-delivery.md",
-      "sha256": "039c925f21c4e5987f377605bd09fe67950fafdb88aee39939ae740f108ed6da"
+      "sha256": "62f486bb9abd81b0129815347624f2a971e3adedc156f44da466144c84789aa7"
     }
-  ]
+  ],
+  "handoff_task": "T-US-009-002",
+  "pending_merge_evidence": {
+    "status": "awaiting Console evidence",
+    "repository_and_target": "Current repository-host evidence identifying OpenExec and its actual default branch; branch name is not assumed.",
+    "verified_candidate": "Bind source_files/source_sha256 and preparation base to candidate commits and published PR head; refresh checks if relevant source changes.",
+    "gate_review_decision": "Canonical gate and independent review references bound to the exact candidate, plus the actual owner merge decision scoped to repository, PR, revision and target branch. None is supplied by this handoff.",
+    "actual_merge": "Repository-host merged PR record, merged revision, target default branch and merge time; refetched branch history proving inclusion of the merged revision and verified fix. Record content equivalence and revision mapping for squash/rebase.",
+    "boundary": "Preparation readiness is not approval or merge evidence. Missing merge evidence is not proof of non-delivery. Console serving revision is not OpenExec delivery evidence."
+  }
 }
