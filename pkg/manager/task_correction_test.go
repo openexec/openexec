@@ -164,7 +164,7 @@ func TestCorrectionNativeQueueSuccess(t *testing.T) {
 }
 
 func TestCorrectionNativeQueueRefusals(t *testing.T) {
-	for _, mode := range []string{"absent", "candidate", "task_binding", "review", "dependency", "failed_check", "cancel", "admitted_restart", "stale_plan"} {
+	for _, mode := range []string{"absent", "candidate", "task_binding", "review", "dependency", "failed_check", "cancel", "admitted_restart", "admitted_failure_restart", "stale_plan"} {
 		t.Run(mode, func(t *testing.T) {
 			f, c, repair := correctionFixture(t)
 			ctx := context.Background()
@@ -198,13 +198,19 @@ func TestCorrectionNativeQueueRefusals(t *testing.T) {
 				f.mode = "refusal"
 			case "cancel":
 				f.mode = "cancel"
-			case "admitted_restart":
+			case "admitted_restart", "admitted_failure_restart":
 				s, err := release.NewSQLiteStore(f.env.mgr.state.GetDB())
 				if err != nil {
 					t.Fatal(err)
 				}
 				if err = s.AdmitTaskCorrection(ctx, c); err != nil {
 					t.Fatal(err)
+				}
+				if mode == "admitted_failure_restart" {
+					data, _ := json.Marshal(recaptureReceipt("verify", 7))
+					if err := f.env.mgr.state.RecordTaskFailureStep(ctx, state.RunStepData{ID: "interrupted-fresh", RunID: "A", Status: "failed", Agent: "deterministic-verification", Metadata: string(data)}, 3); err != nil {
+						t.Fatal(err)
+					}
 				}
 			case "stale_plan":
 				_, err := f.env.mgr.state.GetDB().Exec(`UPDATE graph_generations SET status='stale'`)
@@ -217,7 +223,7 @@ func TestCorrectionNativeQueueRefusals(t *testing.T) {
 			if err == nil {
 				t.Fatal("refusal accepted")
 			}
-			if mode == "failed_check" || mode == "cancel" || mode == "admitted_restart" {
+			if mode == "failed_check" || mode == "cancel" || mode == "admitted_restart" || mode == "admitted_failure_restart" {
 				assertCorrectionReload(t, f, c, repair, false)
 				calls := f.calls
 				if err := boundaryRun(f); err == nil {

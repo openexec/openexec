@@ -4,9 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Exhausted task correction / US-008 / T-US-008-001]
-  Implemented the native candidate-bound, single-pass correction path and its
-  persistence/queue tests. The authoritative implementation and verification
+- [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002]
+  Implemented bounded candidate correction, durable continuing-failure and
+  exhaustion dispositions, independent queue draining and execution/completion
+  controls, including Stop's late-completion race. The authoritative implementation and verification
   record is [exhausted-task reconciliation](docs/verification/exhausted-task-reconciliation.md).
   This entry concerns exhaustion, not the older identity story with the same
   task numbering. Console owns publication, canonical gates, review and merge.
@@ -755,11 +756,6 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
-
-- Exhausted correction: authority consumption, corrected candidate content
-  binding, one bounded admission, Stop races and queue convergence remain later
-  implementation boundaries, tracked once in
-  [native integration discovery](docs/exhausted-task-discovery.md#evidence-and-unresolved-boundaries).
 
 - Identity delivery evidence and the remaining coordinator requirement are tracked
   in [the delivery record](docs/verification/plan-identity-delivery.md#completion-boundary-and-external-follow-up).

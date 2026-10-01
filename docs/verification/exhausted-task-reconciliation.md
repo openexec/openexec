@@ -1,6 +1,6 @@
 # Bounded exhausted-task reconciliation
 
-US-008 / T-US-008-001 implements the native slice identified by the
+US-008 / T-US-008-001 and T-US-008-002 implement the native slices identified by the
 [discovery record](../exhausted-task-discovery.md). That record describes the
 pre-change refusal, not current reconciliation behavior. Live Project context
 (accepted portfolio Goal revision 4) and the Simple Loop contract were read;
@@ -53,54 +53,84 @@ Ignored runtime output is not candidate source; verification output must stay
 outside the Git candidate. This does not attest arbitrary ignored dependencies
 or a deployed product.
 
+## Exhaustion and continuing failure
+
+Exhausted tasks without correction authority retain failed status and the
+original `verification_failure_evidence`, with an `exhaustion` disposition in
+existing metadata. They do not enter repair creation. Interrupted legacy
+recaptures retain their existing exhausted/needs_review disposition. Independent
+runnable tasks drain using the existing story/dependency/priority policy; the
+queue then returns its typed retained-work boundary. Dependents stay pending.
+
+An admitted correction's fresh failure is atomically persisted in run_steps and
+`task_correction.fresh_evidence_id`, without replacing its original receipt
+binding. The consumed record becomes continuing_failure/needs_review with the
+actual failure reason. This also drains independent work without a new repair.
+Denied execution, Stop, cancellation, drift and unmet completion obligations
+persist a terminal correction disposition and end that invocation. Re-entry
+cannot renew consumption. A crash between fresh failure persistence and final
+disposition becomes interrupted/needs_review on restart.
+
+Stop remains effective even if an executor returns success afterward: late
+pipeline events cannot overwrite stopped status. Both task disposition and run
+status are reread after database reopen. Completion still checks cancellation,
+candidate identity and accepted validation obligations, including fresh proof
+for every required item. Agent prose, artifact claims and historical supported
+completion claims do not discharge those obligations.
+
 ## Executed evidence
 
-The following commands passed on the implementation candidate:
+Fresh verification for T-US-008-002 uses the executable default acceptance suite:
+`scripts/verify-exhausted-task-reconciliation.sh`. It runs verifier self-tests and
+both native slices, requiring all 31 named tests/subcases to run and pass with no
+skips. `exhaustion-controls` is also a working standalone mode requiring 16
+named tests/subcases. Admission/completion and native-queue modes remain usable.
+The verifier rejects missing subcases, missing package passes, duplicate tests,
+failures, skips, unstructured evidence and truncated persisted JSON. Five Python
+control tests exercise these refusals and fragmented-output reconstruction.
 
-- `scripts/verify-exhausted-task-reconciliation.sh admission-completion`:
-  three required named tests executed and passed, with reloaded SQLite evidence.
-- `scripts/verify-exhausted-task-reconciliation.sh native-queue`:
-  three required named tests executed and passed, with no skips.
-- `python3 -m unittest discover -s scripts/verification -p
-  test_exhausted_task_reconciliation.py`: three verifier controls passed.
-  Missing runs, zero tests, missing package passes, skips, failures, duplicate
-  runs and truncated persisted JSON refuse. Fragmented Go JSON output is
-  reassembled before persistence evidence is parsed and printed.
-- Existing discovery verifier controls: five passed, including source inventory
-  and frozen-baseline provenance checks.
-- Host `run_declared_check(check="lint")`: exit 0, Go vet and UI ESLint.
-- Host `run_declared_check(check="test")`: exit 0, Go suite and UI Vitest
-  (40 files, 635 tests). Both host checks were rerun after the production
-  changes; subsequent test-only strengthening passed both task modes again.
-- `make compat-test`: current `.openexec`, legacy `.uaos`, configuration fallback
-  and legacy tasks JSON fallback journeys passed.
-- `make type-check`: Go build and UI TypeScript checks passed.
+The new native queue journeys cover continuing and unchanged check failure,
+exhaustion without authority, blocked dependents, independent draining, denied
+effects, agent-only claims, cancellation after admission and at completion,
+Stop at completion and unmet validation introduced during verification. Each
+journey closes and reopens SQLite, rereads the retained task, receipt, consumed
+allowance, completed prerequisite and dependent, then re-enters the queue and
+tries to renew authority. Continuing failures also reread the actual command
+evidence file, checking argv, cwd and exit code (including unchanged exit 2).
+No extra repair may appear. Ordinary task attempt history remains 3/3.
 
-The five distinct Go tests are `TestCorrectionAdmissionPersistence`,
-`TestCorrectionCompletionObligations`, `TestCorrectionNativeQueueSuccess`,
-`TestCorrectionNativeQueueRefusals` and `TestCorrectionNativeStopAndFailure`.
-They use actual manager pipelines, real shell subprocesses, native repair
-creation, accepted validation plans and actual database close/reopen. Inspected
-reloaded snapshots retain the original task at 3/3, its branch and commit list,
-the same completed repair identity and unchanged historical failure receipt.
-Successful correction persists consumed/completed and the dependent completes;
-unsuccessful correction keeps the dependent pending with no attempt spent.
-Concurrent admission admits only once; restart after admission, after failure
-and after completion cannot mint verification. Tests also cover absent authority,
-candidate/task mismatch, review, dependencies, stale plans, cancellation, Stop,
-real check failure, candidate mutation and stale task metadata writes.
+`TestCorrectionNativeQueueRefusals` additionally covers interruption after a
+fresh failure was persisted but before disposition. The release persistence
+test now emits structured reloaded state and checks failure cannot re-admit.
+`TestRecaptureBoundariesTerminal/restart_spent` deliberately now expects the
+native drained-queue boundary instead of an immediate recapture error; its
+exhausted state, history, blocked-dependent and no-dispatch assertions remain.
+The existing named recapture variants retain their original assertions.
 
-No existing test assertions were weakened or replaced. New tests assert the
-accepted correction behavior, while the frozen discovery continues to assert
-the historical refusal. During verification, long Go JSON evidence was initially
-printed incompletely; the verifier now joins output fragments and rejects a
-truncated snapshot, with a regression control for both cases.
+The new Stop-at-completion test first failed with `control bypassed`, exposing
+a queued completion overwriting Stop. It passes after the status fix. Related
+recapture tests exposed a lost legacy exhausted disposition; that production
+compatibility gap was fixed, rather than weakening the state assertions.
+The initial host test check exited 2; final check results are recorded below.
+
+- Default acceptance suite: exit 0, all required cases pass; reloaded evidence
+  and dispositions parsed again by the verifier.
+- Standalone exhaustion-controls: exit 0; 16 required tests/subcases, no skips.
+- Related legacy named-recapture and terminal tests: exit 0 (17.389 seconds).
+- `make compat-test`: exit 0; current `.openexec`, legacy `.uaos`, configuration
+  and tasks JSON fallbacks passed.
+- `make type-check`: exit 0; Go build and UI TypeScript passed.
+- Host `run_declared_check(check="test")`: exit 0; Go suite and UI Vitest
+  passed (40 files, 635 UI tests). The final acceptance rerun additionally
+  checks structured release failure evidence and persisted stopped run status.
+- Host `run_declared_check(check="lint")`: exit 0; Go vet and UI ESLint passed.
+- `git diff --check`: exit 0.
 
 ## Compatibility and complexity
 
 There is no schema migration, new task type, executor, scheduler, controller,
-owner decision or delivery route. One reserved task metadata record carries the
-explicit correction and its consumption. The added bounded transition is failed
+owner decision or delivery route. Existing task metadata carries the correction, consumption, failure evidence
+and exhaustion disposition; no table or schema was added. The added bounded transition is failed
 to in_progress to done/needs_review without refunding exhausted attempts.
 Existing task selection and validation are reused; their ordinary interfaces
 and legacy no-accepted-plan behavior remain intact. No current/legacy discovery

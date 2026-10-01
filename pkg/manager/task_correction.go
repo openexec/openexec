@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -255,7 +256,21 @@ func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Tas
 	}
 	defer func() {
 		if err != nil {
-			_ = store.FinishTaskCorrection(context.Background(), c, false)
+			outcome := "refused"
+			if ctx.Err() != nil {
+				outcome = "cancelled"
+			} else if info, e := m.Status(task.ID); e == nil {
+				if info.Status == StatusStopped {
+					outcome = "stopped"
+				} else if info.FailureEvidenceID != "" {
+					outcome = "continuing_failure"
+				}
+			}
+			if saveErr := store.FailTaskCorrection(context.Background(), c, outcome, err.Error()); saveErr != nil {
+				err = errors.Join(err, fmt.Errorf("persist correction disposition: %w", saveErr))
+			} else if outcome == "continuing_failure" {
+				err = nil // Durable unfinished work; drain independently runnable tasks.
+			}
 		}
 	}()
 	for _, item := range plan.Items {

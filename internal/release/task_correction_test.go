@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"sync"
 	"testing"
 )
@@ -125,5 +126,13 @@ func TestCorrectionAdmissionPersistence(t *testing.T) {
 	if err != nil || task.Status != TaskStatusNeedsReview {
 		t.Fatalf("disposition: %+v %v", task, err)
 	}
-	t.Logf("RELOADED_CORRECTION admission consumed=%v history=%d/%d candidate=%s", got.Consumed, task.AttemptCount, task.MaxAttempts, got.CandidateDigest)
+	persisted, err = CorrectionForTask(task)
+	if err != nil || persisted.Outcome != "refused" || !persisted.Consumed {
+		t.Fatal("failure disposition not persisted", err)
+	}
+	if err := fresh.AdmitTaskCorrection(ctx, c); err == nil {
+		t.Fatal("failure renewed authority")
+	}
+	data, _ := json.Marshal(map[string]interface{}{"task": task})
+	t.Logf("RELOADED_CORRECTION %s", data)
 }

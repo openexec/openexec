@@ -19,6 +19,32 @@ MODES = {
     },
 }
 
+MODES["exhaustion-controls"] = {
+    "internal/release": ["TestCorrectionAdmissionPersistence"],
+    "pkg/manager": [
+        "TestCorrectionExhaustionControls",
+        *["TestCorrectionExhaustionControls/" + case for case in (
+            "continuing_failure", "unchanged_failure", "no_authority", "blocked_dependents", "independent_drain")],
+        "TestCorrectionExecutionControls",
+        *["TestCorrectionExecutionControls/" + case for case in (
+            "denied_effects", "agent_claim", "cancel_after_admission", "cancel_completion", "stop_completion", "unmet_validation")],
+        "TestCorrectionNativeStopAndFailure/stop",
+        "TestCorrectionCompletionObligations",
+    ],
+}
+# Preserve required subcases, not just parent tests that pass with an empty table.
+MODES["native-queue"]["pkg/manager"] += [
+    "TestCorrectionNativeQueueRefusals/" + case for case in (
+        "absent", "candidate", "task_binding", "review", "dependency", "failed_check",
+        "cancel", "admitted_restart", "admitted_failure_restart", "stale_plan")]
+MODES["native-queue"]["pkg/manager"] += [
+    "TestCorrectionNativeStopAndFailure/" + case for case in ("stop", "check_failure", "drift")]
+MODES["acceptance"] = {}
+for mode in list(MODES.values()):
+    for package, tests in mode.items():
+        MODES["acceptance"].setdefault(package, [])
+        MODES["acceptance"][package] = sorted(set(MODES["acceptance"][package]) | set(tests))
+
 
 def validate(events, required):
     runs, passes, packages = set(), set(), set()
@@ -43,14 +69,28 @@ def validate(events, required):
     # events. Reassemble per test before inspecting or publishing the evidence.
     for output in output_by_test.values():
         for line in output.splitlines():
+            if "RELOADED_EXHAUSTION " in line:
+                task = json.loads(line.split("RELOADED_EXHAUSTION ", 1)[1])
+                if task["attempt_count"] != task["max_attempts"] or task["metadata"]["verification_failure_evidence"] != "legacy":
+                    raise ValueError("exhaustion lost original history/receipt")
+                c = task["metadata"].get("task_correction")
+                if c is not None and (not c["consumed"] or c["outcome"] != "continuing_failure" or not c["fresh_evidence_id"] or not c["reason"]):
+                    raise ValueError("missing continuing-failure disposition")
+                if c is None and task["metadata"]["exhaustion"]["outcome"] != "attempt_limit":
+                    raise ValueError("missing exhaustion disposition")
+                reloaded.append(line.strip())
+            if "RELOADED_FAILURE " in line:
+                receipt = json.loads(line.split("RELOADED_FAILURE ", 1)[1])
+                if receipt["Status"] != "failed":
+                    raise ValueError("missing persisted fresh failure")
+                reloaded.append(line.strip())
             if "RELOADED_CORRECTION " in line:
                 payload = line.split("RELOADED_CORRECTION ", 1)[1]
-                if payload.startswith("{"):
-                    persisted = json.loads(payload)
-                    task = persisted["task"]
-                    correction = task["metadata"]["task_correction"]
-                    if (task["attempt_count"], task["max_attempts"], correction["consumed"]) != (3, 3, True):
-                        raise ValueError("persisted correction history/consumption mismatch")
+                persisted = json.loads(payload)
+                task = persisted["task"]
+                correction = task["metadata"]["task_correction"]
+                if (task["attempt_count"], task["max_attempts"], correction["consumed"]) != (3, 3, True):
+                    raise ValueError("persisted correction history/consumption mismatch")
                 reloaded.append(line.strip())
     expected = {(f"github.com/openexec/openexec/{pkg}", test)
                 for pkg, tests in required.items() for test in tests}
@@ -65,15 +105,19 @@ def validate(events, required):
 
 def main():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("mode", choices=MODES)
+    parser.add_argument("mode", nargs="?", default="acceptance", choices=MODES)
     args = parser.parse_args()
     required = MODES[args.mode]
+    controls = subprocess.run(["python3", "-m", "unittest", "discover", "-s",
+                               "scripts/verification", "-p", "test_exhausted_task_reconciliation.py"], cwd=ROOT)
+    if controls.returncode:
+        raise SystemExit(controls.returncode)
     events = []
     env = os.environ.copy()
     env.setdefault("GOCACHE", str(Path(tempfile.gettempdir()) / "openexec-correction-go-cache"))
     for package, tests in required.items():
         command = ["go", "test", "-json", "-count=1", "-timeout=90s", "./" + package,
-                   "-run", "^(" + "|".join(tests) + ")$"]
+                   "-run", "^(" + "|".join(sorted({test.split("/")[0] for test in tests})) + ")$"]
         result = subprocess.run(command, cwd=ROOT, env=env, text=True, capture_output=True)
         if result.returncode:
             raise SystemExit(result.stdout + result.stderr)

@@ -81,8 +81,8 @@ func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Ma
 	}
 	for _, task := range tasks {
 		switch {
-		case task.Status == release.TaskStatusInProgress && task.Metadata["task_correction"] != nil:
-			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='needs_review', metadata=json_set(metadata,'$.task_correction.outcome','interrupted') WHERE id=? AND status='in_progress' AND json_extract(metadata,'$.task_correction.consumed')=1`, task.ID)
+		case (task.Status == release.TaskStatusInProgress || task.Status == release.TaskStatusFailed) && task.Metadata["task_correction"] != nil:
+			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='needs_review', metadata=json_set(metadata,'$.task_correction.outcome','interrupted') WHERE id=? AND status IN ('in_progress','failed') AND json_extract(metadata,'$.task_correction.consumed')=1 AND json_extract(metadata,'$.task_correction.outcome')='running'`, task.ID)
 		case task.Status == release.TaskStatusInProgress && task.Metadata["recapture_outcome"] == "running":
 			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='failed' WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
 		case task.Status == release.TaskStatusInProgress:

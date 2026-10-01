@@ -22,6 +22,8 @@ type TaskCorrection struct {
 	StateHash       string `json:"state_hash"`
 	Consumed        bool   `json:"consumed"`
 	Outcome         string `json:"outcome"`
+	FreshEvidenceID string `json:"fresh_evidence_id,omitempty"`
+	Reason          string `json:"reason,omitempty"`
 }
 
 func CorrectionForTask(task *Task) (TaskCorrection, error) {
@@ -53,7 +55,7 @@ func correctionChanged(result sql.Result, err error) error {
 // AuthorizeTaskCorrection persists exactly one explicit decision. The caller
 // authenticates that decision; task metadata/receipts never manufacture it.
 func (s *SQLiteStore) AuthorizeTaskCorrection(ctx context.Context, c TaskCorrection) error {
-	if c.Consumed || c.Outcome != "" {
+	if c.Consumed || c.Outcome != "" || c.FreshEvidenceID != "" || c.Reason != "" {
 		return ErrInvalidData
 	}
 	if _, err := CorrectionForTask(&Task{ID: c.TaskID, Metadata: map[string]interface{}{"task_correction": c}}); err != nil {
@@ -80,12 +82,21 @@ func (s *SQLiteStore) AdmitTaskCorrection(ctx context.Context, c TaskCorrection)
 // FinishTaskCorrection atomically checks existing completion obligations and
 // updates the consumed disposition. Failed/stopped checks retain review work.
 func (s *SQLiteStore) FinishTaskCorrection(ctx context.Context, c TaskCorrection, success bool) error {
+	return s.finishTaskCorrection(ctx, c, success, "refused", "")
+}
+
+// FailTaskCorrection retains the terminal reason without minting another attempt.
+func (s *SQLiteStore) FailTaskCorrection(ctx context.Context, c TaskCorrection, outcome, reason string) error {
+	return s.finishTaskCorrection(ctx, c, false, outcome, reason)
+}
+
+func (s *SQLiteStore) finishTaskCorrection(ctx context.Context, c TaskCorrection, success bool, failureOutcome, reason string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	status, outcome := TaskStatusNeedsReview, "refused"
+	status, outcome := TaskStatusNeedsReview, failureOutcome
 	if success {
 		var plan, hash string
 		if err := tx.QueryRowContext(ctx, `SELECT id,worktree_state_hash FROM validation_plan_revisions WHERE task_id=? AND status='accepted' ORDER BY revision DESC LIMIT 1`, c.TaskID).Scan(&plan, &hash); err != nil {
@@ -114,12 +125,12 @@ func (s *SQLiteStore) FinishTaskCorrection(ctx context.Context, c TaskCorrection
 		status, outcome = TaskStatusDone, "completed"
 	}
 	if err := correctionChanged(tx.ExecContext(ctx, `UPDATE tasks SET status=?, completed_at=CASE WHEN ?='done' THEN datetime('now') ELSE completed_at END,
- metadata=json_set(metadata,'$.task_correction.outcome',?) WHERE id=? AND (status='in_progress' OR (?='needs_review' AND status='failed'))
+ metadata=json_set(metadata,'$.task_correction.outcome',?,'$.task_correction.reason',?) WHERE id=? AND (status='in_progress' OR (?='needs_review' AND status='failed'))
  AND attempt_count=max_attempts AND git_branch=?
  AND json_extract(metadata,'$.task_correction.decision_ref')=?
  AND json_extract(metadata,'$.task_correction.candidate_digest')=?
  AND json_extract(metadata,'$.task_correction.consumed')=1
- AND json_extract(metadata,'$.task_correction.outcome')='running'`, status, status, outcome, c.TaskID, status, c.Branch, c.DecisionRef, c.CandidateDigest)); err != nil {
+ AND json_extract(metadata,'$.task_correction.outcome')='running'`, status, status, outcome, reason, c.TaskID, status, c.Branch, c.DecisionRef, c.CandidateDigest)); err != nil {
 		return err
 	}
 	return tx.Commit()
