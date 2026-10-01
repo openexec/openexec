@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -168,6 +170,11 @@ func TestCorrectionExecutionControls(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			f, c, repair := correctionFixture(t)
 			createQueueTask(t, f.env, "Independent", nil)
+			if mode == "denied_effects" {
+				if _, err := f.env.mgr.state.GetDB().Exec(`UPDATE tasks SET verification_script='printf forbidden > forbidden-effect.txt' WHERE id='A'`); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if err := f.env.mgr.AuthorizeTaskCorrection(context.Background(), c); err != nil {
 				t.Fatal(err)
 			}
@@ -175,6 +182,11 @@ func TestCorrectionExecutionControls(t *testing.T) {
 			f.env.mgr.cfg.StageExecutor = executor
 			if err := boundaryRun(f); err == nil {
 				t.Fatal("control bypassed")
+			}
+			if mode == "denied_effects" {
+				if _, err := os.Stat(filepath.Join(f.env.dir, "forbidden-effect.txt")); !os.IsNotExist(err) {
+					t.Fatal("denied executor effect escaped", err)
+				}
 			}
 			assertCorrectionReload(t, f, c, repair, false)
 			a, err := f.env.rel.TaskSnapshot(context.Background(), "A")

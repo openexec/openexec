@@ -131,8 +131,12 @@ def validate(events, required):
 
 def main():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("mode", nargs="?", default="acceptance", choices=[*MODES, "coverage", "removal-sensitive"])
+    parser.add_argument("mode", nargs="?", default="acceptance", choices=[*MODES, "all", "coverage", "removal-sensitive"])
     args = parser.parse_args()
+    if args.mode == "all":
+        from exhausted_task_all import main as verify_all
+        verify_all()
+        return
     required = MODES.get(args.mode, MODES["acceptance"])
     controls = subprocess.run(["python3", "-m", "unittest", "discover", "-s",
                                "scripts/verification", "-p", "test_exhausted_task_reconciliation.py"], cwd=ROOT)

@@ -1,15 +1,18 @@
+$ make compat-test
 🧪 Running compatibility regression tests...
 go test ./internal/validation/... -run Compatibility -v
 === RUN   TestCompatibility_ExistingProjects_StatusCLI
 === RUN   TestCompatibility_ExistingProjects_StatusCLI/current_openexec_project
 === RUN   TestCompatibility_ExistingProjects_StatusCLI/legacy_uaos_project
---- PASS: TestCompatibility_ExistingProjects_StatusCLI (0.08s)
-    --- PASS: TestCompatibility_ExistingProjects_StatusCLI/current_openexec_project (0.00s)
+--- PASS: TestCompatibility_ExistingProjects_StatusCLI (0.09s)
+    --- PASS: TestCompatibility_ExistingProjects_StatusCLI/current_openexec_project (0.01s)
     --- PASS: TestCompatibility_ExistingProjects_StatusCLI/legacy_uaos_project (0.00s)
 === RUN   TestCompatibility_LegacyProjectConfigFallback
 --- PASS: TestCompatibility_LegacyProjectConfigFallback (0.00s)
 === RUN   TestCompatibility_LegacyTasksJSONFallback
-[FALLBACK] Loading from JSON (/tmp/TestCompatibility_LegacyTasksJSONFallback2751415169/001/legacy-tasks-project/.openexec/tasks.json) because SQLite unavailable. Run 'openexec run' to migrate.
+[FALLBACK] Loading from JSON (/tmp/TestCompatibility_LegacyTasksJSONFallback1136878758/001/legacy-tasks-project/.openexec/tasks.json) because SQLite unavailable. Run 'openexec run' to migrate.
 --- PASS: TestCompatibility_LegacyTasksJSONFallback (0.03s)
 PASS
-ok  	github.com/openexec/openexec/internal/validation	0.115s
+ok  	github.com/openexec/openexec/internal/validation	0.118s
+
+exit=0

@@ -16,7 +16,7 @@ IMPLEMENTATION_BASE = 'ca2bdf8c254cfa95d7140064b177f54e7529a763'
 CHECKS = {
     'lint': 'run_declared_check lint (make lint)',
     'test': 'run_declared_check test (make test)',
-    'acceptance': 'scripts/verify-exhausted-task-reconciliation.sh',
+    'acceptance': 'scripts/verify-exhausted-task-reconciliation.sh all',
     'reload': 'scripts/verify-exhausted-task-reconciliation.sh exhaustion-controls',
     'compatibility': 'make compat-test',
     'types': 'make type-check',
@@ -78,7 +78,7 @@ def read(path):
 
 
 def validate(root, record):
-    require(record['schema'] == 1 and record['task'] == 'T-US-009-001', 'wrong task/schema')
+    require(record['schema'] == 1 and record['task'] == 'T-US-011-004', 'wrong task/schema')
     require(record['branch'] == BRANCH == git(root, 'branch', '--show-current'), 'stale candidate branch')
     require(record['base_revision'] == BASE and record['implementation_base'] == IMPLEMENTATION_BASE,
             'stale base identity')
@@ -110,24 +110,46 @@ def validate(root, record):
         require(not response.get('isError'), 'host check error')
         require(name + ' exited 0' in logs[name], 'missing successful host exit')
     require('PASS' in logs['compatibility'] and 'tsc --noEmit' in logs['types'], 'missing check output')
-    inventory = read(local(root, 'scripts/verification/exhausted-task-inventory.json'))['functions']
-    measured = []
-    for row in inventory:
-        key = row['path'] + ':' + row['symbol']
-        matches = re.findall(re.escape(key) + r': (\d+)/(\d+)', logs['acceptance'])
-        require(len(matches) == 1, 'missing/duplicate measured function: ' + key)
-        covered, statements = map(int, matches[0])
-        require(0 <= covered <= statements and statements > 0, 'invalid coverage')
-        measured.append(dict(row, covered=covered, statements=statements))
-    require(record['affected_function_coverage'] == measured, 'coverage differs from evidence')
-    require(sum(r['covered'] for r in measured) * 10 > sum(r['statements'] for r in measured) * 9,
-            'insufficient whole-function coverage')
-    require('acceptance: PASS' in logs['acceptance'] and '84 required tests/subcases; no skips; reopened evidence parsed' in logs['acceptance'],
-            'missing acceptance evidence')
-    require('removal-sensitive: PASS; native regression exit 1; exact refusal: task repair attempt limit reached' in logs['acceptance'],
+    # Unit coverage has its own events/profile; native integration events cannot
+    # satisfy the threshold. Recompute the complete source-derived denominator.
+    import tempfile
+    import exhausted_task_review_contract as contract
+    import exhausted_task_all as all_checks
+    import exhausted_task_unit_coverage as unit_checks
+    from exhausted_task_proof import require_coverage
+    required, cases = all_checks.required_cases()
+    all_result = read(local(root, RESULTS + 'all-result.json'))
+    require(all_result['source_sha256'] == all_checks.source_hashes(), 'stale all-mode source')
+    events = read(local(root, RESULTS + 'native-events.json'))
+    from exhausted_task_reconciliation import validate as validate_native
+    validate_native(events, required)
+    contract.check_events(events, cases)
+    unit_manifest = read(unit_checks.MANIFEST)
+    unit_required = {p: sorted(set(tests) | set(unit_manifest['subtests'].get(p, []))) for p, tests in unit_manifest['tests'].items()}
+    unit_events = read(local(root, RESULTS + 'unit-events.json'))
+    contract.check_events(unit_events, [dict(package=p, test=t) for p, tests in unit_required.items() for t in tests])
+    profile = local(root, RESULTS + 'unit-coverage.out')
+    require(profile.read_text().startswith('mode: atomic\n'), 'missing dedicated atomic unit profile')
+    with tempfile.TemporaryDirectory(prefix='exhausted-delivery-') as directory:
+        temp = Path(directory)
+        helper = temp / 'inventory'
+        contract.coverage.run('go', 'build', '-o', str(helper), './scripts/verification/retentioncoverage')
+        functions = contract.resolve_scope(read(contract.SCOPE), helper, temp)
+        blocks = {p: contract.coverage.expected_blocks(p, temp / 'instrumented.go') for p in {f['path'] for f in functions}}
+        contract.fill_missing_blocks(blocks, profile, temp / 'complete.out')
+        measured = contract.coverage.evaluate(functions, blocks, temp / 'complete.out')
+    require(record['affected_function_coverage'] == measured['functions'], 'coverage differs from evidence')
+    require_coverage(measured)
+    require('all: PASS' in logs['acceptance'], 'missing acceptance evidence')
+    removal = local(root, RESULTS + 'removal.txt').read_text()
+    require('removal-sensitive: PASS; native regression exit 1; exact refusal: task repair attempt limit reached' in removal,
             'missing removal-sensitive proof')
-    require('Overlay artifacts cleaned; original source SHA256 ' + sha(local(root, 'pkg/manager/task_queue.go').read_bytes()) in logs['acceptance'],
+    require('Overlay artifacts cleaned; original source SHA256 ' + sha(local(root, 'pkg/manager/task_queue.go').read_bytes()) in removal,
             'stale removal proof')
+    from exhausted_task_mutations import CONTROLS
+    controls = local(root, RESULTS + 'review-controls.txt').read_text()
+    for name, *_ in CONTROLS:
+        require(name + ': expected named assertion failure; source restored' in controls, 'missing removal control: ' + name)
     # Inspect actual persisted JSON payloads, not prose claims.
     output = logs['reload']
     require('exhaustion-controls: PASS' in output, 'missing reload execution')
@@ -149,7 +171,8 @@ def validate(root, record):
             require(receipt['Status'] == 'failed', 'lost persisted fresh failure')
     for ref in record['references']:
         require(sha(local(root, ref['path']).read_bytes()) == ref['sha256'], 'stale evidence reference')
-    require(record['references'], 'missing evidence references')
+    required_refs = {RESULTS + name for name in ('native-events.json', 'unit-events.json', 'unit-coverage.out', 'review-controls.txt', 'removal.txt', 'all-result.json')}
+    require(required_refs <= {ref['path'] for ref in record['references']}, 'missing evidence references')
 
 
 def main():

@@ -1,0 +1,19 @@
+{"Time":"2026-10-01T20:04:38.189662347+03:00","Action":"start","Package":"github.com/openexec/openexec/internal/cli"}
+{"Time":"2026-10-01T20:04:38.193706363+03:00","Action":"run","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote"}
+{"Time":"2026-10-01T20:04:38.193736608+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"=== RUN   TestTaskCorrectAgentCannotSelfPromote\n"}
+{"Time":"2026-10-01T20:04:38.193744775+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"Error: task correction requires an operator session\n"}
+{"Time":"2026-10-01T20:04:38.193746004+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"Usage:\n"}
+{"Time":"2026-10-01T20:04:38.193747389+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"  correct \u003ctask-id\u003e [flags]\n"}
+{"Time":"2026-10-01T20:04:38.193748908+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"\n"}
+{"Time":"2026-10-01T20:04:38.193749768+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"Flags:\n"}
+{"Time":"2026-10-01T20:04:38.193750721+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"      --authorize-correction   Explicitly authorize one correction verification pass\n"}
+{"Time":"2026-10-01T20:04:38.193752701+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"      --decision-ref string    Explicit operator correction decision reference\n"}
+{"Time":"2026-10-01T20:04:38.193753705+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"      --dir string             Retained candidate root (default \".\")\n"}
+{"Time":"2026-10-01T20:04:38.193755403+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"  -h, --help                   help for correct\n"}
+{"Time":"2026-10-01T20:04:38.193756414+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"      --plan string            Require this current accepted plan\n"}
+{"Time":"2026-10-01T20:04:38.193757356+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"\n"}
+{"Time":"2026-10-01T20:04:38.193760093+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Output":"--- PASS: TestTaskCorrectAgentCannotSelfPromote (0.00s)\n"}
+{"Time":"2026-10-01T20:04:38.193761499+03:00","Action":"pass","Package":"github.com/openexec/openexec/internal/cli","Test":"TestTaskCorrectAgentCannotSelfPromote","Elapsed":0}
+{"Time":"2026-10-01T20:04:38.193763321+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Output":"PASS\n"}
+{"Time":"2026-10-01T20:04:38.194361947+03:00","Action":"output","Package":"github.com/openexec/openexec/internal/cli","Output":"ok  \tgithub.com/openexec/openexec/internal/cli\t0.005s\n"}
+{"Time":"2026-10-01T20:04:38.194374177+03:00","Action":"pass","Package":"github.com/openexec/openexec/internal/cli","Elapsed":0.005}

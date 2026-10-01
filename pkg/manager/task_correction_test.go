@@ -283,6 +283,14 @@ func TestCorrectionNativeQueueRefusals(t *testing.T) {
 				if !found {
 					t.Fatalf("original boundary evidence missing: %+v", boundary)
 				}
+				serialized, err := json.Marshal(boundary)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var decoded TaskQueueBoundary
+				if err := json.Unmarshal(serialized, &decoded); err != nil || !reflect.DeepEqual(decoded.Tasks, boundary.Tasks) {
+					t.Fatal("boundary JSON lost evidence", err)
+				}
 				if f.calls != 0 {
 					t.Fatal("refusal dispatched correction checks")
 				}

@@ -1,0 +1,4 @@
+$ python3 scripts/verify-task-correct.py
+PASS: public CLI scratch journeys, SQLite reopen, four compiled mutations, restored-source rerun
+
+exit=0

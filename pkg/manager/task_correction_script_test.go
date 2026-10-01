@@ -4,18 +4,26 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/runtime"
 )
 
 // Each journey executes the actual shell command through the native deterministic
 // executor, then closes and reopens SQLite and resumes the dependent queue.
 func TestCorrectionTaskScriptJourneys(t *testing.T) {
 	for _, origin := range []string{"planned", "planner_imported", "legacy_no_plan"} {
-		for _, mode := range []string{"pass", "missing_file", "exit_3", "plan_failure", "quoted", "unsupported", "effect_denial", "no_authority"} {
+		modes := []string{"pass", "missing_file", "exit_3", "quoted", "effect_denial", "no_authority"}
+		if origin == "planned" {
+			modes = append(modes, "plan_failure", "unsupported")
+		}
+		for _, mode := range modes {
 			t.Run(origin+"/"+mode, func(t *testing.T) {
 				f, c, repair := correctionFixtureOrigin(t, origin == "planner_imported", "true")
 				db := f.env.mgr.state.GetDB()
@@ -54,16 +62,10 @@ func TestCorrectionTaskScriptJourneys(t *testing.T) {
 				case "quoted":
 					script = `test 'a b' = "a b" && test '$HOME' = '$HOME'`
 				case "plan_failure":
-					if c.PlanID == "" {
-						t.Skip("accepted-plan obligation requires a planned task")
-					}
 					if _, err := db.Exec(`UPDATE validation_items SET command_argv='["/bin/sh","-c","exit 3"]' WHERE id='check'`); err != nil {
 						t.Fatal(err)
 					}
 				case "unsupported":
-					if c.PlanID == "" {
-						t.Skip("unsupported plan command requires a plan")
-					}
 					if _, err := db.Exec(`UPDATE validation_items SET command_argv='["sh","-c","true","extra-argv"]' WHERE id='check'`); err != nil {
 						t.Fatal(err)
 					}
@@ -80,6 +82,9 @@ func TestCorrectionTaskScriptJourneys(t *testing.T) {
 					t.Fatal(err)
 				}
 				ctx := context.Background()
+				if mode == "unsupported" {
+					createQueueTask(t, f.env, "Independent", nil)
+				}
 				if mode != "no_authority" {
 					err := f.env.mgr.AuthorizeTaskCorrection(ctx, c)
 					if mode == "unsupported" {
@@ -88,6 +93,26 @@ func TestCorrectionTaskScriptJourneys(t *testing.T) {
 						}
 						if f.calls != 0 {
 							t.Fatal("unsupported command executed")
+						}
+						original, err := f.env.mgr.state.GetRunStep(ctx, "legacy")
+						if err != nil {
+							t.Fatal(err)
+						}
+						if err := boundaryRun(f); err == nil {
+							t.Fatal("unsupported authorization escaped exhausted boundary")
+						}
+						f.restart(t)
+						task, err := f.env.rel.TaskSnapshot(ctx, "A")
+						if err != nil || task.Status != release.TaskStatusFailed || task.AttemptCount != 3 || task.Metadata["task_correction"] != nil {
+							t.Fatal("unsupported authorization persisted", task, err)
+						}
+						independent, err := f.env.rel.TaskSnapshot(ctx, "Independent")
+						if err != nil || independent.Status != release.TaskStatusDone || f.calls != 0 {
+							t.Fatal("unsupported check blocked independent work", err)
+						}
+						retained, err := f.env.mgr.state.GetRunStep(ctx, "legacy")
+						if err != nil || !reflect.DeepEqual(original, retained) {
+							t.Fatal("unsupported command rewrote receipt", err)
 						}
 						return
 					}
@@ -218,4 +243,63 @@ func TestCorrectionWithoutChecksUsesNativeCompletion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCorrectionSupportedArgv(t *testing.T) {
+	for _, form := range []string{"sh", "absolute_sh", "lint", "test"} {
+		t.Run(form, func(t *testing.T) {
+			f, c, repair := correctionFixture(t)
+			f.env.mgr.cfg.StageExecutor = &correctionArgvExecutor{f}
+			argv := `["sh","-c","test -f corrected.go"]`
+			scope := ""
+			if form == "absolute_sh" {
+				argv = `["/bin/sh","-c","test -f corrected.go"]`
+			}
+			if form == "lint" || form == "test" {
+				argv = `[]`
+				scope = form
+			}
+			if _, err := f.env.mgr.state.GetDB().Exec(`UPDATE validation_items SET command_argv=?,scope=?`, argv, scope); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.env.mgr.AuthorizeTaskCorrection(context.Background(), c); err != nil {
+				t.Fatal(err)
+			}
+			if err := boundaryRun(f); err != nil {
+				t.Fatal(err)
+			}
+			assertCorrectionReload(t, f, c, repair, true)
+			if f.calls == 0 {
+				t.Fatal("required command never dispatched")
+			}
+			var proofs int
+			if err := f.env.mgr.state.GetDB().QueryRow(`SELECT count(*) FROM validation_evidence_links WHERE status='passed'`).Scan(&proofs); err != nil || proofs != 2 {
+				t.Fatalf("required item proofs=%d: %v", proofs, err)
+			}
+		})
+	}
+}
+
+// Named lint/test stages must use the real configured command resolver too.
+type correctionArgvExecutor struct{ f *recaptureFixture }
+
+func (e *correctionArgvExecutor) Execute(ctx context.Context, stage *runtime.Stage, input *runtime.StageInput) (*runtime.StageResult, error) {
+	if stage.Name != "lint" && stage.Name != "test" {
+		return e.f.Execute(ctx, stage, input)
+	}
+	e.f.calls++
+	config, err := project.LoadProjectConfig(e.f.env.dir)
+	if err != nil {
+		return nil, err
+	}
+	copy := *stage
+	if stage.Name == "lint" {
+		copy.Commands = config.Execution.LintCommands
+	} else {
+		copy.Commands = config.Execution.TestCommands
+	}
+	stage = &copy
+	executor := blueprint.NewDefaultExecutor(e.f.env.dir)
+	executor.VerificationStages = map[*blueprint.Stage]bool{stage: true}
+	return executor.Execute(ctx, stage, input)
 }

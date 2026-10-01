@@ -57,13 +57,15 @@ plan/state binding, unchanged 3/3 attempts and completed repair history. Ordinar
 implementation stages use the existing fixture's deterministic success adapter;
 no provider or external effects are needed.
 
-Two compiled CLI source overlays falsify the happy journeys: skipping the manager
-authorization leaves A failed with `TaskQueueBoundary`; changing the decision
-reference fails exact persisted-binding assertions. The unmodified source is
-rebuilt and rerun afterward. The mutation selector excludes the denial subtest
-so each control reaches its intended persistence assertion; positive runs include
-all denials. A separate CLI test proves changing the environment after command
-construction cannot promote an agent command.
+Four compiled CLI source overlays falsify the happy and denial journeys:
+skipping authorization leaves A failed with `TaskQueueBoundary`; changing the
+reference fails exact persisted-binding assertions; bypassing the operator or
+reference guard fails the command-refusal assertion. Happy-path mutation selectors
+exclude denials so they reach persistence; guard-removal selectors require the
+denial subtests. The unmodified executable is rebuilt and rerun afterward. Go
+JSON must show the exact planned/no-plan journeys and denial subtests running and
+passing; missing/skipped cases refuse verification. The separate CLI test proves
+changing the environment after construction cannot promote an agent command.
 
 No existing tests were weakened or replaced. Compatibility evaluation: no schema,
 loader, migration, fallback, queue or correction lifecycle change; this is a new
@@ -72,7 +74,7 @@ one command, no new persistent record or scheduler. The host lint/test results
 and final verification outcome are recorded below; canonical gates, independent
 review, publication and merge remain Console-owned.
 
-Final results (2026-10-01): task verifier exited 0, including both expected
+Final results (2026-10-01): task verifier exited 0, including the expected
 mutation failures and the restored-source CLI/manager rerun. Declared host
 `test` exited 0 (Go suite and all 635 UI tests); final declared host `lint`
 exited 0 (Go vet and UI ESLint). `git diff --check` passed. The initial local

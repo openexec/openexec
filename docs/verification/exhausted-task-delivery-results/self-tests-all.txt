@@ -1,0 +1,8 @@
+$ python3 -m unittest discover -s scripts/verification -p test_exhausted_task_all.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.018s
+
+OK
+
+exit=0

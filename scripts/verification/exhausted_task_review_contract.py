@@ -54,6 +54,8 @@ def validate(scope, contract):
 
 def check_events(events, cases):
     expected = {(MODULE + c['package'], c['test']) for c in cases}
+    if not expected:
+        raise ValueError('empty required native cases')
     runs, passes, packages = set(), set(), set()
     for event in events:
         key = (event.get('Package'), event.get('Test'))
@@ -93,7 +95,7 @@ def resolve_scope(scope, helper, temp):
 def fill_missing_blocks(blocks, profile, output):
     """Keep the source denominator; synthesize zero hits for omitted blocks."""
     lines = profile.read_text().splitlines()
-    if not lines or lines[0] != 'mode: count':
+    if not lines or lines[0] not in ('mode: count', 'mode: atomic'):
         raise ValueError('missing count profile')
     present = set()
     for line in lines[1:]:
@@ -106,6 +108,9 @@ def fill_missing_blocks(blocks, profile, output):
         for a, b, c, d, n in body:
             if (path, a, b, c, d) not in present:
                 lines.append(f'{MODULE}{path}:{a}.{b},{c}.{d} {n} 0')
+    # Statement positions are identical in atomic and count instrumentation.
+    # Normalize only for the shared evaluator; retain the original atomic artifact.
+    lines[0] = 'mode: count'
     output.write_text('\n'.join(lines) + '\n')
 
 

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "task": "T-US-009-001",
+  "task": "T-US-011-004",
   "branch": "outcome/ad5a70cd0924dae18de345dbdf74e623",
   "base_revision": "dbfec11b6934dec8b1fa72c50cc6f871f44043a6",
   "implementation_base": "ca2bdf8c254cfa95d7140064b177f54e7529a763",
@@ -817,7 +817,7 @@
     {
       "path": "docs/exhausted-task-discovery.md",
       "mode": "100644",
-      "sha256": "6a42dfe6e52307a23bf484e7b89feb49a1230a4862136e8c5ce4fd02f47a85f7"
+      "sha256": "208a634ff654f77f5c24549f047a03f76ab363d8f72da1456048a69d638442aa"
     },
     {
       "path": "docs/exhausted-task-reconciliation-evidence.md",
@@ -885,6 +885,11 @@
       "sha256": "182787c90e79cdd45f525e9c71eb9ad6aef23ed52a2fc8fa5aef3629ff024b60"
     },
     {
+      "path": "docs/verification/correction-task-scripts.md",
+      "mode": "100644",
+      "sha256": "911a5efcf715331a11d39526152f7a98ff5c1cb809c20f57eb9c3b2e7d43d794"
+    },
+    {
       "path": "docs/verification/delivery-result.json",
       "mode": "100644",
       "sha256": "16d6f08b8ead65fd9d3c5198e99d4bea5c16b4f937c1b13562cfda7fbc05bca4"
@@ -892,7 +897,7 @@
     {
       "path": "docs/verification/exhausted-task-discovery-result.json",
       "mode": "100644",
-      "sha256": "85a015157402b7ece94ed125b19f4b7353c5d777adadcf808c611d7d35c97428"
+      "sha256": "2f8b7ae8eac902c6d17e91d6b3edbb807811c81772bc2601b1354b087708473a"
     },
     {
       "path": "docs/verification/exhausted-task-discovery.md",
@@ -903,6 +908,16 @@
       "path": "docs/verification/exhausted-task-reconciliation.md",
       "mode": "100644",
       "sha256": "cf9ddb82cefdfd558caaaa5b4f50cefde78579780d854036530ff3598631683b"
+    },
+    {
+      "path": "docs/verification/exhausted-task-records.md",
+      "mode": "100644",
+      "sha256": "c94b54f04c6cfee11b5b7e8d82f564391c2eb804cbfeb771902299e92dd5ea76"
+    },
+    {
+      "path": "docs/verification/exhausted-task-review-contract.md",
+      "mode": "100644",
+      "sha256": "758d2463fc700d051ddb1accb540ae1084785c77467e94968b38ea547642c501"
     },
     {
       "path": "docs/verification/legacy-recapture.md",
@@ -1083,6 +1098,16 @@
       "path": "docs/verification/storage-unit-coverage.md",
       "mode": "100644",
       "sha256": "c7daedceaaa60d455661c2afbfa6db955d3a04ca4cee39612018a05841c9a446"
+    },
+    {
+      "path": "docs/verification/task-correct-transcript.txt",
+      "mode": "100644",
+      "sha256": "fe032790d0da029e824c7436b31259472a902249356dfa872e026e9bac318e45"
+    },
+    {
+      "path": "docs/verification/task-correct.md",
+      "mode": "100644",
+      "sha256": "1eceae6c5c136c3cf78eefaed40f0b66a49978e9bd7f038be7c2760fe07fd0d7"
     },
     {
       "path": "go.mod",
@@ -1588,6 +1613,21 @@
       "path": "internal/cli/symbol_index_test.go",
       "mode": "100644",
       "sha256": "af09d0483387292ba638451dcac0e3e63ebef8264ec88500298e10a9129cb1f9"
+    },
+    {
+      "path": "internal/cli/task_correct.go",
+      "mode": "100644",
+      "sha256": "9799be5d481f8297e3ba5e950ebffca89c8f3b698095c9a2dcb8d69be69737d7"
+    },
+    {
+      "path": "internal/cli/task_correct_test.go",
+      "mode": "100644",
+      "sha256": "b8ea2f52ebe6bdcd71ba998cce1375c4a1f092709550ac74571fec08d7862729"
+    },
+    {
+      "path": "internal/cli/task_correct_unit_test.go",
+      "mode": "100644",
+      "sha256": "b5d30ea9e9c2ce8263ee5026dbedf016eea623eb85169ce48f90a201b82ac16c"
     },
     {
       "path": "internal/cli/tract_serve.go",
@@ -2900,6 +2940,11 @@
       "sha256": "6b1e88912c9950686934ab50fff30e1d54dcbcc812e4555e15c6908df5dd7db6"
     },
     {
+      "path": "internal/planner/delivery_boundary_test.go",
+      "mode": "100644",
+      "sha256": "415ca35ce2450c691d3d137987c220eccd8485b37994fa4f5714894c848b2777"
+    },
+    {
       "path": "internal/planner/dependency_test.go",
       "mode": "100644",
       "sha256": "9062819b7be7042bcfee82d59250cbd0d50a2499e4df70eaac6a15fe997a8b5c"
@@ -2942,7 +2987,7 @@
     {
       "path": "internal/planner/prompt.go",
       "mode": "100644",
-      "sha256": "1629780c9d66cad5317793dbb0b85636a2a0b1dfe38d2bb9e4324c61524d9417"
+      "sha256": "da5564291fb19f5af7c69d162ff7b01fb4fcd3c3e64140a57cfb9b5b55717ecb"
     },
     {
       "path": "internal/planner/remap.go",
@@ -3482,7 +3527,7 @@
     {
       "path": "internal/release/sqlite_store.go",
       "mode": "100644",
-      "sha256": "17daf8b00b97cac9d5f004b14e458e9423f4b7f069436a4a30b4d21d33173a4f"
+      "sha256": "77632ec3db1bc2594f1d9868a519b68ab986382a071609626993bd75fe01c696"
     },
     {
       "path": "internal/release/sqlite_store_test.go",
@@ -3497,12 +3542,17 @@
     {
       "path": "internal/release/task_correction.go",
       "mode": "100644",
-      "sha256": "3627c14469c676764f2541948d6636bdaa8cfb890528403102619953418ad877"
+      "sha256": "e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c"
+    },
+    {
+      "path": "internal/release/task_correction_refusal_test.go",
+      "mode": "100644",
+      "sha256": "904b519a2c092e775fe463896bc09e6faafc508634b12b44eb3c750c8e691584"
     },
     {
       "path": "internal/release/task_correction_test.go",
       "mode": "100644",
-      "sha256": "a89c551f833cc2072b393837e0495c6d3630e849e3a5286865a294da2e9da424"
+      "sha256": "dbea50d5e838af06a40d9ae0c42dc512850d9108248a3db888abf33d35081bd0"
     },
     {
       "path": "internal/repository/reader.go",
@@ -4782,7 +4832,7 @@
     {
       "path": "pkg/manager/recapture_fixture_test.go",
       "mode": "100644",
-      "sha256": "e0999442ca693b04dccc14a57cf1120a2be1e6eea3d8faf1bcd3e710e7198a1a"
+      "sha256": "38b9819375539616b878f01d74fe972cde0c3c98eb4dc2c664119e28a703580c"
     },
     {
       "path": "pkg/manager/recapture_journey_test.go",
@@ -4832,27 +4882,52 @@
     {
       "path": "pkg/manager/task_boundary.go",
       "mode": "100644",
-      "sha256": "03fd20c9c2ed0ec8a05196459d211ced3443e34d123766b077a49544a56a58fb"
+      "sha256": "91dd7334060bd3c5166832315337a9dad07de2a174cc0d4867f171490600a136"
     },
     {
       "path": "pkg/manager/task_boundary_test.go",
       "mode": "100644",
-      "sha256": "5b625d55e818774b801cce07ac692902cf6c301f4f2137a0dda3e00c9044a324"
+      "sha256": "a9daddf2c141263e4ded775d4f42cd14911b5698e1bebd24f5ecbbdbf615392e"
+    },
+    {
+      "path": "pkg/manager/task_correct_cli_test.go",
+      "mode": "100644",
+      "sha256": "7b9beda1a0e14e42130a88af388de8d1edc6e3b39ba694f978486d4a0f23d80b"
     },
     {
       "path": "pkg/manager/task_correction.go",
       "mode": "100644",
-      "sha256": "5684892e781642ddf516894b7e8372ba829d9c6370cb9f95807e2d2dc5e82fd6"
+      "sha256": "e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
     },
     {
       "path": "pkg/manager/task_correction_coverage_test.go",
       "mode": "100644",
-      "sha256": "eab93165bd7e02746d4418236217129fc0f31690ae13157f0d59e57f2c7dc19b"
+      "sha256": "21a62f74fe437c592feaee0de1394a9a502fe2724c5afa025fe636ad037401bd"
+    },
+    {
+      "path": "pkg/manager/task_correction_refusal_test.go",
+      "mode": "100644",
+      "sha256": "4ca8dd48e69395693eebebdc0cfca270030424f56a7cdc3e627d5b2c6a6a19bf"
+    },
+    {
+      "path": "pkg/manager/task_correction_script_test.go",
+      "mode": "100644",
+      "sha256": "edfc2c71e9b52705533a28b0d3cf62065443fc480a66098903fa296d5af3d59f"
     },
     {
       "path": "pkg/manager/task_correction_test.go",
       "mode": "100644",
-      "sha256": "80ef009fe5b523f657486aa1016cf66e626b7d9d5ed1881bf4f766f01967ec2f"
+      "sha256": "9d70d8d0c7ebbda5d90f5ebf473c11a11f61d434ad8d39a35069bb6549b64006"
+    },
+    {
+      "path": "pkg/manager/task_correction_unit_test.go",
+      "mode": "100644",
+      "sha256": "a46f101ba3cef7c0f85accac92ed064a698dba6a5d1c54b02972f742edc8ef42"
+    },
+    {
+      "path": "pkg/manager/task_delivery_boundary_test.go",
+      "mode": "100644",
+      "sha256": "c31127598ae4fd495cd07398b0cbdd8474bd9823f438473fd7c313bde6893f40"
     },
     {
       "path": "pkg/manager/task_durable_store_test.go",
@@ -4867,7 +4942,7 @@
     {
       "path": "pkg/manager/task_exhaustion_test.go",
       "mode": "100644",
-      "sha256": "b0aad2d73c084f162b414b50fa53dfd9a9ff19cca2da15098ab877cee7d43a8f"
+      "sha256": "a36ed9bb4e63b0f66d86a84f163195193718057a06e66239f6b96cd10ede0d3d"
     },
     {
       "path": "pkg/manager/task_failure.go",
@@ -4902,7 +4977,7 @@
     {
       "path": "pkg/manager/task_recapture.go",
       "mode": "100644",
-      "sha256": "d74b6eeb5f5b4de0f0c5991cadcc9ea60c4c2d188067a75202a90a3a0583bd88"
+      "sha256": "6bc2737b53f94befc16007960db6c3f98b2e949d88b641da538399510e75d099"
     },
     {
       "path": "pkg/manager/task_repair_journey_test.go",
@@ -4912,7 +4987,7 @@
     {
       "path": "pkg/manager/task_restart_boundary_test.go",
       "mode": "100644",
-      "sha256": "90039aa4aff4a18bfd8ba13c2b9dd2dc207359c6d26b22242043a37b9dcc2359"
+      "sha256": "3653e043064c63af08496ad448256b7615a1736f4fd904b878d1bf82c922e63f"
     },
     {
       "path": "pkg/manager/testdata/recapture-compatibility/openexec/.openexec/config.json",
@@ -5140,6 +5215,11 @@
       "sha256": "0ad6d2e38b2a5948920217af383effc6a1003f9eb93a6a934d3fe577e701df25"
     },
     {
+      "path": "scripts/exhausted-task-coverage-scope.json",
+      "mode": "100644",
+      "sha256": "12d1a464b877cf72b19f466199b26339b4004c597a8ad001f898d9a31e5404d6"
+    },
+    {
       "path": "scripts/fixtures/exhausted-task/baseline.tar.gz",
       "mode": "100644",
       "sha256": "0a6813af42eb7dfc66669df168353597371da0ac7dfcf7111fe52e24aff031c6"
@@ -5235,9 +5315,34 @@
       "sha256": "a02fab15922532a7b0033bd6bfb7b6a371a7fe9aa3968bc88ae9f128ad2f406f"
     },
     {
+      "path": "scripts/verification/exhausted-task-records.json",
+      "mode": "100644",
+      "sha256": "7bbf72e86434169302e120704753d187fbd62c279df1e5c0ca705ffd51d5ad8e"
+    },
+    {
+      "path": "scripts/verification/exhausted-task-review-cases.json",
+      "mode": "100644",
+      "sha256": "b22d80f22e0873b7d5ed63ea3cc1545ca290451d3825a2a4929b4caf6181aaa1"
+    },
+    {
+      "path": "scripts/verification/exhausted-task-unit-tests.json",
+      "mode": "100644",
+      "sha256": "265ccbcde41338efe236fbab1f4d7ed2db71768c360bbc52d1cc70f73939c4fb"
+    },
+    {
+      "path": "scripts/verification/exhausted_task_all.py",
+      "mode": "100644",
+      "sha256": "4f16690f0ae1d8f64b235935a6e75f77c70d4e1fe00ea43ffd21c07082a7ccca"
+    },
+    {
       "path": "scripts/verification/exhausted_task_delivery.py",
       "mode": "100644",
-      "sha256": "b49c9e34887bcd7ae87650ab6c8e23d206a4a7bf5042a57b6dccf9c734d0e34f"
+      "sha256": "1e62b361f4885285b7e09100a0f8d251a5c7bbc60aa9b3d9f936369dcea87b88"
+    },
+    {
+      "path": "scripts/verification/exhausted_task_mutations.py",
+      "mode": "100644",
+      "sha256": "0edbfe67078d50748e52f5cdcf55240c68718b1e65708e36059fa37be0a6afb2"
     },
     {
       "path": "scripts/verification/exhausted_task_proof.py",
@@ -5247,7 +5352,22 @@
     {
       "path": "scripts/verification/exhausted_task_reconciliation.py",
       "mode": "100644",
-      "sha256": "9954d14c1e8bd1e2e66763b376e1339814b6dccbc98d46dbf8c327ef21b217a8"
+      "sha256": "03ca490779a0a7de1c9b43cb5ea5bf47aee0c2f84344101d63794f836a25ed94"
+    },
+    {
+      "path": "scripts/verification/exhausted_task_records.py",
+      "mode": "100644",
+      "sha256": "b81346134fa5f4df8c0ae0bc38097d180781a6418e8e0934066b83c6a0281cb2"
+    },
+    {
+      "path": "scripts/verification/exhausted_task_review_contract.py",
+      "mode": "100644",
+      "sha256": "bba3ebe5346f67cbe06dc0438ebf888a1722abca7f1ba1b92c6f8530fcd98afd"
+    },
+    {
+      "path": "scripts/verification/exhausted_task_unit_coverage.py",
+      "mode": "100644",
+      "sha256": "c8a1956787ca43b6a0ebd413174fcdd2182aa2a7b960143bceb38b9491287020"
     },
     {
       "path": "scripts/verification/fixtures/exhausted-task-delivery/refusals.json",
@@ -5485,6 +5605,11 @@
       "sha256": "609e05475fd009a456df2d58f6fabc4e13801c46dd4eee5c9cb08fc71f24dbfe"
     },
     {
+      "path": "scripts/verification/test_exhausted_task_all.py",
+      "mode": "100644",
+      "sha256": "a07a99ce28863a0616db91ffc6a6819736d0c340d199594a940b79a8039cb5c3"
+    },
+    {
       "path": "scripts/verification/test_exhausted_task_delivery.py",
       "mode": "100644",
       "sha256": "d5297b4841d8fa9329cbdde387538eae1c280e943c708e1282f1deaa93570dc0"
@@ -5493,6 +5618,16 @@
       "path": "scripts/verification/test_exhausted_task_reconciliation.py",
       "mode": "100644",
       "sha256": "c96976ffc5d356642c4f3abd82799a29ce67a7f7f37353bd621ee2ddd3763608"
+    },
+    {
+      "path": "scripts/verification/test_exhausted_task_records.py",
+      "mode": "100644",
+      "sha256": "49c0fce38465584ab618aee79974163a5f202f9fe01866c4329679fa7001bfe8"
+    },
+    {
+      "path": "scripts/verification/test_exhausted_task_review_contract.py",
+      "mode": "100644",
+      "sha256": "52ddd4c60c2be14b016804c63973886a5e4e3d11d9df3f8332cf08f053a1de85"
     },
     {
       "path": "scripts/verification/test_named_recapture_dispatch.py",
@@ -5580,6 +5715,11 @@
       "sha256": "85eeae7c04a686bb698b4263f6fb86ef58c8453b36e615f155ca5e9178a2f597"
     },
     {
+      "path": "scripts/verify-exhausted-task-correction.sh",
+      "mode": "100755",
+      "sha256": "b14d2b1f574c1217847a39ad856191901d8fc132e04ee334e9d556847ae2aff6"
+    },
+    {
       "path": "scripts/verify-exhausted-task-delivery-evidence.sh",
       "mode": "100755",
       "sha256": "e6eb749a94175df37de887e7430b2246a2ec7f11f4b39e31ddf7ef17e05afd24"
@@ -5593,6 +5733,16 @@
       "path": "scripts/verify-exhausted-task-reconciliation.sh",
       "mode": "100755",
       "sha256": "81bd85cb3e82422c62655d2690b1affa629137cd5548d3fc29b6d30eaf28a4b7"
+    },
+    {
+      "path": "scripts/verify-exhausted-task-records.py",
+      "mode": "100755",
+      "sha256": "4dd5a4f2197a80540eacebb76a835a59d80b38d5d58fd5e4bf6f32e36e84ce30"
+    },
+    {
+      "path": "scripts/verify-exhausted-task-review-contract.sh",
+      "mode": "100644",
+      "sha256": "ca2bfdde3ccebc49026395296c3e8867a6926bef911661c18be9e7293322f6d0"
     },
     {
       "path": "scripts/verify-plan-identity-compat.sh",
@@ -5628,6 +5778,11 @@
       "path": "scripts/verify-reviewed-plan-identity.sh",
       "mode": "100755",
       "sha256": "8d2f0da671997f61408752be2e57cae44a5b4ef3e08eecf63ec71047d16c12ee"
+    },
+    {
+      "path": "scripts/verify-task-correct.py",
+      "mode": "100644",
+      "sha256": "f7b77fe4f6386362aad8c913b9ddf4cede61b3ac19a2132735e0a2a67e94d4a1"
     },
     {
       "path": "scripts/verify-verification-repair.sh",
@@ -6690,417 +6845,461 @@
       "sha256": "322c05c207380d2e08d5884bd1be365b17afdcbc0ebe68700b15faa941774fb4"
     }
   ],
-  "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80",
+  "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
   "digest_algorithm": "SHA256 of UTF-8 compact JSON sorted-key array of sorted path/mode/SHA256 rows; git cached plus unignored untracked union, current filesystem bytes. Deletions absent. Symlink target text hashed. Excludes delivery Markdown/JSON/results, NOTES.md, bin/, ui/dist/, ui/coverage/, .gocache/, __pycache__. Git-ignored disposable outputs excluded. No HEAD hash self-reference; base ancestry and branch checked separately.",
   "changed_behavior": [
-    "Explicit authority binds one correction pass to retained task, receipt, candidate, accepted plan and graph. Native queue consumes the pass atomically without resetting attempts or deleting history.",
-    "Fresh deterministic checks and existing completion/effect controls determine success; dependents then resume in the original queue. Continuing failure persists fresh evidence and terminal disposition; independent work drains.",
-    "This delivery stage adds only read-only verification tooling, fixtures and evidence, reusing native reconciliation proof. No new runtime abstraction, lifecycle state, loop or authority."
+    "Repository all mode runs 35 review cases and 147 required native names, dedicated atomic unit coverage, public executable journeys, races, discovery and removal controls.",
+    "Production unchanged in this stage. Existing native correction and task-script enforcement are verified; no new runtime authority or state."
   ],
   "refusal_cases": [
-    "Missing authority, stale candidate/task/receipt/graph/plan, missing dependency, unsupported/empty/unaccepted checks, failed required checks and consumed grant refuse.",
-    "Denied effects, agent-only completion claims, cancellation, Stop, candidate drift, unmet validation and interrupted admission cannot mint a new pass.",
-    "Delivery fixtures reject stale branch/base/digest, missing evidence/check, failed/stale check, missing measured coverage and unsupported D2/Goal/delivery completion."
+    "Missing/skipped/failed named cases; missing or empty profiles; <=90% coverage; narrowed whole-function source scope.",
+    "Stale candidate, task, plan, graph, receipt and authority; operational store errors; spent/replayed decisions; absent operator authorization; unsupported obligations; denied executor effects; Stop and cancellation."
   ],
   "persisted_reload_assertions": [
-    "Real SQLite close/reopen preserves 3/3 attempts, original legacy receipt, consumed correction, retained branch/commits, completed prerequisite and dependent state. Re-entry and reauthorization cannot renew consumption.",
-    "Continuing failure reloads a fresh failed receipt, reason and disposition; no-authority exhaustion reloads attempt_limit. Success/reopen is covered by TestCorrectionNativeQueueSuccess and TestCorrectionDiagnosticQueueSuccess in acceptance; serialized failure/exhaustion payloads are stored in reload.txt.",
-    "The preparation verifier rereads persisted JSON, file hashes, native payloads and source files. CLI self-tests persist modified records and verify refusal after reread."
+    "Native Git/SQLite fixtures reopen task, receipt, decision, candidate, plan, dependent and completed prerequisite; exhausted attempts stay 3/3.",
+    "Independent work drains; refused authority stays consumed; replacement history and exact fresh decision survive reopen without reverting candidate bytes/HEAD."
   ],
   "limitations": [
-    "Preparation evidence is local candidate evidence, not publication, independent review, owner acceptance, merge or deployment. D2 requires subsequent Console-coordinated default-branch merge.",
-    "Coverage is aggregate whole-function statement coverage strictly above 90%, not a per-function 90% claim. Native fixtures exercise a real queue and SQLite with synthetic retained receipts, not the owner database or live Console UI.",
-    "Host Go suite may use Go cache; focused acceptance uses count=1. Existing React act warnings and read-only Go module stat-cache warning did not fail checks. Logs are hashed local evidence, not externally signed attestations.",
-    "Full canonical gate runs later in Console repository runner. Six named check outputs are preparation-stage evidence. T-US-009-002 rereads the package, reruns boundary fixtures and preparation verification, and runs fresh host lint; it does not repeat native acceptance or take delivery actions."
+    "Synthetic local fixtures and frozen baseline discovery, not owner incident DB or Console browser evidence. Unit/component profile uses fixture providers/executors; native shell and shipped CLI are separately verified.",
+    "Canonical gate, independent review, publication, owner decision and actual default-branch merge unverified; D2 pending.",
+    "Local logs are content-bound evidence, not signed attestations. Read-only Go module-stat-cache and existing UI act warnings did not fail checks."
   ],
   "historical_console_evidence": [
-    "Supplied observation: Agent Console revision f7bf25d5 started 2026-10-01T14:36:52Z. This is Console provenance, not independently reverified OpenExec deployment evidence.",
-    "Earlier Settings commits, Console tests and hooks-drift notes are historical context only; no current Console delivery or transport success is inferred."
+    "Supplied Console revision 69d80355 started 2026-10-01T16:34:34Z; not independently verified and not OpenExec deployment proof."
   ],
   "console_followups": [
-    "After queue completion, Console owns candidate commits, PR publication, canonical gate, independent review and asking the owner for the exact merge decision. Only the owner supplies that decision; preparation is not approval. D2 stays pending until actual OpenExec default-branch merge evidence is supplied and verified.",
-    "Console-repository authority transport, Settings presentation and serving-revision verification need their own scoped evidence; this OpenExec stage neither implements nor certifies them."
+    "Bind candidate bytes to published PR head, canonical gate and independent review; obtain exact owner merge decision through Console.",
+    "Re-fetch actual OpenExec default branch and retain merge revision/content equivalence evidence before claiming D2."
   ],
   "checks": {
     "lint": {
       "command": "run_declared_check lint (make lint)",
       "exit_code": 0,
+      "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
       "evidence": "docs/verification/exhausted-task-delivery-results/lint.json",
-      "sha256": "536fdcb0121f6e6c160fabb697c0b5feb5183c453cd25aea51bd3ae33caee765",
-      "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80"
+      "sha256": "536fdcb0121f6e6c160fabb697c0b5feb5183c453cd25aea51bd3ae33caee765"
     },
     "test": {
       "command": "run_declared_check test (make test)",
       "exit_code": 0,
+      "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
       "evidence": "docs/verification/exhausted-task-delivery-results/test.json",
-      "sha256": "b70701df357021315ac72b0225ea371ff43beb29776ae1b0eca4577b0acfa945",
-      "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80"
+      "sha256": "d063aae64a1b724890c73e0a8baf9ec8db7386d441b7f4cef25cf818bce5618b"
     },
     "acceptance": {
-      "command": "scripts/verify-exhausted-task-reconciliation.sh",
+      "command": "scripts/verify-exhausted-task-reconciliation.sh all",
       "exit_code": 0,
+      "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
       "evidence": "docs/verification/exhausted-task-delivery-results/acceptance.txt",
-      "sha256": "a8c42b1d84258882cbf7dbf28532259aea66fe9070047590650d77b2648ff20d",
-      "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80"
+      "sha256": "5dae5dd5caedbb29967d42fa68a8b561638719388ed09f8b638e9d264efe8a82"
     },
     "reload": {
       "command": "scripts/verify-exhausted-task-reconciliation.sh exhaustion-controls",
       "exit_code": 0,
+      "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
       "evidence": "docs/verification/exhausted-task-delivery-results/reload.txt",
-      "sha256": "bae2c46f6a9cbbc4d73b29e6fb55ebc8c02b9f98ae4893bc3f20497687f8a2e1",
-      "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80"
+      "sha256": "49f5ac47f5f82d9289d65f7072abd57d58ac7de3e1f5acfb57e75f7c6cf8574c"
     },
     "compatibility": {
       "command": "make compat-test",
       "exit_code": 0,
+      "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
       "evidence": "docs/verification/exhausted-task-delivery-results/compatibility.txt",
-      "sha256": "c42d7c483c9d6d80f50655fc5babd50a35f18812cfc0d20dd1f24141f68a7dd1",
-      "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80"
+      "sha256": "f02d2c575f85a53f4ec2d95aaabd92a171f311aaa8abef44c415db1782427668"
     },
     "types": {
       "command": "make type-check",
       "exit_code": 0,
+      "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
       "evidence": "docs/verification/exhausted-task-delivery-results/types.txt",
-      "sha256": "371da2f3aff795ec0f652f632270ad88a57c61f87805adc2fd0be119dff222f0",
-      "source_sha256": "3fbb09bac1d6f8b3deabade4ff867fa7466e668404e01b1a0f12f9d8c53f5c80"
+      "sha256": "4ca7b9fb9cba038566828001db1f9d0254389db7cb436f87057daec99e35435f"
     }
   },
   "affected_function_coverage": [
     {
-      "path": "pkg/manager/scheduler.go",
-      "symbol": "(*Manager).ExecuteTasks",
-      "declaration": "func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {",
-      "covered": 144,
-      "statements": 168
-    },
-    {
-      "path": "pkg/manager/task_queue.go",
-      "symbol": "(*Manager).executeTaskQueue",
-      "declaration": "func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {",
-      "covered": 106,
-      "statements": 124
-    },
-    {
-      "path": "pkg/manager/task_queue.go",
-      "symbol": "(*Manager).waitTaskQueueRun",
-      "declaration": "func (m *Manager) waitTaskQueueRun(ctx context.Context, id string) error {",
-      "covered": 45,
-      "statements": 51
-    },
-    {
-      "path": "pkg/manager/task_queue.go",
-      "symbol": "retryWithStopReason",
-      "declaration": "func retryWithStopReason(ctx context.Context, rel *release.Manager, id, reason string) (bool, error) {",
-      "covered": 12,
-      "statements": 13
-    },
-    {
-      "path": "pkg/manager/task_execution_lock.go",
-      "symbol": "(*Manager).lockTaskExecution",
-      "declaration": "func (m *Manager) lockTaskExecution(exclusive bool) (*flock.Flock, error) {",
-      "covered": 17,
-      "statements": 19
-    },
-    {
-      "path": "pkg/manager/task_execution_lock.go",
-      "symbol": "entryFinished",
-      "declaration": "func entryFinished(e *entry) bool {",
-      "covered": 6,
-      "statements": 7
-    },
-    {
-      "path": "pkg/manager/task_execution_lock.go",
-      "symbol": "(*Manager).reconcileInterruptedTasks",
-      "declaration": "func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Manager, storyIDs []string) error {",
-      "covered": 12,
-      "statements": 13
-    },
-    {
-      "path": "pkg/manager/task_execution_lock.go",
-      "symbol": "isRepairTask",
-      "declaration": "func isRepairTask(task *release.Task) bool {",
+      "path": "internal/cli/task_correct.go",
+      "name": "init",
+      "change": "review scope union",
       "covered": 1,
       "statements": 1
     },
     {
-      "path": "pkg/manager/task_failure.go",
-      "symbol": "(*Manager).persistTaskVerificationFailure",
-      "declaration": "func (m *Manager) persistTaskVerificationFailure(taskID string, event loop.Event) string {",
-      "covered": 38,
-      "statements": 40
-    },
-    {
-      "path": "pkg/manager/task_failure.go",
-      "symbol": "(*Manager).repairTaskFromRetainedFailure",
-      "declaration": "func (m *Manager) repairTaskFromRetainedFailure(ctx context.Context, taskID, evidenceID string) error {",
-      "covered": 17,
-      "statements": 18
-    },
-    {
-      "path": "pkg/manager/task_recapture.go",
-      "symbol": "(*Manager).diagnosticFreeReceipt",
-      "declaration": "func (m *Manager) diagnosticFreeReceipt(artifacts map[string]string) bool {",
-      "covered": 18,
-      "statements": 19
-    },
-    {
-      "path": "pkg/manager/task_recapture.go",
-      "symbol": "recapturePhase",
-      "declaration": "func recapturePhase(phase string, artifacts map[string]string) (string, error) {",
-      "covered": 8,
-      "statements": 8
-    },
-    {
-      "path": "pkg/manager/task_recapture.go",
-      "symbol": "(*Manager).resolveRecaptureCommand",
-      "declaration": "func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, artifacts map[string]string) (string, error) {",
-      "covered": 25,
-      "statements": 25
-    },
-    {
-      "path": "pkg/manager/task_recapture.go",
-      "symbol": "(*Manager).recaptureTaskFailure",
-      "declaration": "func (m *Manager) recaptureTaskFailure(ctx context.Context, taskID, evidenceID, phase string, artifacts map[string]string) error {",
-      "covered": 79,
-      "statements": 85
-    },
-    {
-      "path": "pkg/manager/task_boundary.go",
-      "symbol": "retainedTaskBoundary",
-      "declaration": "func retainedTaskBoundary(tasks []*release.Task) error {",
-      "covered": 20,
-      "statements": 20
-    },
-    {
-      "path": "pkg/manager/manager.go",
-      "symbol": "(*Manager).start",
-      "declaration": "func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts ...StartOption) error {",
-      "covered": 84,
-      "statements": 100
-    },
-    {
-      "path": "pkg/manager/manager.go",
-      "symbol": "(*Manager).Stop",
-      "declaration": "func (m *Manager) Stop(fwuID string) error {",
-      "covered": 10,
-      "statements": 10
-    },
-    {
-      "path": "pkg/manager/manager.go",
-      "symbol": "(*Manager).Wait",
-      "declaration": "func (m *Manager) Wait(ctx context.Context, fwuID string) error {",
-      "covered": 10,
-      "statements": 10
+      "path": "internal/cli/task_correct.go",
+      "name": "newTaskCorrectCommand",
+      "change": "review scope union",
+      "covered": 51,
+      "statements": 59
     },
     {
       "path": "internal/release/failure_repair.go",
-      "symbol": "(*SQLiteStore).CreateFailureRepair",
-      "declaration": "func (s *SQLiteStore) CreateFailureRepair(ctx context.Context, taskID, evidenceID, diagnosis string) (*Task, error) {",
+      "name": "(*Manager).CreateFailureRepair",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 16
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "(*Manager).RecaptureEligible",
+      "change": "review scope union",
+      "covered": 8,
+      "statements": 9
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "(*SQLiteStore).CreateFailureRepair",
+      "change": "review scope union",
       "covered": 71,
       "statements": 78
     },
     {
       "path": "internal/release/failure_repair.go",
-      "symbol": "runnableTasks",
-      "declaration": "func runnableTasks(ctx context.Context, store Store, storyIDs []string, recaptureID string) ([]*Task, error) {",
+      "name": "runnableTasks",
+      "change": "review scope union",
       "covered": 1,
       "statements": 1
     },
     {
       "path": "internal/release/failure_repair.go",
-      "symbol": "(*Manager).CreateFailureRepair",
-      "declaration": "func (m *Manager) CreateFailureRepair(ctx context.Context, taskID, evidenceID, diagnosis string) (*Task, error) {",
-      "covered": 12,
-      "statements": 16
-    },
-    {
-      "path": "internal/release/failure_repair.go",
-      "symbol": "(*Manager).RecaptureEligible",
-      "declaration": "func (m *Manager) RecaptureEligible(ctx context.Context, task *Task) (bool, error) {",
-      "covered": 9,
-      "statements": 9
+      "name": "selectRunnableTasks",
+      "change": "review scope union",
+      "covered": 57,
+      "statements": 62
     },
     {
       "path": "internal/release/manager.go",
-      "symbol": "(*Manager).UpdateTask",
-      "declaration": "func (m *Manager) UpdateTask(updated *Task) error {",
-      "covered": 28,
-      "statements": 31
-    },
-    {
-      "path": "internal/release/manager.go",
-      "symbol": "(*Manager).SetTaskStatus",
-      "declaration": "func (m *Manager) SetTaskStatus(taskID string, status string) error {",
+      "name": "(*Manager).SetTaskStatus",
+      "change": "review scope union",
       "covered": 7,
       "statements": 8
     },
     {
+      "path": "internal/release/manager.go",
+      "name": "(*Manager).UpdateTask",
+      "change": "review scope union",
+      "covered": 27,
+      "statements": 31
+    },
+    {
       "path": "internal/release/sqlite_store.go",
-      "symbol": "(*SQLiteStore).CanCompleteTask",
-      "declaration": "func (s *SQLiteStore) CanCompleteTask(ctx context.Context, taskID string) error {",
+      "name": "(*SQLiteStore).BulkCreateTasks",
+      "change": "review scope union",
+      "covered": 32,
+      "statements": 33
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "name": "(*SQLiteStore).CanCompleteTask",
+      "change": "review scope union",
       "covered": 1,
       "statements": 1
     },
     {
-      "path": "pkg/db/state/task_failure.go",
-      "symbol": "(*Store).RecordTaskFailureStep",
-      "declaration": "func (s *Store) RecordTaskFailureStep(ctx context.Context, step RunStepData, attempt int) error {",
-      "covered": 16,
-      "statements": 16
-    },
-    {
-      "path": "internal/release/failure_repair.go",
-      "symbol": "selectRunnableTasks",
-      "declaration": "func selectRunnableTasks(ctx context.Context, store Store, storyIDs []string, recaptureID string, correction bool) ([]*Task, error) {",
-      "covered": 62,
-      "statements": 62
+      "path": "internal/release/sqlite_store.go",
+      "name": "(*SQLiteStore).UpdateTask",
+      "change": "review scope union",
+      "covered": 30,
+      "statements": 34
     },
     {
       "path": "internal/release/sqlite_store.go",
-      "symbol": "(*SQLiteStore).createTaskInternal",
-      "declaration": "func (s *SQLiteStore) createTaskInternal(ctx context.Context, task *Task) error {",
+      "name": "(*SQLiteStore).createTaskInternal",
+      "change": "review scope union",
       "covered": 26,
       "statements": 29
     },
     {
       "path": "internal/release/sqlite_store.go",
-      "symbol": "(*SQLiteStore).UpdateTask",
-      "declaration": "func (s *SQLiteStore) UpdateTask(ctx context.Context, task *Task) error {",
-      "covered": 31,
-      "statements": 34
-    },
-    {
-      "path": "internal/release/sqlite_store.go",
-      "symbol": "canCompleteTask",
-      "declaration": "func canCompleteTask(ctx context.Context, db completionQuerier, taskID string) error {",
-      "covered": 15,
+      "name": "canCompleteTask",
+      "change": "review scope union",
+      "covered": 14,
       "statements": 18
     },
     {
-      "path": "internal/release/sqlite_store.go",
-      "symbol": "(*SQLiteStore).BulkCreateTasks",
-      "declaration": "func (s *SQLiteStore) BulkCreateTasks(ctx context.Context, tasks []*Task) error {",
-      "covered": 32,
-      "statements": 33
+      "path": "internal/release/task_correction.go",
+      "name": "(*Manager).CorrectionEligible",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 14
     },
     {
       "path": "internal/release/task_correction.go",
-      "symbol": "CorrectionForTask",
-      "declaration": "func CorrectionForTask(task *Task) (TaskCorrection, error) {",
-      "covered": 7,
-      "statements": 7
+      "name": "(*SQLiteStore).AdmitTaskCorrection",
+      "change": "review scope union",
+      "covered": 5,
+      "statements": 6
     },
     {
       "path": "internal/release/task_correction.go",
-      "symbol": "correctionChanged",
-      "declaration": "func correctionChanged(result sql.Result, err error) error {",
-      "covered": 7,
-      "statements": 8
-    },
-    {
-      "path": "internal/release/task_correction.go",
-      "symbol": "(*SQLiteStore).AuthorizeTaskCorrection",
-      "declaration": "func (s *SQLiteStore) AuthorizeTaskCorrection(ctx context.Context, c TaskCorrection) error {",
+      "name": "(*SQLiteStore).AuthorizeTaskCorrection",
+      "change": "review scope union",
       "covered": 6,
       "statements": 6
     },
     {
       "path": "internal/release/task_correction.go",
-      "symbol": "(*SQLiteStore).AdmitTaskCorrection",
-      "declaration": "func (s *SQLiteStore) AdmitTaskCorrection(ctx context.Context, c TaskCorrection) error {",
-      "covered": 2,
-      "statements": 2
-    },
-    {
-      "path": "internal/release/task_correction.go",
-      "symbol": "(*SQLiteStore).FinishTaskCorrection",
-      "declaration": "func (s *SQLiteStore) FinishTaskCorrection(ctx context.Context, c TaskCorrection, success bool) error {",
+      "name": "(*SQLiteStore).FailTaskCorrection",
+      "change": "review scope union",
       "covered": 1,
       "statements": 1
     },
     {
       "path": "internal/release/task_correction.go",
-      "symbol": "(*SQLiteStore).FailTaskCorrection",
-      "declaration": "func (s *SQLiteStore) FailTaskCorrection(ctx context.Context, c TaskCorrection, outcome, reason string) error {",
+      "name": "(*SQLiteStore).FinishTaskCorrection",
+      "change": "review scope union",
       "covered": 1,
       "statements": 1
     },
     {
       "path": "internal/release/task_correction.go",
-      "symbol": "(*SQLiteStore).finishTaskCorrection",
-      "declaration": "func (s *SQLiteStore) finishTaskCorrection(ctx context.Context, c TaskCorrection, success bool, failureOutcome, reason string) error {",
-      "covered": 20,
-      "statements": 22
+      "name": "(*SQLiteStore).RefuseTaskCorrection",
+      "change": "review scope union",
+      "covered": 23,
+      "statements": 28
     },
     {
       "path": "internal/release/task_correction.go",
-      "symbol": "(*Manager).CorrectionEligible",
-      "declaration": "func (m *Manager) CorrectionEligible(ctx context.Context, task *Task) (bool, error) {",
-      "covered": 13,
-      "statements": 14
+      "name": "(*SQLiteStore).finishTaskCorrection",
+      "change": "review scope union",
+      "covered": 30,
+      "statements": 36
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "CorrectionForTask",
+      "change": "review scope union",
+      "covered": 7,
+      "statements": 7
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "CorrectionRefused",
+      "change": "review scope union",
+      "covered": 3,
+      "statements": 3
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "correctionChanged",
+      "change": "review scope union",
+      "covered": 7,
+      "statements": 8
+    },
+    {
+      "path": "pkg/db/state/task_failure.go",
+      "name": "(*Store).RecordTaskFailureStep",
+      "change": "review scope union",
+      "covered": 16,
+      "statements": 16
     },
     {
       "path": "pkg/manager/events.go",
-      "symbol": "(*Manager).consumeEvents",
-      "declaration": "func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {",
-      "covered": 63,
+      "name": "(*Manager).consumeEvents",
+      "change": "review scope union",
+      "covered": 64,
       "statements": 70
     },
     {
       "path": "pkg/manager/events.go",
-      "symbol": "updateInfo",
-      "declaration": "func updateInfo(info *PipelineInfo, event loop.Event) {",
+      "name": "updateInfo",
+      "change": "review scope union",
+      "covered": 27,
+      "statements": 27
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "name": "(*Manager).Stop",
+      "change": "review scope union",
+      "covered": 10,
+      "statements": 10
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "name": "(*Manager).Wait",
+      "change": "review scope union",
+      "covered": 10,
+      "statements": 10
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "name": "(*Manager).start",
+      "change": "review scope union",
+      "covered": 98,
+      "statements": 100
+    },
+    {
+      "path": "pkg/manager/scheduler.go",
+      "name": "(*Manager).ExecuteTasks",
+      "change": "review scope union",
+      "covered": 151,
+      "statements": 168
+    },
+    {
+      "path": "pkg/manager/task_boundary.go",
+      "name": "(*TaskQueueBoundary).Error",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "pkg/manager/task_boundary.go",
+      "name": "retainedTaskBoundary",
+      "change": "review scope union",
       "covered": 27,
       "statements": 27
     },
     {
       "path": "pkg/manager/task_correction.go",
-      "symbol": "(*Manager).CorrectionCandidate",
-      "declaration": "func (m *Manager) CorrectionCandidate(ctx context.Context) (path, branch, digest string, err error) {",
+      "name": "(*Manager).AuthorizeTaskCorrection",
+      "change": "review scope union",
+      "covered": 11,
+      "statements": 12
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "(*Manager).CorrectionCandidate",
+      "change": "review scope union",
       "covered": 66,
       "statements": 76
     },
     {
       "path": "pkg/manager/task_correction.go",
-      "symbol": "(*Manager).AuthorizeTaskCorrection",
-      "declaration": "func (m *Manager) AuthorizeTaskCorrection(ctx context.Context, c release.TaskCorrection) error {",
-      "covered": 10,
-      "statements": 12
+      "name": "(*Manager).checkCorrectionCandidate",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 13
     },
     {
       "path": "pkg/manager/task_correction.go",
-      "symbol": "(*Manager).checkCorrectionCandidate",
-      "declaration": "func (m *Manager) checkCorrectionCandidate(ctx context.Context, c release.TaskCorrection) error {",
-      "covered": 10,
-      "statements": 11
+      "name": "(*Manager).correctionPlan",
+      "change": "review scope union",
+      "covered": 25,
+      "statements": 27
     },
     {
       "path": "pkg/manager/task_correction.go",
-      "symbol": "(*Manager).correctionPlan",
-      "declaration": "func (m *Manager) correctionPlan(ctx context.Context, c release.TaskCorrection) (state.ValidationPlanRevision, error) {",
-      "covered": 22,
-      "statements": 23
+      "name": "(*Manager).reconcileTaskCorrection",
+      "change": "review scope union",
+      "covered": 104,
+      "statements": 115
     },
     {
       "path": "pkg/manager/task_correction.go",
-      "symbol": "correctionCheck",
-      "declaration": "func correctionCheck(item state.ValidationItem) (string, string, error) {",
+      "name": "correctionCheck",
+      "change": "review scope union",
       "covered": 5,
       "statements": 5
     },
     {
       "path": "pkg/manager/task_correction.go",
-      "symbol": "(*Manager).reconcileTaskCorrection",
-      "declaration": "func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Task) (err error) {",
-      "covered": 68,
-      "statements": 79
+      "name": "invalidCorrectionState",
+      "change": "review scope union",
+      "covered": 3,
+      "statements": 3
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "(*Manager).lockTaskExecution",
+      "change": "review scope union",
+      "covered": 18,
+      "statements": 19
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "(*Manager).reconcileInterruptedTasks",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 13
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "entryFinished",
+      "change": "review scope union",
+      "covered": 6,
+      "statements": 7
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "isRepairTask",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "pkg/manager/task_failure.go",
+      "name": "(*Manager).persistTaskVerificationFailure",
+      "change": "review scope union",
+      "covered": 38,
+      "statements": 40
+    },
+    {
+      "path": "pkg/manager/task_failure.go",
+      "name": "(*Manager).repairTaskFromRetainedFailure",
+      "change": "review scope union",
+      "covered": 17,
+      "statements": 18
     },
     {
       "path": "pkg/manager/task_queue.go",
-      "symbol": "(*Manager).persistTaskExhaustion",
-      "declaration": "func (m *Manager) persistTaskExhaustion(ctx context.Context, task *release.Task) error {",
+      "name": "(*Manager).executeTaskQueue",
+      "change": "review scope union",
+      "covered": 98,
+      "statements": 124
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "(*Manager).persistTaskExhaustion",
+      "change": "review scope union",
       "covered": 2,
       "statements": 2
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "(*Manager).waitTaskQueueRun",
+      "change": "review scope union",
+      "covered": 45,
+      "statements": 51
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "retryWithStopReason",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 13
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).diagnosticFreeReceipt",
+      "change": "review scope union",
+      "covered": 18,
+      "statements": 19
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).recaptureTaskFailure",
+      "change": "review scope union",
+      "covered": 78,
+      "statements": 85
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).resolveRecaptureCommand",
+      "change": "review scope union",
+      "covered": 4,
+      "statements": 4
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).resolveVerificationCommand",
+      "change": "review scope union",
+      "covered": 22,
+      "statements": 22
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "recapturePhase",
+      "change": "review scope union",
+      "covered": 8,
+      "statements": 8
     }
   ],
   "removal_sensitive_proof": {
@@ -7112,40 +7311,124 @@
   },
   "references": [
     {
-      "path": "docs/exhausted-task-reconciliation-evidence.md",
-      "sha256": "b49ee124a33253c1a7ad34c2198c55fe15073cdf9d449ea91881ace9516e92b1"
+      "path": "docs/verification/exhausted-task-delivery-results/acceptance.exit.json",
+      "sha256": "124fd50cb6d223cdd18fedc166d00af7254199b6e6dedf9be82f71db87af6d01"
     },
     {
-      "path": "docs/verification/exhausted-task-reconciliation.md",
-      "sha256": "cf9ddb82cefdfd558caaaa5b4f50cefde78579780d854036530ff3598631683b"
+      "path": "docs/verification/exhausted-task-delivery-results/acceptance.txt",
+      "sha256": "5dae5dd5caedbb29967d42fa68a8b561638719388ed09f8b638e9d264efe8a82"
     },
     {
-      "path": "docs/exhausted-task-discovery.md",
-      "sha256": "6a42dfe6e52307a23bf484e7b89feb49a1230a4862136e8c5ce4fd02f47a85f7"
+      "path": "docs/verification/exhausted-task-delivery-results/all-result.json",
+      "sha256": "d6855e8eb76894df10d9044934ee87461a114cafb4d0463f5faaa1135e096275"
     },
     {
-      "path": "docs/verification/exhausted-task-discovery-result.json",
-      "sha256": "85a015157402b7ece94ed125b19f4b7353c5d777adadcf808c611d7d35c97428"
+      "path": "docs/verification/exhausted-task-delivery-results/compatibility.exit.json",
+      "sha256": "124fd50cb6d223cdd18fedc166d00af7254199b6e6dedf9be82f71db87af6d01"
     },
     {
-      "path": "scripts/verification/exhausted-task-inventory.json",
-      "sha256": "a02fab15922532a7b0033bd6bfb7b6a371a7fe9aa3968bc88ae9f128ad2f406f"
+      "path": "docs/verification/exhausted-task-delivery-results/compatibility.txt",
+      "sha256": "f02d2c575f85a53f4ec2d95aaabd92a171f311aaa8abef44c415db1782427668"
     },
     {
-      "path": "pkg/manager/task_correction_test.go",
-      "sha256": "80ef009fe5b523f657486aa1016cf66e626b7d9d5ed1881bf4f766f01967ec2f"
+      "path": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "sha256": "89da5faded0c51557a99a6bf7cfff0691e447558af85f8c8621d0e4398f3c6ec"
     },
     {
-      "path": "pkg/manager/task_exhaustion_test.go",
-      "sha256": "b0aad2d73c084f162b414b50fa53dfd9a9ff19cca2da15098ab877cee7d43a8f"
+      "path": "docs/verification/exhausted-task-delivery-results/discovery.txt",
+      "sha256": "83bacecdcd50db497eb632bb023f90bb60b15258fe4930ba2228537329d2ff27"
     },
     {
-      "path": "scripts/verification/fixtures/exhausted-task-delivery/refusals.json",
-      "sha256": "bdbc6a801beff6412a51cc7a855776d544abfd60b04d3cbe8905c1f2c9b18b42"
+      "path": "docs/verification/exhausted-task-delivery-results/internal-cli-native.jsonl",
+      "sha256": "17b86d4c4b3b0b38bcc2ff1d0555c9a611ed68487196d9c969ba2fcce7a8600f"
     },
     {
-      "path": "docs/exhausted-task-delivery.md",
-      "sha256": "62f486bb9abd81b0129815347624f2a971e3adedc156f44da466144c84789aa7"
+      "path": "docs/verification/exhausted-task-delivery-results/internal-release-native.jsonl",
+      "sha256": "b3870efe5597d4ae946ea08c621d9ec9d06a86dd516083364f51e60c5551b3e9"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/lint.json",
+      "sha256": "536fdcb0121f6e6c160fabb697c0b5feb5183c453cd25aea51bd3ae33caee765"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/native-events.json",
+      "sha256": "fbb887a5ab94c38b5cc9b243d1258d94807f7a137d1ed2ec396153bca30d1e3f"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/pkg-manager-native.jsonl",
+      "sha256": "b266ad1992349c927c860a181828b207d5f4d93d546a2e2de3440c92112240c6"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/public-command.txt",
+      "sha256": "bda9aaec118af1c483e9bd6dab56abd982680db5a35ef37caa37a1dff8d01f11"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/race.txt",
+      "sha256": "1448eac5455f642f6b99188b67495f3ee49baeba73176454053b35806fd79a03"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/reload.exit.json",
+      "sha256": "124fd50cb6d223cdd18fedc166d00af7254199b6e6dedf9be82f71db87af6d01"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/reload.txt",
+      "sha256": "49f5ac47f5f82d9289d65f7072abd57d58ac7de3e1f5acfb57e75f7c6cf8574c"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/reloads.txt",
+      "sha256": "49c697aa06dad0912d79830a79f9ad3acdc44cc02fc793dae9aced337b0ec01a"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/removal.txt",
+      "sha256": "cb8a65cf4c7f3945de12bd9631be783bd1483648aed04a1fc4d686ba774a28ab"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "sha256": "748f885bd08160246f3b0cf754ab76449776c70d114766d9fb73bc2f05aefcee"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/self-tests-all.txt",
+      "sha256": "608d42901b2b1e91038e7afa7abefcced1030f4dca2cd6af2feba2b3fa63a505"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/self-tests-full.txt",
+      "sha256": "c71f39af17b3a06c0939f8c569c9254a35f5259987d3861384c89c6222250c3a"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/self-tests-reconciliation.txt",
+      "sha256": "1b55b65c4d9312324581d4a6ebc18ea0745dcbed2f9171e9aefb38fef4e11003"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/self-tests-review_contract.txt",
+      "sha256": "d70d34a6da8a86cec9e8f972fd3810cf5a9675b1708959f983647045950498b1"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/test.json",
+      "sha256": "d063aae64a1b724890c73e0a8baf9ec8db7386d441b7f4cef25cf818bce5618b"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/types.exit.json",
+      "sha256": "124fd50cb6d223cdd18fedc166d00af7254199b6e6dedf9be82f71db87af6d01"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/types.txt",
+      "sha256": "4ca7b9fb9cba038566828001db1f9d0254389db7cb436f87057daec99e35435f"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/unit-coverage.out",
+      "sha256": "83d8040fb85d842d072a1e3c630328662af295a7903bf002e614fa735c9a3ad3"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/unit-events.json",
+      "sha256": "8d862ced9987d010410dae13ddb9ddf037bd1edc6bb6eb4b0604bfcad4eb6a28"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/unit-events.jsonl",
+      "sha256": "4a258faff2a64fc59431fe2fb84a1ac9cdd382591b5b5b9c002e5286015e2d38"
+    },
+    {
+      "path": "docs/verification/exhausted-task-delivery-results/unit-result.json",
+      "sha256": "edb9c21a43f06aa2f28b21b91802da92dda6852de85e7cddbd2b33cb4eaaf253"
     }
   ],
   "handoff_task": "T-US-009-002",
@@ -7156,5 +7439,38 @@
     "gate_review_decision": "Canonical gate and independent review references bound to the exact candidate, plus the actual owner merge decision scoped to repository, PR, revision and target branch. None is supplied by this handoff.",
     "actual_merge": "Repository-host merged PR record, merged revision, target default branch and merge time; refetched branch history proving inclusion of the merged revision and verified fix. Record content equivalence and revision mapping for squash/rebase.",
     "boundary": "Preparation readiness is not approval or merge evidence. Missing merge evidence is not proof of non-delivery. Console serving revision is not OpenExec delivery evidence."
-  }
+  },
+  "stage_entry_revision": "45d0ac5e01fa9361f532995e933a6bc546412239",
+  "findings": [
+    {
+      "id": "F1",
+      "disposition": "accepted",
+      "provisional": false,
+      "evidence": "pkg/manager/task_correction.go:reconcileTaskCorrection; internal/release/task_correction.go:RefuseTaskCorrection",
+      "qualification": "Returning nil alone can loop forever; terminal records must be skipped. Malformed records need conditional raw-record ownership. Reauthorization requires fresh valid bindings."
+    },
+    {
+      "id": "F2",
+      "disposition": "accepted",
+      "provisional": false,
+      "evidence": "internal/cli/task_correct.go:newTaskCorrectCommand; pkg/manager/task_correct_cli_test.go:TestTaskCorrectCLI",
+      "qualification": "Accept local missing access only; absence in Agent Console is unproven. An arbitrary valid different decision is not a falsifier unless exact supplied/persisted identity is asserted."
+    },
+    {
+      "id": "F3",
+      "disposition": "accepted",
+      "provisional": false,
+      "evidence": "pkg/manager/task_correction.go:reconcileTaskCorrection; internal/release/task_correction.go:finishTaskCorrection",
+      "qualification": "Accepted script and applicable-plan enforcement. Reject the proposed unconditional zero-check refusal: native completion permits tasks with no declared verification obligations; correction must not invent new obligations. TestCorrectionWithoutChecksUsesNativeCompletion pins this accepted dependency-stage behavior."
+    },
+    {
+      "id": "F4",
+      "disposition": "accepted",
+      "provisional": false,
+      "evidence": "pkg/manager/task_boundary.go:retainedTaskBoundary",
+      "qualification": "Keep private reason out of Error(); preserve non-exhausted failure behavior."
+    }
+  ],
+  "unit_covered": 1442,
+  "unit_statements": 1596
 }

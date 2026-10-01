@@ -1,68 +1,13 @@
-.........
-----------------------------------------------------------------------
-Ran 9 tests in 0.025s
-
-OK
-go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info157264947.tmp: read-only file system
-pkg/manager/scheduler.go:(*Manager).ExecuteTasks: 144/168
-pkg/manager/task_queue.go:(*Manager).executeTaskQueue: 106/124
-pkg/manager/task_queue.go:(*Manager).waitTaskQueueRun: 45/51
-pkg/manager/task_queue.go:retryWithStopReason: 12/13
-pkg/manager/task_execution_lock.go:(*Manager).lockTaskExecution: 17/19
-pkg/manager/task_execution_lock.go:entryFinished: 6/7
-pkg/manager/task_execution_lock.go:(*Manager).reconcileInterruptedTasks: 12/13
-pkg/manager/task_execution_lock.go:isRepairTask: 1/1
-pkg/manager/task_failure.go:(*Manager).persistTaskVerificationFailure: 38/40
-pkg/manager/task_failure.go:(*Manager).repairTaskFromRetainedFailure: 17/18
-pkg/manager/task_recapture.go:(*Manager).diagnosticFreeReceipt: 18/19
-pkg/manager/task_recapture.go:recapturePhase: 8/8
-pkg/manager/task_recapture.go:(*Manager).resolveRecaptureCommand: 25/25
-pkg/manager/task_recapture.go:(*Manager).recaptureTaskFailure: 79/85
-pkg/manager/task_boundary.go:retainedTaskBoundary: 20/20
-pkg/manager/manager.go:(*Manager).start: 84/100
-pkg/manager/manager.go:(*Manager).Stop: 10/10
-pkg/manager/manager.go:(*Manager).Wait: 10/10
-internal/release/failure_repair.go:(*SQLiteStore).CreateFailureRepair: 71/78
-internal/release/failure_repair.go:runnableTasks: 1/1
-internal/release/failure_repair.go:(*Manager).CreateFailureRepair: 12/16
-internal/release/failure_repair.go:(*Manager).RecaptureEligible: 9/9
-internal/release/manager.go:(*Manager).UpdateTask: 28/31
-internal/release/manager.go:(*Manager).SetTaskStatus: 7/8
-internal/release/sqlite_store.go:(*SQLiteStore).CanCompleteTask: 1/1
-pkg/db/state/task_failure.go:(*Store).RecordTaskFailureStep: 16/16
-internal/release/failure_repair.go:selectRunnableTasks: 62/62
-internal/release/sqlite_store.go:(*SQLiteStore).createTaskInternal: 26/29
-internal/release/sqlite_store.go:(*SQLiteStore).UpdateTask: 31/34
-internal/release/sqlite_store.go:canCompleteTask: 15/18
-internal/release/sqlite_store.go:(*SQLiteStore).BulkCreateTasks: 32/33
-internal/release/task_correction.go:CorrectionForTask: 7/7
-internal/release/task_correction.go:correctionChanged: 7/8
-internal/release/task_correction.go:(*SQLiteStore).AuthorizeTaskCorrection: 6/6
-internal/release/task_correction.go:(*SQLiteStore).AdmitTaskCorrection: 2/2
-internal/release/task_correction.go:(*SQLiteStore).FinishTaskCorrection: 1/1
-internal/release/task_correction.go:(*SQLiteStore).FailTaskCorrection: 1/1
-internal/release/task_correction.go:(*SQLiteStore).finishTaskCorrection: 20/22
-internal/release/task_correction.go:(*Manager).CorrectionEligible: 13/14
-pkg/manager/events.go:(*Manager).consumeEvents: 63/70
-pkg/manager/events.go:updateInfo: 27/27
-pkg/manager/task_correction.go:(*Manager).CorrectionCandidate: 66/76
-pkg/manager/task_correction.go:(*Manager).AuthorizeTaskCorrection: 10/12
-pkg/manager/task_correction.go:(*Manager).checkCorrectionCandidate: 10/11
-pkg/manager/task_correction.go:(*Manager).correctionPlan: 22/23
-pkg/manager/task_correction.go:correctionCheck: 5/5
-pkg/manager/task_correction.go:(*Manager).reconcileTaskCorrection: 68/79
-pkg/manager/task_queue.go:(*Manager).persistTaskExhaustion: 2/2
-Coverage: 1293/1433 (90.2303%)
-Coverage PASS; 48 whole functions; 84 required tests/subcases; no skips; reopened evidence parsed
-=== RUN   TestCorrectionDiagnosticQueueSuccess
-2026/10/01 17:41:42 [StateStore] Initialized: path=/tmp/TestCorrectionDiagnosticQueueSuccess1304428217/002/state.db, schema=v1, async_queue_size=1000
-[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
-[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
-2026/10/01 17:41:42 [Watchdog] Started monitoring with stall threshold 5m0s
-2026/10/01 17:41:42 [StateStore] Initialized: path=/tmp/TestCorrectionDiagnosticQueueSuccess1304428217/002/state.db, schema=v1, async_queue_size=1000
-2026/10/01 17:41:42 [Watchdog] Started monitoring with stall threshold 5m0s
-    task_correction_test.go:173: task repair attempt limit reached
---- FAIL: TestCorrectionDiagnosticQueueSuccess (0.19s)
-removal-sensitive: PASS; native regression exit 1; exact refusal: task repair attempt limit reached
-Overlay artifacts cleaned; original source SHA256 50a6e238d3b49c77c63b702542414f5522cfe5fde43cfaf808f96c83fb661302
-acceptance: PASS
+self-tests-all: exit 0
+self-tests-reconciliation: exit 0
+self-tests-review_contract: exit 0
+go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info289621585.tmp: read-only file system
+Dedicated unit coverage: 1442/1596 (90.3509%); 55 complete functions
+Native cases PASS: 147 required names; all 35 review cases; no skips
+discovery: exit 0
+race: exit 0
+public-command: exit 0
+removal: exit 0
+review-controls: exit 0
+correction-controls: exit 0
+all: PASS; result reread at /tmp/openexec-exhausted-all/all-result.json

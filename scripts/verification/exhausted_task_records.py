@@ -83,7 +83,7 @@ def source_digest(root):
 
 def case_command(case):
     # No shell, no regex metacharacters supplied by records. Each subtest anchored.
-    require(re.fullmatch(r'Test[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*', case['test']) is not None,
+    require(re.fullmatch(r'Test[A-Za-z0-9_]+(?:/[A-Za-z0-9_-]+)*', case['test']) is not None,
             'invalid exact test selector')
     selector = '/'.join('^' + s + '$' for s in case['test'].split('/'))
     return ['go', 'test', '-json', '-count=1', '-timeout=90s',
@@ -98,7 +98,7 @@ def validate_records(root, record):
     matrix, scope = read(local(root, record['matrix'])), read(local(root, record['scope']))
     require(matrix['task_id'] == scope['task_id'] == 'T-US-010-002'
             and matrix['review_id'] == 'afa2fdef5783532f6034a12a002ab508'
-            and matrix['status'] == 'definition_only', 'wrong upstream contract')
+            and matrix['status'] in ('definition_only', 'implemented_pending_verification'), 'wrong upstream contract')
     cases = review.validate(scope, matrix)
     require(scope['production_files'] == ['pkg/manager/task_correction.go', 'internal/release/task_correction.go',
                                          'pkg/manager/task_boundary.go'], 'production denominator narrowed')
@@ -146,8 +146,8 @@ def validate_records(root, record):
         texts(case['assertions'], 'case assertions')
         require(isinstance(case['setup'], str) and case['setup'].strip()
                 and isinstance(case['negative_control'], str) and case['negative_control'].strip(), 'incomplete case/falsifier')
-        require(case['implementation'] in ('required_not_implemented', 'existing_requires_strengthening'),
-                'definitions cannot claim implemented evidence')
+        require(case['implementation'] in ('required_not_implemented', 'existing_requires_strengthening', 'implemented'),
+                'unknown case implementation state')
         case_command(case)
     checklists = record['checklists']
     require(isinstance(checklists, dict) and set(checklists) == FINDINGS, 'all four finding checklists required')

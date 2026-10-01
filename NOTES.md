@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Complete correction verification / US-011 / T-US-011-004]
+  Current contract, findings, provenance, exact results and limitations live once
+  in [the delivery record](docs/exhausted-task-delivery.md). The `all` harness
+  separates atomic unit coverage from shell/public-command integration, pins
+  names/subcases, rereads SQLite and falsifies removed controls. Entire changed
+  shared functions stay in the source-derived denominator; missing blocks are
+  uncovered and coverage must exceed 90%. No product lifecycle or schema change.
+  Final verification and the ordinary task commit are recorded in that document.
+
 - [Trusted operator correction / US-011 / T-US-011-003]
   Shipped `openexec task correct` reuses the operator-session boundary and native
   manager authorization, requiring explicit correction authority and a decision
@@ -112,7 +121,7 @@ Raw capture. One line per thought, any grammar.
   Persisted package reread, preparation verifier and three boundary test methods
   (eleven persisted refusal fixtures) passed. Fresh host lint exited 0. Native
   checks remain preparation-stage evidence. No tests/production behavior changed;
-  no acceptance or delivery action taken; handoff edits remain uncommitted.
+  no acceptance or delivery action taken; later task commits preserve the handoff.
 
 - [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002, T-US-008-003]
   Native correction/disposition interfaces remain documented in
@@ -876,12 +885,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Questions
 
-- Exhausted correction: operator transport in Console, actual incident bindings,
-  no-plan verification and terminal-refusal lifecycle questions are maintained in
-  [the current discovery](docs/exhausted-task-discovery.md#hypotheses-and-cross-repository-uncertainty)
-  and its review checklist. Another checkout was not read. Required future
-  integration and merge evidence remain unverified; no new owner decision is
-  requested by this discovery stage.
+- Exhausted correction: OpenExec verification and dispositions are recorded in
+  [the delivery record](docs/exhausted-task-delivery.md). Console authority
+  transport, live incident bindings, canonical review and actual merge evidence
+  remain external follow-ups; no new owner decision is requested by this stage.
 
 - Identity delivery evidence and the remaining coordinator requirement are tracked
   in [the delivery record](docs/verification/plan-identity-delivery.md#completion-boundary-and-external-follow-up).

@@ -1,0 +1,20 @@
+$ bash scripts/verify-exhausted-task-reconciliation.sh removal-sensitive
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.025s
+
+OK
+=== RUN   TestCorrectionDiagnosticQueueSuccess
+2026/10/01 20:04:56 [StateStore] Initialized: path=/tmp/TestCorrectionDiagnosticQueueSuccess867724796/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/10/01 20:04:56 [Watchdog] Started monitoring with stall threshold 5m0s
+2026/10/01 20:04:56 [StateStore] Initialized: path=/tmp/TestCorrectionDiagnosticQueueSuccess867724796/002/state.db, schema=v1, async_queue_size=1000
+2026/10/01 20:04:56 [Watchdog] Started monitoring with stall threshold 5m0s
+    task_correction_test.go:179: task repair attempt limit reached
+--- FAIL: TestCorrectionDiagnosticQueueSuccess (0.22s)
+removal-sensitive: PASS; native regression exit 1; exact refusal: task repair attempt limit reached
+Overlay artifacts cleaned; original source SHA256 50a6e238d3b49c77c63b702542414f5522cfe5fde43cfaf808f96c83fb661302
+removal-sensitive: PASS
+
+exit=0
