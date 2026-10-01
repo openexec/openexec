@@ -4,9 +4,10 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Reviewed-wave identity / US-008 / T-US-008-001, 2026-10-01]
-  Authoritative implementation/evidence entry for this task; older US-008
-  retention work below is a different story. Baseline:
+- [Reviewed-wave delivery preparation / US-009 / T-US-009-001, 2026-10-01]
+  Authoritative consolidated repair and delivery evidence, including dependency
+  US-008 / T-US-008-001; older similarly numbered stories below concern other
+  work. Local preparation is complete; D2 remains pending. Repair baseline:
   `38d20b4255926d311b295ff944b82e3673a89ac4`. Used the US-007 discovery entry
   below to construct `pkg/manager/testdata/reviewed-identity/{retained,subsequent}.json`.
   These are repository-local reproductions of its documented incident shape,
@@ -44,7 +45,12 @@ Raw capture. One line per thought, any grammar.
   title-only lookup remains supported; native preparation supplies full content.
   The atomic importer's conflict/receipt enforcement was not relaxed.
 
-  Regression and negative control:
+  Corrected historical reproduction: the refused identity is US-001, not the
+  planning story US-007. The rejected plan had substituted the planning-story
+  number into incident evidence; the accepted plan restores US-001 and US-005.
+  Historical incident text is not itself an executed reproduction. The following
+  dependency-stage runs reproduced that exact refusal with repository fixtures:
+
   - Before production edits, `go test ./pkg/manager -run
     '^TestReviewedIdentityLifecycle$' -count=1` exited 1 with
     `reviewed stories US-001 conflicts with retained content`.
@@ -96,36 +102,58 @@ Raw capture. One line per thought, any grammar.
   every expected instrumentation block. Each full function body must exceed
   90%, independently of aggregate coverage. Observed final statement coverage:
 
-  | Scoped function | Covered / statements |
-  | --- | --- |
-  | RemapPlanIDs | 15 / 15 |
-  | rewriteIDRefs | 6 / 6 |
-  | nextFreeID | 4 / 4 |
-  | nextFreeTaskID | 8 / 8 |
-  | remapContentIDs | 59 / 59 |
-  | rewritePlanRefs | 31 / 31 |
-  | ReviewedGoalEqual | 1 / 1 |
-  | reviewedArrayEqual | 3 / 3 |
-  | ReviewedStoryEqual | 1 / 1 |
-  | reviewedMode | 3 / 3 |
-  | ReviewedTaskEqual | 1 / 1 |
-  | preparePlanIDs | 18 / 19 |
-  | reviewedIdentityConflicts | 12 / 12 |
-  | uniquePlanIDs | 15 / 15 |
-  | reviewedPlanRows | 17 / 17 |
-  | ImportReviewedPlan | 1 / 1 |
-  | ValidatePlanIdentities | 1 / 1 |
-  | importReviewedPlan | 98 / 106 |
+  | Scoped function | Covered / statements | Statement coverage |
+  | --- | --- | --- |
+  | RemapPlanIDs | 15 / 15 | 100.00% |
+  | rewriteIDRefs | 6 / 6 | 100.00% |
+  | nextFreeID | 4 / 4 | 100.00% |
+  | nextFreeTaskID | 8 / 8 | 100.00% |
+  | remapContentIDs | 59 / 59 | 100.00% |
+  | rewritePlanRefs | 31 / 31 | 100.00% |
+  | ReviewedGoalEqual | 1 / 1 | 100.00% |
+  | reviewedArrayEqual | 3 / 3 | 100.00% |
+  | ReviewedStoryEqual | 1 / 1 | 100.00% |
+  | reviewedMode | 3 / 3 | 100.00% |
+  | ReviewedTaskEqual | 1 / 1 | 100.00% |
+  | preparePlanIDs | 18 / 19 | 94.74% |
+  | reviewedIdentityConflicts | 12 / 12 | 100.00% |
+  | uniquePlanIDs | 15 / 15 | 100.00% |
+  | reviewedPlanRows | 17 / 17 | 100.00% |
+  | ImportReviewedPlan | 1 / 1 | 100.00% |
+  | ValidatePlanIdentities | 1 / 1 | 100.00% |
+  | importReviewedPlan | 98 / 106 | 92.45% |
 
-  Commands and observed results:
+  Named lifecycle/canonical results (fresh execution, all PASS, no skips):
+
+  - `pkg/manager:TestReviewedIdentityLifecycle`: PASS.
+  - `pkg/manager:TestReviewedIdentityChangedGoalAndTask`: PASS.
+  - `pkg/manager:TestReviewedIdentityDuplicateRefusal`: PASS.
+  - `pkg/manager:TestReviewedPlanReplayAtomicImportFailure`: PASS.
+  - `pkg/manager:TestReviewedPlanReplayRefusesConflictAndMissingAdapters`: PASS.
+  - `pkg/manager:TestReviewedPlanRefinementAllocatesBeforeRereview`: PASS.
+  - `pkg/manager:TestReviewedIdentityPostReviewConflictAtomicRetry`: PASS.
+  - `internal/release:TestReviewedIdentityAtomicRefusals`: PASS.
+  - `pkg/manager:TestReviewedPlanReplaySurvivesCancelledReviewAndCompletedImport`: PASS.
+  - `pkg/manager:TestReviewedIdentityClosedStoreRefusesPreparation`: PASS.
+  - `pkg/manager:TestReviewedRowsCanonicalConversion`: PASS.
+  - `internal/planner:TestRemapContentReservationsAndReplay`: PASS.
+  - `internal/planner:TestRewritePlanRefsAllFields`: PASS.
+  - `internal/release:TestReviewedCanonicalFields`: PASS.
+  - `internal/release:TestReviewedCanonicalNormalizationAndRetention`: PASS.
+
+  Commands and observed results (refreshed for US-009 on 2026-10-01 unless
+  explicitly labelled dependency-stage evidence):
+
   - `scripts/verify-reviewed-plan-identity.sh`: exit 0,
     `Reviewed identity verification PASS`; all manifest tests passed, none skipped.
-    Lowest function coverage 92.45%. Python controls explicitly refuse absent
-    coverage blocks and empty instrumentation. Temporary empty-manifest and
+    Scoped aggregate: 294/303 statements (97.03%); the threshold applies to
+    each full function, not this aggregate. Lowest function coverage 92.45%.
+    Python controls explicitly refuse absent coverage blocks and empty
+    instrumentation. Dependency-stage temporary empty-manifest and
     omitted-RemapPlanIDs-manifest mutations both exited nonzero with their
     expected diagnostics; restored the manifest and reran successfully.
   - Host `run_declared_check(check="lint")`: `lint exited 0`, Go vet and UI ESLint.
-  - Final host `run_declared_check(check="test")`: `test exited 0`; this
+  - Dependency-stage final host `run_declared_check(check="test")`: `test exited 0`; this
     executes `make test` (Go `go test ./...` plus UI Vitest). Manager passed
     in 114.879s; UI reported 40 files and 635 tests passed.
   - `make compat-test`: exit 0; existing `.openexec` and legacy `.uaos` status
@@ -141,15 +169,42 @@ Raw capture. One line per thought, any grammar.
   content and same-request replay reuse existing identities. A new request that
   again supplies different content under historical occupied IDs is a new wave;
   this is not a cross-ID content-deduplication index. Canonical comparison tests
-  cover every compared field and normalization distinction. No deployed-product
-  claim is made from the Console serving revision. Ordinary candidate commit is
-  required by the current stage wrapper; publication, canonical gate, independent
-  review and owner merge decision remain with Agent Console.
+  cover every compared field and normalization distinction.
+
+  Candidate binding: verification ran against implementation commit
+  `74f5b0b96e492b2b417cf8320b80f5d27abce3ff`; this preparation changes only
+  NOTES.md. No production code, tests, fixtures, manifests or executable scripts
+  changed, so the fresh scoped verifier and compatibility/type/lint results
+  apply to the final candidate's identical executable content. Full host test
+  evidence above is inherited from that dependency commit, not claimed as a
+  fresh US-009 full-suite run. The scoped Go run emitted a read-only module-cache
+  stat warning but completed with exit 0 and every required test/coverage result.
+  The accepted task verifier is `git diff --check && test -s NOTES.md` (exit 0).
+  Final reread and Git diff establish that the evidence persisted and this is a
+  documentation-only preparation. No tests were altered in US-009; the deliberate
+  US-008 test change and its rationale are recorded above.
+
+  Console handoff: the current stage's explicit ordinary-Git persistence rule
+  supersedes the accepted artifact's older no-preparation-commit wording. This
+  task commit preserves local work only. Console still owns publication, the
+  canonical gate, independent review, presentation of the exact PR candidate to
+  the owner (T-US-009-002), and authorized merge execution/evidence. Neither the
+  local commit nor task completion nor owner acceptance satisfies D2. No actual
+  default-branch merge evidence was supplied or established here; keep D2 pending
+  until Console records the merged revision and corresponding default-branch/PR
+  evidence for the verified candidate. The observed Console serving revision
+  fa197cf8 (started 2026-10-01T02:57:45Z) does not attest OpenExec deployment.
+
+  Separate follow-up: Agent Console's goal-mode verifier mismatch belongs in
+  Agent Console's repository. It is distinct from the repaired engine import
+  conflict. This task neither edits nor verifies that checkout, and OpenExec task
+  statuses do not establish parent Goal delivery. Console must resolve/verify
+  that follow-up independently; local preparation does not claim it complete.
 
 - [Reviewed-plan identity discovery / US-007 / T-US-007-001, 2026-10-01]
   Inspection baseline: `e33bab1d3551da1236c9075dc153766c991e3467`.
   Implementation observations below are historical baseline findings; the
-  reviewed-wave US-008 entry above records the repaired behavior and verification.
+  consolidated US-009 entry above records the US-008 repair and verification.
   This entry is the authoritative record for this discovery task; similarly
   numbered schema/evidence stories below concern other work. Read root
   `AGENTS.md`, `AGENTS.local.md`, this memory, and
