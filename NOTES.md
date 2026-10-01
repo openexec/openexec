@@ -4,12 +4,23 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Native exhaustion discovery / US-007 / T-US-007-001]
-  The authoritative reproduction, frozen baseline provenance, lifecycle trace,
-  fail-closed verifier and executed evidence are in
-  [exhausted-task discovery](docs/verification/exhausted-task-discovery.md).
-  This is distinct from the older reviewed-plan identity story with the same
-  numeric IDs. Production behavior is unchanged; Console retains delivery.
+- [Native exhaustion discovery / US-007 / T-US-007-001, T-US-007-002]
+  Baseline reproduction/provenance remains in
+  [the reproduction record](docs/verification/exhausted-task-discovery.md).
+  [Native integration discovery](docs/exhausted-task-discovery.md) now records
+  concrete persisted fields, source-inspected boundaries, required repository
+  checks and the 26-function inventory for later whole-function coverage.
+  Fresh `scripts/verify-exhausted-task-discovery.sh` exited 0: real timeout,
+  completed prerequisite, same-candidate correction, exhausted queue refusal,
+  SQLite close/reopen and unchanged receipt/task snapshots. Five verifier test
+  methods passed, including missing/duplicate inventory, wrong source symbols,
+  missing documentation sections and stale baseline provenance refusals.
+  Host `run_declared_check(check="lint")` exited 0 (Go vet and UI ESLint).
+  The persisted JSON result was replaced and reread, not appended. No production
+  behavior or existing Go tests changed; two Python control tests were added
+  to enforce this discovery contract. Current/legacy loading is unchanged.
+  Console tests, Settings commit and hooks drift are historical context only.
+  Full canonical gates and delivery remain Console-owned, not claimed here.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
@@ -737,6 +748,11 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Exhausted correction: authority consumption, corrected candidate content
+  binding, one bounded admission, Stop races and queue convergence remain later
+  implementation boundaries, tracked once in
+  [native integration discovery](docs/exhausted-task-discovery.md#evidence-and-unresolved-boundaries).
 
 - Identity delivery evidence and the remaining coordinator requirement are tracked
   in [the delivery record](docs/verification/plan-identity-delivery.md#completion-boundary-and-external-follow-up).

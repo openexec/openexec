@@ -46,6 +46,11 @@
     "missing_test_refused",
     "skipped_test_refused",
     "missing_evidence_refused",
-    "absent_receipt_refused"
-  ]
+    "absent_receipt_refused",
+    "inventory_refusals",
+    "documentation_refusals",
+    "stale_baseline_refused"
+  ],
+  "discovery_inventory_sha256": "2d5ce54354164892e2897747c5960296d5d8fd6095bd933109be1cba3e5bd798",
+  "discovery_document_sha256": "ccf1a67383786bcb09972ef2f26fd10aeaeff4d0bf6668e175d5b109f00a4112"
 }

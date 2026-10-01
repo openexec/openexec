@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "purpose": "Discovery inventory for later whole-function coverage; not a coverage result or implementation gate.",
+  "functions": [
+    {
+      "path": "pkg/manager/scheduler.go",
+      "symbol": "(*Manager).ExecuteTasks",
+      "declaration": "func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {"
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "symbol": "(*Manager).executeTaskQueue",
+      "declaration": "func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {"
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "symbol": "(*Manager).waitTaskQueueRun",
+      "declaration": "func (m *Manager) waitTaskQueueRun(ctx context.Context, id string) error {"
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "symbol": "retryWithStopReason",
+      "declaration": "func retryWithStopReason(ctx context.Context, rel *release.Manager, id, reason string) (bool, error) {"
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "symbol": "(*Manager).lockTaskExecution",
+      "declaration": "func (m *Manager) lockTaskExecution(exclusive bool) (*flock.Flock, error) {"
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "symbol": "entryFinished",
+      "declaration": "func entryFinished(e *entry) bool {"
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "symbol": "(*Manager).reconcileInterruptedTasks",
+      "declaration": "func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Manager, storyIDs []string) error {"
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "symbol": "isRepairTask",
+      "declaration": "func isRepairTask(task *release.Task) bool {"
+    },
+    {
+      "path": "pkg/manager/task_failure.go",
+      "symbol": "(*Manager).persistTaskVerificationFailure",
+      "declaration": "func (m *Manager) persistTaskVerificationFailure(taskID string, event loop.Event) string {"
+    },
+    {
+      "path": "pkg/manager/task_failure.go",
+      "symbol": "(*Manager).repairTaskFromRetainedFailure",
+      "declaration": "func (m *Manager) repairTaskFromRetainedFailure(ctx context.Context, taskID, evidenceID string) error {"
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "symbol": "(*Manager).diagnosticFreeReceipt",
+      "declaration": "func (m *Manager) diagnosticFreeReceipt(artifacts map[string]string) bool {"
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "symbol": "recapturePhase",
+      "declaration": "func recapturePhase(phase string, artifacts map[string]string) (string, error) {"
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "symbol": "(*Manager).resolveRecaptureCommand",
+      "declaration": "func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, artifacts map[string]string) (string, error) {"
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "symbol": "(*Manager).recaptureTaskFailure",
+      "declaration": "func (m *Manager) recaptureTaskFailure(ctx context.Context, taskID, evidenceID, phase string, artifacts map[string]string) error {"
+    },
+    {
+      "path": "pkg/manager/task_boundary.go",
+      "symbol": "retainedTaskBoundary",
+      "declaration": "func retainedTaskBoundary(tasks []*release.Task) error {"
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "symbol": "(*Manager).start",
+      "declaration": "func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts ...StartOption) error {"
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "symbol": "(*Manager).Stop",
+      "declaration": "func (m *Manager) Stop(fwuID string) error {"
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "symbol": "(*Manager).Wait",
+      "declaration": "func (m *Manager) Wait(ctx context.Context, fwuID string) error {"
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "symbol": "(*SQLiteStore).CreateFailureRepair",
+      "declaration": "func (s *SQLiteStore) CreateFailureRepair(ctx context.Context, taskID, evidenceID, diagnosis string) (*Task, error) {"
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "symbol": "runnableTasks",
+      "declaration": "func runnableTasks(ctx context.Context, store Store, storyIDs []string, recaptureID string) ([]*Task, error) {"
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "symbol": "(*Manager).CreateFailureRepair",
+      "declaration": "func (m *Manager) CreateFailureRepair(ctx context.Context, taskID, evidenceID, diagnosis string) (*Task, error) {"
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "symbol": "(*Manager).RecaptureEligible",
+      "declaration": "func (m *Manager) RecaptureEligible(ctx context.Context, task *Task) (bool, error) {"
+    },
+    {
+      "path": "internal/release/manager.go",
+      "symbol": "(*Manager).UpdateTask",
+      "declaration": "func (m *Manager) UpdateTask(updated *Task) error {"
+    },
+    {
+      "path": "internal/release/manager.go",
+      "symbol": "(*Manager).SetTaskStatus",
+      "declaration": "func (m *Manager) SetTaskStatus(taskID string, status string) error {"
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "symbol": "(*SQLiteStore).CanCompleteTask",
+      "declaration": "func (s *SQLiteStore) CanCompleteTask(ctx context.Context, taskID string) error {"
+    },
+    {
+      "path": "pkg/db/state/task_failure.go",
+      "symbol": "(*Store).RecordTaskFailureStep",
+      "declaration": "func (s *Store) RecordTaskFailureStep(ctx context.Context, step RunStepData, attempt int) error {"
+    }
+  ]
+}
