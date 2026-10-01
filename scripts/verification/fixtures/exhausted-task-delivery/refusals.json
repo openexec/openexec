@@ -1,13 +1,203 @@
 [
-  {"name":"stale branch", "path":["branch"], "value":"outcome/obsolete", "error":"stale candidate branch"},
-  {"name":"stale base", "path":["base_revision"], "value":"0000000000000000000000000000000000000000", "error":"stale base identity"},
-  {"name":"stale digest", "path":["source_sha256"], "value":"stale", "error":"stale source content"},
-  {"name":"missing evidence", "path":["checks","test","evidence"], "value":"docs/missing-proof.json", "error":"missing/nonlocal evidence"},
-  {"name":"missing check", "path":["checks","lint"], "delete":true, "error":"missing required check"},
-  {"name":"failed check", "path":["checks","test","exit_code"], "value":1, "error":"unsuccessful/stale required check"},
-  {"name":"stale check", "path":["checks","test","source_sha256"], "value":"stale", "error":"unsuccessful/stale required check"},
-  {"name":"D2 unsupported", "path":["D2"], "value":"completed", "error":"unsupported completion claim"},
-  {"name":"Goal unsupported", "path":["goal_complete"], "value":true, "error":"unsupported completion claim"},
-  {"name":"delivery unsupported", "path":["delivery"], "value":"completed", "error":"unsupported completion claim"},
-  {"name":"coverage missing", "path":["affected_function_coverage"], "value":[], "error":"coverage differs"}
+  {
+    "name": "stale branch",
+    "path": [
+      "branch"
+    ],
+    "value": "outcome/obsolete",
+    "error": "stale candidate branch"
+  },
+  {
+    "name": "stale base",
+    "path": [
+      "base_revision"
+    ],
+    "value": "0000000000000000000000000000000000000000",
+    "error": "stale base identity"
+  },
+  {
+    "name": "stale digest",
+    "path": [
+      "source_sha256"
+    ],
+    "value": "stale",
+    "error": "stale source content"
+  },
+  {
+    "name": "missing evidence",
+    "path": [
+      "checks",
+      "test",
+      "evidence"
+    ],
+    "value": "docs/missing-proof.json",
+    "error": "missing/nonlocal evidence"
+  },
+  {
+    "name": "missing check",
+    "path": [
+      "checks",
+      "lint"
+    ],
+    "delete": true,
+    "error": "missing required check"
+  },
+  {
+    "name": "failed check",
+    "path": [
+      "checks",
+      "test",
+      "exit_code"
+    ],
+    "value": 1,
+    "error": "unsuccessful/stale required check"
+  },
+  {
+    "name": "stale check",
+    "path": [
+      "checks",
+      "test",
+      "source_sha256"
+    ],
+    "value": "stale",
+    "error": "unsuccessful/stale required check"
+  },
+  {
+    "name": "D2 unsupported",
+    "path": [
+      "D2"
+    ],
+    "value": "completed",
+    "error": "unsupported completion claim"
+  },
+  {
+    "name": "Goal unsupported",
+    "path": [
+      "goal_complete"
+    ],
+    "value": true,
+    "error": "unsupported completion claim"
+  },
+  {
+    "name": "delivery unsupported",
+    "path": [
+      "delivery"
+    ],
+    "value": "completed",
+    "error": "unsupported completion claim"
+  },
+  {
+    "name": "coverage missing",
+    "path": [
+      "affected_function_coverage"
+    ],
+    "value": [],
+    "error": "coverage differs"
+  },
+  {
+    "name": "missing findings",
+    "path": [
+      "findings"
+    ],
+    "value": [],
+    "error": "finding dispositions"
+  },
+  {
+    "name": "missing cases",
+    "path": [
+      "case_outcomes"
+    ],
+    "value": [],
+    "error": "case outcomes"
+  },
+  {
+    "name": "missing falsifiers",
+    "path": [
+      "falsifier_outcomes"
+    ],
+    "value": [],
+    "error": "falsifier outcomes"
+  },
+  {
+    "name": "wrong unit total",
+    "path": [
+      "unit_covered"
+    ],
+    "value": 1596,
+    "error": "coverage total"
+  },
+  {
+    "name": "wrong denominator",
+    "path": [
+      "unit_statements"
+    ],
+    "value": 1442,
+    "error": "coverage total"
+  },
+  {
+    "name": "wrong tested revision",
+    "path": [
+      "tested_revision"
+    ],
+    "value": "0000000000000000000000000000000000000000",
+    "error": "tested provenance"
+  },
+  {
+    "name": "wrong tested digest",
+    "path": [
+      "tested_source_sha256"
+    ],
+    "value": "0000000000000000000000000000000000000000000000000000000000000000",
+    "error": "tested provenance"
+  },
+  {
+    "name": "hidden evidence change",
+    "path": [
+      "evidence_only_changes"
+    ],
+    "value": [],
+    "error": "implementation drift"
+  },
+  {
+    "name": "missing scratch",
+    "path": [
+      "scratch_evidence"
+    ],
+    "value": "docs/missing.txt",
+    "error": "scratch reference"
+  },
+  {
+    "name": "missing references",
+    "path": [
+      "references"
+    ],
+    "value": [],
+    "error": "missing evidence references"
+  },
+  {
+    "name": "missing D1",
+    "path": [
+      "D1"
+    ],
+    "value": "pending",
+    "error": "D1 result"
+  },
+  {
+    "name": "missing fresh checks",
+    "path": [
+      "preparation_checks"
+    ],
+    "value": {},
+    "error": "missing preparation checks"
+  },
+  {
+    "name": "failed fresh check",
+    "path": [
+      "preparation_checks",
+      "lint",
+      "exit_code"
+    ],
+    "value": 1,
+    "error": "failed preparation check"
+  }
 ]

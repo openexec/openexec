@@ -36,6 +36,22 @@ class DeliveryTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                     self.assertIn(fixture['error'], result.stderr)
 
+    def test_preparation_does_not_require_merge_but_delivery_does(self):
+        for phase, expected, marker in (
+            ('preparation', 0, 'D2 pending'),
+            ('delivery', 1, 'actual coordinator merge evidence required'),
+        ):
+            result = subprocess.run(['bash', 'scripts/verify-exhausted-task-delivery-evidence.sh',
+                                     '--phase', phase], cwd=delivery.ROOT, text=True, capture_output=True)
+            self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+            self.assertIn(marker, result.stdout + result.stderr)
+
+    def test_notes_cannot_be_coordinator_evidence(self):
+        record = delivery.read(delivery.ROOT / delivery.RECORD)
+        with self.assertRaisesRegex(ValueError, 'Console merge evidence'):
+            delivery.validate_merge(delivery.ROOT, record, {'status': 'pending',
+                'console_revision': '0f5ce914', 'checkout_note': 'merged'})
+
     def test_manifest_includes_uncommitted_bytes_modes_and_deletions(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

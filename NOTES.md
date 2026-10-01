@@ -4,14 +4,12 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Complete correction verification / US-011 / T-US-011-004]
-  Current contract, findings, provenance, exact results and limitations live once
-  in [the delivery record](docs/exhausted-task-delivery.md). The `all` harness
-  separates atomic unit coverage from shell/public-command integration, pins
-  names/subcases, rereads SQLite and falsifies removed controls. Entire changed
-  shared functions stay in the source-derived denominator; missing blocks are
-  uncovered and coverage must exceed 90%. No product lifecycle or schema change.
-  Final verification and the ordinary task commit are recorded in that document.
+- [Candidate evidence preparation / US-012 / T-US-012-001]
+  Current D1 receipts, tested candidate, later evidence-only edits, four findings,
+  every case/falsifier, scratch/reload evidence and limitations live once in
+  [the delivery record](docs/exhausted-task-delivery.md). Preparation and refusal
+  paths reread local artifacts; actual delivery refuses absent coordinator merge
+  evidence. No publication, acceptance, merge or deployment is claimed.
 
 - [Trusted operator correction / US-011 / T-US-011-003]
   Shipped `openexec task correct` reuses the operator-session boundary and native

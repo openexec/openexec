@@ -1,6 +1,6 @@
 {
-  "schema": 1,
-  "task": "T-US-011-004",
+  "schema": 2,
+  "task": "T-US-012-001",
   "branch": "outcome/ad5a70cd0924dae18de345dbdf74e623",
   "base_revision": "dbfec11b6934dec8b1fa72c50cc6f871f44043a6",
   "implementation_base": "ca2bdf8c254cfa95d7140064b177f54e7529a763",
@@ -5337,7 +5337,7 @@
     {
       "path": "scripts/verification/exhausted_task_delivery.py",
       "mode": "100644",
-      "sha256": "1e62b361f4885285b7e09100a0f8d251a5c7bbc60aa9b3d9f936369dcea87b88"
+      "sha256": "a0cd3814e85226fc0f7db5741de7aa6f22e06159066219cb70d10e3cad0bb853"
     },
     {
       "path": "scripts/verification/exhausted_task_mutations.py",
@@ -5372,7 +5372,7 @@
     {
       "path": "scripts/verification/fixtures/exhausted-task-delivery/refusals.json",
       "mode": "100644",
-      "sha256": "bdbc6a801beff6412a51cc7a855776d544abfd60b04d3cbe8905c1f2c9b18b42"
+      "sha256": "ce7121551b46f055e178d73ed1fa1295e6002dbe307c5e9e4040695c51554714"
     },
     {
       "path": "scripts/verification/fixtures/plan-identity-delivery/complete.json",
@@ -5612,7 +5612,7 @@
     {
       "path": "scripts/verification/test_exhausted_task_delivery.py",
       "mode": "100644",
-      "sha256": "d5297b4841d8fa9329cbdde387538eae1c280e943c708e1282f1deaa93570dc0"
+      "sha256": "5977c1767b310feea79855186b044c461231010007bb4f643c08f56d96c4487e"
     },
     {
       "path": "scripts/verification/test_exhausted_task_reconciliation.py",
@@ -6845,7 +6845,7 @@
       "sha256": "322c05c207380d2e08d5884bd1be365b17afdcbc0ebe68700b15faa941774fb4"
     }
   ],
-  "source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
+  "source_sha256": "67cffb325db833750807b213ed508ae717a6251f4522dc7c52239ca3beb5e98e",
   "digest_algorithm": "SHA256 of UTF-8 compact JSON sorted-key array of sorted path/mode/SHA256 rows; git cached plus unignored untracked union, current filesystem bytes. Deletions absent. Symlink target text hashed. Excludes delivery Markdown/JSON/results, NOTES.md, bin/, ui/dist/, ui/coverage/, .gocache/, __pycache__. Git-ignored disposable outputs excluded. No HEAD hash self-reference; base ancestry and branch checked separately.",
   "changed_behavior": [
     "Repository all mode runs 35 review cases and 147 required native names, dedicated atomic unit coverage, public executable journeys, races, discovery and removal controls.",
@@ -6865,7 +6865,7 @@
     "Local logs are content-bound evidence, not signed attestations. Read-only Go module-stat-cache and existing UI act warnings did not fail checks."
   ],
   "historical_console_evidence": [
-    "Supplied Console revision 69d80355 started 2026-10-01T16:34:34Z; not independently verified and not OpenExec deployment proof."
+    "Supplied Console observation 0f5ce914, started 2026-10-01T17:12:15Z; not independently checked and not OpenExec deployment evidence."
   ],
   "console_followups": [
     "Bind candidate bytes to published PR head, canonical gate and independent review; obtain exact owner merge decision through Console.",
@@ -7429,9 +7429,13 @@
     {
       "path": "docs/verification/exhausted-task-delivery-results/unit-result.json",
       "sha256": "edb9c21a43f06aa2f28b21b91802da92dda6852de85e7cddbd2b33cb4eaaf253"
+    },
+    {
+      "path": "docs/verification/task-correct-transcript.txt",
+      "sha256": "fe032790d0da029e824c7436b31259472a902249356dfa872e026e9bac318e45"
     }
   ],
-  "handoff_task": "T-US-009-002",
+  "handoff_task": "T-US-012-001",
   "pending_merge_evidence": {
     "status": "awaiting Console evidence",
     "repository_and_target": "Current repository-host evidence identifying OpenExec and its actual default branch; branch name is not assumed.",
@@ -7440,7 +7444,7 @@
     "actual_merge": "Repository-host merged PR record, merged revision, target default branch and merge time; refetched branch history proving inclusion of the merged revision and verified fix. Record content equivalence and revision mapping for squash/rebase.",
     "boundary": "Preparation readiness is not approval or merge evidence. Missing merge evidence is not proof of non-delivery. Console serving revision is not OpenExec delivery evidence."
   },
-  "stage_entry_revision": "45d0ac5e01fa9361f532995e933a6bc546412239",
+  "stage_entry_revision": "cc79237b82fcccd4716396984bc2e799d6d35a28",
   "findings": [
     {
       "id": "F1",
@@ -7472,5 +7476,415 @@
     }
   ],
   "unit_covered": 1442,
-  "unit_statements": 1596
+  "unit_statements": 1596,
+  "D1": "verified_native",
+  "tested_revision": "cc79237b82fcccd4716396984bc2e799d6d35a28",
+  "tested_source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
+  "evidence_only_changes": [
+    "scripts/verification/exhausted_task_delivery.py",
+    "scripts/verification/fixtures/exhausted-task-delivery/refusals.json",
+    "scripts/verification/test_exhausted_task_delivery.py"
+  ],
+  "case_outcomes": [
+    {
+      "id": "candidate_edit",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/candidate_edit",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "candidate_commit",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/candidate_commit",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "candidate_output",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/candidate_output",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "branch",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/actual_branch",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "state",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/state_hash",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "plan",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/newer_plan",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "graph",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/graph",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "binding",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeQueueRefusals/task_binding",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "malformed_metadata",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/metadata_array",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "receipt",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/receipt",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "restart",
+      "package": "pkg/manager",
+      "test": "TestCorrectionPreAdmissionRefusalPersistence/candidate_edit",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "independent_candidate_change",
+      "package": "pkg/manager",
+      "test": "TestCorrectionIndependentCandidateChange",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "concurrency",
+      "package": "internal/release",
+      "test": "TestCorrectionAdmissionRefusalRace",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "reauthorization",
+      "package": "internal/release",
+      "test": "TestCorrectionRefusalReopenAndDecisionHistory",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "store_io",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalStoreFailureIsOperational",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "original_regression",
+      "package": "pkg/manager",
+      "test": "TestCorrectionDiagnosticQueueSuccess",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "public_operator",
+      "package": "pkg/manager",
+      "test": "TestTaskCorrectCLI/planned",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "public_legacy",
+      "package": "pkg/manager",
+      "test": "TestTaskCorrectCLI/no-plan",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "public_agent_denied",
+      "package": "pkg/manager",
+      "test": "TestTaskCorrectCLI/planned/denials",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "public_missing_decision",
+      "package": "pkg/manager",
+      "test": "TestTaskCorrectCLI/no-plan/denials",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "public_decision_binding",
+      "package": "pkg/manager",
+      "test": "TestTaskCorrectCLI/planned",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "no_plan_success",
+      "package": "pkg/manager",
+      "test": "TestCorrectionTaskScriptJourneys/legacy_no_plan/pass",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "no_plan_failure",
+      "package": "pkg/manager",
+      "test": "TestCorrectionTaskScriptJourneys/legacy_no_plan/exit_3",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "planned_script_failure",
+      "package": "pkg/manager",
+      "test": "TestCorrectionTaskScriptJourneys/planned/exit_3",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "planned_success",
+      "package": "pkg/manager",
+      "test": "TestCorrectionTaskScriptJourneys/planned/pass",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "unsupported_argv",
+      "package": "pkg/manager",
+      "test": "TestCorrectionTaskScriptJourneys/planned/unsupported",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "supported_argv",
+      "package": "pkg/manager",
+      "test": "TestCorrectionSupportedArgv",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "empty_obligations",
+      "package": "pkg/manager",
+      "test": "TestCorrectionWithoutChecksUsesNativeCompletion/no_plan",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "boundary_no_authority",
+      "package": "pkg/manager",
+      "test": "TestCorrectionExhaustionControls/no_authority",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "boundary_restart",
+      "package": "pkg/manager",
+      "test": "TestCorrectionExhaustionControls/no_authority",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "boundary_ordinary_failure",
+      "package": "pkg/manager",
+      "test": "TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "boundary_human_reason_privacy",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeQueueRefusals/candidate",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "stop",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeStopAndFailure/stop",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "cancellation",
+      "package": "pkg/manager",
+      "test": "TestCorrectionExecutionControls/cancel_completion",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    },
+    {
+      "id": "denied_effects",
+      "package": "pkg/manager",
+      "test": "TestCorrectionExecutionControls/denied_effects",
+      "outcome": "passed",
+      "evidence": "docs/verification/exhausted-task-delivery-results/native-events.json"
+    }
+  ],
+  "falsifier_outcomes": [
+    {
+      "id": "executor-restrictions",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "executor-restrictions: expected named assertion failure; source restored db2b1d61ea2c3ee3b43dc138fba27e8b25cf7dcd5773d185fcd9bfff95693c57"
+    },
+    {
+      "id": "operational-store-error",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "operational-store-error: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
+    },
+    {
+      "id": "conditional-owner",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "conditional-owner: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c"
+    },
+    {
+      "id": "stop-control",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "stop-control: expected named assertion failure; source restored db2b1d61ea2c3ee3b43dc138fba27e8b25cf7dcd5773d185fcd9bfff95693c57"
+    },
+    {
+      "id": "cancellation-control",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "cancellation-control: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
+    },
+    {
+      "id": "refusal-persistence",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "refusal-persistence: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
+    },
+    {
+      "id": "independent-drain",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "independent-drain: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
+    },
+    {
+      "id": "fresh-evidence-guard",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "fresh-evidence-guard: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c"
+    },
+    {
+      "id": "snapshot-ownership",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "snapshot-ownership: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c"
+    },
+    {
+      "id": "spent-authority",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "spent-authority: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c"
+    },
+    {
+      "id": "unsupported-obligation",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "unsupported-obligation: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
+    },
+    {
+      "id": "invented-obligation",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/review-controls.txt",
+      "marker": "invented-obligation: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933"
+    },
+    {
+      "id": "refusal",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "marker": "refusal"
+    },
+    {
+      "id": "boundary-kind",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "marker": "boundary-kind"
+    },
+    {
+      "id": "boundary-evidence",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "marker": "boundary-evidence"
+    },
+    {
+      "id": "task-script-execution",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "marker": "task-script-execution"
+    },
+    {
+      "id": "task-script-completion",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "marker": "task-script-completion"
+    },
+    {
+      "id": "original-exhaustion",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/correction-controls.txt",
+      "marker": "original-exhaustion"
+    },
+    {
+      "id": "skip-authorization",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/task-correct-transcript.txt",
+      "marker": "skip-authorization"
+    },
+    {
+      "id": "bypass-operator",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/task-correct-transcript.txt",
+      "marker": "bypass-operator"
+    },
+    {
+      "id": "bypass-decision",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/task-correct-transcript.txt",
+      "marker": "bypass-decision"
+    },
+    {
+      "id": "change-decision",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/task-correct-transcript.txt",
+      "marker": "change-decision"
+    },
+    {
+      "id": "removal-sensitive: PASS",
+      "outcome": "intended assertion failed; source restored",
+      "evidence": "docs/verification/exhausted-task-delivery-results/removal.txt",
+      "marker": "removal-sensitive: PASS"
+    }
+  ],
+  "scratch_evidence": "docs/verification/task-correct-transcript.txt",
+  "preparation_checks": {
+    "lint": {
+      "evidence": "docs/verification/exhausted-task-delivery-results/preparation-lint.json",
+      "sha256": "536fdcb0121f6e6c160fabb697c0b5feb5183c453cd25aea51bd3ae33caee765",
+      "exit_code": 0,
+      "scope": "Go and UI; unchanged throughout host checks; Python validated by --self-test"
+    },
+    "test": {
+      "evidence": "docs/verification/exhausted-task-delivery-results/preparation-test.json",
+      "sha256": "b403e15ed61aa5df79d983664977dd6afbe5f208373bd77e5554297b7a20daac",
+      "exit_code": 0,
+      "scope": "Go and UI; unchanged throughout host checks; Python validated by --self-test"
+    }
+  }
 }

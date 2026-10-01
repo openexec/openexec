@@ -1,19 +1,21 @@
 # Exhausted-task correction verification
 
-US-011 / T-US-011-004. This record replaces the earlier US-009 preparation
-summary. The candidate is verified locally; publication, canonical gates,
+US-012 / T-US-012-001. This record finalizes the retained US-011 verification
+receipts for independently runnable preparation. The candidate is verified locally; publication, canonical gates,
 independent review, the owner's merge decision and D2 remain Console-owned.
 No merge, deployment or live incident correction is claimed.
 
 ## Candidate and scope
 
 Branch: `outcome/ad5a70cd0924dae18de345dbdf74e623`.
-Stage-entry revision: `45d0ac5e01fa9361f532995e933a6bc546412239`.
+Preparation entry and retained tested candidate: `cc79237b82fcccd4716396984bc2e799d6d35a28`.
+The implementation verification ran on working bytes starting from
+`45d0ac5e01fa9361f532995e933a6bc546412239`; the retained commit preserves those bytes.
 Production comparison base: `ca2bdf8c254cfa95d7140064b177f54e7529a763`.
 The retained preparation ancestor is
 `dbfec11b6934dec8b1fa72c50cc6f871f44043a6`.
 The ordinary Git commit for this task preserves the candidate; its subject names
-US-011 and T-US-011-004. It does not supply external delivery authority.
+US-012 and T-US-012-001. It does not supply external delivery authority.
 
 [The machine record](exhausted-task-delivery.json) binds source paths, modes and
 SHA256 values, including staged, unstaged and untracked source. The record, this
@@ -40,7 +42,7 @@ Go JSON must contain exact run/pass events and package success; missing, failed
 or skipped names refuse acceptance. Required child names are pinned independently
 of parent tests. Disjoint verification commands may run concurrently.
 
-Final candidate verification, 2026-10-01:
+Retained implementation verification, 2026-10-01 (actual receipts from T-US-011-004):
 
 | Check | Exact result / retained evidence |
 | --- | --- |
@@ -55,7 +57,7 @@ Final candidate verification, 2026-10-01:
 [All-mode provenance](verification/exhausted-task-delivery-results/all-result.json)
 records the stage-entry revision, branch, source hashes and log digests. It rejects
 source changes during verification. The delivery package was written, reread and
-recomputed against current source. All 34 verifier self-tests passed (exit 0),
+recomputed against current source. The retained implementation run passed all 34 verifier self-tests (exit 0),
 including persisted delivery-record refusal fixtures —
 [output](verification/exhausted-task-delivery-results/self-tests-full.txt).
 Canonical gates remain unverified as specified below.
@@ -107,7 +109,7 @@ the configured executor refuses it and the file is absent; removing the executor
 binding creates the file and fails the assertion. This proves preservation of the
 configured executor boundary, not an OS sandbox or arbitrary host-code adversary.
 
-## Test changes and compatibility
+## Retained implementation test changes and compatibility
 
 Added direct correction/CLI units, explicit changed-candidate refusal and fresh
 binding cases, supported-argv execution, persisted independent-change assertions,
@@ -131,8 +133,8 @@ own pinned baseline and is regression evidence, not this candidate's unit profil
 Logs are local evidence, not signed attestations. Existing React act warnings and
 Go's read-only module-stat-cache warning are recorded with the actual exits.
 
-The supplied Console serving observation is revision `69d80355`, started
-`2026-10-01T16:34:34Z`; it was not independently checked here and is not OpenExec
+The supplied Console serving observation is revision `0f5ce914`, started
+`2026-10-01T17:12:15Z`; it was not independently checked here and is not OpenExec
 deployment evidence. Canonical `make check`/`make pr-gate`, independent review,
 publication, owner acceptance and default-branch merge are explicitly **unverified**
 in this stage. Missing merge evidence proves neither delivery nor non-delivery.
@@ -140,3 +142,55 @@ Console must bind these verified bytes to the published candidate/PR head, obtai
 its canonical gate and review, request the exact owner merge decision, then record
 and re-fetch the actual OpenExec merged revision and default branch (including
 content equivalence for squash/rebase). D2 remains pending until that evidence exists.
+
+## Final preparation and provenance
+
+Run `bash scripts/verify-exhausted-task-delivery-evidence.sh --phase preparation`
+from this repository. D1 is verified native; D2 remains pending. The schema-2
+record retains the original check digests and tested source digest rather than
+attributing old checks to later edits. The current source digest additionally
+covers the preparation validator, its tests and its refusal fixtures. Only those
+three named source paths may differ from the retained tested candidate; any
+implementation, test-harness or scope drift requires fresh implementation evidence.
+Git objects and every validation input are repository-local. No external checkout,
+owner database, temporary scratch directory or network request is required to
+validate the saved package. Temporary paths in transcripts identify the runs;
+they are not validation inputs.
+
+The structured `case_outcomes` enumerates all 35 exact native cases; the existing
+case matrix supplies each setup, assertion and falsifier definition. Structured
+`falsifier_outcomes` binds 23 actual removal outcomes to their retained logs:
+12 review controls, six correction controls, four public-command controls and
+the original exact-exhaustion control. The validator rereads event run/pass
+pairs, source hashes, coverage totals, all-mode log hashes, four finding
+dispositions, scratch transcript and saved SQLite reload payloads. Original
+receipt hashes are also checked against the retained commit, preventing a later
+edit from silently replacing supplied evidence.
+
+The [scratch transcript](verification/task-correct-transcript.txt) records the
+built executable's planned and no-plan journeys: operator/flag/reference and
+binding denials, explicit authorization, scoped queue, reopened correction,
+original receipt retention, four compiled falsifiers and a restored-source rerun.
+It is preserved byte-for-byte, including actual argv and exits. This stage walks
+the preparation and refusal CLI paths against those persisted receipts; it does
+not claim to rerun the prior product journeys.
+
+`--self-test` passes five test methods, including 24 persisted refusal fixtures.
+Preparation succeeds with no coordinator export; `--phase delivery` exits 1 with
+`actual coordinator merge evidence required`. A Console revision or checkout
+note cannot substitute for that export. `--merge-evidence` accepts only a local
+file and validates coordinator identity, exact clean candidate, required gate,
+review and owner-decision references, observed default branch and local merge
+objects, with ancestry or identical-tree evidence for squash/rebase. These are
+trusted coordinator exports, not cryptographically authenticated attestations.
+No supplied merge receipt was found or invented; the verifier does not publish,
+request approval, merge or deploy.
+
+Compatibility evaluation for this preparation stage: only documentation,
+evidence validation and its tests change. Product Go/UI source, task storage,
+project loading, `.uaos` migration and `.openexec/tasks.json` fallback are unchanged
+from the tested candidate. Complexity delta: no runtime concept, state, transition,
+loop or owner decision; existing repository validators and receipts are reused.
+Fresh host lint and test both exited 0 (Go vet/tests, UI ESLint and 635 UI tests);
+their scope is unchanged Go/UI source, while the final Python validator is tested
+by the preparation self-test. These receipts are retained separately as `preparation-lint.json` and `preparation-test.json` in the evidence directory.
