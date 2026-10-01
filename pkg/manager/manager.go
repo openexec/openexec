@@ -531,6 +531,25 @@ func (m *Manager) Stop(fwuID string) error {
 	return nil
 }
 
+// Wait blocks until the pipeline's run goroutine has returned, or ctx ends.
+// Stop marks a run stopped at once while that goroutine is still writing
+// into the work directory; a caller about to remove that directory waits
+// here first.
+func (m *Manager) Wait(ctx context.Context, fwuID string) error {
+	m.mu.Lock()
+	e, ok := m.pipelines[fwuID]
+	m.mu.Unlock()
+	if !ok || e.done == nil {
+		return nil
+	}
+	select {
+	case <-e.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // Pause signals the pipeline for the given FWU ID to pause after the current iteration.
 func (m *Manager) Pause(fwuID string) error {
 	m.mu.Lock()

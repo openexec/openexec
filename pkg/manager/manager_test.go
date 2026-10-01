@@ -377,3 +377,27 @@ func TestConcurrentReadersDoNotRaceRunningPipeline(t *testing.T) {
 	close(stop)
 	readers.Wait()
 }
+
+func TestWaitReturnsOnlyAfterTheRunGoroutine(t *testing.T) {
+	done := make(chan struct{})
+	m := &Manager{pipelines: map[string]*entry{"RUN-W": {done: done}}}
+	returned := make(chan error, 1)
+	go func() { returned <- m.Wait(context.Background(), "RUN-W") }()
+	select {
+	case err := <-returned:
+		t.Fatalf("Wait returned before the run goroutine finished: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(done)
+	select {
+	case err := <-returned:
+		if err != nil {
+			t.Fatalf("Wait: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Wait did not return after the run goroutine finished")
+	}
+	if err := m.Wait(context.Background(), "absent"); err != nil {
+		t.Fatalf("Wait on an unknown run: %v", err)
+	}
+}
