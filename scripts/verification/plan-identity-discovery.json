@@ -1,0 +1,110 @@
+{
+  "task": "T-US-010-002",
+  "story": "US-010",
+  "baseline": "38d20b4255926d311b295ff944b82e3673a89ac4",
+  "coverage": {
+    "metric": "statements",
+    "operator": ">",
+    "percent": 90,
+    "scope": "whole functions including closures"
+  },
+  "fixtures": [
+    "pkg/manager/testdata/reviewed-identity/retained.json",
+    "pkg/manager/testdata/reviewed-identity/subsequent.json"
+  ],
+  "identities": [
+    "US-001",
+    "US-005",
+    "T-US-001-001"
+  ],
+  "functions": [
+    "internal/planner/remap.go:RemapPlanIDs",
+    "internal/planner/remap.go:rewriteIDRefs",
+    "internal/planner/remap.go:nextFreeID",
+    "internal/planner/remap.go:nextFreeTaskID",
+    "internal/planner/remap_content.go:remapContentIDs",
+    "internal/planner/remap_content.go:rewritePlanRefs",
+    "internal/release/reviewed_identity.go:ReviewedGoalEqual",
+    "internal/release/reviewed_identity.go:reviewedArrayEqual",
+    "internal/release/reviewed_identity.go:ReviewedStoryEqual",
+    "internal/release/reviewed_identity.go:reviewedMode",
+    "internal/release/reviewed_identity.go:ReviewedTaskEqual",
+    "pkg/manager/planner.go:(*Manager).preparePlanIDs",
+    "pkg/manager/planner_identity.go:reviewedIdentityConflicts",
+    "pkg/manager/planner_identity.go:uniquePlanIDs",
+    "pkg/manager/planner_replay.go:reviewedPlanRows",
+    "internal/release/reviewed_plan_import.go:(*Manager).ImportReviewedPlan",
+    "internal/release/reviewed_plan_import.go:(*Manager).ValidatePlanIdentities",
+    "internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan",
+    "pkg/manager/planner.go:(*Manager).importBoundPlan",
+    "internal/release/sqlite_store.go:(*SQLiteStore).getStoryInternal",
+    "internal/release/sqlite_store.go:(*SQLiteStore).getTaskInternal"
+  ],
+  "blocks": [
+    {
+      "function": "pkg/manager/planner.go:(*Manager).importBoundPlan",
+      "anchors": [
+        "st := &release.Story{",
+        "task := &release.Task{"
+      ],
+      "purpose": "native empty-list storage normalization before CreateStory/CreateTask"
+    },
+    {
+      "function": "internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan",
+      "anchors": [
+        "insert := func(",
+        "if jsonFields[column] {",
+        "array := func("
+      ],
+      "purpose": "SQL list predicate construction and canonical array serialization"
+    }
+  ],
+  "helpers": [
+    "pkg/manager/planner_identity_lifecycle_test.go:identityFixture",
+    "pkg/manager/planner_identity_lifecycle_test.go:identitySnapshot",
+    "pkg/manager/scheduler_test.go:newSchedulerTestEnv",
+    "pkg/manager/task_restart_boundary_test.go:freshQueueManager"
+  ],
+  "existing_tests": [
+    "pkg/manager:TestReviewedIdentityLifecycle",
+    "pkg/manager:TestReviewedIdentityChangedGoalAndTask",
+    "pkg/manager:TestReviewedIdentityDuplicateRefusal",
+    "pkg/manager:TestReviewedPlanReplayAtomicImportFailure",
+    "pkg/manager:TestReviewedPlanReplayRefusesConflictAndMissingAdapters",
+    "pkg/manager:TestReviewedPlanRefinementAllocatesBeforeRereview",
+    "pkg/manager:TestReviewedIdentityPostReviewConflictAtomicRetry",
+    "internal/release:TestReviewedIdentityAtomicRefusals",
+    "pkg/manager:TestReviewedPlanReplaySurvivesCancelledReviewAndCompletedImport",
+    "pkg/manager:TestReviewedIdentityClosedStoreRefusesPreparation",
+    "pkg/manager:TestReviewedRowsCanonicalConversion",
+    "internal/planner:TestRemapContentReservationsAndReplay",
+    "internal/planner:TestRewritePlanRefsAllFields",
+    "internal/release:TestReviewedCanonicalFields",
+    "internal/release:TestReviewedCanonicalNormalizationAndRetention",
+    "pkg/manager:TestNativeIdenticalReimportPreservesIdentities",
+    "pkg/manager:TestNativeIdenticalReimportCanonicalStorage",
+    "pkg/manager:TestReviewedIdentityLegacyEmptyLists",
+    "pkg/manager:TestNativeIdenticalReimportWriteRefusals",
+    "internal/release:TestReviewedIdentityNullableStoryMembership",
+    "internal/release:TestReviewedIdentityListMatrix",
+    "internal/release:TestReviewedIdentitySQLFields"
+  ],
+  "required_sections": [
+    "Fixtures and public boundaries",
+    "Native identical replay",
+    "Legacy JSON null",
+    "Schema-supported SQL NULL",
+    "Changed-content allocation",
+    "Concurrent conflict refusal",
+    "Persisted snapshots and receipts",
+    "Mutation expectations",
+    "Coverage inventory",
+    "Console follow-up and delivery boundary",
+    "Verification"
+  ],
+  "entry_points": [
+    "pkg/manager/planner.go:(*Manager).Plan",
+    "internal/release/reviewed_plan_import.go:(*Manager).ImportReviewedPlan",
+    "internal/release/reviewed_plan_import.go:(*Manager).ValidatePlanIdentities"
+  ]
+}

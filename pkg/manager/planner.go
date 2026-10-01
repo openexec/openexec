@@ -288,11 +288,21 @@ func (m *Manager) preparePlanIDs(plan *planner.ProjectPlan) error {
 		return err
 	}
 
+	if err := rel.Load(); err != nil {
+		return err
+	}
+	if err := uniquePlanIDs(plan); err != nil {
+		return err
+	}
+
 	// Re-plan support: the generator always numbers from US-001/G-001, so a
 	// second plan (refactor epic, post-build feature wave) collides with the
 	// existing backlog. Remap genuinely-new colliding IDs to free ones;
-	// identical items (same ID and title) stay put and are skipped below.
+	// identical importer content stays put, including populated task mappings.
 	remapped := planner.RemapPlanIDs(plan, planner.ExistingLookup{
+		Conflicts: func(candidate *planner.ProjectPlan) map[string]bool {
+			return reviewedIdentityConflicts(rel, candidate)
+		},
 		GoalTitle: func(id string) (string, bool) {
 			if g := rel.GetGoal(id); g != nil {
 				return g.Title, true
@@ -384,6 +394,12 @@ func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) erro
 				Status:             release.StoryStatusPending,
 				CreatedAt:          now,
 			}
+			if st.AcceptanceCriteria == nil {
+				st.AcceptanceCriteria = []string{}
+			}
+			if st.DependsOn == nil {
+				st.DependsOn = []string{}
+			}
 			if err := rel.CreateStory(st); err != nil {
 				return fmt.Errorf("import story %s: %w", s.ID, err)
 			}
@@ -407,6 +423,9 @@ func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) erro
 					MaxAttempts:        3,
 					Status:             release.TaskStatusPending,
 					CreatedAt:          now,
+				}
+				if task.DependsOn == nil {
+					task.DependsOn = []string{}
 				}
 				task.Metadata = t.ExecutionMetadata()
 

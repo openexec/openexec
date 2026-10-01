@@ -531,19 +531,23 @@ func (m *Manager) Stop(fwuID string) error {
 	return nil
 }
 
-// Wait blocks until the pipeline's run goroutine has returned, or ctx ends.
-// Stop marks a run stopped at once while that goroutine is still writing
-// into the work directory; a caller about to remove that directory waits
-// here first.
+// Wait waits for the current pipeline attempt and its event persistence to finish.
+// A terminal status alone is insufficient: Stop marks the attempt stopped before
+// its goroutines have exited. Callers must wait before removing the work directory.
+// Canceling ctx only cancels this wait. An unknown run has nothing left to
+// join, so waiting on it returns at once.
 func (m *Manager) Wait(ctx context.Context, fwuID string) error {
 	m.mu.Lock()
-	e, ok := m.pipelines[fwuID]
+	var done chan struct{}
+	if e, ok := m.pipelines[fwuID]; ok {
+		done = e.done
+	}
 	m.mu.Unlock()
-	if !ok || e.done == nil {
+	if done == nil {
 		return nil
 	}
 	select {
-	case <-e.done:
+	case <-done:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

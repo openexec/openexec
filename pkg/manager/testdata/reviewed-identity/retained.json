@@ -1,0 +1,54 @@
+{
+  "goals": [
+    {
+      "id": "G-001",
+      "title": "Delivery",
+      "description": "Retained goal"
+    },
+    {
+      "id": "G-002",
+      "title": "Verification",
+      "description": "Verify"
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "goal_id": "G-001",
+      "title": "Story 001",
+      "description": "Original content",
+      "acceptance_criteria": [
+        "Verified"
+      ],
+      "verification_script": "true",
+      "contract": "Original contract",
+      "tasks": [
+        {
+          "id": "T-US-001-001",
+          "title": "Implement",
+          "description": "Retained task",
+          "mode": "afk"
+        }
+      ]
+    },
+    {
+      "id": "US-005",
+      "goal_id": "G-001",
+      "title": "Story 005",
+      "description": "Original content",
+      "acceptance_criteria": [
+        "Verified"
+      ],
+      "verification_script": "true",
+      "contract": "Original contract",
+      "tasks": [
+        {
+          "id": "T-US-005-001",
+          "title": "Implement",
+          "description": "Retained task",
+          "mode": "afk"
+        }
+      ]
+    }
+  ]
+}

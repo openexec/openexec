@@ -102,7 +102,7 @@ func TestReviewedPlanRestartDoesNotRefundInterruptedRefinement(t *testing.T) {
 	}
 }
 
-func TestReviewedPlanRefinementConflictRefusesBeforeRereview(t *testing.T) {
+func TestReviewedPlanRefinementAllocatesBeforeRereview(t *testing.T) {
 	e := newSchedulerTestEnv(t)
 	e.mgr.cfg.MaxReviewCycles = 2
 	generated, reviews := 0, 0
@@ -118,18 +118,25 @@ func TestReviewedPlanRefinementConflictRefusesBeforeRereview(t *testing.T) {
 	})
 	e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) {
 		reviews++
-		if reviews > 1 {
-			t.Fatal("conflicting plan reached rereview")
+		if reviews == 1 {
+			return rejectedReplayReview, nil
 		}
-		return rejectedReplayReview, nil
+		var stories int
+		if err := e.mgr.state.GetDB().QueryRow(`SELECT COUNT(*) FROM stories`).Scan(&stories); err != nil || stories != 0 {
+			t.Fatalf("preflight persisted work: %d %v", stories, err)
+		}
+		return replayReviewFixture, nil
 	})
-	if _, err := e.mgr.Plan(context.Background(), replayRequest()); err == nil || !strings.Contains(err.Error(), "conflict") {
-		t.Fatalf("conflict not refused: %v", err)
+	result, err := e.mgr.Plan(context.Background(), replayRequest())
+	if err != nil {
+		t.Fatal(err)
 	}
-	var stories int
-	e.mgr.state.GetDB().QueryRow(`SELECT COUNT(*) FROM stories`).Scan(&stories)
-	if stories != 0 {
-		t.Fatal("pre-review validation persisted work")
+	if reviews != 2 || result.Plan.Goals[0].ID == "G-1" || result.Plan.Stories[0].GoalID != result.Plan.Goals[0].ID {
+		t.Fatalf("refinement not allocated consistently: %+v", result)
+	}
+	var description string
+	if err := e.mgr.state.GetDB().QueryRow(`SELECT description FROM goals WHERE id='G-1'`).Scan(&description); err != nil || description != "Different retained purpose" {
+		t.Fatalf("retained goal changed: %q %v", description, err)
 	}
 }
 

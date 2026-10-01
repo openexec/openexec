@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "feature": "6fbdb8c642f3b58c1788c74e84fa0860",
+  "review": "f320866fc267dc32777060cc8c16c646",
+  "branch": "outcome/6fbdb8c642f3b58c1788c74e84fa0860",
+  "pull_request": "https://github.com/openexec/openexec/pull/78",
+  "content_sha256": "d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b",
+  "findings": [
+    {
+      "index": 0,
+      "decision": "accepted",
+      "reason": "Native null-list replay duplicated identities; repair canonicalizes new writes, compares legacy empty lists symmetrically and preserves strict content refusal. BLOB null also requires json(column), beyond the suggested text predicate.",
+      "evidence": [
+        "pkg/manager/planner_identity_empty_test.go",
+        "internal/release/reviewed_identity.go",
+        "internal/release/reviewed_plan_import.go",
+        "pkg/manager/planner.go"
+      ]
+    }
+  ],
+  "checks": {
+    "targeted": {
+      "command": "bash scripts/verify-plan-identity-compat.sh targeted",
+      "exit_code": 0,
+      "passed": true,
+      "content_sha256": "d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b",
+      "log": "docs/verification/plan-identity-results/targeted.txt",
+      "sha256": "e82fcbe238c9d5de0997fbd1ee6256317e22fefb324a6b554a4c9ff81b35aa65"
+    },
+    "coverage": {
+      "command": "bash scripts/verify-plan-identity-compat.sh coverage",
+      "exit_code": 0,
+      "passed": true,
+      "content_sha256": "d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b",
+      "log": "docs/verification/plan-identity-results/coverage.txt",
+      "sha256": "ef52b4627aa3cb94fb25790b4d32cac41c7df37ef74755370bf65a3e92929927"
+    },
+    "mutations": {
+      "command": "bash scripts/verify-plan-identity-compat.sh mutations",
+      "exit_code": 0,
+      "passed": true,
+      "content_sha256": "d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b",
+      "log": "docs/verification/plan-identity-results/mutations.txt",
+      "sha256": "d8ccfe25afef05eb7109c30f1308f85c0c8d5c27f86f6eb8e038c5ba97f7c224"
+    },
+    "compat-test": {
+      "command": "bash scripts/verify-plan-identity-compat.sh compat-test",
+      "exit_code": 0,
+      "passed": true,
+      "content_sha256": "d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b",
+      "log": "docs/verification/plan-identity-results/compat-test.txt",
+      "sha256": "f5a2f702af4befb2cb987337d4197df384b037222b665190c60503dcc096fce6"
+    },
+    "restored": {
+      "command": "bash scripts/verify-plan-identity-compat.sh restored",
+      "exit_code": 0,
+      "passed": true,
+      "content_sha256": "d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b",
+      "log": "docs/verification/plan-identity-results/restored.txt",
+      "sha256": "32988f91cb70d07de701fd7c131ca9fd054f351eccfb0c8a285f82a66d6babb5"
+    }
+  },
+  "coverage": {
+    "internal/planner/remap.go:RemapPlanIDs": [
+      15,
+      15
+    ],
+    "internal/planner/remap.go:rewriteIDRefs": [
+      6,
+      6
+    ],
+    "internal/planner/remap.go:nextFreeID": [
+      4,
+      4
+    ],
+    "internal/planner/remap.go:nextFreeTaskID": [
+      8,
+      8
+    ],
+    "internal/planner/remap_content.go:remapContentIDs": [
+      59,
+      59
+    ],
+    "internal/planner/remap_content.go:rewritePlanRefs": [
+      31,
+      31
+    ],
+    "internal/release/reviewed_identity.go:ReviewedGoalEqual": [
+      1,
+      1
+    ],
+    "internal/release/reviewed_identity.go:reviewedArrayEqual": [
+      5,
+      5
+    ],
+    "internal/release/reviewed_identity.go:ReviewedStoryEqual": [
+      1,
+      1
+    ],
+    "internal/release/reviewed_identity.go:reviewedMode": [
+      3,
+      3
+    ],
+    "internal/release/reviewed_identity.go:ReviewedTaskEqual": [
+      1,
+      1
+    ],
+    "pkg/manager/planner.go:(*Manager).preparePlanIDs": [
+      18,
+      19
+    ],
+    "pkg/manager/planner_identity.go:reviewedIdentityConflicts": [
+      12,
+      12
+    ],
+    "pkg/manager/planner_identity.go:uniquePlanIDs": [
+      15,
+      15
+    ],
+    "pkg/manager/planner_replay.go:reviewedPlanRows": [
+      17,
+      17
+    ],
+    "internal/release/reviewed_plan_import.go:(*Manager).ImportReviewedPlan": [
+      1,
+      1
+    ],
+    "internal/release/reviewed_plan_import.go:(*Manager).ValidatePlanIdentities": [
+      1,
+      1
+    ],
+    "internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan": [
+      100,
+      106
+    ],
+    "pkg/manager/planner.go:(*Manager).importBoundPlan": [
+      49,
+      53
+    ],
+    "internal/release/sqlite_store.go:(*SQLiteStore).getStoryInternal": [
+      35,
+      36
+    ],
+    "internal/release/sqlite_store.go:(*SQLiteStore).getTaskInternal": [
+      31,
+      34
+    ]
+  },
+  "preparation": "ready",
+  "d2": "pending",
+  "goal_complete": false,
+  "verifier_files": {
+    "scripts/verification/fixtures/plan-identity-delivery/complete.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "scripts/verification/fixtures/plan-identity-delivery/incomplete.json": "8aa973100a15bf817985395637131e838cf84e427be4792583def923f020f5fa",
+    "scripts/verification/fixtures/plan-identity-delivery/stale.json": "0d4a5367ffabab57196f570d22491410dfbfa4058760374bd5e725132e717124",
+    "scripts/verification/plan_identity_delivery.py": "f31c7299535adc29ec9244aed0fe43cb597c72f155d4a86ae029da98872b5bcf",
+    "scripts/verification/plan_identity_delivery_test.py": "1531e10c7f0b793c05955706d67d296f17343280dfdb615b5c5087fce1a30d52",
+    "scripts/verify-plan-identity-delivery-evidence.sh": "99ed63ce7e7eca727d2534b2d31224b67156578a02eaa153250a02dc311e3f63"
+  }
+}

@@ -1,0 +1,69 @@
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.065s
+
+OK
+BEGIN identity compatibility: coverage
+go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info26535750.tmp: read-only file system
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.580s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.000s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info331497941.tmp: read-only file system
+internal/planner/remap.go:RemapPlanIDs: 15/15 (100.00%)
+internal/planner/remap.go:rewriteIDRefs: 6/6 (100.00%)
+internal/planner/remap.go:nextFreeID: 4/4 (100.00%)
+internal/planner/remap.go:nextFreeTaskID: 8/8 (100.00%)
+internal/planner/remap_content.go:remapContentIDs: 59/59 (100.00%)
+internal/planner/remap_content.go:rewritePlanRefs: 31/31 (100.00%)
+internal/release/reviewed_identity.go:ReviewedGoalEqual: 1/1 (100.00%)
+internal/release/reviewed_identity.go:reviewedArrayEqual: 5/5 (100.00%)
+internal/release/reviewed_identity.go:ReviewedStoryEqual: 1/1 (100.00%)
+internal/release/reviewed_identity.go:reviewedMode: 3/3 (100.00%)
+internal/release/reviewed_identity.go:ReviewedTaskEqual: 1/1 (100.00%)
+pkg/manager/planner.go:(*Manager).preparePlanIDs: 18/19 (94.74%)
+pkg/manager/planner_identity.go:reviewedIdentityConflicts: 12/12 (100.00%)
+pkg/manager/planner_identity.go:uniquePlanIDs: 15/15 (100.00%)
+pkg/manager/planner_replay.go:reviewedPlanRows: 17/17 (100.00%)
+internal/release/reviewed_plan_import.go:(*Manager).ImportReviewedPlan: 1/1 (100.00%)
+internal/release/reviewed_plan_import.go:(*Manager).ValidatePlanIdentities: 1/1 (100.00%)
+internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan: 100/106 (94.34%)
+pkg/manager/planner.go:(*Manager).importBoundPlan: 49/53 (92.45%)
+internal/release/sqlite_store.go:(*SQLiteStore).getStoryInternal: 35/36 (97.22%)
+internal/release/sqlite_store.go:(*SQLiteStore).getTaskInternal: 31/34 (91.18%)
+PASS pkg/manager:TestReviewedIdentityLifecycle
+PASS pkg/manager:TestReviewedIdentityChangedGoalAndTask
+PASS pkg/manager:TestReviewedIdentityDuplicateRefusal
+PASS pkg/manager:TestReviewedPlanReplayAtomicImportFailure
+PASS pkg/manager:TestReviewedPlanReplayRefusesConflictAndMissingAdapters
+PASS pkg/manager:TestReviewedPlanRefinementAllocatesBeforeRereview
+PASS pkg/manager:TestReviewedIdentityPostReviewConflictAtomicRetry
+PASS internal/release:TestReviewedIdentityAtomicRefusals
+PASS pkg/manager:TestReviewedPlanReplaySurvivesCancelledReviewAndCompletedImport
+PASS pkg/manager:TestReviewedIdentityClosedStoreRefusesPreparation
+PASS pkg/manager:TestReviewedRowsCanonicalConversion
+PASS internal/planner:TestRemapContentReservationsAndReplay
+PASS internal/planner:TestRewritePlanRefsAllFields
+PASS internal/release:TestReviewedCanonicalFields
+PASS internal/release:TestReviewedCanonicalNormalizationAndRetention
+PASS pkg/manager:TestNativeIdenticalReimportPreservesIdentities
+PASS pkg/manager:TestNativeIdenticalReimportCanonicalStorage
+PASS pkg/manager:TestReviewedIdentityLegacyEmptyLists
+PASS pkg/manager:TestNativeIdenticalReimportWriteRefusals
+PASS internal/release:TestReviewedIdentityNullableStoryMembership
+PASS internal/release:TestReviewedIdentityListMatrix
+PASS internal/release:TestReviewedIdentitySQLFields
+Reviewed identity verification PASS
+PASS T-US-011-002: discovery-scoped identity unit coverage
+PASS identity compatibility: coverage

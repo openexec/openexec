@@ -1,0 +1,22 @@
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.067s
+
+OK
+BEGIN identity compatibility: mutations
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+PASS mutation: story SQL NULL reader compiled; expected assertion: converting NULL to string is unsupported
+PASS mutation: task SQL NULL reader compiled; expected assertion: converting NULL to string is unsupported
+PASS mutation: content allocation compiled; expected assertion: reviewed stories US-001 conflicts with retained content
+PASS mutation: atomic conflict refusal compiled; expected assertion: genuine conflict not refused
+PASS mutation: native replay compiled; expected assertion: identical native replay moved US-001
+PASS mutation: native JSON writer compiled; expected assertion: got null want []
+PASS mutation: legacy comparator compiled; expected assertion: exact legacy replay changed plan identities/content
+PASS mutation: legacy BLOB predicate compiled; expected assertion: reviewed stories US-001 conflicts with retained content
+PASS mutation: SQL predicate compiled; expected assertion: reviewed stories US-001 conflicts with retained content
+PASS mutation copies cleaned
+PASS identity compatibility: mutations

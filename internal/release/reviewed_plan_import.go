@@ -65,7 +65,7 @@ func (m *Manager) importReviewedPlan(ctx context.Context, goals []*Goal, stories
 			args := []any{id}
 			for i, column := range columns {
 				if jsonFields[column] {
-					predicates = append(predicates, "json("+column+")=json(?)")
+					predicates = append(predicates, "json(CASE WHEN "+column+" IS NULL OR json("+column+")='null' THEN '[]' ELSE "+column+" END)=json(?)")
 				} else {
 					predicates = append(predicates, "COALESCE("+column+",'')=?")
 				}
