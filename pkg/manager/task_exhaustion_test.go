@@ -154,6 +154,8 @@ func (e *correctionControlExecutor) Execute(ctx context.Context, stage *runtime.
 			if err := e.f.env.mgr.Stop("A"); err != nil {
 				return nil, err
 			}
+		case "script_removed":
+			_, err = e.f.env.mgr.state.GetDB().Exec(`UPDATE tasks SET verification_script='' WHERE id='A'`)
 		case "unmet_validation":
 			_, err = e.f.env.mgr.state.GetDB().Exec(`INSERT INTO validation_items(id,plan_revision_id,source,requirement,disposition,criterion) VALUES('late-obligation',?,'policy','blocking','accepted','New obligation')`, e.c.PlanID)
 		}
@@ -162,7 +164,7 @@ func (e *correctionControlExecutor) Execute(ctx context.Context, stage *runtime.
 }
 
 func TestCorrectionExecutionControls(t *testing.T) {
-	for _, mode := range []string{"denied_effects", "agent_claim", "cancel_after_admission", "cancel_completion", "stop_completion", "unmet_validation"} {
+	for _, mode := range []string{"denied_effects", "agent_claim", "cancel_after_admission", "cancel_completion", "stop_completion", "unmet_validation", "script_removed"} {
 		t.Run(mode, func(t *testing.T) {
 			f, c, repair := correctionFixture(t)
 			createQueueTask(t, f.env, "Independent", nil)
@@ -183,7 +185,7 @@ func TestCorrectionExecutionControls(t *testing.T) {
 			if err != nil || !got.Consumed || got.Outcome == "running" || got.Outcome == "completed" || got.Reason == "" {
 				t.Fatalf("unpersisted control: %+v %v", got, err)
 			}
-			if strings.Contains(mode, "completion") || mode == "unmet_validation" {
+			if strings.Contains(mode, "completion") || (mode == "unmet_validation" || mode == "script_removed") {
 				if executor.calls != 2 {
 					t.Fatal("completion boundary unreachable", executor.calls)
 				}

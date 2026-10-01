@@ -80,6 +80,12 @@ func (m *Manager) resolveRecaptureCommand(task *release.Task, phase string, arti
 	if err != nil {
 		return "", err
 	}
+	return m.resolveVerificationCommand(task, phase, artifacts)
+}
+
+// resolveVerificationCommand is shared by historical recapture and fresh task
+// verification. Only historical recapture supplies registered receipt artifacts.
+func (m *Manager) resolveVerificationCommand(task *release.Task, phase string, artifacts map[string]string) (string, error) {
 	command := ""
 	for hash, path := range artifacts {
 		if len(hash) != 64 {

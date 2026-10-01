@@ -128,7 +128,7 @@ func (m *Manager) CorrectionCandidate(ctx context.Context) (path, branch, digest
 }
 
 // AuthorizeTaskCorrection is a trusted control-plane API, not worker output.
-// The decision must explicitly authorize this exact candidate and accepted
+// The decision must explicitly authorize this exact candidate and any accepted
 // plan. It does not broaden the configured executor's resource/effect policy.
 func (m *Manager) AuthorizeTaskCorrection(ctx context.Context, c release.TaskCorrection) error {
 	lock, err := m.lockTaskExecution(true)
@@ -157,6 +157,9 @@ func (m *Manager) checkCorrectionCandidate(ctx context.Context, c release.TaskCo
 	if path != c.CandidatePath || branch != c.Branch || digest != c.CandidateDigest {
 		return fmt.Errorf("%w: correction candidate mismatch", release.ErrInvalidData)
 	}
+	if c.PlanID == "" && c.StateHash == "" {
+		return nil
+	}
 	manifest, err := knowledge.BuildScanManifest(path)
 	if err != nil {
 		return err
@@ -168,6 +171,17 @@ func (m *Manager) checkCorrectionCandidate(ctx context.Context, c release.TaskCo
 }
 
 func (m *Manager) correctionPlan(ctx context.Context, c release.TaskCorrection) (state.ValidationPlanRevision, error) {
+	if c.PlanID == "" {
+		var count int
+		err := m.state.GetDB().QueryRowContext(ctx, `SELECT COUNT(*) FROM validation_plan_revisions WHERE task_id=? AND status='accepted'`, c.TaskID).Scan(&count)
+		if err != nil {
+			return state.ValidationPlanRevision{}, err
+		}
+		if count != 0 || c.StateHash != "" {
+			return state.ValidationPlanRevision{}, fmt.Errorf("%w: correction requires current accepted validation plan", release.ErrInvalidData)
+		}
+		return state.ValidationPlanRevision{}, nil
+	}
 	plan, err := m.state.GetValidationPlanRevision(ctx, c.PlanID)
 	if err != nil {
 		return plan, err
@@ -187,17 +201,12 @@ func (m *Manager) correctionPlan(ctx context.Context, c release.TaskCorrection) 
 	if graphStatus != "current" || graphState != c.StateHash {
 		return plan, fmt.Errorf("%w: correction validation graph is stale", release.ErrInvalidData)
 	}
-	count := 0
 	for _, item := range plan.Items {
 		if item.Disposition == "accepted" && (item.Requirement == "required" || item.Requirement == "blocking") {
-			count++
 			if _, _, err := correctionCheck(item); err != nil {
 				return plan, err
 			}
 		}
-	}
-	if count == 0 {
-		return plan, fmt.Errorf("%w: correction requires explicit required checks", release.ErrInvalidData)
 	}
 	return plan, nil
 }
@@ -295,42 +304,77 @@ func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Tas
 			}
 		}
 	}()
-	for _, item := range plan.Items {
-		if item.Disposition != "accepted" || (item.Requirement != "required" && item.Requirement != "blocking") {
-			continue
+	// The task script is a required native verify check even without a plan.
+	// Resolve it without receipt artifacts: those describe the historical failure,
+	// not the current task's verification obligation.
+	checks := []state.ValidationItem{}
+	if strings.TrimSpace(task.VerificationScript) != "" {
+		command, resolveErr := m.resolveVerificationCommand(task, "verify", nil)
+		if resolveErr != nil {
+			return resolveErr
 		}
+		checks = append(checks, state.ValidationItem{CommandArgv: []string{"sh", "-c", command}})
+	}
+	for _, item := range plan.Items {
+		if item.Disposition == "accepted" && (item.Requirement == "required" || item.Requirement == "blocking") {
+			checks = append(checks, item)
+		}
+	}
+	// Identical obligations share one execution, but each keeps its own proof.
+	passed := map[string]bool{}
+	for _, item := range checks {
 		if err = ctx.Err(); err != nil {
 			return err
 		}
-		name, command, _ := correctionCheck(item)
-		timeout := 5 * time.Minute
-		if m.cfg.TaskTimeout > 0 && m.cfg.TaskTimeout < timeout {
-			timeout = m.cfg.TaskTimeout
+		name, command, checkErr := correctionCheck(item)
+		if checkErr != nil {
+			return checkErr
 		}
-		stage := &blueprint.Stage{Name: name, Type: runtime.StageTypeDeterministic, Timeout: timeout}
-		if command != "" {
-			stage.Commands = []string{command}
+		key := name + "\x00" + command
+		if !passed[key] {
+			timeout := 5 * time.Minute
+			if m.cfg.TaskTimeout > 0 && m.cfg.TaskTimeout < timeout {
+				timeout = m.cfg.TaskTimeout
+			}
+			stage := &blueprint.Stage{Name: name, Type: runtime.StageTypeDeterministic, Timeout: timeout}
+			if command != "" {
+				stage.Commands = []string{command}
+			}
+			if err = m.start(ctx, task.ID, true, WithBlueprint("standard_task"), func(cfg *pipeline.Config) { cfg.RecaptureStage = stage }); err != nil {
+				return err
+			}
+			err = m.waitTaskQueueRun(ctx, task.ID)
 		}
-		if err = m.start(ctx, task.ID, true, WithBlueprint("standard_task"), func(cfg *pipeline.Config) { cfg.RecaptureStage = stage }); err != nil {
-			return err
+		if err == nil {
+			err = m.checkCorrectionCandidate(ctx, c)
 		}
-		if err = m.waitTaskQueueRun(ctx, task.ID); err != nil {
-			return err
-		}
-		if err = m.checkCorrectionCandidate(ctx, c); err != nil {
-			return err
+		status := "completed"
+		if err != nil {
+			status = "failed"
 		}
 		stepID := "correction-" + uuid.NewString()
-		proof, _ := json.Marshal(map[string]string{"correction_decision": c.DecisionRef, "validation_item_id": item.ID, "plan_id": c.PlanID})
-		if err = m.state.AddRunStepFull(ctx, stepID, task.ID, "", name, "deterministic-verification", 0, "completed", c.CandidateDigest, string(proof)); err != nil {
+		metadata := map[string]string{"correction_decision": c.DecisionRef, "validation_item_id": item.ID, "plan_id": c.PlanID}
+		if item.ID == "" {
+			metadata["task_verification_script"] = task.VerificationScript
+		}
+		proof, _ := json.Marshal(metadata)
+		if saveErr := m.state.AddRunStepFull(context.WithoutCancel(ctx), stepID, task.ID, "", name, "deterministic-verification", 0, status, c.CandidateDigest, string(proof)); saveErr != nil {
+			return errors.Join(err, saveErr)
+		}
+		if err != nil {
 			return err
 		}
-		if err = m.state.LinkValidationEvidence(ctx, state.ValidationEvidenceLink{ValidationItemID: item.ID, RunID: task.ID, RunStepID: stepID, WorktreeStateHash: c.StateHash, PatchHash: plan.PatchHash, Status: "passed"}); err != nil {
-			return err
+		passed[key] = true
+		if item.ID != "" {
+			if err = m.state.LinkValidationEvidence(ctx, state.ValidationEvidenceLink{ValidationItemID: item.ID, RunID: task.ID, RunStepID: stepID, WorktreeStateHash: c.StateHash, PatchHash: plan.PatchHash, Status: "passed"}); err != nil {
+				return err
+			}
 		}
 	}
-	if _, err = m.state.EvidenceCoverage(ctx, c.PlanID); err != nil {
-		return err
+	if c.PlanID != "" {
+		if _, err = m.state.EvidenceCoverage(ctx, c.PlanID); err != nil {
+			return err
+		}
 	}
 	// Serialize Stop with the final disposition; an observed Stop wins.
 	m.mu.Lock()
@@ -338,7 +382,7 @@ func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Tas
 	if err = ctx.Err(); err != nil {
 		return err
 	}
-	if entry := m.pipelines[task.ID]; entry == nil || entry.info.Status != StatusComplete {
+	if entry := m.pipelines[task.ID]; len(checks) > 0 && (entry == nil || entry.info.Status != StatusComplete) {
 		return fmt.Errorf("correction stopped before completion")
 	}
 	if err = m.checkCorrectionCandidate(ctx, c); err != nil {

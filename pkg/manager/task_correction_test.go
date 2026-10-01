@@ -23,7 +23,12 @@ import (
 
 func correctionFixture(t *testing.T, checkCommands ...string) (*recaptureFixture, release.TaskCorrection, *release.Task) {
 	t.Helper()
-	f := newRecaptureFixture(t, "test -f corrected.go")
+	return correctionFixtureOrigin(t, false, checkCommands...)
+}
+
+func correctionFixtureOrigin(t *testing.T, imported bool, checkCommands ...string) (*recaptureFixture, release.TaskCorrection, *release.Task) {
+	t.Helper()
+	f := newRecaptureFixtureOrigin(t, "test -f corrected.go", imported)
 	f.mode = "success"
 	e := f.env
 	write := func(name, data string) {

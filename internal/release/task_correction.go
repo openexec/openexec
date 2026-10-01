@@ -33,7 +33,7 @@ func CorrectionForTask(task *Task) (TaskCorrection, error) {
 	if err == nil {
 		err = json.Unmarshal(data, &c)
 	}
-	if err != nil || strings.TrimSpace(c.DecisionRef) == "" || c.TaskID != task.ID || c.EvidenceID == "" || c.CandidatePath == "" || c.CandidateDigest == "" || c.Branch == "" || c.PlanID == "" || c.StateHash == "" {
+	if err != nil || strings.TrimSpace(c.DecisionRef) == "" || c.TaskID != task.ID || c.EvidenceID == "" || c.CandidatePath == "" || c.CandidateDigest == "" || c.Branch == "" || (c.PlanID == "") != (c.StateHash == "") {
 		return c, fmt.Errorf("explicit candidate-bound correction authority required")
 	}
 	return c, nil
@@ -176,7 +176,7 @@ func (s *SQLiteStore) finishTaskCorrection(ctx context.Context, c TaskCorrection
 	status, outcome := TaskStatusNeedsReview, failureOutcome
 	if success {
 		var plan, hash string
-		if err := tx.QueryRowContext(ctx, `SELECT id,worktree_state_hash FROM validation_plan_revisions WHERE task_id=? AND status='accepted' ORDER BY revision DESC LIMIT 1`, c.TaskID).Scan(&plan, &hash); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT id,worktree_state_hash FROM validation_plan_revisions WHERE task_id=? AND status='accepted' ORDER BY revision DESC LIMIT 1`, c.TaskID).Scan(&plan, &hash); err != nil && err != sql.ErrNoRows {
 			return err
 		}
 		if plan != c.PlanID || hash != c.StateHash {
@@ -198,6 +198,32 @@ func (s *SQLiteStore) finishTaskCorrection(ctx context.Context, c TaskCorrection
 		}
 		if missing != 0 {
 			return fmt.Errorf("correction requires fresh evidence for every required check")
+		}
+		var script string
+		if err := tx.QueryRowContext(ctx, `SELECT verification_script FROM tasks WHERE id=?`, c.TaskID).Scan(&script); err != nil {
+			return err
+		}
+		var changed int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM run_steps WHERE run_id=?
+            AND inputs_hash=? AND json_extract(metadata,'$.correction_decision')=?
+            AND json_extract(metadata,'$.task_verification_script') IS NOT NULL
+            AND json_extract(metadata,'$.task_verification_script')!=?`, c.TaskID, c.CandidateDigest, c.DecisionRef, script).Scan(&changed); err != nil {
+			return err
+		}
+		if changed != 0 {
+			return fmt.Errorf("correction task verification script changed")
+		}
+		if strings.TrimSpace(script) != "" {
+			var proofs int
+			if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM run_steps WHERE run_id=? AND phase='verify'
+                AND status='completed' AND agent='deterministic-verification' AND inputs_hash=?
+                AND json_extract(metadata,'$.correction_decision')=?
+                AND json_extract(metadata,'$.task_verification_script')=?`, c.TaskID, c.CandidateDigest, c.DecisionRef, script).Scan(&proofs); err != nil {
+				return err
+			}
+			if proofs == 0 {
+				return fmt.Errorf("correction requires fresh evidence for task verification script")
+			}
 		}
 		status, outcome = TaskStatusDone, "completed"
 	}

@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Required correction task scripts / US-011 / T-US-011-002]
+  Implementation and verification contract: [task-script record](docs/verification/correction-task-scripts.md).
+  Native correction now enforces task scripts alongside applicable plan checks,
+  including planner-imported and legacy no-plan tasks. Shared recapture command
+  resolution, executor effects, native completion and retained bindings remain
+  authoritative. No new schema, state, loop, grant or owner decision.
+  Verification results are recorded in that single task record.
+
+
 - [Bounded correction refusals / US-011 / T-US-011-001]
   Native pre-admission correction validation now records consumed terminal
   refusals through a conditional SQLite update, preserving failed status,

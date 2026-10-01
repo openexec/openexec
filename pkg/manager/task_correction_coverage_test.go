@@ -126,7 +126,14 @@ func TestCorrectionPlanRefusalCoverage(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := f.env.mgr.correctionPlan(context.Background(), c); err == nil {
+			_, err := f.env.mgr.correctionPlan(context.Background(), c)
+			if mode == "empty" || mode == "optional" {
+				// Native completion permits plans without mandatory items;
+				// the task script remains independently required.
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if err == nil {
 				t.Fatal("invalid plan accepted")
 			}
 			if mode == "wrong_hash" {
