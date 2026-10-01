@@ -44,6 +44,7 @@ type PlanResult struct {
 	ArtifactHash       string               `json:"artifact_hash,omitempty"`
 	ArtifactPath       string               `json:"artifact_path,omitempty"`
 	PromptVersion      string               `json:"prompt_version,omitempty"`
+	PlannerBuild       string               `json:"planner_build,omitempty"`
 	Review             *planner.PlanReview  `json:"review,omitempty"`
 	ReviewArtifactPath string               `json:"review_artifact_path,omitempty"`
 }

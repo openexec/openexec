@@ -183,3 +183,41 @@ func TestReviewedPlanImportNamesADanglingGoalReference(t *testing.T) {
 		t.Fatalf("dangling goal not named: %v", err)
 	}
 }
+
+// A refusal replayed after the planner changed is the same refusal forever:
+// Agent Console Goal b5b5611a got three "fresh plans" in three seconds after
+// the planner fix it waited for went live. A refused receipt from another
+// build is planned again; an approved one, and one from this build, replay.
+func TestReviewedPlanRefusalIsReplannedByAChangedPlanner(t *testing.T) {
+	build := "old"
+	defer func(previous func() string) { plannerBuild = previous }(plannerBuild)
+	plannerBuild = func() string { return build }
+	e := newSchedulerTestEnv(t)
+	e.mgr.cfg.MaxReviewCycles = 1
+	generated := 0
+	e.mgr.cfg.PlanGenerator = planCompletionFunc(func(context.Context, string) (string, error) { generated++; return replayPlanFixture, nil })
+	e.mgr.cfg.PlanReviewer = fixedPlanCompletion(rejectedReplayReview)
+	refused, err := e.mgr.Plan(context.Background(), replayRequest())
+	if err != nil || refused.Valid {
+		t.Fatalf("want a refused plan: %+v %v", refused, err)
+	}
+	if _, err := e.mgr.Plan(context.Background(), replayRequest()); err != nil || generated != 1 {
+		t.Fatalf("same build re-planned a refusal: generated=%d %v", generated, err)
+	}
+	build = "fixed"
+	e.mgr.cfg.PlanReviewer = fixedPlanCompletion(replayReviewFixture)
+	approved, err := e.mgr.Plan(context.Background(), replayRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !approved.Valid || generated != 2 {
+		t.Fatalf("changed planner replayed the refusal: generated=%d %+v", generated, approved)
+	}
+	build = "later"
+	e.mgr.cfg.PlanGenerator = planCompletionFunc(func(context.Context, string) (string, error) { t.Fatal("approved plan regenerated"); return "", nil })
+	e.mgr.cfg.PlanReviewer = planCompletionFunc(func(context.Context, string) (string, error) { t.Fatal("approved plan reviewed again"); return "", nil })
+	replayed, err := e.mgr.Plan(context.Background(), replayRequest())
+	if err != nil || replayed.ArtifactHash != approved.ArtifactHash {
+		t.Fatalf("approved receipt not replayed: %+v %v", replayed, err)
+	}
+}
