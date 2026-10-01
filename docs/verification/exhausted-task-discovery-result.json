@@ -1,0 +1,51 @@
+{
+  "acceptance": "fixture-owner-accepted-scope",
+  "attempts": 3,
+  "branch": "fixture/retained-candidate",
+  "candidate": "candidate/retained",
+  "candidate_corrected": true,
+  "corrected_check_exit": 0,
+  "correction_authorization": "fixture-owner: correct check.sh in candidate/retained and verify; no attempt reset, new candidate, publication or deployment",
+  "entry_point": "Manager.ExecuteTasks(TaskOriented=true)",
+  "max_attempts": 3,
+  "pipeline_count": 0,
+  "prerequisite_status": "done",
+  "receipt": {
+    "verification_failure_digest": "ca571526e800065d0678b4561a6b77946e5df84eece75b6d0ee64af53a1c6577",
+    "verification_failure_receipt": "[{\"gate\":\"test\",\"exit_code\":124,\"command\":\"sh check.sh\",\"output\":\"verification timeout: deadline exceeded\\n\"}]"
+  },
+  "receipt_id": "timeout-attempt-3",
+  "refusals": [
+    "task repair attempt limit reached",
+    "task repair attempt limit reached"
+  ],
+  "reopened": true,
+  "status": "failed",
+  "task_count": 2,
+  "task_id": "T-EXHAUSTED-001",
+  "test": "TestExhaustedNativeQueueDiscovery",
+  "baseline_revision": "43631b9bf2519efd8659a6bcde729c1d9f324c7a",
+  "baseline_archive_sha256": "0a6813af42eb7dfc66669df168353597371da0ac7dfcf7111fe52e24aff031c6",
+  "fixture_sha256": {
+    "scenario.json": "8ef22c7d65757745919c8c9f0a83b76e204978f3dcbb8566af33a87f95af3590",
+    "reproduction_test.go.txt": "54051f5c4dda4553a6cb50c78b750ce7865a4aac8d1cff927d3afcc423150b69"
+  },
+  "command": [
+    "go",
+    "test",
+    "-mod=readonly",
+    "-json",
+    "./pkg/manager",
+    "-run",
+    "^TestExhaustedNativeQueueDiscovery$",
+    "-count=1",
+    "-timeout=60s"
+  ],
+  "exit_code": 0,
+  "verifier_controls": [
+    "missing_test_refused",
+    "skipped_test_refused",
+    "missing_evidence_refused",
+    "absent_receipt_refused"
+  ]
+}

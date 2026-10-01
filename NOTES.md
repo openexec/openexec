@@ -4,6 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Native exhaustion discovery / US-007 / T-US-007-001]
+  The authoritative reproduction, frozen baseline provenance, lifecycle trace,
+  fail-closed verifier and executed evidence are in
+  [exhausted-task discovery](docs/verification/exhausted-task-discovery.md).
+  This is distinct from the older reviewed-plan identity story with the same
+  numeric IDs. Production behavior is unchanged; Console retains delivery.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
