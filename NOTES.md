@@ -4,6 +4,217 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Reviewed-plan identity discovery / US-007 / T-US-007-001, 2026-10-01]
+  Inspection baseline: `e33bab1d3551da1236c9075dc153766c991e3467`.
+  This entry is the authoritative record for this discovery task; similarly
+  numbered schema/evidence stories below concern other work. Read root
+  `AGENTS.md`, `AGENTS.local.md`, this memory, and
+  `docs/OPENEXEC_SIMPLE_LOOP_ARCHITECTURE_CONTRACT.md`. Live Console
+  `openexec_get_project(openexec)` reports accepted Goal revision 4, Professional
+  Portfolio Stewardship, with unfinished V3 milestones; that portfolio context
+  does not enlarge this task. The supplied slice is discovery for content-safe
+  reviewed-plan allocation. OpenExec's native planning/import boundary owns it;
+  reuse remapping, reviewed row conversion, SQLite transactions and receipts.
+  No new abstraction is needed. Complexity delta: zero concepts, persistent
+  state, transitions, owner decisions or runtime changes. Console retains
+  delivery; the explicit current task instruction requires an ordinary candidate
+  commit despite the older plan artifact's no-commit wording.
+
+  **Observed interfaces and call paths (source inspection):**
+  `internal/planner/remap.go` exports `ExistingLookup` with
+  `GoalTitle/StoryTitle func(string) (string, bool)` and
+  `TaskExists func(string) bool`; `RemapPlanIDs(*ProjectPlan, ExistingLookup) int`
+  mutates the plan and returns the changed-ID count (nil plan returns zero).
+  `pkg/manager/planner.go:preparePlanIDs(*planner.ProjectPlan) error` obtains
+  the cached release manager and supplies its `GetGoal/GetStory/GetTask` lookups.
+  It has no content comparator. Goal/story equality is raw title equality;
+  occupied task IDs always move, even beneath an unchanged same-title story.
+  `nextFreeID` scans from 001 and reserves retained and incoming IDs;
+  `nextFreeTaskID` scans suffixes from 001, stripping a numeric trailing suffix
+  or appending one otherwise. Thus allocation fills holes, not max-ID-plus-one.
+  A story-prefix task rewrite only checks retained occupancy before suffix
+  allocation; incoming reservations participate in the allocator, not every
+  directly rewritten task ID. Duplicate incoming IDs are not rejected here.
+
+  `Plan` dispatches a nonempty RequestID to `replayReviewedPlan` in
+  `pkg/manager/planner_replay.go`. The durable path reloads the release cache,
+  generates/validates, prepares IDs before persisting the artifact and reviewing,
+  and converts approved plans with `reviewedPlanRows` before atomic import.
+  Rejected refinements pass stale-base validation, preparation and
+  `ValidatePlanIdentities` before artifact persistence and rereview. Initial
+  generated plans do not have that rollback-only preflight. The non-request
+  reviewed path also prepares before review; `importBoundPlan` prepares again
+  and refuses changed reviewed bytes. Its sequential CreateGoal/CreateStory/
+  CreateTask path is not the atomic reviewed-request importer, skips occupied
+  rows and clears unknown goal references. Do not conflate these paths.
+
+  **Observed canonical comparison and normalization:**
+  `reviewedPlanRows(*planner.ProjectPlan)` returns
+  `([]*release.Goal, []*release.Story, []*release.Task)`.
+  `internal/release/reviewed_plan_import.go` compares existing rows by ID and
+  these fields, not by title alone:
+
+  | Row | Compared fields |
+  | --- | --- |
+  | Goal | title, description, success_criteria, verification_method |
+  | Story | goal_id, title, description, acceptance_criteria, verification_script, contract, depends_on, story_type, priority, tasks |
+  | Task | story_id, title, description, verification_script, depends_on, priority, max_attempts; metadata mode separately |
+
+  The converter fixes story_type to feature, uses zero-based story/task indexes
+  as priorities, sets max_attempts to 3, and builds each story's ordered task-ID
+  list. Nonblank technical_strategy is appended verbatim to task description
+  after `\n\nTechnical strategy:\n`; whitespace-only strategy is omitted.
+  Other strings are not trimmed or case-folded. SQL compares scalar columns
+  with `COALESCE(column,'')=?`; empty goal_id inserts as NULL. Incoming nil
+  arrays serialize as `[]`; SQL `json(column)=json(?)` normalizes JSON formatting
+  but preserves order and duplicates. Retained JSON `null` is not equivalent
+  to `[]`. `Task.ExecutionMetadata` emits mode/decision_reason/decision_ref
+  when present. Missing or non-string mode compares as afk, while an explicit
+  empty string remains empty (it is not defaulted). Only mode is compared;
+  decision metadata and other existing metadata are retained, not compared or
+  replaced. Malformed retained task metadata refuses import. New task metadata
+  is serialized, with nil becoming `{}`. SchemaVersion and RequirementID belong
+  to the plan artifact but are not columns in this canonical comparison.
+
+  **Observed reference rewriting:**
+  Goal maps update story GoalID; story maps update story IDs and DependsOn;
+  embedded story IDs in task IDs follow via first substring replacement;
+  task maps update task DependsOn in a separate pass. Combined maps rewrite
+  goal description/success criteria/verification method, story description/
+  contract/verification script/acceptance criteria, and task description/
+  technical strategy/verification script. Titles, RequirementID and decision
+  metadata are not rewritten. `rewriteIDRefs` matches numeric task, story and
+  goal patterns with greedy digits and task alternative first, so US-0011
+  survives a US-001 mapping. The regex has no surrounding word boundaries:
+  arbitrary prefixes or suffixes are not a proven exclusion. Historical IDs
+  inside prose are also rewritten; fixtures must retain their own historical
+  identifiers independently of this discovery story's numbering.
+
+  **Observed transaction, retention and replay contracts:**
+  `ImportReviewedPlan(ctx, goals, stories, tasks, stepID, runID, inputDigest,
+  receipt) error` calls the private `importReviewedPlan(..., validateOnly bool)`;
+  `ValidatePlanIdentities(ctx, goals, stories, tasks) error` uses the same code
+  with blank receipt identifiers and validateOnly=true. Both require SQLite,
+  hold manager/store locks and start one transaction with deferred rollback.
+  Validation performs real constraint/insertion checks and rolls everything
+  back; it creates no receipt or cache refresh. Dangling goal references are
+  explicitly named. Other reference guarantees depend on the actual schema;
+  JSON dependencies are not comprehensively validated by this function.
+  Conflicting retained canonical rows or mode fail without overwriting them.
+  Existing lifecycle status, timestamps, attempts, candidate/branch/PR data,
+  approvals, commit associations and unrelated metadata are outside the insert
+  comparison and have no update here. An empty retained metadata string fails
+  decoding before the new-row metadata update can run.
+
+  Import writes goals, stories, tasks and the run_steps import receipt in the
+  same transaction. Any pre-commit failure rolls all these writes back;
+  previously persisted plan/review artifacts and review receipts are outside
+  that transaction and remain. Cache refresh happens after commit and unlock:
+  a refresh error can be returned after durable success. Receipt replay looks
+  up stepID first and requires exact inputs_hash, metadata receipt bytes, run_id,
+  phase=plan, agent=reviewed-plan-import and status=completed. A matching receipt
+  returns immediately without rechecking rows; a mismatch refuses. It is not a
+  general database integrity scan and does not refresh the cache on that return.
+
+  Durable request identity uses the RequestID digest for run/step IDs and a
+  separate intent/options digest (compact adds a mode distinction). It checks
+  run scope, retained input identity, plan/review hashes, exact artifact bytes
+  and paths. Interrupted generation/review resumes retained results; review
+  versions are archived, refinement dispatch accounting is persisted, and an
+  approved replay imports with the exact retained receipt rather than allocating
+  again. A new request with identical generated content does allocate again:
+  receipt replay and allocator idempotence are distinct requirements.
+
+  **Existing tests and fixture/reopen entry points:**
+  `internal/planner/remap_test.go` covers fresh input, same-title story without
+  tasks, different-title backlog collisions, dependencies, selected prose and
+  suffix allocation. Its IdempotentReimport test does not prove populated-plan
+  replay. `pkg/manager/planner_review_test.go` covers pre-review allocation and
+  review races; `planner_replay_test.go` covers cancelled review, retained
+  lifecycle/branch/PR state, input conflicts, missing adapters and a trigger
+  abort on the second task with rollback/retry. Those replay tests construct a
+  fresh Manager around the same state handle, not a true store reopen.
+  `planner_refinement_replay_test.go` covers rollback-only conflict refusal
+  before rereview, interrupted refinement accounting and dangling goals.
+  `internal/release/reviewed_plan_import_test.go:TestReviewedStoryWithoutAGoalImports`
+  only calls ValidatePlanIdentities despite its name; it is no persisted-import
+  proof. Use its state.NewStore then release.NewManager setup to get the ledger
+  foreign-key schema, not only a release-only schema.
+  `newSchedulerTestEnv` in `pkg/manager/scheduler_test.go` builds temp workdir,
+  `.openexec`, state.db, admitted provider fixtures and shared release manager.
+  `planCompletionFunc`, `fixedPlanCompletion`, `replayRequest`, replayPlanFixture
+  and replayReviewFixture provide deterministic adapters without real inference.
+  For actual reopen use `e.mgr.Close(); e.closeState(); freshQueueManager(t,e)`
+  from `task_restart_boundary_test.go`, as exercised by
+  `planner_schema_recovery_test.go`; it opens the same state.db anew. Query
+  `state.GetDB()` for durable snapshots rather than trusting cached getters.
+
+  **Repository-local reproducer strategy (proposed, not yet executed):**
+  Seed canonical retained goals, same-title stories US-001 and US-005, and
+  T-US-001-001/T-US-005-001 tasks through the real reviewed importer. Snapshot
+  their rows, completed lifecycle/commit/candidate metadata and exact receipts.
+  Generate a new request with US-001's title unchanged but description/contract
+  changed; use real preparePlanIDs -> artifact/review -> reviewedPlanRows ->
+  ImportReviewedPlan and capture the retained-content conflict. Add a wave
+  involving both historical stories and a same-title changed parent goal.
+  Cover changed task content alone, changed ordered task membership, and parent
+  changes even when titles remain equal. The expected pre-fix refusal follows
+  from source, not an executed historical incident reproduction in this stage.
+  After repair, assert fresh collision-free IDs and consistent structured/prose
+  references, preserved old rows, exact request replay without provider calls,
+  and no duplicates after genuine close/reopen. Replay an already allocated
+  exact plan separately from restarting the same request. Inject a late SQL
+  trigger failure, mismatched receipt and incompatible post-review row; require
+  atomic refusal, unchanged old receipts and successful retry where appropriate.
+
+  Proposed function-level unit scope: RemapPlanIDs, nextFreeID, nextFreeTaskID,
+  rewriteIDRefs, preparePlanIDs, reviewedPlanRows, ImportReviewedPlan,
+  ValidatePlanIdentities and importReviewedPlan, plus every new comparison or
+  allocation helper introduced by the later repair. Enforce greater-than-90%
+  statement coverage for each complete named function body with a frozen manifest
+  that fails on missing functions; report each function and aggregate coverage.
+  Table-test every canonical field, nil/empty arrays, ordered differences,
+  parent mappings, technical strategy, mode defaults/conflicts, metadata
+  retention, ID reservations and reference boundaries. Keep lifecycle/reopen
+  tests alongside this unit gate; coverage alone cannot prove atomicity. If the
+  later implementation intentionally allows changed-content allocation before
+  rereview, reassess RefinementConflictRefusesBeforeRereview's expectation and
+  retain a separate genuine post-review conflict test. No test changed here.
+
+  **Protected compatibility and evidence limits:**
+  `internal/project/project.go:LoadProjectConfig` tries `.openexec/project.json`
+  then `.uaos/project.json`; `project_test.go` covers both canonical paths.
+  `internal/release/manager.go:Load` bootstraps JSON only when story count is
+  zero, logs bootstrap errors and refreshes SQLite caches. Bootstrap reads
+  `.openexec/tasks.json` with a tasks array after goals/stories; it is distinct
+  from reviewed import. Separately, `internal/tui/file_source.go:readProjectState`
+  falls back to tasks.json progress when SQLite is unavailable; this is the
+  reader exercised by LegacyTasksJSONFallback, not the bootstrap function.
+  `internal/validation/compatibility_test.go` supplies
+  existing-project status CLI fixtures plus LegacyProjectConfigFallback and
+  LegacyTasksJSONFallback; `make compat-test` targets Compatibility there.
+  Future allocation changes must preserve these paths and persisted completed
+  work. This documentation-only diff cannot change their behavior; it does not
+  claim a separately run compatibility gate or delivery. Historical plan artifact
+  `83ff344c502c37740ec5e064c2328631a89152d66480c5fb35e095a771571c7a.json`
+  supplies the discovery verifier and historical fixture names. Its incident
+  descriptions and earlier NOTES delivery claims are historical assertions,
+  not proof of this checkout's deployment. The supplied Console serving revision
+  is not an OpenExec deployment attestation.
+
+  **Executed verification:** host `run_declared_check(check="test", args=
+  ["./internal/planner", "./internal/release", "./pkg/manager", "-run",
+  "TestReviewed", "-count=1"])` returned `test exited 0`. Output showed
+  `go test ./...` and the UI suite, rather than a filtered package invocation;
+  do not interpret the supplied arguments as proof of targeted selection.
+  Planner, release, manager and validation packages passed in that run. The
+  initial request with a pipe-separated test regex was rejected by the check's
+  argument allowlist before execution; retrying with an accepted argument
+  obtained real exit evidence. No source or tests changed. The task's own
+  `git diff --check && test -s NOTES.md` verifier passed after this edit.
+  No identity repair, new lifecycle reproducer, coverage measurement, merge or
+  deployment is claimed by this discovery stage.
+
 - [Planner schema delivery / US-008 / T-US-008-004] Isolated repair-disabled
   regression, restored full verifier, host test/lint and compatibility/type checks
   passed. Exact commands, coverage, reopened import/accounting, refusal scope and
