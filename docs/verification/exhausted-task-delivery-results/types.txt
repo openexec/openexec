@@ -1,0 +1,12 @@
+⌨️ Checking Go types...
+go build -v ./...
+make[1]: Entering directory '/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623'
+⌨️ Checking UI types...
+cd ui && npm run type-check
+(node:16973) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+> @openexec/ui@0.1.0 type-check
+> tsc --noEmit
+
+make[1]: Leaving directory '/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623'

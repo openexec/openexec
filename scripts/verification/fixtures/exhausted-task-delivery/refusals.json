@@ -1,0 +1,13 @@
+[
+  {"name":"stale branch", "path":["branch"], "value":"outcome/obsolete", "error":"stale candidate branch"},
+  {"name":"stale base", "path":["base_revision"], "value":"0000000000000000000000000000000000000000", "error":"stale base identity"},
+  {"name":"stale digest", "path":["source_sha256"], "value":"stale", "error":"stale source content"},
+  {"name":"missing evidence", "path":["checks","test","evidence"], "value":"docs/missing-proof.json", "error":"missing/nonlocal evidence"},
+  {"name":"missing check", "path":["checks","lint"], "delete":true, "error":"missing required check"},
+  {"name":"failed check", "path":["checks","test","exit_code"], "value":1, "error":"unsuccessful/stale required check"},
+  {"name":"stale check", "path":["checks","test","source_sha256"], "value":"stale", "error":"unsuccessful/stale required check"},
+  {"name":"D2 unsupported", "path":["D2"], "value":"completed", "error":"unsupported completion claim"},
+  {"name":"Goal unsupported", "path":["goal_complete"], "value":true, "error":"unsupported completion claim"},
+  {"name":"delivery unsupported", "path":["delivery"], "value":"completed", "error":"unsupported completion claim"},
+  {"name":"coverage missing", "path":["affected_function_coverage"], "value":[], "error":"coverage differs"}
+]

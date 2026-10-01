@@ -4,6 +4,13 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Exhausted task delivery preparation / US-009 / T-US-009-001]
+  Current package: [delivery preparation](docs/exhausted-task-delivery.md) and
+  its JSON companion. Candidate/source-bound host lint/test, native acceptance,
+  persisted reload controls, compatibility and type checks passed. Preparation
+  verifier and eleven persisted refusal fixtures passed; no production behavior
+  changed. Ordinary stage commit preserves work; Console delivery and D2 pending.
+
 - [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002, T-US-008-003]
   Native correction/disposition interfaces remain documented in
   [the implementation record](docs/verification/exhausted-task-reconciliation.md).
