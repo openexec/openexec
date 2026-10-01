@@ -4,6 +4,18 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [CI repair verification manifest, 2026-10-01]
+  Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
+  `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
+  regressions passed ten repetitions. The next step refused with `changed
+  function missing from manifest: pkg/manager/manager.go:(*Manager).Wait`.
+  Added Wait to the existing whole-function coverage scope and both regression
+  tests to mandatory execution and selection. Coverage thresholds, baseline,
+  missing-function refusal and importer behavior remain unchanged. Fresh identity
+  verification passed all 22 mandatory tests; Wait is 10/10 covered statements,
+  and every scoped function exceeds 90%. Compatibility/UI/type checks remain
+  pending in the resumed durable job.
+
 - [Fresh review of identity CI repair, 2026-10-01]
   Hosted run 36817948767/job 110227023325 fails
   TestWaitReturnsOnlyAfterTheRunGoroutine: `Wait on an unknown run: pipeline

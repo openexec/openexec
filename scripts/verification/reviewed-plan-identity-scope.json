@@ -21,7 +21,8 @@
     "internal/release/reviewed_plan_import.go:(*Manager).importReviewedPlan",
     "pkg/manager/planner.go:(*Manager).importBoundPlan",
     "internal/release/sqlite_store.go:(*SQLiteStore).getStoryInternal",
-    "internal/release/sqlite_store.go:(*SQLiteStore).getTaskInternal"
+    "internal/release/sqlite_store.go:(*SQLiteStore).getTaskInternal",
+    "pkg/manager/manager.go:(*Manager).Wait"
   ],
   "tests": [
     "pkg/manager:TestReviewedIdentityLifecycle",
@@ -43,6 +44,8 @@
     "pkg/manager:TestNativeIdenticalReimportCanonicalStorage",
     "pkg/manager:TestReviewedIdentityLegacyEmptyLists",
     "pkg/manager:TestNativeIdenticalReimportWriteRefusals",
-    "internal/release:TestReviewedIdentityNullableStoryMembership"
+    "internal/release:TestReviewedIdentityNullableStoryMembership",
+    "pkg/manager:TestWaitReturnsOnlyAfterTheRunGoroutine",
+    "pkg/manager:TestWaitJoinsStoppedAttempt"
   ]
 }
