@@ -87,6 +87,27 @@ func TestHumanBoundaryRefinementCannotRemoveOrAuthorizeRetainedWork(t *testing.T
 	}
 }
 
+func TestHumanBoundaryRefinementMayCorrectTheBoundaryStrategy(t *testing.T) {
+	// Review refused a retained acceptance task's strategy; the refinement
+	// that corrects it must reach review instead of the original wording.
+	original, next := boundaryPlan(), boundaryPlan()
+	original.Stories[0].Tasks[1].TechnicalStrategy = "Use safe_commit for preparatory changes."
+	next.Stories[0].Tasks[1].TechnicalStrategy = "Consume the owner's decision; make no commits."
+	next.Stories[0].Tasks[1].Description = "Reworded"
+	raw, _ := json.Marshal(next)
+	got, err := New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", original, &PlanReview{Assessment: "remove safe_commit from the acceptance task"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := got.Stories[0].Tasks[1]
+	if task.TechnicalStrategy != "Consume the owner's decision; make no commits." {
+		t.Fatalf("corrected strategy replaced by the refused one: %q", task.TechnicalStrategy)
+	}
+	if task.Description != original.Stories[0].Tasks[1].Description || task.DecisionReason != original.Stories[0].Tasks[1].DecisionReason {
+		t.Fatalf("owner-facing boundary not restored: %+v", task)
+	}
+}
+
 func TestHumanBoundaryMetadataRoundTrip(t *testing.T) {
 	task := boundaryPlan().Stories[0].Tasks[1]
 	raw, _ := json.Marshal(task)
