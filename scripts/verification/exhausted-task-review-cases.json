@@ -1,0 +1,575 @@
+{
+  "schema_version": 1,
+  "task_id": "T-US-010-002",
+  "review_id": "afa2fdef5783532f6034a12a002ab508",
+  "status": "definition_only",
+  "assessment": "docs/exhausted-task-discovery.md#review-assessment-observations-versus-proposed-repairs",
+  "findings": [
+    {
+      "id": "F1",
+      "disposition": "accepted",
+      "provisional": true,
+      "evidence": "pkg/manager/task_correction.go:reconcileTaskCorrection; pkg/manager/task_queue.go:executeTaskQueue; internal/release/task_correction.go:AuthorizeTaskCorrection",
+      "qualification": "Returning nil alone can loop forever; terminal records must be skipped. Malformed records need conditional raw-record ownership. Reauthorization requires fresh valid bindings."
+    },
+    {
+      "id": "F2",
+      "disposition": "accepted",
+      "provisional": true,
+      "evidence": "pkg/manager/task_correction.go:AuthorizeTaskCorrection has no production manager caller in this checkout",
+      "qualification": "Accept local missing access only; absence in Agent Console is unproven. An arbitrary valid different decision is not a falsifier unless exact supplied/persisted identity is asserted."
+    },
+    {
+      "id": "F3",
+      "disposition": "accepted",
+      "provisional": true,
+      "evidence": "pkg/manager/task_correction.go:correctionPlan/correctionCheck omit VerificationScript; internal/release/task_correction.go decoder/finalizer require plan",
+      "qualification": "No-plan legacy completion does not justify zero-check correction. Keep every accepted obligation. Failed native checks must leave failed/continuing_failure and be skipped on restart."
+    },
+    {
+      "id": "F4",
+      "disposition": "accepted",
+      "provisional": true,
+      "evidence": "pkg/manager/task_boundary.go:retainedTaskBoundary projects failed without attempt_limit or evidence_id",
+      "qualification": "Keep private reason out of Error(); preserve non-exhausted failure behavior."
+    }
+  ],
+  "dependencies": [
+    {
+      "task": "T-US-010-001",
+      "consumes": [
+        "docs/exhausted-task-discovery.md",
+        "scripts/verification/exhausted-task-inventory.json"
+      ],
+      "reason": "Source diagnoses, native lifecycle boundaries and whole-function inventory are inputs to this contract."
+    }
+  ],
+  "execution": {
+    "command_template": [
+      "go",
+      "test",
+      "-json",
+      "-count=1",
+      "-timeout=90s",
+      "./{package}",
+      "-run",
+      "^{test}$"
+    ],
+    "rule": "Anchor each slash-separated selector component separately. Require run and pass for exact full subtest name and package pass, never exit zero alone. Future names are obligations, not implemented evidence.",
+    "scratch": "After implementing F2, build shipped CLI and repeat operator authorization -> scoped queue -> close/reopen SQLite in a scratch git project. Record actual command argv, exit codes, decision-ref, branch/candidate hash, A/Settings rows and original receipt byte comparison.",
+    "negative_controls": "Run each named mutation against its mapped tests with Go source overlays, verify intended assertion fails, restore source hashes, then rerun positive tests. Compile errors, skips and unrelated failures are not proof."
+  },
+  "cases": [
+    {
+      "id": "candidate_edit",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/candidate_edit",
+      "implementation": "required_not_implemented",
+      "setup": "After grant save different corrected.go bytes",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "candidate_commit",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/candidate_commit",
+      "implementation": "required_not_implemented",
+      "setup": "After grant commit independent product changes",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "candidate_output",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/candidate_output",
+      "implementation": "required_not_implemented",
+      "setup": "After grant regenerate unignored untracked output",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "branch",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/branch",
+      "implementation": "required_not_implemented",
+      "setup": "After grant switch branch without changing tree bytes",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "state",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/state",
+      "implementation": "required_not_implemented",
+      "setup": "Keep candidate binding but mismatch scan-manifest state hash",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "plan",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/plan",
+      "implementation": "required_not_implemented",
+      "setup": "Create a newer accepted validation plan revision after grant",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "graph",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/graph",
+      "implementation": "required_not_implemented",
+      "setup": "Mark bound graph generation stale after grant",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "binding",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/binding",
+      "implementation": "required_not_implemented",
+      "setup": "Persist task_correction.task_id=Settings on A",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "malformed_metadata",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/malformed_metadata",
+      "implementation": "required_not_implemented",
+      "setup": "Persist malformed task_correction value in otherwise valid task metadata",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "receipt",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/receipt",
+      "implementation": "required_not_implemented",
+      "setup": "Corrupt retained receipt digest or required artifact binding",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; preserve retained receipt bytes as found, including invalid artifacts, and completed repair; never rewrite evidence to make it valid",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Restore raw pre-admission error return: typed-boundary and Independent-done assertions fail"
+    },
+    {
+      "id": "restart",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/restart",
+      "implementation": "required_not_implemented",
+      "setup": "Authorize, corrupt candidate, close/reopen before first queue run",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Skip terminal-disposition persistence: reopen/second-run assertions fail"
+    },
+    {
+      "id": "independent_candidate_change",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalDrain/independent_candidate_change",
+      "implementation": "required_not_implemented",
+      "setup": "Keep A temporarily dependency-ineligible; Independent commits a change in the SAME queue before A becomes eligible",
+      "assertions": [
+        "errors.As finds TaskQueueBoundary, not raw refusal error",
+        "Independent is done; A remains failed at attempt_count=max_attempts=3; Settings remains blocked",
+        "Persisted correction is consumed, refused_stale, has a reason and no fresh_evidence_id; exhaustion retains legacy evidence",
+        "No correction check dispatched; legacy receipt bytes and completed repair are unchanged",
+        "Close/reopen store; second queue run returns boundary with zero new dispatches",
+        "Derive fresh valid bindings and authorize a NEW decision; never-admitted refusal can be replaced"
+      ],
+      "negative_control": "Return raw candidate mismatch after Independent runs: terminal boundary and persisted refusal assertions fail"
+    },
+    {
+      "id": "concurrency",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalConcurrency",
+      "implementation": "required_not_implemented",
+      "setup": "Race two native queue callers and two fresh grants; coordinate with channels, run -race",
+      "assertions": [
+        "Exactly one writer/admission wins; loser is bounded",
+        "No duplicate check or completion claim; counts remain 3/3 after reopen",
+        "Independent work drains after the winning owner releases writer lock"
+      ],
+      "negative_control": "Remove conditional SQL ownership or queue writer guard: duplicate-admission/writer assertions fail"
+    },
+    {
+      "id": "reauthorization",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionReauthorization",
+      "implementation": "required_not_implemented",
+      "setup": "Try new and replayed decisions for refused, admitted, successful and continuing-failure records",
+      "assertions": [
+        "Only consumed never-admitted refused_stale with no fresh evidence accepts a NEW decision",
+        "Admitted, successful and continuing-failure records cannot renew allowance",
+        "Old decision replay refuses; new candidate/receipt/plan/task bindings are validated and persist after reopen"
+      ],
+      "negative_control": "Allow overwrite of every consumed record: spent-authority refusal assertion fails"
+    },
+    {
+      "id": "store_io",
+      "finding": "F1",
+      "package": "pkg/manager",
+      "test": "TestCorrectionRefusalStoreError",
+      "implementation": "required_not_implemented",
+      "setup": "Close store or inject receipt read IO error",
+      "assertions": [
+        "Internal IO/store errors remain errors, never synthetic successful dispositions",
+        "No unauthorized execution or partial grant write"
+      ],
+      "negative_control": "Swallow store error: expected error assertion fails"
+    },
+    {
+      "id": "original_regression",
+      "finding": "baseline",
+      "package": "pkg/manager",
+      "test": "TestCorrectionDiagnosticQueueSuccess",
+      "implementation": "existing_requires_strengthening",
+      "setup": "Retain diagnostic-bearing original failed task at 3/3, completed repair and legacy receipt",
+      "assertions": [
+        "Authorized native correction completes A then dependent Settings",
+        "Attempts, original receipt and completed repair survive reopen"
+      ],
+      "negative_control": "Remove queue reconciliation integration: exact task repair attempt limit reached failure"
+    },
+    {
+      "id": "public_operator",
+      "finding": "F2",
+      "package": "internal/cli",
+      "test": "TestTaskCorrectOperator/operator",
+      "implementation": "required_not_implemented",
+      "setup": "Run shipped local operator command, then scoped native queue",
+      "assertions": [
+        "CLI computes candidate, branch, manifest, receipt and current plan; exact decision-ref persists",
+        "Scoped queue completes A and Settings; reopened A stays 3/3 and legacy receipt bytes unchanged"
+      ],
+      "negative_control": "Skip Manager.AuthorizeTaskCorrection: A remains failed and completion assertions fail; for denial cases bypass session/decision guard and require refusal assertion failure"
+    },
+    {
+      "id": "public_legacy",
+      "finding": "F2",
+      "package": "internal/cli",
+      "test": "TestTaskCorrectOperator/legacy",
+      "implementation": "required_not_implemented",
+      "setup": "Use an existing .openexec database with exhausted A",
+      "assertions": [
+        "CLI computes candidate, branch, manifest, receipt and current plan; exact decision-ref persists",
+        "Scoped queue completes A and Settings; reopened A stays 3/3 and legacy receipt bytes unchanged"
+      ],
+      "negative_control": "Skip Manager.AuthorizeTaskCorrection: A remains failed and completion assertions fail; for denial cases bypass session/decision guard and require refusal assertion failure"
+    },
+    {
+      "id": "public_agent_denied",
+      "finding": "F2",
+      "package": "internal/cli",
+      "test": "TestTaskCorrectOperator/agent_denied",
+      "implementation": "required_not_implemented",
+      "setup": "Invoke command from agent session",
+      "assertions": [
+        "Command refuses before authority write; DB snapshot unchanged; no check dispatched"
+      ],
+      "negative_control": "Skip Manager.AuthorizeTaskCorrection: A remains failed and completion assertions fail; for denial cases bypass session/decision guard and require refusal assertion failure"
+    },
+    {
+      "id": "public_missing_decision",
+      "finding": "F2",
+      "package": "internal/cli",
+      "test": "TestTaskCorrectOperator/missing_decision",
+      "implementation": "required_not_implemented",
+      "setup": "Omit decision-ref",
+      "assertions": [
+        "Command refuses before authority write; DB snapshot unchanged; no check dispatched"
+      ],
+      "negative_control": "Skip Manager.AuthorizeTaskCorrection: A remains failed and completion assertions fail; for denial cases bypass session/decision guard and require refusal assertion failure"
+    },
+    {
+      "id": "public_decision_binding",
+      "finding": "F2",
+      "package": "internal/cli",
+      "test": "TestTaskCorrectOperator/decision_binding",
+      "implementation": "required_not_implemented",
+      "setup": "Compare supplied decision-ref with persisted record exactly",
+      "assertions": [
+        "CLI computes candidate, branch, manifest, receipt and current plan; exact decision-ref persists",
+        "Scoped queue completes A and Settings; reopened A stays 3/3 and legacy receipt bytes unchanged"
+      ],
+      "negative_control": "Skip Manager.AuthorizeTaskCorrection: A remains failed and completion assertions fail; for denial cases bypass session/decision guard and require refusal assertion failure"
+    },
+    {
+      "id": "no_plan_success",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/no_plan_success",
+      "implementation": "required_not_implemented",
+      "setup": "No plan; VerificationScript=test -f corrected.go",
+      "assertions": [
+        "Exactly one verify check runs; A and Settings done",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Fresh verify run_step is tagged with exact correction_decision even without validation item; failing checks retain failure artifacts"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "no_plan_failure",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/no_plan_failure",
+      "implementation": "required_not_implemented",
+      "setup": "No plan; VerificationScript=exit 3",
+      "assertions": [
+        "A stays failed; consumed continuing_failure; Settings blocked",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Fresh verify run_step is tagged with exact correction_decision even without validation item; failing checks retain failure artifacts"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "planned_script_failure",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/planned_script_failure",
+      "implementation": "required_not_implemented",
+      "setup": "Accepted passing required plan plus VerificationScript=exit 3",
+      "assertions": [
+        "Native script runs and prevents A completion",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Fresh verify run_step is tagged with exact correction_decision even without validation item; failing checks retain failure artifacts"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "planned_success",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/planned_success",
+      "implementation": "required_not_implemented",
+      "setup": "Accepted required/blocking items plus successful native script",
+      "assertions": [
+        "All required checks and verify run before A and Settings complete",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Fresh verify run_step is tagged with exact correction_decision even without validation item; failing checks retain failure artifacts"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "unsupported_argv",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/unsupported_argv",
+      "implementation": "required_not_implemented",
+      "setup": "Accepted required item with unsupported deterministic argv",
+      "assertions": [
+        "Bounded refusal; no silently dropped obligation; independent work drains",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Pre-admission refusal creates no fresh verification evidence; no check is silently treated as passed"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "supported_argv",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/supported_argv",
+      "implementation": "required_not_implemented",
+      "setup": "Exercise each documented supported argv form, bare lint/test and shell -c",
+      "assertions": [
+        "Required checks execute exactly as declared",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Fresh verify run_step is tagged with exact correction_decision even without validation item; failing checks retain failure artifacts"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "empty_obligations",
+      "finding": "F3",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeObligations/empty_obligations",
+      "implementation": "required_not_implemented",
+      "setup": "No plan and empty VerificationScript",
+      "assertions": [
+        "Refuse vacuous correction success; retain evidence and attempts",
+        "Reopen DB; attempts remain 3/3; original receipt unchanged",
+        "Pre-admission refusal creates no fresh verification evidence; no check is silently treated as passed"
+      ],
+      "negative_control": "Remove native script inclusion: required verify evidence or failed-script noncompletion assertion fails; unsupported argv mutant silently drops item and must fail refusal assertion"
+    },
+    {
+      "id": "boundary_no_authority",
+      "finding": "F4",
+      "package": "pkg/manager",
+      "test": "TestCorrectionBoundaryEvidence/no_authority",
+      "implementation": "required_not_implemented",
+      "setup": "Project retained tasks through native queue boundary, JSON round-trip and database reopen",
+      "assertions": [
+        "Exhausted failed A is kind attempt_limit with evidence_id legacy",
+        "Ordinary below-limit failure remains kind failed; no fabricated evidence ID",
+        "Error() omits private reason; structured JSON preserves permitted evidence and decision fields"
+      ],
+      "negative_control": "Restore unconditional BoundaryFailed branch or omit evidence_id: kind/evidence assertion fails"
+    },
+    {
+      "id": "boundary_restart",
+      "finding": "F4",
+      "package": "pkg/manager",
+      "test": "TestCorrectionBoundaryEvidence/restart",
+      "implementation": "required_not_implemented",
+      "setup": "Project retained tasks through native queue boundary, JSON round-trip and database reopen",
+      "assertions": [
+        "Exhausted failed A is kind attempt_limit with evidence_id legacy",
+        "Ordinary below-limit failure remains kind failed; no fabricated evidence ID",
+        "Error() omits private reason; structured JSON preserves permitted evidence and decision fields"
+      ],
+      "negative_control": "Restore unconditional BoundaryFailed branch or omit evidence_id: kind/evidence assertion fails"
+    },
+    {
+      "id": "boundary_ordinary_failure",
+      "finding": "F4",
+      "package": "pkg/manager",
+      "test": "TestCorrectionBoundaryEvidence/ordinary_failure",
+      "implementation": "required_not_implemented",
+      "setup": "Project retained tasks through native queue boundary, JSON round-trip and database reopen",
+      "assertions": [
+        "Exhausted failed A is kind attempt_limit with evidence_id legacy",
+        "Ordinary below-limit failure remains kind failed; no fabricated evidence ID",
+        "Error() omits private reason; structured JSON preserves permitted evidence and decision fields"
+      ],
+      "negative_control": "Restore unconditional BoundaryFailed branch or omit evidence_id: kind/evidence assertion fails"
+    },
+    {
+      "id": "boundary_human_reason_privacy",
+      "finding": "F4",
+      "package": "pkg/manager",
+      "test": "TestCorrectionBoundaryEvidence/human_reason_privacy",
+      "implementation": "required_not_implemented",
+      "setup": "Project retained tasks through native queue boundary, JSON round-trip and database reopen",
+      "assertions": [
+        "Exhausted failed A is kind attempt_limit with evidence_id legacy",
+        "Ordinary below-limit failure remains kind failed; no fabricated evidence ID",
+        "Error() omits private reason; structured JSON preserves permitted evidence and decision fields"
+      ],
+      "negative_control": "Restore unconditional BoundaryFailed branch or omit evidence_id: kind/evidence assertion fails"
+    },
+    {
+      "id": "stop",
+      "finding": "controls",
+      "package": "pkg/manager",
+      "test": "TestCorrectionNativeStopAndFailure/stop",
+      "implementation": "existing_requires_strengthening",
+      "setup": "Use native pipeline with deterministic synchronization at boundary",
+      "assertions": [
+        "Stop during deterministic execution prevents completion; Wait joins cleanup; reopen proves consumed terminal outcome"
+      ],
+      "negative_control": "Remove Stop/completion serialization; completion-after-Stop assertion fails"
+    },
+    {
+      "id": "cancellation",
+      "finding": "controls",
+      "package": "pkg/manager",
+      "test": "TestCorrectionExecutionControls/cancel_completion",
+      "implementation": "existing_requires_strengthening",
+      "setup": "Use native pipeline with deterministic synchronization at boundary",
+      "assertions": [
+        "Cancellation before and after admission cannot complete; admitted allowance remains consumed after reopen"
+      ],
+      "negative_control": "Remove context completion guard; noncompletion assertion fails"
+    },
+    {
+      "id": "denied_effects",
+      "finding": "controls",
+      "package": "pkg/manager",
+      "test": "TestCorrectionExecutionControls/denied_effects",
+      "implementation": "existing_requires_strengthening",
+      "setup": "Use native pipeline with deterministic synchronization at boundary",
+      "assertions": [
+        "Executor receives original restrictions; denied effect actually refuses; no unauthorized file/provider effect; task cannot complete"
+      ],
+      "negative_control": "Drop executor effect restrictions; denial and side-effect assertions fail"
+    }
+  ]
+}

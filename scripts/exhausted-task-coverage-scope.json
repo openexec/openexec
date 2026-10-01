@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "task_id": "T-US-010-002",
+  "story_id": "US-010",
+  "baseline": "ca2bdf8c",
+  "review_baseline": "354f874b56d881f993d4499dc82fc506d66f7046",
+  "inventory": "scripts/verification/exhausted-task-inventory.json",
+  "production_files": [
+    "pkg/manager/task_correction.go",
+    "internal/release/task_correction.go",
+    "pkg/manager/task_boundary.go"
+  ],
+  "changed_function_roots": [
+    "internal/",
+    "pkg/",
+    "cmd/"
+  ],
+  "packages": [
+    "pkg/manager",
+    "internal/release",
+    "pkg/db/state",
+    "internal/cli"
+  ],
+  "unit": "whole_function_statements",
+  "minimum_percent_exclusive": 90,
+  "missing_coverage": "uncovered",
+  "exclusions": [],
+  "policy": [
+    "Union the referenced inventory, every function in production_files, and every added or modified production function since baseline, including untracked Go files.",
+    "Include all new CLI command constructors, handlers and helpers and modified registration/shared functions regardless of filename. Never restrict discovery to a correction filename.",
+    "Removed functions require explicit scope review; missing files or symbols fail. Derive the denominator from source instrumentation, never the profile.",
+    "Missing profile blocks count as zero covered statements with their full source statement count. Missing/empty profiles cannot pass.",
+    "No exclusion solely to raise coverage; no partial function ranges, generated test-only copies, package aggregate substitute or threshold reduction.",
+    "Use native Go test JSON run and pass events for every case and subcase; absent, skipped or failed cases prevent repair completion.",
+    "Run mutants with source overlays; require the named assertion failure, not a compilation or infrastructure failure, and verify source hashes after cleanup."
+  ]
+}

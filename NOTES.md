@@ -4,6 +4,26 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Exhausted correction review contract / US-010 / T-US-010-002]
+  Single contract: [review checklist and scope](docs/verification/exhausted-task-review-contract.md).
+  Four source-supported provisional accepted dispositions have explicit
+  qualifications; 35 cases map exact test selectors, assertions and falsifiers.
+  Missing future tests are unverified obligations, not passes. Coverage unions
+  the existing inventory, correction production files and every changed/new
+  production function, including CLI/shared registration; source statements
+  missing from profiles count uncovered. No coverage exclusions are permitted.
+  Fresh `bash scripts/verify-exhausted-task-review-contract.sh` exited 0:
+  six contract-tool tests passed and the persisted JSON resolved 49 whole
+  functions. Empty native test events and empty count coverage were separately
+  exercised through the verifier CLI and refused. Host declared lint exited 0
+  (Go vet and UI ESLint); git diff --check passed. Go emitted a read-only module
+  stat-cache warning while its AST helper build still exited 0.
+  No production/Go tests changed; current and legacy project behavior unchanged.
+  Production repair journeys, their mutants, operator scratch flow and final
+  review resolution remain for implementation/verification, not this definition
+  stage. No D1/D2 or deployment claim. Local Git preserves this stage; Console
+  retains publication, canonical gate and owner merge decision.
+
 - [Exhausted task delivery handoff / US-009 / T-US-009-001, T-US-009-002]
   Single current package: [delivery preparation](docs/exhausted-task-delivery.md)
   and its JSON companion. Preparation complete; D2 and delivery pending until
