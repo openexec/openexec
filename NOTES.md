@@ -4,6 +4,20 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Identity delivery CI repair, 2026-10-01]
+  Hosted job 110221956165 (run 36816292665, Go 1.25.14) failed in
+  TestHandleStartRunDuplicate with `TempDir RemoveAll cleanup: unlinkat ...:
+  directory not empty`; its pipeline finished after test cleanup began.
+  API fixtures now stop and join all attempts before closing SQLite/removing
+  temporary files. Manager.Wait exposes the existing attempt completion channel,
+  including event persistence; Stop's terminal status is not a join. No new
+  persistent concepts, controllers, lifecycle transitions or identity changes.
+  Focused duplicate-start test passed five times on Go 1.26.5; a real injected
+  pipeline test proves stopped status cannot release Wait, cancellation of a
+  wait is bounded, shutdown writes persist, and repeat waits succeed.
+  Full Go 1.25.14 CI test command and compatibility/identity checks are pending
+  durable verification. Existing identity repair and completed work retained.
+
 - [Validated identity delivery preparation / US-012 / T-US-012-002]
   The single current record is docs/verification/plan-identity-delivery.md with
   machine record plan-identity-delivery.json and repository-local stored logs.

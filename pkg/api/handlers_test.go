@@ -33,7 +33,6 @@ func buildMockClaude(t *testing.T) string {
 	return bin
 }
 
-
 func testManager(t *testing.T, bin string) *manager.Manager {
 	t.Helper()
 	workDir := t.TempDir()
@@ -57,6 +56,19 @@ func testManager(t *testing.T, bin string) *manager.Manager {
 	if err != nil {
 		t.Fatalf("manager.New: %v", err)
 	}
+	t.Cleanup(func() {
+		defer mgr.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		for _, run := range mgr.List() {
+			if err := mgr.Stop(run.FWUID); err != nil {
+				t.Errorf("Stop(%s): %v", run.FWUID, err)
+			}
+			if err := mgr.Wait(ctx, run.FWUID); err != nil {
+				t.Errorf("Wait(%s): %v", run.FWUID, err)
+			}
+		}
+	})
 	return mgr
 }
 
