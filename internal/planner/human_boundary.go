@@ -134,8 +134,13 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			}
 			next := &nextStory.Tasks[i]
 			if t.Mode == TaskModeHITL {
+				// What the owner is asked stays; how the agent carries it out
+				// is the refinement's to correct. Restoring the strategy too
+				// returned a refused instruction (safe_commit in an acceptance
+				// task, openexec b5b5611a) to every fresh plan, so review
+				// could never approve one.
 				next.Mode, next.DecisionReason, next.DecisionRef = t.Mode, t.DecisionReason, t.DecisionRef
-				next.Description, next.TechnicalStrategy = t.Description, t.TechnicalStrategy
+				next.Description = t.Description
 			}
 			// An edge to work refinement was free to merge away is not restored;
 			// it would point at a task that no longer exists.
