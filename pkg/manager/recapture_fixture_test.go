@@ -21,10 +21,11 @@ import (
 // Shared receipt, command resolution, restart and terminal assertions for the
 // independently owned recapture boundary/coverage/compatibility scenarios.
 type recaptureFixture struct {
-	env    *schedulerTestEnv
-	calls  int
-	mode   string
-	cancel context.CancelFunc
+	originalReceipt []byte
+	env             *schedulerTestEnv
+	calls           int
+	mode            string
+	cancel          context.CancelFunc
 }
 
 func newRecaptureFixture(t *testing.T, command string) *recaptureFixture {

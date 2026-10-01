@@ -4,20 +4,27 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002]
-  Implemented bounded candidate correction, durable continuing-failure and
-  exhaustion dispositions, independent queue draining and execution/completion
-  controls, including Stop's late-completion race. The authoritative implementation and verification
-  record is [exhausted-task reconciliation](docs/verification/exhausted-task-reconciliation.md).
-  This entry concerns exhaustion, not the older identity story with the same
-  task numbering. Console owns publication, canonical gates, review and merge.
+- [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002, T-US-008-003]
+  Native correction/disposition interfaces remain documented in
+  [the implementation record](docs/verification/exhausted-task-reconciliation.md).
+  Current inventory reconciliation, fail-closed coverage, source-overlay removal
+  proof and fresh required-check results belong once in
+  [the final verification record](docs/exhausted-task-reconciliation-evidence.md).
+  Fresh default acceptance (coverage plus exact-refusal overlay), independent
+  discovery, host test/lint, compatibility, type-check and embedded build passed.
+  The record contains measured coverage, rollback/reopen assertions, verifier
+  refusal controls, actual exit results and limitations; temporary overlays were
+  removed and candidate production source was unchanged.
+  This concerns exhaustion, not the older identity/retention stories sharing task
+  numbers. Console claims in older notes are historical; publication, canonical
+  gates, independent review, owner acceptance and merge remain Console-owned.
 
 - [Native exhaustion discovery / US-007 / T-US-007-001, T-US-007-002]
   Baseline reproduction/provenance remains in
   [the reproduction record](docs/verification/exhausted-task-discovery.md).
   [Native integration discovery](docs/exhausted-task-discovery.md) now records
   concrete persisted fields, source-inspected boundaries, required repository
-  checks and the 26-function inventory for later whole-function coverage.
+  checks and the initial function inventory, since expanded by reconciliation finalization.
   Fresh `scripts/verify-exhausted-task-discovery.sh` exited 0: real timeout,
   completed prerequisite, same-candidate correction, exhausted queue refusal,
   SQLite close/reopen and unchanged receipt/task snapshots. Five verifier test

@@ -131,7 +131,7 @@ class VerifierControls(unittest.TestCase):
         for mutate in ('missing', 'duplicate', 'symbol', 'declaration'):
             damaged = copy.deepcopy(inventory)
             if mutate == 'missing':
-                damaged['functions'].pop()
+                damaged['functions'].pop(0)
             elif mutate == 'duplicate':
                 damaged['functions'].append(damaged['functions'][0])
             else:

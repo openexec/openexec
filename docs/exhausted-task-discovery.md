@@ -175,6 +175,32 @@ package aggregate coverage for the affected functions. Inventory:
 - `internal/release/sqlite_store.go`: `(*SQLiteStore).CanCompleteTask`.
 - `pkg/db/state/task_failure.go`: `(*Store).RecordTaskFailureStep`.
 
+Implementation reconciliation (US-008 / T-US-008-003) adds these final source
+bodies without changing the frozen discovery journey or its original denominator:
+
+- `internal/release/failure_repair.go`: `selectRunnableTasks`.
+- `internal/release/sqlite_store.go`: `(*SQLiteStore).createTaskInternal`.
+- `internal/release/sqlite_store.go`: `(*SQLiteStore).UpdateTask`.
+- `internal/release/sqlite_store.go`: `canCompleteTask`.
+- `internal/release/sqlite_store.go`: `(*SQLiteStore).BulkCreateTasks`.
+- `internal/release/task_correction.go`: `CorrectionForTask`.
+- `internal/release/task_correction.go`: `correctionChanged`.
+- `internal/release/task_correction.go`: `(*SQLiteStore).AuthorizeTaskCorrection`.
+- `internal/release/task_correction.go`: `(*SQLiteStore).AdmitTaskCorrection`.
+- `internal/release/task_correction.go`: `(*SQLiteStore).FinishTaskCorrection`.
+- `internal/release/task_correction.go`: `(*SQLiteStore).FailTaskCorrection`.
+- `internal/release/task_correction.go`: `(*SQLiteStore).finishTaskCorrection`.
+- `internal/release/task_correction.go`: `(*Manager).CorrectionEligible`.
+- `pkg/manager/events.go`: `(*Manager).consumeEvents`.
+- `pkg/manager/events.go`: `updateInfo`.
+- `pkg/manager/task_correction.go`: `(*Manager).CorrectionCandidate`.
+- `pkg/manager/task_correction.go`: `(*Manager).AuthorizeTaskCorrection`.
+- `pkg/manager/task_correction.go`: `(*Manager).checkCorrectionCandidate`.
+- `pkg/manager/task_correction.go`: `(*Manager).correctionPlan`.
+- `pkg/manager/task_correction.go`: `correctionCheck`.
+- `pkg/manager/task_correction.go`: `(*Manager).reconcileTaskCorrection`.
+- `pkg/manager/task_queue.go`: `(*Manager).persistTaskExhaustion`.
+
 ## Required OpenExec checks
 
 - This task: `scripts/verify-exhausted-task-discovery.sh` runs the frozen native

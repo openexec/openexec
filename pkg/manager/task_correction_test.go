@@ -2,7 +2,10 @@ package manager
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/pkg/runtime"
 	"os"
 	"os/exec"
@@ -116,6 +119,9 @@ func assertCorrectionReload(t *testing.T, f *recaptureFixture, c release.TaskCor
 	}
 	step, err := f.env.mgr.state.GetRunStep(ctx, "legacy")
 	originalReceipt, _ := json.Marshal(recaptureReceipt("verify", 2))
+	if f.originalReceipt != nil {
+		originalReceipt = f.originalReceipt
+	}
 	if err != nil || step == nil || step.Status != "failed" || step.RunID != "A" || step.Agent.String != "deterministic-verification" || step.Metadata != string(originalReceipt) {
 		t.Fatal("historical receipt changed", err)
 	}
@@ -135,8 +141,30 @@ func assertCorrectionReload(t *testing.T, f *recaptureFixture, c release.TaskCor
 }
 
 func TestCorrectionNativeQueueSuccess(t *testing.T) {
+	testCorrectionQueueSuccess(t, false)
+}
+
+func TestCorrectionDiagnosticQueueSuccess(t *testing.T) {
+	testCorrectionQueueSuccess(t, true)
+}
+
+func testCorrectionQueueSuccess(t *testing.T, diagnostic bool) {
 	f, c, repair := correctionFixture(t)
 	ctx := context.Background()
+	if diagnostic {
+		refs := recaptureReceipt("verify", 124)
+		payload := `[{"gate":"verify","exit_code":124,"command":"sh check.sh","output":"verification timeout: deadline exceeded\n"}]`
+		refs[gates.VerificationFailureReceiptKey] = payload
+		refs[gates.VerificationFailureDigestKey] = fmt.Sprintf("%x", sha256.Sum256([]byte(payload)))
+		data, err := json.Marshal(refs)
+		f.originalReceipt = data
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.env.mgr.state.GetDB().Exec(`UPDATE run_steps SET metadata=? WHERE id='legacy'`, string(data)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := f.env.mgr.AuthorizeTaskCorrection(ctx, c); err != nil {
 		t.Fatal(err)
 	}

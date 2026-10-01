@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MODES = {
     "admission-completion": {
         "internal/release": ["TestCorrectionAdmissionPersistence"],
-        "pkg/manager": ["TestCorrectionCompletionObligations", "TestCorrectionNativeQueueSuccess"],
+        "pkg/manager": ["TestCorrectionCompletionObligations", "TestCorrectionNativeQueueSuccess", "TestCorrectionDiagnosticQueueSuccess"],
     },
     "native-queue": {
         "pkg/manager": ["TestCorrectionNativeQueueSuccess", "TestCorrectionNativeQueueRefusals",
@@ -44,6 +44,32 @@ for mode in list(MODES.values()):
     for package, tests in mode.items():
         MODES["acceptance"].setdefault(package, [])
         MODES["acceptance"][package] = sorted(set(MODES["acceptance"][package]) | set(tests))
+
+
+# The final acceptance gate also pins the refusal/coverage journeys added here.
+MODES["acceptance"]["internal/release"] += [
+    "TestCorrectionEligibilityRefusesLostStory",
+    "TestCorrectionInvalidAuthorityAndClosedStore", "TestCorrectionTaskMoveRoundTrip",
+    "TestCorrectionRepairRollbackAndHistory", "TestCorrectionCreationMetadataAndBulkRollback",
+]
+MODES["acceptance"]["pkg/manager"] += [
+    "TestCorrectionOptionalChecksAndTimeout",
+    "TestCorrectionRefusesLostStoreAndWriter", "TestCorrectionLateEventStatus",
+    "TestCorrectionCandidateInputs", "TestCorrectionPlanRefusalCoverage",
+    "TestCorrectionQueueAdmissionErrors", "TestCorrectionLegacyHumanBoundary",
+    "TestCorrectionEvidenceWriteFailures",
+]
+for test, cases in {
+    "TestCorrectionCandidateInputs": "missing not_git subdirectory detached unborn deleted internal_link external_link broken_link directory_link mode bytes",
+    "TestCorrectionPlanRefusalCoverage": "missing_plan wrong_hash unsupported empty not_accepted named optional",
+    "TestCorrectionQueueAdmissionErrors": "parallel active_queue active_pipeline missing_task_wait missing_task_retry invalid_authority consumed missing_receipt",
+    "TestCorrectionEvidenceWriteFailures": "step link disposition",
+}.items():
+    MODES["acceptance"]["pkg/manager"] += [test + "/" + case for case in cases.split()]
+MODES["acceptance"]["internal/release"] += [
+    "TestCorrectionRepairRollbackAndHistory/" + case for case in
+    "missing metadata dependencies story_tasks completed_story inherited_branch insert_failure update_failure closed".split()
+]
 
 
 def validate(events, required):
@@ -105,13 +131,21 @@ def validate(events, required):
 
 def main():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument("mode", nargs="?", default="acceptance", choices=MODES)
+    parser.add_argument("mode", nargs="?", default="acceptance", choices=[*MODES, "coverage", "removal-sensitive"])
     args = parser.parse_args()
-    required = MODES[args.mode]
+    required = MODES.get(args.mode, MODES["acceptance"])
     controls = subprocess.run(["python3", "-m", "unittest", "discover", "-s",
                                "scripts/verification", "-p", "test_exhausted_task_reconciliation.py"], cwd=ROOT)
     if controls.returncode:
         raise SystemExit(controls.returncode)
+    if args.mode in ("acceptance", "coverage", "removal-sensitive"):
+        from exhausted_task_proof import measure, removal_sensitive
+        if args.mode != "removal-sensitive":
+            measure(required, validate)
+        if args.mode != "coverage":
+            removal_sensitive()
+        print(f"{args.mode}: PASS")
+        return
     events = []
     env = os.environ.copy()
     env.setdefault("GOCACHE", str(Path(tempfile.gettempdir()) / "openexec-correction-go-cache"))

@@ -80,6 +80,10 @@ completion claims do not discharge those obligations.
 
 ## Executed evidence
 
+The results below are the historical T-US-008-002 run. The final T-US-008-003
+acceptance command, expanded inventory, coverage, removal proof and fresh checks
+are maintained in [the final verification record](../exhausted-task-reconciliation-evidence.md).
+
 Fresh verification for T-US-008-002 uses the executable default acceptance suite:
 `scripts/verify-exhausted-task-reconciliation.sh`. It runs verifier self-tests and
 both native slices, requiring all 31 named tests/subcases to run and pass with no
