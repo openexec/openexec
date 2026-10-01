@@ -1,0 +1,30 @@
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.063s
+
+OK
+BEGIN identity compatibility: targeted
++ go test ./pkg/manager ./internal/release ./internal/planner -count=1 -timeout=120s -json -run ^(TestNativeIdenticalReimportCanonicalStorage|TestNativeIdenticalReimportPreservesIdentities|TestNativeIdenticalReimportWriteRefusals|TestRemapContentReservationsAndReplay|TestReviewedCanonicalFields|TestReviewedCanonicalNormalizationAndRetention|TestReviewedIdentityAtomicRefusals|TestReviewedIdentityChangedGoalAndTask|TestReviewedIdentityClosedStoreRefusesPreparation|TestReviewedIdentityDuplicateRefusal|TestReviewedIdentityLegacyEmptyLists|TestReviewedIdentityLifecycle|TestReviewedIdentityListMatrix|TestReviewedIdentityNullableStoryMembership|TestReviewedIdentityPostReviewConflictAtomicRetry|TestReviewedIdentitySQLFields|TestReviewedPlanRefinementAllocatesBeforeRereview|TestReviewedPlanReplayAtomicImportFailure|TestReviewedPlanReplayRefusesConflictAndMissingAdapters|TestReviewedPlanReplaySurvivesCancelledReviewAndCompletedImport|TestReviewedRowsCanonicalConversion|TestRewritePlanRefsAllFields)$
+PASS pkg/manager:TestReviewedIdentityLifecycle
+PASS pkg/manager:TestReviewedIdentityChangedGoalAndTask
+PASS pkg/manager:TestReviewedIdentityDuplicateRefusal
+PASS pkg/manager:TestReviewedPlanReplayAtomicImportFailure
+PASS pkg/manager:TestReviewedPlanReplayRefusesConflictAndMissingAdapters
+PASS pkg/manager:TestReviewedPlanRefinementAllocatesBeforeRereview
+PASS pkg/manager:TestReviewedIdentityPostReviewConflictAtomicRetry
+PASS internal/release:TestReviewedIdentityAtomicRefusals
+PASS pkg/manager:TestReviewedPlanReplaySurvivesCancelledReviewAndCompletedImport
+PASS pkg/manager:TestReviewedIdentityClosedStoreRefusesPreparation
+PASS pkg/manager:TestReviewedRowsCanonicalConversion
+PASS internal/planner:TestRemapContentReservationsAndReplay
+PASS internal/planner:TestRewritePlanRefsAllFields
+PASS internal/release:TestReviewedCanonicalFields
+PASS internal/release:TestReviewedCanonicalNormalizationAndRetention
+PASS pkg/manager:TestNativeIdenticalReimportPreservesIdentities
+PASS pkg/manager:TestNativeIdenticalReimportCanonicalStorage
+PASS pkg/manager:TestReviewedIdentityLegacyEmptyLists
+PASS pkg/manager:TestNativeIdenticalReimportWriteRefusals
+PASS internal/release:TestReviewedIdentityNullableStoryMembership
+PASS internal/release:TestReviewedIdentityListMatrix
+PASS internal/release:TestReviewedIdentitySQLFields
+PASS identity compatibility: targeted

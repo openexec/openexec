@@ -4,13 +4,19 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Candidate-linked identity delivery evidence / US-012 / T-US-012-001]
-  The consolidated current repair, compatibility and delivery record is
-  docs/verification/plan-identity-delivery.md, with its reproducible content
-  manifest alongside it. This replaces the US-011 evidence entry; earlier
-  reviewed-wave entries below are historical stage reports, not current delivery
-  attestations. The record separates fresh local checks from supplied context
-  and retains Console's external follow-up and completion boundary.
+- [Validated identity delivery preparation / US-012 / T-US-012-002]
+  The single current record is docs/verification/plan-identity-delivery.md with
+  machine record plan-identity-delivery.json and repository-local stored logs.
+  scripts/verify-plan-identity-delivery-evidence.sh validates dispositions,
+  candidate/log digests, mandatory checks/tests, per-function coverage >90%,
+  all expected mutation failures and consistent outcomes. Complete preparation
+  passes independently of pending D2; --goal-complete refuses absent current
+  coordinator merge evidence. The --self-test fixtures exercise complete,
+  incomplete and stale records, CLI rereads and refusal paths. Existing Go
+  repairs/tests are retained; no production changes in this stage. See the single
+  record for executed results and same-branch/PR #78 Console handoff. The ordinary
+  local commit preserves work only; publication, canonical gates and D2 remain
+  Console-owned. No native delivery actions or tasks were added.
 
 - [Reviewed-wave delivery preparation / US-009 / T-US-009-001, 2026-10-01]
   Authoritative consolidated repair and delivery evidence, including dependency

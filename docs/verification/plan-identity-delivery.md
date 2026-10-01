@@ -1,4 +1,4 @@
-# Plan identity delivery record — US-012 / T-US-012-001
+# Plan identity delivery record — US-012 / T-US-012-002
 
 ## Retained outcome and provenance
 
@@ -15,7 +15,8 @@ Locally inspected on 2026-10-01:
   `38d20b4255926d311b295ff944b82e3673a89ac4`.
 - Existing repair commits: `8715b6c5` (normalization), `3ff7c794`
   (coverage and BLOB handling), `81f168c5` (compatibility verification).
-- This stage changes documentation/evidence only; production and tests are unchanged.
+- Preparation base: `21d6ee4c` (T-US-012-001). This stage adds the delivery
+  validator, its fixtures and controls; production Go code is unchanged.
 
 Supplied historical context, not a fresh remote observation:
 
@@ -39,7 +40,9 @@ No new runtime abstraction, schema, loop or owner decision is introduced.
 all source/tests/fixtures in internal/planner, internal/release and pkg/manager;
 verification helpers and identity entry scripts; CLAUDE.md, Makefile and Go module
 inputs. It includes the full repaired source/test content, not merely a patch.
-Documentation-only changes here do not invalidate the executable-content binding.
+The new delivery verifier and its fixtures have a separate `verifier_files` binding
+in the machine record; the original manifest continues to identify the repaired
+content exercised by the stored Go verification runs.
 The manifest itself has SHA-256:
 
 `d93a6ad07acefc29b9aea442b73fc93af62497dcddd6445856a74a4af0299e6b`
@@ -82,14 +85,16 @@ exact replay and post-review concurrent conflict atomic retry remain tested.
 The list matrix checks 144 retained/incoming combinations over all four list
 columns; scalar identity predicates also remain covered.
 
-No tests changed in this stage. The repair dependency deliberately changed two
+This stage adds Python delivery-verifier controls without changing Go tests.
+The repair dependency deliberately changed two
 nil-versus-empty inequality expectations to equality, as required by the accepted
 semantics; value, order, duplicate and genuine-conflict assertions remain strict.
 Canonical raw-storage assertions prevent tolerant comparison from hiding bad writes.
 
 ## Executed D1 verification
 
-Fresh commands executed in this worktree on 2026-10-01 (each exit 0):
+Commands executed in this worktree by T-US-012-001 on 2026-10-01 (each exit 0);
+targeted, mutations and restored were rerun by T-US-012-002, also exit 0:
 
 | Command | Observed result |
 | --- | --- |
@@ -113,7 +118,9 @@ belong to the later socket-capable repository runner, outside this stage's scope
 
 Artifact verification: `sha256sum -c docs/verification/plan-identity-content.sha256`
 verified all 184 entries (exit 0); `git diff --check && test -s NOTES.md` passed.
-The saved record was re-read and checked against the fresh command outputs.
+The prior stage re-read the saved record against its fresh command outputs.
+This stage retains those outputs under `plan-identity-results/` and validates
+their hashes, completion markers, mandatory test results and measured counts.
 
 ## Coverage inventory and measurement
 
@@ -168,6 +175,79 @@ unexpected success do not count; driver controls enforce this distinction.
 The candidate is never mutated: each control uses a disposable repository copy,
 restores original sources between mutations and checks cleanup. Source manifest
 verification and the restored public journeys bind the final unchanged content.
+
+
+## Executable preparation validation
+
+The authoritative machine record is [plan-identity-delivery.json](plan-identity-delivery.json).
+It stores the single finding disposition, candidate provenance, required commands,
+exit codes, content binding, log hashes, coverage counts and independent preparation,
+D2 and Goal outcomes. The prose above explains these results; it is not parsed as
+a substitute for them. Stored logs are repository-local verification artifacts,
+not fixture-generated successes. They originate in T-US-012-001; targeted and
+mutation and restored results were additionally rerun successfully during T-US-012-002.
+
+Run from any directory:
+
+```sh
+bash scripts/verify-plan-identity-delivery-evidence.sh
+bash scripts/verify-plan-identity-delivery-evidence.sh --self-test
+bash scripts/verify-plan-identity-delivery-evidence.sh --goal-complete
+```
+
+The first command exits 0 with `preparation=ready`, `d2=pending` and
+`goal_complete=false`. The self-test passed all 25 tests (exit 0). It exercises complete, incomplete and stale
+repository-local fixture overlays plus missing checks, every missing mutation,
+coverage at/below 90%, missing coverage/test execution, modified source/verifier/log
+bytes, omitted manifest content, path escapes, duplicate keys, contradictory
+outcomes and coordinator receipt failures. It also writes records, reopens them
+through the shell entry point and checks both exit codes and JSON results.
+The third command intentionally exits 1: complete preparation is retained in its
+output, but current coordinator merge evidence is required for Goal completion.
+
+Required **preparation** checks are targeted, coverage, mutations, compat-test and
+restored, from the existing compatibility driver. Every inventory test must appear
+once in each applicable log; every inventory function must exceed 90% independently;
+all nine compiled mutations must fail at their expected assertions. Full host
+lint/test and the canonical PR gate remain Console delivery obligations; this
+scoped preparation result does not certify those gates. No check list in an input
+record can remove one of these requirements.
+
+Content verification hashes every manifest entry and rejects missing protected
+source/test/fixture/helper files, including newly added files. Separate verifier
+hashes cover this stage's script and controls without rewriting the prior run's
+content binding. Log hashes detect edits; this is integrity and consistency checking,
+not authentication of a local author. Rerun the underlying checks whenever their
+bound content changes, then replace the record and logs rather than appending claims.
+
+A merger claim requires a separately supplied trusted Agent Console export:
+`--merge-evidence /path/to/coordinator-receipt.json`. The verifier reuses the existing
+`delivery.check_merge` contract: exact current Git HEAD and whole-candidate file
+digest, repository, candidate/default-branch ancestry assertion, merge/default-branch
+revisions, canonical gate, independent review, owner decision, no unresolved
+findings and merge reference. The export must also identify `issuer=agent-console`,
+this feature and PR, a nonempty `default_branch_merger`, and timezone-qualified
+`observed_at` within the last 24 hours. A local preparation record cannot supply
+its own merge evidence. Receipt validation checks an export supplied by the trusted
+coordinator; it cannot authenticate an arbitrary user-created JSON file or query
+remote state. Synthetic receipt tests establish validation behavior only.
+
+Console handoff remains the existing branch `outcome/6fbdb8c642f3b58c1788c74e84fa0860`
+and PR #78. After the native queue finishes, Console binds the final candidate to
+its canonical gate, publishes to that same PR, records this review's disposition,
+and applies the owner's standing promotion controls before recording the exact
+merger/default-branch evidence. Do not create a replacement PR or request another
+review for this advisory repair. No native commit/publication/review/owner-decision/
+merge/deployment task or action is introduced. The ordinary local commit required
+by this stage only preserves the candidate. The Console follow-up below remains
+external and unverified here.
+
+Architecture: reuse deterministic verification, the existing content manifest,
+discovery inventory, compatibility logs and merge receipt contract. No runtime
+concepts, persistent runtime state, transitions, owner decisions or loops are added;
+only a read-only evidence validator and its fixtures. The live Project context was
+read (Goal/Ready 4, Interpretation 10); its wider portfolio scope does not expand
+this selected stage.
 
 ## Completion boundary and external follow-up
 
