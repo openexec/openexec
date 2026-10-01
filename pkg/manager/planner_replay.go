@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/openexec/openexec/internal/config"
@@ -28,6 +30,48 @@ type retainedPlanRequest struct {
 	ReviewLimit        int         `json:"review_limit,omitempty"`
 	RefinementAttempts int         `json:"refinement_attempts,omitempty"`
 	SchemaCorrection   string      `json:"schema_correction,omitempty"` // retained diagnostic + rejected response; nonempty consumes the single correction
+}
+
+// plannerBuild names the OpenExec build that generates and reviews plans: the
+// module version a consumer pinned, or this checkout's revision. Empty when
+// the build cannot say, and then no receipt is judged by it.
+var plannerBuild = sync.OnceValue(func() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	const module = "github.com/openexec/openexec"
+	for _, dep := range info.Deps {
+		if dep.Path == module {
+			if dep.Replace != nil {
+				dep = dep.Replace
+			}
+			return dep.Version + " " + dep.Sum
+		}
+	}
+	if info.Main.Path == module {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				return setting.Value
+			}
+		}
+		if info.Main.Version != "(devel)" {
+			return info.Main.Version
+		}
+	}
+	return ""
+})
+
+// staleRefusal reports a retained plan whose review refused it under another
+// planner build. Replay exists so a restart neither re-plans nor re-reviews
+// accepted work; a refusal grants nothing and imported nothing, and replaying
+// it after the planner was fixed returned the same refusal to every pick-up
+// (Agent Console Goal b5b5611a: three "fresh plans" in three seconds, the
+// fixed planner never called).
+func staleRefusal(result *PlanResult) bool {
+	build := plannerBuild()
+	return result != nil && result.Review != nil && !result.Review.Approved &&
+		build != "" && result.PlannerBuild != build
 }
 
 func planDigest(v any) string {
@@ -136,6 +180,16 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 		raw = string(encoded)
 		return nil
 	}
+	if staleRefusal(retained.Result) {
+		// The refused round stays archived under its own number; the
+		// regenerated plan is reviewed as the next one.
+		retained.Result = nil
+		retained.SchemaCorrection = ""
+		retained.ReviewRound++
+		if err := save(); err != nil {
+			return nil, err
+		}
+	}
 	if retained.Result == nil {
 		p := planner.New(m.cfg.PlanGenerator)
 		var plan *planner.ProjectPlan
@@ -160,7 +214,7 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 		if path == "" {
 			return nil, fmt.Errorf("generated plan artifact could not be persisted")
 		}
-		retained.Result = &PlanResult{Plan: plan, PlanID: id, ArtifactHash: hash, ArtifactPath: path, PromptVersion: prompt.PromptVersion}
+		retained.Result = &PlanResult{Plan: plan, PlanID: id, ArtifactHash: hash, ArtifactPath: path, PromptVersion: prompt.PromptVersion, PlannerBuild: plannerBuild()}
 		if err := save(); err != nil {
 			return nil, err
 		}
@@ -282,7 +336,7 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			if hash == result.ArtifactHash {
 				return nil, fmt.Errorf("plan refinement produced no changed plan; unchanged review retry refused")
 			}
-			retained.Result = &PlanResult{Plan: refined, PlanID: id, ArtifactHash: hash, ArtifactPath: path, PromptVersion: prompt.PromptVersion}
+			retained.Result = &PlanResult{Plan: refined, PlanID: id, ArtifactHash: hash, ArtifactPath: path, PromptVersion: prompt.PromptVersion, PlannerBuild: plannerBuild()}
 			retained.ReviewRound++
 			if err := save(); err != nil {
 				return nil, err
