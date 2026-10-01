@@ -534,15 +534,14 @@ func (m *Manager) Stop(fwuID string) error {
 // Wait waits for the current pipeline attempt and its event persistence to finish.
 // A terminal status alone is insufficient: Stop marks the attempt stopped before
 // its goroutines have exited. Callers must wait before removing the work directory.
-// Canceling ctx only cancels this wait.
+// Canceling ctx only cancels this wait. An unknown run has nothing left to
+// join, so waiting on it returns at once.
 func (m *Manager) Wait(ctx context.Context, fwuID string) error {
 	m.mu.Lock()
-	e, ok := m.pipelines[fwuID]
-	if !ok {
-		m.mu.Unlock()
-		return fmt.Errorf("pipeline %s not found", fwuID)
+	var done chan struct{}
+	if e, ok := m.pipelines[fwuID]; ok {
+		done = e.done
 	}
-	done := e.done
 	m.mu.Unlock()
 	if done == nil {
 		return nil

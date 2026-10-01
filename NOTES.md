@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Fresh review of identity CI repair, 2026-10-01]
+  Hosted run 36817948767/job 110227023325 fails
+  TestWaitReturnsOnlyAfterTheRunGoroutine: `Wait on an unknown run: pipeline
+  absent not found`. The cleanup repair changed the existing absent-run no-op
+  contract. The matching correction appeared in the shared worktree during this
+  review and was preserved: absent runs have nothing to join. Host verification
+  of TestWaitReturnsOnlyAfterTheRunGoroutine, TestWaitJoinsStoppedAttempt and
+  TestHandleStartRunDuplicate passed five repetitions each. Prior detached
+  verification has no available progress/result record; full checks are pending.
+
 - [Identity delivery CI repair, 2026-10-01]
   Hosted job 110221956165 (run 36816292665, Go 1.25.14) failed in
   TestHandleStartRunDuplicate with `TempDir RemoveAll cleanup: unlinkat ...:

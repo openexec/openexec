@@ -30,8 +30,8 @@ func TestWaitJoinsStoppedAttempt(t *testing.T) {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := e.mgr.Wait(ctx, "missing"); err == nil {
-		t.Fatal("unknown attempt accepted")
+	if err := e.mgr.Wait(ctx, "missing"); err != nil {
+		t.Fatalf("Wait on an unknown attempt: %v", err)
 	}
 	if err := e.mgr.Start(ctx, "RUN-WAIT"); err != nil {
 		t.Fatal(err)
