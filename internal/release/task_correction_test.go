@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 )
@@ -157,6 +158,11 @@ func TestCorrectionInvalidAuthorityAndClosedStore(t *testing.T) {
 		}
 		if err := s.AuthorizeTaskCorrection(ctx, bad); err == nil {
 			t.Fatal("invalid authority persisted", mode)
+		}
+		if mode != "missing" {
+			if err := s.AdmitTaskCorrection(ctx, bad); !errors.Is(err, ErrInvalidData) {
+				t.Fatalf("invalid disposition must be refused before admission SQL: %s: %v", mode, err)
+			}
 		}
 	}
 	task, err := s.GetTask(ctx, "task")

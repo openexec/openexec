@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -154,14 +155,14 @@ func (m *Manager) checkCorrectionCandidate(ctx context.Context, c release.TaskCo
 		return err
 	}
 	if path != c.CandidatePath || branch != c.Branch || digest != c.CandidateDigest {
-		return fmt.Errorf("correction candidate mismatch")
+		return fmt.Errorf("%w: correction candidate mismatch", release.ErrInvalidData)
 	}
 	manifest, err := knowledge.BuildScanManifest(path)
 	if err != nil {
 		return err
 	}
 	if manifest.WorktreeStateHash != c.StateHash {
-		return fmt.Errorf("correction validation state mismatch")
+		return fmt.Errorf("%w: correction validation state mismatch", release.ErrInvalidData)
 	}
 	return nil
 }
@@ -177,14 +178,14 @@ func (m *Manager) correctionPlan(ctx context.Context, c release.TaskCorrection) 
 		return plan, err
 	}
 	if latest != plan.ID || plan.TaskID != c.TaskID || plan.Status != "accepted" || plan.WorktreeStateHash != c.StateHash {
-		return plan, fmt.Errorf("correction requires current accepted validation plan")
+		return plan, fmt.Errorf("%w: correction requires current accepted validation plan", release.ErrInvalidData)
 	}
 	var graphState, graphStatus string
 	if err := m.state.GetDB().QueryRowContext(ctx, `SELECT worktree_state_hash,status FROM graph_generations WHERE id=?`, plan.GenerationID).Scan(&graphState, &graphStatus); err != nil {
 		return plan, err
 	}
 	if graphStatus != "current" || graphState != c.StateHash {
-		return plan, fmt.Errorf("correction validation graph is stale")
+		return plan, fmt.Errorf("%w: correction validation graph is stale", release.ErrInvalidData)
 	}
 	count := 0
 	for _, item := range plan.Items {
@@ -196,7 +197,7 @@ func (m *Manager) correctionPlan(ctx context.Context, c release.TaskCorrection) 
 		}
 	}
 	if count == 0 {
-		return plan, fmt.Errorf("correction requires explicit required checks")
+		return plan, fmt.Errorf("%w: correction requires explicit required checks", release.ErrInvalidData)
 	}
 	return plan, nil
 }
@@ -208,14 +209,35 @@ func correctionCheck(item state.ValidationItem) (string, string, error) {
 	if len(item.CommandArgv) == 3 && (item.CommandArgv[0] == "sh" || item.CommandArgv[0] == "/bin/sh") && item.CommandArgv[1] == "-c" && strings.TrimSpace(item.CommandArgv[2]) != "" {
 		return "verify", item.CommandArgv[2], nil
 	}
-	return "", "", fmt.Errorf("required validation item %s has no supported deterministic check", item.ID)
+	return "", "", fmt.Errorf("%w: required validation item %s has no supported deterministic check", release.ErrInvalidData, item.ID)
 }
 
 // Called only by the native queue under exclusive workspace ownership.
 func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Task) (err error) {
-	c, err := release.CorrectionForTask(task)
+	if release.CorrectionRefused(task) {
+		return errRecaptureWaiting
+	}
+	store, err := release.NewSQLiteStore(m.state.GetDB())
 	if err != nil {
 		return err
+	}
+	admitted := false
+	defer func() {
+		if admitted || err == nil || !invalidCorrectionState(err) {
+			return
+		}
+		if saveErr := store.RefuseTaskCorrection(ctx, task, err.Error()); saveErr != nil {
+			err = errors.Join(err, fmt.Errorf("persist correction refusal: %w", saveErr))
+		} else {
+			err = nil // Durable refusal; native queue continues independent work.
+		}
+	}()
+	c, err := release.CorrectionForTask(task)
+	if err != nil {
+		return fmt.Errorf("%w: %v", release.ErrInvalidData, err)
+	}
+	if task.Git == nil || task.Git.Branch != c.Branch || task.Metadata["verification_failure_evidence"] != c.EvidenceID {
+		return fmt.Errorf("%w: correction task binding changed", release.ErrInvalidData)
 	}
 
 	step, loadErr := m.state.GetRunStep(ctx, c.EvidenceID)
@@ -224,10 +246,13 @@ func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Tas
 	}
 	var artifacts map[string]string
 	if step == nil || step.RunID != task.ID || step.Status != "failed" || step.Agent.String != "deterministic-verification" || json.Unmarshal([]byte(step.Metadata), &artifacts) != nil || !gates.ValidateVerificationFailureArtifacts(artifacts) {
-		return fmt.Errorf("correction requires the retained task failure receipt")
+		return fmt.Errorf("%w: correction requires the retained task failure receipt", release.ErrInvalidData)
 	}
 	if c.Consumed {
 		return fmt.Errorf("correction verification allowance already consumed")
+	}
+	if c.Outcome != "" || c.FreshEvidenceID != "" || c.Reason != "" {
+		return fmt.Errorf("%w: malformed correction disposition", release.ErrInvalidData)
 	}
 	if err = m.checkCorrectionCandidate(ctx, c); err != nil {
 		return err
@@ -247,13 +272,10 @@ func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Tas
 	if !eligible {
 		return errRecaptureWaiting
 	}
-	store, err := release.NewSQLiteStore(m.state.GetDB())
-	if err != nil {
-		return err
-	}
 	if err = store.AdmitTaskCorrection(ctx, c); err != nil {
 		return err
 	}
+	admitted = true
 	defer func() {
 		if err != nil {
 			outcome := "refused"
@@ -323,4 +345,13 @@ func (m *Manager) reconcileTaskCorrection(ctx context.Context, task *release.Tas
 		return err
 	}
 	return store.FinishTaskCorrection(ctx, c, true)
+}
+
+// Missing or malformed retained records are terminal input refusals. Cancellation,
+// unavailable stores and other I/O failures must remain retryable operational errors.
+func invalidCorrectionState(err error) bool {
+	var syntax *json.SyntaxError
+	var shape *json.UnmarshalTypeError
+	return errors.Is(err, release.ErrInvalidData) || errors.Is(err, sql.ErrNoRows) ||
+		errors.As(err, &syntax) || errors.As(err, &shape)
 }

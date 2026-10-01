@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/pkg/runtime"
@@ -195,6 +196,7 @@ func TestCorrectionNativeQueueRefusals(t *testing.T) {
 	for _, mode := range []string{"absent", "candidate", "task_binding", "review", "dependency", "failed_check", "cancel", "admitted_restart", "admitted_failure_restart", "stale_plan"} {
 		t.Run(mode, func(t *testing.T) {
 			f, c, repair := correctionFixture(t)
+			createQueueTask(t, f.env, "Independent", nil)
 			ctx := context.Background()
 			if mode != "absent" {
 				if err := f.env.mgr.AuthorizeTaskCorrection(ctx, c); err != nil {
@@ -250,6 +252,66 @@ func TestCorrectionNativeQueueRefusals(t *testing.T) {
 			err := boundaryRun(f)
 			if err == nil {
 				t.Fatal("refusal accepted")
+			}
+			if mode == "candidate" || mode == "stale_plan" || mode == "task_binding" {
+				var boundary *TaskQueueBoundary
+				if !errors.As(err, &boundary) {
+					t.Fatalf("want TaskQueueBoundary: %v", err)
+				}
+				independent, e := f.env.rel.TaskSnapshot(ctx, "Independent")
+				if e != nil || independent.Status != release.TaskStatusDone {
+					t.Fatalf("independent work blocked: %+v %v", independent, e)
+				}
+				a, e := f.env.rel.TaskSnapshot(ctx, "A")
+				if e != nil || a.Status != release.TaskStatusFailed || a.AttemptCount != 3 || a.MaxAttempts != 3 || !release.CorrectionRefused(a) {
+					t.Fatalf("terminal refusal lost: %+v %v", a, e)
+				}
+				found := false
+				for _, item := range boundary.Tasks {
+					if item.TaskID == "A" {
+						found = item.Kind == BoundaryAttemptLimit && item.EvidenceID == "legacy" && item.DecisionReason != ""
+						if strings.Contains(boundary.Error(), item.DecisionReason) {
+							t.Fatal("reason leaked")
+						}
+					}
+				}
+				if !found {
+					t.Fatalf("original boundary evidence missing: %+v", boundary)
+				}
+				if f.calls != 0 {
+					t.Fatal("refusal dispatched correction checks")
+				}
+				f.restart(t)
+				if err := boundaryRun(f); !errors.As(err, &boundary) {
+					t.Fatalf("restart boundary: %v", err)
+				}
+				again, e := f.env.rel.TaskSnapshot(ctx, "Independent")
+				if e != nil || !reflect.DeepEqual(independent, again) || f.calls != 0 {
+					t.Fatal("restart dispatched work", e)
+				}
+				if mode == "candidate" {
+					if err := os.WriteFile(filepath.Join(f.env.dir, "corrected.go"), []byte("package corrected\n"), 0644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, err := f.env.mgr.state.GetDB().Exec("UPDATE graph_generations SET status='current'"); err != nil {
+					t.Fatal(err)
+				}
+				if err := f.env.mgr.AuthorizeTaskCorrection(ctx, c); err == nil {
+					t.Fatal("replayed decision renewed authority")
+				}
+				c.DecisionRef = "fixture-owner:fresh-correction"
+				if err := f.env.mgr.AuthorizeTaskCorrection(ctx, c); err != nil {
+					t.Fatal("fresh authorization refused", err)
+				}
+				if err := boundaryRun(f); err != nil {
+					t.Fatal("fresh correction failed", err)
+				}
+				assertCorrectionReload(t, f, c, repair, true)
+				if f.calls != 2 {
+					t.Fatalf("fresh checks=%d", f.calls)
+				}
+				return
 			}
 			if mode == "failed_check" || mode == "cancel" || mode == "admitted_restart" || mode == "admitted_failure_restart" {
 				assertCorrectionReload(t, f, c, repair, false)

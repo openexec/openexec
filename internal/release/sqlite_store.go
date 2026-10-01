@@ -903,7 +903,7 @@ func (s *SQLiteStore) createTaskInternal(ctx context.Context, task *Task) error 
 			?, ?, ?, ?,
 			?, ?, ?, ?,
 			?, ?,
-			?, ?, ?, ?, ?, ?, ?, json_remove(?, '$.task_correction')
+			?, ?, ?, ?, ?, ?, ?, json_remove(?, '$.task_correction', '$.task_correction_history')
 		)
 	`
 
@@ -1120,8 +1120,8 @@ func (s *SQLiteStore) UpdateTask(ctx context.Context, task *Task) error {
 			approval_status = ?, approval_approved_by = ?, approval_approved_at = ?, approval_comments = ?,
 			approval_rejection_reason = ?, approval_review_cycle = ?,
 			needs_review = ?, review_notes = ?, status = ?, started_at = ?, completed_at = ?, error_message = ?, metadata = CASE
-                WHEN json_extract(metadata,'$.task_correction') IS NULL THEN json_remove(?,'$.task_correction')
-                ELSE json_set(CASE WHEN json_type(?)='object' THEN ? ELSE '{}' END,'$.task_correction',json_extract(metadata,'$.task_correction')) END
+                WHEN json_extract(metadata,'$.task_correction') IS NULL THEN json_remove(?,'$.task_correction','$.task_correction_history')
+                ELSE json_set(CASE WHEN json_type(?)='object' THEN ? ELSE '{}' END,'$.task_correction',json_extract(metadata,'$.task_correction'), '$.task_correction_history',COALESCE(json_extract(metadata,'$.task_correction_history'),json('[]'))) END
         WHERE id = ?
 	`
 
@@ -1402,7 +1402,7 @@ func (s *SQLiteStore) BulkCreateTasks(ctx context.Context, tasks []*Task) error 
 				?, ?, ?, ?,
 				?, ?, ?, ?,
 				?, ?,
-				?, ?, ?, ?, ?, ?, ?, json_remove(?, '$.task_correction')
+				?, ?, ?, ?, ?, ?, ?, json_remove(?, '$.task_correction', '$.task_correction_history')
 			)
 		`,
 			task.ID, task.StoryID, task.Title, task.Description, task.VerificationScript, dependsOnJSON,

@@ -4,6 +4,43 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Bounded correction refusals / US-011 / T-US-011-001]
+  Native pre-admission correction validation now records consumed terminal
+  refusals through a conditional SQLite update, preserving failed status,
+  attempt counters and original failure evidence. Invalid retained bindings
+  differ from operational store/I/O errors. The existing queue skips recorded
+  refusals and drains independent tasks; exhausted failed boundaries expose the
+  original evidence_id and attempt_limit without leaking reasons in Error().
+  Fresh explicit decisions can replace only never-admitted refusals without
+  fresh evidence. Prior decisions remain protected in task_correction_history;
+  replay, replacement and admission/refusal races cannot double-admit.
+  Reused the native queue, task metadata and SQLite conditions. Complexity:
+  no new loop, task state, authority object or owner decision type; one terminal
+  correction outcome and an audit array within existing task metadata.
+  Live Project context and Simple Loop contract read before implementation.
+  Added real manager/SQLite reopen journeys for invalid receipts, candidate,
+  branch, state hash, current/newer plans, graph, task binding and malformed
+  correction/plan records; independent candidate changes and store failures;
+  replacement history and concurrent admission/refusal/authorization tests.
+  Strengthened TestCorrectionNativeQueueRefusals for independent completion,
+  failed 3/3 retention, zero correction checks, restart and fresh authorization.
+  Updated TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct,
+  TestFreshTaskQueueReopensFailedTaskWithAttemptsLeft and
+  TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation to assert the accepted
+  attempt_limit classification (and original receipt), replacing stale failed
+  expectations reproduced by host test exit 2. Admission validation assertions
+  were added to TestCorrectionInvalidAuthorityAndClosedStore.
+  Verification: task script exited 0, including three compiled source-overlay
+  controls removing refusal persistence, boundary kind and evidence projection,
+  followed by a passing unmodified native queue rerun. Focused admission test
+  and final host lint/test exited 0 (Go suite and 635 UI tests).
+  Shell syntax and git diff --check passed; no assertions were weakened.
+  Compatibility: no schema, project loader, migration or fallback changes;
+  legacy absent-correction records retain ordinary scheduling semantics.
+  New audit metadata is stripped on untrusted creation and preserved on update.
+  Publication, full canonical gate, independent review and merge remain Console
+  work after the task queue; this stage makes no delivery or deployment claim.
+
 - [Exhausted runnable records / US-010 / T-US-010-003]
   Current implementation and evidence schema: [records contract](docs/verification/exhausted-task-records.md).
   Structured source/checklist references consume the existing case matrix and

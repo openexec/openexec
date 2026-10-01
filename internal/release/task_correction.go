@@ -1,6 +1,7 @@
 package release
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -10,7 +11,7 @@ import (
 
 // TaskCorrection is explicit trusted-caller authority for one verification pass
 // of a retained candidate. It grants no implementation or external effects.
-// The record is write-once; consumption is never reset by replay or restart.
+// Consumed decisions remain in history; replay and restart never reset them.
 type TaskCorrection struct {
 	DecisionRef     string `json:"decision_ref"`
 	TaskID          string `json:"task_id"`
@@ -62,13 +63,89 @@ func (s *SQLiteStore) AuthorizeTaskCorrection(ctx context.Context, c TaskCorrect
 		return err
 	}
 	data, _ := json.Marshal(c)
-	return correctionChanged(s.db.ExecContext(ctx, `UPDATE tasks SET metadata=json_set(metadata,'$.task_correction',json(?))
+	return correctionChanged(s.db.ExecContext(ctx, `UPDATE tasks SET metadata=json_set(
+ CASE WHEN json_extract(metadata,'$.task_correction') IS NULL THEN metadata
+ ELSE json_insert(json_set(metadata,'$.task_correction_history',
+ COALESCE(json_extract(metadata,'$.task_correction_history'),json('[]'))),
+ '$.task_correction_history[#]',json_extract(metadata,'$.task_correction')) END,
+ '$.task_correction',json(?))
  WHERE id=? AND status='failed' AND max_attempts>0 AND attempt_count=max_attempts
  AND git_branch=? AND json_extract(metadata,'$.verification_failure_evidence')=?
- AND json_extract(metadata,'$.task_correction') IS NULL`, string(data), c.TaskID, c.Branch, c.EvidenceID))
+ AND (json_extract(metadata,'$.task_correction') IS NULL OR (
+ json_extract(metadata,'$.task_correction.outcome')='pre_admission_refused'
+ AND json_extract(metadata,'$.task_correction.consumed')=1
+ AND COALESCE(json_extract(metadata,'$.task_correction.fresh_evidence_id'),'')=''
+ AND COALESCE(json_extract(metadata,'$.task_correction.decision_ref'),'')!=?))
+ AND NOT EXISTS (SELECT 1 FROM json_each(metadata,'$.task_correction_history')
+ WHERE json_extract(value,'$.decision_ref')=?)`, string(data), c.TaskID, c.Branch, c.EvidenceID, c.DecisionRef, c.DecisionRef))
+}
+
+// CorrectionRefused recognizes a durable pre-admission disposition even when
+// the retained authority itself is malformed.
+func CorrectionRefused(task *Task) bool {
+	data, _ := json.Marshal(task.Metadata["task_correction"])
+	var c struct {
+		Consumed bool   `json:"consumed"`
+		Outcome  string `json:"outcome"`
+	}
+	return json.Unmarshal(data, &c) == nil && c.Consumed && c.Outcome == "pre_admission_refused"
+}
+
+// RefuseTaskCorrection consumes only the exact observed, never-admitted record.
+// Operational read/write errors do not masquerade as a recorded refusal.
+func (s *SQLiteStore) RefuseTaskCorrection(ctx context.Context, task *Task, reason string) error {
+	var raw string
+	if err := s.db.QueryRowContext(ctx, "SELECT metadata FROM tasks WHERE id=?", task.ID).Scan(&raw); err != nil {
+		return err
+	}
+	var metadata map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &metadata); err != nil {
+		return err
+	}
+	observed, err := json.Marshal(task.Metadata["task_correction"])
+	if err != nil {
+		return err
+	}
+	retained, err := json.Marshal(metadata["task_correction"])
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(observed, retained) || metadata["task_correction"] == nil {
+		return fmt.Errorf("correction authority changed before refusal")
+	}
+	record, ok := metadata["task_correction"].(map[string]interface{})
+	if !ok {
+		record = map[string]interface{}{"retained_record": metadata["task_correction"]}
+	}
+	// A malformed unconsumed record can be refused, but never refund anything
+	// that may already have run or produced fresh evidence.
+	if record["consumed"] == true || (record["outcome"] != nil && record["outcome"] != "") {
+		return fmt.Errorf("correction already admitted or consumed")
+	}
+	record["consumed"], record["outcome"], record["reason"] = true, "pre_admission_refused", reason
+	branch := ""
+	if task.Git != nil {
+		branch = task.Git.Branch
+	}
+	evidence, _ := task.Metadata["verification_failure_evidence"].(string)
+	data, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	return correctionChanged(s.db.ExecContext(ctx, `UPDATE tasks SET
+ metadata=json_set(metadata,'$.task_correction',json(?))
+ WHERE id=? AND status='failed' AND max_attempts>0 AND attempt_count=max_attempts
+ AND metadata=? AND git_branch=?
+ AND COALESCE(json_extract(metadata,'$.verification_failure_evidence'),'')=?`, string(data), task.ID, raw, branch, evidence))
 }
 
 func (s *SQLiteStore) AdmitTaskCorrection(ctx context.Context, c TaskCorrection) error {
+	if c.Consumed || c.Outcome != "" || c.FreshEvidenceID != "" || c.Reason != "" {
+		return ErrInvalidData
+	}
+	if _, err := CorrectionForTask(&Task{ID: c.TaskID, Metadata: map[string]interface{}{"task_correction": c}}); err != nil {
+		return err
+	}
 	data, _ := json.Marshal(c)
 	return correctionChanged(s.db.ExecContext(ctx, `UPDATE tasks SET status='in_progress',
  metadata=json_set(metadata,'$.task_correction.consumed',json('true'),'$.task_correction.outcome','running')
@@ -146,7 +223,7 @@ func (m *Manager) CorrectionEligible(ctx context.Context, task *Task) (bool, err
 		return false, err
 	}
 	if story.Git != nil && story.Git.Branch != "" && (task.Git == nil || task.Git.Branch != story.Git.Branch) {
-		return false, fmt.Errorf("task and story candidate branches disagree")
+		return false, fmt.Errorf("%w: task and story candidate branches disagree", ErrInvalidData)
 	}
 	tasks, err := selectRunnableTasks(ctx, m.store, []string{task.StoryID}, task.ID, true)
 	if err != nil {
