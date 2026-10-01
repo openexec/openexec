@@ -4,12 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Candidate evidence preparation / US-012 / T-US-012-001]
+- [Candidate evidence preparation and Console handoff / US-012 / T-US-012-001, T-US-012-002]
   Current D1 receipts, tested candidate, later evidence-only edits, four findings,
   every case/falsifier, scratch/reload evidence and limitations live once in
   [the delivery record](docs/exhausted-task-delivery.md). Preparation and refusal
   paths reread local artifacts; actual delivery refuses absent coordinator merge
-  evidence. No publication, acceptance, merge or deployment is claimed.
+  evidence. Handoff preserves the existing PR/review and Console authority;
+  exact task verification, eight self-tests and host lint passed. D2 stays pending;
+  separate merge validation refuses absent evidence. No native delivery or HITL
+  task was added. No publication, acceptance, merge or deployment is claimed.
 
 - [Trusted operator correction / US-011 / T-US-011-003]
   Shipped `openexec task correct` reuses the operator-session boundary and native

@@ -1,0 +1,183 @@
+{
+  "schema_version": "1.1",
+  "goals": [
+    {
+      "id": "G-007",
+      "title": "Make authorized exhausted-task correction reachable and bounded",
+      "description": "Repair the existing OpenExec correction lifecycle so an explicitly authorized correction can reconcile the same retained candidate through native verification and completion controls without resetting attempts, losing failure evidence, or blocking eligible independent work. Preserve existing product changes and candidate provenance. D1 requires demonstrated regression coverage and required OpenExec checks; D2 requires subsequent merge to OpenExec's default branch through Agent Console and the owner's existing promotion controls.",
+      "success_criteria": "",
+      "verification_method": ""
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-010",
+      "title": "Discover and establish the current correction-lifecycle contract",
+      "description": "As a developer, I want repository-local evidence of the correction lifecycle, authority controls and verification obligations so repairs address verified gaps within the accepted goal.",
+      "requirement_id": "",
+      "goal_id": "G-007",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Discovery distinguishes observed repository behavior, historical evidence and unverified reviewer hypotheses.",
+        "Each of the four findings in review afa2fdef5783532f6034a12a002ab508 has a provisional disposition and a complete Root cause, Cases, Fix, Prove and Falsify checklist supported by repository references.",
+        "Discovery identifies native persistence, queue, verification, completion, operator authorization and effect controls, supported command forms, shared-file dependencies and required OpenExec checks.",
+        "A coverage manifest defines correction-related production statements, including modified shared-file functions, and a runnable unit coverage gate requiring strictly greater than 90% coverage.",
+        "The planning contract distinguishes native preparation completion from coordinator verification of D2; native queue completion does not require a merge or imply that D2 is satisfied.",
+        "All discovery inputs and verification artifacts are repository-local. Possible Console integration work is recorded as an external follow-up rather than inferred to be missing from another checkout."
+      ],
+      "verification_script": "set -eu\npython3 scripts/verify-exhausted-task-records.py --self-test\npython3 scripts/verify-exhausted-task-records.py --record discovery --require-all-findings --require-case-matrix --require-coverage-scope --require-delivery-stage-separation",
+      "contract": "This enabling story has no independent accepted requirement; requirement_id is the canonical empty string. It supports G-007. Read repository instructions, NOTES.md and available Project context; record unavailable context and never execute owner-reserved NOTES.md items. The supplied review is advisory, not proof of current implementation behavior. Validate the existing planning representation before implementation: native story verification may complete preparation while D2 remains outstanding for Agent Console. If the scheduler conflates those states, repair the repository-local planning contract and its regression coverage before executing dependent implementation tasks. Do not install an inevitably failing merge gate or silently mark D2 complete. Work only in this repository. All native tasks are AFK; Agent Console owns candidate commits and external delivery.",
+      "tasks": [
+        {
+          "id": "T-US-010-001",
+          "title": "Inspect lifecycle mechanisms and preparation-versus-delivery semantics",
+          "description": "Inspect internal/release/task_correction.go, pkg/manager/task_correction.go, task_queue.go, task_boundary.go, task_recapture.go, CanCompleteTask, CLI operator authorization and planning/story completion semantics. Search non-test production code for AuthorizeTaskCorrection callers. Read instructions, NOTES.md and available Project context. Create docs/exhausted-task-discovery.md separating observations from hypotheses and historical claims. Identify supported verification commands, actual required checks and how native preparation can finish without claiming D2. Capture active work under NOTES.md Now and unresolved questions under Questions. Record cross-repository integration uncertainty without reading another checkout.",
+          "technical_strategy": "",
+          "depends_on": [],
+          "mode": "afk",
+          "verification_script": "set -eu\ntest -s docs/exhausted-task-discovery.md\nrg -n 'AuthorizeTaskCorrection|CorrectionForTask|CanCompleteTask|resolveRecaptureCommand' internal pkg\nrg -n 'Observed behavior|Unverified hypotheses|Operator authority|Verification commands|Coordinator completion stage' docs/exhausted-task-discovery.md"
+        },
+        {
+          "id": "T-US-010-002",
+          "title": "Define finding checklists, executable cases and coverage scope",
+          "description": "Record a provisional accepted or rejected disposition for each finding with evidence or a concrete correctness or accepted-scope reason. Map every reported case and falsifier to executable assertions: original exhausted-task regression; candidate, branch, state, plan, graph, binding, malformed metadata and receipt refusals; restart; independent-work candidate changes; concurrency; reauthorization; planned and no-plan obligations; public operator access; Stop; cancellation; denied effects; and structured boundary evidence. Define scripts/exhausted-task-coverage-scope.json covering correction production files and all modified correction-related shared functions, including new CLI functions. Count missing coverage as uncovered and prohibit exclusions made solely to raise coverage. Record dependencies only where behavior or artifacts are consumed.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-010-001"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\ntest -s scripts/exhausted-task-coverage-scope.json\nrg -n 'Root cause|Cases|Fix|Prove|Falsify|Console|Coverage scope' docs/exhausted-task-discovery.md"
+        },
+        {
+          "id": "T-US-010-003",
+          "title": "Validate discovery and establish a runnable delivery-stage contract",
+          "description": "Implement scripts/verify-exhausted-task-records.py with structured repository-local records and self-tests. Validate all four finding checklists, case coverage, falsifiers, source paths, runnable commands, coverage denominator and dependencies. Reject paths outside this repository and incomplete records. Verify that native preparation can pass with D2 explicitly outstanding, and that only actual coordinator merge evidence can satisfy D2. If current repository planning semantics cannot represent that distinction, repair that contract before implementation and add a regression proving queue completion neither waits for post-queue merge nor claims it occurred. Keep the external merge decision under its existing owner controls.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-010-002"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\npython3 scripts/verify-exhausted-task-records.py --self-test\npython3 scripts/verify-exhausted-task-records.py --record discovery --require-all-findings --require-case-matrix --require-coverage-scope --require-delivery-stage-separation"
+        }
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Reconcile authorized exhausted tasks through the shipped operator path",
+      "description": "As a trusted operator, I want an explicitly authorized correction of an exhausted task to use native verification and completion controls while preserving retry limits, retained evidence and eligible independent work.",
+      "requirement_id": "D1",
+      "goal_id": "G-007",
+      "depends_on": [
+        "US-010"
+      ],
+      "acceptance_criteria": [
+        "A public trusted operator command authorizes a bounded correction of an accepted native task failed at 3/3 with a completed prerequisite repair and retained timeout receipt. The existing queue admits fresh required verification once against the same retained candidate.",
+        "Successful completion uses native accepted validation obligations. SQLite reload proves fresh evidence persisted, historical attempts and completed repairs remain unchanged, candidate identity and dependencies are preserved, and dependent work becomes runnable.",
+        "Pre-admission candidate, branch, state, plan, graph, task-binding, malformed-metadata and invalid-receipt refusals are durable and actionable. They run no correction checks, leave the task failed, drain independent work and do not repeat silently after restart. Operational store or I/O failures remain visible.",
+        "Only a new explicit decision may replace a terminal never-admitted refusal with no fresh verification evidence. Earlier decisions and refusal history remain available; concurrent execution cannot double-admit or reopen a consumed pass.",
+        "Every nonempty task verification_script is a required native verify check alongside applicable accepted-plan obligations. No-plan tasks retain native legacy completion behavior and persist fresh correction-tagged verification evidence.",
+        "A no-plan task using 'test -f corrected.go' completes after exactly one successful verify check; a task using 'exit 3' remains failed with continuing_failure evidence. Unsupported validation obligations cannot be omitted or counted as passed.",
+        "Absent authority, unchanged failure, Stop, cancellation, different candidate, unsatisfied validation and denied effects cannot bypass limits or claim completion. Automatic retries remain bounded without resetting or globally increasing attempts or adding another recovery loop.",
+        "An exhausted failed task's structured boundary reports attempt_limit and the original failing-check evidence reference, including after restart and without correction authority.",
+        "Removal-sensitive negative controls reproduce the original 'repair task refused: task repair attempt limit reached' failure and detect removal of refusal persistence, production authorization, task-script enforcement and boundary evidence propagation.",
+        "Every advisory finding receives a final evidence-backed disposition covering its entire checklist. Dedicated unit statement coverage is strictly greater than 90% across the declared production scope, and missing or skipped required cases fail verification.",
+        "A repository-local scratch walkthrough exercises the public command, native queue, refusal branches and persisted reload. Required OpenExec lint, test, compatibility and type checks pass before D1 is claimed."
+      ],
+      "verification_script": "set -eu\npython3 scripts/verify-exhausted-task-records.py --record discovery --require-all-findings --require-case-matrix --require-coverage-scope --require-delivery-stage-separation\nbash scripts/verify-exhausted-task-correction.sh --case all --negative-controls --enforce-unit-coverage --coverage-threshold-exclusive 90 --scratch-walkthrough\ngo test ./internal/release ./pkg/manager ./internal/cli -count=1\nmake lint\nmake test\nmake compat-test\nmake type-check\npython3 scripts/verify-exhausted-task-records.py --record delivery --require-d1-evidence --require-all-findings",
+      "contract": "Implement and verify only this repository, using the existing native lifecycle and effect controls. Preserve existing product work and candidate provenance. Console commit a59d3e7b88b7, its reported 156 tests, 12 mutation cases, type-check and declared test/lint results are historical context; do not execute Console checks here or claim its Settings Goal complete. Its separate hooks-check drift remains outside this repair. Assess all four findings rather than accepting them automatically; record uncertainty about external integration as a Console-repository follow-up. Run negative controls in disposable fixtures inside this repository. Native tasks must not commit, call safe_commit, publish, push, resolve external reviews, merge or request another review. Agent Console owns those delivery operations under actual effect authority. Use the prescribed runner for checks expected to exceed a few minutes, and require completed receipts before claiming verification.",
+      "tasks": [
+        {
+          "id": "T-US-011-001",
+          "title": "Persist bounded refusals and report original exhaustion evidence",
+          "description": "Repair internal/release and manager correction transitions with conditional SQLite updates that persist terminal consumed pre-admission refusals, retain their reasons and original failure evidence, and leave the task failed at 3/3. Cover invalid receipt, candidate digest, branch, state hash, current plan, graph, task binding and malformed correction metadata. Distinguish invalid retained state from operational failures. Allow a fresh explicit decision to replace only a never-admitted terminal refusal with no fresh evidence, preserving decision history and preventing concurrent double admission. Continue native queue selection after a recorded refusal so independent tasks drain. Extend TaskBoundary with evidence_id and classify exhausted failed tasks as attempt_limit without exposing detailed reasons through Error(). Add reopen and restart tests. For candidate, stale_plan and task_binding, assert a TaskQueueBoundary, Independent done, A failed at 3/3, zero correction checks, no second-run dispatch and successful fresh authorization after restoring valid bindings. Include independent-task candidate changes, malformed records, store failures and admission races. Add refusal and boundary mutation controls to scripts/verify-exhausted-task-correction.sh.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-010-003"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\nbash scripts/verify-exhausted-task-correction.sh --case refusal-boundary --negative-controls\ngo test ./internal/release ./pkg/manager -count=1\ngo test -race ./internal/release ./pkg/manager -run 'TestCorrection.*(Concurrent|Admission|Refusal|Restart)' -count=1"
+        },
+        {
+          "id": "T-US-011-002",
+          "title": "Enforce task scripts and applicable native validation obligations",
+          "description": "Extend the repaired correction transitions to run each nonempty VerificationScript as a required verify check using native recapture resolution, alongside all applicable accepted-plan obligations. Preserve supported argv semantics and effect controls; unsupported required commands must fail visibly. Permit no-plan tasks without PlanID or plan StateHash while retaining task, receipt, candidate, branch and authority bindings and native CanCompleteTask rules. Persist a correction_decision-tagged run_step for task verification even without a validation item. Exercise planned, planner-imported and legacy no-plan tasks with real local commands and database reload. Prove exactly one verify invocation for 'test -f corrected.go', failure when its file is absent, and continuing_failure for 'exit 3'. Test failing scripts with passing plans and failing plans with passing scripts, completed repair and attempt preservation, dependent execution, missing authority, unchanged failures, Stop, cancellation, candidate changes, unfulfilled validation and effect denial. Add task-script-removal controls and an original-exhaustion falsifier restoring the prior repair refusal.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-011-001"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\nbash scripts/verify-exhausted-task-correction.sh --case native-obligations --negative-controls\nbash scripts/verify-exhausted-task-correction.sh --case original-exhaustion --negative-controls\ngo test ./internal/release ./pkg/manager -count=1"
+        },
+        {
+          "id": "T-US-011-003",
+          "title": "Expose correction authorization through a trusted operator command",
+          "description": "Add a shipped command such as openexec task correct \u003ctask-id\u003e --decision-ref \u003cref\u003e [--plan \u003cid\u003e] following the existing local operator versus agent authorization split. Require explicit correction authority and its decision reference; a caller-supplied string alone must not grant operator authority. Derive the retained receipt, CorrectionCandidate, branch and applicable current accepted plan and scan-manifest bindings from native state. Call Manager.AuthorizeTaskCorrection and leave execution to the existing queue. Add CLI-level planned and no-plan fixtures with failed 3/3 task A, completed repair, timeout receipt, dependent Settings task and independent work. Invoke the public command and scoped native queue, then reopen SQLite to assert successful completion, exact decision binding, unchanged historical attempts, original receipt and candidate identity. Cover denied agent access, missing or invalid references, stale bindings and repeated authorization. Run the built command against a disposable scratch project inside this repository and retain a transcript. A mutation skipping authorization must leave A failed with a TaskQueueBoundary; a decision-binding mutation must fail persistence assertions. Document this repository's usable operator interface and any Console-side transport follow-up.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-011-002"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\nbash scripts/verify-exhausted-task-correction.sh --case operator --negative-controls --scratch-walkthrough\ngo test ./internal/cli ./pkg/manager -count=1"
+        },
+        {
+          "id": "T-US-011-004",
+          "title": "Verify the complete correction contract and enforce unit coverage",
+          "description": "Complete the repository-local harness so all mode exercises every discovery case, public-command walkthrough, persisted reload assertion and removal-sensitive control. Require named tests to execute; reject missing or skipped cases. Collect dedicated unit coverage using go test -covermode=atomic with the relevant packages instrumented. Calculate covered statements over the complete approved production scope, including modified shared functions, treating missing entries as uncovered. Fail at 90% or lower, and self-test below, equal to and above the threshold plus missing and empty profiles. Do not substitute integration-only coverage for the unit threshold. Run OpenExec lint, tests, compatibility checks and type checks, including protected .openexec, .uaos and migration fallback behavior. Record exact results, candidate provenance, limitations and final accepted or rejected dispositions for all four findings in docs/exhausted-task-delivery.md. Accepted findings require every listed case and falsifier; rejected findings require concrete correctness or accepted-scope reasons. Unrun checks remain explicitly unverified.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-011-001",
+            "T-US-011-002",
+            "T-US-011-003"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\nbash scripts/verify-exhausted-task-correction.sh --self-test-coverage-gate\nbash scripts/verify-exhausted-task-correction.sh --case all --negative-controls --enforce-unit-coverage --coverage-threshold-exclusive 90 --scratch-walkthrough\ngo test ./internal/release ./pkg/manager ./internal/cli -count=1\nmake lint\nmake test\nmake compat-test\nmake type-check\npython3 scripts/verify-exhausted-task-records.py --record delivery --require-d1-evidence --require-all-findings"
+        }
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Prepare delivery evidence and track coordinator-owned default-branch merge",
+      "description": "As the delivery coordinator, I want complete repository-local candidate evidence and a separate merge completion stage so the native queue can finish preparation while actual D2 satisfaction remains verifiable.",
+      "requirement_id": "D2",
+      "goal_id": "G-007",
+      "depends_on": [
+        "US-010",
+        "US-011"
+      ],
+      "acceptance_criteria": [
+        "Repository-local delivery evidence contains verified D1 results, all four finding dispositions, case and falsifier results, compatibility evidence, unit coverage, limitations and retained candidate provenance.",
+        "Native story and task verification use preparation-only checks that can pass before external delivery. Passing those checks does not satisfy D2 or claim the fix is merged.",
+        "An explicit Agent Console completion stage outside native queue verification retains D2 as outstanding until actual merge to OpenExec's default branch is established.",
+        "Coordinator completion evidence must identify the repository, actual default branch, merged pull request and ancestry connecting the merged change to the verified retained candidate.",
+        "Agent Console retains candidate commit, canonical gate, publication, review resolution and the existing owner merge boundary. Native tasks do not duplicate that boundary or invent approval, decision references or delivery evidence.",
+        "The existing feature, candidate branch, pull request and review identity are preserved, and preparation remains runnable without waiting for the post-queue delivery stage."
+      ],
+      "verification_script": "set -eu\npython3 scripts/verify-exhausted-task-records.py --self-test\npython3 scripts/verify-exhausted-task-records.py --record delivery --require-d1-evidence --require-all-findings --require-provenance --require-console-ownership --require-delivery-stage-separation --reject-unproven-merge-claim --preparation-only",
+      "contract": "This story maps to D2, whose accepted condition remains actual merge to OpenExec's default branch. Its native verification establishes preparation readiness only. After native queue completion, Agent Console owns the external D2 completion stage and supplies actual merge evidence under the existing owner promotion controls. The separate completion check is: python3 scripts/verify-exhausted-task-records.py --record delivery --require-provenance --require-coordinator-merge-evidence. That command is not a native task or story gate and must fail when actual merge evidence is absent. Preserve feature ad5a70cd0924dae18de345dbdf74e623, branch outcome/ad5a70cd0924dae18de345dbdf74e623, pull request https://github.com/openexec/openexec/pull/80 and review afa2fdef5783532f6034a12a002ab508. Do not add native publication, commit, review-request, acceptance, merge or deployment tasks. Preserve the coordinator's existing human boundary without inventing a new decision reference. All native preparation is AFK and precedes that boundary; acceptance must not mutate the exact candidate presented. A Console process revision or successful local checks cannot establish product delivery.",
+      "tasks": [
+        {
+          "id": "T-US-012-001",
+          "title": "Finalize independently runnable candidate evidence preparation",
+          "description": "Finalize docs/exhausted-task-delivery.md and structured repository-local artifacts with actual D1 receipts, coverage scope and result, four finding dispositions, every case and falsifier outcome, scratch walkthrough, persisted reload checks, compatibility evaluation and limitations. Record the retained candidate and distinguish the implementation tested from later evidence-only changes. Extend validation to reject missing or inconsistent evidence and provenance. Self-test that preparation succeeds with D2 outstanding while actual merge verification fails without coordinator evidence. Preserve any real supplied evidence without inferring it from checkout notes. All validation inputs must reside in this repository.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-011-004"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\npython3 scripts/verify-exhausted-task-records.py --self-test\npython3 scripts/verify-exhausted-task-records.py --record delivery --require-d1-evidence --require-all-findings --require-provenance --reject-unproven-merge-claim --preparation-only"
+        },
+        {
+          "id": "T-US-012-002",
+          "title": "Record the external coordinator completion stage without blocking the queue",
+          "description": "Record the handoff for the existing feature, candidate, pull request and review. Identify Agent Console as owner of candidate commits, canonical gate, publication, review resolution and the exact owner merge decision, subject to actual authority. Define the post-queue D2 evidence contract and its separate merge-evidence validation command. Require repository, default branch, merged pull request and verified candidate ancestry; never manufacture those values. Validate that no native dependency or verification script waits for external merge, that preparation completion leaves D2 visibly outstanding when evidence is absent, and that the handoff creates no native effectful delivery or duplicate HITL task. This task finishes preparation and does not perform or wait for external delivery.",
+          "technical_strategy": "",
+          "depends_on": [
+            "T-US-012-001"
+          ],
+          "mode": "afk",
+          "verification_script": "set -eu\npython3 scripts/verify-exhausted-task-records.py --record delivery --require-d1-evidence --require-all-findings --require-provenance --require-console-ownership --require-delivery-stage-separation --reject-unproven-merge-claim --preparation-only"
+        }
+      ]
+    }
+  ]
+}

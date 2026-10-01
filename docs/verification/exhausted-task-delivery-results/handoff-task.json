@@ -1,0 +1,6 @@
+{
+  "command": "set -eu\npython3 scripts/verify-exhausted-task-records.py --record delivery --require-d1-evidence --require-all-findings --require-provenance --require-console-ownership --require-delivery-stage-separation --reject-unproven-merge-claim --preparation-only",
+  "exit_code": 0,
+  "stdout": "preparation: PASS; candidate/source/checks/reloads/removal proof verified; D2 pending\n",
+  "stderr": "go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info56008135.tmp: read-only file system\n"
+}

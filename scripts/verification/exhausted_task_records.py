@@ -311,6 +311,13 @@ def completion(root, native_passed, receipt=None, demand_merge=False):
 
 
 def main(argv=None):
+    # The accepted US-012 plan names the finalized delivery package. Keep its
+    # native command runnable without changing the immutable accepted plan.
+    import sys
+    args = list(sys.argv[1:] if argv is None else argv)
+    if '--record' in args and args[args.index('--record') + 1:][:1] == ['delivery']:
+        import exhausted_task_delivery
+        return exhausted_task_delivery.main(args)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--record', default=RECORD)
     parser.add_argument('--phase', choices=('records', 'preparation', 'delivery'), default='records')

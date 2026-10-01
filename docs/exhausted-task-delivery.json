@@ -5337,7 +5337,7 @@
     {
       "path": "scripts/verification/exhausted_task_delivery.py",
       "mode": "100644",
-      "sha256": "a0cd3814e85226fc0f7db5741de7aa6f22e06159066219cb70d10e3cad0bb853"
+      "sha256": "21daddc58b0457befa53a39a39c5d67bba5842b7e033c138533bb927ff83ed54"
     },
     {
       "path": "scripts/verification/exhausted_task_mutations.py",
@@ -5357,7 +5357,7 @@
     {
       "path": "scripts/verification/exhausted_task_records.py",
       "mode": "100644",
-      "sha256": "b81346134fa5f4df8c0ae0bc38097d180781a6418e8e0934066b83c6a0281cb2"
+      "sha256": "395c951e7227865662a507ed55864c7faa40a9ee01ba7af0ab419ee15c82f352"
     },
     {
       "path": "scripts/verification/exhausted_task_review_contract.py",
@@ -5612,7 +5612,7 @@
     {
       "path": "scripts/verification/test_exhausted_task_delivery.py",
       "mode": "100644",
-      "sha256": "5977c1767b310feea79855186b044c461231010007bb4f643c08f56d96c4487e"
+      "sha256": "7c38071f2d7af7548387898ba8884f383eaab6994dac2f2d5efaee619116a9a8"
     },
     {
       "path": "scripts/verification/test_exhausted_task_reconciliation.py",
@@ -6845,7 +6845,7 @@
       "sha256": "322c05c207380d2e08d5884bd1be365b17afdcbc0ebe68700b15faa941774fb4"
     }
   ],
-  "source_sha256": "67cffb325db833750807b213ed508ae717a6251f4522dc7c52239ca3beb5e98e",
+  "source_sha256": "738671ccaec0e74e1f7e3acea88c9d027c117bd612f6b4cfae24ab49d2eab187",
   "digest_algorithm": "SHA256 of UTF-8 compact JSON sorted-key array of sorted path/mode/SHA256 rows; git cached plus unignored untracked union, current filesystem bytes. Deletions absent. Symlink target text hashed. Excludes delivery Markdown/JSON/results, NOTES.md, bin/, ui/dist/, ui/coverage/, .gocache/, __pycache__. Git-ignored disposable outputs excluded. No HEAD hash self-reference; base ancestry and branch checked separately.",
   "changed_behavior": [
     "Repository all mode runs 35 review cases and 147 required native names, dedicated atomic unit coverage, public executable journeys, races, discovery and removal controls.",
@@ -7435,7 +7435,7 @@
       "sha256": "fe032790d0da029e824c7436b31259472a902249356dfa872e026e9bac318e45"
     }
   ],
-  "handoff_task": "T-US-012-001",
+  "handoff_task": "T-US-012-002",
   "pending_merge_evidence": {
     "status": "awaiting Console evidence",
     "repository_and_target": "Current repository-host evidence identifying OpenExec and its actual default branch; branch name is not assumed.",
@@ -7482,6 +7482,7 @@
   "tested_source_sha256": "4fdf308862645ff2d0c8e7d8f4a48d838b170be77dc352cf6f644cda6bf1bd06",
   "evidence_only_changes": [
     "scripts/verification/exhausted_task_delivery.py",
+    "scripts/verification/exhausted_task_records.py",
     "scripts/verification/fixtures/exhausted-task-delivery/refusals.json",
     "scripts/verification/test_exhausted_task_delivery.py"
   ],
@@ -7885,6 +7886,29 @@
       "sha256": "b403e15ed61aa5df79d983664977dd6afbe5f208373bd77e5554297b7a20daac",
       "exit_code": 0,
       "scope": "Go and UI; unchanged throughout host checks; Python validated by --self-test"
+    }
+  },
+  "handoff": {
+    "feature": "ad5a70cd0924dae18de345dbdf74e623",
+    "branch": "outcome/ad5a70cd0924dae18de345dbdf74e623",
+    "pull_request": "https://github.com/openexec/openexec/pull/80",
+    "review": "afa2fdef5783532f6034a12a002ab508",
+    "owner": "Agent Console",
+    "authority": "existing effect authority and exact owner merge decision",
+    "responsibilities": [
+      "candidate commits",
+      "canonical gate",
+      "publication",
+      "independent review and resolution",
+      "exact owner merge decision"
+    ],
+    "stage": "post-queue",
+    "native_delivery_tasks": [],
+    "new_hitl_tasks": [],
+    "merge_evidence": null,
+    "accepted_plan": {
+      "path": "docs/verification/exhausted-task-delivery-results/accepted-plan.json",
+      "sha256": "ad37f1da10991dbf7fa6ccc491df302f6727e6c3bf6190f4e3b76e76d0f1a861"
     }
   }
 }

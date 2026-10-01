@@ -16,6 +16,7 @@ IMPLEMENTATION_BASE = 'ca2bdf8c254cfa95d7140064b177f54e7529a763'
 TESTED = 'cc79237b82fcccd4716396984bc2e799d6d35a28'
 EVIDENCE_EDITS = {
     'scripts/verification/exhausted_task_delivery.py',
+    'scripts/verification/exhausted_task_records.py',
     'scripts/verification/test_exhausted_task_delivery.py',
     'scripts/verification/fixtures/exhausted-task-delivery/refusals.json',
 }
@@ -83,7 +84,44 @@ def read(path):
     return json.loads(path.read_text(), object_pairs_hook=unique)
 
 
+def validate_handoff(root, record):
+    handoff = record['handoff']
+    require(handoff['feature'] == BRANCH.split('/')[1]
+            and handoff['branch'] == BRANCH
+            and handoff['pull_request'] == 'https://github.com/openexec/openexec/pull/80'
+            and handoff['review'] == 'afa2fdef5783532f6034a12a002ab508', 'wrong handoff identity')
+    require(handoff['owner'] == 'Agent Console'
+            and handoff['authority'] == 'existing effect authority and exact owner merge decision'
+            and handoff['responsibilities'] == ['candidate commits', 'canonical gate', 'publication',
+                                               'independent review and resolution', 'exact owner merge decision'],
+            'wrong Console ownership')
+    require(handoff['stage'] == 'post-queue' and handoff['native_delivery_tasks'] == []
+            and handoff['new_hitl_tasks'] == [] and handoff['merge_evidence'] is None,
+            'native delivery or invented merge evidence')
+    plan_path = local(root, handoff['accepted_plan']['path'])
+    require(sha(plan_path.read_bytes()) == handoff['accepted_plan']['sha256'], 'changed accepted plan')
+    plan = read(plan_path)
+    stories = plan['stories']
+    tasks = [task for story in stories for task in story['tasks']]
+    require({s['id'] for s in stories} == {'US-010', 'US-011', 'US-012'}
+            and {t['id'] for t in tasks} == {
+                'T-US-010-001', 'T-US-010-002', 'T-US-010-003',
+                'T-US-011-001', 'T-US-011-002', 'T-US-011-003', 'T-US-011-004',
+                'T-US-012-001', 'T-US-012-002'}, 'unexpected native delivery task')
+    for nodes in (stories, tasks):
+        ids = {n['id'] for n in nodes}
+        for node in nodes:
+            require(set(node.get('depends_on', [])) <= ids, 'external native dependency')
+            script = node['verification_script']
+            require(not any(token in script for token in (
+                '--require-coordinator-merge-evidence', '--merge-evidence', '--phase delivery',
+                'gh pr', 'git push', 'git commit', 'sleep ', 'curl ', 'while ')),
+                'native verification waits for delivery')
+    require(all(t['mode'] == 'afk' for t in tasks), 'duplicate native HITL boundary')
+
+
 def validate(root, record):
+    validate_handoff(root, record)
     require(record['schema'] == 2 and record['task'] == 'T-US-012-001', 'wrong task/schema')
     require(record['branch'] == BRANCH == git(root, 'branch', '--show-current'), 'stale candidate branch')
     require(record['base_revision'] == BASE and record['implementation_base'] == IMPLEMENTATION_BASE,
@@ -258,7 +296,7 @@ def validate_merge(root, record, receipt):
         'git@github.com:openexec/openexec.git'), 'wrong Git repository identity')
     require(receipt.get('issuer') == 'agent-console' and receipt.get('feature') == BRANCH.split('/')[1],
             'wrong coordinator merge provenance')
-    require(re.fullmatch(r'https://github.com/openexec/openexec/pull/[1-9][0-9]*', receipt['pull_request']),
+    require(receipt['pull_request'] == record['handoff']['pull_request'],
             'wrong merge pull request')
     observed = datetime.fromisoformat(receipt['observed_at'].replace('Z', '+00:00'))
     require(observed.tzinfo is not None and timedelta(0) <= datetime.now(timezone.utc) - observed <= timedelta(hours=24),
@@ -280,12 +318,22 @@ def validate_merge(root, record, receipt):
         raise ValueError('missing merge integration evidence')
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--phase', required=True, choices=['preparation', 'delivery'])
+    parser.add_argument('--phase', default='preparation', choices=['preparation', 'delivery'])
     parser.add_argument('--record', default=RECORD)
     parser.add_argument('--merge-evidence', help='repository-local trusted coordinator export')
-    args = parser.parse_args()
+    for flag in ('require-d1-evidence', 'require-all-findings', 'require-provenance',
+                 'require-console-ownership', 'require-delivery-stage-separation',
+                 'reject-unproven-merge-claim', 'preparation-only', 'require-coordinator-merge-evidence'):
+        parser.add_argument('--' + flag, action='store_true')
+    args = parser.parse_args(argv)
+    if args.record == 'delivery':
+        args.record = RECORD
+    if args.require_coordinator_merge_evidence:
+        args.phase = 'delivery'
+    if args.preparation_only and (args.phase == 'delivery' or args.merge_evidence):
+        parser.error('preparation-only cannot consume merge evidence')
     try:
         record = read(local(ROOT, args.record))
         validate(ROOT, record)
