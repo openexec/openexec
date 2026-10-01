@@ -4,6 +4,102 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Empty-list identity inspection / US-010 / T-US-010-001, 2026-10-01]
+  Selected stage: inspect current identity handling and bound the repair; no
+  production/test edits or other native tasks. Read AGENTS.md, AGENTS.local.md,
+  this memory, PROJECT_INTENT.md and the Simple Loop architecture contract.
+  Live openexec_get_project(openexec) returned accepted Goal revision 4,
+  Ready revision 4 and current Interpretation revision 10 (portfolio stewardship).
+  The supplied identity Goal and retained plan artifact
+  `.openexec/artifacts/plans/d716497f0b746af9d26daac8f0a2a45d97b79c84f692fb5df935f2936451d8c4.json`
+  bound this narrower inspection; its task verification is `git diff --check`.
+  The discovery script belongs to the next task, not this one. For me untouched.
+
+  Provenance: initial worktree clean, HEAD
+  `4b406941` (US-009 evidence), containing implementation `74f5b0b9` and
+  discovery `38d20b42`; branch is
+  `outcome/6fbdb8c642f3b58c1788c74e84fa0860` in the supplied candidate directory.
+  The retained fix is present here, not missing in another repository.
+  Local main is `186646ee320886726512b6468f229d53da1d7714`;
+  `git merge-base --is-ancestor 74f5b0b9 main` returned 1. This proves only local
+  ancestry, not current GitHub PR or default-branch state. PR #78 and review
+  f320866fc267dc32777060cc8c16c646 are supplied delivery bindings. No merge or
+  deployment is established. The Console serving revision is not OpenExec
+  deployment evidence. Ordinary candidate Git persistence is required by the
+  stage wrapper, superseding the retained task's older no-commit instruction;
+  external publication, gate, disposition and merger remain Console-owned.
+
+  Source-verified mechanism and qualifications:
+  - `pkg/manager/planner.go:63,201,285,330`: ordinary Plan with empty RequestID,
+    Review=false and AutoImport=true reaches importBoundPlan(false), which
+    prepares identities after generation. preparePlanIDs reloads retained state
+    and supplies the full-content conflict callback for every route. Nonempty
+    RequestID instead selects the durable reviewed replay path.
+  - `pkg/manager/planner_identity.go:9` converts through
+    `pkg/manager/planner_replay.go:413` and checks goals, stories and tasks with
+    ReviewedGoalEqual/ReviewedStoryEqual/ReviewedTaskEqual. Canonical identity
+    includes parent IDs, ordered task membership, priorities, expanded strategy
+    descriptions, max attempts and mode; lifecycle/evidence is excluded.
+  - `pkg/manager/planner.go:383,409` DOES copy story/task DependsOn. The advisory's
+    wording that these fields are absent is inaccurate: nil is copied when
+    input omits them. AcceptanceCriteria is likewise copied without normalization.
+    `internal/release/manager.go:484,639,674,1070` caches rows, appends task IDs
+    to parent membership and saves through store Create/Update operations.
+    `internal/release/sqlite_store.go:508,750,853,1087` marshals nil lists to JSON
+    null; story/task readers at 645-653 and 981 unmarshal valid JSON null to nil.
+    Thus the native persistence/load path preserves the mismatch described.
+  - `internal/release/reviewed_identity.go:10` normalizes only incoming nil to
+    empty; reflect.DeepEqual distinguishes retained nil. The existing
+    `internal/release/reviewed_identity_test.go:51` explicitly expects that
+    distinction. `internal/release/reviewed_plan_import.go:64-100` separately
+    compares json(column)=json(?) while writing incoming nil as []. Both
+    preparation and atomic validation therefore need compatible empty semantics.
+    ValidatePlanIdentities uses the same transaction in rollback-only mode;
+    matching import receipts return early, so receipt replay alone is not proof
+    of existing-row predicate compatibility.
+  - `internal/planner/remap_content.go:10` reevaluates conflicts to a fixed point:
+    moving a task changes story membership, then moves its parent and siblings.
+    Story conflicts are considered before tasks, so a nil story dependency can
+    also cause a direct story move. The advisory's cascade is plausible, not the
+    only ordering. Identical native replay duplication is supported by source
+    tracing here, not yet demonstrated with an executed native regression.
+  - `CLAUDE.md:109` still describes same-title identity. That is obsolete for
+    native preparation's full-content callback; the exported legacy title-only
+    lookup remains available, so avoid claiming title matching ceased everywhere.
+
+  Existing executed evidence: `bash scripts/verify-reviewed-plan-identity.sh`
+  exited 0 on this unchanged executable candidate. Its two Python controls and
+  all 15 mandatory tests passed without skips; every scoped function exceeded
+  90% statement coverage (lowest 92.45%). A read-only Go module stat-cache warning
+  did not fail the run. `pkg/manager/planner_identity_lifecycle_test.go:22` checks
+  changed same-title US-001/US-005, references, full-column snapshots, exact
+  receipts, real close/reopen and exact distinct-request reuse. At line 272 the
+  reviewer injects a genuine Goal conflict: no partial rows/receipt, then retry
+  after reopen without regeneration or rereview. These execute the actual
+  Manager.Plan/SQLite boundary with deterministic adapters. They seed reviewed
+  imports, not the native writer; their success does not refute the advisory.
+
+  Bounded repair recommendation (not implemented in this inspection): reuse
+  importBoundPlan and both existing comparators. Canonicalize native empty story
+  acceptance/dependency lists and task dependencies to []; normalize retained
+  nil in Go and legacy JSON null/schema-supported SQL NULL in SQL list predicates.
+  Preserve meaningful list values/order/duplicates, all other content checks,
+  receipt binding, atomic refusal and retained bytes; do not migrate old rows.
+  Update CLAUDE.md and the two obsolete nil-inequality assertions intentionally.
+  Reuse identityFixture, identitySnapshot and freshQueueManager for public native
+  replay, legacy reviewed validation/import and isolated task-null cascade cases.
+  Keep literal US-001, US-005 and T-US-001-001 independent of task numbering.
+  Required later evidence: direct stored arrays, full snapshots and reopen;
+  native replay mutation removing writer/old-side normalization; independent SQL
+  predicate mutation producing the exact retained-story refusal; original
+  content-allocation mutation; restored targeted suite, compatibility and coverage.
+  Include importBoundPlan and SQL predicate construction in the coverage inventory;
+  the current manifest omits the native writer. No new schema, runtime loop,
+  persistent concept or authority abstraction is needed (complexity delta zero).
+  Advisory mechanism merits repair; this inspection is not a completed repair
+  disposition. Agent Console goal-mode verifier mismatch remains an external
+  follow-up; no other checkout was inspected, edited, built or verified.
+
 - [Reviewed-wave delivery preparation / US-009 / T-US-009-001, 2026-10-01]
   Authoritative consolidated repair and delivery evidence, including dependency
   US-008 / T-US-008-001; older similarly numbered stories below concern other
@@ -680,6 +776,13 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Empty-list identity inspection: native duplication and legacy-null reuse remain
+  source-supported but not executed regressions; schema-supported SQL NULL must
+  be checked before promising that case. US-011 owns repair/mutation evidence.
+  Current remote merger evidence is absent, so D2 remains unverified. The named
+  run_declared_check tool was not in this session's callable catalog; no host
+  lint/test receipt is claimed. The local scoped verifier above passed.
 
 - Compact planning: unverified D2 delivery and canonical runner checks
   are tracked in [compact requirement evidence](docs/verification/compact-requirement-evidence.md#verification-and-outstanding-questions).
