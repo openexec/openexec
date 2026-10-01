@@ -56,6 +56,8 @@ class UnitCoverageControls(unittest.TestCase):
         for events, code in [(wanted, 0), (wanted, 2), ([], 1),
                              ([dict(Action='fail', Test='TestOther')], 1),
                              (wanted + [dict(Action='fail', Test='TestOther')], 1),
+                             (wanted + [dict(Action='fail', Test='TestIdentity/unrelated')], 1),
+                             (wanted + [dict(Action='skip', Test='TestIdentity/skipped')], 1),
                              ([dict(Action='output', Output='[build failed]')], 1),
                              ([dict(Action='output', Test='TestIdentity', Output='unrelated error'),
                                dict(Action='fail', Test='TestIdentity')], 1)]:
