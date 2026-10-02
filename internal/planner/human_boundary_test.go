@@ -269,3 +269,19 @@ func TestRepositoryScopeRuleSharedAcrossPlannerPrompts(t *testing.T) {
 		}
 	}
 }
+
+func TestDeliveryEvidenceRuleSharedAcrossPlannerPrompts(t *testing.T) {
+	// Without it the planner makes tasks finish on evidence only the
+	// delivered, running candidate can produce, and review refuses every
+	// fresh plan (openexec f5cae74f, run ff3c0c5e).
+	for name, prompt := range map[string]string{"generation": StoryGenerationPrompt, "compact": CompactStoryGenerationPrompt, "review": StoryReviewPrompt, "fix": StoryFixPrompt} {
+		if !strings.Contains(prompt, DeliveryEvidenceRule) {
+			t.Fatalf("%s prompt lacks the delivery-ordered evidence rule", name)
+		}
+	}
+	for _, want := range []string{"never a task's acceptance criterion", "Goal review after delivery", "Do not reject a plan for leaving"} {
+		if !strings.Contains(DeliveryEvidenceRule, want) {
+			t.Fatalf("delivery evidence rule lost %q", want)
+		}
+	}
+}

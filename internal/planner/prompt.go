@@ -95,6 +95,29 @@ so it is complete and verifiable on its own. Reject any task that edits,
 builds or verifies another repository.
 `
 
+// DeliveryEvidenceRule is shared by every planning path. Tasks finish before
+// the coordinator delivers, so a task that must show evidence only the merged,
+// deployed and running candidate can produce never finishes, and a reviewer
+// rightly refuses it; three fresh plans in a row were refused for exactly that
+// (openexec f5cae74f, run ff3c0c5e). The coordinator's Goal review closes such
+// conditions after delivery.
+const DeliveryEvidenceRule = `DELIVERY-ORDERED EVIDENCE:
+Tasks finish before the coordinator publishes, merges, deploys or restarts the
+candidate, and no task can perform those effects. Evidence that only the
+delivered, running candidate can produce (its served revision, live or
+production behaviour, a restart of the serving system, dogfood records made by
+the new code) is never a task's acceptance criterion or verification. Tasks
+implement the change and prove it against the candidate with executable
+regressions, and may build the export or check that will gather the live
+evidence. Name the live evidence in the owning story's contract as verified by
+the coordinator's Goal review after delivery; that review plans any remaining
+gap. Evidence the running system already holds may be read by a task through
+an authorized read-only route. Do not reject a plan for leaving
+delivery-ordered evidence to the Goal review, and do not admit only a
+discovery story while every implementation story waits for evidence that
+cannot exist before delivery.
+`
+
 // HumanBoundaryRule is shared by generation, review and refinement. Classification
 // describes required owner input; it never grants permission for an effect.
 const HumanBoundaryRule = `EXECUTION AND HUMAN BOUNDARIES:
@@ -150,6 +173,7 @@ RULES:
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
+` + DeliveryEvidenceRule + `
 ` + CandidateCommitRule + `
 OUTPUT FORMAT (JSON object):
 {
@@ -223,6 +247,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 4. The story and every task MUST have a concrete verification_script that fails when the change is broken (never a bare grep piped to another command, never 'echo ok'). A script that compares against the default branch MUST use the remote ref origin/<default> (e.g. 'git diff --name-only origin/main...HEAD'), NEVER a bare local branch name such as 'main': task worktrees are synced to origin/<default> and do not advance the local branch, so a stale local 'main' fails correct work or passes wrong work.
 5. ` + HumanBoundaryRule + `
 ` + RepositoryScopeRule + `
+` + DeliveryEvidenceRule + `
 ` + RequirementIdentityRule + `
 ` + CandidateCommitRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
@@ -253,6 +278,7 @@ dependency modeling for parallel execution.
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
+` + DeliveryEvidenceRule + `
 ` + CandidateCommitRule + `
 Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
@@ -336,6 +362,7 @@ The reviewer has analyzed the stories and provided a refactoring plan. Follow it
 ` + HumanBoundaryRule + `
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
+` + DeliveryEvidenceRule + `
 ` + CandidateCommitRule + `
 ORIGINAL INTENT:
 %s
