@@ -59,7 +59,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
             if failureEvidenceID != "" { e.info.FailureEvidenceID = failureEvidenceID }
             newStatus = e.info.Status
             newErr = e.info.Error
-            becameTerminal = !isTerminal(prev) && isTerminal(newStatus)
+            becameTerminal = (!isTerminal(prev) || prev == StatusStopped) && isTerminal(newStatus)
         }
         m.mu.Unlock()
 
@@ -162,6 +162,11 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 
 // updateInfo applies a single event to PipelineInfo.
 func updateInfo(info *PipelineInfo, event loop.Event) {
+	// A completion already queued by the executor must not undo an observed Stop.
+	if info.Status == StatusStopped {
+		return
+	}
+
 	switch event.Type {
 	case loop.EventIterationStart:
 		info.Iteration = event.Iteration

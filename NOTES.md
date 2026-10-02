@@ -4,6 +4,161 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Candidate evidence preparation and Console handoff / US-012 / T-US-012-001, T-US-012-002]
+  Current D1 receipts, tested candidate, later evidence-only edits, four findings,
+  every case/falsifier, scratch/reload evidence and limitations live once in
+  [the delivery record](docs/exhausted-task-delivery.md). Preparation and refusal
+  paths reread local artifacts; actual delivery refuses absent coordinator merge
+  evidence. Handoff preserves the existing PR/review and Console authority;
+  exact task verification, eight self-tests and host lint passed. D2 stays pending;
+  separate merge validation refuses absent evidence. No native delivery or HITL
+  task was added. No publication, acceptance, merge or deployment is claimed.
+
+- [Trusted operator correction / US-011 / T-US-011-003]
+  Shipped `openexec task correct` reuses the operator-session boundary and native
+  manager authorization, requiring explicit correction authority and a decision
+  reference. Implementation, scratch transcript, mutation proof, compatibility
+  evaluation and Console transport follow-up live once in
+  [the operator interface record](docs/verification/task-correct.md).
+
+- [Required correction task scripts / US-011 / T-US-011-002]
+  Implementation and verification contract: [task-script record](docs/verification/correction-task-scripts.md).
+  Native correction now enforces task scripts alongside applicable plan checks,
+  including planner-imported and legacy no-plan tasks. Shared recapture command
+  resolution, executor effects, native completion and retained bindings remain
+  authoritative. No new schema, state, loop, grant or owner decision.
+  Verification results are recorded in that single task record.
+
+
+- [Bounded correction refusals / US-011 / T-US-011-001]
+  Native pre-admission correction validation now records consumed terminal
+  refusals through a conditional SQLite update, preserving failed status,
+  attempt counters and original failure evidence. Invalid retained bindings
+  differ from operational store/I/O errors. The existing queue skips recorded
+  refusals and drains independent tasks; exhausted failed boundaries expose the
+  original evidence_id and attempt_limit without leaking reasons in Error().
+  Fresh explicit decisions can replace only never-admitted refusals without
+  fresh evidence. Prior decisions remain protected in task_correction_history;
+  replay, replacement and admission/refusal races cannot double-admit.
+  Reused the native queue, task metadata and SQLite conditions. Complexity:
+  no new loop, task state, authority object or owner decision type; one terminal
+  correction outcome and an audit array within existing task metadata.
+  Live Project context and Simple Loop contract read before implementation.
+  Added real manager/SQLite reopen journeys for invalid receipts, candidate,
+  branch, state hash, current/newer plans, graph, task binding and malformed
+  correction/plan records; independent candidate changes and store failures;
+  replacement history and concurrent admission/refusal/authorization tests.
+  Strengthened TestCorrectionNativeQueueRefusals for independent completion,
+  failed 3/3 retention, zero correction checks, restart and fresh authorization.
+  Updated TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct,
+  TestFreshTaskQueueReopensFailedTaskWithAttemptsLeft and
+  TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation to assert the accepted
+  attempt_limit classification (and original receipt), replacing stale failed
+  expectations reproduced by host test exit 2. Admission validation assertions
+  were added to TestCorrectionInvalidAuthorityAndClosedStore.
+  Verification: task script exited 0, including three compiled source-overlay
+  controls removing refusal persistence, boundary kind and evidence projection,
+  followed by a passing unmodified native queue rerun. Focused admission test
+  and final host lint/test exited 0 (Go suite and 635 UI tests).
+  Shell syntax and git diff --check passed; no assertions were weakened.
+  Compatibility: no schema, project loader, migration or fallback changes;
+  legacy absent-correction records retain ordinary scheduling semantics.
+  New audit metadata is stripped on untrusted creation and preserved on update.
+  Publication, full canonical gate, independent review and merge remain Console
+  work after the task queue; this stage makes no delivery or deployment claim.
+
+- [Exhausted runnable records / US-010 / T-US-010-003]
+  Current implementation and evidence schema: [records contract](docs/verification/exhausted-task-records.md).
+  Structured source/checklist references consume the existing case matrix and
+  coverage scope. Records validation is separate from native preparation and
+  actual coordinator merge proof; D1/D2 remain outstanding for this candidate.
+  Repaired shared planning semantics before verifier implementation; reused
+  story contract and native queue without a runtime schema or lifecycle change.
+  Fresh `python3 scripts/verify-exhausted-task-records.py --self-test` exited 0:
+  14 self-tests passed, including actual native queue checks, SQLite reopen,
+  planning round trips and three compiled source-overlay refusal controls with
+  restored-source positive reruns. CLI reread validates 35 required cases and
+  a source-derived denominator of 49 whole functions / 1434 statements; this is
+  scope, not measured repair coverage. Upstream contract verifier also passed.
+  Host declared lint and test both exited 0; compatibility, Go/UI type checks
+  and git diff --check passed. Final strengthened native fixture was rerun by
+  the self-test after the host suite started; no production change followed it.
+  Four review findings remain provisional/unrepaired in this selected stage;
+  evidence intake refuses missing native runs, falsifiers and coordinator merge.
+  No existing assertions weakened. Existing/legacy loading remains unchanged.
+  Ordinary Git preserves this stage; Console retains publication, canonical gate,
+  review resolution and the owner's external merge decision. No delivery claim.
+
+- [Exhausted correction review contract / US-010 / T-US-010-002]
+  Single contract: [review checklist and scope](docs/verification/exhausted-task-review-contract.md).
+  Four source-supported provisional accepted dispositions have explicit
+  qualifications; 35 cases map exact test selectors, assertions and falsifiers.
+  Missing future tests are unverified obligations, not passes. Coverage unions
+  the existing inventory, correction production files and every changed/new
+  production function, including CLI/shared registration; source statements
+  missing from profiles count uncovered. No coverage exclusions are permitted.
+  Fresh `bash scripts/verify-exhausted-task-review-contract.sh` exited 0:
+  six contract-tool tests passed and the persisted JSON resolved 49 whole
+  functions. Empty native test events and empty count coverage were separately
+  exercised through the verifier CLI and refused. Host declared lint exited 0
+  (Go vet and UI ESLint); git diff --check passed. Go emitted a read-only module
+  stat-cache warning while its AST helper build still exited 0.
+  No production/Go tests changed; current and legacy project behavior unchanged.
+  Production repair journeys, their mutants, operator scratch flow and final
+  review resolution remain for implementation/verification, not this definition
+  stage. No D1/D2 or deployment claim. Local Git preserves this stage; Console
+  retains publication, canonical gate and owner merge decision.
+
+- [Exhausted task delivery handoff / US-009 / T-US-009-001, T-US-009-002]
+  Single current package: [delivery preparation](docs/exhausted-task-delivery.md)
+  and its JSON companion. Preparation complete; D2 and delivery pending until
+  Console supplies actual OpenExec default-branch merge evidence. The package
+  specifies verified-source → candidate/PR head → merged revision and target
+  branch evidence, including squash/rebase equivalence. Missing evidence does
+  not establish non-delivery; Console serving revision establishes neither.
+  Console owns candidate commits, publication, canonical gate, independent
+  review and requesting the owner's exact merge decision. Preparation is not
+  approval. No decision or delivery references were fabricated.
+  Persisted package reread, preparation verifier and three boundary test methods
+  (eleven persisted refusal fixtures) passed. Fresh host lint exited 0. Native
+  checks remain preparation-stage evidence. No tests/production behavior changed;
+  no acceptance or delivery action taken; later task commits preserve the handoff.
+
+- [Exhausted task correction / US-008 / T-US-008-001, T-US-008-002, T-US-008-003]
+  Native correction/disposition interfaces remain documented in
+  [the implementation record](docs/verification/exhausted-task-reconciliation.md).
+  Current inventory reconciliation, fail-closed coverage, source-overlay removal
+  proof and fresh required-check results belong once in
+  [the final verification record](docs/exhausted-task-reconciliation-evidence.md).
+  Fresh default acceptance (coverage plus exact-refusal overlay), independent
+  discovery, host test/lint, compatibility, type-check and embedded build passed.
+  The record contains measured coverage, rollback/reopen assertions, verifier
+  refusal controls, actual exit results and limitations; temporary overlays were
+  removed and candidate production source was unchanged.
+  This concerns exhaustion, not the older identity/retention stories sharing task
+  numbers. Console claims in older notes are historical; publication, canonical
+  gates, independent review, owner acceptance and merge remain Console-owned.
+
+- [Exhausted correction review discovery / US-010 / T-US-010-001]
+  Current source assessment and all four review completion checklists live once
+  in [native integration discovery](docs/exhausted-task-discovery.md).
+  Replaced stale pre-implementation assertions; distinguished source observations,
+  frozen baseline evidence, proposed repairs and cross-repository uncertainty.
+  Read repository instructions, working memory, Simple Loop contract and live
+  Project context; its portfolio roadmap does not expand this selected stage.
+  The discovery-time absence of a shipped correction caller is superseded by
+  T-US-011-003 and its operator interface record. That earlier stage recorded
+  discovery rather than implementation or review-resolution evidence.
+  Fresh task verifier `bash scripts/verify-exhausted-task-discovery.sh` exited 0:
+  five verifier-control tests passed, the frozen native journey passed, and its
+  replacement JSON was reread and validated. This reproduces the baseline, not
+  the four newly reviewed repair scenarios. Host run_declared_check(lint) exited
+  0 with Go vet and UI ESLint; git diff --check passed. Full gates, new correction
+  regression/negative controls and operator scratch journey were not run here.
+  No production code or tests changed; current/legacy loading is unchanged.
+  Ordinary Git preserves this stage; Console retains publication, canonical gate,
+  review resolution, owner acceptance and default-branch merge evidence.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
@@ -730,6 +885,11 @@ Raw capture. One line per thought, any grammar.
   access, then expose typed checkout-bound reads with body provenance.
 
 ## Questions
+
+- Exhausted correction: OpenExec verification and dispositions are recorded in
+  [the delivery record](docs/exhausted-task-delivery.md). Console authority
+  transport, live incident bindings, canonical review and actual merge evidence
+  remain external follow-ups; no new owner decision is requested by this stage.
 
 - Identity delivery evidence and the remaining coordinator requirement are tracked
   in [the delivery record](docs/verification/plan-identity-delivery.md#completion-boundary-and-external-follow-up).

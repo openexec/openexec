@@ -1,0 +1,560 @@
+{
+  "baseline": "ca2bdf8c254cfa95d7140064b177f54e7529a763",
+  "functions": [
+    {
+      "path": "internal/cli/task_correct.go",
+      "name": "init",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "internal/cli/task_correct.go",
+      "name": "newTaskCorrectCommand",
+      "change": "review scope union",
+      "covered": 51,
+      "statements": 59
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "(*Manager).CreateFailureRepair",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 16
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "(*Manager).RecaptureEligible",
+      "change": "review scope union",
+      "covered": 8,
+      "statements": 9
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "(*SQLiteStore).CreateFailureRepair",
+      "change": "review scope union",
+      "covered": 71,
+      "statements": 78
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "runnableTasks",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "internal/release/failure_repair.go",
+      "name": "selectRunnableTasks",
+      "change": "review scope union",
+      "covered": 57,
+      "statements": 62
+    },
+    {
+      "path": "internal/release/manager.go",
+      "name": "(*Manager).SetTaskStatus",
+      "change": "review scope union",
+      "covered": 7,
+      "statements": 8
+    },
+    {
+      "path": "internal/release/manager.go",
+      "name": "(*Manager).UpdateTask",
+      "change": "review scope union",
+      "covered": 27,
+      "statements": 31
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "name": "(*SQLiteStore).BulkCreateTasks",
+      "change": "review scope union",
+      "covered": 32,
+      "statements": 33
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "name": "(*SQLiteStore).CanCompleteTask",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "name": "(*SQLiteStore).UpdateTask",
+      "change": "review scope union",
+      "covered": 30,
+      "statements": 34
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "name": "(*SQLiteStore).createTaskInternal",
+      "change": "review scope union",
+      "covered": 26,
+      "statements": 29
+    },
+    {
+      "path": "internal/release/sqlite_store.go",
+      "name": "canCompleteTask",
+      "change": "review scope union",
+      "covered": 14,
+      "statements": 18
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*Manager).CorrectionEligible",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 14
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*SQLiteStore).AdmitTaskCorrection",
+      "change": "review scope union",
+      "covered": 5,
+      "statements": 6
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*SQLiteStore).AuthorizeTaskCorrection",
+      "change": "review scope union",
+      "covered": 6,
+      "statements": 6
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*SQLiteStore).FailTaskCorrection",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*SQLiteStore).FinishTaskCorrection",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*SQLiteStore).RefuseTaskCorrection",
+      "change": "review scope union",
+      "covered": 23,
+      "statements": 28
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "(*SQLiteStore).finishTaskCorrection",
+      "change": "review scope union",
+      "covered": 30,
+      "statements": 36
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "CorrectionForTask",
+      "change": "review scope union",
+      "covered": 7,
+      "statements": 7
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "CorrectionRefused",
+      "change": "review scope union",
+      "covered": 3,
+      "statements": 3
+    },
+    {
+      "path": "internal/release/task_correction.go",
+      "name": "correctionChanged",
+      "change": "review scope union",
+      "covered": 7,
+      "statements": 8
+    },
+    {
+      "path": "pkg/db/state/task_failure.go",
+      "name": "(*Store).RecordTaskFailureStep",
+      "change": "review scope union",
+      "covered": 16,
+      "statements": 16
+    },
+    {
+      "path": "pkg/manager/events.go",
+      "name": "(*Manager).consumeEvents",
+      "change": "review scope union",
+      "covered": 64,
+      "statements": 70
+    },
+    {
+      "path": "pkg/manager/events.go",
+      "name": "updateInfo",
+      "change": "review scope union",
+      "covered": 27,
+      "statements": 27
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "name": "(*Manager).Stop",
+      "change": "review scope union",
+      "covered": 10,
+      "statements": 10
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "name": "(*Manager).Wait",
+      "change": "review scope union",
+      "covered": 10,
+      "statements": 10
+    },
+    {
+      "path": "pkg/manager/manager.go",
+      "name": "(*Manager).start",
+      "change": "review scope union",
+      "covered": 98,
+      "statements": 100
+    },
+    {
+      "path": "pkg/manager/scheduler.go",
+      "name": "(*Manager).ExecuteTasks",
+      "change": "review scope union",
+      "covered": 151,
+      "statements": 168
+    },
+    {
+      "path": "pkg/manager/task_boundary.go",
+      "name": "(*TaskQueueBoundary).Error",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "pkg/manager/task_boundary.go",
+      "name": "retainedTaskBoundary",
+      "change": "review scope union",
+      "covered": 27,
+      "statements": 27
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "(*Manager).AuthorizeTaskCorrection",
+      "change": "review scope union",
+      "covered": 11,
+      "statements": 12
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "(*Manager).CorrectionCandidate",
+      "change": "review scope union",
+      "covered": 66,
+      "statements": 76
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "(*Manager).checkCorrectionCandidate",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 13
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "(*Manager).correctionPlan",
+      "change": "review scope union",
+      "covered": 25,
+      "statements": 27
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "(*Manager).reconcileTaskCorrection",
+      "change": "review scope union",
+      "covered": 104,
+      "statements": 115
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "correctionCheck",
+      "change": "review scope union",
+      "covered": 5,
+      "statements": 5
+    },
+    {
+      "path": "pkg/manager/task_correction.go",
+      "name": "invalidCorrectionState",
+      "change": "review scope union",
+      "covered": 3,
+      "statements": 3
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "(*Manager).lockTaskExecution",
+      "change": "review scope union",
+      "covered": 18,
+      "statements": 19
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "(*Manager).reconcileInterruptedTasks",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 13
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "entryFinished",
+      "change": "review scope union",
+      "covered": 6,
+      "statements": 7
+    },
+    {
+      "path": "pkg/manager/task_execution_lock.go",
+      "name": "isRepairTask",
+      "change": "review scope union",
+      "covered": 1,
+      "statements": 1
+    },
+    {
+      "path": "pkg/manager/task_failure.go",
+      "name": "(*Manager).persistTaskVerificationFailure",
+      "change": "review scope union",
+      "covered": 38,
+      "statements": 40
+    },
+    {
+      "path": "pkg/manager/task_failure.go",
+      "name": "(*Manager).repairTaskFromRetainedFailure",
+      "change": "review scope union",
+      "covered": 17,
+      "statements": 18
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "(*Manager).executeTaskQueue",
+      "change": "review scope union",
+      "covered": 98,
+      "statements": 124
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "(*Manager).persistTaskExhaustion",
+      "change": "review scope union",
+      "covered": 2,
+      "statements": 2
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "(*Manager).waitTaskQueueRun",
+      "change": "review scope union",
+      "covered": 45,
+      "statements": 51
+    },
+    {
+      "path": "pkg/manager/task_queue.go",
+      "name": "retryWithStopReason",
+      "change": "review scope union",
+      "covered": 12,
+      "statements": 13
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).diagnosticFreeReceipt",
+      "change": "review scope union",
+      "covered": 18,
+      "statements": 19
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).recaptureTaskFailure",
+      "change": "review scope union",
+      "covered": 78,
+      "statements": 85
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).resolveRecaptureCommand",
+      "change": "review scope union",
+      "covered": 4,
+      "statements": 4
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "(*Manager).resolveVerificationCommand",
+      "change": "review scope union",
+      "covered": 22,
+      "statements": 22
+    },
+    {
+      "path": "pkg/manager/task_recapture.go",
+      "name": "recapturePhase",
+      "change": "review scope union",
+      "covered": 8,
+      "statements": 8
+    }
+  ],
+  "covered": 1442,
+  "statements": 1596,
+  "percent": 90.35087719298245,
+  "passed": true,
+  "command": [
+    "go",
+    "test",
+    "./pkg/manager",
+    "./internal/release",
+    "./internal/cli",
+    "-json",
+    "-count=1",
+    "-timeout=120s",
+    "-run",
+    "^(TestAnAttemptIsToldWhyThePreviousOneStopped|TestAuditIncludesArtifactsAndCheckpointWritten|TestCancelledQueueRetainsWriterUntilAttemptDrain|TestConcurrentReadersDoNotRaceRunningPipeline|TestConsumeEventsClosesSubs|TestConsumeEventsFanOut|TestConsumeEventsSlowSubscriber|TestCorrectionAdmissionPersistence|TestCorrectionAdmissionRefusalRace|TestCorrectionCandidateInputs|TestCorrectionCompletionObligations|TestCorrectionCreationMetadataAndBulkRollback|TestCorrectionEligibilityRefusesLostStory|TestCorrectionIndependentCandidateChange|TestCorrectionInvalidAuthorityAndClosedStore|TestCorrectionLateEventStatus|TestCorrectionLegacyHumanBoundary|TestCorrectionNoPlanCannotHideAcceptedPlan|TestCorrectionNoPlanCompletionRequiresScriptProof|TestCorrectionPlanRefusalCoverage|TestCorrectionPreAdmissionRefusalPersistence|TestCorrectionQueueAdmissionErrors|TestCorrectionRefusalReopenAndDecisionHistory|TestCorrectionRefusalReplacementGuards|TestCorrectionRefusalStoreFailureIsOperational|TestCorrectionRefusesLostStoreAndWriter|TestCorrectionRepairRollbackAndHistory|TestCorrectionTaskMoveRoundTrip|TestCorrectionUnitConcurrentQueues|TestCorrectionUnitInterruptAndAdmissionErrors|TestCorrectionUnitLegacyScheduler|TestCorrectionUnitQueueAndPersistenceErrors|TestCorrectionUnitQueueStoreGuards|TestCorrectionUnitReconcile|TestCorrectionUnitSharedStart|TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation|TestFailureRepairConcurrentReplayCreatesOneDependency|TestFailureRepairGuardsAndTransactionRollback|TestFailureRepairPersistsDependencyAndSameCandidateAcrossRestart|TestFilterAutoDispatchable_DefaultsToAFK|TestFilterAutoDispatchable_HoldsBackHITLAndDependents|TestFreshTaskQueueReconcilesOnlyScopedInterruptedWork|TestFreshTaskQueueReopensFailedTaskWithAttemptsLeft|TestList|TestListEmpty|TestLiveWorkspaceOwnerPreventsFreshQueueReconciliation|TestNewManager|TestPausedQueueDrainsBeforeReleasingWorkspaceAndRetainsBoundary|TestPausedTaskCannotOverwriteNewerAttemptDuringDrain|TestRecaptureUnitAttemptRoundTrip|TestRecaptureUnitInvalidReceipt|TestRecaptureUnitOwnershipAndEligibility|TestRecaptureUnitPersistenceRefusals|TestRecaptureUnitPhaseIdentity|TestRecaptureUnitQueueGuards|TestRecaptureUnitResolutionAndEvidence|TestRecaptureUnitRetryPersistenceRefusal|TestRetentionUnitPersistReferencesAndRefusals|TestRetentionUnitRepairContextRefusesInvalidEvidence|TestRetentionUnitRepairDescriptionUsesPersistedContext|TestRunnableTasksHonorsScopeDependenciesPriorityAndMissingRecords|TestScheduler_DefaultWorkerCount|TestScheduler_DependencyChainOrderVerified|TestScheduler_DependencyChainRespected|TestScheduler_DependentTasksRunSequentially|TestScheduler_DiamondDependency|TestScheduler_DiamondOrderVerified|TestScheduler_EmptyTaskList|TestScheduler_FailedTaskBlocksDependents|TestScheduler_IndependentTasksRunInParallel|TestScheduler_SingleTask|TestScheduler_SkipsNonPendingTasks|TestScheduler_StoryDependencyRespected|TestScheduler_TaskStatusUpdatedOnCompletion|TestScheduler_WorkerCountRespected|TestStartAfterComplete|TestStartAndStatus|TestStartRefusesTerminalButUndrainedAttempt|TestStatusNotFound|TestSubscribe|TestSubscribeNotFound|TestTaskCorrectAgentCannotSelfPromote|TestTaskCorrectUnit|TestTaskFailureReceiptAndDispositionAreAtomic|TestTaskOrientedQueueCompletesCrossStoryDependencies|TestTaskOrientedQueueDiscoversTaskAddedAfterFirstDispatch|TestTaskOrientedQueueExcludesCompetingStart|TestTaskOrientedQueueFailureDoesNotCascadeOrInventRepair|TestTaskOrientedQueueRetainsBlockedWorkAndScope|TestTaskOrientedQueueRetriesAStoppedAttemptInTheSameRun|TestTaskOrientedQueueRunsActualPipelineAndDependencies|TestTaskOrientedQueueYieldsAtATaskBoundary|TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct|TestTaskQueueHumanWaitRunsIndependentWorkAndSurvivesRestart|TestTaskQueueRefusesTransientBacklog|TestUpdateInfoError|TestUpdateInfoErrorFallbackText|TestUpdateInfoIterationStart|TestUpdateInfoOperatorAttention|TestUpdateInfoPaused|TestUpdateInfoPipelineComplete|TestUpdateInfoRouteDecision|TestUpdateInfoStageStart|TestWaitJoinsStoppedAttempt|TestWaitReturnsOnlyAfterTheRunGoroutine)$",
+    "-covermode=atomic",
+    "-coverpkg=./internal/cli,./internal/release,./pkg/db/state,./pkg/manager",
+    "-coverprofile=/tmp/openexec-exhausted-all/unit-coverage.out"
+  ],
+  "required_tests": {
+    "pkg/manager": [
+      "TestAnAttemptIsToldWhyThePreviousOneStopped",
+      "TestAuditIncludesArtifactsAndCheckpointWritten",
+      "TestCancelledQueueRetainsWriterUntilAttemptDrain",
+      "TestConcurrentReadersDoNotRaceRunningPipeline",
+      "TestConsumeEventsClosesSubs",
+      "TestConsumeEventsFanOut",
+      "TestConsumeEventsSlowSubscriber",
+      "TestCorrectionCandidateInputs",
+      "TestCorrectionCompletionObligations",
+      "TestCorrectionIndependentCandidateChange",
+      "TestCorrectionLateEventStatus",
+      "TestCorrectionLegacyHumanBoundary",
+      "TestCorrectionNoPlanCannotHideAcceptedPlan",
+      "TestCorrectionNoPlanCompletionRequiresScriptProof",
+      "TestCorrectionPlanRefusalCoverage",
+      "TestCorrectionPreAdmissionRefusalPersistence",
+      "TestCorrectionQueueAdmissionErrors",
+      "TestCorrectionRefusalStoreFailureIsOperational",
+      "TestCorrectionRefusesLostStoreAndWriter",
+      "TestCorrectionUnitConcurrentQueues",
+      "TestCorrectionUnitInterruptAndAdmissionErrors",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/active",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/admission",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/cancel",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/failure_write",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/malformed_outcome",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/receipt_read",
+      "TestCorrectionUnitInterruptAndAdmissionErrors/stop",
+      "TestCorrectionUnitLegacyScheduler",
+      "TestCorrectionUnitLegacyScheduler/done",
+      "TestCorrectionUnitLegacyScheduler/options",
+      "TestCorrectionUnitLegacyScheduler/owned",
+      "TestCorrectionUnitQueueAndPersistenceErrors",
+      "TestCorrectionUnitQueueAndPersistenceErrors/disposition",
+      "TestCorrectionUnitQueueAndPersistenceErrors/link",
+      "TestCorrectionUnitQueueAndPersistenceErrors/no_authority",
+      "TestCorrectionUnitQueueAndPersistenceErrors/refused",
+      "TestCorrectionUnitQueueAndPersistenceErrors/step",
+      "TestCorrectionUnitQueueAndPersistenceErrors/study",
+      "TestCorrectionUnitQueueAndPersistenceErrors/success",
+      "TestCorrectionUnitQueueAndPersistenceErrors/waiting",
+      "TestCorrectionUnitQueueStoreGuards",
+      "TestCorrectionUnitQueueStoreGuards/attempt",
+      "TestCorrectionUnitQueueStoreGuards/complete",
+      "TestCorrectionUnitQueueStoreGuards/empty",
+      "TestCorrectionUnitQueueStoreGuards/exhaustion",
+      "TestCorrectionUnitQueueStoreGuards/scope",
+      "TestCorrectionUnitQueueStoreGuards/start",
+      "TestCorrectionUnitReconcile",
+      "TestCorrectionUnitReconcile/deduplicated",
+      "TestCorrectionUnitReconcile/no_plan",
+      "TestCorrectionUnitReconcile/optional",
+      "TestCorrectionUnitReconcile/planned",
+      "TestCorrectionUnitReconcile/refused",
+      "TestCorrectionUnitSharedStart",
+      "TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation",
+      "TestFilterAutoDispatchable_DefaultsToAFK",
+      "TestFilterAutoDispatchable_HoldsBackHITLAndDependents",
+      "TestFreshTaskQueueReconcilesOnlyScopedInterruptedWork",
+      "TestFreshTaskQueueReopensFailedTaskWithAttemptsLeft",
+      "TestList",
+      "TestListEmpty",
+      "TestLiveWorkspaceOwnerPreventsFreshQueueReconciliation",
+      "TestNewManager",
+      "TestPausedQueueDrainsBeforeReleasingWorkspaceAndRetainsBoundary",
+      "TestPausedTaskCannotOverwriteNewerAttemptDuringDrain",
+      "TestRecaptureUnitAttemptRoundTrip",
+      "TestRecaptureUnitInvalidReceipt",
+      "TestRecaptureUnitOwnershipAndEligibility",
+      "TestRecaptureUnitPersistenceRefusals",
+      "TestRecaptureUnitPhaseIdentity",
+      "TestRecaptureUnitQueueGuards",
+      "TestRecaptureUnitResolutionAndEvidence",
+      "TestRecaptureUnitRetryPersistenceRefusal",
+      "TestRetentionUnitPersistReferencesAndRefusals",
+      "TestRetentionUnitRepairContextRefusesInvalidEvidence",
+      "TestRetentionUnitRepairDescriptionUsesPersistedContext",
+      "TestScheduler_DefaultWorkerCount",
+      "TestScheduler_DependencyChainOrderVerified",
+      "TestScheduler_DependencyChainRespected",
+      "TestScheduler_DependentTasksRunSequentially",
+      "TestScheduler_DiamondDependency",
+      "TestScheduler_DiamondOrderVerified",
+      "TestScheduler_EmptyTaskList",
+      "TestScheduler_FailedTaskBlocksDependents",
+      "TestScheduler_IndependentTasksRunInParallel",
+      "TestScheduler_SingleTask",
+      "TestScheduler_SkipsNonPendingTasks",
+      "TestScheduler_StoryDependencyRespected",
+      "TestScheduler_TaskStatusUpdatedOnCompletion",
+      "TestScheduler_WorkerCountRespected",
+      "TestStartAfterComplete",
+      "TestStartAndStatus",
+      "TestStartRefusesTerminalButUndrainedAttempt",
+      "TestStatusNotFound",
+      "TestSubscribe",
+      "TestSubscribeNotFound",
+      "TestTaskFailureReceiptAndDispositionAreAtomic",
+      "TestTaskOrientedQueueCompletesCrossStoryDependencies",
+      "TestTaskOrientedQueueDiscoversTaskAddedAfterFirstDispatch",
+      "TestTaskOrientedQueueExcludesCompetingStart",
+      "TestTaskOrientedQueueFailureDoesNotCascadeOrInventRepair",
+      "TestTaskOrientedQueueRetainsBlockedWorkAndScope",
+      "TestTaskOrientedQueueRetriesAStoppedAttemptInTheSameRun",
+      "TestTaskOrientedQueueRunsActualPipelineAndDependencies",
+      "TestTaskOrientedQueueYieldsAtATaskBoundary",
+      "TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct",
+      "TestTaskQueueHumanWaitRunsIndependentWorkAndSurvivesRestart",
+      "TestTaskQueueRefusesTransientBacklog",
+      "TestUpdateInfoError",
+      "TestUpdateInfoErrorFallbackText",
+      "TestUpdateInfoIterationStart",
+      "TestUpdateInfoOperatorAttention",
+      "TestUpdateInfoPaused",
+      "TestUpdateInfoPipelineComplete",
+      "TestUpdateInfoRouteDecision",
+      "TestUpdateInfoStageStart",
+      "TestWaitJoinsStoppedAttempt",
+      "TestWaitReturnsOnlyAfterTheRunGoroutine"
+    ],
+    "internal/release": [
+      "TestCorrectionAdmissionPersistence",
+      "TestCorrectionAdmissionRefusalRace",
+      "TestCorrectionCreationMetadataAndBulkRollback",
+      "TestCorrectionEligibilityRefusesLostStory",
+      "TestCorrectionInvalidAuthorityAndClosedStore",
+      "TestCorrectionRefusalReopenAndDecisionHistory",
+      "TestCorrectionRefusalReplacementGuards",
+      "TestCorrectionRepairRollbackAndHistory",
+      "TestCorrectionTaskMoveRoundTrip",
+      "TestFailureRepairConcurrentReplayCreatesOneDependency",
+      "TestFailureRepairGuardsAndTransactionRollback",
+      "TestFailureRepairPersistsDependencyAndSameCandidateAcrossRestart",
+      "TestRunnableTasksHonorsScopeDependenciesPriorityAndMissingRecords"
+    ],
+    "internal/cli": [
+      "TestTaskCorrectAgentCannotSelfPromote",
+      "TestTaskCorrectUnit",
+      "TestTaskCorrectUnit/bad_decision",
+      "TestTaskCorrectUnit/bad_plan",
+      "TestTaskCorrectUnit/bad_receipt",
+      "TestTaskCorrectUnit/missing_db",
+      "TestTaskCorrectUnit/missing_flag",
+      "TestTaskCorrectUnit/missing_task",
+      "TestTaskCorrectUnit/planned",
+      "TestTaskCorrectUnit/replay",
+      "TestTaskCorrectUnit/success"
+    ]
+  }
+}

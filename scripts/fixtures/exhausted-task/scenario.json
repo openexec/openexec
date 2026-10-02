@@ -1,0 +1,12 @@
+{
+  "provenance": "Synthetic accepted-task incident shape from T-US-007-001; not an owner database export or deployment claim.",
+  "task_id": "T-EXHAUSTED-001",
+  "story_id": "US-EXHAUSTED",
+  "receipt_id": "timeout-attempt-3",
+  "candidate": "candidate/retained",
+  "branch": "fixture/retained-candidate",
+  "acceptance": "fixture-owner-accepted-scope",
+  "correction_authorization": "fixture-owner: correct check.sh in candidate/retained and verify; no attempt reset, new candidate, publication or deployment",
+  "before": "#!/bin/sh\ntimeout 0.05s sleep 2\ncode=$?\nif [ \"$code\" -eq 124 ]; then echo 'verification timeout: deadline exceeded' >&2; fi\nexit \"$code\"\n",
+  "after": "#!/bin/sh\ntrue\n"
+}

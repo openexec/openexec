@@ -143,7 +143,7 @@ func TestFreshTaskQueueReopensFailedTaskWithAttemptsLeft(t *testing.T) {
 	}
 	want := []TaskBoundary{
 		{TaskID: "human", Status: release.TaskStatusFailed, Kind: BoundaryFailed},
-		{TaskID: "spent", Status: release.TaskStatusFailed, Kind: BoundaryFailed},
+		{TaskID: "spent", Status: release.TaskStatusFailed, Kind: BoundaryAttemptLimit},
 	}
 	if !reflect.DeepEqual(boundary.Tasks, want) {
 		t.Fatalf("boundary = %+v", boundary.Tasks)
@@ -185,7 +185,7 @@ func TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation(t *testing.T) {
 	if err := fresh.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); !errors.As(err, &boundary) {
 		t.Fatalf("want only the spent repair retained, not a recursive repair refusal: %v", err)
 	}
-	if want := []TaskBoundary{{TaskID: "repair-spent", Status: release.TaskStatusFailed, Kind: BoundaryFailed}}; !reflect.DeepEqual(boundary.Tasks, want) {
+	if want := []TaskBoundary{{TaskID: "repair-spent", Status: release.TaskStatusFailed, Kind: BoundaryAttemptLimit, EvidenceID: "verification-failure-spent"}}; !reflect.DeepEqual(boundary.Tasks, want) {
 		t.Fatalf("boundary = %+v", boundary.Tasks)
 	}
 	rel, err := fresh.GetInternalReleaseManager()

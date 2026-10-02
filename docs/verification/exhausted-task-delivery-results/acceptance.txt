@@ -1,0 +1,13 @@
+self-tests-all: exit 0
+self-tests-reconciliation: exit 0
+self-tests-review_contract: exit 0
+go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info289621585.tmp: read-only file system
+Dedicated unit coverage: 1442/1596 (90.3509%); 55 complete functions
+Native cases PASS: 147 required names; all 35 review cases; no skips
+discovery: exit 0
+race: exit 0
+public-command: exit 0
+removal: exit 0
+review-controls: exit 0
+correction-controls: exit 0
+all: PASS; result reread at /tmp/openexec-exhausted-all/all-result.json

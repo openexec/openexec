@@ -1,0 +1,187 @@
+package manager
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/openexec/openexec/internal/execution/gates"
+	"github.com/openexec/openexec/internal/release"
+	"github.com/openexec/openexec/pkg/db/state"
+)
+
+type exhaustionScenario struct {
+	TaskID        string `json:"task_id"`
+	StoryID       string `json:"story_id"`
+	ReceiptID     string `json:"receipt_id"`
+	Candidate     string `json:"candidate"`
+	Branch        string `json:"branch"`
+	Acceptance    string `json:"acceptance"`
+	Authorization string `json:"correction_authorization"`
+	Before        string `json:"before"`
+	After         string `json:"after"`
+}
+
+// This test runs unchanged native production source in the frozen module.
+func TestExhaustedNativeQueueDiscovery(t *testing.T) {
+	ctx := context.Background()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile("testdata/exhausted-task.json")
+	must(err)
+	var f exhaustionScenario
+	must(json.Unmarshal(data, &f))
+	if f.TaskID == "" || f.ReceiptID == "" || f.Acceptance == "" || f.Authorization == "" || f.Before == "" || f.After == "" {
+		t.Fatal("missing fixture evidence or authority")
+	}
+	dir := t.TempDir()
+	candidate := filepath.Join(dir, f.Candidate)
+	must(os.MkdirAll(candidate, 0700))
+	check := filepath.Join(candidate, "check.sh")
+	must(os.WriteFile(check, []byte(f.Before), 0600))
+	command := exec.Command("sh", "check.sh")
+	command.Dir = candidate
+	output, failed := command.CombinedOutput()
+	exit, ok := failed.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 124 || !strings.Contains(string(output), "verification timeout: deadline exceeded") {
+		t.Fatalf("timeout reproduction absent: %v %s", failed, output)
+	}
+	artifacts := gates.VerificationFailureArtifacts(gates.NewCommandFailureWithOutput(ctx, "test", failed, "sh check.sh", string(output)))
+	if !gates.ValidateVerificationFailureArtifacts(artifacts) {
+		t.Fatal("invalid observed timeout receipt")
+	}
+	receiptBytes, err := json.Marshal(artifacts)
+	must(err)
+	dbPath := filepath.Join(dir, "state.db")
+	open := func() (*Manager, *release.Manager, *state.Store) {
+		s, err := state.NewStore(dbPath)
+		must(err)
+		m, err := New(Config{WorkDir: candidate, StateStore: s})
+		must(err)
+		r, err := m.GetInternalReleaseManager()
+		must(err)
+		return m, r, s
+	}
+	m, r, s := open()
+	defer func() { m.Close(); _ = s.Close() }()
+	must(r.CreateStory(&release.Story{ID: f.StoryID, Title: "Accepted exhaustion fixture", Status: release.StoryStatusPending}))
+	must(r.CreateTask(&release.Task{ID: f.TaskID, StoryID: f.StoryID, Title: "Retained candidate", Description: "Verify the accepted candidate", Status: release.TaskStatusFailed, AttemptCount: 2, MaxAttempts: 3, Metadata: map[string]interface{}{"decision_ref": f.Acceptance, "mode": "afk"}}))
+	task, err := r.TaskSnapshot(ctx, f.TaskID)
+	must(err)
+	task.Git = &release.TaskGitInfo{Branch: f.Branch, Commits: []string{"fixture-retained-commit"}}
+	must(r.UpdateTask(task))
+	// Reach the completed prerequisite through native repair insertion before
+	// consuming the final original-task attempt. Do not invent an exhausted repair.
+	repair, err := r.CreateFailureRepair(ctx, f.TaskID, "prerequisite-attempt-2", "Correct prerequisite in retained candidate")
+	must(err)
+	must(r.SetTaskStatus(repair.ID, release.TaskStatusDone))
+	task, err = r.TaskSnapshot(ctx, f.TaskID)
+	must(err)
+	task.Status = release.TaskStatusInProgress
+	task.AttemptCount = 3
+	must(r.UpdateTask(task))
+	must(s.CreateRun(ctx, f.TaskID, "", "", candidate, "workspace-write"))
+	must(s.RecordTaskFailureStep(ctx, state.RunStepData{ID: f.ReceiptID, RunID: f.TaskID, Phase: "test", Agent: "deterministic-verification", Iteration: 3, Status: "failed", Metadata: string(receiptBytes)}, 3))
+	// Explicit fixture authority allows only this correction in this candidate.
+	task, err = r.TaskSnapshot(ctx, f.TaskID)
+	must(err)
+	task.Metadata["correction_authorization"] = f.Authorization
+	task.Metadata["candidate"] = f.Candidate
+	must(r.UpdateTask(task))
+	must(os.WriteFile(check, []byte(f.After), 0600))
+	command = exec.Command("sh", "check.sh")
+	command.Dir = candidate
+	correctedOutput, err := command.CombinedOutput()
+	must(err)
+	if len(correctedOutput) != 0 {
+		t.Fatal("unexpected corrected check output")
+	}
+	// Failed status alone excludes selection; also prove the attempt bound
+	// independently with pending status, then restore the failed disposition.
+	task, err = r.TaskSnapshot(ctx, f.TaskID)
+	must(err)
+	task.Status = release.TaskStatusPending
+	must(r.UpdateTask(task))
+	ready, err := r.RunnableTasks(ctx, []string{f.StoryID})
+	must(err)
+	if len(ready) != 0 {
+		t.Fatal("pending exhausted task selected")
+	}
+	task.Status = release.TaskStatusFailed
+	must(r.UpdateTask(task))
+	before, err := r.TaskSnapshot(ctx, f.TaskID)
+	must(err)
+	priorReceipt, err := s.GetRunStep(ctx, f.ReceiptID)
+	must(err)
+	if priorReceipt == nil || priorReceipt.Metadata != string(receiptBytes) {
+		t.Fatal("receipt was not saved")
+	}
+	var refusals []string
+	for round := 0; round < 2; round++ {
+		ready, err := r.RunnableTasks(ctx, []string{f.StoryID})
+		must(err)
+		if len(ready) != 0 {
+			t.Fatal("exhausted task selected", ready)
+		}
+		refusal := m.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{f.StoryID}})
+		if refusal == nil || refusal.Error() != "task repair attempt limit reached" {
+			t.Fatalf("wrong native refusal: %v", refusal)
+		}
+		refusals = append(refusals, refusal.Error())
+		if len(m.List()) != 0 {
+			t.Fatal("exhausted queue dispatched a pipeline")
+		}
+		after, err := r.TaskSnapshot(ctx, f.TaskID)
+		must(err)
+		if !reflect.DeepEqual(before, after) {
+			t.Fatalf("refusal mutated retained task: before=%+v after=%+v", before, after)
+		}
+		retained, err := s.GetRunStep(ctx, f.ReceiptID)
+		must(err)
+		if !reflect.DeepEqual(priorReceipt, retained) {
+			t.Fatal("timeout receipt changed")
+		}
+		tasks, err := r.TasksInStories(ctx, []string{f.StoryID})
+		must(err)
+		if len(tasks) != 2 {
+			t.Fatal("refusal invented additional task")
+		}
+		prerequisite, err := r.TaskSnapshot(ctx, repair.ID)
+		must(err)
+		if prerequisite.Status != release.TaskStatusDone {
+			t.Fatal("prerequisite completion lost")
+		}
+		bytes, err := os.ReadFile(check)
+		must(err)
+		if string(bytes) != f.After {
+			t.Fatal("candidate correction did not persist")
+		}
+		if round == 0 {
+			m.Close()
+			must(s.Close())
+			m, r, s = open()
+		}
+	}
+	result := map[string]interface{}{"test": "TestExhaustedNativeQueueDiscovery", "entry_point": "Manager.ExecuteTasks(TaskOriented=true)", "task_id": f.TaskID, "attempts": before.AttemptCount, "max_attempts": before.MaxAttempts, "status": before.Status, "candidate": f.Candidate, "branch": before.Git.Branch, "acceptance": f.Acceptance, "correction_authorization": f.Authorization, "prerequisite_status": "done", "receipt_id": f.ReceiptID, "receipt": artifacts, "refusals": refusals, "reopened": true, "candidate_corrected": true, "corrected_check_exit": 0, "pipeline_count": len(m.List()), "task_count": 2}
+	encoded, err := json.MarshalIndent(result, "", "  ")
+	must(err)
+	path := os.Getenv("EXHAUSTED_RESULT")
+	if path == "" {
+		t.Fatal("persisted evidence destination required")
+	}
+	must(os.WriteFile(path, append(encoded, '\n'), 0600))
+	persisted, err := os.ReadFile(path)
+	must(err)
+	if string(persisted) != string(append(encoded, '\n')) {
+		t.Fatal("result round-trip mismatch")
+	}
+}

@@ -1,0 +1,9 @@
+$ bash scripts/verify-exhausted-task-discovery.sh
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.071s
+
+OK
+Exhausted native discovery PASS; fresh persisted result reread: docs/verification/exhausted-task-discovery-result.json
+
+exit=0

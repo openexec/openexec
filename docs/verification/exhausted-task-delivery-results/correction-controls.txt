@@ -1,0 +1,13 @@
+$ bash scripts/verify-exhausted-task-correction.sh
+ok  	github.com/openexec/openexec/internal/release	29.297s
+ok  	github.com/openexec/openexec/pkg/manager	43.535s
+refusal: native journey rejected mutation (want TaskQueueBoundary)
+boundary-kind: native journey rejected mutation (original boundary evidence missing)
+boundary-evidence: native journey rejected mutation (original boundary evidence missing)
+task-script-execution: native journey rejected mutation (script journey failed)
+task-script-completion: native journey rejected mutation (missing task script proof accepted)
+original-exhaustion: native journey rejected mutation (wrong terminal cause: repair task refused: task repair attempt limit reached)
+ok  	github.com/openexec/openexec/pkg/manager	10.464s
+Exhausted correction scripts, refusal, persistence, races and boundary controls passed.
+
+exit=0

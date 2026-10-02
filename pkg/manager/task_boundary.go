@@ -10,6 +10,7 @@ import (
 // TaskBoundary is a projection of retained native work, not a new task state or
 // a request for permission. A missing legacy decision reference remains held.
 type TaskBoundary struct {
+	EvidenceID     string `json:"evidence_id,omitempty"`
 	TaskID         string `json:"task_id"`
 	Status         string `json:"status"`
 	Kind           string `json:"kind"`
@@ -48,6 +49,15 @@ func retainedTaskBoundary(tasks []*release.Task) error {
 		switch task.Status {
 		case release.TaskStatusFailed:
 			item.Kind = BoundaryFailed
+			if task.MaxAttempts <= 0 || task.AttemptCount >= task.MaxAttempts {
+				item.Kind = BoundaryAttemptLimit
+				item.EvidenceID, _ = task.Metadata["verification_failure_evidence"].(string)
+				item.DecisionReason, _ = task.Metadata[previousAttemptStop].(string)
+				if c, ok := task.Metadata["task_correction"].(map[string]interface{}); ok {
+					item.DecisionReason, _ = c["reason"].(string)
+					item.DecisionRef, _ = c["decision_ref"].(string)
+				}
+			}
 		case release.TaskStatusNeedsReview:
 			item.Kind = BoundaryReview
 		case release.TaskStatusPending:

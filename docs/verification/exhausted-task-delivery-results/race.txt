@@ -1,0 +1,5 @@
+$ go test ./internal/release ./pkg/manager -race -count=1 -timeout=120s -run ^TestCorrectionUnitConcurrentQueues$|^TestCorrectionAdmissionRefusalRace$|^TestCorrectionRefusalReplacementGuards$|^TestCorrectionQueueAdmissionErrors$
+ok  	github.com/openexec/openexec/internal/release	16.352s
+ok  	github.com/openexec/openexec/pkg/manager	5.638s
+
+exit=0

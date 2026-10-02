@@ -82,6 +82,27 @@ preparation before a retained human acceptance boundary; the acceptance task
 must not mutate or commit the exact candidate it asks the owner to accept.
 `
 
+// DeliveryBoundaryRule separates executable preparation from coordinator-owned
+// delivery using the existing story contract, not a second task lifecycle.
+const DeliveryBoundaryRule = `POST-QUEUE DELIVERY:
+When delivery belongs to Agent Console or another coordinator, native tasks and
+verification_script verify repository-local preparation. Preserve the full Goal
+and every accepted requirement, including delivery conditions such as D2, in the
+owning story's contract and acceptance criteria. Explicitly mark post-queue
+delivery outstanding there; do not claim Goal completion from queue completion.
+Do not create tasks or dependencies that publish a PR, run the coordinator's
+canonical gate, request its review, raise its owner merge decision, merge or
+deploy. Those effects occur after the queue finishes under existing owner
+controls. A preparation verifier must pass with D2 explicitly outstanding; only
+actual coordinator-supplied default-branch merge evidence can satisfy D2.
+If owner acceptance is required within this plan, retain a single final HITL
+acceptance task after autonomous preparation; the coordinator brings the PR to
+that boundary. Never make preparation wait for a subsequent merge or fabricate
+approval. Reject plans that require post-queue effects to finish native work,
+or that drop delivery requirements to make verification pass. This distinction
+governs Goal verification and requirement coverage in all planning modes.
+`
+
 // RepositoryScopeRule is shared by every planning path. A plan runs in one
 // repository's candidate; a task whose files live in another repository can
 // neither be done nor verified there, and three Goals stopped on one
@@ -136,7 +157,7 @@ RULES:
    - The FIRST slice of a story must be the thinnest possible end-to-end path through the feature (a tracer bullet). Later slices add depth to that already-working path.
 6. PARALLELISM: Maximize parallelism where possible. Only add depends_on between stories when there is a true data or artifact dependency (e.g., Story B needs files created by Story A). Stories that are orthogonal (touching different files/modules) MUST NOT depend on each other.
 7. GOAL LINKING: Every story must include a "goal_id" (G-001, etc.). If a goal has no stories, the project fails.
-8. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command) that specifically verifies the GOAL it is linked to and FAILS LOUDLY when the goal is not met. The script MUST exit non-zero on any failure. Do NOT write false-green scripts:
+8. VERIFIABILITY: Every story MUST have an executable 'verification_script' (shell command) that specifically verifies its repository-local Goal obligations and FAILS LOUDLY when those obligations are not met (see POST-QUEUE DELIVERY). The script MUST exit non-zero on any failure. Do NOT write false-green scripts:
    - NEVER append '|| <fallback>' to a test/assertion command — the fallback can pass while the real check failed. For the same reason never chain assertions as 'A && B || C' (that reports success when C passes even if A failed).
    - NEVER redirect the checked command's stderr to /dev/null to "clean up" output; a hidden error is a hidden failure.
    - Do not pipe an assertion like 'grep -q' into another command (e.g. '| head') — the pipe discards grep's exit status, so the check can never fail.
@@ -151,6 +172,7 @@ RULES:
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
 ` + CandidateCommitRule + `
+` + DeliveryBoundaryRule + `
 OUTPUT FORMAT (JSON object):
 {
   "schema_version": "1.1",
@@ -225,6 +247,7 @@ Generate a plan with EXACTLY ONE goal and EXACTLY ONE story. Rules:
 ` + RepositoryScopeRule + `
 ` + RequirementIdentityRule + `
 ` + CandidateCommitRule + `
+` + DeliveryBoundaryRule + `
 6. Acceptance criteria state observable behavior, not implementation steps.
 
 Return ONLY valid JSON, no markdown, in this exact shape:
@@ -233,7 +256,7 @@ Return ONLY valid JSON, no markdown, in this exact shape:
   "goals": [{"id":"G-001","title":"...","description":"..."}],
   "stories": [{
     "id":"US-001","title":"...","goal_id":"G-001","requirement_id":"REQ-001",
-    "description":"...",
+    "description":"...","contract":"...",
     "acceptance_criteria":["..."],
     "verification_script":"...",
     "tasks":[{"id":"T-US-001-001","title":"...","description":"...","technical_strategy":"...","mode":"afk","verification_script":"..."}]
@@ -254,6 +277,7 @@ dependency modeling for parallel execution.
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
 ` + CandidateCommitRule + `
+` + DeliveryBoundaryRule + `
 Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
 REVIEW THE STORIES AGAINST THESE CRITERIA:
@@ -337,6 +361,7 @@ The reviewer has analyzed the stories and provided a refactoring plan. Follow it
 ` + RequirementIdentityRule + `
 ` + RepositoryScopeRule + `
 ` + CandidateCommitRule + `
+` + DeliveryBoundaryRule + `
 ORIGINAL INTENT:
 %s
 

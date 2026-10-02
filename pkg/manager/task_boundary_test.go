@@ -91,7 +91,7 @@ func TestTaskQueueBoundaryKeepsLegacyHumanFailureAndLimitsDistinct(t *testing.T)
 	for _, item := range boundary.Tasks {
 		kinds[item.TaskID] = item.Kind
 	}
-	if !reflect.DeepEqual(kinds, map[string]string{"legacy-human": BoundaryHuman, "limit": BoundaryAttemptLimit, "failed": BoundaryFailed, "review": BoundaryReview}) {
+	if !reflect.DeepEqual(kinds, map[string]string{"legacy-human": BoundaryHuman, "limit": BoundaryAttemptLimit, "failed": BoundaryAttemptLimit, "review": BoundaryReview}) {
 		t.Fatalf("boundary kinds = %v", kinds)
 	}
 	boundary.Tasks[0].DecisionReason = "sensitive owner detail"

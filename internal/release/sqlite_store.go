@@ -903,7 +903,7 @@ func (s *SQLiteStore) createTaskInternal(ctx context.Context, task *Task) error 
 			?, ?, ?, ?,
 			?, ?, ?, ?,
 			?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?
+			?, ?, ?, ?, ?, ?, ?, json_remove(?, '$.task_correction', '$.task_correction_history')
 		)
 	`
 
@@ -1119,8 +1119,10 @@ func (s *SQLiteStore) UpdateTask(ctx context.Context, task *Task) error {
 			git_commits = ?, git_branch = ?, git_pr_number = ?, git_pr_url = ?,
 			approval_status = ?, approval_approved_by = ?, approval_approved_at = ?, approval_comments = ?,
 			approval_rejection_reason = ?, approval_review_cycle = ?,
-			needs_review = ?, review_notes = ?, status = ?, started_at = ?, completed_at = ?, error_message = ?, metadata = ?
-		WHERE id = ?
+			needs_review = ?, review_notes = ?, status = ?, started_at = ?, completed_at = ?, error_message = ?, metadata = CASE
+                WHEN json_extract(metadata,'$.task_correction') IS NULL THEN json_remove(?,'$.task_correction','$.task_correction_history')
+                ELSE json_set(CASE WHEN json_type(?)='object' THEN ? ELSE '{}' END,'$.task_correction',json_extract(metadata,'$.task_correction'), '$.task_correction_history',COALESCE(json_extract(metadata,'$.task_correction_history'),json('[]'))) END
+        WHERE id = ?
 	`
 
 	af := extractApproval(task.Approval)
@@ -1136,7 +1138,7 @@ func (s *SQLiteStore) UpdateTask(ctx context.Context, task *Task) error {
 		gitCommitsJSON, gitBranch, gitPRNumber, gitPRUrl,
 		af.status, af.approvedBy, nullTimePtr(af.approvedAt), af.comments,
 		af.rejectionReason, af.reviewCycle,
-		needsReview, task.ReviewNotes, task.Status, nullTimePtr(task.StartedAt), nullTimePtr(task.CompletedAt), task.ErrorMessage, metadataJSON,
+		needsReview, task.ReviewNotes, task.Status, nullTimePtr(task.StartedAt), nullTimePtr(task.CompletedAt), task.ErrorMessage, metadataJSON, metadataJSON, metadataJSON,
 		task.ID,
 	)
 	if err != nil {
@@ -1157,8 +1159,16 @@ func (s *SQLiteStore) UpdateTask(ctx context.Context, task *Task) error {
 // CanCompleteTask enforces only validation obligations that an accepted plan
 // made authoritative. Tasks with no accepted plan preserve legacy behavior.
 func (s *SQLiteStore) CanCompleteTask(ctx context.Context, taskID string) error {
+	return canCompleteTask(ctx, s.db, taskID)
+}
+
+type completionQuerier interface {
+	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+}
+
+func canCompleteTask(ctx context.Context, db completionQuerier, taskID string) error {
 	var planID, generationID, stateHash string
-	err := s.db.QueryRowContext(ctx, `SELECT id, generation_id, worktree_state_hash FROM validation_plan_revisions WHERE task_id = ? AND status = 'accepted' ORDER BY revision DESC LIMIT 1`, taskID).Scan(&planID, &generationID, &stateHash)
+	err := db.QueryRowContext(ctx, `SELECT id, generation_id, worktree_state_hash FROM validation_plan_revisions WHERE task_id = ? AND status = 'accepted' ORDER BY revision DESC LIMIT 1`, taskID).Scan(&planID, &generationID, &stateHash)
 	if err == sql.ErrNoRows {
 		return nil
 	}
@@ -1166,14 +1176,14 @@ func (s *SQLiteStore) CanCompleteTask(ctx context.Context, taskID string) error 
 		return fmt.Errorf("load accepted validation plan: %w", err)
 	}
 	var generationStatus, currentState string
-	if err := s.db.QueryRowContext(ctx, `SELECT status, worktree_state_hash FROM graph_generations WHERE id = ?`, generationID).Scan(&generationStatus, &currentState); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT status, worktree_state_hash FROM graph_generations WHERE id = ?`, generationID).Scan(&generationStatus, &currentState); err != nil {
 		return fmt.Errorf("load validation graph generation: %w", err)
 	}
 	if generationStatus != "current" || currentState != stateHash {
 		return fmt.Errorf("task %s validation evidence is stale: graph generation is %s", taskID, generationStatus)
 	}
 	var outstanding int
-	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM validation_items i
+	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM validation_items i
 		WHERE i.plan_revision_id = ? AND i.disposition = 'accepted'
 		AND i.requirement IN ('required','blocking')
 		AND NOT EXISTS (
@@ -1392,7 +1402,7 @@ func (s *SQLiteStore) BulkCreateTasks(ctx context.Context, tasks []*Task) error 
 				?, ?, ?, ?,
 				?, ?, ?, ?,
 				?, ?,
-				?, ?, ?, ?, ?, ?, ?, ?
+				?, ?, ?, ?, ?, ?, ?, json_remove(?, '$.task_correction', '$.task_correction_history')
 			)
 		`,
 			task.ID, task.StoryID, task.Title, task.Description, task.VerificationScript, dependsOnJSON,

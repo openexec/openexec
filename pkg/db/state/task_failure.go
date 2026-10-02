@@ -19,8 +19,11 @@ func (s *Store) RecordTaskFailureStep(ctx context.Context, step RunStepData, att
 	}
 	defer tx.Rollback()
 	result, err := tx.ExecContext(ctx, `UPDATE tasks SET status='failed',
-		metadata=json_set(COALESCE(NULLIF(CAST(metadata AS TEXT),'null'),'{}'),'$.verification_failure_evidence',?)
-		WHERE id=? AND status='in_progress' AND attempt_count=?`, step.ID, step.RunID, attempt)
+		metadata=CASE WHEN json_extract(metadata,'$.task_correction.outcome')='running'
+        AND json_extract(metadata,'$.task_correction.consumed')=1
+        THEN json_set(metadata,'$.task_correction.fresh_evidence_id',?)
+        ELSE json_set(COALESCE(NULLIF(CAST(metadata AS TEXT),'null'),'{}'),'$.verification_failure_evidence',?) END
+		WHERE id=? AND status='in_progress' AND attempt_count=?`, step.ID, step.ID, step.RunID, attempt)
 	if err != nil {
 		return err
 	}

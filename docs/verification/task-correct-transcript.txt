@@ -1,0 +1,207 @@
+$ go build -o /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/openexec ./cmd/openexec
+exit=0
+$ go test ./pkg/manager -run ^TestTaskCorrectCLI$ -count=1 -json
+exit=0
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: task correction requires an operator session
+    task_correct_cli_test.go:79: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --decision-ref fixture-owner:explicit-correction
+        Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:80: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:81: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref bad reference
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:82: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction --plan stale-plan
+        Error: --plan must match the current accepted task plan
+    task_correct_cli_test.go:87: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: invalid data: correction validation graph is stale
+    task_correct_cli_test.go:95: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+    task_correct_cli_test.go:102: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction requires the retained task failure receipt
+--- PASS: TestTaskCorrectCLI/planned/denials (0.11s)
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:137: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+    task_correct_cli_test.go:141: RELOADED_CORRECTION {"dependent":{"id":"Settings","title":"Settings","description":"Implement the bounded fixture task","story_id":"S","depends_on":["A"],"priority":0,"attempt_count":1,"max_attempts":3,"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:41Z"},"repair":{"id":"repair-777b5a19a5fb3deef304c9b1feef2f66","title":"Repair: A","description":"repair prerequisite","story_id":"S","task_type":"fix","priority":0,"attempt_count":0,"max_attempts":2,"git":{"commits":[],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:41Z","metadata":{"diagnosis":"repair prerequisite","failure_evidence":"earlier-receipt","mode":"afk","repair_of":"A"}},"task":{"id":"A","title":"A","description":"Implement the bounded fixture task","story_id":"S","verification_script":"test -f corrected.go","depends_on":["repair-777b5a19a5fb3deef304c9b1feef2f66"],"priority":0,"attempt_count":3,"max_attempts":3,"git":{"commits":["retained-history"],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:41Z","completed_at":"2026-10-01T17:04:42Z","metadata":{"exhaustion":{"evidence_id":"legacy","outcome":"attempt_limit","reason":"ordinary attempts exhausted"},"task_correction":{"branch":"retained","candidate_digest":"ff64402164466ca11ca83cb141040c11bc6b6238a286614d4069adcf494aee11","candidate_path":"/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002","consumed":true,"decision_ref":"fixture-owner:explicit-correction","evidence_id":"legacy","outcome":"completed","plan_id":"validation_plan_89e4ffdc-bf79-4d12-b169-d35912a817c8","reason":"","state_hash":"sha256:f03999fa7886147b22877efef1febd46183cab7f963ceba9f61110c61e9dc1ba","task_id":"A"},"verification_failure_evidence":"legacy"}}}
+    task_correct_cli_test.go:147: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned262179003/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+--- PASS: TestTaskCorrectCLI/planned (0.49s)
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: task correction requires an operator session
+    task_correct_cli_test.go:79: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --decision-ref fixture-owner:explicit-correction
+        Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:80: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:81: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref bad reference
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:82: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction --plan stale-plan
+        Error: --plan must match the current accepted task plan
+    task_correct_cli_test.go:95: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+    task_correct_cli_test.go:102: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction requires the retained task failure receipt
+--- PASS: TestTaskCorrectCLI/no-plan/denials (0.08s)
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:137: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+    task_correct_cli_test.go:141: RELOADED_CORRECTION {"dependent":{"id":"Settings","title":"Settings","description":"Implement the bounded fixture task","story_id":"S","depends_on":["A"],"priority":0,"attempt_count":1,"max_attempts":3,"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:42Z"},"repair":{"id":"repair-777b5a19a5fb3deef304c9b1feef2f66","title":"Repair: A","description":"repair prerequisite","story_id":"S","task_type":"fix","priority":0,"attempt_count":0,"max_attempts":2,"git":{"commits":[],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:42Z","metadata":{"diagnosis":"repair prerequisite","failure_evidence":"earlier-receipt","mode":"afk","repair_of":"A"}},"task":{"id":"A","title":"A","description":"Implement the bounded fixture task","story_id":"S","verification_script":"test -f corrected.go","depends_on":["repair-777b5a19a5fb3deef304c9b1feef2f66"],"priority":0,"attempt_count":3,"max_attempts":3,"git":{"commits":["retained-history"],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:42Z","completed_at":"2026-10-01T17:04:42Z","metadata":{"exhaustion":{"evidence_id":"legacy","outcome":"attempt_limit","reason":"ordinary attempts exhausted"},"task_correction":{"branch":"retained","candidate_digest":"d4d17055f9d0c244a8198fa02db896abce4ad7734be3822c8c8dc076be3b1b6c","candidate_path":"/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002","consumed":true,"decision_ref":"fixture-owner:explicit-correction","evidence_id":"legacy","outcome":"completed","plan_id":"","reason":"","state_hash":"","task_id":"A"},"verification_failure_evidence":"legacy"}}}
+    task_correct_cli_test.go:147: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan759454044/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+--- PASS: TestTaskCorrectCLI/no-plan (0.40s)
+--- PASS: TestTaskCorrectCLI (0.89s)
+PASS
+$ go build -overlay /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/skip-authorization.json -o /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/openexec ./cmd/openexec
+exit=0
+$ go test ./pkg/manager -run ^TestTaskCorrectCLI$/(planned|no-plan)$/^$ -count=1 -json
+exit=1
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1718071814/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:132: authorization missing; A failed 3/3 with TaskQueueBoundary: explicit candidate-bound correction authority required
+--- FAIL: TestTaskCorrectCLI/planned (0.17s)
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan728280761/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:132: authorization missing; A failed 3/3 with TaskQueueBoundary: explicit candidate-bound correction authority required
+--- FAIL: TestTaskCorrectCLI/no-plan (0.18s)
+--- FAIL: TestTaskCorrectCLI (0.35s)
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	0.358s
+$ go build -overlay /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/bypass-operator.json -o /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/openexec ./cmd/openexec
+exit=0
+$ go test ./pkg/manager -run ^TestTaskCorrectCLI$/(planned|no-plan)$/^denials$ -count=1 -json
+exit=1
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned2960451921/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+--- FAIL: TestTaskCorrectCLI/planned/denials (0.03s)
+    task_correct_cli_test.go:110: want TaskQueueBoundary: <nil>
+--- FAIL: TestTaskCorrectCLI/planned (0.29s)
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan2999315715/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+--- FAIL: TestTaskCorrectCLI/no-plan/denials (0.03s)
+    task_correct_cli_test.go:110: want TaskQueueBoundary: <nil>
+--- FAIL: TestTaskCorrectCLI/no-plan (0.23s)
+--- FAIL: TestTaskCorrectCLI (0.51s)
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	0.517s
+$ go build -overlay /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/bypass-decision.json -o /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/openexec ./cmd/openexec
+exit=0
+$ go test ./pkg/manager -run ^TestTaskCorrectCLI$/(planned|no-plan)$/^denials$ -count=1 -json
+exit=1
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned373079428/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: task correction requires an operator session
+    task_correct_cli_test.go:79: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned373079428/002 --decision-ref fixture-owner:explicit-correction
+        Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:80: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned373079428/002 --authorize-correction
+        Error: explicit candidate-bound correction authority required
+    task_correct_cli_test.go:81: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned373079428/002 --authorize-correction --decision-ref bad reference
+        Authorized task A correction with decision bad reference; execution remains with the native queue.
+--- FAIL: TestTaskCorrectCLI/planned/denials (0.07s)
+    task_correct_cli_test.go:110: want TaskQueueBoundary: <nil>
+--- FAIL: TestTaskCorrectCLI/planned (0.32s)
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan2045552947/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: task correction requires an operator session
+    task_correct_cli_test.go:79: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan2045552947/002 --decision-ref fixture-owner:explicit-correction
+        Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:80: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan2045552947/002 --authorize-correction
+        Error: explicit candidate-bound correction authority required
+    task_correct_cli_test.go:81: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan2045552947/002 --authorize-correction --decision-ref bad reference
+        Authorized task A correction with decision bad reference; execution remains with the native queue.
+--- FAIL: TestTaskCorrectCLI/no-plan/denials (0.06s)
+    task_correct_cli_test.go:110: want TaskQueueBoundary: <nil>
+--- FAIL: TestTaskCorrectCLI/no-plan (0.26s)
+--- FAIL: TestTaskCorrectCLI (0.58s)
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	0.583s
+$ go build -overlay /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/change-decision.json -o /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/openexec ./cmd/openexec
+exit=0
+$ go test ./pkg/manager -run ^TestTaskCorrectCLI$/(planned|no-plan)$/^$ -count=1 -json
+exit=1
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned4042108117/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:135: exact decision binding mismatch: got {DecisionRef:fixture-owner:explicit-correction-mutated TaskID:A EvidenceID:legacy CandidatePath:/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned4042108117/002 CandidateDigest:372b8af6869a92711eaa130bc81f9eb3885141e8a3be25e3ee2dac4a38810e80 Branch:retained PlanID:validation_plan_f5358ce3-d3e3-4603-8f17-0edf80a8276f StateHash:sha256:f03999fa7886147b22877efef1febd46183cab7f963ceba9f61110c61e9dc1ba Consumed:false Outcome: FreshEvidenceID: Reason:} want {DecisionRef:fixture-owner:explicit-correction TaskID:A EvidenceID:legacy CandidatePath:/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned4042108117/002 CandidateDigest:372b8af6869a92711eaa130bc81f9eb3885141e8a3be25e3ee2dac4a38810e80 Branch:retained PlanID:validation_plan_f5358ce3-d3e3-4603-8f17-0edf80a8276f StateHash:sha256:f03999fa7886147b22877efef1febd46183cab7f963ceba9f61110c61e9dc1ba Consumed:false Outcome: FreshEvidenceID: Reason:}
+--- FAIL: TestTaskCorrectCLI/planned (0.18s)
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan675317914/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:135: exact decision binding mismatch: got {DecisionRef:fixture-owner:explicit-correction-mutated TaskID:A EvidenceID:legacy CandidatePath:/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan675317914/002 CandidateDigest:0d10da996955280b44ba03b6ceca9371dac775ad1d4cc99fa6ba94b16f7a4680 Branch:retained PlanID: StateHash: Consumed:false Outcome: FreshEvidenceID: Reason:} want {DecisionRef:fixture-owner:explicit-correction TaskID:A EvidenceID:legacy CandidatePath:/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan675317914/002 CandidateDigest:0d10da996955280b44ba03b6ceca9371dac775ad1d4cc99fa6ba94b16f7a4680 Branch:retained PlanID: StateHash: Consumed:false Outcome: FreshEvidenceID: Reason:}
+--- FAIL: TestTaskCorrectCLI/no-plan (0.16s)
+--- FAIL: TestTaskCorrectCLI (0.35s)
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	0.350s
+$ go build -o /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/openexec ./cmd/openexec
+exit=0
+$ go test ./internal/cli ./pkg/manager -run ^TestTaskCorrect -count=1 -json
+exit=0
+Error: task correction requires an operator session
+--- PASS: TestTaskCorrectAgentCannotSelfPromote (0.00s)
+Authorized task A correction with decision owner:unit; execution remains with the native queue.
+--- PASS: TestTaskCorrectUnit/success (0.07s)
+Authorized task A correction with decision owner:unit; execution remains with the native queue.
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: task correction requires an operator session
+--- PASS: TestTaskCorrectUnit/planned (0.04s)
+    task_correct_cli_test.go:79: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --decision-ref fixture-owner:explicit-correction
+        Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:80: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:81: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref bad reference
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:82: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction --plan stale-plan
+        Error: --plan must match the current accepted task plan
+--- PASS: TestTaskCorrectUnit/missing_flag (0.03s)
+Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:87: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: invalid data: correction validation graph is stale
+--- PASS: TestTaskCorrectUnit/bad_decision (0.03s)
+Error: stat /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectUnitmissing_db3162309936/002/.openexec/openexec.db: no such file or directory
+    task_correct_cli_test.go:95: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+--- PASS: TestTaskCorrectUnit/missing_db (0.02s)
+    task_correct_cli_test.go:102: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction requires the retained task failure receipt
+--- PASS: TestTaskCorrectCLI/planned/denials (0.11s)
+Error: task not found
+--- PASS: TestTaskCorrectUnit/missing_task (0.04s)
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+Error: correction requires the retained task failure receipt
+--- PASS: TestTaskCorrectUnit/bad_receipt (0.04s)
+    task_correct_cli_test.go:137: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+Error: --plan must match the current accepted task plan
+--- PASS: TestTaskCorrectUnit/bad_plan (0.04s)
+Authorized task A correction with decision owner:unit; execution remains with the native queue.
+Error: correction authority, candidate or allowance no longer matches
+--- PASS: TestTaskCorrectUnit/replay (0.06s)
+--- PASS: TestTaskCorrectUnit (0.37s)
+PASS
+    task_correct_cli_test.go:141: RELOADED_CORRECTION {"dependent":{"id":"Settings","title":"Settings","description":"Implement the bounded fixture task","story_id":"S","depends_on":["A"],"priority":0,"attempt_count":1,"max_attempts":3,"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:54Z"},"repair":{"id":"repair-777b5a19a5fb3deef304c9b1feef2f66","title":"Repair: A","description":"repair prerequisite","story_id":"S","task_type":"fix","priority":0,"attempt_count":0,"max_attempts":2,"git":{"commits":[],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:54Z","metadata":{"diagnosis":"repair prerequisite","failure_evidence":"earlier-receipt","mode":"afk","repair_of":"A"}},"task":{"id":"A","title":"A","description":"Implement the bounded fixture task","story_id":"S","verification_script":"test -f corrected.go","depends_on":["repair-777b5a19a5fb3deef304c9b1feef2f66"],"priority":0,"attempt_count":3,"max_attempts":3,"git":{"commits":["retained-history"],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:54Z","completed_at":"2026-10-01T17:04:54Z","metadata":{"exhaustion":{"evidence_id":"legacy","outcome":"attempt_limit","reason":"ordinary attempts exhausted"},"task_correction":{"branch":"retained","candidate_digest":"4241004b76fba557dcab6c4aa07ecd3e54e657a2c1e064f3b1e4c78c1f67682e","candidate_path":"/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002","consumed":true,"decision_ref":"fixture-owner:explicit-correction","evidence_id":"legacy","outcome":"completed","plan_id":"validation_plan_76bb0f2d-1695-4ba6-a236-ea427325fb06","reason":"","state_hash":"sha256:f03999fa7886147b22877efef1febd46183cab7f963ceba9f61110c61e9dc1ba","task_id":"A"},"verification_failure_evidence":"legacy"}}}
+    task_correct_cli_test.go:147: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIplanned1366691678/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+--- PASS: TestTaskCorrectCLI/planned (0.45s)
+    task_correct_cli_test.go:78: PUBLIC_COMMAND operator=false task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: task correction requires an operator session
+    task_correct_cli_test.go:79: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --decision-ref fixture-owner:explicit-correction
+        Error: explicit --authorize-correction is required
+    task_correct_cli_test.go:80: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:81: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref bad reference
+        Error: a valid --decision-ref is required (1-256 reference characters, no whitespace)
+    task_correct_cli_test.go:82: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction --plan stale-plan
+        Error: --plan must match the current accepted task plan
+    task_correct_cli_test.go:95: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+    task_correct_cli_test.go:102: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction requires the retained task failure receipt
+--- PASS: TestTaskCorrectCLI/no-plan/denials (0.09s)
+    task_correct_cli_test.go:120: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Authorized task A correction with decision fixture-owner:explicit-correction; execution remains with the native queue.
+    task_correct_cli_test.go:137: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+    task_correct_cli_test.go:141: RELOADED_CORRECTION {"dependent":{"id":"Settings","title":"Settings","description":"Implement the bounded fixture task","story_id":"S","depends_on":["A"],"priority":0,"attempt_count":1,"max_attempts":3,"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:54Z"},"repair":{"id":"repair-777b5a19a5fb3deef304c9b1feef2f66","title":"Repair: A","description":"repair prerequisite","story_id":"S","task_type":"fix","priority":0,"attempt_count":0,"max_attempts":2,"git":{"commits":[],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:54Z","metadata":{"diagnosis":"repair prerequisite","failure_evidence":"earlier-receipt","mode":"afk","repair_of":"A"}},"task":{"id":"A","title":"A","description":"Implement the bounded fixture task","story_id":"S","verification_script":"test -f corrected.go","depends_on":["repair-777b5a19a5fb3deef304c9b1feef2f66"],"priority":0,"attempt_count":3,"max_attempts":3,"git":{"commits":["retained-history"],"branch":"retained"},"needs_review":false,"status":"done","created_at":"2026-10-01T17:04:54Z","completed_at":"2026-10-01T17:04:54Z","metadata":{"exhaustion":{"evidence_id":"legacy","outcome":"attempt_limit","reason":"ordinary attempts exhausted"},"task_correction":{"branch":"retained","candidate_digest":"044a444152796edc723c26fabd061b91900f4366098005f861f64d44ae372871","candidate_path":"/mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002","consumed":true,"decision_ref":"fixture-owner:explicit-correction","evidence_id":"legacy","outcome":"completed","plan_id":"","reason":"","state_hash":"","task_id":"A"},"verification_failure_evidence":"legacy"}}}
+    task_correct_cli_test.go:147: PUBLIC_COMMAND operator=true task correct A --dir /mnt/data1/projects/openexec/.openexec/outcome-candidates/ad5a70cd0924dae18de345dbdf74e623/.openexec/task-correct-5l06utsh/TestTaskCorrectCLIno-plan1935331055/002 --authorize-correction --decision-ref fixture-owner:explicit-correction
+        Error: correction authority, candidate or allowance no longer matches
+--- PASS: TestTaskCorrectCLI/no-plan (0.39s)
+--- PASS: TestTaskCorrectCLI (0.85s)
+PASS

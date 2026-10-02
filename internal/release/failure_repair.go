@@ -129,6 +129,10 @@ func RunnableTasks(ctx context.Context, store Store, storyIDs []string) ([]*Task
 }
 
 func runnableTasks(ctx context.Context, store Store, storyIDs []string, recaptureID string) ([]*Task, error) {
+	return selectRunnableTasks(ctx, store, storyIDs, recaptureID, false)
+}
+
+func selectRunnableTasks(ctx context.Context, store Store, storyIDs []string, recaptureID string, correction bool) ([]*Task, error) {
 	scope := map[string]bool{}
 	for _, id := range storyIDs {
 		scope[id] = true
@@ -149,6 +153,9 @@ func runnableTasks(ctx context.Context, store Store, storyIDs []string, recaptur
 	for _, task := range tasks {
 		if task.ID == recaptureID && task.Status == TaskStatusFailed {
 			task.Status = TaskStatusPending
+			if correction {
+				task.AttemptCount = 0
+			}
 		}
 		taskByID[task.ID] = task
 	}

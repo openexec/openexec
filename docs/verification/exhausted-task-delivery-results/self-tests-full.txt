@@ -1,0 +1,7 @@
+....go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info295347973.tmp: read-only file system
+...............go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/openexec/@v/v0.13.2-0.20260904080945-186646ee3208.info643759367.tmp: read-only file system
+...............
+----------------------------------------------------------------------
+Ran 34 tests in 9.773s
+
+OK

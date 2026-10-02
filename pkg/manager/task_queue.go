@@ -65,6 +65,22 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			if task.Status != release.TaskStatusFailed {
 				continue
 			}
+			if task.Metadata["task_correction"] != nil {
+				if err := m.reconcileTaskCorrection(ctx, task); err != nil {
+					if errors.Is(err, errRecaptureWaiting) {
+						continue
+					}
+					return err
+				}
+				processedFailure = true
+				continue
+			}
+			if task.MaxAttempts <= 0 || task.AttemptCount >= task.MaxAttempts {
+				if err := m.persistTaskExhaustion(ctx, task); err != nil {
+					return err
+				}
+				continue
+			}
 			id, _ := task.Metadata["verification_failure_evidence"].(string)
 			if id != "" && !isRepairTask(task) {
 				if err := m.repairTaskFromRetainedFailure(ctx, task.ID, id); err != nil {
@@ -129,6 +145,19 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			if info, statusErr := m.Status(task.ID); statusErr == nil && info.Status == StatusError {
 				if saveErr := rel.SetTaskStatus(task.ID, release.TaskStatusFailed); saveErr != nil {
 					return fmt.Errorf("task failed and failure disposition could not persist: %w", saveErr)
+				}
+				if task.MaxAttempts <= 0 || attempt.AttemptCount >= task.MaxAttempts {
+					if _, saveErr := retryWithStopReason(ctx, rel, task.ID, info.Error); saveErr != nil {
+						return saveErr
+					}
+					exhausted, loadErr := rel.TaskSnapshot(ctx, task.ID)
+					if loadErr != nil {
+						return loadErr
+					}
+					if saveErr := m.persistTaskExhaustion(ctx, exhausted); saveErr != nil {
+						return saveErr
+					}
+					continue
 				}
 				if info.FailureEvidenceID != "" && ctx.Err() == nil {
 					if repairErr := m.repairTaskFromRetainedFailure(ctx, task.ID, info.FailureEvidenceID); repairErr != nil {
@@ -310,4 +339,18 @@ func attemptDescription(task *release.Task) string {
 	return task.Description + "\n\nThe previous attempt at this task stopped with:\n" + previous +
 		"\n\nStart there: find out why it stopped and remove the cause, then finish the task and verify it. " +
 		"What it found is the work that remains, not a reason to stop again."
+}
+
+// Exhaustion is a disposition of the existing task, never a repair-creation error.
+// Keep failed status so a later explicit candidate-bound correction may be admitted.
+func (m *Manager) persistTaskExhaustion(ctx context.Context, task *release.Task) error {
+	_, err := m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status=CASE WHEN json_extract(metadata,'$.recapture_outcome')='running' THEN 'needs_review' ELSE status END,
+        metadata=json_set(CASE WHEN json_extract(metadata,'$.recapture_outcome')='running'
+        THEN json_set(metadata,'$.recapture_outcome','exhausted') ELSE metadata END,
+        '$.exhaustion',json_object('outcome','attempt_limit','evidence_id',
+        COALESCE(json_extract(metadata,'$.verification_failure_evidence'),''),
+        'reason',COALESCE(json_extract(metadata,'$.previous_attempt_stop'),'ordinary attempts exhausted')))
+        WHERE id=? AND status='failed' AND (max_attempts<=0 OR attempt_count>=max_attempts)
+        AND json_extract(metadata,'$.task_correction') IS NULL`, task.ID)
+	return err
 }

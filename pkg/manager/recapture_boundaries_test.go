@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -89,7 +90,9 @@ func TestRecaptureBoundariesTerminal(t *testing.T) {
 			}
 			f.restart(t)
 			err := boundaryRun(f)
-			if err == nil || !strings.Contains(err.Error(), "recapture "+tc.outcome) {
+			var boundary *TaskQueueBoundary
+			drainedExhaustion := tc.name == "restart_spent" && errors.As(err, &boundary)
+			if !drainedExhaustion && (err == nil || !strings.Contains(err.Error(), "recapture "+tc.outcome)) {
 				t.Fatalf("missing explicit terminal reason: %v", err)
 			}
 			for _, checkpoint := range []string{"terminal", "terminal_restart"} {

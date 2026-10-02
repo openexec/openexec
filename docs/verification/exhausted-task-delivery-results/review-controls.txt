@@ -1,0 +1,17 @@
+$ python3 scripts/verification/exhausted_task_mutations.py
+executor-restrictions: expected named assertion failure; source restored db2b1d61ea2c3ee3b43dc138fba27e8b25cf7dcd5773d185fcd9bfff95693c57
+operational-store-error: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933
+conditional-owner: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c
+stop-control: expected named assertion failure; source restored db2b1d61ea2c3ee3b43dc138fba27e8b25cf7dcd5773d185fcd9bfff95693c57
+cancellation-control: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933
+refusal-persistence: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933
+independent-drain: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933
+fresh-evidence-guard: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c
+snapshot-ownership: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c
+spent-authority: expected named assertion failure; source restored e7413057b0c0e625387eec72f3dbfa2c709cc83bd68d866f2e9a1d8c39ec5c8c
+unsupported-obligation: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933
+invented-obligation: expected named assertion failure; source restored e5b1a7e7bafdabd1ffca86d4d0c550bb765ac76c64f433ca6488ca45e5f25933
+ok  	github.com/openexec/openexec/internal/release	9.958s
+ok  	github.com/openexec/openexec/pkg/manager	13.478s
+
+exit=0

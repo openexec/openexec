@@ -21,21 +21,39 @@ import (
 // Shared receipt, command resolution, restart and terminal assertions for the
 // independently owned recapture boundary/coverage/compatibility scenarios.
 type recaptureFixture struct {
-	env    *schedulerTestEnv
-	calls  int
-	mode   string
-	cancel context.CancelFunc
+	originalReceipt []byte
+	env             *schedulerTestEnv
+	calls           int
+	commands        []string
+	mode            string
+	cancel          context.CancelFunc
 }
 
 func newRecaptureFixture(t *testing.T, command string) *recaptureFixture {
 	t.Helper()
+	return newRecaptureFixtureOrigin(t, command, false)
+}
+
+func newRecaptureFixtureOrigin(t *testing.T, command string, imported bool) *recaptureFixture {
+	t.Helper()
 	e := newSchedulerTestEnv(t)
-	createStory(t, e.rel, "S", nil)
-	createQueueTask(t, e, "A", nil)
-	createQueueTask(t, e, "Settings", []string{"A"})
+	if imported {
+		e.mgr.cfg.PlanGenerator = fixedPlanCompletion(`{"goals":[{"id":"G-1","title":"Correct","description":"Correct retained work"}],"stories":[{"id":"S","title":"Correct","goal_id":"G-1","tasks":[{"id":"A","title":"Correct candidate","description":"Correct and verify","verification_script":` + fmt.Sprintf("%q", command) + `,"mode":"afk","max_attempts":3},{"id":"Settings","title":"Dependent","description":"Execute after verified correction","mode":"afk","depends_on":["A"]}]}]}`)
+		e.mgr.cfg.PlanReviewer = fixedPlanCompletion(replayReviewFixture)
+		if _, err := e.mgr.Plan(context.Background(), replayRequest()); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		createStory(t, e.rel, "S", nil)
+		createQueueTask(t, e, "A", nil)
+		createQueueTask(t, e, "Settings", []string{"A"})
+	}
 	task, err := e.rel.TaskSnapshot(context.Background(), "A")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if imported && task.VerificationScript != command {
+		t.Fatalf("planner import lost task verification script: %q", task.VerificationScript)
 	}
 	task.Status, task.AttemptCount, task.VerificationScript = release.TaskStatusInProgress, 1, command
 	if err := e.rel.UpdateTask(task); err != nil {
@@ -68,6 +86,7 @@ func (f *recaptureFixture) Execute(ctx context.Context, stage *runtime.Stage, in
 		return nil, fmt.Errorf("fixture stops at ordinary task execution")
 	}
 	f.calls++
+	f.commands = append(f.commands, stage.Commands...)
 	if f.mode == "exhausted" {
 		// A legacy adapter still returning only a normal-exit receipt must not
 		// mint repeated diagnostic-free repair tasks.
