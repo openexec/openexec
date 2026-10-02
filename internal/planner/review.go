@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/openexec/openexec/internal/execution/gates"
 )
 
 // PlanReview is the result already specified by StoryReviewPrompt. It is
@@ -57,6 +59,16 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 	if issues := LintHumanBoundaries(plan); len(issues) != 0 {
 		wire.PlanReview.Approved = false
 		wire.Assessment += fmt.Sprintf("; human boundary lint refused: %v", issues)
+	}
+	for _, story := range plan.Stories {
+		for _, task := range story.Tasks {
+			if len(task.AllowedPaths) > 0 {
+				if err := gates.ValidateRepairScope(task.AllowedPaths); err != nil {
+					wire.PlanReview.Approved = false
+					wire.Assessment += fmt.Sprintf("; task %s repair scope refused: %v", task.ID, err)
+				}
+			}
+		}
 	}
 	return &wire.PlanReview, nil
 }

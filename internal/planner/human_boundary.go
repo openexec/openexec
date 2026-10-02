@@ -9,10 +9,13 @@ import (
 // ExecutionMetadata uses the existing native task metadata in both import paths.
 // Missing reasons never convert retained legacy HITL work into automatic work.
 func (t Task) ExecutionMetadata() map[string]interface{} {
-	if t.Mode == "" && t.DecisionReason == "" && t.DecisionRef == "" {
+	if t.Mode == "" && t.DecisionReason == "" && t.DecisionRef == "" && len(t.AllowedPaths) == 0 {
 		return nil
 	}
 	m := map[string]interface{}{"mode": t.Mode}
+	if len(t.AllowedPaths) > 0 {
+		m["allowed_paths"] = append([]string(nil), t.AllowedPaths...)
+	}
 	if t.DecisionReason != "" {
 		m["decision_reason"] = t.DecisionReason
 	}
