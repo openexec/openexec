@@ -98,6 +98,7 @@ builds or verifies another repository.
 // HumanBoundaryRule is shared by generation, review and refinement. Classification
 // describes required owner input; it never grants permission for an effect.
 const HumanBoundaryRule = `EXECUTION AND HUMAN BOUNDARIES:
+For each implementation task, supply allowed_paths: an array of exact repository-relative files or explicit directory prefixes ending in /. Include bounded implementation and repair files within the accepted contract. These paths do not grant effects or owner authority. Never use missing scope, dot paths, absolute paths or wildcards to mean the whole repository. The independent plan reviewer must check the scope against the task and accepted outcome.
 Use mode "afk" for planning, ordering, implementation, automated QA, independent
 agent review, ordinary repairs and bounded experiments within the accepted goal.
 Use mode "hitl" only for an unresolved owner preference, a material goal or

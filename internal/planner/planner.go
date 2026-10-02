@@ -35,6 +35,7 @@ type Task struct {
 	DecisionReason     string   `json:"decision_reason,omitempty"`
 	DecisionRef        string   `json:"decision_ref,omitempty"`
 	VerificationScript string   `json:"verification_script"`
+	AllowedPaths       []string `json:"allowed_paths,omitempty"`
 }
 
 // Story represents a functional requirement mapped to a goal
