@@ -131,7 +131,9 @@ func TestReviewedPlanRefinementAllocatesBeforeRereview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reviews != 2 || result.Plan.Goals[0].ID == "G-1" || result.Plan.Stories[0].GoalID != result.Plan.Goals[0].ID {
+	// The goal persisted meanwhile is that goal: refinement carries it as
+	// persisted, never under a new ID.
+	if reviews != 2 || result.Plan.Goals[0].ID != "G-1" || result.Plan.Goals[0].Description != "Different retained purpose" || result.Plan.Stories[0].GoalID != "G-1" {
 		t.Fatalf("refinement not allocated consistently: %+v", result)
 	}
 	var description string

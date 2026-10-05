@@ -57,7 +57,12 @@ func TestReviewedPlanUsesImportedIdentitiesAndRefusesReviewRace(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			story := result.Plan.Stories[0]
+			// The persisted story keeps its ID; the plan's new task follows it
+			// in a continuation story that review saw and import created.
+			if result.Plan.Stories[0].ID != "US-1" || len(result.Plan.Stories) != 2 {
+				t.Fatalf("persisted story renamed: %+v", result.Plan.Stories)
+			}
+			story := result.Plan.Stories[1]
 			if story.ID == "US-1" || !strings.Contains(reviewed, story.ID) || e.rel.GetTask(story.Tasks[0].ID) == nil {
 				t.Fatal("review and imported task identities diverged")
 			}
@@ -74,7 +79,7 @@ func TestReviewedPlanUsesImportedIdentitiesAndRefusesReviewRace(t *testing.T) {
 					ID string `json:"id"`
 				} `json:"stories"`
 			}
-			if err := json.Unmarshal(data, &retained); err != nil || retained.Stories[0].ID != story.ID {
+			if err := json.Unmarshal(data, &retained); err != nil || len(retained.Stories) != 2 || retained.Stories[1].ID != story.ID {
 				t.Fatal("artifact describes different plan", err)
 			}
 		})
