@@ -189,7 +189,7 @@ func TestManagerPlan_RejectsStaleBaseRef(t *testing.T) {
 						}
 						continue
 					}
-					if err != nil || !result.Valid || reviewed != 2 || importedTaskCount(t, e) != 2 {
+					if err != nil || !result.Valid || reviewed != 1 || importedTaskCount(t, e) != 2 {
 						t.Fatalf("origin/main refinement not persisted: %+v %v", result, err)
 					}
 				}

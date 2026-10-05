@@ -237,8 +237,18 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			return nil, fmt.Errorf("retained plan artifact conflicts or is unavailable")
 		}
 		if result.Review == nil {
-			review, err := planner.New(m.cfg.PlanReviewer).ReviewPlan(ctx, content, result.Plan)
-			if err != nil {
+			var review *planner.PlanReview
+			if retained.RefinementAttempts >= 1 {
+				if issues := planner.DeterministicPlanIssues(result.Plan); len(issues) != 0 {
+					return nil, fmt.Errorf("the plan fixed after its review still fails required checks: %s", strings.Join(issues, "; "))
+				}
+				// One review, one fix (owner, 2026-10-05): the plan the
+				// planner fixed after its review is imported as it is. A second
+				// review sent plans round again and again: v0.7.0 Goal 41195b1f
+				// went through nine plans without converging. This record says
+				// what happened; it is not a reviewer's approval.
+				review = &planner.PlanReview{Approved: true, Assessment: "Imported after one review and one fix: the planner refined the plan the review rejected, and the refined plan is not reviewed again."}
+			} else if review, err = planner.New(m.cfg.PlanReviewer).ReviewPlan(ctx, content, result.Plan); err != nil {
 				return nil, err
 			}
 			result.Review = review

@@ -100,14 +100,16 @@ func TestReviewedPlanSchemaCorrection(t *testing.T) {
 				return replayReviewFixture, nil
 			})
 			result, err := e.mgr.Plan(context.Background(), replayRequest())
+			// One review, one fix: the corrected plan is imported without a
+			// second review, but still has to pass the deterministic checks.
 			switch scenario {
-			case "approved":
+			case "approved", "rejected", "missing-approval", "malformed-approval":
 				if err != nil || !result.Valid {
 					t.Fatalf("correction failed: %+v %v", result, err)
 				}
-			case "rejected", "legacy-hitl", "invalid-boundary":
-				if err != nil || result.Valid {
-					t.Fatalf("rejection bypassed: %+v %v", result, err)
+			case "legacy-hitl", "invalid-boundary":
+				if err == nil || !strings.Contains(err.Error(), "human boundary lint refused") {
+					t.Fatalf("an invalid boundary was imported after its fix: %+v %v", result, err)
 				}
 			case "interrupted", "remaining-budget":
 				if !errors.Is(err, context.Canceled) {
@@ -122,13 +124,11 @@ func TestReviewedPlanSchemaCorrection(t *testing.T) {
 				t.Fatalf("calls=%d", calls)
 			}
 			wantReviews := 1
-			if scenario == "approved" || scenario == "rejected" || scenario == "legacy-hitl" || scenario == "invalid-boundary" || scenario == "missing-approval" || scenario == "malformed-approval" {
-				wantReviews = 2
-			}
+			imported := scenario == "approved" || scenario == "rejected" || scenario == "missing-approval" || scenario == "malformed-approval"
 			if reviews != wantReviews {
 				t.Fatalf("reviews=%d", reviews)
 			}
-			if scenario == "approved" {
+			if imported {
 				if _, err := e.mgr.state.GetDB().Exec(`UPDATE tasks SET status='in_progress',attempt_count=2 WHERE id='T-1'`); err != nil {
 					t.Fatal(err)
 				}
@@ -142,6 +142,15 @@ func TestReviewedPlanSchemaCorrection(t *testing.T) {
 				fresh.cfg.PlanReviewer = fixedPlanCompletion(rejectedReplayReview)
 			}
 			again, err := fresh.Plan(context.Background(), replayRequest())
+			if scenario == "legacy-hitl" || scenario == "invalid-boundary" {
+				// The refusal holds across a restart, and nothing was imported.
+				var tasks int
+				fresh.state.GetDB().QueryRow(`SELECT COUNT(*) FROM tasks`).Scan(&tasks)
+				if err == nil || !strings.Contains(err.Error(), "human boundary lint refused") || tasks != 0 {
+					t.Fatalf("an invalid boundary was imported after a restart: %v tasks=%d", err, tasks)
+				}
+				return
+			}
 			wantCalls := 3
 			if scenario == "remaining-budget" {
 				wantCalls = 4
@@ -153,7 +162,7 @@ func TestReviewedPlanSchemaCorrection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if again.Valid != (scenario == "approved") || calls != wantCalls || reviews != wantReviews {
+			if again.Valid != imported || calls != wantCalls || reviews != wantReviews {
 				t.Fatal("restart refunded budget or changed approval")
 			}
 			var metadata string
@@ -174,7 +183,7 @@ func TestReviewedPlanSchemaCorrection(t *testing.T) {
 			if err := fresh.state.GetDB().QueryRow(`SELECT COUNT(*) FROM run_steps WHERE agent='reviewed-plan-import'`).Scan(&imports); err != nil {
 				t.Fatal(err)
 			}
-			if scenario == "approved" {
+			if imported {
 				var status string
 				var attempts, history int
 				if err := fresh.state.GetDB().QueryRow(`SELECT status,attempt_count FROM tasks WHERE id='T-1'`).Scan(&status, &attempts); err != nil {

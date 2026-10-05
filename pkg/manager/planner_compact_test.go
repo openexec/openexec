@@ -144,7 +144,8 @@ func TestCompactRequirementIdentityPersistsAcrossManagerReopen(t *testing.T) {
 		return replayReviewFixture, nil
 	})
 	result, err := e.mgr.Plan(context.Background(), req)
-	if err != nil || !result.Valid || generated != 2 || reviewed != 2 {
+	// One review, one fix: the refined compact plan is not reviewed again.
+	if err != nil || !result.Valid || generated != 2 || reviewed != 1 {
 		t.Fatalf("compact refinement failed: %+v %v %d/%d", result, err, generated, reviewed)
 	}
 	raw, err := os.ReadFile(result.ArtifactPath)
@@ -166,7 +167,7 @@ func TestCompactRequirementIdentityPersistsAcrossManagerReopen(t *testing.T) {
 	cfg.StateStore = reopened
 	fresh := &Manager{cfg: cfg, state: reopened}
 	again, err := fresh.Plan(context.Background(), req)
-	if err != nil || !again.Valid || again.Plan.Stories[0].RequirementID != "REQ-001" || generated != 2 || reviewed != 2 {
+	if err != nil || !again.Valid || again.Plan.Stories[0].RequirementID != "REQ-001" || generated != 2 || reviewed != 1 {
 		t.Fatalf("reopened receipt lost identity or replayed provider: %+v %v", again, err)
 	}
 	var imports int
