@@ -571,8 +571,12 @@ func (s *Server) handleBacklogCompleteStory(req Request, params toolsCallParams)
 	}
 
 	var remaining []string
+	byID := map[string]*release.Task{}
+	for _, t := range mgr.GetTasks() {
+		byID[t.ID] = t
+	}
 	for _, t := range mgr.GetTasksForStory(st.ID) {
-		if t.Status != release.TaskStatusDone && t.Status != release.TaskStatusApproved {
+		if !release.Delivered(t, byID) {
 			remaining = append(remaining, fmt.Sprintf("%s [%s]", t.ID, t.Status))
 		}
 	}

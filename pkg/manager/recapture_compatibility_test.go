@@ -142,7 +142,8 @@ func TestRecaptureCompatibility(t *testing.T) {
 							t.Fatalf("success did not converge: %+v %+v calls=%d", task, settings, f.calls)
 						}
 					case "failure":
-						if task.Status != release.TaskStatusPending || task.AttemptCount != 2 || settings.Status != release.TaskStatusPending || settings.AttemptCount != 0 || f.calls != 1 || len(tasks) != 3 {
+						// The failed task is closed with its fix; its dependent waits for the fix.
+						if task.Status != release.TaskStatusFailed || task.Metadata["fixed_by"] == nil || task.AttemptCount != 2 || settings.Status != release.TaskStatusPending || settings.AttemptCount != 0 || f.calls != 1 || len(tasks) != 3 {
 							t.Fatalf("repair disposition: %+v %+v calls=%d tasks=%d", task, settings, f.calls, len(tasks))
 						}
 						id, _ := task.Metadata["verification_failure_evidence"].(string)

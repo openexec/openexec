@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/release"
 	"github.com/openexec/openexec/pkg/db/state"
 )
 
@@ -99,7 +101,46 @@ func (m *Manager) repairTaskFromRetainedFailure(ctx context.Context, taskID, evi
 	if err != nil {
 		return err
 	}
-	diagnosis := fmt.Sprintf("Diagnose and repair the failed verification for task %s. Evidence: run step %s; retained verification evidence and artifact references: %s. Preserve the original task/candidate and accepted scope. Reproduce the failing check, determine its cause, repair it, and verify it; this receipt proves failure, not a particular code defect. Do not weaken the check or cross effect boundaries.", taskID, evidenceID, step.Metadata)
-	_, err = rel.CreateFailureRepair(ctx, taskID, evidenceID, diagnosis)
+	failed, err := rel.TaskSnapshot(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	original := failed
+	if rootID, _ := failed.Metadata["repair_of"].(string); rootID != "" {
+		if original, err = rel.TaskSnapshot(ctx, rootID); err != nil {
+			return err
+		}
+	}
+	_, err = rel.CreateFailureRepair(ctx, taskID, evidenceID, fixTaskDescription(original, failed, evidenceID, step.Metadata))
 	return err
+}
+
+// fixTaskDescription is the whole scope of a fix task, for the stage that
+// writes the fix and for the review that judges it: the original task, its
+// code, how it failed, and that only the fix is to be delivered. Its review
+// sees the original task, the original code and the fix together, so a
+// finding outside the original task is out of scope, not more work.
+func fixTaskDescription(original, failed *release.Task, evidenceID, evidence string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Fix task for %s %q. The original task is closed: it was implemented and failed its check. ", original.ID, original.Title)
+	b.WriteString("Deliver only the fix that makes the original task pass. Do not redo the original task.\n\n")
+	fmt.Fprintf(&b, "Original task:\n%s\n\n", strings.TrimSpace(original.Description))
+	if script := strings.TrimSpace(original.VerificationScript); script != "" {
+		fmt.Fprintf(&b, "Its check, which this fix must pass unchanged:\n%s\n\n", script)
+	}
+	if original.Git != nil && (len(original.Git.Commits) > 0 || original.Git.Branch != "") {
+		fmt.Fprintf(&b, "Its code: branch %s, commits %s. Read them with git show before changing anything.\n\n",
+			original.Git.Branch, strings.Join(original.Git.Commits, ", "))
+	} else {
+		b.WriteString("Its code is the original task's work in this candidate; read its changes before changing anything.\n\n")
+	}
+	if failed.ID != original.ID {
+		fmt.Fprintf(&b, "An earlier fix, %s, also failed; this fix replaces it.\n\n", failed.ID)
+	}
+	fmt.Fprintf(&b, "How it failed (run step %s): %s\n\n", evidenceID, evidence)
+	b.WriteString("Preserve the original task/candidate and accepted scope. Reproduce the failing check, find its cause, change only what that cause requires, and verify with the check above. ")
+	b.WriteString("The review of this fix judges the original task, its code and this fix together. ")
+	b.WriteString("Anything outside the original task is out of scope for this fix: record it as a finding for later, do not do it. ")
+	b.WriteString("Note: this receipt proves failure, not a particular code defect. Do not weaken the check or cross effect boundaries.")
+	return b.String()
 }

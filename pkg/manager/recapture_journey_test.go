@@ -25,7 +25,7 @@ func TestLegacyRecaptureFailureReloadRepair(t *testing.T) {
 	}
 	f.restart(t)
 	task, err := f.env.rel.TaskSnapshot(ctx, "A")
-	if err != nil || task.AttemptCount != 2 || task.Status != release.TaskStatusPending {
+	if err != nil || task.AttemptCount != 2 || task.Status != release.TaskStatusFailed || task.Metadata["fixed_by"] == nil {
 		t.Fatalf("original disposition: %+v %v", task, err)
 	}
 	id, _ := task.Metadata["verification_failure_evidence"].(string)

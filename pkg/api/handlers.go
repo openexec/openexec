@@ -499,9 +499,13 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
     var total, done int
     if rel, err := s.Mgr.GetInternalReleaseManager(); err == nil {
         tasks := rel.GetTasks()
+        byID := make(map[string]*release.Task, len(tasks))
+        for _, t := range tasks {
+            byID[t.ID] = t
+        }
         total = len(tasks)
         for _, t := range tasks {
-            if t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved {
+            if release.Delivered(t, byID) {
                 done++
             }
         }

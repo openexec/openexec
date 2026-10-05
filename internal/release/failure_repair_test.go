@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -33,7 +34,7 @@ func repairFixture(t *testing.T) (*SQLiteStore, string) {
 	return s, path
 }
 
-func TestFailureRepairPersistsDependencyAndSameCandidateAcrossRestart(t *testing.T) {
+func TestFailureClosesTaskAndItsFixRunsFirstAcrossRestart(t *testing.T) {
 	s, path := repairFixture(t)
 	ctx := context.Background()
 	original, _ := s.GetTask(ctx, "task")
@@ -48,8 +49,10 @@ func TestFailureRepairPersistsDependencyAndSameCandidateAcrossRestart(t *testing
 		t.Fatal(err)
 	}
 	ready, err := RunnableTasks(ctx, s, []string{"story"})
-	if err != nil || len(ready) != 2 || ready[0].ID != repair.ID {
-		t.Fatal("original did not wait on new repair", ready, err)
+	// The fix runs first, even before higher-priority work; the closed
+	// task is not runnable.
+	if err != nil || len(ready) != 2 || ready[0].ID != repair.ID || ready[1].ID != "peer" {
+		t.Fatal("fix does not run first", ready, err)
 	}
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
@@ -70,37 +73,116 @@ func TestFailureRepairPersistsDependencyAndSameCandidateAcrossRestart(t *testing
 	if _, err := reopened.CreateFailureRepair(ctx, "task", "evidence:1", "different diagnosis"); err == nil {
 		t.Fatal("same evidence authorized changed repair")
 	}
+	// Closed, not reopened: the failed task keeps everything it had, and
+	// only its closing record names the fix.
 	retained, _ := reopened.GetTask(ctx, "task")
-	if retained.Status != TaskStatusPending || retained.ErrorMessage != original.ErrorMessage || !reflect.DeepEqual(retained.Git, original.Git) || retained.AttemptCount != original.AttemptCount {
-		t.Fatal("original history rewritten", retained)
+	if retained.Status != TaskStatusFailed || retained.Metadata["fixed_by"] != repair.ID || retained.ErrorMessage != original.ErrorMessage ||
+		!reflect.DeepEqual(retained.Git, original.Git) || retained.AttemptCount != original.AttemptCount || !reflect.DeepEqual(retained.DependsOn, original.DependsOn) {
+		t.Fatal("failed task not closed as it failed", retained)
+	}
+	if again.Metadata["repair_of"] != "task" || again.Metadata["fix_of"] != "task" || again.TaskType != "fix" {
+		t.Fatal("fix does not name its original", again.Metadata)
 	}
 	again.Status = TaskStatusDone
 	if err := reopened.UpdateTask(ctx, again); err != nil {
 		t.Fatal(err)
 	}
 	ready, err = RunnableTasks(ctx, reopened, []string{"story"})
-	if err != nil || len(ready) != 2 || ready[1].ID != "task" {
-		t.Fatal("original cannot resume after repair", err)
+	if err != nil || len(ready) != 1 || ready[0].ID != "peer" {
+		t.Fatal("closed task ran again after its fix", ready, err)
 	}
 	retained, _ = reopened.GetTask(ctx, "task")
-	if retained.Status == TaskStatusDone {
-		t.Fatal("repair falsely completed original")
+	tasks, _ := reopened.ListTasks(ctx)
+	byID := map[string]*Task{}
+	for _, task := range tasks {
+		byID[task.ID] = task
+	}
+	if retained.Status != TaskStatusFailed || !Delivered(retained, byID) {
+		t.Fatal("closed task rewritten, or not delivered by its passed fix", retained)
+	}
+}
+
+// A fix that fails its check is closed like any task and the next fix
+// follows for the same original task, until the original's budget is spent.
+// Work that waits on the original runs once the chain ends in a passed fix;
+// no task in the chain is ever changed after it closed.
+func TestFixChainClosesFailedFixesAndDeliversThroughTheLastFix(t *testing.T) {
+	s, _ := repairFixture(t)
+	ctx := context.Background()
+	if err := s.CreateTask(ctx, &Task{ID: "after", StoryID: "story", Status: TaskStatusPending, MaxAttempts: 3, DependsOn: []string{"task"}}); err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.CreateFailureRepair(ctx, "task", "evidence:1", "fix one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Status = TaskStatusFailed
+	if err := s.UpdateTask(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.CreateFailureRepair(ctx, first.ID, "evidence:2", "fix two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Metadata["repair_of"] != "task" || second.Metadata["fix_of"] != first.ID {
+		t.Fatal("next fix lost its original", second.Metadata)
+	}
+	closedFirst, _ := s.GetTask(ctx, first.ID)
+	if closedFirst.Status != TaskStatusFailed || closedFirst.Metadata["fixed_by"] != second.ID {
+		t.Fatal("failed fix not closed with the next fix", closedFirst)
+	}
+	ready, err := RunnableTasks(ctx, s, []string{"story"})
+	if err != nil || len(ready) != 1 || ready[0].ID != second.ID {
+		t.Fatal("dependent ran before the chain passed, or next fix not first", ready, err)
+	}
+	second.Status = TaskStatusDone
+	if err := s.UpdateTask(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	ready, err = RunnableTasks(ctx, s, []string{"story"})
+	if err != nil || len(ready) != 1 || ready[0].ID != "after" {
+		t.Fatal("dependent did not run after the chain passed", ready, err)
+	}
+	original, _ := s.GetTask(ctx, "task")
+	closedFirst, _ = s.GetTask(ctx, first.ID)
+	if original.Status != TaskStatusFailed || closedFirst.Status != TaskStatusFailed {
+		t.Fatal("a closed task in the chain was rewritten")
+	}
+	// The budget is the original's max_attempts (3): a third failed fix
+	// gets one more, a fourth is refused.
+	second.Status = TaskStatusFailed
+	if err := s.UpdateTask(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	third, err := s.CreateFailureRepair(ctx, second.ID, "evidence:3", "fix three")
+	if err != nil {
+		t.Fatal(err)
+	}
+	third.Status = TaskStatusFailed
+	if err := s.UpdateTask(ctx, third); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateFailureRepair(ctx, third.ID, "evidence:4", "fix four"); err == nil {
+		t.Fatal("fix chain outran the original task's budget")
+	}
+	if _, err := s.CreateFailureRepair(ctx, first.ID, "evidence:5", "fix again"); err == nil {
+		t.Fatal("a task already closed with a fix was fixed twice")
 	}
 }
 
 func TestFailureRepairGuardsAndTransactionRollback(t *testing.T) {
-	for _, mode := range []string{"done", "pending", "limit", "hitl", "branch", "missing_evidence", "rollback"} {
+	for _, mode := range []string{"in_progress", "pending", "limit", "hitl", "branch", "missing_evidence", "rollback"} {
 		t.Run(mode, func(t *testing.T) {
 			s, _ := repairFixture(t)
 			ctx := context.Background()
 			task, _ := s.GetTask(ctx, "task")
 			switch mode {
-			case "done":
-				task.Status = TaskStatusDone
+			case "in_progress":
+				task.Status = TaskStatusInProgress
 			case "pending":
 				task.Status = TaskStatusPending
 			case "limit":
-				task.AttemptCount = task.MaxAttempts
+				task.MaxAttempts = 0
 			case "hitl":
 				task.Metadata["mode"] = TaskModeHITL
 				task.Metadata["decision_reason"] = "Owner must grant access"
@@ -173,7 +255,7 @@ func TestRunnableTasksHonorsScopeDependenciesPriorityAndMissingRecords(t *testin
 	}
 }
 
-func TestFailureRepairConcurrentReplayCreatesOneDependency(t *testing.T) {
+func TestFailureRepairConcurrentReplayCreatesOneFix(t *testing.T) {
 	s, _ := repairFixture(t)
 	ctx := context.Background()
 	var wg sync.WaitGroup
@@ -196,7 +278,39 @@ func TestFailureRepairConcurrentReplayCreatesOneDependency(t *testing.T) {
 	task, _ := s.GetTask(ctx, "task")
 	story, _ := s.GetStory(ctx, "story")
 	count, _ := s.CountTasks(ctx)
-	if count != 2 || len(task.DependsOn) != 1 || len(story.Tasks) != 2 || task.DependsOn[0] != story.Tasks[1] {
-		t.Fatal("duplicate repair or dependency", task, story, count)
+	if count != 2 || len(task.DependsOn) != 0 || len(story.Tasks) != 2 || task.Metadata["fixed_by"] != story.Tasks[1] {
+		t.Fatal("duplicate fix, or closed task rewritten", task, story, count)
+	}
+}
+
+// A finding on delivered work is a new fix task; the done task it names is
+// never changed, and the fix runs before other work.
+func TestFixOfDoneTaskLeavesItUnchanged(t *testing.T) {
+	s, _ := repairFixture(t)
+	ctx := context.Background()
+	task, _ := s.GetTask(ctx, "task")
+	task.Status = TaskStatusDone
+	if err := s.UpdateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := s.GetTask(ctx, "task")
+	if err := s.CreateTask(ctx, &Task{ID: "peer", StoryID: "story", Status: TaskStatusPending, MaxAttempts: 3, Priority: -1}); err != nil {
+		t.Fatal(err)
+	}
+	var fixes []string
+	for i := 1; i <= 4; i++ { // more findings than the failure budget
+		fix, err := s.CreateFailureRepair(ctx, "task", fmt.Sprintf("review-finding:%d", i), fmt.Sprintf("finding %d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixes = append(fixes, fix.ID)
+	}
+	after, _ := s.GetTask(ctx, "task")
+	if !reflect.DeepEqual(after, before) {
+		t.Fatal("done task changed by a finding", after)
+	}
+	ready, err := RunnableTasks(ctx, s, []string{"story"})
+	if err != nil || len(ready) != 5 || ready[4].ID != "peer" {
+		t.Fatal("fixes of findings do not run first", ready, err)
 	}
 }

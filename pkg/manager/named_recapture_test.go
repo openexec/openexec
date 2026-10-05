@@ -114,7 +114,7 @@ func TestNamedRecaptureIncident(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if fixture.calls != 1 || task.Metadata["recapture_outcome"] != "failed" || task.Status != release.TaskStatusPending {
+				if fixture.calls != 1 || task.Metadata["recapture_outcome"] != "failed" || task.Status != release.TaskStatusFailed || task.Metadata["fixed_by"] == nil {
 					t.Fatalf("named recapture missing: calls=%d status=%s recapture_outcome=%v queue=%v", fixture.calls, task.Status, task.Metadata["recapture_outcome"], queueErr)
 				}
 				if task.AttemptCount != 2 || task.VerificationScript != "" {

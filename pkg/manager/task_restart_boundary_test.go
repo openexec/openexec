@@ -167,10 +167,13 @@ func TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation(t *testing.T) {
 	createStory(t, e.rel, "S", nil)
 	for _, task := range []*release.Task{
 		{ID: "original", StoryID: "S", Status: release.TaskStatusDone, AttemptCount: 1, MaxAttempts: 3},
+		// Fixes that stopped without a failed-check receipt: one with an
+		// attempt left runs again, a spent one is a boundary. A fix that
+		// failed its check is closed and fixed again (failure_repair_test).
 		{ID: "repair-retry", StoryID: "S", Status: release.TaskStatusFailed, AttemptCount: 1, MaxAttempts: 2,
-			Metadata: map[string]interface{}{"repair_of": "original", "verification_failure_evidence": "verification-failure-retry"}},
+			Metadata: map[string]interface{}{"repair_of": "original"}},
 		{ID: "repair-spent", StoryID: "S", Status: release.TaskStatusFailed, AttemptCount: 2, MaxAttempts: 2,
-			Metadata: map[string]interface{}{"repair_of": "original", "verification_failure_evidence": "verification-failure-spent"}},
+			Metadata: map[string]interface{}{"repair_of": "original"}},
 	} {
 		task.Title, task.Description = task.ID, "Resume the retained bounded fixture"
 		if err := e.rel.CreateTask(task); err != nil {
@@ -183,7 +186,7 @@ func TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation(t *testing.T) {
 	defer cancel()
 	var boundary *TaskQueueBoundary
 	if err := fresh.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}}); !errors.As(err, &boundary) {
-		t.Fatalf("want only the spent repair retained, not a recursive repair refusal: %v", err)
+		t.Fatalf("want only the spent fix retained: %v", err)
 	}
 	if want := []TaskBoundary{{TaskID: "repair-spent", Status: release.TaskStatusFailed, Kind: BoundaryFailed}}; !reflect.DeepEqual(boundary.Tasks, want) {
 		t.Fatalf("boundary = %+v", boundary.Tasks)
