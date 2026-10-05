@@ -149,8 +149,11 @@ func TestInjectedExecutorUsesRealQueueAndTrustedRepair(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || !repaired || current.Status != release.TaskStatusDone || current.AttemptCount != 2 {
-				t.Fatalf("real queue did not repair/resume: %v %#v repaired=%v", err, current, repaired)
+			// The failed task stays closed with its fix; the fix passed.
+			fix, _ := current.Metadata["fixed_by"].(string)
+			fixed, _ := e.rel.TaskSnapshot(ctx, fix)
+			if err != nil || !repaired || current.Status != release.TaskStatusFailed || current.AttemptCount != 1 || fixed == nil || fixed.Status != release.TaskStatusDone {
+				t.Fatalf("real queue did not close the task with a passed fix: %v %#v repaired=%v", err, current, repaired)
 			}
 			tasks, err := e.rel.TasksInStories(ctx, []string{"S"})
 			if err != nil || len(tasks) != 2 {

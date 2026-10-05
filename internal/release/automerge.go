@@ -164,7 +164,7 @@ func (m *Manager) isStoryCompleteUnlocked(storyID string) (bool, string) {
 		if !ok {
 			return false, storyID
 		}
-		if task.Status != TaskStatusDone && task.Status != TaskStatusApproved {
+		if !Delivered(task, m.tasks) {
 			return false, storyID
 		}
 	}
@@ -219,8 +219,8 @@ func (m *Manager) mergeStoryUnlocked(storyID string) error {
 			if !ok {
 				return fmt.Errorf("task %s not found", taskID)
 			}
-			// Task must be done or approved
-			if task.Status != TaskStatusDone && task.Status != TaskStatusApproved {
+			// Task must be done or approved, or closed with a passed fix chain
+			if !Delivered(task, m.tasks) {
 				return fmt.Errorf("task %s is not complete (status: %s)", taskID, task.Status)
 			}
 			// If task needs review, it must be approved

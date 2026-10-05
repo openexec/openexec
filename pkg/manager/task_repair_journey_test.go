@@ -14,7 +14,7 @@ import (
 // This is a controlled-provider integration journey, not native model or
 // deployment evidence. Both task execution and failed checks run as processes
 // through the ordinary manager/blueprint path against a temporary project.
-func TestTaskQueueFailedCheckCreatesRepairAndResumesOriginalWork(t *testing.T) {
+func TestTaskQueueFailedCheckClosesTaskAndItsFixDeliversIt(t *testing.T) {
 	e := newSchedulerTestEnv(t)
 	e.mgr.cfg.RunnerCommand = e.mgr.cfg.CommandName
 	e.mgr.cfg.CommandName = ""
@@ -48,9 +48,13 @@ func TestTaskQueueFailedCheckCreatesRepairAndResumesOriginalWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	var repairs int
+	byID := map[string]*release.Task{}
 	for _, task := range tasks {
-		if task.Status != release.TaskStatusDone {
-			t.Fatalf("unfinished task: %s %s", task.ID, task.Status)
+		byID[task.ID] = task
+	}
+	for _, task := range tasks {
+		if !release.Delivered(task, byID) {
+			t.Fatalf("undelivered task: %s %s", task.ID, task.Status)
 		}
 		if task.Metadata["repair_of"] == "A" {
 			repairs++
@@ -64,9 +68,12 @@ func TestTaskQueueFailedCheckCreatesRepairAndResumesOriginalWork(t *testing.T) {
 	if repairs != 1 {
 		t.Fatalf("wanted one repair, got %d", repairs)
 	}
+	// The failed task stays closed as it failed, never run or rewritten
+	// again; its fix passed, and B, which waited on it, ran.
 	a, err := e.rel.TaskSnapshot(ctx, "A")
-	if err != nil || a.AttemptCount != 2 {
-		t.Fatal("original task did not resume after repair", a, err)
+	fix, _ := a.Metadata["fixed_by"].(string)
+	if err != nil || a.Status != release.TaskStatusFailed || a.AttemptCount != 1 || fix == "" || byID[fix] == nil || byID[fix].Status != release.TaskStatusDone {
+		t.Fatal("original task was not closed with a passed fix", a, err)
 	}
 }
 
@@ -127,8 +134,10 @@ func TestTaskQueueRestartAfterFailureReceiptBeforeRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	recovered, err := rel.TaskSnapshot(ctx, "A")
-	if err != nil || recovered.Status != release.TaskStatusDone || recovered.AttemptCount != 2 {
-		t.Fatal("original did not resume after restart", recovered, err)
+	fix, _ := recovered.Metadata["fixed_by"].(string)
+	fixed, fixErr := rel.TaskSnapshot(ctx, fix)
+	if err != nil || recovered.Status != release.TaskStatusFailed || recovered.AttemptCount != 1 || fixErr != nil || fixed.Status != release.TaskStatusDone {
+		t.Fatal("original was not closed with a passed fix after restart", recovered, err)
 	}
 	if _, err := os.Stat(filepath.Join(e.dir, "feature.txt")); err != nil {
 		t.Fatal("repair action absent", err)

@@ -65,8 +65,10 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			if task.Status != release.TaskStatusFailed {
 				continue
 			}
+			// A failed fix is closed and fixed like any failed task; only a
+			// task already closed with its fix is done here.
 			id, _ := task.Metadata["verification_failure_evidence"].(string)
-			if id != "" && !isRepairTask(task) {
+			if fixedBy, _ := task.Metadata["fixed_by"].(string); id != "" && fixedBy == "" {
 				if err := m.repairTaskFromRetainedFailure(ctx, task.ID, id); err != nil {
 					if errors.Is(err, errRecaptureWaiting) {
 						continue

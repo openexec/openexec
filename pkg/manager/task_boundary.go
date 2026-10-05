@@ -41,7 +41,8 @@ func (b *TaskQueueBoundary) Error() string {
 func retainedTaskBoundary(tasks []*release.Task) error {
 	boundary := &TaskQueueBoundary{}
 	for _, task := range tasks {
-		if task.Status == release.TaskStatusDone {
+		// A task closed with its fix is not open work; its fix is.
+		if task.Status == release.TaskStatusDone || release.ClosedWithFix(task) {
 			continue
 		}
 		item := TaskBoundary{TaskID: task.ID, Status: task.Status, Kind: BoundaryRetained}

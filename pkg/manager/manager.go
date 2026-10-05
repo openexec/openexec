@@ -597,10 +597,14 @@ func (m *Manager) Status(fwuID string) (PipelineInfo, error) {
 
 	if rel, err := m.GetInternalReleaseManager(); err == nil {
 		tasks := rel.GetTasks()
+		byID := make(map[string]*release.Task, len(tasks))
+		for _, t := range tasks {
+			byID[t.ID] = t
+		}
 		info.TotalTasks = len(tasks)
 		doneCount := 0
 		for _, t := range tasks {
-			if t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved {
+			if release.Delivered(t, byID) {
 				doneCount++
 			}
 		}
@@ -618,9 +622,13 @@ func (m *Manager) List() []PipelineInfo {
 	var total, done int
 	if rel, err := m.GetInternalReleaseManager(); err == nil {
 		tasks := rel.GetTasks()
+		byID := make(map[string]*release.Task, len(tasks))
+		for _, t := range tasks {
+			byID[t.ID] = t
+		}
 		total = len(tasks)
 		for _, t := range tasks {
-			if t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved {
+			if release.Delivered(t, byID) {
 				done++
 			}
 		}

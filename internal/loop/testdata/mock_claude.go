@@ -28,7 +28,7 @@ func main() {
 				continue
 			}
 			prompt := os.Args[i+1]
-			if strings.Contains(prompt, "Diagnose and repair the failed verification for task A.") {
+			if strings.Contains(prompt, "Fix task for A ") {
 				if err := os.WriteFile("feature.txt", []byte("implemented and repaired\n"), 0600); err != nil {
 					panic(err)
 				}
