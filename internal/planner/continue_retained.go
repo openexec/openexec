@@ -15,30 +15,27 @@ type RetainedLedger struct {
 	Story func(id string) (Story, bool)
 	// TaskStory names the persisted story that holds a task.
 	TaskStory func(id string) (string, bool)
-	// OpenBoundary reports whether a persisted story holds a human (HITL)
-	// task that is not finished.
-	OpenBoundary func(storyID string) bool
 	// Taken reports whether any persisted goal, story or task holds an ID.
 	Taken func(id string) bool
 	// Conflicts reports which plan IDs differ from their persisted rows.
 	Conflicts func(*ProjectPlan) map[string]bool
 }
 
-// ContinueRetainedWork keeps the identity of an open owner boundary a re-plan
-// lists again in changed form. A story, or a task, that names a persisted
-// story holding an unfinished HITL task is that story: the plan carries it
-// with its persisted content and IDs, and new tasks the plan put into it move
-// to a continuation story that depends on it. It returns the IDs the plan
-// continues; import leaves those rows as they are.
+// ContinueRetainedWork makes a re-plan continue the persisted backlog instead
+// of renaming it. Every goal, story and task ID the plan lists that is already
+// persisted names that persisted row: the plan carries it with its persisted
+// content and ID, never a new ID. New tasks the plan put into a persisted
+// story move to a continuation story that depends on it, a new story that
+// only regrouped persisted tasks resolves to their story, and genuinely new
+// work keeps (or is given) IDs nothing persisted holds. It returns the IDs the
+// plan continues; import leaves those rows as they are.
 //
-// Treating the changed re-listing as new work renamed the boundary instead: a
-// Goal's retained owner boundary T-US-008-002 came back as T-US-017-002 and
-// then T-US-022-002, plan review refused each rename, and the Goal re-planned
-// eight times without converging. Other changed work still moves to new IDs:
-// a revised automatic task gets fresh attempts under its new ID, and a later
-// wave numbered from US-001 is new work, not a continuation. What the owner is
-// asked is not the re-plan's to reword, and the boundary waits for the
-// automatic work regardless (HITL tasks are never dispatched).
+// Treating a changed re-listing as new work renamed it: a Goal's owner
+// boundary T-US-008-002 came back as T-US-017-002, T-US-022-002 and
+// T-US-014-002, and its pending work US-004 as US-021 and US-013, plan review
+// refused the renames, and the Goal re-planned nine times without
+// converging. A persisted task is never renamed (owner rule, 2026-10-05); a
+// re-plan's rewording of one is dropped in favour of what was imported.
 func ContinueRetainedWork(plan *ProjectPlan, ledger RetainedLedger) []string {
 	if plan == nil {
 		return nil
@@ -49,9 +46,6 @@ func ContinueRetainedWork(plan *ProjectPlan, ledger RetainedLedger) []string {
 	keep := func(storyID string) bool {
 		if _, ok := continued[storyID]; ok {
 			return true
-		}
-		if !ledger.OpenBoundary(storyID) {
-			return false
 		}
 		story, ok := ledger.Story(storyID)
 		if !ok {
@@ -77,8 +71,23 @@ func ContinueRetainedWork(plan *ProjectPlan, ledger RetainedLedger) []string {
 			keep(s.ID)
 		}
 	}
+	goals := []string{}
+	for i, g := range plan.Goals {
+		if !conflicts[g.ID] {
+			continue
+		}
+		if persisted, ok := ledger.Goal(g.ID); ok {
+			plan.Goals[i] = persisted
+			goals = append(goals, g.ID)
+		}
+	}
 	if len(continued) == 0 {
-		return nil
+		if len(goals) == 0 {
+			return nil
+		}
+		slices.Sort(goals)
+		plan.Continues = goals
+		return plan.Continues
 	}
 
 	used := map[string]bool{}
@@ -153,7 +162,7 @@ func ContinueRetainedWork(plan *ProjectPlan, ledger RetainedLedger) []string {
 	}
 	plan.Stories = stories
 
-	ids := []string{}
+	ids := goals
 	for id, story := range continued {
 		ids = append(ids, id)
 		for _, t := range story.Tasks {

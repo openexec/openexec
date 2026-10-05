@@ -23,7 +23,7 @@ func continuePlanJSON(t *testing.T, plan planner.ProjectPlan) string {
 // The remapper took the reworded story for new work and renamed the boundary
 // (T-US-008-002 → T-US-017-002 → T-US-022-002); plan review refused every
 // rename and the Goal re-planned eight times without converging.
-func TestReplanContinuesUnfinishedRetainedWork(t *testing.T) {
+func TestReplanNeverRenamesPersistedWork(t *testing.T) {
 	e := newSchedulerTestEnv(t)
 	ctx := context.Background()
 	first := planner.ProjectPlan{
@@ -96,7 +96,7 @@ func TestReplanContinuesUnfinishedRetainedWork(t *testing.T) {
 	if !reflect.DeepEqual(hitl, []string{"T-US-002-002"}) || kept.Tasks[1].DecisionReason != "Merging needs the owner" {
 		t.Fatalf("owner boundary renamed or reworded: %v %+v", hitl, kept.Tasks[1])
 	}
-	if !reflect.DeepEqual(p.Continues, []string{"G-001", "T-US-002-001", "T-US-002-002", "US-002"}) {
+	if !reflect.DeepEqual(p.Continues, []string{"G-001", "T-US-001-001", "T-US-002-001", "T-US-002-002", "US-001", "US-002"}) {
 		t.Fatalf("continues = %v", p.Continues)
 	}
 	// The new task follows the boundary in a story of its own.
@@ -112,13 +112,10 @@ func TestReplanContinuesUnfinishedRetainedWork(t *testing.T) {
 	if !reflect.DeepEqual(cont.Tasks[0].DependsOn, []string{"T-US-002-002"}) {
 		t.Fatalf("continuation lost its edge to the retained boundary: %v", cont.Tasks[0].DependsOn)
 	}
-	// Finished work restated in new words is still new work at a new ID,
-	// and references to it follow it.
-	if s, ok := byID["US-001"]; ok {
-		t.Fatalf("finished story reused: %+v", s)
-	}
-	if byID["US-003"].Tasks[0].Description == "Count them in US-001's map" {
-		t.Fatal("reference to the moved story not rewritten")
+	// Finished work restated in new words is the finished work: never renamed,
+	// never re-created as a pending duplicate.
+	if s, ok := byID["US-001"]; !ok || s.Title != "Map observer inputs" || s.Tasks[0].ID != "T-US-001-001" {
+		t.Fatalf("finished story renamed or rewritten: %+v", s)
 	}
 	if identitySnapshot(t, e.mgr, `SELECT * FROM tasks WHERE id IN ('T-US-002-001','T-US-002-002') ORDER BY id`) != retained ||
 		identitySnapshot(t, e.mgr, `SELECT * FROM stories WHERE id='US-002'`) != retainedStory {
@@ -138,7 +135,11 @@ func TestReplanContinuesUnfinishedRetainedWork(t *testing.T) {
 	if err := e.mgr.preparePlanIDs(&again); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(&again, p) {
+	// Rows that now match their persisted content exactly need no listing
+	// in Continues; every ID and all content stay as reviewed.
+	want := *p
+	want.Continues, again.Continues = nil, nil
+	if !reflect.DeepEqual(&again, &want) {
 		t.Fatal("continued plan moved on preparation")
 	}
 }

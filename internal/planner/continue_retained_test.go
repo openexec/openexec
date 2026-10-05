@@ -20,8 +20,7 @@ func boundaryLedger() RetainedLedger {
 			}
 			return "", false
 		},
-		OpenBoundary: func(id string) bool { return id == "US-008" },
-		Taken:        func(id string) bool { return ids[id] },
+		Taken: func(id string) bool { return ids[id] },
 		Conflicts: func(p *ProjectPlan) map[string]bool {
 			c := map[string]bool{}
 			for _, s := range p.Stories {
@@ -66,13 +65,34 @@ func TestContinueRetainedWorkRegroupedBoundary(t *testing.T) {
 	}
 }
 
-// Without an open boundary nothing is continued: a changed re-listing of
-// automatic work keeps moving to new IDs.
-func TestContinueRetainedWorkLeavesAutomaticWork(t *testing.T) {
-	ledger := boundaryLedger()
-	ledger.OpenBoundary = func(string) bool { return false }
-	plan := &ProjectPlan{Stories: []Story{{ID: "US-008", Title: "Revised", Tasks: []Task{{ID: "T-US-008-001", Title: "Revised check"}}}}}
-	if got := ContinueRetainedWork(plan, ledger); got != nil || plan.Stories[0].Title != "Revised" {
-		t.Fatalf("continued %v: %+v", got, plan.Stories[0])
+// Automatic work is never renamed either: the 09:14 re-plan restated the
+// persisted story US-008 with its repair task under the new ID US-014 and
+// suffixed the repair task "-001". Restated persisted IDs stay; new work that
+// holds a free ID is left alone.
+func TestContinueRetainedWorkNeverRenamesAutomaticWork(t *testing.T) {
+	plan := &ProjectPlan{
+		Goals: []Goal{{ID: "G-005", Title: "Reworded goal"}},
+		Stories: []Story{
+			{ID: "US-008", GoalID: "G-005", Title: "Revised", Tasks: []Task{{ID: "T-US-008-001", Title: "Revised check"}}},
+			{ID: "US-030", GoalID: "G-005", Title: "New work", Tasks: []Task{{ID: "T-US-030-001", Title: "Build", DependsOn: []string{"T-US-008-001"}}}},
+		},
+	}
+	got := ContinueRetainedWork(plan, boundaryLedger())
+	if !reflect.DeepEqual(got, []string{"G-005", "T-US-008-001", "T-US-008-002", "US-008"}) {
+		t.Fatalf("continues = %v", got)
+	}
+	if plan.Stories[0].Title != "Goal Validation" || plan.Stories[0].Tasks[0].Title != "Run make check" || plan.Goals[0].Title != "Observers" {
+		t.Fatalf("persisted content not kept: %+v %+v", plan.Stories[0], plan.Goals[0])
+	}
+	if s := plan.Stories[1]; s.ID != "US-030" || s.Tasks[0].ID != "T-US-030-001" || !reflect.DeepEqual(s.Tasks[0].DependsOn, []string{"T-US-008-001"}) {
+		t.Fatalf("new work changed: %+v", s)
+	}
+}
+
+// A plan that restates nothing persisted is untouched.
+func TestContinueRetainedWorkLeavesNewPlans(t *testing.T) {
+	plan := &ProjectPlan{Stories: []Story{{ID: "US-030", Title: "New", Tasks: []Task{{ID: "T-US-030-001"}}}}}
+	if got := ContinueRetainedWork(plan, boundaryLedger()); got != nil || plan.Continues != nil {
+		t.Fatalf("continued %v", got)
 	}
 }

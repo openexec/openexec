@@ -6,6 +6,7 @@ import (
 	"github.com/openexec/openexec/internal/planner"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,16 +57,24 @@ func TestReviewedIdentityLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A persisted ID is never renamed: the restated stories stay as they
+	// were imported, and the new tasks the wave put into them follow in
+	// continuation stories with IDs nothing persisted holds.
 	p := second.Plan
-	if p.Stories[0].ID == "US-001" || p.Stories[1].ID == "US-005" {
-		t.Fatal("same-title changed stories reused")
+	if len(p.Stories) != 4 || p.Stories[0].ID != "US-001" || p.Stories[2].ID != "US-005" {
+		t.Fatalf("persisted stories renamed: %+v", p.Stories)
 	}
-	for _, s := range p.Stories {
-		if s.GoalID != "G-002" || !strings.Contains(s.Description, s.ID) || !strings.Contains(s.Tasks[0].TechnicalStrategy, s.ID) || s.Tasks[0].ID != "T-"+s.ID+"-002" {
-			t.Fatalf("inconsistent references: %+v", s)
+	if !slices.Contains(p.Continues, "US-001") || !slices.Contains(p.Continues, "T-US-001-001") || !slices.Contains(p.Continues, "US-005") {
+		t.Fatalf("continues = %v", p.Continues)
+	}
+	c1, c2 := p.Stories[1], p.Stories[3]
+	for i, c := range []planner.Story{c1, c2} {
+		retained := []string{"US-001", "US-005"}[i]
+		if c.ID == retained || c.GoalID != "G-002" || !slices.Contains(c.DependsOn, retained) || len(c.Tasks) != 1 || c.Tasks[0].ID != "T-"+c.ID+"-001" {
+			t.Fatalf("inconsistent continuation: %+v", c)
 		}
 	}
-	if !reflect.DeepEqual(p.Stories[1].DependsOn, []string{p.Stories[0].ID}) || !reflect.DeepEqual(p.Stories[1].Tasks[0].DependsOn, []string{p.Stories[0].Tasks[0].ID}) {
+	if !reflect.DeepEqual(c2.Tasks[0].DependsOn, []string{c1.Tasks[0].ID}) {
 		t.Fatal("dependencies not rewritten")
 	}
 	for i, q := range queries[:3] {
@@ -113,7 +122,11 @@ func TestReviewedIdentityLifecycle(t *testing.T) {
 	if err := fresh.preparePlanIDs(&persisted); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(&persisted, p) {
+	// After import, rows that now match their persisted content need no
+	// listing in Continues; every ID and all content stay as reviewed.
+	want := *p
+	want.Continues, persisted.Continues = nil, nil
+	if !reflect.DeepEqual(&persisted, &want) {
 		t.Fatal("exact allocated plan moved on preparation")
 	}
 	// A distinct request with exact content must not duplicate retained rows.
@@ -213,26 +226,23 @@ func TestReviewedIdentityChangedGoalAndTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Plan.Goals[0].ID == "G-001" || result.Plan.Stories[0].GoalID != result.Plan.Goals[0].ID {
-		t.Fatal("changed goal not remapped")
+	// The changed restatement is the persisted goal, story and task.
+	if result.Plan.Goals[0].ID != "G-001" || result.Plan.Goals[0].Description == "Same title changed goal" ||
+		result.Plan.Stories[0].ID != "US-001" || result.Plan.Stories[0].Tasks[0].Description == "Changed task content alone" {
+		t.Fatalf("persisted identity renamed or rewritten: %+v", result.Plan)
 	}
-	if strings.Contains(result.Plan.Goals[0].SuccessCriteria, "US-001") {
-		t.Fatal("goal prose did not follow child remapping")
-	}
-	// A task-only change must also change its retained story's ordered task map.
+	// A task-only change does not rename the task either.
 	raw, _ = json.Marshal(result.Plan)
 	var next planner.ProjectPlan
 	if err := json.Unmarshal(raw, &next); err != nil {
 		t.Fatal(err)
 	}
-	oldStory := next.Stories[0].ID
-	oldTask := next.Stories[0].Tasks[0].ID
 	next.Stories[0].Tasks[0].TechnicalStrategy = "A new strategy"
 	if err := e.mgr.preparePlanIDs(&next); err != nil {
 		t.Fatal(err)
 	}
-	if next.Stories[0].ID == oldStory || next.Stories[0].Tasks[0].ID == oldTask {
-		t.Fatal("task change did not propagate to story membership")
+	if next.Stories[0].ID != "US-001" || next.Stories[0].Tasks[0].ID != "T-US-001-001" || next.Stories[0].Tasks[0].TechnicalStrategy != "" {
+		t.Fatalf("task change renamed or rewrote the persisted task: %+v", next.Stories[0])
 	}
 	goals, stories, tasks := reviewedPlanRows(&next)
 	if err := e.rel.ValidatePlanIdentities(context.Background(), goals, stories, tasks); err != nil {

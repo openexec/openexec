@@ -55,9 +55,6 @@ func uniquePlanIDs(plan *planner.ProjectPlan) error {
 // retainedLedger presents the persisted backlog as plan content, so a
 // continued story is carried exactly as it was imported.
 func retainedLedger(rel *release.Manager) planner.RetainedLedger {
-	finished := func(t *release.Task) bool {
-		return t.Status == release.TaskStatusDone || t.Status == release.TaskStatusApproved
-	}
 	return planner.RetainedLedger{
 		Goal: func(id string) (planner.Goal, bool) {
 			g := rel.GetGoal(id)
@@ -97,18 +94,6 @@ func retainedLedger(rel *release.Manager) planner.RetainedLedger {
 				return t.StoryID, true
 			}
 			return "", false
-		},
-		OpenBoundary: func(storyID string) bool {
-			s := rel.GetStory(storyID)
-			if s == nil {
-				return false
-			}
-			for _, taskID := range s.Tasks {
-				if t := rel.GetTask(taskID); t != nil && t.ExecutionMode() == release.TaskModeHITL && !finished(t) {
-					return true
-				}
-			}
-			return false
 		},
 		Taken: func(id string) bool {
 			return rel.GetGoal(id) != nil || rel.GetStory(id) != nil || rel.GetTask(id) != nil
