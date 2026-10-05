@@ -38,13 +38,14 @@ func TestReviewedPlanRefinesRejectedReviewAndImportsOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Valid || generated != 2 || reviewed != 2 {
+	// One review, one fix: the refined plan is imported without a second review.
+	if !result.Valid || generated != 2 || reviewed != 1 {
 		t.Fatalf("did not close ordinary review loop: %+v %d/%d", result, generated, reviewed)
 	}
 	if _, err := e.mgr.Plan(context.Background(), replayRequest()); err != nil {
 		t.Fatal(err)
 	}
-	if generated != 2 || reviewed != 2 {
+	if generated != 2 || reviewed != 1 {
 		t.Fatal("completed refinement repeated")
 	}
 	var reviews, imports, tasks int
@@ -133,7 +134,7 @@ func TestReviewedPlanRefinementAllocatesBeforeRereview(t *testing.T) {
 	}
 	// The goal persisted meanwhile is that goal: refinement carries it as
 	// persisted, never under a new ID.
-	if reviews != 2 || result.Plan.Goals[0].ID != "G-1" || result.Plan.Goals[0].Description != "Different retained purpose" || result.Plan.Stories[0].GoalID != "G-1" {
+	if reviews != 1 || result.Plan.Goals[0].ID != "G-1" || result.Plan.Goals[0].Description != "Different retained purpose" || result.Plan.Stories[0].GoalID != "G-1" {
 		t.Fatalf("refinement not allocated consistently: %+v", result)
 	}
 	var description string
@@ -168,7 +169,7 @@ func TestReviewedPlanRefinementKeepsCitedGoalsFromABareStoryArray(t *testing.T) 
 	if err != nil {
 		t.Fatalf("refined plan import failed: %v", err)
 	}
-	if !result.Valid || generated != 2 || reviewed != 2 || len(result.Plan.Goals) != 1 || result.Plan.Goals[0].ID != "G-1" {
+	if !result.Valid || generated != 2 || reviewed != 1 || len(result.Plan.Goals) != 1 || result.Plan.Goals[0].ID != "G-1" {
 		t.Fatalf("refined plan lost its goal: %+v %d/%d", result.Plan.Goals, generated, reviewed)
 	}
 	var goals, stories int

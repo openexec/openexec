@@ -173,3 +173,30 @@ func carryGoals(original, refined *ProjectPlan) {
 		}
 	}
 }
+
+// DeterministicPlanIssues are the checks every plan must pass, with or without
+// a reviewer: verification lint, the stale-base rule and the human-boundary
+// lint. ReviewPlan applies them to the reviewer's verdict; a plan imported
+// after its one fix, without a second review, must pass them on its own.
+func DeterministicPlanIssues(plan *ProjectPlan) []string {
+	var issues []string
+	if lint := LintPlanVerification(plan); len(lint) != 0 {
+		issues = append(issues, fmt.Sprintf("verification lint refused: %v", lint))
+	}
+	if err := PlanStaleBaseRefError(plan); err != nil {
+		issues = append(issues, err.Error())
+	}
+	if lint := LintHumanBoundaries(plan); len(lint) != 0 {
+		issues = append(issues, fmt.Sprintf("human boundary lint refused: %v", lint))
+	}
+	for _, story := range plan.Stories {
+		for _, task := range story.Tasks {
+			if len(task.AllowedPaths) > 0 {
+				if err := gates.ValidateRepairScope(task.AllowedPaths); err != nil {
+					issues = append(issues, fmt.Sprintf("task %s repair scope refused: %v", task.ID, err))
+				}
+			}
+		}
+	}
+	return issues
+}
