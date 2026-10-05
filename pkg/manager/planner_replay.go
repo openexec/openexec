@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -414,10 +415,19 @@ func reviewedPlanRows(plan *planner.ProjectPlan) ([]*release.Goal, []*release.St
 	var goals []*release.Goal
 	var stories []*release.Story
 	var tasks []*release.Task
+	// Continued rows are already persisted exactly; there is nothing to
+	// import or compare, and their plan position is not their priority.
+	continued := func(id string) bool { return slices.Contains(plan.Continues, id) }
 	for _, g := range plan.Goals {
+		if continued(g.ID) {
+			continue
+		}
 		goals = append(goals, &release.Goal{ID: g.ID, Title: g.Title, Description: g.Description, SuccessCriteria: g.SuccessCriteria, VerificationMethod: g.VerificationMethod})
 	}
 	for i, s := range plan.Stories {
+		if continued(s.ID) {
+			continue
+		}
 		story := &release.Story{ID: s.ID, GoalID: s.GoalID, Title: s.Title, Description: s.Description, AcceptanceCriteria: s.AcceptanceCriteria, VerificationScript: s.VerificationScript, Contract: s.Contract, DependsOn: s.DependsOn, StoryType: release.StoryTypeFeature, Priority: i}
 		for j, t := range s.Tasks {
 			description := t.Description

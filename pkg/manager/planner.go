@@ -295,6 +295,10 @@ func (m *Manager) preparePlanIDs(plan *planner.ProjectPlan) error {
 		return err
 	}
 
+	if continued := planner.ContinueRetainedWork(plan, retainedLedger(rel)); len(continued) > 0 {
+		log.Printf("[Planner] Re-plan continues %d retained IDs: %v", len(continued), continued)
+	}
+
 	// Re-plan support: the generator always numbers from US-001/G-001, so a
 	// second plan (refactor epic, post-build feature wave) collides with the
 	// existing backlog. Remap genuinely-new colliding IDs to free ones;

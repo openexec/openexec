@@ -2,6 +2,7 @@ package planner
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 )
 
@@ -102,8 +103,14 @@ func rewritePlanRefs(plan *ProjectPlan, refs map[string]string) {
 		return s
 	}
 	rw := func(s string) string { return rewriteIDRefs(s, refs) }
+	// Continued rows are persisted content; a new story taking a free ID
+	// must not rewrite what the retained story already depends on.
+	continued := func(id string) bool { return slices.Contains(plan.Continues, id) }
 	for i := range plan.Goals {
 		g := &plan.Goals[i]
+		if continued(g.ID) {
+			continue
+		}
 		g.ID = id(g.ID)
 		g.Description = rw(g.Description)
 		g.SuccessCriteria = rw(g.SuccessCriteria)
@@ -111,6 +118,9 @@ func rewritePlanRefs(plan *ProjectPlan, refs map[string]string) {
 	}
 	for i := range plan.Stories {
 		s := &plan.Stories[i]
+		if continued(s.ID) {
+			continue
+		}
 		s.ID = id(s.ID)
 		s.GoalID = id(s.GoalID)
 		for j := range s.DependsOn {
