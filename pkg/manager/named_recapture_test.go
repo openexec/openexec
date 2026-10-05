@@ -163,15 +163,19 @@ func TestNamedRecaptureIncident(t *testing.T) {
 				}
 				repairs := 0
 				for _, repair := range tasks {
-					if repair.Metadata["repair_of"] == "A" {
+					// The check's fix; the fixture's stop inside it is a
+					// provider fix of the fix, counted apart.
+					if repair.Metadata["repair_of"] == "A" && repair.Metadata["failure_kind"] == "check" {
 						repairs++
 						if !strings.Contains(repair.Description, "NAMED_CHECK_DIAGNOSTIC") || !strings.Contains(repair.Description, id) {
 							t.Fatal("repair lost diagnostic/reference")
 						}
 					}
 				}
-				if repairs != 1 || len(tasks) != 3 {
-					t.Fatal("expected exactly one repair")
+				// A, its waiting dependent, the check's fix, and the provider
+				// fix of that fix (the fixture stops inside the fix).
+				if repairs != 1 || len(tasks) != 4 {
+					t.Fatal("expected exactly one check fix", len(tasks))
 				}
 				settings, err := e.rel.TaskSnapshot(ctx, "Settings")
 				if err != nil || settings.Status != release.TaskStatusPending || settings.AttemptCount != 0 {

@@ -466,27 +466,3 @@ func TestRecaptureUnitPhaseIdentity(t *testing.T) {
 	}
 }
 
-func TestRecaptureUnitRetryPersistenceRefusal(t *testing.T) {
-	f := newRecaptureFixture(t, "exit 0")
-	ctx := context.Background()
-	if retry, err := retryWithStopReason(ctx, f.env.rel, "missing", "stopped"); err == nil || retry {
-		t.Fatalf("missing task allowed retry: %v %v", retry, err)
-	}
-	if _, err := f.env.mgr.state.GetDB().Exec("CREATE TRIGGER refusal BEFORE UPDATE ON tasks BEGIN SELECT RAISE(ABORT, 'write refused'); END"); err != nil {
-		t.Fatal(err)
-	}
-	if retry, err := retryWithStopReason(ctx, f.env.rel, "A", "stopped"); err == nil || retry {
-		t.Fatalf("unpersisted retry accepted: %v %v", retry, err)
-	}
-	if _, err := f.env.mgr.state.GetDB().Exec("DROP TRIGGER refusal"); err != nil {
-		t.Fatal(err)
-	}
-	f.restart(t)
-	task, err := f.env.rel.TaskSnapshot(ctx, "A")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if task.AttemptCount != 1 || task.Status != release.TaskStatusFailed || task.Metadata[previousAttemptStop] != nil || task.Metadata["verification_failure_evidence"] != "legacy" {
-		t.Fatalf("failed retry changed persisted task: %+v", task)
-	}
-}

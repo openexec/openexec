@@ -27,6 +27,7 @@ func boundaryEvidence(t *testing.T, f *recaptureFixture, checkpoint string, repa
 	if err != nil {
 		t.Fatal(err)
 	}
+	tasks = checkLedger(tasks)
 	count := 0
 	for _, task := range tasks {
 		if task.Metadata["repair_of"] == "A" {
@@ -145,7 +146,7 @@ func TestRecaptureBoundariesFailure(t *testing.T) {
 		t.Fatal("fresh private diagnostics unavailable")
 	}
 	tasks, _ := f.env.rel.TasksInStories(context.Background(), []string{"S"})
-	for _, repair := range tasks {
+	for _, repair := range checkLedger(tasks) {
 		if repair.Metadata["repair_of"] == "A" && !strings.Contains(repair.Description, id) {
 			t.Fatal("repair missing fresh evidence")
 		}
@@ -203,4 +204,20 @@ func TestRecaptureBoundariesSuccessCompletionGuard(t *testing.T) {
 	if f.calls != 1 {
 		t.Fatal("success recaptured again")
 	}
+}
+
+// checkLedger leaves out the provider fix of a fix: recapture fixtures stop
+// the queue inside the fix they run, and that stop is closed with a fix of
+// its own. What these tests count is the failed check's own fix.
+func checkLedger(tasks []*release.Task) []*release.Task {
+	var out []*release.Task
+	for _, task := range tasks {
+		of, _ := task.Metadata["fix_of"].(string)
+		root, _ := task.Metadata["repair_of"].(string)
+		if task.Metadata["failure_kind"] == "provider" && of != root {
+			continue
+		}
+		out = append(out, task)
+	}
+	return out
 }

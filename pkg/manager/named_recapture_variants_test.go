@@ -175,13 +175,18 @@ func TestNamedRecaptureVariants(t *testing.T) {
 						if err != nil {
 							t.Fatal(err)
 						}
-						repairs := 0
+						// The check's fix, plus at most one provider fix of it:
+						// the fixture stops inside the fix it runs.
+						repairs, stops := 0, 0
 						for _, candidate := range tasks {
-							if candidate.Metadata["repair_of"] == "A" {
+							switch {
+							case candidate.Metadata["repair_of"] == "A" && candidate.Metadata["failure_kind"] == "check":
 								repairs++
+							case candidate.Metadata["repair_of"] == "A" && candidate.Metadata["failure_kind"] == "provider" && candidate.Metadata["fix_of"] != "A":
+								stops++
 							}
 						}
-						if repairs != wantRepairs || len(tasks) != 2+wantRepairs {
+						if repairs != wantRepairs || stops > wantRepairs || len(tasks) != 2+wantRepairs+stops {
 							t.Fatalf("duplicate or missing repair: %+v", tasks)
 						}
 						settings, err := f.env.rel.TaskSnapshot(ctx, "Settings")

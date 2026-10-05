@@ -144,3 +144,78 @@ func fixTaskDescription(original, failed *release.Task, evidenceID, evidence str
 	b.WriteString("Note: this receipt proves failure, not a particular code defect. Do not weaken the check or cross effect boundaries.")
 	return b.String()
 }
+
+// fixProviderStop closes a task whose attempt stopped without a failed-check
+// receipt (the provider or a stage stopped: crash, timeout, refused tool) and
+// creates its fix task, as a failed check does. The stop is recorded as its
+// own run step, so provider stops are evidence and counted apart from failed
+// checks (failure_kind "provider").
+//
+// False when the task is a provider fix that stopped again for the same
+// reason: that attempt learned nothing a further fix could use, so the chain
+// stops there and the task is a boundary.
+func (m *Manager) fixProviderStop(ctx context.Context, rel *release.Manager, taskID, stage string, attempt int, reason string) (bool, error) {
+	// A stage that only reported itself failed, with no cause from the
+	// runner, is an untrusted claim (its output could not be verified), not
+	// a stop: a boundary, never work. A stop has a cause ("command failed:
+	// exit status 127: ...", a provider error, a timeout).
+	if _, cause, found := strings.Cut(reason, "failed:"); found && strings.TrimSpace(cause) == "" {
+		return false, nil
+	}
+	failed, err := rel.TaskSnapshot(ctx, taskID)
+	if err != nil {
+		return false, err
+	}
+	// Only a plain stop: a failed check, its recapture, or output that could
+	// not be trusted is judged by the verification path, never turned into
+	// new work by its error text.
+	if failed.ExecutionMode() == release.TaskModeHITL || failed.Metadata["verification_failure_evidence"] != nil || failed.Metadata["recapture_outcome"] != nil {
+		return false, nil
+	}
+	if previous, _ := failed.Metadata["failure_evidence"].(string); strings.HasPrefix(previous, release.ProviderStopEvidence) {
+		if step, err := m.state.GetRunStep(ctx, previous); err == nil && step != nil {
+			var prior map[string]interface{}
+			if json.Unmarshal([]byte(step.Metadata), &prior) == nil && prior["stop_reason"] == reason {
+				return false, nil
+			}
+		}
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%s", taskID, attempt, reason)))
+	evidenceID := release.ProviderStopEvidence + hex.EncodeToString(sum[:16])
+	data, _ := json.Marshal(map[string]interface{}{"stop_reason": reason, "attempt": attempt})
+	if err := m.state.AddRunStepFull(ctx, evidenceID, taskID, "", "provider", "provider-stop", attempt, "failed", "", string(data)); err != nil {
+		return false, err
+	}
+	original := failed
+	if rootID, _ := failed.Metadata["repair_of"].(string); rootID != "" {
+		if original, err = rel.TaskSnapshot(ctx, rootID); err != nil {
+			return false, err
+		}
+	}
+	if _, err := rel.CreateFailureRepair(ctx, taskID, evidenceID, providerFixDescription(original, failed, evidenceID, reason)); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// providerFixDescription scopes a fix task after a provider stop: why it
+// stopped, the original task and the code it has so far, and only what
+// remains of the original task.
+func providerFixDescription(original, failed *release.Task, evidenceID, reason string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Fix task for %s %q. The original task is closed: its attempt stopped before finishing (run step %s):\n%s\n\n", original.ID, original.Title, evidenceID, reason)
+	b.WriteString("Find out why it stopped and remove the cause, then complete what the original task still needs. Do not redo what is already done.\n\n")
+	fmt.Fprintf(&b, "Original task:\n%s\n\n", strings.TrimSpace(original.Description))
+	if script := strings.TrimSpace(original.VerificationScript); script != "" {
+		fmt.Fprintf(&b, "Its check, which this fix must pass unchanged:\n%s\n\n", script)
+	}
+	if original.Git != nil && (len(original.Git.Commits) > 0 || original.Git.Branch != "") {
+		fmt.Fprintf(&b, "Its code so far: branch %s, commits %s. Read them before changing anything.\n\n", original.Git.Branch, strings.Join(original.Git.Commits, ", "))
+	}
+	if failed.ID != original.ID {
+		fmt.Fprintf(&b, "An earlier fix, %s, also stopped; this fix replaces it.\n\n", failed.ID)
+	}
+	b.WriteString("The review of this fix judges the original task, its code and this fix together. ")
+	b.WriteString("Anything outside the original task is out of scope: record it as a finding for later, do not do it. Do not weaken the check or cross effect boundaries.")
+	return b.String()
+}

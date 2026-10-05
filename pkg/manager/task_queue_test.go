@@ -124,17 +124,20 @@ func TestTaskOrientedQueueFailureDoesNotCascadeOrInventRepair(t *testing.T) {
 	}
 	a, _ := e.rel.TaskSnapshot(context.Background(), "A")
 	b, _ := e.rel.TaskSnapshot(context.Background(), "B")
-	// A missing verifier fails every attempt the same way: the queue retries
-	// once with the reason, sees it repeat, and stops with an attempt left.
-	if a.Status != release.TaskStatusFailed || a.AttemptCount != 2 || b.Status != release.TaskStatusPending || b.AttemptCount != 0 {
+	// A missing verifier stops every attempt the same way: A is closed with a
+	// provider fix, the fix stops for the same reason, and the chain ends
+	// there. B, which waits on A, never runs.
+	if a.Status != release.TaskStatusFailed || a.AttemptCount != 1 || a.Metadata["fixed_by"] == nil || b.Status != release.TaskStatusPending || b.AttemptCount != 0 {
 		t.Fatal("failure lost accounting or cascaded", a, b)
 	}
-	if reason, _ := a.Metadata["previous_attempt_stop"].(string); !strings.Contains(reason, "missing_verifier_command_98312") {
-		t.Fatalf("the stop reason was not kept for the next attempt: %+v", a.Metadata)
+	fix, _ := e.rel.TaskSnapshot(context.Background(), a.Metadata["fixed_by"].(string))
+	if fix == nil || fix.Status != release.TaskStatusFailed || fix.Metadata["failure_kind"] != "provider" || fix.Metadata["fixed_by"] != nil ||
+		!strings.Contains(fix.Description, "missing_verifier_command_98312") {
+		t.Fatalf("the stop is not a provider fix carrying its reason: %+v", fix)
 	}
 	tasks, _ := e.rel.TasksInStories(context.Background(), []string{"S"})
-	if len(tasks) != 2 {
-		t.Fatal("unclassified error invented repair")
+	if len(tasks) != 3 {
+		t.Fatalf("a repeated stop extended the chain: %d tasks", len(tasks))
 	}
 }
 
@@ -187,10 +190,9 @@ func TestTaskOrientedQueueDiscoversTaskAddedAfterFirstDispatch(t *testing.T) {
 	}
 }
 
-// A task that stops with attempts left is tried again in the same queue, told
-// why the previous attempt stopped, instead of ending the run and waiting for
-// another one to take a single further step.
-func TestTaskOrientedQueueRetriesAStoppedAttemptInTheSameRun(t *testing.T) {
+// A task whose attempt stops is closed and its provider fix runs next in the
+// same queue, told why the attempt stopped, instead of ending the run.
+func TestTaskOrientedQueueFixesAStoppedAttemptInTheSameRun(t *testing.T) {
 	e := newSchedulerTestEnv(t)
 	createStory(t, e.rel, "S", nil)
 	createQueueTask(t, e, "A", nil)
@@ -208,21 +210,24 @@ func TestTaskOrientedQueueRetriesAStoppedAttemptInTheSameRun(t *testing.T) {
 		t.Fatalf("a stop with attempts left ended the run: %v", err)
 	}
 	a, _ := e.rel.TaskSnapshot(context.Background(), "A")
-	if a.Status != release.TaskStatusDone || a.AttemptCount != 2 {
-		t.Fatalf("want done on the second attempt of one run: %+v", a)
+	fixID, _ := a.Metadata["fixed_by"].(string)
+	fix, _ := e.rel.TaskSnapshot(context.Background(), fixID)
+	if a.Status != release.TaskStatusFailed || a.AttemptCount != 1 || fix == nil || fix.Status != release.TaskStatusDone || fix.Metadata["failure_kind"] != "provider" {
+		t.Fatalf("want A closed and its provider fix done in one run: %+v %+v", a, fix)
 	}
 }
 
-func TestAnAttemptIsToldWhyThePreviousOneStopped(t *testing.T) {
-	task := &release.Task{Description: "Move the header", Metadata: map[string]interface{}{}}
-	if got := attemptDescription(task); got != "Move the header" {
-		t.Fatalf("a first attempt changed its description: %q", got)
-	}
-	task.Metadata[previousAttemptStop] = "ten assertions expect the previous header"
-	got := attemptDescription(task)
-	for _, want := range []string{"Move the header", "ten assertions expect the previous header", "remove the cause"} {
+func TestAProviderFixIsToldWhyTheAttemptStopped(t *testing.T) {
+	original := &release.Task{ID: "A", Title: "Move the header", Description: "Move the header", VerificationScript: "make check"}
+	got := providerFixDescription(original, original, "provider-stop-x", "ten assertions expect the previous header")
+	for _, want := range []string{"Fix task for A", "Move the header", "ten assertions expect the previous header", "remove the cause", "make check", "out of scope"} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("attempt description lacks %q: %q", want, got)
+			t.Fatalf("provider fix description lacks %q: %q", want, got)
+		}
+	}
+	for evidence, kind := range map[string]string{"provider-stop-1": "provider", "console-repair:2": "finding", "verification-failure-3": "check"} {
+		if got := release.FailureKind(evidence); got != kind {
+			t.Fatalf("FailureKind(%s) = %s, want %s", evidence, got, kind)
 		}
 	}
 }
