@@ -60,6 +60,9 @@ type ProjectPlan struct {
 	SchemaVersion string  `json:"schema_version"`
 	Goals         []Goal  `json:"goals"`
 	Stories       []Story `json:"stories"`
+	// Continues names the persisted goals, stories and tasks this plan lists
+	// as they are (ContinueRetainedWork). Import leaves those rows alone.
+	Continues []string `json:"continues,omitempty"`
 }
 
 // Validate checks that the plan has required fields and is well-formed.
