@@ -109,7 +109,7 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 		if err := rel.UpdateTask(&attempt); err != nil {
 			return fmt.Errorf("record task attempt: %w", err)
 		}
-		options := []StartOption{WithBlueprint("standard_task"), WithTaskDescription(attemptDescription(task))}
+		options := []StartOption{WithBlueprint("standard_task"), WithTaskDescription(task.Description)}
 		if opts.IsStudy {
 			options = append(options, WithIsStudy(true))
 		}
@@ -139,11 +139,11 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 					continue
 				}
 				if reason := strings.TrimSpace(info.Error); reason != "" && ctx.Err() == nil {
-					retry, retryErr := retryWithStopReason(ctx, rel, task.ID, reason)
-					if retryErr != nil {
-						return fmt.Errorf("record the stopped attempt: %w", retryErr)
+					fixed, fixErr := m.fixProviderStop(ctx, rel, task.ID, info.Stage, attempt.AttemptCount, reason)
+					if fixErr != nil {
+						return fmt.Errorf("fix task for a provider stop refused: %w", fixErr)
 					}
-					if retry {
+					if fixed {
 						continue
 					}
 				}
@@ -257,59 +257,4 @@ func (m *Manager) waitTaskQueueRun(ctx context.Context, id string) error {
 		case <-ticker.C:
 		}
 	}
-}
-
-// previousAttemptStop is the task metadata key holding why the task's last
-// attempt stopped, in the stage's own words.
-const previousAttemptStop = "previous_attempt_stop"
-
-// retryWithStopReason records why an attempt stopped and, while the task has
-// attempts left, reopens it inside this same queue.
-//
-// A stage that reports failure is usually reporting what it found: a page
-// that 404s, ten assertions that still expect the previous header, an image
-// the stack cannot serve. Each of those is the next thing to fix, not a reason
-// to end the run. Ending it anyway cost one whole run per defect: fotoyks
-// T-US-007-001 and T-US-007-002 each stopped with attempts left, the run was
-// recorded as failed, the lane waited out its quiet period, and a fresh run
-// fixed exactly one more thing. The next attempt was never told what the
-// previous one found, so it started by rediscovering it.
-//
-// Bounded twice: by the task's own max_attempts, and by the stop reason — an
-// attempt that stops for the same reason as the one before learned nothing a
-// further attempt could use, so the queue stops there as before and the task
-// keeps its remaining attempts for a queue started after something changed.
-func retryWithStopReason(ctx context.Context, rel *release.Manager, id, reason string) (bool, error) {
-	task, err := rel.TaskSnapshot(ctx, id)
-	if err != nil {
-		return false, err
-	}
-	if task.Metadata == nil {
-		task.Metadata = map[string]interface{}{}
-	}
-	previous, _ := task.Metadata[previousAttemptStop].(string)
-	task.Metadata[previousAttemptStop] = reason
-	retry := previous != reason && task.Status == release.TaskStatusFailed &&
-		task.MaxAttempts > 0 && task.AttemptCount < task.MaxAttempts &&
-		task.ExecutionMode() != release.TaskModeHITL
-	if retry {
-		task.Status = release.TaskStatusPending
-	}
-	if err := rel.UpdateTask(task); err != nil {
-		return false, err
-	}
-	return retry, nil
-}
-
-// attemptDescription is what one attempt of task is told: its description
-// and, when an earlier attempt stopped, why — framed as the problem to remove,
-// not as a boundary to respect.
-func attemptDescription(task *release.Task) string {
-	previous, _ := task.Metadata[previousAttemptStop].(string)
-	if strings.TrimSpace(previous) == "" {
-		return task.Description
-	}
-	return task.Description + "\n\nThe previous attempt at this task stopped with:\n" + previous +
-		"\n\nStart there: find out why it stopped and remove the cause, then finish the task and verify it. " +
-		"What it found is the work that remains, not a reason to stop again."
 }

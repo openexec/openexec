@@ -126,7 +126,7 @@ func (s *SQLiteStore) CreateFailureRepair(ctx context.Context, taskID, evidenceI
 		return nil, err
 	}
 	mode := (&Task{Metadata: rootMeta}).ExecutionMode()
-	repairFields := map[string]interface{}{"repair_of": rootID, "fix_of": taskID, "failure_evidence": evidenceID, "diagnosis": diagnosis, "mode": mode}
+	repairFields := map[string]interface{}{"repair_of": rootID, "fix_of": taskID, "failure_evidence": evidenceID, "failure_kind": FailureKind(evidenceID), "diagnosis": diagnosis, "mode": mode}
 	for _, key := range []string{"decision_reason", "decision_ref"} {
 		if value, ok := rootMeta[key]; ok {
 			repairFields[key] = value
@@ -159,6 +159,27 @@ func (s *SQLiteStore) CreateFailureRepair(ctx context.Context, taskID, evidenceI
 		return nil, err
 	}
 	return s.getTaskInternal(ctx, id)
+}
+
+// Evidence id prefixes name what kind of failure a fix task answers.
+const (
+	ProviderStopEvidence = "provider-stop-"
+	FindingEvidence      = "console-repair:"
+)
+
+// FailureKind is how a fix task's failure is counted: "provider" when the
+// provider or a stage stopped the attempt, "finding" when a review, gate or
+// verdict found a defect in work that ran, "check" when the task failed its
+// own verification check.
+func FailureKind(evidenceID string) string {
+	switch {
+	case strings.HasPrefix(evidenceID, ProviderStopEvidence):
+		return "provider"
+	case strings.HasPrefix(evidenceID, FindingEvidence):
+		return "finding"
+	default:
+		return "check"
+	}
 }
 
 // Delivered reports whether a task's work is delivered: done (or approved),

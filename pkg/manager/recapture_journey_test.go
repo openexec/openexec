@@ -50,10 +50,10 @@ func TestLegacyRecaptureFailureReloadRepair(t *testing.T) {
 		t.Fatal("private repair context unavailable after reload")
 	}
 	tasks, err := f.env.rel.TasksInStories(ctx, []string{"S"})
-	if err != nil || len(tasks) != 3 {
+	if err != nil || len(checkLedger(tasks)) != 3 {
 		t.Fatal("expected one repair", err)
 	}
-	for _, repair := range tasks {
+	for _, repair := range checkLedger(tasks) {
 		if repair.Metadata["repair_of"] == "A" && !strings.Contains(repair.Description, id) {
 			t.Fatal("repair lacks fresh context")
 		}

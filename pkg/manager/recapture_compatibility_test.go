@@ -143,7 +143,7 @@ func TestRecaptureCompatibility(t *testing.T) {
 						}
 					case "failure":
 						// The failed task is closed with its fix; its dependent waits for the fix.
-						if task.Status != release.TaskStatusFailed || task.Metadata["fixed_by"] == nil || task.AttemptCount != 2 || settings.Status != release.TaskStatusPending || settings.AttemptCount != 0 || f.calls != 1 || len(tasks) != 3 {
+						if task.Status != release.TaskStatusFailed || task.Metadata["fixed_by"] == nil || task.AttemptCount != 2 || settings.Status != release.TaskStatusPending || settings.AttemptCount != 0 || f.calls != 1 || len(checkLedger(tasks)) != 3 {
 							t.Fatalf("repair disposition: %+v %+v calls=%d tasks=%d", task, settings, f.calls, len(tasks))
 						}
 						id, _ := task.Metadata["verification_failure_evidence"].(string)
@@ -168,7 +168,7 @@ func TestRecaptureCompatibility(t *testing.T) {
 							t.Fatal("original command and diagnostics lost after reopen")
 						}
 						repairs := 0
-						for _, repair := range tasks {
+						for _, repair := range checkLedger(tasks) {
 							if repair.Metadata["repair_of"] == "A" {
 								repairs++
 								if !strings.Contains(repair.Description, id) {
