@@ -320,6 +320,13 @@ REVIEW THE STORIES AGAINST THESE CRITERIA:
    Every implementation story must have a final task or acceptance criterion that
    summarizes the verification evidence for the entire feature set.
 
+10. **Persisted Work**: IDs listed in "continues" are goals, stories and tasks
+   already imported, many already done. Their wording, allowed_paths and
+   verification are fixed: a re-plan cannot change them and import keeps them
+   as persisted. Do not reject the plan for the content of those rows; judge
+   whether the remaining and new work builds correctly on them and covers the
+   intent. A story's requirement_id is still checked.
+
 ORIGINAL INTENT:
 %s
 
