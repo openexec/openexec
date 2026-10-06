@@ -2,6 +2,7 @@ package planner
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -94,5 +95,26 @@ func TestContinueRetainedWorkLeavesNewPlans(t *testing.T) {
 	plan := &ProjectPlan{Stories: []Story{{ID: "US-030", Title: "New", Tasks: []Task{{ID: "T-US-030-001"}}}}}
 	if got := ContinueRetainedWork(plan, boundaryLedger()); got != nil || plan.Continues != nil {
 		t.Fatalf("continued %v", got)
+	}
+}
+
+// A persisted story has no requirement_id column; the plan's binding for the
+// same story survives continuation while its rewording does not.
+func TestContinueRetainedWorkKeepsThePlansRequirementBinding(t *testing.T) {
+	plan := &ProjectPlan{Stories: []Story{
+		{ID: "US-008", GoalID: "G-005", RequirementID: "navigation", Title: "Reworded", Tasks: []Task{{ID: "T-US-008-001", Title: "Reworded check"}}},
+	}}
+	ContinueRetainedWork(plan, boundaryLedger())
+	if got := plan.Stories[0]; got.ID != "US-008" || got.RequirementID != "navigation" || got.Title != "Goal Validation" {
+		t.Fatalf("continued story = %+v", got)
+	}
+}
+
+// Every row of a re-plan can be persisted work the planner cannot reword; a
+// review that rejects their content rejects every re-plan the same way (Goal
+// 8e9a210a, 10-06: 48 of 48 IDs continued, refused for their 09-29 wording).
+func TestStoryReviewPromptJudgesPersistedRowsAsFixed(t *testing.T) {
+	if !strings.Contains(StoryReviewPrompt, `IDs listed in "continues"`) || !strings.Contains(StoryReviewPrompt, "Do not reject the plan for the content of those rows") {
+		t.Fatal("review prompt does not say continued rows are fixed")
 	}
 }

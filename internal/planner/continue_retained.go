@@ -122,7 +122,16 @@ func ContinueRetainedWork(plan *ProjectPlan, ledger RetainedLedger) []string {
 			}
 			fresh = append(fresh, t)
 		}
-		if _, ok := continued[s.ID]; ok {
+		if story, ok := continued[s.ID]; ok {
+			// The ledger never persists requirement_id, so a continued story
+			// comes back unbound and every one of its tasks is backlog that
+			// never runs. The plan's binding for that same story is the only
+			// one there is; its wording is still dropped (Goal 8e9a210a,
+			// 10-06: every re-plan reviewed as the unbound 09-29 ledger).
+			if story.RequirementID == "" {
+				story.RequirementID = s.RequirementID
+				continued[s.ID] = story
+			}
 			emit(s.ID)
 			for _, id := range held {
 				emit(id)
