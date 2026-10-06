@@ -13,6 +13,10 @@ func TestLintVerificationScript(t *testing.T) {
 		`grep -q "MAX_BYTES" route.ts | head -1`,
 		`test -f a && grep foo a || true`,
 		`cat x 2>/dev/null`,
+		`grep -q x a || { echo missing; false; true; }`,
+		`go test ./... || exit 0`,
+		`grep -q x a || false || true`,
+		`test -f a && grep foo a || { echo no; }`,
 	}
 	for _, s := range falseGreen {
 		if issues := LintVerificationScript(s); len(issues) == 0 {
@@ -25,6 +29,14 @@ func TestLintVerificationScript(t *testing.T) {
 		`go test ./internal/foo/...`,
 		`grep -q "MAX_BYTES = 40" route.ts`,
 		``,
+		// A fallback that fails the script reports the failure; it masks nothing.
+		// Voice-control Goal 4011a347's plan was refused for the first one.
+		`f="$HOME/observe.env"; for k in A B; do grep -q "^$k=" "$f" || { echo "missing $k"; exit 1; }; done`,
+		`go test ./internal/x || exit 1`,
+		`grep -q foo a || false`,
+		"grep -q foo a || exit 2\necho ok",
+		`test -f a && grep -q foo a || { exit 1; }`,
+		`(grep -q foo a || exit 1)`,
 	}
 	for _, s := range sound {
 		if issues := LintVerificationScript(s); len(issues) != 0 {
