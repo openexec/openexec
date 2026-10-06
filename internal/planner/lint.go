@@ -12,16 +12,28 @@ import (
 var falseGreenPatterns = []struct {
 	name string
 	re   *regexp.Regexp
+	// orElse marks a pattern whose match ends at `||`: it is no mask when the
+	// fallback after it fails the script itself.
+	orElse bool
 }{
 	{"masks failure: a test/assert command followed by `|| <fallback>` (the fallback can pass while the real check failed)",
-		regexp.MustCompile(`(?i)(vitest|jest|pytest|\bnpm test\b|\bgo test\b|\bgrep\b)[^\n|]*\|\|`)},
+		regexp.MustCompile(`(?i)(vitest|jest|pytest|\bnpm test\b|\bgo test\b|\bgrep\b)[^\n|]*\|\|`), true},
 	{"hides errors: `2>/dev/null` on the checked command",
-		regexp.MustCompile(`2>\s*/dev/null`)},
+		regexp.MustCompile(`2>\s*/dev/null`), false},
+	// A pipe is one `|`; `grep -q x || exit 1` keeps the exit status.
 	{"discards exit status: a quiet grep (`grep -q`) piped into another command",
-		regexp.MustCompile(`grep\s+-\w*q\w*\b[^\n|]*\|`)},
+		regexp.MustCompile(`grep\s+-\w*q\w*\b[^\n|]*\|(?:[^|]|\z)`), false},
 	{"masks failure: assertions chained as `A && B || C` (C passing hides an A/B failure)",
-		regexp.MustCompile(`&&[^\n]*\|\|`)},
+		regexp.MustCompile(`&&[^\n|]*\|\|`), true},
 }
+
+// failingFallback is a fallback that fails the script: `|| exit 1`,
+// `|| false`, `|| return 1`, or a `{ ...; }` group ending in one of them.
+// `cmd || { echo "missing $k"; exit 1; }` reports the failure loudly; it is
+// the idiom the lint asks for, not a mask.
+var failingFallback = regexp.MustCompile(`^\s*(?:\{(?:[^{}\n]*?;)?\s*` + failCommand + `\s*;?\s*\}|` + failCommand + `\s*(?:;|\)|\n|\z))`)
+
+const failCommand = `(?:exit\s+[1-9][0-9]*|false|return\s+[1-9][0-9]*)`
 
 // StaleBaseRefIssue reports a verification script that diffs against a bare
 // local `main`/`master`. OpenExec runs tasks in linked candidate worktrees
@@ -285,8 +297,12 @@ func LintVerificationScript(script string) []string {
 	}
 	var issues []string
 	for _, p := range falseGreenPatterns {
-		if p.re.MatchString(script) {
+		for _, loc := range p.re.FindAllStringIndex(script, -1) {
+			if p.orElse && failingFallback.MatchString(script[loc[1]:]) {
+				continue
+			}
 			issues = append(issues, p.name)
+			break
 		}
 	}
 	return issues
