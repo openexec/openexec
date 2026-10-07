@@ -30,7 +30,10 @@ type retainedPlanRequest struct {
 	ReviewRound        int         `json:"review_round,omitempty"`
 	ReviewLimit        int         `json:"review_limit,omitempty"`
 	RefinementAttempts int         `json:"refinement_attempts,omitempty"`
-	SchemaCorrection   string      `json:"schema_correction,omitempty"` // retained diagnostic + rejected response; nonempty consumes the single correction
+	// CheckRepairs counts repairs of a fixed plan that still failed the
+	// deterministic checks; bounded by maxCheckRepairs.
+	CheckRepairs     int    `json:"check_repairs,omitempty"`
+	SchemaCorrection string `json:"schema_correction,omitempty"` // retained diagnostic + rejected response; nonempty consumes the single correction
 }
 
 // plannerBuild names the OpenExec build that generates and reviews plans: the
@@ -220,6 +223,49 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			return nil, err
 		}
 	}
+	// replaceWithRefined asks the planner to fix the current plan against a
+	// review and makes the fixed plan current, unreviewed. A check repair
+	// (staleIsFatal false) leaves a stale base reference to the checks the
+	// loop runs again, so a repair can fix it.
+	replaceWithRefined := func(review *planner.PlanReview, staleIsFatal bool) error {
+		current := retained.Result
+		refined, err := planner.New(m.cfg.PlanGenerator).RefinePlanWithSchemaCorrection(ctx, content, current.Plan, review, func(decode *planner.ResponseDecodeError) error {
+			if retained.SchemaCorrection != "" {
+				return fmt.Errorf("retained schema correction budget exhausted")
+			}
+			retained.SchemaCorrection = decode.Error()
+			return save()
+		})
+		if err != nil {
+			return err
+		}
+		if err := refined.Validate(); err != nil {
+			return err
+		}
+		if req.AutoImport {
+			if staleIsFatal {
+				if err := planner.PlanStaleBaseRefError(refined); err != nil {
+					return err
+				}
+			}
+			if err := m.preparePlanIDs(refined); err != nil {
+				return err
+			}
+			goals, stories, tasks := reviewedPlanRows(refined)
+			if err := rel.ValidatePlanIdentities(ctx, goals, stories, tasks); err != nil {
+				return err
+			}
+		}
+		id, hash, path := m.writePlanArtifact(refined)
+		if path == "" {
+			return fmt.Errorf("refined plan artifact could not be persisted")
+		}
+		if hash == current.ArtifactHash {
+			return fmt.Errorf("plan refinement produced no changed plan; unchanged review retry refused")
+		}
+		retained.Result = &PlanResult{Plan: refined, PlanID: id, ArtifactHash: hash, ArtifactPath: path, PromptVersion: prompt.PromptVersion, PlannerBuild: plannerBuild()}
+		return save()
+	}
 	for {
 		result := retained.Result
 		// Validate content-addressed evidence before using it, including on replay.
@@ -240,7 +286,30 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			var review *planner.PlanReview
 			if retained.RefinementAttempts >= 1 {
 				if issues := planner.DeterministicPlanIssues(result.Plan); len(issues) != 0 {
-					return nil, fmt.Errorf("the plan fixed after its review still fails required checks: %s", strings.Join(issues, "; "))
+					// Who decides and what a task may touch are refused, never
+					// repaired: a repair could satisfy the lint by dropping the
+					// owner's decision.
+					if verification := planner.VerificationPlanIssues(result.Plan); len(verification) != len(issues) {
+						return nil, fmt.Errorf("the plan fixed after its review still fails required checks: %s", strings.Join(issues, "; "))
+					}
+					// The checks are deterministic and name what to change, so
+					// a repair is bounded work, not another review round: the
+					// planner gets only these failures and changes nothing
+					// else. Refused outright, Goal 4011a347's second round
+					// failed three times overnight on the masked-check lint
+					// (10-07, 01:17 to 05:38), each retry a fresh run.
+					if retained.CheckRepairs >= maxCheckRepairs {
+						return nil, fmt.Errorf("the plan fixed after its review still fails required checks after %d check repairs: %s", retained.CheckRepairs, strings.Join(issues, "; "))
+					}
+					retained.CheckRepairs++
+					if err := save(); err != nil {
+						return nil, err
+					}
+					repairReview := &planner.PlanReview{Approved: false, Assessment: planner.CheckRepairInstruction(issues)}
+					if err := replaceWithRefined(repairReview, false); err != nil {
+						return nil, err
+					}
+					continue
 				}
 				// One review, one fix (owner, 2026-10-05): the plan the
 				// planner fixed after its review is imported as it is. A second
@@ -318,39 +387,9 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 			if err := save(); err != nil {
 				return nil, err
 			}
-			refined, err := planner.New(m.cfg.PlanGenerator).RefinePlanWithSchemaCorrection(ctx, content, result.Plan, result.Review, func(decode *planner.ResponseDecodeError) error {
-				if retained.SchemaCorrection != "" {
-					return fmt.Errorf("retained schema correction budget exhausted")
-				}
-				retained.SchemaCorrection = decode.Error()
-				return save()
-			})
-			if err != nil {
+			if err := replaceWithRefined(result.Review, true); err != nil {
 				return nil, err
 			}
-			if err := refined.Validate(); err != nil {
-				return nil, err
-			}
-			if req.AutoImport {
-				if err := planner.PlanStaleBaseRefError(refined); err != nil {
-					return nil, err
-				}
-				if err := m.preparePlanIDs(refined); err != nil {
-					return nil, err
-				}
-				goals, stories, tasks := reviewedPlanRows(refined)
-				if err := rel.ValidatePlanIdentities(ctx, goals, stories, tasks); err != nil {
-					return nil, err
-				}
-			}
-			id, hash, path := m.writePlanArtifact(refined)
-			if path == "" {
-				return nil, fmt.Errorf("refined plan artifact could not be persisted")
-			}
-			if hash == result.ArtifactHash {
-				return nil, fmt.Errorf("plan refinement produced no changed plan; unchanged review retry refused")
-			}
-			retained.Result = &PlanResult{Plan: refined, PlanID: id, ArtifactHash: hash, ArtifactPath: path, PromptVersion: prompt.PromptVersion, PlannerBuild: plannerBuild()}
 			retained.ReviewRound++
 			if err := save(); err != nil {
 				return nil, err
@@ -453,3 +492,8 @@ func reviewedPlanRows(plan *planner.ProjectPlan) ([]*release.Goal, []*release.St
 	}
 	return goals, stories, tasks
 }
+
+// maxCheckRepairs bounds the repairs of a fixed plan that still fails the
+// deterministic plan checks. The checks name what to change, so two repairs
+// cover a plan whose first repair fixed some failures and exposed others.
+const maxCheckRepairs = 2
