@@ -17,6 +17,7 @@ func TestLintVerificationScript(t *testing.T) {
 		`go test ./... || exit 0`,
 		`grep -q x a || false || true`,
 		`test -f a && grep foo a || { echo no; }`,
+		`test -f a && grep -q x a | head -1`,
 	}
 	for _, s := range falseGreen {
 		if issues := LintVerificationScript(s); len(issues) == 0 {
@@ -37,6 +38,10 @@ func TestLintVerificationScript(t *testing.T) {
 		"grep -q foo a || exit 2\necho ok",
 		`test -f a && grep -q foo a || { exit 1; }`,
 		`(grep -q foo a || exit 1)`,
+		// The pipe belongs to the last command of the list, not to the grep.
+		// Voice-control Goal 4011a347's re-plan was refused for this shape.
+		`grep -q T a.md && go test ./x -coverprofile=c && go tool cover -func=c | python3 -I -c 'import sys'`,
+		`grep -q T a.md; go tool cover -func=c | python3 -I -c 'import sys'`,
 	}
 	for _, s := range sound {
 		if issues := LintVerificationScript(s); len(issues) != 0 {
