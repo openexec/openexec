@@ -204,3 +204,45 @@ func TestFailedRepairTaskUsesItsOwnAttemptsNotRepairCreation(t *testing.T) {
 		t.Fatalf("a repair of a repair was created: %d tasks, %v", len(tasks), err)
 	}
 }
+
+// A failed task closed by its fix stays closed: tasks are immutable, and its
+// fix is the work that runs. Reopening it because it had attempts left ran
+// the closed task again beside its fix, and its next stop was refused as
+// "already closed with fix", failing the whole queue (agent-console Voice
+// Goal fb9feb61, T-US-008-001 and repair-45e07bbb, 2026-10-07).
+func TestFreshTaskQueueNeverReopensATaskClosedByItsFix(t *testing.T) {
+	e := newSchedulerTestEnv(t)
+	createStory(t, e.rel, "S", nil)
+	for _, task := range []*release.Task{
+		{ID: "original", StoryID: "S", Status: release.TaskStatusFailed, AttemptCount: 1, MaxAttempts: 3,
+			Metadata: map[string]interface{}{"fixed_by": "fix-1"}},
+		{ID: "fix-1", StoryID: "S", Status: release.TaskStatusFailed, AttemptCount: 1, MaxAttempts: 2,
+			Metadata: map[string]interface{}{"repair_of": "original", "fix_of": "original", "fixed_by": "fix-2"}},
+		{ID: "fix-2", StoryID: "S", Status: release.TaskStatusPending, MaxAttempts: 2,
+			Metadata: map[string]interface{}{"repair_of": "original", "fix_of": "fix-1"}},
+	} {
+		task.Title, task.Description = task.ID, "Resume the retained bounded fixture"
+		if err := e.rel.CreateTask(task); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.mgr.Close()
+	fresh := freshQueueManager(t, e)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_ = fresh.ExecuteTasks(ctx, RunOptions{TaskOriented: true, StoryIDs: []string{"S"}})
+	rel, err := fresh.GetInternalReleaseManager()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"original", "fix-1"} {
+		closed, err := rel.TaskSnapshot(ctx, id)
+		if err != nil || closed.Status != release.TaskStatusFailed || closed.AttemptCount != 1 {
+			t.Fatalf("task %s closed by its fix was reopened: %+v, %v", id, closed, err)
+		}
+	}
+	fix, err := rel.TaskSnapshot(ctx, "fix-2")
+	if err != nil || fix.Status != release.TaskStatusDone || fix.AttemptCount != 1 {
+		t.Fatalf("the open fix did not run: %+v, %v", fix, err)
+	}
+}
