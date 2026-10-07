@@ -250,6 +250,11 @@ func runnableTasks(ctx context.Context, store Store, storyIDs []string, recaptur
 		if task.Status != TaskStatusPending || !scope[task.StoryID] || task.ExecutionMode() == TaskModeHITL || task.MaxAttempts <= 0 || task.AttemptCount >= task.MaxAttempts {
 			continue
 		}
+		// A task closed with its fix never runs again, even if a stale
+		// status says pending; its fix carries the work.
+		if fixedBy, _ := task.Metadata["fixed_by"].(string); fixedBy != "" {
+			continue
+		}
 		story := storyByID[task.StoryID]
 		if story == nil || story.Status == StoryStatusDone {
 			continue

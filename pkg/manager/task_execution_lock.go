@@ -80,6 +80,19 @@ func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Ma
 		return err
 	}
 	for _, task := range tasks {
+		// A task closed with its fix is finished, whatever its status says:
+		// reopened, it ran again beside its own fix and, stopped once more,
+		// was refused a second fix, ending the run (voice-output Goal
+		// fb9feb61, 10-07 14:46). Closed tasks stay closed (owner rule).
+		if closedWithFix(task) {
+			if task.Status == release.TaskStatusInProgress {
+				_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='failed' WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
+				if err != nil {
+					return fmt.Errorf("reconcile retained task %s: %w", task.ID, err)
+				}
+			}
+			continue
+		}
 		switch {
 		case task.Status == release.TaskStatusInProgress && task.Metadata["recapture_outcome"] == "running":
 			_, err = m.state.GetDB().ExecContext(ctx, `UPDATE tasks SET status='failed' WHERE id=? AND status='in_progress' AND attempt_count=?`, task.ID, task.AttemptCount)
@@ -98,6 +111,12 @@ func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Ma
 		}
 	}
 	return nil
+}
+
+// closedWithFix reports whether task was closed by a fix task (fixed_by).
+func closedWithFix(task *release.Task) bool {
+	fixedBy, _ := task.Metadata["fixed_by"].(string)
+	return fixedBy != ""
 }
 
 // isRepairTask reports whether task was created to repair another task. It

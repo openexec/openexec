@@ -172,6 +172,11 @@ func (m *Manager) fixProviderStop(ctx context.Context, rel *release.Manager, tas
 	if failed.ExecutionMode() == release.TaskModeHITL || failed.Metadata["verification_failure_evidence"] != nil || failed.Metadata["recapture_outcome"] != nil {
 		return false, nil
 	}
+	// Already closed with its fix: the stop is handled, and the queue goes on
+	// to the fix instead of failing the run on a refused second fix.
+	if closedWithFix(failed) {
+		return true, nil
+	}
 	if previous, _ := failed.Metadata["failure_evidence"].(string); strings.HasPrefix(previous, release.ProviderStopEvidence) {
 		if step, err := m.state.GetRunStep(ctx, previous); err == nil && step != nil {
 			var prior map[string]interface{}
