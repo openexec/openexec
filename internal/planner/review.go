@@ -179,6 +179,14 @@ func carryGoals(original, refined *ProjectPlan) {
 // lint. ReviewPlan applies them to the reviewer's verdict; a plan imported
 // after its one fix, without a second review, must pass them on its own.
 func DeterministicPlanIssues(plan *ProjectPlan) []string {
+	return append(VerificationPlanIssues(plan), boundaryPlanIssues(plan)...)
+}
+
+// VerificationPlanIssues are the deterministic failures of a plan's
+// verification commands: masked checks and stale base references. Only these
+// are repaired by the planner (CheckRepairInstruction): their fix is a
+// rewritten command, never a change to what the plan does.
+func VerificationPlanIssues(plan *ProjectPlan) []string {
 	var issues []string
 	if lint := LintPlanVerification(plan); len(lint) != 0 {
 		issues = append(issues, fmt.Sprintf("verification lint refused: %v", lint))
@@ -186,6 +194,14 @@ func DeterministicPlanIssues(plan *ProjectPlan) []string {
 	if err := PlanStaleBaseRefError(plan); err != nil {
 		issues = append(issues, err.Error())
 	}
+	return issues
+}
+
+// boundaryPlanIssues are failures of who decides and what a task may touch.
+// They are refused, never repaired: a planner asked to fix a human boundary can
+// satisfy the lint by removing the owner's decision.
+func boundaryPlanIssues(plan *ProjectPlan) []string {
+	var issues []string
 	if lint := LintHumanBoundaries(plan); len(lint) != 0 {
 		issues = append(issues, fmt.Sprintf("human boundary lint refused: %v", lint))
 	}
@@ -199,4 +215,18 @@ func DeterministicPlanIssues(plan *ProjectPlan) []string {
 		}
 	}
 	return issues
+}
+
+// CheckRepairInstruction is the review a check repair gives the planner: only
+// the deterministic failures, the idioms that pass them, and an instruction to
+// change nothing else.
+func CheckRepairInstruction(issues []string) string {
+	return "Required deterministic plan checks refused this plan. Fix only what they name and change nothing else: keep every story, task, ID, requirement_id, dependency and description as it is.\n\nFailures:\n- " +
+		strings.Join(issues, "\n- ") +
+		"\n\nA verification command must fail the script when its check fails:\n" +
+		"- instead of `cmd || other`, write `cmd || { echo \"what failed\"; exit 1; }`;\n" +
+		"- never pipe `grep -q` into another command: write `grep -q PATTERN FILE || { echo \"missing PATTERN\"; exit 1; }`;\n" +
+		"- never chain `A && B || C`: write separate checks, each ending in `|| { echo ...; exit 1; }`;\n" +
+		"- never send the checked command's errors to /dev/null;\n" +
+		"- never diff against a bare local main or master: use origin/main or the task's base revision."
 }
