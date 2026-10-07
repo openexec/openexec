@@ -25,7 +25,7 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	data, err := json.Marshal(plan)
+	data, err := promptPlan(plan)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (p *Planner) RefinePlanWithSchemaCorrection(ctx context.Context, intent str
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	data, err := json.Marshal(plan)
+	data, err := promptPlan(plan)
 	if err != nil {
 		return nil, err
 	}
