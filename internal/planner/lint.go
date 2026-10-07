@@ -20,9 +20,11 @@ var falseGreenPatterns = []struct {
 		regexp.MustCompile(`(?i)(vitest|jest|pytest|\bnpm test\b|\bgo test\b|\bgrep\b)[^\n|]*\|\|`), true},
 	{"hides errors: `2>/dev/null` on the checked command",
 		regexp.MustCompile(`2>\s*/dev/null`), false},
-	// A pipe is one `|`; `grep -q x || exit 1` keeps the exit status.
+	// A pipe is one `|`; `grep -q x || exit 1` keeps the exit status. The
+	// pipe must belong to the grep's own command: `&&` and `;` end it, so
+	// `grep -q x f && go tool cover -func=p | python3 ...` pipes only cover.
 	{"discards exit status: a quiet grep (`grep -q`) piped into another command",
-		regexp.MustCompile(`grep\s+-\w*q\w*\b[^\n|]*\|(?:[^|]|\z)`), false},
+		regexp.MustCompile(`grep\s+-\w*q\w*\b[^\n|&;]*\|(?:[^|]|\z)`), false},
 	{"masks failure: assertions chained as `A && B || C` (C passing hides an A/B failure)",
 		regexp.MustCompile(`&&[^\n|]*\|\|`), true},
 }
