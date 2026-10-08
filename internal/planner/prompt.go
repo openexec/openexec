@@ -325,7 +325,10 @@ REVIEW THE STORIES AGAINST THESE CRITERIA:
    verification are fixed: a re-plan cannot change them and import keeps them
    as persisted. Do not reject the plan for the content of those rows; judge
    whether the remaining and new work builds correctly on them and covers the
-   intent. A story's requirement_id is still checked.
+   intent. A story's requirement_id is still checked. Goals in
+   "persisted_goals" already exist: a story may name one as its goal_id
+   without the plan restating it. A fix cannot create goals, so never propose
+   a new goal; name the existing goal the work serves.
 
 ORIGINAL INTENT:
 %s
@@ -387,6 +390,8 @@ Follow the reviewer's refactoring_plan exactly. Generate the proposed stories wi
 3. Acceptance criteria extracted from the intent document
 4. Proper IDs: US-001, US-002, etc. and T-US-001-001, T-US-001-002, etc.
 5. DEPENDENCIES: Model dependencies via "depends_on" lists for stories and tasks.
+6. GOALS: A story's "goal_id" names a goal in CURRENT STORIES' "goals" or
+   "persisted_goals". You cannot create goals; never cite any other goal id.
 
 OUTPUT FORMAT - JSON array:
 [
