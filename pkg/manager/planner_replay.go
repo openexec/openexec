@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -229,7 +230,7 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 	// loop runs again, so a repair can fix it.
 	replaceWithRefined := func(review *planner.PlanReview, staleIsFatal bool) error {
 		current := retained.Result
-		refined, err := planner.New(m.cfg.PlanGenerator).RefinePlanWithSchemaCorrection(ctx, content, current.Plan, review, func(decode *planner.ResponseDecodeError) error {
+		refined, err := planner.New(m.cfg.PlanGenerator).RefinePlanWithSchemaCorrection(ctx, content, withLedgerGoals(current.Plan, rel), review, func(decode *planner.ResponseDecodeError) error {
 			if retained.SchemaCorrection != "" {
 				return fmt.Errorf("retained schema correction budget exhausted")
 			}
@@ -248,6 +249,7 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 					return err
 				}
 			}
+			dropUnknownGoals(refined, rel)
 			if err := m.preparePlanIDs(refined); err != nil {
 				return err
 			}
@@ -317,7 +319,7 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 				// went through nine plans without converging. This record says
 				// what happened; it is not a reviewer's approval.
 				review = &planner.PlanReview{Approved: true, Assessment: "Imported after one review and one fix: the planner refined the plan the review rejected, and the refined plan is not reviewed again."}
-			} else if review, err = planner.New(m.cfg.PlanReviewer).ReviewPlan(ctx, content, result.Plan); err != nil {
+			} else if review, err = planner.New(m.cfg.PlanReviewer).ReviewPlan(ctx, content, withLedgerGoals(result.Plan, rel)); err != nil {
 				return nil, err
 			}
 			result.Review = review
@@ -497,3 +499,32 @@ func reviewedPlanRows(plan *planner.ProjectPlan) ([]*release.Goal, []*release.St
 // deterministic plan checks. The checks name what to change, so two repairs
 // cover a plan whose first repair fixed some failures and exposed others.
 const maxCheckRepairs = 2
+
+// withLedgerGoals is the plan as its reviewer and fixer read it: beside the
+// persisted goals, in ID order, since a re-plan lists only some of them.
+func withLedgerGoals(plan *planner.ProjectPlan, rel *release.Manager) *planner.ProjectPlan {
+	shown := *plan
+	shown.PersistedGoals = nil
+	for _, g := range rel.GetGoals() {
+		shown.PersistedGoals = append(shown.PersistedGoals, planner.Goal{ID: g.ID, Title: g.Title, Description: g.Description, SuccessCriteria: g.SuccessCriteria, VerificationMethod: g.VerificationMethod})
+	}
+	slices.SortFunc(shown.PersistedGoals, func(a, b planner.Goal) int { return strings.Compare(a.ID, b.ID) })
+	return &shown
+}
+
+// dropUnknownGoals unbinds a refined story from a goal that neither the plan
+// nor the ledger holds. A fix cannot create goals (carryGoals), and the
+// unreviewed import already clears such a reference; refused here, it ended
+// the SRE Goal 0ca8ccef's run d1687257 after its review and fix (10-08).
+func dropUnknownGoals(plan *planner.ProjectPlan, rel *release.Manager) {
+	listed := map[string]bool{}
+	for _, g := range plan.Goals {
+		listed[g.ID] = true
+	}
+	for i, s := range plan.Stories {
+		if s.GoalID != "" && !listed[s.GoalID] && rel.GetGoal(s.GoalID) == nil {
+			log.Printf("[Planner] Refined story %s cites goal %s, which neither the plan nor the ledger holds; it serves no goal", s.ID, s.GoalID)
+			plan.Stories[i].GoalID = ""
+		}
+	}
+}

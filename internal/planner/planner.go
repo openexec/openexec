@@ -63,6 +63,9 @@ type ProjectPlan struct {
 	// Continues names the persisted goals, stories and tasks this plan lists
 	// as they are (ContinueRetainedWork). Import leaves those rows alone.
 	Continues []string `json:"continues,omitempty"`
+	// PersistedGoals are the ledger's goals, for a reviewer or fixer to read
+	// (promptPlan). They are not plan content.
+	PersistedGoals []Goal `json:"-"`
 }
 
 // Validate checks that the plan has required fields and is well-formed.
