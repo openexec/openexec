@@ -23,5 +23,29 @@ legacy repository-graph route, including scan, changed-impact, and validation
 writes. Agent Console retains both server credentials and never exposes either
 through the external advisory profile. OpenExec binds to loopback by default;
 each route family fails closed when its own credential is absent.
-Broader V2.1 freshness enforcement is still open and must not be inferred from
-this adapter.
+
+## Freshness contract (Phase 1B exit, OpenExec side)
+
+Every evidence read passes the V2.1 read gate (`freshGeneration`): it
+recomputes the scan manifest, refreshes a drifted worktree before answering,
+or refuses. Every success and refusal body carries `provenance` — the
+generation that answered (`graph_version`, `freshness`, `checkout_id`,
+`worktree_state_hash`, …). `generation` still carries the same values for
+existing internal consumers. Refusals carry a machine-readable `reason`:
+
+| Status | `reason` | `provenance.freshness` | Meaning |
+| --- | --- | --- | --- |
+| 409 | `graph_stale` | `stale` | Drift detected and refresh impossible or disabled; nothing is answered from the old pointers |
+| 404 | `graph_missing` | `missing` | No generation exists for this checkout (never scanned) |
+| 404 | `not_found` | — | The graph exists but the symbol does not |
+
+`internal/server/repository_evidence_test.go` proves the exit criterion through
+the external routes: an edit after publication yields a refreshed answer citing
+a new `graph_version`; with refresh disabled the same reads refuse as stale;
+missing graph and missing symbol stay distinguishable. Ambiguous names return
+every candidate, and none is auto-selected (V2.3 contract tests).
+
+Agent Console currently turns every non-2xx evidence response into a generic
+"refused with status N" tool error. To keep stale, missing and not-found
+distinguishable end to end, it has to pass through `reason` and `provenance`
+(Agent Console work, outside this repository).

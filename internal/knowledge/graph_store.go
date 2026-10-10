@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -361,7 +362,7 @@ func (s *Store) ResolveGraphSymbol(ctx context.Context, identity RepositoryIdent
 		maxCandidates = 20
 	}
 	generation, _, err := s.freshGeneration(ctx, identity)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return QueryEnvelope[SymbolResolution]{
 			Query:       QueryMeta{Type: "resolve_symbol", Roots: []string{name}},
 			Generation:  RepositoryState{RepositoryID: identity.RepositoryID, CheckoutID: identity.CheckoutID, WorktreeID: identity.WorktreeID, Freshness: FreshnessMissing},

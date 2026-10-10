@@ -29,6 +29,27 @@ func IsStaleGraph(err error) bool {
 	return errors.As(err, &stale)
 }
 
+// MissingGraphError reports that no graph generation exists for the checkout.
+// It is distinct from a symbol that is absent from a current graph, so callers
+// can tell "never scanned" from "not found". It unwraps to sql.ErrNoRows to
+// keep existing missing-graph handling working.
+type MissingGraphError struct {
+	State RepositoryState
+}
+
+func (e *MissingGraphError) Error() string {
+	return "repository graph has not been built for this checkout; run `openexec knowledge graph scan`"
+}
+
+func (e *MissingGraphError) Unwrap() error { return sql.ErrNoRows }
+
+func missingGraph(identity RepositoryIdentity) *MissingGraphError {
+	return &MissingGraphError{State: RepositoryState{
+		RepositoryID: identity.RepositoryID, CheckoutID: identity.CheckoutID,
+		WorktreeID: identity.WorktreeID, BaseCommit: identity.BaseCommit, Freshness: FreshnessMissing,
+	}}
+}
+
 // errRefreshDisabled explains a stale refusal that the reader deliberately did
 // not repair.
 var errRefreshDisabled = errors.New(
@@ -58,6 +79,10 @@ func (s *Store) freshGeneration(ctx context.Context, identity RepositoryIdentity
 		return GraphGeneration{}, RepositoryState{}, err
 	}
 	generation, err := s.activeGeneration(ctx, identity.WorktreeID)
+	if err == sql.ErrNoRows {
+		missing := missingGraph(identity)
+		return GraphGeneration{}, missing.State, missing
+	}
 	if err != nil {
 		return GraphGeneration{}, RepositoryState{}, err
 	}
@@ -97,10 +122,11 @@ func (s *Store) freshGeneration(ctx context.Context, identity RepositoryIdentity
 		}
 	}
 	generation, err = s.activeGeneration(ctx, identity.WorktreeID)
+	if err == sql.ErrNoRows {
+		missing := missingGraph(identity)
+		return GraphGeneration{}, missing.State, missing
+	}
 	if err != nil {
-		if err == sql.ErrNoRows {
-			state.Freshness = FreshnessMissing
-		}
 		return GraphGeneration{}, state, err
 	}
 	current, err := BuildScanManifest(identity.RootPath)
