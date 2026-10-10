@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 )
@@ -18,7 +19,7 @@ type ModuleDependencyResult struct {
 // worktree manifest. A mismatch marks the generation stale before returning.
 func (s *Store) CurrentRepositoryState(ctx context.Context, identity RepositoryIdentity) (RepositoryState, error) {
 	_, state, err := s.freshGeneration(ctx, identity)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return RepositoryState{RepositoryID: identity.RepositoryID, CheckoutID: identity.CheckoutID, WorktreeID: identity.WorktreeID, BaseCommit: identity.BaseCommit, Freshness: FreshnessMissing}, nil
 	}
 	if err != nil {

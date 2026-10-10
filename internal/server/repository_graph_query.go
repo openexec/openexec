@@ -49,17 +49,39 @@ func (s *Server) repositoryGraphStore() (*knowledge.Store, error) {
 	return knowledge.NewStoreWithDB(s.StateStore.GetDB())
 }
 
+// graphEnvelope adds response-body provenance to a graph answer. Provenance
+// repeats the answering generation under the name the external evidence
+// contract cites; `generation` stays for existing internal consumers.
+type graphEnvelope[T any] struct {
+	knowledge.QueryEnvelope[T]
+	Provenance knowledge.RepositoryState `json:"provenance"`
+}
+
+func respondGraph[T any](s *Server, w http.ResponseWriter, envelope knowledge.QueryEnvelope[T]) {
+	if envelope.Generation.GraphVersion != "" {
+		w.Header().Set(graphVersionHeader, envelope.Generation.GraphVersion)
+	}
+	s.respondJSON(w, http.StatusOK, graphEnvelope[T]{QueryEnvelope: envelope, Provenance: envelope.Generation})
+}
+
+// respondGraphError keeps "never scanned", "stale" and "not found" apart in a
+// machine-readable reason; an empty 404 would let a missing graph read as an
+// absent symbol.
 func (s *Server) respondGraphError(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
+	reason := "graph_error"
 	state := knowledge.RepositoryState{}
 	var stale *knowledge.StaleGraphError
-	if errors.As(err, &stale) {
-		status = http.StatusConflict
-		state = stale.State
-	} else if errors.Is(err, sql.ErrNoRows) {
-		status = http.StatusNotFound
+	var missing *knowledge.MissingGraphError
+	switch {
+	case errors.As(err, &stale):
+		status, reason, state = http.StatusConflict, "graph_stale", stale.State
+	case errors.As(err, &missing):
+		status, reason, state = http.StatusNotFound, "graph_missing", missing.State
+	case errors.Is(err, sql.ErrNoRows):
+		status, reason = http.StatusNotFound, "not_found"
 	}
-	s.respondJSON(w, status, map[string]any{"error": err.Error(), "generation": state, "freshness": state.Freshness})
+	s.respondJSON(w, status, map[string]any{"error": err.Error(), "reason": reason, "generation": state, "provenance": state, "freshness": state.Freshness})
 }
 
 // intQuery reads an optional positive bound. An absent bound takes the
@@ -117,7 +139,7 @@ func (s *Server) handleGraphSymbols(w http.ResponseWriter, r *http.Request) {
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondGraphResult(w, result.Generation, result)
+	respondGraph(s, w, result)
 }
 func (s *Server) handleGraphSymbolDetail(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -129,7 +151,7 @@ func (s *Server) handleGraphSymbolDetail(w http.ResponseWriter, r *http.Request)
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondGraphResult(w, result.Generation, result)
+	respondGraph(s, w, result)
 }
 func (s *Server) handleGraphSymbolDependencies(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -152,7 +174,7 @@ func (s *Server) handleGraphSymbolDependencies(w http.ResponseWriter, r *http.Re
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondGraphResult(w, result.Generation, result)
+	respondGraph(s, w, result)
 }
 func (s *Server) handleGraphSymbolCalls(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -173,7 +195,7 @@ func (s *Server) handleGraphSymbolCalls(w http.ResponseWriter, r *http.Request) 
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondGraphResult(w, result.Generation, result)
+	respondGraph(s, w, result)
 }
 func (s *Server) handleGraphSymbolImpact(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -189,7 +211,7 @@ func (s *Server) handleGraphSymbolImpact(w http.ResponseWriter, r *http.Request)
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondGraphResult(w, result.Generation, result)
+	respondGraph(s, w, result)
 }
 
 func (s *Server) handleGraphChangedImpact(w http.ResponseWriter, r *http.Request) {
@@ -236,5 +258,5 @@ func (s *Server) handleGraphSymbolSource(w http.ResponseWriter, r *http.Request)
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondGraphResult(w, result.Generation, result)
+	respondGraph(s, w, result)
 }

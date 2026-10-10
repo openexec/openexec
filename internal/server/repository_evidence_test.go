@@ -1,10 +1,16 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/openexec/openexec/internal/knowledge"
+	"github.com/openexec/openexec/pkg/db/state"
 )
 
 const repositoryEvidenceTestToken = "openexec-evidence-token-longer-than-thirty-two"
@@ -36,6 +42,136 @@ func TestRepositoryEvidenceProfileRequiresIndependentTokenAndPreservesProvenance
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"freshness":"current"`) ||
 		!strings.Contains(response.Body.String(), `"graph_version"`) {
 		t.Fatalf("evidence response = %d %s", response.Code, response.Body.String())
+	}
+}
+
+type evidenceBody struct {
+	Reason     string                    `json:"reason"`
+	Provenance knowledge.RepositoryState `json:"provenance"`
+	Generation knowledge.RepositoryState `json:"generation"`
+	Result     struct {
+		Candidates []knowledge.SymbolCandidate `json:"candidates"`
+		knowledge.SymbolSource
+	} `json:"result"`
+}
+
+func decodeEvidence(t *testing.T, response *httptest.ResponseRecorder) evidenceBody {
+	t.Helper()
+	var body evidenceBody
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode %s: %v", response.Body.String(), err)
+	}
+	return body
+}
+
+func evidenceFixture(t *testing.T) graphQueryFixture {
+	t.Helper()
+	fixture := newGraphQueryFixture(t)
+	fixture.server.repositoryEvidenceToken = repositoryEvidenceTestToken
+	fixture.server.registerRepositoryEvidenceRoutes()
+	return fixture
+}
+
+func evidenceTargetID(t *testing.T, fixture graphQueryFixture) (string, evidenceBody) {
+	t.Helper()
+	response := evidenceRequest(t, fixture, "/api/v1/external-evidence/symbols?q=Target", repositoryEvidenceTestToken)
+	body := decodeEvidence(t, response)
+	if response.Code != http.StatusOK || len(body.Result.Candidates) != 1 {
+		t.Fatalf("target search = %d %s", response.Code, response.Body.String())
+	}
+	return body.Result.Candidates[0].Symbol.ID, body
+}
+
+// Phase 1B exit of the Agent Console external advisory plan: mutate the
+// repository after graph publication and prove the external read refreshes,
+// citing the answering generation in response-body provenance.
+func TestRepositoryEvidenceReadAfterEditRefreshesAndCitesAnsweringGeneration(t *testing.T) {
+	fixture := evidenceFixture(t)
+	id, before := evidenceTargetID(t, fixture)
+	if before.Provenance.GraphVersion == "" || before.Provenance.Freshness != knowledge.FreshnessCurrent ||
+		before.Provenance.CheckoutID != fixture.identity.CheckoutID || before.Provenance != before.Generation {
+		t.Fatalf("search provenance = %#v, generation = %#v", before.Provenance, before.Generation)
+	}
+	updated := "package sample\n\n\n// edited after publication\nfunc Target() { println(\"edited\") }\nfunc Caller() { Target() }\nfunc Run() {}\n"
+	if err := os.WriteFile(filepath.Join(fixture.server.ProjectsDir, "main.go"), []byte(updated), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	response := evidenceRequest(t, fixture, "/api/v1/external-evidence/symbols/"+id+"/source", repositoryEvidenceTestToken)
+	after := decodeEvidence(t, response)
+	if response.Code != http.StatusOK || after.Provenance.Freshness != knowledge.FreshnessCurrent ||
+		after.Provenance.GraphVersion == "" || after.Provenance.GraphVersion == before.Provenance.GraphVersion ||
+		after.Result.Source.Content != "func Target() { println(\"edited\") }" {
+		t.Fatalf("edited source read = %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestRepositoryEvidenceRefusesStaleGraphWhenRefreshIsDisabled(t *testing.T) {
+	fixture := evidenceFixture(t)
+	store, err := knowledge.NewStoreWithDB(fixture.server.StateStore.GetDB())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.SetRefreshOnRead(false)
+	fixture.server.KnowledgeStore = store
+	id, before := evidenceTargetID(t, fixture)
+	if err := os.WriteFile(filepath.Join(fixture.server.ProjectsDir, "main.go"), []byte("package sample\n\nfunc Target() { println(\"edited\") }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{
+		"/api/v1/external-evidence/symbols?q=Target",
+		"/api/v1/external-evidence/symbols/" + id + "/source",
+	} {
+		response := evidenceRequest(t, fixture, target, repositoryEvidenceTestToken)
+		body := decodeEvidence(t, response)
+		if response.Code != http.StatusConflict || body.Reason != "graph_stale" ||
+			body.Provenance.Freshness != knowledge.FreshnessStale ||
+			body.Provenance.GraphVersion != before.Provenance.GraphVersion ||
+			len(body.Result.Candidates) != 0 || body.Result.Source.Content != "" {
+			t.Fatalf("stale %s = %d %s", target, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestRepositoryEvidenceDistinguishesMissingGraphFromMissingSymbol(t *testing.T) {
+	fixture := evidenceFixture(t)
+	unknown := evidenceRequest(t, fixture, "/api/v1/external-evidence/symbols/no-such-symbol", repositoryEvidenceTestToken)
+	if body := decodeEvidence(t, unknown); unknown.Code != http.StatusNotFound || body.Reason != "not_found" {
+		t.Fatalf("unknown symbol = %d %s", unknown.Code, unknown.Body.String())
+	}
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package sample\nfunc Target() {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stateStore, err := state.NewStore(filepath.Join(t.TempDir(), "openexec.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = stateStore.Close() })
+	graphStore, err := knowledge.NewStoreWithDB(stateStore.GetDB())
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := graphStore.EnsureRepositoryIdentity(t.Context(), root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unscanned := graphQueryFixture{server: &Server{
+		StateStore: stateStore, KnowledgeStore: graphStore, ProjectsDir: root, Mux: http.NewServeMux(),
+		repositoryEvidenceToken: repositoryEvidenceTestToken,
+	}, identity: identity}
+	unscanned.server.registerRepositoryEvidenceRoutes()
+	for _, target := range []string{
+		"/api/v1/external-evidence/symbols?q=Target",
+		"/api/v1/external-evidence/symbols/any/source",
+	} {
+		response := evidenceRequest(t, unscanned, target, repositoryEvidenceTestToken)
+		body := decodeEvidence(t, response)
+		if response.Code != http.StatusNotFound || body.Reason != "graph_missing" ||
+			body.Provenance.Freshness != knowledge.FreshnessMissing || body.Provenance.GraphVersion != "" ||
+			body.Provenance.CheckoutID != identity.CheckoutID {
+			t.Fatalf("missing graph %s = %d %s", target, response.Code, response.Body.String())
+		}
 	}
 }
 
