@@ -15,7 +15,7 @@ import (
 
 var (
 	ErrOutsideRoot   = errors.New("source path is outside repository root")
-	ErrStalePointer  = errors.New("source pointer is stale")
+	ErrStalePointer  = knowledge.ErrStaleSource
 	ErrRangeTooLarge = errors.New("source range exceeds configured limit")
 )
 

@@ -373,7 +373,15 @@ func (s *Store) ResolveGraphSymbol(ctx context.Context, identity RepositoryIdent
 	if err != nil {
 		return QueryEnvelope[SymbolResolution]{}, fmt.Errorf("load graph generation: %w", err)
 	}
+	return s.resolveGraphSymbolIn(ctx, generation, name, file, kind, maxCandidates)
+}
 
+// resolveGraphSymbolIn resolves within one already-gated generation. Composite
+// reads call it so every part of their answer comes from the same graph.
+func (s *Store) resolveGraphSymbolIn(ctx context.Context, generation GraphGeneration, name, file, kind string, maxCandidates int) (QueryEnvelope[SymbolResolution], error) {
+	if maxCandidates <= 0 || maxCandidates > 100 {
+		maxCandidates = 20
+	}
 	query := `SELECT s.id, s.repository_id, s.language, s.kind, s.display_name, s.qualified_name,
 		o.symbol_id, o.generation_id, o.node_id, o.file_path, o.start_line, o.end_line,
 		o.start_byte, o.end_byte, o.signature, o.file_content_hash, o.source_range_hash,

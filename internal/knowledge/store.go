@@ -73,6 +73,9 @@ type Store struct {
 	// noRefreshOnRead makes reads report drift instead of repairing it.
 	// See SetRefreshOnRead.
 	noRefreshOnRead bool
+	// afterContextGate, when set by tests, runs between BuildRepositoryContext's
+	// freshness gate and its reads — the window the gate's lock cannot cover.
+	afterContextGate func()
 }
 
 func NewStore(projectDir string) (*Store, error) {

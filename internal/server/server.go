@@ -350,7 +350,9 @@ func (s *Server) handleRepositoryContext(w http.ResponseWriter, r *http.Request)
 	}
 	projection, err := store.BuildRepositoryContext(r.Context(), identity, names, r.URL.Query().Get("task_id"), r.URL.Query().Get("run_id"), planID, report)
 	if err != nil {
-		s.respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		// Same mapping as the graph routes: a stale refusal is 409 with its
+		// generation, not an opaque server failure.
+		s.respondGraphError(w, err)
 		return
 	}
 	s.respondJSON(w, http.StatusOK, projection)

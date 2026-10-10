@@ -2,7 +2,9 @@ package knowledge
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -97,10 +99,21 @@ type RepositoryContextProjection struct {
 	OpenExecReference  OpenExecReference           `json:"openexec_reference"`
 }
 
+// BuildRepositoryContext passes the freshness gate exactly once and reads every
+// part of the projection from that one generation. Re-entering the public
+// queries per item would re-gate each one, so a mid-build edit could mix graph
+// versions under a single GraphVersion label, and their stale refusals were
+// swallowed into limitation notes beside Freshness: current.
 func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryIdentity, names []string, taskID, runID, planRevisionID string, report *statepkg.CompletionReport) (RepositoryContextProjection, error) {
-	state, err := s.CurrentRepositoryState(ctx, identity)
+	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return RepositoryContextProjection{}, fmt.Errorf("repository graph is missing: %w", err)
+		}
 		return RepositoryContextProjection{}, err
+	}
+	if s.afterContextGate != nil {
+		s.afterContextGate()
 	}
 	projection := RepositoryContextProjection{
 		SchemaVersion: RepositoryContextSchemaVersion, SourceSystem: "openexec",
@@ -155,10 +168,9 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 		}
 	} else {
 		for _, name := range names {
-			resolved, resolveErr := s.ResolveGraphSymbol(ctx, identity, name, "", "", 20)
+			resolved, resolveErr := s.resolveGraphSymbolIn(ctx, generation, name, "", "", 20)
 			if resolveErr != nil {
-				projection.Limitations = append(projection.Limitations, name+": resolution failed")
-				continue
+				return RepositoryContextProjection{}, fmt.Errorf("resolve %s: %w", name, resolveErr)
 			}
 			if resolved.Result.Candidate == nil {
 				projection.Limitations = append(projection.Limitations, name+": "+resolved.Result.Status)
@@ -193,10 +205,14 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 			continue
 		}
 		seenDependencyFiles[candidate.Occurrence.FilePath] = true
-		dependencies, err := s.FindModuleDependencies(ctx, identity, candidate.Occurrence.FilePath, false, 1, DefaultGraphLimits())
-		if err != nil {
+		dependencies, err := s.moduleDependenciesIn(ctx, generation, state, candidate.Occurrence.FilePath, false, 1, DefaultGraphLimits())
+		if errors.Is(err, sql.ErrNoRows) {
+			// The file holds symbols but no module node in this generation.
 			projection.Limitations = append(projection.Limitations, candidate.Occurrence.FilePath+": module dependencies unavailable")
 			continue
+		}
+		if err != nil {
+			return RepositoryContextProjection{}, fmt.Errorf("module dependencies of %s: %w", candidate.Occurrence.FilePath, err)
 		}
 		for _, edge := range dependencies.Result.Edges {
 			var to string
@@ -245,6 +261,19 @@ func (s *Store) BuildRepositoryContext(ctx context.Context, identity RepositoryI
 	}
 	if state.Freshness != FreshnessCurrent {
 		projection.Limitations = append(projection.Limitations, "graph is "+string(state.Freshness)+"; use repository inspection for conclusions")
+	}
+	// A scan that promoted a newer generation while this projection was built
+	// (another reader's refresh, or another process sharing the database) makes
+	// the "current" label false. The rows read stay consistent — generations
+	// are immutable — but the answer is no longer the current graph.
+	if active, activeErr := s.activeGeneration(ctx, identity.WorktreeID); activeErr != nil || active.ID != generation.ID {
+		stale := state
+		stale.Freshness = FreshnessStale
+		cause := activeErr
+		if cause == nil {
+			cause = fmt.Errorf("graph generation %s was superseded by %s while the projection was built", generation.ID, active.ID)
+		}
+		return RepositoryContextProjection{}, &StaleGraphError{State: stale, Cause: cause}
 	}
 	sort.Slice(projection.ResolvedSymbols, func(i, j int) bool {
 		return projection.ResolvedSymbols[i].SafeLocation < projection.ResolvedSymbols[j].SafeLocation

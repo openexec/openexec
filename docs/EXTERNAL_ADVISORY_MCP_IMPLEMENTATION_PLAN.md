@@ -23,5 +23,12 @@ legacy repository-graph route, including scan, changed-impact, and validation
 writes. Agent Console retains both server credentials and never exposes either
 through the external advisory profile. OpenExec binds to loopback by default;
 each route family fails closed when its own credential is absent.
-Broader V2.1 freshness enforcement is still open and must not be inferred from
-this adapter.
+V2.1 freshness enforcement lives in OpenExec's graph read gate, not in this
+adapter. The ten public store reads the coverage matrix exercises
+(`internal/knowledge/graph_freshness_matrix_test.go`), including the
+repository-context projection, refresh or refuse source, configuration and
+extractor-version drift. These routes reuse the graph handlers, which answer a
+stale refusal with 409, and so does `GET /api/v1/repository-context`; the
+adapter must preserve those refusals. The remaining V2.1 gaps (untested
+cancellation and concurrent-scan cases, per-process locking, per-read hashing
+cost) are recorded in `KNOWLEDGE_V2_PLAN.md`.

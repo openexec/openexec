@@ -9,12 +9,25 @@ Agent Console integration contract, 2026-08-03 freshness audit.
 
 | Phase | Delivered evidence | Status |
 | --- | --- | --- |
-| V2.1 | Read-time manifest comparison, serialized refresh/re-resolution, typed stale refusal, edit/move/rename/line-shift/current-source tests | Implemented; focused Go tests pass |
+| V2.1 | Read-time manifest comparison, serialized refresh/re-resolution, typed stale refusal, edit/move/rename/line-shift/current-source tests. Coverage matrix (`graph_freshness_matrix_test.go`) over the ten public store reads — state, resolve, find, detail, source, relations, dependencies, impact, changed-impact and the repository-context projection — times four drifts: source edit, configuration-file edit, configuration-digest mismatch and extractor-version mismatch. With refresh off each read refuses side-effect-free; with refresh on each promotes a new generation and its successful answer carries that graph version. The repository-context projection gates once and reads every part from that generation, and refuses as stale if a newer generation (same or another process) was promoted while it was built; `GET /api/v1/repository-context` answers that refusal with 409, as the graph routes do. A source edit or deletion between gate and read is a typed stale refusal at the store layer. MCP journey test drives the real adapter and store on a git worktree: scan → resolve → edit → source re-resolve → symbols-profile stale refusal → reopen with the persisted generation | Implemented; Go tests pass. Not covered: the HTTP source route's 409 for a mid-read edit rests on the shared error mapping (no HTTP test injects the edit); cancellation during a read-triggered refresh and a read racing an in-process scan are untested; the graph mutex is per-process, so cross-process freshness relies on the read-time manifest check and, for the projection, the post-build generation check. Latency: every gated read re-reads and hashes all scan inputs — O(input bytes) per read (`graph_freshness_bench_test.go`; see below) |
 | V2.2 | Projection provenance, worktree state, extractor capabilities, exact totals and per-list selection/truncation scopes; console rendering | Implemented; Go/React tests pass |
 | V2.3 | Checkout-authorized paginated symbol/detail/relationship/impact/source API and incoming/outgoing CLI calls | Implemented; endpoint contract tests pass |
 | V2.4 | Console Explore Overview, Dependencies, Symbols, Call flow, Impact and Source views plus Mermaid export | Implemented; type, lint, unit and production build pass; Playwright could not start because this host forbids listener sockets |
 | V2.5 | Fact-derived owner summary and dead-candidate projection into existing Attention -> triage -> supervised execution lifecycle | Implemented; server and owner tests pass |
 | V2.6 | Python/Svelte extraction, `_archive` exclusion and persisted named-generation tender/bid audit in Siivous | Implemented and manually spot-checked; Python behavior tests were not run because `pytest` is absent and Docker access is denied |
+
+V2.1 read latency, measured 2026-10-11 on an i9-13900K with a warm page cache
+(`go test ./internal/knowledge -run '^$' -bench GatedRead -benchmem`):
+
+| Repository | Ungated resolve | Gate only | Gated resolve | Gated repository context |
+| --- | --- | --- | --- | --- |
+| 100 Go files, ~2 KiB each | 0.13 ms | 3.2 ms | 3.0 ms | 7.5 ms |
+| 1,000 Go files, ~2 KiB each | 1.3 ms | 14.0 ms | 14.4 ms | 32.1 ms |
+| This checkout, manifest only (843 inputs, 7.6 MiB) | — | 26.3 ms | — | — |
+
+The gate dominates and grows with total input bytes; a cold cache or a much
+larger repository costs proportionally more. Refresh cost on drift is extra
+and is not in these figures.
 
 The implementation is not allowed to turn those two unavailable execution
 checks into passed evidence. Release acceptance requires rerunning the console
