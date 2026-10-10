@@ -632,6 +632,9 @@ var knowledgeGraphCallsCmd = &cobra.Command{
 		for _, node := range result.Result.Nodes {
 			cmd.Printf("  %s %s\n", node.NodeType, node.QualifiedName)
 		}
+		for _, limitation := range result.Limitations {
+			cmd.Printf("  limitation: %s\n", limitation)
+		}
 		if result.Truncated {
 			cmd.Println("  result truncated by graph limits")
 		}

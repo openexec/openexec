@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -155,12 +156,20 @@ func (s *Store) FindSymbolRelationships(ctx context.Context, identity Repository
 	if depth < 1 {
 		depth = 1
 	}
+	// A clamped depth is disclosed rather than silent: callers must not read a
+	// bounded traversal as the full relationship set they asked for.
+	var depthLimitation string
 	if depth > limits.MaxDepth {
+		depthLimitation = fmt.Sprintf("requested depth %d exceeds the traversal limit %d; traversal bounded to depth %d", depth, limits.MaxDepth, limits.MaxDepth)
 		depth = limits.MaxDepth
 	}
 	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
 		return QueryEnvelope[RelationshipResult]{}, err
+	}
+	limitations := append([]string(nil), generation.Limitations...)
+	if depthLimitation != "" {
+		limitations = append(limitations, depthLimitation)
 	}
 	_, nodeID, _, err := s.loadImpactRoot(ctx, generation.ID, symbolID)
 	if err != nil {
@@ -225,5 +234,5 @@ func (s *Store) FindSymbolRelationships(ctx context.Context, identity Repository
 	if incoming {
 		direction = "incoming"
 	}
-	return QueryEnvelope[RelationshipResult]{Query: QueryMeta{Type: "symbol_relationships_" + direction, Roots: []string{symbolID}}, Generation: state, Result: RelationshipResult{Root: root, Nodes: nodes, Edges: edges}, Resolution: ResolutionMeta{Status: "bounded", Methods: edgeMethods(edges)}, Limitations: generation.Limitations, Truncated: truncated}, nil
+	return QueryEnvelope[RelationshipResult]{Query: QueryMeta{Type: "symbol_relationships_" + direction, Roots: []string{symbolID}}, Generation: state, Result: RelationshipResult{Root: root, Nodes: nodes, Edges: edges}, Resolution: ResolutionMeta{Status: "bounded", Methods: edgeMethods(edges)}, Limitations: limitations, Truncated: truncated || depthLimitation != ""}, nil
 }

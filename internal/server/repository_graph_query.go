@@ -108,8 +108,14 @@ func (s *Server) handleGraphSymbolDependencies(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	incoming := r.URL.Query().Get("direction") == "incoming"
-	result, err := store.FindSymbolRelationships(r.Context(), identity, r.PathValue("id"), incoming, intQuery(r, "depth", 1), []string{"calls", "references"}, knowledge.DefaultGraphLimits())
+	// Dependencies default to outgoing; an unrecognized direction is refused so
+	// a typo cannot silently answer the opposite question.
+	direction := r.URL.Query().Get("direction")
+	if direction != "" && direction != "outgoing" && direction != "incoming" {
+		s.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "direction must be outgoing or incoming"})
+		return
+	}
+	result, err := store.FindSymbolRelationships(r.Context(), identity, r.PathValue("id"), direction == "incoming", intQuery(r, "depth", 1), []string{"calls", "references"}, knowledge.DefaultGraphLimits())
 	if err != nil {
 		s.respondGraphError(w, err)
 		return

@@ -135,6 +135,85 @@ func TestRepositoryGraphQueriesRequireCheckoutAuthorityAndPreserveAmbiguity(t *t
 	}
 }
 
+func graphSymbolID(t *testing.T, fixture graphQueryFixture, name string) string {
+	t.Helper()
+	response := graphRequest(t, fixture, "/api/v1/repository-graph/symbols?q="+name, fixture.identity.CheckoutID)
+	var result knowledge.QueryEnvelope[knowledge.SymbolSearchResult]
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range result.Result.Candidates {
+		if candidate.Symbol.DisplayName == name {
+			return candidate.Symbol.ID
+		}
+	}
+	t.Fatalf("symbol %s not found: %s", name, response.Body.String())
+	return ""
+}
+
+func relationshipNames(t *testing.T, response *httptest.ResponseRecorder) (map[string]bool, knowledge.QueryEnvelope[knowledge.RelationshipResult]) {
+	t.Helper()
+	if response.Code != http.StatusOK {
+		t.Fatalf("relationship status = %d, body=%s", response.Code, response.Body.String())
+	}
+	var result knowledge.QueryEnvelope[knowledge.RelationshipResult]
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, node := range result.Result.Nodes {
+		names[node.DisplayName] = true
+	}
+	return names, result
+}
+
+func TestRepositoryGraphCallDirectionsAndDependencyRefusal(t *testing.T) {
+	fixture := newGraphQueryFixture(t)
+	callerID, targetID := graphSymbolID(t, fixture, "Caller"), graphSymbolID(t, fixture, "Target")
+	base := "/api/v1/repository-graph/symbols/"
+
+	callees, outgoing := relationshipNames(t, graphRequest(t, fixture, base+callerID+"/calls?direction=outgoing", fixture.identity.CheckoutID))
+	if !callees["Target"] || callees["Caller"] || outgoing.Generation.Freshness != knowledge.FreshnessCurrent || outgoing.Generation.GraphVersion == "" {
+		t.Fatalf("outgoing calls for Caller = %#v", outgoing)
+	}
+	callers, _ := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/calls?direction=incoming", fixture.identity.CheckoutID))
+	if !callers["Caller"] || !callers["TestService"] || callers["Target"] {
+		t.Fatalf("incoming calls for Target = %v", callers)
+	}
+	if none, _ := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/calls?direction=outgoing", fixture.identity.CheckoutID)); len(none) != 0 {
+		t.Fatalf("Target has no callees, got %v", none)
+	}
+
+	// Depth beyond the traversal limit is bounded and disclosed, never silent.
+	_, deep := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/calls?direction=incoming&depth=99", fixture.identity.CheckoutID))
+	disclosed := false
+	for _, limitation := range deep.Limitations {
+		disclosed = disclosed || strings.Contains(limitation, "requested depth 99 exceeds the traversal limit")
+	}
+	if !disclosed || !deep.Truncated {
+		t.Fatalf("clamped depth was not disclosed: %#v", deep)
+	}
+
+	// Dependencies keep their outgoing default and refuse unknown directions.
+	if deps, _ := relationshipNames(t, graphRequest(t, fixture, base+callerID+"/dependencies", fixture.identity.CheckoutID)); !deps["Target"] {
+		t.Fatalf("default dependencies for Caller = %v", deps)
+	}
+	if dependants, _ := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/dependencies?direction=incoming", fixture.identity.CheckoutID)); !dependants["Caller"] {
+		t.Fatalf("incoming dependencies for Target = %v", dependants)
+	}
+	for _, path := range []string{"/dependencies?direction=incomming", "/calls?direction=sideways"} {
+		if response := graphRequest(t, fixture, base+targetID+path, fixture.identity.CheckoutID); response.Code != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, body=%s", path, response.Code, response.Body.String())
+		}
+	}
+	// Checkout authority applies to every traversal route.
+	for _, path := range []string{"/calls?direction=outgoing", "/dependencies", "/impact", "/source"} {
+		if response := graphRequest(t, fixture, base+targetID+path, "other-checkout"); response.Code != http.StatusForbidden {
+			t.Fatalf("cross-checkout %s status = %d", path, response.Code)
+		}
+	}
+}
+
 func TestRepositoryGraphChangedImpactIsCheckoutAuthorizedAndBounded(t *testing.T) {
 	fixture := newGraphQueryFixture(t)
 	request := knowledge.ChangedImpactRequest{Files: []string{"main.go"}, MaxDepth: 2}
