@@ -28,6 +28,15 @@ func (s *Store) CurrentRepositoryState(ctx context.Context, identity RepositoryI
 }
 
 func (s *Store) FindModuleDependencies(ctx context.Context, identity RepositoryIdentity, module string, reverse bool, depth int, limits GraphLimits) (QueryEnvelope[ModuleDependencyResult], error) {
+	generation, state, err := s.freshGeneration(ctx, identity)
+	if err != nil {
+		return QueryEnvelope[ModuleDependencyResult]{}, err
+	}
+	return s.moduleDependenciesIn(ctx, generation, state, module, reverse, depth, limits)
+}
+
+// moduleDependenciesIn walks import edges within one already-gated generation.
+func (s *Store) moduleDependenciesIn(ctx context.Context, generation GraphGeneration, state RepositoryState, module string, reverse bool, depth int, limits GraphLimits) (QueryEnvelope[ModuleDependencyResult], error) {
 	if limits.MaxDepth <= 0 {
 		limits = DefaultGraphLimits()
 	}
@@ -36,10 +45,6 @@ func (s *Store) FindModuleDependencies(ctx context.Context, identity RepositoryI
 	}
 	if depth > limits.MaxDepth {
 		depth = limits.MaxDepth
-	}
-	generation, state, err := s.freshGeneration(ctx, identity)
-	if err != nil {
-		return QueryEnvelope[ModuleDependencyResult]{}, err
 	}
 	root, err := s.findModuleNode(ctx, generation.ID, module)
 	if err != nil {

@@ -63,6 +63,60 @@ func TestRepositoryContextAPIRefreshesAndSurvivesRestart(t *testing.T) {
 	}
 }
 
+// The repository-context route must surface the graph's stale refusal the way
+// the graph routes do — 409 with the refused generation — never as a 500 that
+// a consumer cannot tell apart from a broken server.
+func TestRepositoryContextAPIAnswersStaleRefusalWith409(t *testing.T) {
+	cases := map[string]func(t *testing.T, fixture graphQueryFixture){
+		"refresh_disabled": func(t *testing.T, fixture graphQueryFixture) {
+			store, err := knowledge.NewStoreWithDB(fixture.server.StateStore.GetDB())
+			if err != nil {
+				t.Fatal(err)
+			}
+			store.SetRefreshOnRead(false)
+			fixture.server.KnowledgeStore = store
+			if err := os.WriteFile(filepath.Join(fixture.server.ProjectsDir, "main.go"), []byte("package sample\n\n// edited\nfunc Target() {}\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"refresh_unsafe": func(t *testing.T, fixture graphQueryFixture) {
+			outside := filepath.Join(t.TempDir(), "outside.go")
+			if err := os.WriteFile(outside, []byte("package outside\nfunc Secret() {}\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(outside, filepath.Join(fixture.server.ProjectsDir, "escape.go")); err != nil {
+				t.Skipf("symlink unavailable: %v", err)
+			}
+		},
+	}
+	for name, drift := range cases {
+		t.Run(name, func(t *testing.T) {
+			fixture := newGraphQueryFixture(t)
+			before := graphRequest(t, fixture, "/api/v1/repository-context?symbols=Target", fixture.identity.CheckoutID)
+			var current knowledge.RepositoryContextProjection
+			if before.Code != http.StatusOK || json.Unmarshal(before.Body.Bytes(), &current) != nil {
+				t.Fatalf("fresh context status = %d, body=%s", before.Code, before.Body.String())
+			}
+			drift(t, fixture)
+			response := graphRequest(t, fixture, "/api/v1/repository-context?symbols=Target", fixture.identity.CheckoutID)
+			if response.Code != http.StatusConflict {
+				t.Fatalf("stale context status = %d, body=%s", response.Code, response.Body.String())
+			}
+			var refusal struct {
+				Error      string                    `json:"error"`
+				Freshness  string                    `json:"freshness"`
+				Generation knowledge.RepositoryState `json:"generation"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &refusal); err != nil {
+				t.Fatal(err)
+			}
+			if refusal.Freshness != string(knowledge.FreshnessStale) || refusal.Generation.GraphVersion != current.GraphVersion || refusal.Error == "" {
+				t.Fatalf("refusal lost its generation: %#v", refusal)
+			}
+		})
+	}
+}
+
 func requestRepositoryContext(t *testing.T, server *Server, target string) knowledge.RepositoryContextProjection {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodGet, target, nil)

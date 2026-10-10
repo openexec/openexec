@@ -24,6 +24,11 @@ writes. Agent Console retains both server credentials and never exposes either
 through the external advisory profile. OpenExec binds to loopback by default;
 each route family fails closed when its own credential is absent.
 V2.1 freshness enforcement lives in OpenExec's graph read gate, not in this
-adapter: every graph resolve/read refreshes or refuses drift (coverage matrix
-in `internal/knowledge/graph_freshness_matrix_test.go`; record in
-`KNOWLEDGE_V2_PLAN.md`). The adapter must preserve those stale refusals.
+adapter. The ten public store reads the coverage matrix exercises
+(`internal/knowledge/graph_freshness_matrix_test.go`), including the
+repository-context projection, refresh or refuse source, configuration and
+extractor-version drift. These routes reuse the graph handlers, which answer a
+stale refusal with 409, and so does `GET /api/v1/repository-context`; the
+adapter must preserve those refusals. The remaining V2.1 gaps (untested
+cancellation and concurrent-scan cases, per-process locking, per-read hashing
+cost) are recorded in `KNOWLEDGE_V2_PLAN.md`.
