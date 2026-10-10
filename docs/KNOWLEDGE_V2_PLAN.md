@@ -9,7 +9,7 @@ Agent Console integration contract, 2026-08-03 freshness audit.
 
 | Phase | Delivered evidence | Status |
 | --- | --- | --- |
-| V2.1 | Read-time manifest comparison, serialized refresh/re-resolution, typed stale refusal, edit/move/rename/line-shift/current-source tests | Implemented; focused Go tests pass |
+| V2.1 | Read-time manifest comparison, serialized refresh/re-resolution, typed stale refusal, edit/move/rename/line-shift/current-source tests; per-entry-point coverage matrix (`graph_freshness_matrix_test.go`: state, resolve, find, detail, source, relations, dependencies, impact, changed-impact — each refuses drift side-effect-free with refresh off and promotes a fresh generation with refresh on); a source edit or deletion between gate and read is a typed stale refusal (HTTP 409), not an opaque error | Implemented; focused and `-race` Go tests pass; gate bypass and source-guard removal each verified to fail the matrix |
 | V2.2 | Projection provenance, worktree state, extractor capabilities, exact totals and per-list selection/truncation scopes; console rendering | Implemented; Go/React tests pass |
 | V2.3 | Checkout-authorized paginated symbol/detail/relationship/impact/source API and incoming/outgoing CLI calls | Implemented; endpoint contract tests pass |
 | V2.4 | Console Explore Overview, Dependencies, Symbols, Call flow, Impact and Source views plus Mermaid export | Implemented; type, lint, unit and production build pass; Playwright could not start because this host forbids listener sockets |

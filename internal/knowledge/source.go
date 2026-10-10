@@ -1,6 +1,14 @@
 package knowledge
 
-import "context"
+import (
+	"context"
+	"errors"
+	"io/fs"
+)
+
+// ErrStaleSource is returned by a RepositoryReader whose hash check finds the
+// bytes no longer match the graph pointer.
+var ErrStaleSource = errors.New("source pointer is stale")
 
 type SourceReadRequest struct {
 	RepositoryID string `json:"repository_id"`
@@ -65,6 +73,13 @@ func (s *Store) ReadGraphSymbol(ctx context.Context, identity RepositoryIdentity
 		RangeHash: candidate.Occurrence.RangeHash,
 	})
 	if err != nil {
+		// The file changed or vanished after the gate released: the hashes did
+		// their job, and the caller must see the same stale refusal the gate
+		// gives, not an opaque read failure.
+		if errors.Is(err, ErrStaleSource) || errors.Is(err, fs.ErrNotExist) {
+			state.Freshness = FreshnessStale
+			return QueryEnvelope[*SymbolSource]{}, &StaleGraphError{State: state, Cause: err}
+		}
 		return QueryEnvelope[*SymbolSource]{}, err
 	}
 	return QueryEnvelope[*SymbolSource]{
