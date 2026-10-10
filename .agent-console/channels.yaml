@@ -1,0 +1,9 @@
+# Read by the Agent Console SRE scheduler from this default branch.
+channels:
+  - id: openexec-ci
+    type: ci
+    repository: ${OBSERVE_OPENEXEC_REPOSITORY}
+    bearer_token_env: OBSERVE_CI_TOKEN
+    branch: ${OBSERVE_OPENEXEC_BRANCH}
+    schedule: 10m
+    timeout: 10s
