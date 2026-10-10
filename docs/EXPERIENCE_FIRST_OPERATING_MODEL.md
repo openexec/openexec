@@ -891,6 +891,12 @@ Implementation should be incremental and supervised.
   closure action.
 - Do not add a schema until dogfooding stabilizes the fields.
 
+E0 status (2026-10-11): Review Gate 2 never ran, and its proposals predate
+the Portfolio Stewardship destination. The project-level fidelity review,
+method findings, E1 gap assessment and remaining owner decisions are recorded
+in [`EXPERIENCE_FIRST_DOGFOOD_RECONCILIATION.md`](EXPERIENCE_FIRST_DOGFOOD_RECONCILIATION.md).
+E1 is not authorized by that record.
+
 If G2 declines the bounded implementation slice, E0 completes with that
 negative owner decision and its reasoning rather than becoming permanently
 incomplete. E1–E4 proceed only if G2 separately authorizes them; F1–F3 remain
