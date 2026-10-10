@@ -18,6 +18,7 @@ import type {
   SessionFilters,
   CreateSessionParams,
   ProjectInfo,
+  ProjectKind,
 } from '../types'
 
 // =============================================================================
@@ -62,8 +63,8 @@ export interface UseSessionReturn {
   fetchProjects: () => Promise<void>
   /** Create a new session */
   createSession: (params: CreateSessionParams) => Promise<Session>
-  /** Initialize a new project */
-  initProject: (name: string, path: string) => Promise<void>
+  /** Initialize a new project; resolves to the created project's directory */
+  initProject: (name: string, path: string, kind?: ProjectKind) => Promise<string>
   /** Load a session by ID */
   loadSession: (sessionId: string) => Promise<Session>
   /** Update session title */
@@ -226,18 +227,20 @@ export function useSession(config: SessionApiConfig): UseSessionReturn {
 
   // Initialize project
   const initProject = useCallback(
-    async (name: string, path: string) => {
+    async (name: string, path: string, kind: ProjectKind = 'repository') => {
       const url = `${baseUrl}/projects/init`
-      await apiRequest<any>(
+      const created = await apiRequest<{ project_dir?: string }>(
         url,
         {
           method: 'POST',
-          body: JSON.stringify({ name, path }),
+          body: JSON.stringify({ name, path, kind }),
         },
         authToken
       )
       // Refresh projects list
       await fetchProjects()
+      // A chat project may be created by name only; the server picks its directory
+      return created?.project_dir || path
     },
     [baseUrl, authToken, fetchProjects]
   )

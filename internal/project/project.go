@@ -6,11 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/openexec/openexec/internal/git"
 )
 
 // ProjectConfig holds project-specific configuration
 type ProjectConfig struct {
-	Name                string `json:"name"`
+	Name string `json:"name"`
+	// Kind is KindRepository or KindChat. Empty (every project created before
+	// kinds existed, and legacy .uaos projects) means KindRepository.
+	Kind                string `json:"kind,omitempty"`
 	ProjectDir          string `json:"project_dir,omitempty"`
 	GitEnabled          bool   `json:"git_enabled,omitempty"`
 	GitCommitEnabled    *bool  `json:"git_commit_enabled,omitempty"` // Autonomous local commits; nil-default-true (set false to disable)
@@ -30,6 +35,36 @@ type ProjectConfig struct {
 	// enabled — existing projects keep every module — so the composition root
 	// can turn a module off explicitly without changing default behavior.
 	Modules ModulesConfig `json:"modules,omitempty"`
+}
+
+// Project kinds. A repository project is backed by a git repository and runs
+// the full code pipeline; a chat project is a git-free conversational
+// workspace with no repository and no code quality gates.
+const (
+	KindRepository = "repository"
+	KindChat       = "chat"
+)
+
+// ParseKind normalizes a requested project kind. Empty selects
+// KindRepository; anything other than the two known kinds is an error.
+func ParseKind(kind string) (string, error) {
+	switch kind {
+	case "", KindRepository:
+		return KindRepository, nil
+	case KindChat:
+		return KindChat, nil
+	default:
+		return "", fmt.Errorf("unknown project kind %q: must be %q or %q", kind, KindRepository, KindChat)
+	}
+}
+
+// ProjectKind returns the project's kind, defaulting to KindRepository for
+// configs written before kinds existed.
+func (c *ProjectConfig) ProjectKind() string {
+	if c.Kind == KindChat {
+		return KindChat
+	}
+	return KindRepository
 }
 
 // IsGitCommitEnabled reports whether autonomous local commits are allowed. The
@@ -372,6 +407,47 @@ quality:
 	return config, nil
 }
 
+// InitializeKind creates a project of the given kind (see ParseKind).
+// Repository projects are Initialize plus a git repository (created with the
+// base branch when the directory is not already inside one). Chat projects
+// record their kind, disable git entirely, and get an openexec.yaml without
+// code quality gates.
+func InitializeKind(projectName, projectDir, kind string) (*ProjectConfig, error) {
+	kind, err := ParseKind(kind)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := Initialize(projectName, projectDir)
+	if err != nil {
+		return nil, err
+	}
+
+	if kind == KindRepository {
+		gitClient := git.NewClient(git.Config{Enabled: true, RepoPath: config.ProjectDir})
+		if err := gitClient.Init(config.BaseBranch); err != nil {
+			return nil, fmt.Errorf("failed to initialize git repository: %w", err)
+		}
+		config.Kind = KindRepository
+	} else {
+		gitCommit := false
+		config.Kind = KindChat
+		config.GitEnabled = false
+		config.GitCommitEnabled = &gitCommit
+		config.BaseBranch = ""
+
+		yamlContent := fmt.Sprintf("project:\n  name: %s\n  type: chat\n", config.Name)
+		if err := os.WriteFile(filepath.Join(config.ProjectDir, "openexec.yaml"), []byte(yamlContent), 0644); err != nil {
+			return nil, fmt.Errorf("failed to create openexec.yaml: %w", err)
+		}
+	}
+
+	if err := SaveProjectConfig(config); err != nil {
+		return nil, fmt.Errorf("failed to save project configuration: %w", err)
+	}
+	return config, nil
+}
+
 // LoadProjectConfig loads the project configuration from .openexec directory
 func LoadProjectConfig(projectDir string) (*ProjectConfig, error) {
 	absProjectDir, err := filepath.Abs(projectDir)
@@ -404,6 +480,10 @@ func LoadProjectConfig(projectDir string) (*ProjectConfig, error) {
 	config.ProjectDir = absProjectDir
 	return config, nil
 }
+
+// ValidateName reports whether name is a valid project name. Valid names are
+// safe to use as a single path component.
+func ValidateName(name string) error { return validateProjectName(name) }
 
 // validateProjectName validates the project name
 func validateProjectName(name string) error {

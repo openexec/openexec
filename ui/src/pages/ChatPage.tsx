@@ -22,7 +22,7 @@ import ProjectInitModal from '../components/chat/session/ProjectInitModal'
 import ProjectWizard from '../components/chat/session/ProjectWizard'
 import type { AncestorSession } from '../components/chat/session/ForkAncestryTree'
 import { useChat, useFork, useProviderAvailability, useBlueprint, type ChatConfig } from '../hooks'
-import type { CreateSessionParams, SessionFilters, ToolCallApproval, Session, Message } from '../types'
+import type { CreateSessionParams, SessionFilters, ToolCallApproval, Session, Message, ProjectKind } from '../types'
 import type { ForkOptions, ForkResult } from '../components/chat/session/SessionForkDialog'
 
 /**
@@ -114,14 +114,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
     setShowInitModal(true)
   }, [])
 
-  const handleProjectInitSubmit = useCallback(async (name: string, path: string) => {
+  const handleProjectInitSubmit = useCallback(async (name: string, path: string, kind: ProjectKind) => {
     try {
-      await chat.initProject(name, path)
+      const projectPath = await chat.initProject(name, path, kind)
       // Explicitly refresh projects list
       await chat.fetchProjects()
       setShowInitModal(false)
       // Switch to new project
-      handleProjectSelect(path)
+      handleProjectSelect(projectPath)
     } catch (err) {
       console.error('Project init failed', err)
     }
