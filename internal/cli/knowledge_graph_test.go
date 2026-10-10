@@ -99,6 +99,101 @@ func TestKnowledgeGraphImpactFilesJSONUsesBatchResponse(t *testing.T) {
 	}
 }
 
+func TestKnowledgeGraphCallsDirections(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc Target() {}\nfunc Caller() { Target() }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := knowledge.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ScanRepository(t.Context(), root); err != nil {
+		_ = store.Close()
+		t.Fatal(err)
+	}
+	identity, err := store.EnsureRepositoryIdentity(t.Context(), root, "")
+	if err != nil {
+		_ = store.Close()
+		t.Fatal(err)
+	}
+	ids := map[string]string{}
+	for _, name := range []string{"Target", "Caller"} {
+		found, err := store.FindGraphSymbols(t.Context(), identity, name, "", "", 1, 25)
+		if err != nil {
+			_ = store.Close()
+			t.Fatal(err)
+		}
+		for _, candidate := range found.Result.Candidates {
+			if candidate.Symbol.DisplayName == name {
+				ids[name] = candidate.Symbol.ID
+			}
+		}
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if ids["Target"] == "" || ids["Caller"] == "" {
+		t.Fatalf("symbol ids = %v", ids)
+	}
+
+	previousDirectory, previousJSON := graphDirectory, graphJSON
+	previousDirection, previousDepth := graphCallDirection, graphCallDepth
+	previousOut, previousErr := rootCmd.OutOrStdout(), rootCmd.ErrOrStderr()
+	t.Cleanup(func() {
+		graphDirectory, graphJSON = previousDirectory, previousJSON
+		graphCallDirection, graphCallDepth = previousDirection, previousDepth
+		rootCmd.SetOut(previousOut)
+		rootCmd.SetErr(previousErr)
+		rootCmd.SetArgs(nil)
+	})
+	var output bytes.Buffer
+	rootCmd.SetOut(&output)
+	rootCmd.SetErr(&output)
+	run := func(args ...string) (string, error) {
+		output.Reset()
+		graphJSON = false
+		// Restore the declared flag defaults rather than assigning values here,
+		// so the no-flag run exercises the command's own --direction default.
+		for _, name := range []string{"direction", "depth"} {
+			flag := knowledgeGraphCallsCmd.Flags().Lookup(name)
+			if err := flag.Value.Set(flag.DefValue); err != nil {
+				t.Fatal(err)
+			}
+			flag.Changed = false
+		}
+		rootCmd.SetArgs(append([]string{"knowledge", "graph", "calls", "--directory", root}, args...))
+		err := rootCmd.Execute()
+		return output.String(), err
+	}
+
+	// The default direction is outgoing: Caller's callees.
+	callees, err := run(ids["Caller"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(callees, "outgoing calls for main.Caller") || !strings.Contains(callees, "main.Target") {
+		t.Fatalf("outgoing calls output:\n%s", callees)
+	}
+	callers, err := run(ids["Target"], "--direction", "incoming")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(callers, "incoming calls for main.Target") || !strings.Contains(callers, "main.Caller") {
+		t.Fatalf("incoming calls output:\n%s", callers)
+	}
+	deep, err := run(ids["Target"], "--direction", "incoming", "--depth", "9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(deep, "limitation: requested depth 9 exceeds the traversal limit") || !strings.Contains(deep, "result truncated by graph limits") {
+		t.Fatalf("clamped depth output:\n%s", deep)
+	}
+	if _, err := run(ids["Target"], "--direction", "sideways"); err == nil || !strings.Contains(err.Error(), "direction must be incoming or outgoing") {
+		t.Fatalf("invalid direction error = %v", err)
+	}
+}
+
 func TestKnowledgeGraphValidationCLIRoundTripsLifecycle(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc Target() {}\nfunc Caller() { Target() }\n"), 0o644); err != nil {

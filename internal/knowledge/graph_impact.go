@@ -50,15 +50,18 @@ type ImpactResult struct {
 // generation. Stale or incomplete generations are discovery aids and cannot
 // produce impact conclusions.
 func (s *Store) ImpactAnalysis(ctx context.Context, identity RepositoryIdentity, symbolIDs []string, maxDepth int, limits GraphLimits) (QueryEnvelope[ImpactResult], error) {
-	maxDepth, limits = normalizeImpactBounds(maxDepth, limits)
+	maxDepth, limits, depthLimitation := normalizeImpactBounds(maxDepth, limits)
 	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
 		return QueryEnvelope[ImpactResult]{}, err
 	}
-	return s.impactAnalysisForGeneration(ctx, generation, state, symbolIDs, maxDepth, limits)
+	return s.impactAnalysisForGeneration(ctx, generation, state, symbolIDs, maxDepth, limits, depthLimitation)
 }
 
-func normalizeImpactBounds(maxDepth int, limits GraphLimits) (int, GraphLimits) {
+// normalizeImpactBounds clamps the requested depth to the traversal limit and
+// returns a non-empty limitation when it did, so the cut is disclosed rather
+// than read as the full reach the caller asked for.
+func normalizeImpactBounds(maxDepth int, limits GraphLimits) (int, GraphLimits, string) {
 	if limits.MaxDepth <= 0 {
 		limits = DefaultGraphLimits()
 	}
@@ -66,16 +69,20 @@ func normalizeImpactBounds(maxDepth int, limits GraphLimits) (int, GraphLimits) 
 		maxDepth = 2
 	}
 	if maxDepth > limits.MaxDepth {
-		maxDepth = limits.MaxDepth
+		return limits.MaxDepth, limits, depthLimitationNote(maxDepth, limits.MaxDepth)
 	}
-	return maxDepth, limits
+	return maxDepth, limits, ""
+}
+
+func depthLimitationNote(requested, limit int) string {
+	return fmt.Sprintf("requested depth %d exceeds the traversal limit %d; traversal bounded to depth %d", requested, limit, limit)
 }
 
 // impactAnalysisForGeneration is the shared traversal behind symbol and
 // changed-file impact. The caller has already passed the freshness gate, so a
 // changed-file batch resolves every file and traverses every symbol against one
 // named generation rather than racing a refresh between those two operations.
-func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation GraphGeneration, state RepositoryState, symbolIDs []string, maxDepth int, limits GraphLimits) (QueryEnvelope[ImpactResult], error) {
+func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation GraphGeneration, state RepositoryState, symbolIDs []string, maxDepth int, limits GraphLimits, depthLimitation string) (QueryEnvelope[ImpactResult], error) {
 	if state.Freshness != FreshnessCurrent {
 		return QueryEnvelope[ImpactResult]{
 			Query: QueryMeta{Type: "impact_analysis", Roots: symbolIDs}, Generation: state,
@@ -83,6 +90,10 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 			Resolution:  ResolutionMeta{Status: "unavailable", Methods: []ResolutionStatus{ResolutionUnresolved}},
 			Limitations: []string{"graph is " + string(state.Freshness) + "; use normal repository inspection"},
 		}, nil
+	}
+	limitations := append([]string(nil), generation.Limitations...)
+	if depthLimitation != "" {
+		limitations = append(limitations, depthLimitation)
 	}
 	result := ImpactResult{Unresolved: append([]string{}, generation.Limitations...)}
 	result.Unresolved = append(result.Unresolved, "dynamic dependency injection and runtime registration may not be resolved")
@@ -331,7 +342,7 @@ func (s *Store) impactAnalysisForGeneration(ctx context.Context, generation Grap
 	envelope := QueryEnvelope[ImpactResult]{
 		Query: QueryMeta{Type: "impact_analysis", Roots: symbolIDs}, Generation: state,
 		Result: result, Resolution: ResolutionMeta{Status: "bounded", Methods: uniqueMethods(methods)},
-		Limitations: generation.Limitations, Truncated: truncated,
+		Limitations: limitations, Truncated: truncated || depthLimitation != "",
 	}
 	return boundImpactEnvelopeBytes(envelope, limits.MaxBytes), nil
 }

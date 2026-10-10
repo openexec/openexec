@@ -135,6 +135,183 @@ func TestRepositoryGraphQueriesRequireCheckoutAuthorityAndPreserveAmbiguity(t *t
 	}
 }
 
+func graphSymbolID(t *testing.T, fixture graphQueryFixture, name string) string {
+	t.Helper()
+	response := graphRequest(t, fixture, "/api/v1/repository-graph/symbols?q="+name, fixture.identity.CheckoutID)
+	var result knowledge.QueryEnvelope[knowledge.SymbolSearchResult]
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range result.Result.Candidates {
+		if candidate.Symbol.DisplayName == name {
+			return candidate.Symbol.ID
+		}
+	}
+	t.Fatalf("symbol %s not found: %s", name, response.Body.String())
+	return ""
+}
+
+func relationshipNames(t *testing.T, response *httptest.ResponseRecorder) (map[string]bool, knowledge.QueryEnvelope[knowledge.RelationshipResult]) {
+	t.Helper()
+	if response.Code != http.StatusOK {
+		t.Fatalf("relationship status = %d, body=%s", response.Code, response.Body.String())
+	}
+	var result knowledge.QueryEnvelope[knowledge.RelationshipResult]
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, node := range result.Result.Nodes {
+		names[node.DisplayName] = true
+	}
+	return names, result
+}
+
+func TestRepositoryGraphCallDirectionsAndDependencyRefusal(t *testing.T) {
+	fixture := newGraphQueryFixture(t)
+	callerID, targetID := graphSymbolID(t, fixture, "Caller"), graphSymbolID(t, fixture, "Target")
+	base := "/api/v1/repository-graph/symbols/"
+
+	callees, outgoing := relationshipNames(t, graphRequest(t, fixture, base+callerID+"/calls?direction=outgoing", fixture.identity.CheckoutID))
+	if !callees["Target"] || callees["Caller"] || outgoing.Generation.Freshness != knowledge.FreshnessCurrent || outgoing.Generation.GraphVersion == "" {
+		t.Fatalf("outgoing calls for Caller = %#v", outgoing)
+	}
+	callers, _ := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/calls?direction=incoming", fixture.identity.CheckoutID))
+	if !callers["Caller"] || !callers["TestService"] || callers["Target"] {
+		t.Fatalf("incoming calls for Target = %v", callers)
+	}
+	if none, _ := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/calls?direction=outgoing", fixture.identity.CheckoutID)); len(none) != 0 {
+		t.Fatalf("Target has no callees, got %v", none)
+	}
+
+	// Depth beyond the traversal limit is bounded and disclosed, never silent.
+	_, deep := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/calls?direction=incoming&depth=99", fixture.identity.CheckoutID))
+	disclosed := false
+	for _, limitation := range deep.Limitations {
+		disclosed = disclosed || strings.Contains(limitation, "requested depth 99 exceeds the traversal limit")
+	}
+	if !disclosed || !deep.Truncated {
+		t.Fatalf("clamped depth was not disclosed: %#v", deep)
+	}
+
+	// Dependencies keep their outgoing default and refuse unknown directions.
+	if deps, _ := relationshipNames(t, graphRequest(t, fixture, base+callerID+"/dependencies", fixture.identity.CheckoutID)); !deps["Target"] {
+		t.Fatalf("default dependencies for Caller = %v", deps)
+	}
+	if dependants, _ := relationshipNames(t, graphRequest(t, fixture, base+targetID+"/dependencies?direction=incoming", fixture.identity.CheckoutID)); !dependants["Caller"] {
+		t.Fatalf("incoming dependencies for Target = %v", dependants)
+	}
+	for _, path := range []string{"/dependencies?direction=incomming", "/calls?direction=sideways"} {
+		if response := graphRequest(t, fixture, base+targetID+path, fixture.identity.CheckoutID); response.Code != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, body=%s", path, response.Code, response.Body.String())
+		}
+	}
+	// Checkout authority applies to every traversal route.
+	for _, path := range []string{"/calls?direction=outgoing", "/dependencies", "/impact", "/source"} {
+		if response := graphRequest(t, fixture, base+targetID+path, "other-checkout"); response.Code != http.StatusForbidden {
+			t.Fatalf("cross-checkout %s status = %d", path, response.Code)
+		}
+	}
+}
+
+func TestRepositoryGraphImpactDisclosesDepthCut(t *testing.T) {
+	fixture := newGraphQueryFixture(t)
+	targetID := graphSymbolID(t, fixture, "Target")
+	response := graphRequest(t, fixture, "/api/v1/repository-graph/symbols/"+targetID+"/impact?depth=99", fixture.identity.CheckoutID)
+	if response.Code != http.StatusOK {
+		t.Fatalf("impact status = %d, body=%s", response.Code, response.Body.String())
+	}
+	var deep knowledge.QueryEnvelope[knowledge.ImpactResult]
+	if err := json.Unmarshal(response.Body.Bytes(), &deep); err != nil {
+		t.Fatal(err)
+	}
+	disclosed := false
+	for _, limitation := range deep.Limitations {
+		disclosed = disclosed || strings.Contains(limitation, "requested depth 99 exceeds the traversal limit")
+	}
+	if !disclosed || !deep.Truncated {
+		t.Fatalf("clamped impact depth was not disclosed: limitations=%v truncated=%v", deep.Limitations, deep.Truncated)
+	}
+	// A depth within the limit is answered as asked, without a cut note.
+	response = graphRequest(t, fixture, "/api/v1/repository-graph/symbols/"+targetID+"/impact?depth=1", fixture.identity.CheckoutID)
+	var shallow knowledge.QueryEnvelope[knowledge.ImpactResult]
+	if err := json.Unmarshal(response.Body.Bytes(), &shallow); err != nil {
+		t.Fatal(err)
+	}
+	for _, limitation := range shallow.Limitations {
+		if strings.Contains(limitation, "exceeds the traversal limit") {
+			t.Fatalf("in-limit impact depth reported a cut: %v", shallow.Limitations)
+		}
+	}
+}
+
+func TestRepositoryGraphRefusesMalformedBounds(t *testing.T) {
+	fixture := newGraphQueryFixture(t)
+	targetID := graphSymbolID(t, fixture, "Target")
+	base := "/api/v1/repository-graph/symbols/" + targetID
+	for _, path := range []string{
+		base + "/calls?direction=incoming&depth=abc",
+		base + "/calls?direction=incoming&depth=-2",
+		base + "/calls?direction=incoming&depth=0",
+		base + "/dependencies?depth=1.5",
+		base + "/impact?depth=-1",
+		base + "/impact?depth=two",
+		"/api/v1/repository-graph/symbols?q=Run&page=-1",
+		"/api/v1/repository-graph/symbols?q=Run&page_size=x",
+	} {
+		response := graphRequest(t, fixture, path, fixture.identity.CheckoutID)
+		if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "must be a positive integer") {
+			t.Fatalf("%s status = %d, body=%s", path, response.Code, response.Body.String())
+		}
+	}
+	// Absent bounds still take their defaults.
+	for _, path := range []string{base + "/calls?direction=incoming", base + "/impact", "/api/v1/repository-graph/symbols?q=Run"} {
+		if response := graphRequest(t, fixture, path, fixture.identity.CheckoutID); response.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, body=%s", path, response.Code, response.Body.String())
+		}
+	}
+}
+
+// A read refreshes a drifted graph before answering, so the generation it
+// answered from can be newer than any version the caller cached. The response
+// must name that answered generation in both the body and the header.
+func TestRepositoryGraphReportsAnsweredGenerationAfterRefresh(t *testing.T) {
+	fixture := newGraphQueryFixture(t)
+	callerID := graphSymbolID(t, fixture, "Caller")
+	target := "/api/v1/repository-graph/symbols/" + callerID + "/calls?direction=outgoing"
+	before := graphRequest(t, fixture, target, fixture.identity.CheckoutID)
+	_, beforeResult := relationshipNames(t, before)
+	cached := beforeResult.Generation.GraphVersion
+	if cached == "" || before.Header().Get("X-OpenExec-Graph-Version") != cached {
+		t.Fatalf("initial generation header = %q, body = %q", before.Header().Get("X-OpenExec-Graph-Version"), cached)
+	}
+
+	source := "package sample\n\nfunc Target() {}\nfunc Caller() { Target() }\nfunc Run() {}\nfunc Added() {}\n"
+	if err := os.WriteFile(filepath.Join(fixture.identity.RootPath, "main.go"), []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	after := graphRequest(t, fixture, target, fixture.identity.CheckoutID)
+	_, afterResult := relationshipNames(t, after)
+	answered := afterResult.Generation.GraphVersion
+	if answered == "" || answered == cached || afterResult.Generation.Freshness != knowledge.FreshnessCurrent {
+		t.Fatalf("refreshed read answered generation %q (cached %q, freshness %s)", answered, cached, afterResult.Generation.Freshness)
+	}
+	if got := after.Header().Get("X-OpenExec-Graph-Version"); got != answered {
+		t.Fatalf("generation header = %q, want answered generation %q", got, answered)
+	}
+	store, err := fixture.server.repositoryGraphStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := store.CurrentRepositoryState(t.Context(), fixture.identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.GraphVersion != answered {
+		t.Fatalf("active generation = %q, response answered %q", current.GraphVersion, answered)
+	}
+}
+
 func TestRepositoryGraphChangedImpactIsCheckoutAuthorizedAndBounded(t *testing.T) {
 	fixture := newGraphQueryFixture(t)
 	request := knowledge.ChangedImpactRequest{Files: []string{"main.go"}, MaxDepth: 2}

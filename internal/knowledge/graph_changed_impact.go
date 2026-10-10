@@ -103,7 +103,8 @@ func (s *Store) ChangedImpactAnalysis(ctx context.Context, identity RepositoryId
 	if depth > limits.MaxDepth {
 		return ChangedImpactResponse{}, &ImpactRequestError{Reason: fmt.Sprintf("max_depth %d exceeds the caller's traversal limit %d", depth, limits.MaxDepth)}
 	}
-	depth, limits = normalizeImpactBounds(depth, limits)
+	// Over-limit depths were refused above, so normalization cannot cut here.
+	depth, limits, depthLimitation := normalizeImpactBounds(depth, limits)
 
 	generation, state, err := s.freshGeneration(ctx, identity)
 	if err != nil {
@@ -115,7 +116,7 @@ func (s *Store) ChangedImpactAnalysis(ctx context.Context, identity RepositoryId
 	}
 	symbolIDs = uniqueNonEmpty(append(symbolIDs, resolvedIDs...))
 
-	impact, err := s.impactAnalysisForGeneration(ctx, generation, state, symbolIDs, depth, limits)
+	impact, err := s.impactAnalysisForGeneration(ctx, generation, state, symbolIDs, depth, limits, depthLimitation)
 	if err != nil {
 		return ChangedImpactResponse{}, err
 	}
