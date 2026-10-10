@@ -152,7 +152,16 @@ func TestKnowledgeGraphCallsDirections(t *testing.T) {
 	rootCmd.SetErr(&output)
 	run := func(args ...string) (string, error) {
 		output.Reset()
-		graphJSON, graphCallDirection, graphCallDepth = false, "outgoing", 1
+		graphJSON = false
+		// Restore the declared flag defaults rather than assigning values here,
+		// so the no-flag run exercises the command's own --direction default.
+		for _, name := range []string{"direction", "depth"} {
+			flag := knowledgeGraphCallsCmd.Flags().Lookup(name)
+			if err := flag.Value.Set(flag.DefValue); err != nil {
+				t.Fatal(err)
+			}
+			flag.Changed = false
+		}
 		rootCmd.SetArgs(append([]string{"knowledge", "graph", "calls", "--directory", root}, args...))
 		err := rootCmd.Execute()
 		return output.String(), err

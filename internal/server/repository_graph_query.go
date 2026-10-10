@@ -62,12 +62,32 @@ func (s *Server) respondGraphError(w http.ResponseWriter, err error) {
 	s.respondJSON(w, status, map[string]any{"error": err.Error(), "generation": state, "freshness": state.Freshness})
 }
 
-func intQuery(r *http.Request, name string, fallback int) int {
-	value, err := strconv.Atoi(r.URL.Query().Get(name))
-	if err != nil || value <= 0 {
-		return fallback
+// intQuery reads an optional positive bound. An absent bound takes the
+// fallback; a malformed, zero or negative one is refused with 400 rather than
+// quietly answered at a depth or page the caller did not ask for.
+func (s *Server) intQuery(w http.ResponseWriter, r *http.Request, name string, fallback int) (int, bool) {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return fallback, true
 	}
-	return value
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		s.respondJSON(w, http.StatusBadRequest, map[string]string{"error": name + " must be a positive integer"})
+		return 0, false
+	}
+	return value, true
+}
+
+// graphVersionHeader names the generation a successful graph read actually
+// answered from. A read may refresh the graph first, so this can be newer than
+// any version a caller cached before the request; proxies label with it.
+const graphVersionHeader = "X-OpenExec-Graph-Version"
+
+func (s *Server) respondGraphResult(w http.ResponseWriter, generation knowledge.RepositoryState, result any) {
+	if generation.GraphVersion != "" {
+		w.Header().Set(graphVersionHeader, generation.GraphVersion)
+	}
+	s.respondJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) graphAccess(w http.ResponseWriter, r *http.Request) (*knowledge.Store, knowledge.RepositoryIdentity, bool) {
@@ -84,12 +104,20 @@ func (s *Server) handleGraphSymbols(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	result, err := store.FindGraphSymbols(r.Context(), identity, r.URL.Query().Get("q"), r.URL.Query().Get("file"), r.URL.Query().Get("kind"), intQuery(r, "page", 1), intQuery(r, "page_size", 25))
+	page, ok := s.intQuery(w, r, "page", 1)
+	if !ok {
+		return
+	}
+	pageSize, ok := s.intQuery(w, r, "page_size", 25)
+	if !ok {
+		return
+	}
+	result, err := store.FindGraphSymbols(r.Context(), identity, r.URL.Query().Get("q"), r.URL.Query().Get("file"), r.URL.Query().Get("kind"), page, pageSize)
 	if err != nil {
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }
 func (s *Server) handleGraphSymbolDetail(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -101,7 +129,7 @@ func (s *Server) handleGraphSymbolDetail(w http.ResponseWriter, r *http.Request)
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }
 func (s *Server) handleGraphSymbolDependencies(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -115,12 +143,16 @@ func (s *Server) handleGraphSymbolDependencies(w http.ResponseWriter, r *http.Re
 		s.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "direction must be outgoing or incoming"})
 		return
 	}
-	result, err := store.FindSymbolRelationships(r.Context(), identity, r.PathValue("id"), direction == "incoming", intQuery(r, "depth", 1), []string{"calls", "references"}, knowledge.DefaultGraphLimits())
+	depth, ok := s.intQuery(w, r, "depth", 1)
+	if !ok {
+		return
+	}
+	result, err := store.FindSymbolRelationships(r.Context(), identity, r.PathValue("id"), direction == "incoming", depth, []string{"calls", "references"}, knowledge.DefaultGraphLimits())
 	if err != nil {
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }
 func (s *Server) handleGraphSymbolCalls(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -132,24 +164,32 @@ func (s *Server) handleGraphSymbolCalls(w http.ResponseWriter, r *http.Request) 
 		s.respondJSON(w, http.StatusBadRequest, map[string]string{"error": "direction must be outgoing or incoming"})
 		return
 	}
-	result, err := store.FindSymbolRelationships(r.Context(), identity, r.PathValue("id"), direction == "incoming", intQuery(r, "depth", 1), []string{"calls"}, knowledge.DefaultGraphLimits())
+	depth, ok := s.intQuery(w, r, "depth", 1)
+	if !ok {
+		return
+	}
+	result, err := store.FindSymbolRelationships(r.Context(), identity, r.PathValue("id"), direction == "incoming", depth, []string{"calls"}, knowledge.DefaultGraphLimits())
 	if err != nil {
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }
 func (s *Server) handleGraphSymbolImpact(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
 	if !ok {
 		return
 	}
-	result, err := store.ImpactAnalysis(r.Context(), identity, []string{r.PathValue("id")}, intQuery(r, "depth", 2), knowledge.DefaultGraphLimits())
+	depth, ok := s.intQuery(w, r, "depth", 2)
+	if !ok {
+		return
+	}
+	result, err := store.ImpactAnalysis(r.Context(), identity, []string{r.PathValue("id")}, depth, knowledge.DefaultGraphLimits())
 	if err != nil {
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }
 
 func (s *Server) handleGraphChangedImpact(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +219,7 @@ func (s *Server) handleGraphChangedImpact(w http.ResponseWriter, r *http.Request
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }
 func (s *Server) handleGraphSymbolSource(w http.ResponseWriter, r *http.Request) {
 	store, identity, ok := s.graphAccess(w, r)
@@ -196,5 +236,5 @@ func (s *Server) handleGraphSymbolSource(w http.ResponseWriter, r *http.Request)
 		s.respondGraphError(w, err)
 		return
 	}
-	s.respondJSON(w, http.StatusOK, result)
+	s.respondGraphResult(w, result.Generation, result)
 }

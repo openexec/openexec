@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 )
@@ -160,7 +159,7 @@ func (s *Store) FindSymbolRelationships(ctx context.Context, identity Repository
 	// bounded traversal as the full relationship set they asked for.
 	var depthLimitation string
 	if depth > limits.MaxDepth {
-		depthLimitation = fmt.Sprintf("requested depth %d exceeds the traversal limit %d; traversal bounded to depth %d", depth, limits.MaxDepth, limits.MaxDepth)
+		depthLimitation = depthLimitationNote(depth, limits.MaxDepth)
 		depth = limits.MaxDepth
 	}
 	generation, state, err := s.freshGeneration(ctx, identity)
