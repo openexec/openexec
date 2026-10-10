@@ -1,0 +1,7 @@
+{
+  "sha256": {
+    "baseline-revision.txt": "56b565fb46005525cfe0afeef00c0530207478701f5ba3f0d5ab73402e17a994",
+    "baseline.jsonl": "96d459d2b3f1691f095e42d9e5b1d91b370c785517d99df60fde5c14688830f4",
+    "baseline_test.go.fixture": "3017b2ef172c9f70c0ed267ec563f420aabf062722b4e35824e7fab48f2ab6d9"
+  }
+}

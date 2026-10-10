@@ -1,0 +1,54 @@
+package manager
+
+import (
+ "context"
+ "encoding/json"
+ "errors"
+ "os"
+ "os/exec"
+ "path/filepath"
+ "testing"
+
+ "github.com/openexec/openexec/internal/release"
+ "github.com/openexec/openexec/pkg/runtime"
+ "github.com/openexec/openexec/pkg/db/state"
+)
+
+// Uses only the pre-fix public runtime API and the admitted manager executor.
+func TestPersistedExitOneBaseline(t *testing.T) {
+ e := newSchedulerTestEnv(t)
+ createStory(t, e.rel, "S", nil)
+ createQueueTask(t, e, "A", nil)
+ createQueueTask(t, e, "B", []string{"A"})
+ repaired := false
+ e.mgr.cfg.StageExecutor = admittedFixture(func(ctx context.Context, s *runtime.Stage, i *runtime.StageInput) (*runtime.StageResult, error) {
+  if i.RunID != "A" && i.RunID != "B" { repaired = true }
+  if i.RunID == "A" && s.Name == "test" && !repaired {
+   commandErr := exec.CommandContext(ctx, "sh", "-c", "exit 1").Run()
+   exit, ok := commandErr.(*exec.ExitError)
+   if !ok || exit.ExitCode() != 1 { t.Fatalf("actual command did not exit 1: %v", commandErr) }
+   terminal := struct {Task, Stage, Source, Error string; Attempt, Exit int}{i.RunID, s.Name, "deterministic-runner", commandErr.Error(), 1, exit.ExitCode()}
+   raw, err := json.Marshal(terminal); if err != nil { t.Fatal(err) }
+   path := filepath.Join(e.dir, "terminal.json")
+   if err := os.WriteFile(path, raw, 0600); err != nil { t.Fatal(err) }
+   raw, err = os.ReadFile(path); if err != nil { t.Fatal(err) }
+   if err := json.Unmarshal(raw, &terminal); err != nil { t.Fatal(err) }
+   t.Logf("persisted and reloaded terminal: %s", raw)
+   return nil, runtime.VerificationCommandFailure(ctx, s.Name, errors.New(terminal.Error))
+  }
+  return &runtime.StageResult{StageName:s.Name, Status:runtime.StageStatusCompleted}, nil
+ })
+ err := e.mgr.ExecuteTasks(context.Background(), RunOptions{TaskOriented:true, StoryIDs:[]string{"S"}})
+ e.mgr.Close()
+ e.closeState()
+ store, openErr := state.NewStore(filepath.Join(e.dir, "state.db")); if openErr != nil { t.Fatal(openErr) }; defer store.Close()
+ cfg := e.mgr.cfg; cfg.StateStore = store
+ fresh, openErr := New(cfg); if openErr != nil { t.Fatal(openErr) }; defer fresh.Close()
+ reopened, openErr := fresh.GetInternalReleaseManager(); if openErr != nil { t.Fatal(openErr) }
+ a, readErr := reopened.TaskSnapshot(context.Background(), "A"); if readErr != nil { t.Fatal(readErr) }
+ tasks, readErr := reopened.TasksInStories(context.Background(), []string{"S"}); if readErr != nil { t.Fatal(readErr) }
+ t.Logf("reopened task A status=%s attempt=%d tasks=%d repaired=%v execution_error=%v", a.Status, a.AttemptCount, len(tasks), repaired, err)
+ if err != nil || !repaired || a.Status != release.TaskStatusDone || len(tasks) != 3 {
+  t.Fatal("BEHAVIORAL_BASELINE: persisted exit 1 failed to create native repair and resume A then B")
+ }
+}
