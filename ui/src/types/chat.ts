@@ -61,7 +61,14 @@ export interface ProjectInfo {
   name: string
   path: string
   type: string
+  /** Repository-backed (git, code pipeline) or chat-only (no repository) */
+  kind?: ProjectKind
 }
+
+/**
+ * Kind of project a user can create
+ */
+export type ProjectKind = 'repository' | 'chat'
 
 /**
  * Session creation parameters

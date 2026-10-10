@@ -78,6 +78,19 @@ func (c *Client) IsRepo() bool {
 	return err == nil
 }
 
+// Init creates a new repository at the client path with the given initial
+// branch. It is a no-op when the path is already inside a repository.
+func (c *Client) Init(branch string) error {
+	if !c.enabled || c.IsRepo() {
+		return nil
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	_, err := c.run("init", "--initial-branch="+branch)
+	return err
+}
+
 // CurrentBranch returns the current branch name.
 func (c *Client) CurrentBranch() (string, error) {
 	if !c.enabled {

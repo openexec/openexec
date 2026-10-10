@@ -30,6 +30,7 @@ import type {
   CreateSessionParams,
   ToolCallApproval,
   ProjectInfo,
+  ProjectKind,
 } from '../types'
 import type { ConnectionStatus } from '../types/store'
 
@@ -103,7 +104,7 @@ export interface UseChatReturn {
   // Session actions
   fetchSessions: ReturnType<typeof useSession>['fetchSessions']
   createSession: (params: CreateSessionParams) => Promise<Session>
-  initProject: (name: string, path: string) => Promise<void>
+  initProject: (name: string, path: string, kind?: ProjectKind) => Promise<string>
   loadSession: (sessionId: string) => Promise<void>
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>
   archiveSession: (sessionId: string) => Promise<void>

@@ -17,12 +17,17 @@ type ProjectInfo struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Type string `json:"type"`
+	// Kind is "repository" or "chat" (see project.ParseKind).
+	Kind string `json:"kind"`
 }
 
 type InitProjectRequest struct {
 	Name        string `json:"name"`
 	Path        string `json:"path"`
 	EngramStore string `json:"engramStore"`
+	// Kind selects "repository" (default) or "chat". A chat project may omit
+	// Path; it is then created as <projects dir>/<name>.
+	Kind string `json:"kind"`
 }
 
 type WizardRequest struct {
@@ -62,6 +67,10 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 		}
 
 		projectPath := filepath.Join(s.ProjectsDir, entry.Name())
+		kind := project.KindRepository
+		if pc, err := project.LoadProjectConfig(projectPath); err == nil {
+			kind = pc.ProjectKind()
+		}
 
 		// Check for openexec.yaml (or .openexec/openexec.yaml)
 		cfg, err := gates.LoadConfig(projectPath)
@@ -70,6 +79,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 				Name: cfg.Project.Name,
 				Path: projectPath,
 				Type: cfg.Project.Type,
+				Kind: kind,
 			})
 		} else {
 			// Fallback: Check if openexec.yaml exists manually
@@ -78,12 +88,14 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 					Name: entry.Name(),
 					Path: projectPath,
 					Type: "generic",
+					Kind: kind,
 				})
 			} else if _, err := os.Stat(filepath.Join(projectPath, ".openexec", "openexec.yaml")); err == nil {
 				projects = append(projects, ProjectInfo{
 					Name: entry.Name(),
 					Path: projectPath,
 					Type: "generic",
+					Kind: kind,
 				})
 			}
 		}
@@ -103,6 +115,23 @@ func (s *Server) handleInitProject(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+
+	kind, err := project.ParseKind(req.Kind)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// A chat project has no repository to point at, so it may be named only;
+	// its workspace lives under the projects root. The name check runs before
+	// the path is built so it cannot escape the root.
+	if req.Path == "" && kind == project.KindChat && req.Name != "" && s.ProjectsDir != "" {
+		if err := project.ValidateName(req.Name); err != nil {
+			WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		req.Path = req.Name
 	}
 
 	if req.Path == "" {
@@ -125,7 +154,7 @@ func (s *Server) handleInitProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Initialize the project
-	cfg, err := project.Initialize(req.Name, absPath)
+	cfg, err := project.InitializeKind(req.Name, absPath, kind)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "failed to initialize project: "+err.Error())
 		return

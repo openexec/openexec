@@ -48,7 +48,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
           <option value="">Select Project...</option>
           {projects.map((project) => (
             <option key={project.path} value={project.path}>
-              {project.name}
+              {project.kind === 'chat' ? `${project.name} (chat)` : project.name}
             </option>
           ))}
         </select>
@@ -58,9 +58,9 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
         <button 
           onClick={onProjectInit} 
           style={styles.actionButton}
-          title="Initialize new project in a directory"
+          title="Create a new repository or chat project"
         >
-          Init
+          New
         </button>
         <button 
           onClick={onProjectWizard} 
