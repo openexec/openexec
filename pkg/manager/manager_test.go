@@ -194,6 +194,12 @@ func TestStartAfterComplete(t *testing.T) {
 		}
 	}
 
+	// A terminal status is set before the attempt's goroutines exit, and
+	// Start refuses until they have; join the attempt as callers must.
+	if err := m.Wait(context.Background(), "FWU-01"); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
 	// Re-start should succeed after completion.
 	err = m.Start(context.Background(), "FWU-01")
 	if err != nil {
