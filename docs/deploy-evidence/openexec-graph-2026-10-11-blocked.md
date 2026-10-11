@@ -19,6 +19,19 @@ this unattended, server-minted turn refused before the script could run:
 The earlier verification pass also reported, from its own sandbox:
 `systemctl --user status openexec-graph` → `Failed to connect to bus: No medium found`.
 
+## Supervisor run, 18:36 EEST — script bug, fixed on this branch
+
+The supervisor ran the script from a clean detached origin/main worktree
+(`83d1cab0`). It built, then refused at the built-commit guard before any swap:
+`built binary does not report commit 83d1cab0`. Cause: `openexec version`
+prints with cobra `cmd.Printf`, which writes to stderr, while the guard piped
+only stdout into `grep`. The test stubs echoed `Commit:` to stdout, so
+`TestReviewedGraphDeploy*` could not see it.
+
+Fix: the guard reads `"$built" version 2>&1`; the stubs now print the real
+CLI's format to stderr, and every success/rollback case fails if the fix is
+reverted (checked). The installed service was not touched by that run.
+
 ## What unblocks it
 
 One of:

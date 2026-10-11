@@ -74,7 +74,8 @@ commit="$(git -C "$repo_dir" rev-parse --short HEAD)"
 npm --prefix "$repo_dir/ui" ci --no-audit --no-fund
 make -C "$repo_dir" build COMMIT="$commit"
 built="$repo_dir/bin/openexec"
-if ! "$built" version | grep -q "Commit: *$commit\$"; then
+# The CLI prints its version with cobra cmd.Printf, which writes to stderr.
+if ! "$built" version 2>&1 | grep -q "Commit: *$commit\$"; then
   echo "built binary does not report commit $commit" >&2
   exit 1
 fi
