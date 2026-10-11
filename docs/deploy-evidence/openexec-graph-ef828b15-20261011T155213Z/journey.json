@@ -1,0 +1,2998 @@
+{
+  "base_url": "http://127.0.0.1:8765",
+  "commit": "ef828b15",
+  "version": "0.13.1-153-gef828b15",
+  "at": "2026-10-11T15:52:15.753041228Z",
+  "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+  "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+  "symbol_name": "CanExecute",
+  "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+  "source_sha256": "54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+  "steps": [
+    {
+      "name": "running build",
+      "path": "/api/health",
+      "status": 200,
+      "want": 200,
+      "response_sha256": "82d09089cbc3094ed463d6f743371bb2809a79f1dd1a2e1547863c1a3f888388",
+      "response": {
+        "commit": "ef828b15",
+        "runner": {
+          "args": [
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--max-turns",
+            "50"
+          ],
+          "command": "claude",
+          "model": "sonnet"
+        },
+        "status": "ok",
+        "version": "0.13.1-153-gef828b15"
+      }
+    },
+    {
+      "name": "repository context",
+      "path": "/api/v1/repository-context",
+      "status": 200,
+      "want": 200,
+      "response_sha256": "30d113b39e65bdd99bb1703bb6de94aba75b1c41a55923e71b54765d2a54979b",
+      "response": {
+        "schema_version": 1,
+        "source_system": "openexec",
+        "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+        "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+        "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+        "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+        "freshness": "current",
+        "resolved_symbols": [
+          {
+            "symbol_id": "sym_5219dc33-53de-41b1-9806-b2d2a566cade",
+            "display_name": "cmd/openexec/main.main",
+            "kind": "function",
+            "safe_location": "cmd/openexec/main.go:7",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_1f6d7072-72b6-4e41-9cb3-609aaf81b4b9",
+            "display_name": "internal/approval/types.RiskLevelMedium",
+            "kind": "constant",
+            "safe_location": "internal/approval/types.go:37",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_ad71ce95-772a-4992-a256-c20e63598a89",
+            "display_name": "internal/blueprint/stage.Stage",
+            "kind": "struct",
+            "safe_location": "internal/blueprint/stage.go:11",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_0607aff3-cec5-42da-8156-3c69a760d47c",
+            "display_name": "internal/blueprint/stage.StageResult",
+            "kind": "struct",
+            "safe_location": "internal/blueprint/stage.go:64",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_656ce508-5552-48cd-8ee9-3dae5702bc17",
+            "display_name": "internal/budget/config.Status",
+            "kind": "struct",
+            "safe_location": "internal/budget/config.go:146",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_2487e1c7-2d72-488e-9ace-db6bd8bf1c52",
+            "display_name": "internal/context/gatherer_registry.GathererRegistry.Register",
+            "kind": "method",
+            "safe_location": "internal/context/gatherer_registry.go:25",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_07f1e097-0591-40d7-b16f-9df53f273fb7",
+            "display_name": "internal/context/types.ContextItem",
+            "kind": "struct",
+            "safe_location": "internal/context/types.go:171",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_fa96567a-c3d3-4216-8fcd-deb9950f8ab3",
+            "display_name": "internal/context/types.ContextType",
+            "kind": "type",
+            "safe_location": "internal/context/types.go:26",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_0dd6f6ba-963d-433e-9da1-66a462b29b94",
+            "display_name": "internal/context/types.ContextTypeProjectInstructions",
+            "kind": "constant",
+            "safe_location": "internal/context/types.go:30",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_a82434eb-3839-49e8-b0c6-71dedc0ccb05",
+            "display_name": "internal/context/types.ContextTypeGitStatus",
+            "kind": "constant",
+            "safe_location": "internal/context/types.go:32",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_1e43052a-44b4-4fda-839d-bf02469d6822",
+            "display_name": "internal/conversation/state_machine.Conversation",
+            "kind": "struct",
+            "safe_location": "internal/conversation/state_machine.go:221",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_b0e06f79-176b-4c1b-840e-606e2541088a",
+            "display_name": "internal/knowledge/store.Store.Close",
+            "kind": "method",
+            "safe_location": "internal/knowledge/store.go:414",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_ca7c9d4d-4f4d-47f5-b3e4-ee05af0a0b1e",
+            "display_name": "internal/knowledge/store.Store",
+            "kind": "struct",
+            "safe_location": "internal/knowledge/store.go:70",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_ec093316-c7e8-4dac-b105-dfcf2e4174ad",
+            "display_name": "internal/knowledge/store.NewStore",
+            "kind": "function",
+            "safe_location": "internal/knowledge/store.go:78",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_b522e084-e5a1-4869-a8c0-9be9bf3ff799",
+            "display_name": "internal/loop/event.Event",
+            "kind": "struct",
+            "safe_location": "internal/loop/event.go:88",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_79dcc358-6197-4330-853f-9e3a44758ac5",
+            "display_name": "internal/mcp/locator.OrchestratorLocatorConfig",
+            "kind": "struct",
+            "safe_location": "internal/mcp/locator.go:59",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_b3939579-db51-4d33-bf3e-ea71b519a62c",
+            "display_name": "internal/mcp/locator.NewOrchestratorLocator",
+            "kind": "function",
+            "safe_location": "internal/mcp/locator.go:96",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_d714b476-424d-4704-8c9f-bab6de1fb847",
+            "display_name": "internal/mcp/server.Server",
+            "kind": "struct",
+            "safe_location": "internal/mcp/server.go:65",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_acdeaecf-1cc0-4a6c-9c53-e442d925fd76",
+            "display_name": "internal/protocol/status.BaseMessage",
+            "kind": "struct",
+            "safe_location": "internal/protocol/status.go:29",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_b5284b86-ada3-4e87-8051-4be1b0f0959c",
+            "display_name": "internal/release/manager.Manager",
+            "kind": "struct",
+            "safe_location": "internal/release/manager.go:34",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_32250c7b-38d5-4048-a2a8-86156a8383b1",
+            "display_name": "internal/release/models.Task",
+            "kind": "struct",
+            "safe_location": "internal/release/models.go:109",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_906e2480-134d-4dd2-adcd-0c4e224babca",
+            "display_name": "internal/release/models.Story",
+            "kind": "struct",
+            "safe_location": "internal/release/models.go:59",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_c8ceb17d-42f6-4f1a-ba96-ce5901f77ca5",
+            "display_name": "internal/telegram/auth.NewAuthMiddleware",
+            "kind": "function",
+            "safe_location": "internal/telegram/auth.go:22",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_29b59abe-8854-46d0-ba4d-f4adeb978384",
+            "display_name": "internal/telegram/commands.NewCommandHandler",
+            "kind": "function",
+            "safe_location": "internal/telegram/commands.go:203",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_cbfa6ea5-1f0c-4a56-8408-d2698372a908",
+            "display_name": "internal/telegram/commands.CommandHandler.HandleUpdate",
+            "kind": "method",
+            "safe_location": "internal/telegram/commands.go:313",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_88f6f084-000d-478a-a863-e4a95eff48d2",
+            "display_name": "internal/user/mock_store.NewMockStore",
+            "kind": "function",
+            "safe_location": "internal/user/mock_store.go:16",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_318aa491-2a1c-4479-93d1-561faba00bfc",
+            "display_name": "internal/user/mock_store.MockStore.Create",
+            "kind": "method",
+            "safe_location": "internal/user/mock_store.go:24",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_4c8d602f-3ed5-487d-9eea-0562a04b5d26",
+            "display_name": "internal/user/user.RoleAdmin",
+            "kind": "constant",
+            "safe_location": "internal/user/user.go:20",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_6b961e23-9d80-4fc4-9945-8ce06b8568d1",
+            "display_name": "internal/user/user.NewUser",
+            "kind": "function",
+            "safe_location": "internal/user/user.go:58",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_8437d92c-5058-429c-8a2a-d231e1ebb383",
+            "display_name": "pkg/agent/provider.ToolDefinition",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:130",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_f7809641-333f-482f-81de-aed0f8250cbc",
+            "display_name": "pkg/agent/provider.Request",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:137",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_5e703747-cd11-4125-bbbd-89cb811781b9",
+            "display_name": "pkg/agent/provider.RoleUser",
+            "kind": "constant",
+            "safe_location": "pkg/agent/provider.go:23",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_6810d370-4ea3-4a4a-99dc-96dde8fce41e",
+            "display_name": "pkg/agent/provider.StreamEvent",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:243",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_c1f80139-4211-4bbf-8c03-8f6bc7b586e8",
+            "display_name": "pkg/agent/provider.ProviderCapabilities",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:300",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_abcaa54f-4cb5-48cf-9a95-ca48373a0c68",
+            "display_name": "pkg/agent/provider.ModelInfo",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:324",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_1cebaf21-898f-4496-9d4f-46a81eae9356",
+            "display_name": "pkg/agent/provider.ContentTypeText",
+            "kind": "constant",
+            "safe_location": "pkg/agent/provider.go:33",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_70d50c1a-1252-4d16-9dcd-cda48aab2fcc",
+            "display_name": "pkg/agent/provider.ProviderError",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:345",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_2e5c33b9-8333-42d9-979f-217471e999f1",
+            "display_name": "pkg/agent/provider.ContentBlock",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:41",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_da9fdc1e-a581-43aa-b838-70e3ca588fb3",
+            "display_name": "pkg/agent/provider.Message",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:64",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_2062a636-a4ac-42ea-8271-dd2224facc0a",
+            "display_name": "pkg/agent/provider.NewTextMessage",
+            "kind": "function",
+            "safe_location": "pkg/agent/provider.go:78",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_a0d2c560-a833-43a2-964b-eb1ea0f75be0",
+            "display_name": "pkg/api/handlers.WriteError",
+            "kind": "function",
+            "safe_location": "pkg/api/handlers.go:590",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_2c7bb86f-6c8a-466f-b262-4b98d9f3ce13",
+            "display_name": "pkg/db/session/types.Session",
+            "kind": "struct",
+            "safe_location": "pkg/db/session/types.go:166",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_fc7d7342-075a-46b3-ad89-d94de662d560",
+            "display_name": "pkg/db/session/types.Message",
+            "kind": "struct",
+            "safe_location": "pkg/db/session/types.go:416",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_062e342b-3418-42bb-81da-8955b4546595",
+            "display_name": "pkg/db/session/types.ToolCall",
+            "kind": "struct",
+            "safe_location": "pkg/db/session/types.go:475",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_cccdb3bf-318c-408d-a525-c71c206dc6cf",
+            "display_name": "pkg/db/state/store.Store",
+            "kind": "struct",
+            "safe_location": "pkg/db/state/store.go:29",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_5f984e3f-e7e5-4804-bb84-059f4b7c2b6d",
+            "display_name": "pkg/db/state/verification.ValidationPlanRevision",
+            "kind": "struct",
+            "safe_location": "pkg/db/state/verification.go:35",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_e760366d-a8bb-4c6a-aa9b-1461a6bb8386",
+            "display_name": "pkg/execution/execution.Sandbox",
+            "kind": "struct",
+            "safe_location": "pkg/execution/execution.go:17",
+            "resolution_status": "ast_exact"
+          },
+          {
+            "symbol_id": "sym_c9aca0a6-5e56-436f-a08a-4cfc342bfc1d",
+            "display_name": "templates/sveltekit-postgres/src/lib/api/response.error",
+            "kind": "function",
+            "safe_location": "templates/sveltekit-postgres/src/lib/api/response.ts:15",
+            "resolution_status": "compiler_exact"
+          },
+          {
+            "symbol_id": "sym_649e666e-6104-4604-a650-fa28f3c84c8f",
+            "display_name": "ui/e2e/fixtures.test",
+            "kind": "constant",
+            "safe_location": "ui/e2e/fixtures.ts:10",
+            "resolution_status": "compiler_exact"
+          },
+          {
+            "symbol_id": "sym_1acd1caa-8a76-4d5c-844f-a8ba62ad8208",
+            "display_name": "ui/src/main.rootElement",
+            "kind": "constant",
+            "safe_location": "ui/src/main.tsx:13",
+            "resolution_status": "compiler_exact"
+          }
+        ],
+        "module_dependencies": [
+          {
+            "from": "cmd/openexec/main.go",
+            "to": "github.com/openexec/openexec/pkg/openexec",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/blueprint/stage.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/blueprint/stage.go",
+            "to": "github.com/openexec/openexec/internal/types",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/blueprint/stage.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/budget/config.go",
+            "to": "errors",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/budget/config.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/context/types.go",
+            "to": "database/sql",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/context/types.go",
+            "to": "errors",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/context/types.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/context/types.go",
+            "to": "github.com/google/uuid",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/context/types.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "database/sql",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "github.com/openexec/openexec/pkg/db/sqlitecfg",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "github.com/openexec/openexec/pkg/db/state",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "modernc.org/sqlite",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "os",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "path/filepath",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/knowledge/store.go",
+            "to": "sync",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "bufio",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "bytes",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "crypto/sha256",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "encoding/base64",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "encoding/hex",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "encoding/json",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/internal/approval",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/internal/mode",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/internal/release",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/internal/toolset",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/pkg/infracontract",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/pkg/mcptool",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "github.com/openexec/openexec/pkg/telemetry",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "io",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "os",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "os/exec",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "path/filepath",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "strings",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "sync",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "syscall",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/mcp/server.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/protocol/status.go",
+            "to": "encoding/json",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/protocol/status.go",
+            "to": "errors",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/protocol/status.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "database/sql",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "encoding/json",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "github.com/openexec/openexec/pkg/db/sqlitecfg",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "modernc.org/sqlite",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "os",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "path/filepath",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "strings",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "sync",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/release/manager.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/auth.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/auth.go",
+            "to": "errors",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/auth.go",
+            "to": "github.com/openexec/openexec/internal/user",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "github.com/go-telegram-bot-api/telegram-bot-api/v5",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "github.com/openexec/openexec/internal/conversation",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "github.com/openexec/openexec/internal/logging",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "github.com/openexec/openexec/internal/protocol",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "github.com/openexec/openexec/internal/user",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/telegram/commands.go",
+            "to": "strings",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/user/mock_store.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/user/mock_store.go",
+            "to": "sync",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/user/user.go",
+            "to": "errors",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/user/user.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "internal/user/user.go",
+            "to": "github.com/google/uuid",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/agent/provider.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/agent/provider.go",
+            "to": "encoding/json",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/agent/provider.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "context",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "encoding/json",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "github.com/openexec/openexec/internal/approval",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "github.com/openexec/openexec/internal/release",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "github.com/openexec/openexec/pkg/audit",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "github.com/openexec/openexec/pkg/db/session",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "github.com/openexec/openexec/pkg/db/state",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "github.com/openexec/openexec/pkg/manager",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "log",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "net/http",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "strconv",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "strings",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "sync",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/api/handlers.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/db/session/types.go",
+            "to": "database/sql",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/db/session/types.go",
+            "to": "errors",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/db/session/types.go",
+            "to": "fmt",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/db/session/types.go",
+            "to": "github.com/google/uuid",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/db/session/types.go",
+            "to": "github.com/openexec/openexec/internal/mode",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "pkg/db/session/types.go",
+            "to": "time",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "ui/e2e/fixtures.ts",
+            "to": "ui/node_modules/@playwright/test/index.ts",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "ui/src/main.tsx",
+            "to": "ui/node_modules/@types/react-dom/client.ts",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "ui/src/main.tsx",
+            "to": "ui/node_modules/@types/react/index.ts",
+            "resolution_status": "unresolved"
+          },
+          {
+            "from": "ui/src/main.tsx",
+            "to": "ui/src/App.tsx",
+            "resolution_status": "compiler_exact"
+          }
+        ],
+        "validation_summary": {
+          "verified": [],
+          "not_verified": [
+            "Repository validation is unevaluated: no completion report was supplied."
+          ],
+          "can_complete": false
+        },
+        "totals": {
+          "symbols": 12707,
+          "modules": 834,
+          "edges": 103922,
+          "import_edges": 4113
+        },
+        "provenance": {
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree": {
+            "state": "dirty",
+            "dirty_count": 12,
+            "state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5"
+          },
+          "extractors": {
+            "contracts.openapi": "configuration_derived",
+            "contracts.persistence": "compiler_exact",
+            "contracts.ui_surfaces": "configuration_derived",
+            "effects.static": "static_lexical",
+            "go.calls": "compiler_exact",
+            "go.definitions": "ast_exact",
+            "go.imports": "ast_exact",
+            "python.calls": "heuristic",
+            "python.definitions": "static_lexical",
+            "python.imports": "static_lexical",
+            "svelte.definitions": "static_lexical",
+            "svelte.imports": "static_lexical",
+            "svelte.routes": "configuration_derived",
+            "typescript.definitions": "compiler_exact",
+            "typescript.exports": "compiler_exact",
+            "typescript.imports": "compiler_exact"
+          }
+        },
+        "selections": {
+          "dead_code_candidates": {
+            "scope": "exported symbols without static inbound call or reference edges",
+            "limit": 15,
+            "returned": 15,
+            "total": 3139,
+            "truncated": true,
+            "truncated_count": 3124
+          },
+          "hotspots": {
+            "scope": "symbols ranked by static inbound calls and references",
+            "limit": 10,
+            "returned": 10,
+            "total": 6343,
+            "truncated": true,
+            "truncated_count": 6333
+          },
+          "module_dependencies": {
+            "scope": "direct module dependencies selected from repository import edges",
+            "limit": 100,
+            "returned": 100,
+            "total": 4113,
+            "truncated": true,
+            "truncated_count": 4013
+          },
+          "module_sketch": {
+            "scope": "aggregated top-level module import directions",
+            "limit": 15,
+            "returned": 15,
+            "total": 42,
+            "truncated": true,
+            "truncated_count": 27
+          },
+          "resolved_symbols": {
+            "scope": "representative symbols selected from all repository symbols",
+            "limit": 50,
+            "returned": 50,
+            "total": 12707,
+            "truncated": true,
+            "truncated_count": 12657
+          }
+        },
+        "dead_code_candidates": [
+          {
+            "display_name": "assets_ui_dist.GetUIFS",
+            "kind": "function",
+            "safe_location": "assets_ui_dist.go:15"
+          },
+          {
+            "display_name": "internal/actions/apply_patch.ApplyPatchAction.Execute",
+            "kind": "method",
+            "safe_location": "internal/actions/apply_patch.go:22"
+          },
+          {
+            "display_name": "internal/actions/build_context.BuildContextAction.Execute",
+            "kind": "method",
+            "safe_location": "internal/actions/build_context.go:24"
+          },
+          {
+            "display_name": "internal/actions/checklist_run.ChecklistRunAction.Execute",
+            "kind": "method",
+            "safe_location": "internal/actions/checklist_run.go:38"
+          },
+          {
+            "display_name": "internal/actions/contract_tests.GenerateContractTestsAction.Name",
+            "kind": "method",
+            "safe_location": "internal/actions/contract_tests.go:29"
+          },
+          {
+            "display_name": "internal/actions/contract_tests.GenerateContractTestsAction.Execute",
+            "kind": "method",
+            "safe_location": "internal/actions/contract_tests.go:38"
+          },
+          {
+            "display_name": "internal/actions/interface.Execute",
+            "kind": "function",
+            "safe_location": "internal/actions/interface.go:15"
+          },
+          {
+            "display_name": "internal/actions/run_gates.RunGatesAction.Execute",
+            "kind": "method",
+            "safe_location": "internal/actions/run_gates.go:25"
+          },
+          {
+            "display_name": "internal/agent/coordinator.WorkPlan.Subtasks",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/coordinator.go:41"
+          },
+          {
+            "display_name": "internal/agent/coordinator.Subtask.ID",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/coordinator.go:46"
+          },
+          {
+            "display_name": "internal/agent/coordinator.Subtask.Description",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/coordinator.go:47"
+          },
+          {
+            "display_name": "internal/agent/coordinator.Subtask.Files",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/coordinator.go:48"
+          },
+          {
+            "display_name": "internal/agent/coordinator.Subtask.Dependencies",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/coordinator.go:49"
+          },
+          {
+            "display_name": "internal/agent/executor.ParallelStage.Parallel",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/executor.go:19"
+          },
+          {
+            "display_name": "internal/agent/executor.ParallelStage.MaxAgents",
+            "kind": "persisted_field",
+            "safe_location": "internal/agent/executor.go:22"
+          }
+        ],
+        "hotspots": [
+          {
+            "display_name": "pkg/agent/provider.Message",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:64",
+            "inbound": 199
+          },
+          {
+            "display_name": "internal/protocol/status.BaseMessage",
+            "kind": "struct",
+            "safe_location": "internal/protocol/status.go:29",
+            "inbound": 195
+          },
+          {
+            "display_name": "pkg/agent/provider.RoleUser",
+            "kind": "constant",
+            "safe_location": "pkg/agent/provider.go:23",
+            "inbound": 159
+          },
+          {
+            "display_name": "internal/cli/root.rootCmd",
+            "kind": "variable",
+            "safe_location": "internal/cli/root.go:19",
+            "inbound": 156
+          },
+          {
+            "display_name": "internal/loop/event.Event",
+            "kind": "struct",
+            "safe_location": "internal/loop/event.go:88",
+            "inbound": 142
+          },
+          {
+            "display_name": "pkg/agent/provider.ContentBlock",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:41",
+            "inbound": 141
+          },
+          {
+            "display_name": "internal/user/mock_store.NewMockStore",
+            "kind": "function",
+            "safe_location": "internal/user/mock_store.go:16",
+            "inbound": 140
+          },
+          {
+            "display_name": "internal/knowledge/graph_scan_test.writeTestFile",
+            "kind": "function",
+            "safe_location": "internal/knowledge/graph_scan_test.go:402",
+            "inbound": 137
+          },
+          {
+            "display_name": "pkg/agent/provider.Request",
+            "kind": "struct",
+            "safe_location": "pkg/agent/provider.go:137",
+            "inbound": 132
+          },
+          {
+            "display_name": "internal/mcp/server_test.sendAndReceive",
+            "kind": "function",
+            "safe_location": "internal/mcp/server_test.go:31",
+            "inbound": 120
+          }
+        ],
+        "module_sketch": [
+          {
+            "from": "ui/src/components",
+            "to": "ui/src/types",
+            "weight": 74
+          },
+          {
+            "from": "ui/src/hooks",
+            "to": "ui/src/types",
+            "weight": 24
+          },
+          {
+            "from": "ui/src/components",
+            "to": "ui/src/hooks",
+            "weight": 12
+          },
+          {
+            "from": "ui/src/hooks/__tests__",
+            "to": "ui/src/hooks",
+            "weight": 12
+          },
+          {
+            "from": "ui/src/components/chat",
+            "to": "ui/src/components/chat/session",
+            "weight": 9
+          },
+          {
+            "from": "ui/src/components/chat/diff/__tests__",
+            "to": "ui/src/components/chat/diff",
+            "weight": 8
+          },
+          {
+            "from": "ui/src/components/chat/session/__tests__",
+            "to": "ui/src/components/chat/session",
+            "weight": 8
+          },
+          {
+            "from": "ui/src/components/chat",
+            "to": "ui/src/components/chat/messages",
+            "weight": 7
+          },
+          {
+            "from": "ui/src/components",
+            "to": "ui/src/utils",
+            "weight": 7
+          },
+          {
+            "from": "ui/src/pages",
+            "to": "ui/src/components",
+            "weight": 7
+          },
+          {
+            "from": "ui/src/components/chat",
+            "to": "ui/src/components/chat/header",
+            "weight": 5
+          },
+          {
+            "from": "ui/src/components/chat",
+            "to": "ui/src/components/chat/tools",
+            "weight": 5
+          },
+          {
+            "from": "ui/src/components/chat/header/__tests__",
+            "to": "ui/src/components/chat/header",
+            "weight": 4
+          },
+          {
+            "from": "ui/src/components/chat/restart/__tests__",
+            "to": "ui/src/components/chat/restart",
+            "weight": 4
+          },
+          {
+            "from": "ui/src/components/chat",
+            "to": "ui/src/components/chat/blueprint",
+            "weight": 4
+          }
+        ],
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved",
+          "dead-code candidates are static-reference heuristics; entry points, generated code, and reflective use are not excluded (list truncated)",
+          "repository overview is bounded to 50 representative symbols"
+        ],
+        "openexec_reference": {
+          "resource_version": "resource_d8fd37b176780ef6f3b2d0d73ad44044"
+        }
+      }
+    },
+    {
+      "name": "search",
+      "path": "/api/v1/repository-graph/symbols?page_size=5\u0026q=Execute",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "truncated": true,
+      "response_sha256": "44b65aab0828e3af107e11e3756a0b726aaa35ef0e30b8137aa33b6648508335",
+      "response": {
+        "query": {
+          "type": "find_symbols",
+          "roots": [
+            "Execute"
+          ]
+        },
+        "generation": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        },
+        "result": {
+          "candidates": [
+            {
+              "symbol": {
+                "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "language": "go",
+                "kind": "method",
+                "display_name": "CanExecute",
+                "qualified_name": "internal/mcp/restart.RestartRequest.CanExecute"
+              },
+              "occurrence": {
+                "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                "file_path": "internal/mcp/restart.go",
+                "start_line": 212,
+                "end_line": 214,
+                "start_byte": 7489,
+                "end_byte": 7577,
+                "signature": "func (*RestartRequest) CanExecute() (...)",
+                "file_content_hash": "sha256:f132eab7cc2a78402d002a6f2a3e1ce493569516e67e07dcfce09adc0054be0c",
+                "source_range_hash": "sha256:54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+                "exported": true,
+                "resolution_status": "ast_exact"
+              }
+            },
+            {
+              "symbol": {
+                "symbol_id": "sym_01ec8516-66b5-49a0-963d-5498ded1cf1e",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "language": "go",
+                "kind": "method",
+                "display_name": "CanExecute",
+                "qualified_name": "internal/user/user.User.CanExecute"
+              },
+              "occurrence": {
+                "symbol_id": "sym_01ec8516-66b5-49a0-963d-5498ded1cf1e",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "node_id": "node_15efc6abf12a453df2c0b3367fd99935",
+                "file_path": "internal/user/user.go",
+                "start_line": 85,
+                "end_line": 87,
+                "start_byte": 2302,
+                "end_byte": 2392,
+                "signature": "func (*User) CanExecute() (...)",
+                "file_content_hash": "sha256:54d86880048131dc5a425e934be97a261edf4f83ca974ffe6a868caa0fd9b57c",
+                "source_range_hash": "sha256:ac96a3e914faf541cfa0d4b9c170e38807041ca96921d84f36f12077bf00cce5",
+                "exported": true,
+                "resolution_status": "ast_exact"
+              }
+            },
+            {
+              "symbol": {
+                "symbol_id": "sym_2877d582-3493-474c-830e-f109b0b9987b",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "language": "go",
+                "kind": "method",
+                "display_name": "Execute",
+                "qualified_name": "internal/actions/apply_patch.ApplyPatchAction.Execute"
+              },
+              "occurrence": {
+                "symbol_id": "sym_2877d582-3493-474c-830e-f109b0b9987b",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "node_id": "node_12c61515608c3beceacd086fed8e37a8",
+                "file_path": "internal/actions/apply_patch.go",
+                "start_line": 22,
+                "end_line": 40,
+                "start_byte": 395,
+                "end_byte": 1070,
+                "signature": "func (*ApplyPatchAction) Execute(..., ...) (...)",
+                "file_content_hash": "sha256:3c6ea2e83689c172610a9c14cad9bbad7e38d4ef6bbf16e2a4cc4962cacd2c6e",
+                "source_range_hash": "sha256:24da9bb67c3d19a23fdf8e7c16ba12aa246145af1d6d80590a910ea1c63dbf6a",
+                "exported": true,
+                "resolution_status": "ast_exact"
+              }
+            },
+            {
+              "symbol": {
+                "symbol_id": "sym_d06e2871-684f-4b60-8fca-b16f5f1369e2",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "language": "go",
+                "kind": "method",
+                "display_name": "Execute",
+                "qualified_name": "internal/actions/build_context.BuildContextAction.Execute"
+              },
+              "occurrence": {
+                "symbol_id": "sym_d06e2871-684f-4b60-8fca-b16f5f1369e2",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "node_id": "node_c116d361286a322000b5f2b7a56c3928",
+                "file_path": "internal/actions/build_context.go",
+                "start_line": 24,
+                "end_line": 43,
+                "start_byte": 459,
+                "end_byte": 1045,
+                "signature": "func (*BuildContextAction) Execute(..., ...) (...)",
+                "file_content_hash": "sha256:3bad441190f222c802444604a59473d8c904561f96c8536278babce0eaf4dcfa",
+                "source_range_hash": "sha256:a36f0e6812b2e781aaae92ce6eb4494b605e7ca8cb2cdb99812ea9e8975ef1db",
+                "exported": true,
+                "resolution_status": "ast_exact"
+              }
+            },
+            {
+              "symbol": {
+                "symbol_id": "sym_b8df9794-7d88-478f-b8a4-5a88304b5012",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "language": "go",
+                "kind": "method",
+                "display_name": "Execute",
+                "qualified_name": "internal/actions/checklist_run.ChecklistRunAction.Execute"
+              },
+              "occurrence": {
+                "symbol_id": "sym_b8df9794-7d88-478f-b8a4-5a88304b5012",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "node_id": "node_d4a0920369754dac6aaeba82a1cc0888",
+                "file_path": "internal/actions/checklist_run.go",
+                "start_line": 38,
+                "end_line": 92,
+                "start_byte": 1201,
+                "end_byte": 2535,
+                "signature": "func (*ChecklistRunAction) Execute(..., ...) (...)",
+                "file_content_hash": "sha256:fb958d851817ae3d1d7fb7dce26e70da3c5a6624ee2d690be988dc2d335d1f31",
+                "source_range_hash": "sha256:a746d849d99d1497b60d5bea4425fd29d68baedbb8c63b298fe0cb643bb4dc55",
+                "exported": true,
+                "resolution_status": "ast_exact"
+              }
+            }
+          ]
+        },
+        "resolution": {
+          "status": "bounded",
+          "methods": [
+            "ast_exact"
+          ]
+        },
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved"
+        ],
+        "truncated": true,
+        "pagination": {
+          "page": 1,
+          "page_size": 5,
+          "total": 76,
+          "total_pages": 16
+        },
+        "provenance": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        }
+      }
+    },
+    {
+      "name": "select",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "response_sha256": "37fc952545f9486d12434c9b463d10bb7b215607995f7e4ddd2e058e034c925f",
+      "response": {
+        "query": {
+          "type": "symbol_detail",
+          "roots": [
+            "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb"
+          ]
+        },
+        "generation": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        },
+        "result": {
+          "symbol": {
+            "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+            "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+            "language": "go",
+            "kind": "method",
+            "display_name": "CanExecute",
+            "qualified_name": "internal/mcp/restart.RestartRequest.CanExecute"
+          },
+          "occurrence": {
+            "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+            "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+            "node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+            "file_path": "internal/mcp/restart.go",
+            "start_line": 212,
+            "end_line": 214,
+            "start_byte": 7489,
+            "end_byte": 7577,
+            "signature": "func (*RestartRequest) CanExecute() (...)",
+            "file_content_hash": "sha256:f132eab7cc2a78402d002a6f2a3e1ce493569516e67e07dcfce09adc0054be0c",
+            "source_range_hash": "sha256:54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+            "exported": true,
+            "resolution_status": "ast_exact"
+          },
+          "occurrences": [
+            {
+              "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "file_path": "internal/mcp/restart.go",
+              "start_line": 212,
+              "end_line": 214,
+              "start_byte": 7489,
+              "end_byte": 7577,
+              "signature": "func (*RestartRequest) CanExecute() (...)",
+              "file_content_hash": "sha256:f132eab7cc2a78402d002a6f2a3e1ce493569516e67e07dcfce09adc0054be0c",
+              "source_range_hash": "sha256:54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+              "exported": true,
+              "resolution_status": "ast_exact"
+            },
+            {
+              "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+              "generation_id": "graph_ad96bf36-e09a-453b-b488-178ac9d79b55",
+              "node_id": "node_81d4627f59e3c1f83c5704b98f0d7fb0",
+              "file_path": "internal/mcp/restart.go",
+              "start_line": 212,
+              "end_line": 214,
+              "start_byte": 7489,
+              "end_byte": 7577,
+              "signature": "func (*RestartRequest) CanExecute() (...)",
+              "file_content_hash": "sha256:f132eab7cc2a78402d002a6f2a3e1ce493569516e67e07dcfce09adc0054be0c",
+              "source_range_hash": "sha256:54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+              "exported": true,
+              "resolution_status": "ast_exact"
+            },
+            {
+              "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+              "generation_id": "graph_48a0632b-44e8-4c5c-a5b7-33174caaf9b1",
+              "node_id": "node_1907e6de2160981832b80659505df602",
+              "file_path": "internal/mcp/restart.go",
+              "start_line": 212,
+              "end_line": 214,
+              "start_byte": 7489,
+              "end_byte": 7577,
+              "signature": "func (*RestartRequest) CanExecute() (...)",
+              "file_content_hash": "sha256:f132eab7cc2a78402d002a6f2a3e1ce493569516e67e07dcfce09adc0054be0c",
+              "source_range_hash": "sha256:54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+              "exported": true,
+              "resolution_status": "ast_exact"
+            },
+            {
+              "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9",
+              "node_id": "node_96d4ae5466448d32798110518a1778a6",
+              "file_path": "internal/mcp/restart.go",
+              "start_line": 212,
+              "end_line": 214,
+              "start_byte": 7489,
+              "end_byte": 7577,
+              "signature": "func (*RestartRequest) CanExecute() (...)",
+              "file_content_hash": "sha256:f132eab7cc2a78402d002a6f2a3e1ce493569516e67e07dcfce09adc0054be0c",
+              "source_range_hash": "sha256:54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+              "exported": true,
+              "resolution_status": "ast_exact"
+            }
+          ],
+          "lineage": [
+            {
+              "continuity_status": "preserved",
+              "resolution_method": "exact",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3"
+            },
+            {
+              "continuity_status": "preserved",
+              "resolution_method": "exact",
+              "generation_id": "graph_ad96bf36-e09a-453b-b488-178ac9d79b55"
+            },
+            {
+              "continuity_status": "preserved",
+              "resolution_method": "exact",
+              "generation_id": "graph_48a0632b-44e8-4c5c-a5b7-33174caaf9b1"
+            },
+            {
+              "previous_symbol_id": "sym_3d915df1-5c67-45c0-8305-69058df5857b",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_6f6874fc-9f88-467f-bce8-939278b7a30c",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_458e6985-b93a-4af8-86be-30baeec4628f",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_6cdb5f36-1468-4822-bcb8-7a48b1c2be39",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_4bd43d15-886b-492f-ad29-09023879a029",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_c1297f81-b8e7-41a1-a63a-9c73e96d83dc",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_c3fc5e29-717c-4c11-a76e-7f91c4f1ac0b",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            },
+            {
+              "previous_symbol_id": "sym_806a630d-67a0-4fe1-8e9c-eccbca92c2a2",
+              "continuity_status": "ambiguous",
+              "resolution_method": "heuristic",
+              "generation_id": "graph_94609e94-1992-4086-a3db-f166902875d9"
+            }
+          ]
+        },
+        "resolution": {
+          "status": "resolved",
+          "methods": [
+            "ast_exact"
+          ]
+        },
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved"
+        ],
+        "truncated": false,
+        "provenance": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        }
+      }
+    },
+    {
+      "name": "calls outgoing",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/calls?direction=outgoing",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "response_sha256": "5779ccff597ad1564c15a86f512ff7ad47571517b5c89949e3d0bd99fa773da5",
+      "response": {
+        "query": {
+          "type": "symbol_relationships_outgoing",
+          "roots": [
+            "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb"
+          ]
+        },
+        "generation": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        },
+        "result": {
+          "root": {
+            "id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+            "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+            "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+            "node_type": "symbol",
+            "language": "go",
+            "display_name": "CanExecute",
+            "qualified_name": "internal/mcp/restart.RestartRequest.CanExecute"
+          },
+          "nodes": null,
+          "edges": null
+        },
+        "resolution": {
+          "status": "bounded"
+        },
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved"
+        ],
+        "truncated": false,
+        "provenance": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        }
+      }
+    },
+    {
+      "name": "calls incoming",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/calls?direction=incoming",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "nodes": 4,
+      "response_sha256": "c6ddc0392f22b0a789db2e8e2485a72217eaeb7862241af2c60280bbe395ef35",
+      "response": {
+        "query": {
+          "type": "symbol_relationships_incoming",
+          "roots": [
+            "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb"
+          ]
+        },
+        "generation": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        },
+        "result": {
+          "root": {
+            "id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+            "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+            "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+            "node_type": "symbol",
+            "language": "go",
+            "display_name": "CanExecute",
+            "qualified_name": "internal/mcp/restart.RestartRequest.CanExecute"
+          },
+          "nodes": [
+            {
+              "id": "node_4ed8f48c3a24333c6789d2a8c2bbd7bc",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "node_type": "symbol",
+              "language": "go",
+              "display_name": "TestE2E_MetaSelfFix_RestartManagerApprovalWorkflow",
+              "qualified_name": "internal/mcp/meta_self_fix_e2e_test.TestE2E_MetaSelfFix_RestartManagerApprovalWorkflow"
+            },
+            {
+              "id": "node_605e697ae0f66e1dd4f212804e0715d7",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "node_type": "symbol",
+              "language": "go",
+              "display_name": "ExecuteRestart",
+              "qualified_name": "internal/mcp/restart.RestartManager.ExecuteRestart"
+            },
+            {
+              "id": "node_26bc0bc70394d1371250b355a8bf49c4",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "node_type": "symbol",
+              "language": "go",
+              "display_name": "TestRestartRequest_FullLifecycle",
+              "qualified_name": "internal/mcp/restart_test.TestRestartRequest_FullLifecycle"
+            },
+            {
+              "id": "node_78ee2679f113f33e40252bc41af4d9e0",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "node_type": "symbol",
+              "language": "go",
+              "display_name": "TestRestartRequest_Predicates",
+              "qualified_name": "internal/mcp/restart_test.TestRestartRequest_Predicates"
+            }
+          ],
+          "edges": [
+            {
+              "id": "edge_100c18440a5a6ea88d10ed6c5d19516d",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_26bc0bc70394d1371250b355a8bf49c4",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/restart_test.go",
+              "source_start_byte": 30742,
+              "source_end_byte": 30752
+            },
+            {
+              "id": "edge_25bdb4c1555cfa72a3cb026d1f2beb46",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_4ed8f48c3a24333c6789d2a8c2bbd7bc",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/meta_self_fix_e2e_test.go",
+              "source_start_byte": 17659,
+              "source_end_byte": 17669
+            },
+            {
+              "id": "edge_593e79335e033c2578af3aeafa9de56b",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_78ee2679f113f33e40252bc41af4d9e0",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/restart_test.go",
+              "source_start_byte": 7590,
+              "source_end_byte": 7600
+            },
+            {
+              "id": "edge_6858dc358e14db5f576e5273d89dfc3b",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_4ed8f48c3a24333c6789d2a8c2bbd7bc",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/meta_self_fix_e2e_test.go",
+              "source_start_byte": 16148,
+              "source_end_byte": 16158
+            },
+            {
+              "id": "edge_6c0dff44a89e800afa6960c824a71920",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_4ed8f48c3a24333c6789d2a8c2bbd7bc",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/meta_self_fix_e2e_test.go",
+              "source_start_byte": 16905,
+              "source_end_byte": 16915
+            },
+            {
+              "id": "edge_77f208c815d9bc893fbde580685cb38d",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/restart.go",
+              "source_start_byte": 20498,
+              "source_end_byte": 20508
+            },
+            {
+              "id": "edge_f3ac9e8c9224237cd7f5194512e34050",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_78ee2679f113f33e40252bc41af4d9e0",
+              "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "edge_type": "calls",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/restart_test.go",
+              "source_start_byte": 7693,
+              "source_end_byte": 7703
+            }
+          ]
+        },
+        "resolution": {
+          "status": "bounded",
+          "methods": [
+            "compiler_exact"
+          ]
+        },
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved"
+        ],
+        "truncated": false,
+        "provenance": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        }
+      }
+    },
+    {
+      "name": "dependencies",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/dependencies",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "nodes": 2,
+      "response_sha256": "fa53f456405f30fd4415f0256794f5f5eb78fa835b4724f1e92d968c017663bc",
+      "response": {
+        "query": {
+          "type": "symbol_relationships_outgoing",
+          "roots": [
+            "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb"
+          ]
+        },
+        "generation": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        },
+        "result": {
+          "root": {
+            "id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+            "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+            "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+            "node_type": "symbol",
+            "language": "go",
+            "display_name": "CanExecute",
+            "qualified_name": "internal/mcp/restart.RestartRequest.CanExecute"
+          },
+          "nodes": [
+            {
+              "id": "node_30ce3775f4d1fb351a34f5a699635771",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "node_type": "symbol",
+              "language": "go",
+              "display_name": "RestartRequest",
+              "qualified_name": "internal/mcp/restart.RestartRequest"
+            },
+            {
+              "id": "node_06a4e60330aecb9bebfe5f079556fa4e",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "node_type": "symbol",
+              "language": "go",
+              "display_name": "RestartStatusApproved",
+              "qualified_name": "internal/mcp/restart.RestartStatusApproved"
+            }
+          ],
+          "edges": [
+            {
+              "id": "edge_9901839295cd552dfe7335a5f44ef86b",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "to_node_id": "node_06a4e60330aecb9bebfe5f079556fa4e",
+              "edge_type": "references",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/restart.go",
+              "source_start_byte": 7554,
+              "source_end_byte": 7575
+            },
+            {
+              "id": "edge_f3dd4b5283a8bb7c9b2762c27096c344",
+              "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+              "from_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+              "to_node_id": "node_30ce3775f4d1fb351a34f5a699635771",
+              "edge_type": "references",
+              "resolution_status": "compiler_exact",
+              "source_file_path": "internal/mcp/restart.go",
+              "source_start_byte": 7498,
+              "source_end_byte": 7512
+            }
+          ]
+        },
+        "resolution": {
+          "status": "bounded",
+          "methods": [
+            "compiler_exact"
+          ]
+        },
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved"
+        ],
+        "truncated": false,
+        "provenance": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        }
+      }
+    },
+    {
+      "name": "impact",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/impact",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "response_sha256": "010a99a5c3f779f1bf5d222017d4af356c0883cbd6854e18a5cc7dec359e7acb",
+      "response": {
+        "query": {
+          "type": "impact_analysis",
+          "roots": [
+            "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb"
+          ]
+        },
+        "generation": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        },
+        "result": {
+          "changed": [
+            {
+              "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+              "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+              "language": "go",
+              "kind": "method",
+              "display_name": "CanExecute",
+              "qualified_name": "internal/mcp/restart.RestartRequest.CanExecute"
+            }
+          ],
+          "direct_callers": [
+            {
+              "node": {
+                "id": "node_4ed8f48c3a24333c6789d2a8c2bbd7bc",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "symbol",
+                "language": "go",
+                "display_name": "TestE2E_MetaSelfFix_RestartManagerApprovalWorkflow",
+                "qualified_name": "internal/mcp/meta_self_fix_e2e_test.TestE2E_MetaSelfFix_RestartManagerApprovalWorkflow"
+              },
+              "path": [
+                {
+                  "from_node_id": "node_4ed8f48c3a24333c6789d2a8c2bbd7bc",
+                  "edge_id": "edge_25bdb4c1555cfa72a3cb026d1f2beb46",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/meta_self_fix_e2e_test.TestE2E_MetaSelfFix_RestartManagerApprovalWorkflow calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "node": {
+                "id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "symbol",
+                "language": "go",
+                "display_name": "ExecuteRestart",
+                "qualified_name": "internal/mcp/restart.RestartManager.ExecuteRestart"
+              },
+              "path": [
+                {
+                  "from_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "edge_id": "edge_77f208c815d9bc893fbde580685cb38d",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/restart.RestartManager.ExecuteRestart calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "node": {
+                "id": "node_26bc0bc70394d1371250b355a8bf49c4",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "symbol",
+                "language": "go",
+                "display_name": "TestRestartRequest_FullLifecycle",
+                "qualified_name": "internal/mcp/restart_test.TestRestartRequest_FullLifecycle"
+              },
+              "path": [
+                {
+                  "from_node_id": "node_26bc0bc70394d1371250b355a8bf49c4",
+                  "edge_id": "edge_100c18440a5a6ea88d10ed6c5d19516d",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/restart_test.TestRestartRequest_FullLifecycle calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "node": {
+                "id": "node_78ee2679f113f33e40252bc41af4d9e0",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "symbol",
+                "language": "go",
+                "display_name": "TestRestartRequest_Predicates",
+                "qualified_name": "internal/mcp/restart_test.TestRestartRequest_Predicates"
+              },
+              "path": [
+                {
+                  "from_node_id": "node_78ee2679f113f33e40252bc41af4d9e0",
+                  "edge_id": "edge_593e79335e033c2578af3aeafa9de56b",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/restart_test.TestRestartRequest_Predicates calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            }
+          ],
+          "affected_callers": [
+            {
+              "node": {
+                "id": "node_0c677d141fdf6ab64bce5fcff6e245b7",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "symbol",
+                "language": "go",
+                "display_name": "TestRestartManager_ExecuteRestart",
+                "qualified_name": "internal/mcp/restart_test.TestRestartManager_ExecuteRestart"
+              },
+              "path": [
+                {
+                  "from_node_id": "node_0c677d141fdf6ab64bce5fcff6e245b7",
+                  "edge_id": "edge_1bcd8ae80a2c7addd3a45b91429a7ed9",
+                  "edge_type": "calls",
+                  "to_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "reason": "internal/mcp/restart_test.TestRestartManager_ExecuteRestart calls affected symbol internal/mcp/restart.RestartManager.ExecuteRestart"
+                },
+                {
+                  "from_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "edge_id": "edge_77f208c815d9bc893fbde580685cb38d",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/restart.RestartManager.ExecuteRestart calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "node": {
+                "id": "node_a23fa0d22d7e252e0ad41d459fcbee50",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "symbol",
+                "language": "go",
+                "display_name": "TestRestartManager_ExecuteRestartWithBuild",
+                "qualified_name": "internal/mcp/restart_test.TestRestartManager_ExecuteRestartWithBuild"
+              },
+              "path": [
+                {
+                  "from_node_id": "node_a23fa0d22d7e252e0ad41d459fcbee50",
+                  "edge_id": "edge_8f8f9a75a893b6386fee0459be126d52",
+                  "edge_type": "calls",
+                  "to_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "reason": "internal/mcp/restart_test.TestRestartManager_ExecuteRestartWithBuild calls affected symbol internal/mcp/restart.RestartManager.ExecuteRestart"
+                },
+                {
+                  "from_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "edge_id": "edge_77f208c815d9bc893fbde580685cb38d",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/restart.RestartManager.ExecuteRestart calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            }
+          ],
+          "operational_effects": [
+            {
+              "node": {
+                "id": "node_d29a07123f37873a5422ab10a18d71b6",
+                "generation_id": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+                "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+                "node_type": "operational_effect",
+                "display_name": "filesystem",
+                "qualified_name": "internal/mcp/restart_test.go:TestRestartManager_ExecuteRestart -\u003e filesystem",
+                "metadata": {
+                  "effect": "filesystem",
+                  "evidence": "filesystem mutation"
+                }
+              },
+              "path": [
+                {
+                  "from_node_id": "node_0c677d141fdf6ab64bce5fcff6e245b7",
+                  "edge_id": "edge_1bcd8ae80a2c7addd3a45b91429a7ed9",
+                  "edge_type": "calls",
+                  "to_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "reason": "internal/mcp/restart_test.TestRestartManager_ExecuteRestart calls affected symbol internal/mcp/restart.RestartManager.ExecuteRestart"
+                },
+                {
+                  "from_node_id": "node_605e697ae0f66e1dd4f212804e0715d7",
+                  "edge_id": "edge_77f208c815d9bc893fbde580685cb38d",
+                  "edge_type": "calls",
+                  "to_node_id": "node_06a8c3dfc027b0eaf6c92e1c7b793949",
+                  "reason": "internal/mcp/restart.RestartManager.ExecuteRestart calls affected symbol internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_0c677d141fdf6ab64bce5fcff6e245b7",
+                  "edge_id": "edge_5db351d4fb27d21cebd8109851d5623f",
+                  "edge_type": "has_operational_effect",
+                  "to_node_id": "node_d29a07123f37873a5422ab10a18d71b6",
+                  "reason": "internal/mcp/restart_test.TestRestartManager_ExecuteRestart can cause filesystem"
+                }
+              ]
+            }
+          ],
+          "related_tests": [
+            {
+              "file_path": "internal/mcp/backlog_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c0c1c9c38d2dbcbaa95fd338c6766d1b",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_46fc1b1d9bf02681d81298d51776f658",
+                  "reason": "internal/mcp/backlog_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/backup_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_6ccdffdfc38813870071339ffc74ab58",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_b6dcbf186b0ff777072171257f552751",
+                  "reason": "internal/mcp/backup_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/broker_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_f6483e2f8a9d2eb64b651c9843f2b549",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_e6124c3f7cf58216841e258626073a69",
+                  "reason": "internal/mcp/broker_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/builder_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_6fcb0ba8ecec36b9d6a08266aafd1ab2",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_eb0faab1d4a61334fc7a9f6c5fd56692",
+                  "reason": "internal/mcp/builder_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/fork_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_433730b82d1002bcf869fa23d7f88ff8",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_5895acaf5da2e4bf7176a0cf0e435cb1",
+                  "reason": "internal/mcp/fork_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/git_apply_patch_artifact_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_9f90472d6f68ffe51601f5f56514a13f",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_79917ada2a290a2ea3874411573ad298",
+                  "reason": "internal/mcp/git_apply_patch_artifact_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/idempotency_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_7c74cb7977cbbed641e5f84002a83255",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_72014e206fc42f9f2914b4d41fa23c7a",
+                  "reason": "internal/mcp/idempotency_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/infra_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_9ced70f1b7e25383f3947e37fb4d26a8",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_957d57510c291c0f8fcad720bf8a1902",
+                  "reason": "internal/mcp/infra_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/locator_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c3f33c18525e56bdffd47ebc7e7048f9",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_101d90d761bf8be0b75b57f3c822844f",
+                  "reason": "internal/mcp/locator_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/meta_edit_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_4342a630d26bb902cb20fa9de6c29d0b",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_524051cf9fe308197d2919720ab80ab8",
+                  "reason": "internal/mcp/meta_edit_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/meta_self_fix_e2e_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_148c4612e34c624ba17ca031eca48796",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_eec18cf686fadc987b205416de5b7466",
+                  "reason": "internal/mcp/meta_self_fix_e2e_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/parser_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_01c321ce1814369c8932a5207291dd0e",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_c97273148a433a6662e6026b0ac863e8",
+                  "reason": "internal/mcp/parser_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/patch_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_277679db4560b6a70acf77cd5e93d143",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_1c01c8e3424e363fc839e32fc83a6f29",
+                  "reason": "internal/mcp/patch_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/path_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c21c387c56198642656581b211a249e4",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_27d2116b7d46e6545ca9e3bc82a99024",
+                  "reason": "internal/mcp/path_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/provider_collision_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_6e788622c3fc659ff440a2a5a9fa88b6",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_a0e3c5a32efe2f7c5a172cba3805d119",
+                  "reason": "internal/mcp/provider_collision_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/redact_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_2de90243750745c7571ea38009d4e237",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_38e0945c9ef6568cc1f4ddf06db7bec3",
+                  "reason": "internal/mcp/redact_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/restart_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c9d058c241121975fb39a3c839040ef3",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_4008bae7bd1e408ab351e2bc2ab6ada3",
+                  "reason": "internal/mcp/restart_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/schema_audit_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_241ff10792ee17cbf123770cb02d8c0c",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_3ad26476f9799d5f56e1b4050ca2699e",
+                  "reason": "internal/mcp/schema_audit_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/server_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_3a39f9e8caebebea16d5a060b0e28839",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_fc683094c9294726474f52418b7949ca",
+                  "reason": "internal/mcp/server_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/session_resume_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_4cd3d7499d44af6f4530c4d88a524af1",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_626744b1b2ac2091ecfa1bb9ab807e37",
+                  "reason": "internal/mcp/session_resume_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/signal_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_ed254fc57841e017c303ce7fc71ad9fe",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_0ecc3b5cee81981ad642168efb929ba8",
+                  "reason": "internal/mcp/signal_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/symbols_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_be2e5560224ab932867bd238e677a1d4",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_776530309a49d54f76b08f8812cac7ac",
+                  "reason": "internal/mcp/symbols_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/syntax_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_0e9dbf2e3157b20002834ec207adb236",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_12bdbe594685dadfb1a747bb49e044f5",
+                  "reason": "internal/mcp/syntax_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            },
+            {
+              "file_path": "internal/mcp/tools_test.go",
+              "reason": "registered browser or unit fixture for an affected consumer",
+              "path": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_10c595577e6070ae2e210373ef347005",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_4c8509bf731de8846d034e4aa7e9ddd6",
+                  "reason": "internal/mcp/tools_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ]
+            }
+          ],
+          "unresolved": [
+            "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+            "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+            "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+            "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+            "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+            "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+            "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+            "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+            "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+            "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+            "additional TypeScript diagnostics truncated",
+            "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+            "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+            "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+            "registered HTTP routes without an OpenAPI operation remain unresolved",
+            "dynamic dependency injection and runtime registration may not be resolved"
+          ],
+          "validation_recommendations": [
+            {
+              "criterion": "Structurally related tests for changed symbols pass",
+              "scope": "related_tests",
+              "test_files": [
+                "internal/mcp/backlog_test.go",
+                "internal/mcp/backup_test.go",
+                "internal/mcp/broker_test.go",
+                "internal/mcp/builder_test.go",
+                "internal/mcp/fork_test.go",
+                "internal/mcp/git_apply_patch_artifact_test.go",
+                "internal/mcp/idempotency_test.go",
+                "internal/mcp/infra_test.go",
+                "internal/mcp/locator_test.go",
+                "internal/mcp/meta_edit_test.go",
+                "internal/mcp/meta_self_fix_e2e_test.go",
+                "internal/mcp/parser_test.go",
+                "internal/mcp/patch_test.go",
+                "internal/mcp/path_test.go",
+                "internal/mcp/provider_collision_test.go",
+                "internal/mcp/redact_test.go",
+                "internal/mcp/restart_test.go",
+                "internal/mcp/schema_audit_test.go",
+                "internal/mcp/server_test.go",
+                "internal/mcp/session_resume_test.go",
+                "internal/mcp/signal_test.go",
+                "internal/mcp/symbols_test.go",
+                "internal/mcp/syntax_test.go",
+                "internal/mcp/tools_test.go"
+              ],
+              "graph_paths": [
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c0c1c9c38d2dbcbaa95fd338c6766d1b",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_46fc1b1d9bf02681d81298d51776f658",
+                  "reason": "internal/mcp/backlog_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_6ccdffdfc38813870071339ffc74ab58",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_b6dcbf186b0ff777072171257f552751",
+                  "reason": "internal/mcp/backup_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_f6483e2f8a9d2eb64b651c9843f2b549",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_e6124c3f7cf58216841e258626073a69",
+                  "reason": "internal/mcp/broker_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_6fcb0ba8ecec36b9d6a08266aafd1ab2",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_eb0faab1d4a61334fc7a9f6c5fd56692",
+                  "reason": "internal/mcp/builder_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_433730b82d1002bcf869fa23d7f88ff8",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_5895acaf5da2e4bf7176a0cf0e435cb1",
+                  "reason": "internal/mcp/fork_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_9f90472d6f68ffe51601f5f56514a13f",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_79917ada2a290a2ea3874411573ad298",
+                  "reason": "internal/mcp/git_apply_patch_artifact_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_7c74cb7977cbbed641e5f84002a83255",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_72014e206fc42f9f2914b4d41fa23c7a",
+                  "reason": "internal/mcp/idempotency_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_9ced70f1b7e25383f3947e37fb4d26a8",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_957d57510c291c0f8fcad720bf8a1902",
+                  "reason": "internal/mcp/infra_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c3f33c18525e56bdffd47ebc7e7048f9",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_101d90d761bf8be0b75b57f3c822844f",
+                  "reason": "internal/mcp/locator_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_4342a630d26bb902cb20fa9de6c29d0b",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_524051cf9fe308197d2919720ab80ab8",
+                  "reason": "internal/mcp/meta_edit_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_148c4612e34c624ba17ca031eca48796",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_eec18cf686fadc987b205416de5b7466",
+                  "reason": "internal/mcp/meta_self_fix_e2e_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_01c321ce1814369c8932a5207291dd0e",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_c97273148a433a6662e6026b0ac863e8",
+                  "reason": "internal/mcp/parser_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_277679db4560b6a70acf77cd5e93d143",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_1c01c8e3424e363fc839e32fc83a6f29",
+                  "reason": "internal/mcp/patch_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c21c387c56198642656581b211a249e4",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_27d2116b7d46e6545ca9e3bc82a99024",
+                  "reason": "internal/mcp/path_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_6e788622c3fc659ff440a2a5a9fa88b6",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_a0e3c5a32efe2f7c5a172cba3805d119",
+                  "reason": "internal/mcp/provider_collision_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_2de90243750745c7571ea38009d4e237",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_38e0945c9ef6568cc1f4ddf06db7bec3",
+                  "reason": "internal/mcp/redact_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_c9d058c241121975fb39a3c839040ef3",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_4008bae7bd1e408ab351e2bc2ab6ada3",
+                  "reason": "internal/mcp/restart_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_241ff10792ee17cbf123770cb02d8c0c",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_3ad26476f9799d5f56e1b4050ca2699e",
+                  "reason": "internal/mcp/schema_audit_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_3a39f9e8caebebea16d5a060b0e28839",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_fc683094c9294726474f52418b7949ca",
+                  "reason": "internal/mcp/server_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_4cd3d7499d44af6f4530c4d88a524af1",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_626744b1b2ac2091ecfa1bb9ab807e37",
+                  "reason": "internal/mcp/session_resume_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_ed254fc57841e017c303ce7fc71ad9fe",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_0ecc3b5cee81981ad642168efb929ba8",
+                  "reason": "internal/mcp/signal_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_be2e5560224ab932867bd238e677a1d4",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_776530309a49d54f76b08f8812cac7ac",
+                  "reason": "internal/mcp/symbols_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_0e9dbf2e3157b20002834ec207adb236",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_12bdbe594685dadfb1a747bb49e044f5",
+                  "reason": "internal/mcp/syntax_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                },
+                {
+                  "from_node_id": "node_b965d65bd56ac492f218ceffd968c7da",
+                  "edge_id": "edge_10c595577e6070ae2e210373ef347005",
+                  "edge_type": "tested_by",
+                  "to_node_id": "node_4c8509bf731de8846d034e4aa7e9ddd6",
+                  "reason": "internal/mcp/tools_test.go is registered evidence for affected consumer internal/mcp/restart.RestartRequest.CanExecute"
+                }
+              ],
+              "limitations": [
+                "test relationship selects candidates but does not prove behavioral coverage"
+              ]
+            }
+          ]
+        },
+        "resolution": {
+          "status": "bounded",
+          "methods": [
+            "configuration_derived",
+            "compiler_exact",
+            "static_lexical"
+          ]
+        },
+        "limitations": [
+          "templates/sveltekit-postgres/tsconfig.json: Cannot read file '/mnt/data1/projects/openexec/templates/sveltekit-postgres/.svelte-kit/tsconfig.json'.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find module 'drizzle-kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/drizzle.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find module '@playwright/test' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/playwright.config.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '@sveltejs/kit' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Cannot find module '$lib/auth/lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'event' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/hooks.server.ts: Binding element 'resolve' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module 'lucia' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '@lucia-auth/adapter-drizzle' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/client' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find module '$lib/db/schema' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Parameter 'attributes' implicitly has an 'any' type.",
+          "templates/sveltekit-postgres/src/lib/auth/lucia.ts: Invalid module name in augmentation, module 'lucia' cannot be found.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:crypto' or its corresponding type declarations.",
+          "templates/sveltekit-postgres/src/lib/auth/password.ts: Cannot find module 'node:util' or its corresponding type declarations.",
+          "additional TypeScript diagnostics truncated",
+          "Python definitions and imports use static lexical extraction; decorators, dynamic dispatch, and ORM effects are not fully resolved",
+          "Svelte component scripts use static lexical extraction; reactive markup and generated component code are not fully resolved",
+          "HTTP route registrations that are not method-prefixed ServeMux patterns remain unresolved",
+          "registered HTTP routes without an OpenAPI operation remain unresolved"
+        ],
+        "truncated": false,
+        "provenance": {
+          "repository_id": "repo_f8f07653-3659-44ef-8fc3-dfe678dfa9b9",
+          "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+          "worktree_id": "worktree_fb8175d9-f51a-42ba-b1d3-1f9fd326d2a8",
+          "base_commit": "186646ee320886726512b6468f229d53da1d7714",
+          "worktree_state_hash": "sha256:393a37be025e1c00684f4807653b3ad5c8a143271d1d46ba27dc15c1cf5cdda5",
+          "configuration_digest": "sha256:23bd548a2088da05331557846292c6ab3cbeced540011f626d303377b03a042f",
+          "extractor_version": "repository-graph-v2.3",
+          "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+          "freshness": "current"
+        }
+      }
+    },
+    {
+      "name": "source",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/source",
+      "status": 200,
+      "want": 200,
+      "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+      "freshness": "current",
+      "response_sha256": "3475366257071c086ffcd35ccb4ba479ca83f038dbe71198b87af27c85cd3639"
+    },
+    {
+      "name": "refuse missing bearer",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/source",
+      "status": 401,
+      "want": 401,
+      "response_sha256": "9809344a9e02d9ebd8fabc06c6c61e064e70aed48e4c7332be2adb320e5191ae",
+      "response": {
+        "error": "repository graph bearer required"
+      }
+    },
+    {
+      "name": "refuse wrong bearer",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/source",
+      "status": 401,
+      "want": 401,
+      "response_sha256": "9809344a9e02d9ebd8fabc06c6c61e064e70aed48e4c7332be2adb320e5191ae",
+      "response": {
+        "error": "repository graph bearer required"
+      }
+    },
+    {
+      "name": "refuse other checkout",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/source",
+      "status": 403,
+      "want": 403,
+      "response_sha256": "0f80af7f43bce1cbd5adbcd65f72c2b5609226798d8ee397d25332a7dc986f43",
+      "response": {
+        "error": "repository graph access is not authorized for this checkout"
+      }
+    },
+    {
+      "name": "refuse missing checkout",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/source",
+      "status": 403,
+      "want": 403,
+      "response_sha256": "0f80af7f43bce1cbd5adbcd65f72c2b5609226798d8ee397d25332a7dc986f43",
+      "response": {
+        "error": "repository graph access is not authorized for this checkout"
+      }
+    },
+    {
+      "name": "refuse fabricated symbol",
+      "path": "/api/v1/repository-graph/symbols/fabricated:..%2F..%2Fetc%2Fpasswd/source",
+      "status": 404,
+      "want": 404,
+      "reason": "not_found",
+      "response_sha256": "2d1d25206667124017075c56094d1a895688b9a44674d1e765667f4f2cefe08a",
+      "response": {
+        "error": "sql: no rows in result set",
+        "freshness": "",
+        "generation": {
+          "repository_id": "",
+          "checkout_id": "",
+          "worktree_id": "",
+          "base_commit": "",
+          "worktree_state_hash": "",
+          "configuration_digest": "",
+          "extractor_version": "",
+          "graph_version": "",
+          "freshness": ""
+        },
+        "provenance": {
+          "repository_id": "",
+          "checkout_id": "",
+          "worktree_id": "",
+          "base_commit": "",
+          "worktree_state_hash": "",
+          "configuration_digest": "",
+          "extractor_version": "",
+          "graph_version": "",
+          "freshness": ""
+        },
+        "reason": "not_found"
+      }
+    },
+    {
+      "name": "refuse invalid direction",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/calls?direction=sideways",
+      "status": 400,
+      "want": 400,
+      "response_sha256": "be6d0095a629b2ced889cbebeec4b6b9ba48d9eab6dff789ac8dc53f9a960e68",
+      "response": {
+        "error": "direction must be outgoing or incoming"
+      }
+    },
+    {
+      "name": "refuse malformed depth",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/impact?depth=0",
+      "status": 400,
+      "want": 400,
+      "response_sha256": "dbac523fa13e02740bf255f816dba87d30cabd1eb096d81c6e3fe71183c20d52",
+      "response": {
+        "error": "depth must be a positive integer"
+      }
+    }
+  ]
+}

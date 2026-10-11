@@ -1,0 +1,43 @@
+{
+  "base_url": "http://127.0.0.1:8765",
+  "commit": "ef828b15",
+  "version": "0.13.1-153-gef828b15",
+  "at": "2026-10-11T15:52:22.124555485Z",
+  "checkout_id": "checkout_e00f10bf-d389-48ea-b665-7772dddfff17",
+  "symbol_id": "sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb",
+  "symbol_name": "CanExecute",
+  "graph_version": "graph_a35cff1c-b215-41f7-8630-bfe7fda3fef3",
+  "source_sha256": "54aa314419b0116b95289fd4a9ee98ef165493891bf3e1f57928e1a0285142c8",
+  "steps": [
+    {
+      "name": "running build",
+      "path": "/api/health",
+      "status": 200,
+      "want": 200,
+      "response_sha256": "82d09089cbc3094ed463d6f743371bb2809a79f1dd1a2e1547863c1a3f888388",
+      "response": {
+        "commit": "ef828b15",
+        "runner": {
+          "args": [
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--max-turns",
+            "50"
+          ],
+          "command": "claude",
+          "model": "sonnet"
+        },
+        "status": "ok",
+        "version": "0.13.1-153-gef828b15"
+      }
+    },
+    {
+      "name": "requery source",
+      "path": "/api/v1/repository-graph/symbols/sym_93594c39-8cdd-4424-bf11-8f516a8c5dcb/source",
+      "status": 200,
+      "want": 0,
+      "response_sha256": "3475366257071c086ffcd35ccb4ba479ca83f038dbe71198b87af27c85cd3639"
+    }
+  ]
+}
