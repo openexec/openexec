@@ -511,6 +511,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	s.respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "ok",
 		"version": version.Version,
+		// commit names the revision this process was built from, so a deploy
+		// can be checked against the running service rather than a file mtime.
+		"commit": version.Commit,
 		"runner": map[string]interface{}{
 			"command": runnerCmd,
 			"args":    runnerArgs,
