@@ -396,6 +396,11 @@ func TestHealthEndpointContract(t *testing.T) {
 		t.Error("expected non-empty version")
 	}
 
+	// The build revision is what a deploy verifies the running service against.
+	if health.Commit != version.Commit {
+		t.Errorf("expected commit %q, got %q", version.Commit, health.Commit)
+	}
+
 	if health.Runner.Command == "" {
 		t.Error("expected non-empty runner command")
 	}

@@ -123,6 +123,7 @@ var forbiddenIntentErrorStrings = []string{
 type HealthResponse struct {
 	Status  string       `json:"status"`
 	Version string       `json:"version"`
+	Commit  string       `json:"commit"`
 	Runner  RunnerStatus `json:"runner"`
 }
 
