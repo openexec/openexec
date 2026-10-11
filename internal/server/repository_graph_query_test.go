@@ -459,6 +459,60 @@ func TestRepositoryGraphValidationLifecycleRoundTripsAndRefusesStaleAcceptance(t
 	}
 }
 
+// The Explore journey as Console drives it: search, pick an explicit identity,
+// walk both call directions and impact, read source, then reload the daemon
+// over the same persisted graph and re-query with the identity the caller held.
+func TestRepositoryGraphExploreJourneySurvivesReload(t *testing.T) {
+	fixture := newGraphQueryFixture(t)
+	checkout := fixture.identity.CheckoutID
+	targetID := graphSymbolID(t, fixture, "Target")
+	base := "/api/v1/repository-graph/symbols/" + targetID
+
+	if response := graphRequest(t, fixture, base, checkout); response.Code != http.StatusOK {
+		t.Fatalf("detail status = %d, body=%s", response.Code, response.Body.String())
+	}
+	callers, incoming := relationshipNames(t, graphRequest(t, fixture, base+"/calls?direction=incoming", checkout))
+	if !callers["Caller"] {
+		t.Fatalf("incoming calls for Target = %v", callers)
+	}
+	callerID := graphSymbolID(t, fixture, "Caller")
+	if callees, _ := relationshipNames(t, graphRequest(t, fixture, "/api/v1/repository-graph/symbols/"+callerID+"/calls?direction=outgoing", checkout)); !callees["Target"] {
+		t.Fatalf("outgoing calls for Caller = %v", callees)
+	}
+	if response := graphRequest(t, fixture, base+"/impact", checkout); response.Code != http.StatusOK {
+		t.Fatalf("impact status = %d, body=%s", response.Code, response.Body.String())
+	}
+	source := graphRequest(t, fixture, base+"/source", checkout)
+	if source.Code != http.StatusOK || !strings.Contains(source.Body.String(), "func Target() {}") {
+		t.Fatalf("source status = %d, body=%s", source.Code, source.Body.String())
+	}
+
+	reopened, err := state.NewStore(filepath.Join(fixture.identity.RootPath, ".openexec", "openexec.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = reopened.Close() })
+	reloaded := &Server{StateStore: reopened, ProjectsDir: fixture.server.ProjectsDir, Mux: http.NewServeMux(), repositoryGraphToken: fixture.token}
+	reloaded.registerRepositoryGraphQueryRoutes()
+	after := graphQueryFixture{server: reloaded, identity: fixture.identity, token: fixture.token}
+
+	againCallers, again := relationshipNames(t, graphRequest(t, after, base+"/calls?direction=incoming", checkout))
+	if !againCallers["Caller"] || again.Generation.GraphVersion != incoming.Generation.GraphVersion {
+		t.Fatalf("after reload callers=%v generation=%q, want generation %q", againCallers, again.Generation.GraphVersion, incoming.Generation.GraphVersion)
+	}
+	if response := graphRequest(t, after, base+"/source", checkout); response.Code != http.StatusOK || response.Body.String() != source.Body.String() {
+		t.Fatalf("source after reload status = %d, body=%s", response.Code, response.Body.String())
+	}
+	// Reload does not loosen authority: the held identity is still refused
+	// without the bearer or for another checkout.
+	if response := graphRequestWithToken(t, after, base+"/source", checkout, ""); response.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated source after reload status = %d", response.Code)
+	}
+	if response := graphRequest(t, after, base+"/source", "other-checkout"); response.Code != http.StatusForbidden {
+		t.Fatalf("cross-checkout source after reload status = %d", response.Code)
+	}
+}
+
 func TestRepositoryGraphSourceRefreshesBeforeRead(t *testing.T) {
 	fixture := newGraphQueryFixture(t)
 	search := graphRequest(t, fixture, "/api/v1/repository-graph/symbols?q=Target", fixture.identity.CheckoutID)
