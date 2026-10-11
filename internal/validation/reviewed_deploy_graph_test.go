@@ -17,7 +17,7 @@ const (
 n=$(( $(cat "$STUB_STATE/restarts" 2>/dev/null || echo 0) + 1 ))
 echo "$n" > "$STUB_STATE/restarts"
 if [ "$n" = "${STUB_FAIL_RESTART:-0}" ]; then exit 1; fi
-if [ -x "$STUB_BINARY" ]; then "$STUB_BINARY" version | sed -n 's/^Commit: *//p' > "$STUB_STATE/running"; else : > "$STUB_STATE/running"; fi
+if [ -x "$STUB_BINARY" ]; then "$STUB_BINARY" version 2>&1 | sed -n 's/^Commit: *//p' > "$STUB_STATE/running"; else : > "$STUB_STATE/running"; fi
 `
 	// STUB_HEALTH_DOWN_AT makes health unreachable while the daemon is on
 	// that restart, modelling a build that starts but never answers.
@@ -40,7 +40,7 @@ echo built > "$STUB_STATE/make"
 mkdir -p "$dir/bin"
 cat > "$dir/bin/openexec" <<EOF
 #!/usr/bin/env bash
-if [ "\$1" = version ]; then echo "Commit: $commit"; exit 0; fi
+if [ "\$1" = version ]; then echo "Commit: $commit" >&2; exit 0; fi
 mode=walk; out=""; want=""
 while [ \$# -gt 0 ]; do case "\$1" in --requery) mode=requery ;; --evidence) out="\$2" ;; --want-commit) want="\$2" ;; esac; shift; done
 echo "\$mode \$want" >> "$STUB_STATE/journey.log"
@@ -50,7 +50,7 @@ exit 0
 EOF
 chmod +x "$dir/bin/openexec"
 `
-	stubOldBinary = "#!/usr/bin/env bash\necho 'Commit: old'\n"
+	stubOldBinary = "#!/usr/bin/env bash\necho 'Commit: old' >&2\n"
 	deployUnit    = "openexec-graph.service"
 )
 
@@ -133,7 +133,7 @@ func (f deployFixture) read(name string) string {
 }
 
 func (f deployFixture) installedCommit() string {
-	out, err := exec.Command(f.binary, "version").Output()
+	out, err := exec.Command(f.binary, "version").CombinedOutput()
 	if err != nil {
 		return ""
 	}
@@ -303,7 +303,7 @@ func deployCases() []deployCase {
 				}
 				return ""
 			},
-			mutations: []mutation{{"built commit guard", `if ! "$built" version | grep -q "Commit: *$commit\$"; then`, `if false; then`, 1}},
+			mutations: []mutation{{"built commit guard", `if ! "$built" version 2>&1 | grep -q "Commit: *$commit\$"; then`, `if false; then`, 1}},
 		},
 		{
 			name: "rolls back when the restart fails", withPrevious: true,
