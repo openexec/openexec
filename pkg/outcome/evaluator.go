@@ -79,9 +79,14 @@ type Record struct {
 // Facts must be collected by the host, not copied from a proposed decision.
 // A missing executable binding is not evidence of an owner Stop. An explicit
 // current Stop remains a hard boundary even when execution state is defective.
+// AdmissionRefusal is the host's own refusal to admit execution for the
+// accepted Goal (e.g. the repository declares no lint check). It explains why
+// execution is unavailable, so recovery repairs that precondition instead of
+// rebinding into the same refusal.
 type Facts struct {
 	ExecutionGoalID    string   `json:"execution_goal_id"`
 	ExecutionAvailable bool     `json:"execution_available"`
+	AdmissionRefusal   string   `json:"admission_refusal,omitempty"`
 	HardBoundaryGoalID string   `json:"hard_boundary_goal_id,omitempty"`
 	HardBoundary       string   `json:"hard_boundary,omitempty"`
 	MachineRecovery    bool     `json:"machine_recovery,omitempty"`
@@ -176,6 +181,9 @@ func Evaluate(ctx context.Context, judge Judge, in Input) (Evaluation, error) {
 	}
 	if in.Facts.HardBoundary != "" && in.Facts.HardBoundaryGoalID == in.Contract.GoalID {
 		return result(OwnerBoundary, "unknown", in.Facts.HardBoundary)
+	}
+	if refusal := strings.TrimSpace(in.Facts.AdmissionRefusal); refusal != "" && !in.Facts.ExecutionAvailable {
+		return result(Recover, "unknown", "Execution admission refuses this Goal: "+refusal+" Restoring the binding repeats the same refusal; repair this repository precondition as machine work before resuming execution.")
 	}
 	if !in.Facts.ExecutionAvailable || in.Facts.ExecutionGoalID != in.Contract.GoalID {
 		return result(Recover, "unknown", "Accepted Goal and executable Goal disagree; recover the accepted binding without selecting historical work or requesting owner coordination.")

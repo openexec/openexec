@@ -76,6 +76,30 @@ func TestExecutionAndHistoricalRouteAreIndependentChecks(t *testing.T) {
 	}
 }
 
+// kirppis: admission refused for a missing lint check, and the observer only
+// reported a missing binding, so recovery rebound into the same refusal.
+func TestAdmissionRefusalIsDiagnosedNotRebound(t *testing.T) {
+	refusal := "no lint check for this repository: add a Makefile target or package.json script named lint, or configure AGENT_CONSOLE_TASK_CHECKS"
+	in := fixture()
+	in.Facts.ExecutionGoalID, in.Facts.ExecutionAvailable = "", false
+	in.Facts.AdmissionRefusal = refusal
+	e, err := Evaluate(context.Background(), nil, in)
+	if err != nil || e.Disposition != Recover || !strings.Contains(e.Reason, refusal) || strings.Contains(e.Reason, "Accepted Goal and executable Goal disagree") {
+		t.Fatalf("missing lint check not detected: %+v %v", e, err)
+	}
+	// A current Stop still outranks the machine diagnosis.
+	in.Facts.HardBoundaryGoalID, in.Facts.HardBoundary = in.Contract.GoalID, "stopped"
+	if e, err = Evaluate(context.Background(), nil, in); err != nil || e.Disposition != OwnerBoundary {
+		t.Fatalf("stop bypassed: %+v %v", e, err)
+	}
+	// A stale refusal cannot override execution that was admitted since.
+	in.Facts.HardBoundaryGoalID, in.Facts.HardBoundary = "", ""
+	in.Facts.ExecutionGoalID, in.Facts.ExecutionAvailable = in.Contract.GoalID, true
+	if e, err = Evaluate(context.Background(), nil, in); err != nil || e.Disposition != Continue {
+		t.Fatalf("stale refusal blocked admitted execution: %+v %v", e, err)
+	}
+}
+
 func TestInvalidSemanticJudgmentsCannotAuthorizeContinuation(t *testing.T) {
 	for _, answer := range []string{`{`, `{}`, `{"disposition":"invented","advancement":"unchanged","reason":"x"}`, `{"disposition":"continue","advancement":"73%","reason":"x"}`, `{"disposition":"continue","advancement":"unchanged","reason":"x","condition_ids":["unknown"]}`, `{"disposition":"continue","advancement":"unchanged","reason":"x"}`} {
 		in := fixture()
