@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Defect D2 / FIX2 rework, 2026-10-18] PR #114 inventory link corrected.
+  Added `python3 scripts/defect-inventory/verify-d2.py`: uncached Execute
+  test passes; Go overlay removing only SetOut fails the version assertion
+  with empty stdout, without editing checkout sources. Sandbox and host
+  run_command both passed this verifier; real CLI prints 62 stdout bytes;
+  inventory reports FIXED? D2 and all other rows REPRODUCED. Fresh declared
+  test/lint checks both exited 0 (Go suite; 40 UI files / 635 tests).
+  UI printed React warnings and a WebSocket port-in-use message despite
+  passing. Independent verification remains required.
+
 - [Defect D2 / FIX2, 2026-10-18] Configure stdout in CLI Execute.
   TestExecuteOutput reproduces the missing wiring in a fresh process and
   verifies version stdout plus unknown-command stderr/exit 1 after the fix.
