@@ -10,7 +10,9 @@ Raw capture. One line per thought, any grammar.
   contents returned and overwritten), then passed with persisted in-workspace
   round trips and refusal side-effect checks. Original defect-tag reproducer
   passed before; after repair it fails with "D1 not reproduced" and the inventory
-  script prints FIXED? D1 (exit 1), while D2-D8 remain REPRODUCED.
+  script prints FIXED? D1 (exit 1). This implementation run printed
+  REPRODUCED for D2-D8; the independent review printed FIXED? D7 despite
+  its standalone D7 test passing. Cause unknown; no D7 repair is claimed.
   SECURITY_MODEL scopes its guarantee to infrastructure/MCP and documents sh -c,
   lexical-only checks and the OS-sandbox roadmap. Existing resolver does not
   resolve symlinks; no symlink-resolution or sandbox mechanism added.
@@ -19,7 +21,14 @@ Raw capture. One line per thought, any grammar.
   tests in 40 files) and "lint exited 0" (go vet and UI ESLint). UI output
   included a WebSocket port-in-use warning and React warnings without failures.
   git diff --check passed. Independent verification remains required.
-  Publication owns the eventual fixing PR number; D1 identifies its carrying PR.
+  Rework: inventory now names openexec/openexec#112. The executable
+  python3 scripts/defect-inventory/verify-d1.py uses a temporary Go overlay
+  of api_runner.go from baseline 59f009c690e859e2accd259cdadc5e00c4b34439.
+  It exited 0: the ordinary regression failed with unauthorized outside reads
+  and writes on the baseline, then passed all 15 cases on current code. It
+  rejects build failures as evidence and leaves repository sources untouched.
+  Fresh declared checks after rework returned "test exited 0" (Go packages,
+  635 UI tests across 40 files) and "lint exited 0". git diff --check passed.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
