@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D6 timeline repair, 2026-10-18] Added all missing default-blueprint stages
+  to the existing UI list and display metadata. Backend/UI completeness test
+  fails before the fix and passes after it; nine hook-to-timeline lifecycle
+  cases pass. Inventory reproducer changes D6 from REPRODUCED to FIXED?.
+  Declared test and lint both exited 0 (Go suite plus 41 UI files / 644 tests);
+  UI TypeScript checking also passed. Browser verification was blocked by
+  sandbox listen EPERM and host refusal of the temporary script. Independent
+  verification and publication remain in the unattended Console flow; the
+  numeric PR reference is not yet assigned. No other defect row changed.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait

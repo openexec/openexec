@@ -29,8 +29,12 @@ export type StageType = 'deterministic' | 'agentic'
 export type StageName =
   | 'gather_context'
   | 'implement'
+  | 'generate_contract_tests'
   | 'lint'
+  | 'fix_lint'
   | 'test'
+  | 'fix_tests'
+  | 'production_readiness_check'
   | 'review'
 
 /**
@@ -194,8 +198,12 @@ export interface BlueprintEvent {
 export const BLUEPRINT_STAGES: readonly StageName[] = [
   'gather_context',
   'implement',
+  'generate_contract_tests',
   'lint',
+  'fix_lint',
   'test',
+  'fix_tests',
+  'production_readiness_check',
   'review',
 ] as const
 
@@ -213,14 +221,34 @@ export const STAGE_INFO: Record<StageName, { label: string; description: string;
     description: 'Implement the requested changes',
     type: 'agentic',
   },
+  generate_contract_tests: {
+    label: 'Generate Contract Tests',
+    description: 'Generate feature contract tests',
+    type: 'deterministic',
+  },
   lint: {
     label: 'Lint',
     description: 'Run linting checks on the changes',
     type: 'deterministic',
   },
+  fix_lint: {
+    label: 'Fix Lint',
+    description: 'Fix linting errors',
+    type: 'agentic',
+  },
   test: {
     label: 'Test',
     description: 'Run tests to verify the changes',
+    type: 'deterministic',
+  },
+  fix_tests: {
+    label: 'Fix Tests',
+    description: 'Fix failing tests',
+    type: 'agentic',
+  },
+  production_readiness_check: {
+    label: 'Production Readiness Check',
+    description: 'Check environment, secrets, migrations, authentication, and health',
     type: 'deterministic',
   },
   review: {
