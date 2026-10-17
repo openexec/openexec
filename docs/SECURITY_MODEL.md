@@ -7,9 +7,18 @@ prod database" — and exactly how hallucinations, prompt injection, and poisone
 output are contained. It is the user-facing companion to
 [SRE_ORCHESTRATION_ROADMAP.md](SRE_ORCHESTRATION_ROADMAP.md) (the engineering spec).
 
-**The one-sentence model: the LLM proposes, deterministic Go disposes.** No model output —
+**Scope: the infrastructure/MCP plane described here.** These guarantees do not
+apply to the API coding runner or CLI runners.
+
+**The one-sentence model: the LLM proposes, deterministic Go disposes.** In this
+infrastructure/MCP plane, no model output —
 not a tool call, not a parameter, not a piece of text read from a log — is ever executed
-directly. Everything passes through compiled validation that the model cannot modify.
+directly. Everything in that plane passes through compiled validation that the model cannot modify.
+
+The API coding runner's `run_shell_command` executes model-supplied commands with
+`sh -c`. Its `read_file` and `write_file` reject lexical paths outside the workspace;
+this check does not resolve symlinks or sandbox shell commands. OS sandboxing
+remains roadmap work.
 
 ---
 
