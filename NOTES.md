@@ -4,6 +4,21 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D4, 2026-10-18] Approval URLs now use the API base plus `/v1/approvals`.
+  Exact not-configured 503 clears stale hook approvals and hides the standalone
+  panel; ordinary failures stay visible. No production gate wiring changed.
+  Reproducer prints `FIXED? D4` (exit 1 is its stale-row contract). Twelve regular
+  UI regressions pass; the original-code negative control failed six of the
+  initial ten cases. Browser check with real API routes passes initial load,
+  reload and refused approve/reject; unrelated app data routes are mocked.
+  Run it with `node ui/node_modules/@playwright/test/cli.js test --config
+  ui/playwright.d4.config.ts`. UI type-check passed. Final declared checks returned `test exited 0` (41 UI files, 647 tests)
+  and `lint exited 0`, including the added error-recovery coverage. Inventory row links the
+  repair by this PR's task title; its number is assigned at publication.
+  Compatibility: no project loading, migration, storage or backend behavior
+  changed. Complexity: one component-local visibility flag, no new runtime
+  abstraction or persisted state. Await independent verification, not acceptance.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
