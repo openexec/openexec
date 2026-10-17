@@ -4,6 +4,14 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Defect D2 / FIX2, 2026-10-18] Configure stdout in CLI Execute.
+  TestExecuteOutput reproduces the missing wiring in a fresh process and
+  verifies version stdout plus unknown-command stderr/exit 1 after the fix.
+  Inventory reproducer reports FIXED? D2 with 62 stdout bytes (exit 1 is
+  expected for a fixed row); other rows still reproduce. Declared test
+  (make test: Go plus 635 UI tests) and lint both exited 0. This task enters
+  independent verification, not acceptance.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait

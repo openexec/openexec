@@ -45,6 +45,8 @@ managing projects, kicking off intents, and verifying system statuses.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	rootCmd.SetOut(os.Stdout)
+
 	// Attach CLI commands contributed by modules (pkg/plugin). A module in its
 	// own build registers via plugin.RegisterCommand from an init(); the
 	// open-source core registers none.
