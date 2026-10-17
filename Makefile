@@ -61,6 +61,7 @@ test:
 	@echo "🧪 Running Go tests..."
 	go test ./...
 	@$(MAKE) ui-test
+	@$(MAKE) d4-test
 
 compat-test:
 	@echo "🧪 Running compatibility regression tests..."
@@ -84,3 +85,8 @@ clean:
 	rm -rf bin/
 	rm -rf ui/dist
 	docker rmi openexec-builder || true
+
+.PHONY: d4-test
+d4-test:
+	python3 scripts/defect-inventory/verify-d4.py
+	node ui/node_modules/@playwright/test/cli.js test --config ui/playwright.d4.config.ts

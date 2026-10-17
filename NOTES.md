@@ -4,20 +4,24 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [D4, 2026-10-18] Approval URLs now use the API base plus `/v1/approvals`.
-  Exact not-configured 503 clears stale hook approvals and hides the standalone
-  panel; ordinary failures stay visible. No production gate wiring changed.
-  Reproducer prints `FIXED? D4` (exit 1 is its stale-row contract). Twelve regular
-  UI regressions pass; the original-code negative control failed six of the
-  initial ten cases. Browser check with real API routes passes initial load,
-  reload and refused approve/reject; unrelated app data routes are mocked.
-  Run it with `node ui/node_modules/@playwright/test/cli.js test --config
-  ui/playwright.d4.config.ts`. UI type-check passed. Final declared checks returned `test exited 0` (41 UI files, 647 tests)
-  and `lint exited 0`, including the added error-recovery coverage. Inventory row links the
-  repair by this PR's task title; its number is assigned at publication.
-  Compatibility: no project loading, migration, storage or backend behavior
-  changed. Complexity: one component-local visibility flag, no new runtime
-  abstraction or persisted state. Await independent verification, not acceptance.
+- [D4, 2026-10-18, PR #115] Approval URLs use the API base plus
+  `/v1/approvals`. Exact not-configured 503 clears stale hook approvals and
+  hides the standalone panel; ordinary failures stay visible. No production
+  gate wiring, schema, migration, project loading or compatibility behavior changed.
+  Browser rework opens the right panel, shows a seeded pending approval, starts
+  real polling via a stage event, observes the real Go API's unconfigured 503
+  remove the approval while the panel remains open, then reloads and reopens.
+  Both action routes still refuse with 503. Initial host `make d4-test` passed.
+  `scripts/defect-inventory/verify-d4.py` requires reproducer exit 1 plus
+  `FIXED? D4`, and runs the regular regression against original production
+  sources in an isolated temporary copy: seven of twelve tests fail as expected.
+  `make test` now includes this proof and browser check through `d4-test`, making
+  them reproducible with the declared test runner. Inventory links PR #115.
+  UI TypeScript check passed. Declared test returned `test exited 0`: Go tests,
+  647 UI tests, the reproducer assertion, seven expected original-source
+  failures and the strengthened browser test passed. Declared lint returned
+  `lint exited 0` (Go vet and UI ESLint).
+  Independent verification remains pending; no acceptance claimed.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
