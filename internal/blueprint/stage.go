@@ -144,6 +144,9 @@ type StageExecutor interface {
 
 // StageInput contains the input data for a stage execution.
 type StageInput struct {
+	// TaskAttempt and StageAttempt bind persisted terminal evidence to this invocation.
+	TaskAttempt  int `json:"task_attempt,omitempty"`
+	StageAttempt int `json:"stage_attempt,omitempty"`
 	// RunID is the ID of the current run.
 	RunID string `json:"run_id"`
 

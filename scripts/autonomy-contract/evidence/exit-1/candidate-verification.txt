@@ -1,0 +1,22 @@
+pkg/manager: verified 1 required tests (no skips)
+pre-fix behavioral failure reproduced at 245746baaa66372c4641d137053e330fbc75f679
+pkg/manager: verified 3 required tests (no skips)
+behavioral-reproduction: PASS
+
+pkg/runtime: verified 34 required tests (no skips)
+internal/execution/gates: verified 1 required tests (no skips)
+internal/pipeline: verified 7 required tests (no skips)
+internal/blueprint: verified 1 required tests (no skips)
+runtime-boundary: PASS
+
+pkg/manager: verified 22 required tests (no skips)
+native-recovery-tracer: PASS
+
+pkg/manager: verified 1 required tests (no skips)
+pre-fix behavioral failure reproduced at 245746baaa66372c4641d137053e330fbc75f679
+pkg/runtime: verified 34 required tests (no skips)
+internal/execution/gates: verified 1 required tests (no skips)
+internal/pipeline: verified 7 required tests (no skips)
+internal/blueprint: verified 1 required tests (no skips)
+pkg/manager: verified 22 required tests (no skips)
+exit-1-slice: PASS

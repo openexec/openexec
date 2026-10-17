@@ -1,0 +1,43 @@
+{
+  "source_revision": "fcbc3e61b137c76d76f2b02dd91426fde923d1c1",
+  "date": "2026-09-29",
+  "clean_candidate_before_and_after": true,
+  "aggregates": [
+    {
+      "case": "native-recovery",
+      "command": [
+        "bash",
+        "-euo",
+        "pipefail",
+        "scripts/autonomy-contract/verify-runtime-evidence.sh",
+        "--case",
+        "native-recovery"
+      ],
+      "exit_status": 0
+    },
+    {
+      "case": "engine-recovery",
+      "command": [
+        "bash",
+        "-euo",
+        "pipefail",
+        "scripts/autonomy-contract/verify-runtime-evidence.sh",
+        "--case",
+        "engine-recovery"
+      ],
+      "exit_status": 0
+    },
+    {
+      "case": "story-evidence",
+      "command": [
+        "bash",
+        "-euo",
+        "pipefail",
+        "scripts/autonomy-contract/verify-runtime-evidence.sh",
+        "--case",
+        "story-evidence"
+      ],
+      "exit_status": 0
+    }
+  ]
+}

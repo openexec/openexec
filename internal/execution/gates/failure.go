@@ -53,8 +53,10 @@ type CheckFailure struct {
 	// and the tail of what it printed. Without them a repair task was handed
 	// "test, exit 2" and nothing to reproduce, and stopped on "stored evidence
 	// lacks the test command and diagnostics".
-	Command string `json:"command,omitempty"`
-	Output  string `json:"output,omitempty"`
+	Command    string           `json:"command,omitempty"`
+	Output     string           `json:"output,omitempty"`
+	TerminalID string           `json:"terminal_id,omitempty"`
+	Binding    *TerminalBinding `json:"binding,omitempty"`
 }
 
 // maxFailureOutput bounds the output a receipt carries: the tail, where the
@@ -143,19 +145,27 @@ func VerificationFailureArtifacts(err error) map[string]string {
 // Validation checks integrity/shape, not provenance. Callers must obtain these
 // artifacts from the trusted deterministic execution boundary, not workers.
 func ValidateVerificationFailureArtifacts(artifacts map[string]string) bool {
+	_, ok := decodeChecks(artifacts)
+	return ok
+}
+
+func decodeChecks(artifacts map[string]string) ([]CheckFailure, bool) {
 	payload := artifacts[VerificationFailureReceiptKey]
 	digest := sha256.Sum256([]byte(payload))
 	if artifacts[VerificationFailureDigestKey] != hex.EncodeToString(digest[:]) {
-		return false
+		return nil, false
 	}
 	var checks []CheckFailure
 	if json.Unmarshal([]byte(payload), &checks) != nil || len(checks) == 0 {
-		return false
+		return nil, false
 	}
 	for _, check := range checks {
+		if (check.Binding == nil) != (check.TerminalID == "") || (check.Binding != nil && (!check.Binding.valid() || check.Binding.Stage != check.Gate)) {
+			return nil, false
+		}
 		if strings.TrimSpace(check.Gate) == "" || check.ExitCode <= 0 || check.ExitCode >= 126 {
-			return false
+			return nil, false
 		}
 	}
-	return true
+	return checks, true
 }
