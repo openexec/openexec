@@ -4,15 +4,23 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [D6 timeline repair, 2026-10-18] Added all missing default-blueprint stages
-  to the existing UI list and display metadata. Backend/UI completeness test
-  fails before the fix and passes after it; nine hook-to-timeline lifecycle
-  cases pass. Inventory reproducer changes D6 from REPRODUCED to FIXED?.
-  Declared test and lint both exited 0 (Go suite plus 41 UI files / 644 tests);
-  UI TypeScript checking also passed. Browser verification was blocked by
-  sandbox listen EPERM and host refusal of the temporary script. Independent
-  verification and publication remain in the unattended Console flow; the
-  numeric PR reference is not yet assigned. No other defect row changed.
+- [D6 timeline repair, PR #116, 2026-10-18] Rework adds a ChatPage
+  guard against reprocessing the latest event on blueprint state updates.
+  ChatPage.test.tsx exercises real WebSocket decoding, hooks and page rendering
+  with only network fixtures; includes failure/retry/completion, unknown-stage
+  rejection, panel reopening and remount reset. ui/scripts/verify-d6.mjs passed
+  in Chromium via run_command after sandbox listen EPERM; real application,
+  deterministic network fixtures, reload reset, no page errors. This is not a
+  provider-backed blueprint execution claim. Timeline state is transient.
+  TestDefaultBlueprintStagesAppearInUI executed with origin/main 59f009c6's
+  original list: exit 1, all four omissions named; restored list: exit 0.
+  The page regression also fails with the event guard removed (effect-loop
+  diagnostic), then passes restored. Reproducer prints FIXED? D6 (exit 1 by
+  its documented contract); TypeScript and diff checks pass. Inventory links
+  #116. Declared test passed (645 tests / 42 UI files plus Go); lint passed.
+  Final declared rerun after the bounded effect-loop assertion: test exited 0
+  (645 UI tests / 42 files), lint exited 0. Original-list reproducer also
+  executed and printed REPRODUCED D6; restored file re-read and diff checked.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
