@@ -4,16 +4,19 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
-- [Defect D3, 2026-10-18] Added required serial Vitest step to GitHub CI
-  after UI dependency installation/build. `TestCIRequiresUIUnitTests` failed
-  before the fix and passed afterward; removal, ignored failure, conditional
-  skip and wrong-directory mutations each fail. Direct Vitest run passed all
-  635 tests in 40 files. Inventory reproducer prints `FIXED? D3` (exit 1 by
-  design). Inventory row identifies this task's delivery PR by title; its
-  number is assigned at publication. Host `run_declared_check` returned
-  `lint exited 0` (Go vet + UI ESLint) and `test exited 0` (make test: Go
-  suite + 635 UI tests). UI output includes existing React warnings and
-  `WebSocket server error: Port is already in use`; no tests failed.
+- [Defect D3, 2026-10-18] PR #113 adds required serial Vitest to GitHub CI
+  after UI dependency installation/build. Rework extracts the existing workflow
+  validator and adds seven ordinary in-memory negative controls: removed step,
+  conditional step, ignored failure, wrong directory, missing installation,
+  conditional job and ignored job failure. Focused tests pass; the regular
+  workflow test fails against origin/main 59f009c6 with
+  `CI build is missing required UI vitest step` and passes after restoration.
+  Full inventory reproducer prints `FIXED? D3` and exits 1 as documented;
+  other rows still print REPRODUCED. Inventory now links #113.
+  Host declared gates returned `test exited 0` (make test, Go suite and
+  635 UI tests in 40 files) and `lint exited 0` (Go vet and UI ESLint).
+  React test warnings did not fail the gate. Hosted CI remains unverified.
+  Submitted for independent verification, not task completion.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
