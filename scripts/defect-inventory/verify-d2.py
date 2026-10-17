@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Verify D2 and its negative control without modifying checkout sources.
 
-Run from any directory with Python 3 and Go installed. If the sandbox cannot
-build Go, run this same script through the console's run_command on the host.
+Included in make test (Python 3 and Go required). Reviewers can run the
+console's declared test check when their sandbox cannot build Go.
 """
 
 import json

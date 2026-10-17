@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Defect D2 / FIX2 declared-check rework, 2026-10-18] Added the existing
+  D2 verifier to make test so read-only cross-examiners can reproduce both
+  the missing-SetOut negative control and the real CLI/inventory path via
+  run_declared_check("test"). Updated verification instructions. Fresh
+  declared test and lint both exited 0. Test output includes the expected
+  negative-control failure (stdout empty), fixed CLI output of 62 bytes,
+  FIXED? D2, and 40 UI files / 635 tests passed. UI emitted React warnings
+  and a WebSocket port-in-use message. Independent acceptance remains pending.
+
 - [Defect D2 / FIX2 rework, 2026-10-18] PR #114 inventory link corrected.
   Added `python3 scripts/defect-inventory/verify-d2.py`: uncached Execute
   test passes; Go overlay removing only SetOut fails the version assertion
