@@ -1,0 +1,84 @@
+# OpenExec defect inventory (FIX1)
+
+FIX1 of Goal 14a5a33b "Verified OpenExec defect closure". This file is the
+inventory only. It contains no fixes. Each **confirmed** row is meant to
+become one FIX2 task.
+
+## Pinned revisions (2026-10-17)
+
+| What | Revision |
+|---|---|
+| OpenExec `origin/main` (inventoried) | `ca1e34c7bb79c7f9006254cad94bf6fd12ddf612` |
+| Running build: `openexec-graph` `/api/health` on :8765 | `ec3cefba` (`0.13.1-154-gec3cefba`). The only difference from `ca1e34c7` is `pkg/manager/manager_test.go`. |
+| Agent Console `origin/main` (`79b0ecff`), `go.mod` | `github.com/openexec/openexec v0.13.2-0.20261008125114-cb20c1fe6ae8`. Its tracked `go.work` is `use .`. |
+| Integration lag | `git diff --stat cb20c1fe ca1e34c7 -- pkg/ internal/release internal/pipeline internal/blueprint internal/execution` lists only `pkg/manager/manager_test.go`. The packages Agent Console embeds (`pkg/manager`, `pkg/runtime`, `pkg/db/state`, `pkg/outcome`) behave the same as main. |
+
+## Sources checked
+
+- **GitHub:** open issues #17, #18 and #19, and the only open PR, #67.
+- **Declared checks on `ca1e34c7`:** `lint` exited 0 (go vet plus UI ESLint). `test` exited 0: every Go package passed, including `internal/validation` (compat), and 635 UI tests in 40 files passed.
+- **Skipped tests:** every `t.Skip` depends on the environment or on `-short` mode, or marks a deliberately retired legacy path. The unconditional legacy skips are in `pkg/manager/manager_test.go`, `internal/cli/plan_test.go` and `internal/server/gemini_integration_test.go`. These are test debt, not defects.
+- **TODO/FIXME:** no comment names a bug. The only hit is a test fixture in `internal/quality/nostubs`.
+- **Historical findings:**
+  - `docs/PROJECT_AND_PRO_REVIEW_2026-07-10.md`
+  - `docs/SYMBOL_TOOLS_REVIEW.md`
+  - `docs/VERIFICATION_FAILURE_INSPECTION.md`
+  - `docs/NATIVE_*.md`
+  - `docs/AUTONOMOUS_HUMAN_BOUNDARIES_IMPLEMENTATION_STATUS.md`
+  - `docs/verification*`
+  - `docs/deploy-evidence/`
+- **Exercised journeys:**
+  - `go run ./cmd/openexec version`.
+  - The running graph build's `/api/health`.
+  - The recorded graph journey `docs/deploy-evidence/openexec-graph-ef828b15-*`.
+
+  The owner journey through Agent Console (request work, accept Goal/Ready,
+  leave and return) runs in the Agent Console repository. It was not
+  exercised from this lane.
+
+**Re-run every reproducer** with `scripts/defect-inventory/reproduce.sh`. It
+prints `REPRODUCED` or `FIXED?` for each confirmed row and exits 1 when a row
+has gone stale.
+
+## Confirmed defects, ordered by owner impact
+
+| ID | Defect | Reproducer / evidence | Proposed fix (one line) |
+|---|---|---|---|
+| D1 | The API runner's `write_file` and `read_file` resolve `../x` and absolute paths outside the workspace (`internal/loop/api_runner.go` `resolvePath`), and `run_shell_command` runs `sh -c`. `docs/SECURITY_MODEL.md` states "No model output … is ever executed directly" without limiting that claim to the infra MCP plane. Relevant to ISO 27001. | `go test -tags defectrepro -run TestDefectD1WriteFileEscapesWorkDir ./internal/loop/` passes: both escapes are written. | Refuse paths whose `filepath.Rel` from `workDir` starts with `..`, and limit the SECURITY_MODEL claim to the infra/MCP plane. OS sandboxing stays roadmap. |
+| D2 | Every CLI command that prints with cobra `cmd.Printf`/`Println` writes to **stderr**, because `rootCmd` never calls `SetOut`. 17 files in `internal/cli` are affected, including `version`, `status`, `release`, `approve` and `skills`. Scripts that pipe this output get nothing: the graph deploy guard refused on 10-11 for this reason (#108 worked around it). | `go run ./cmd/openexec version 2>/dev/null \| wc -c` prints `0`. | Call `rootCmd.SetOut(os.Stdout)` in `Execute`, with a test that does not call `SetOut` itself. `version_test.go` hides the bug because it does. |
+| D3 | GitHub CI never runs the UI unit tests. `ci.yml` builds the UI but has no vitest step. They run only in the local `make test` gate. | `grep -E 'vitest\|npm (run )?test' .github/workflows/ci.yml` finds no match. | Add a `npx vitest run --fileParallelism=false` step in `ui/`. |
+| D4 | Embedded UI blueprint approvals can never work. `useBlueprint.ts` and `ApprovalsPanel.tsx` request `${apiUrl}/api/v1/approvals` with the default `apiUrl` of `/api` (`App.tsx:47`), so the request goes to `/api/api/v1/approvals` and returns 404. The correct route would still return 503, because no production code calls `api.WithApprovalGate`. | The `D4` greps in the reproducer script. `pkg/api/handlers.go:1080` returns "approval gate not configured". | Remove the duplicated `/api` prefix. Then either hide the panel, or wire a gate only together with authenticated approval (AHB step 2). Never wire an unauthenticated gate. |
+| D5 | Knowledge Hub always shows "Some knowledge endpoints failed to load". It fetches `/api/v1/knowledge/policies`, and no server registers that route (`internal/server/server.go:409-410` has only symbols and envs). | `grep -rn knowledge/policies --include=*.go internal pkg` finds no handler. | Remove the policies fetch, or add a handler backed by the existing policy data. |
+| D6 | The UI stage timeline drops the default blueprint's `fix_lint` and `production_readiness_check` stages. `StageName`/`BLUEPRINT_STAGES` omit them, and `useBlueprint.ts:158` ignores events for unlisted stages. | `ui/src/types/blueprint.ts:29-35` compared with `internal/blueprint/engine.go:164,189`. | Add the missing stages, or build the list from the blueprint returned by the backend. |
+| D7 | The deterministic router sends the question "what is the difference between a list and a tuple?" to `list_directory`, because of the bare `list` keyword. This affects only the toolset hint in runs without an injected StageExecutor, so it does not affect the Agent Console path. | `internal/router/deterministic_test.go:104` pins this as the actual result, and the test passes. | Match `list` only when a file or directory object follows it, as #20 did for `diff`. |
+| D8 | Build artifacts are tracked in git: 469 `.gocache` files, `bin/openexec`, a root `openexec` binary and `data/fwus.jso`. | `git ls-files .gocache bin/openexec openexec data/fwus.jso \| wc -l` prints `472`. | Run `git rm --cached` on them and add them to `.gitignore`. Rewriting history is not proposed. |
+
+## Revalidated: fixed, not reproducible, or out of scope
+
+| Finding (source) | Status | Evidence |
+|---|---|---|
+| Issue #17: bare `diff` misroutes "difference" | fixed in `25e835b0` (#20) | `TestDeterministicRouter_ParseIntent_DiffWordBoundary` passes. The issue is still open and can be closed. |
+| Review §1: manager/pipeline races on a shared blueprint | fixed in `48b66b2d` | `pipeline.go:474` calls `bp.Clone()`. `go test -race -run TestConcurrentReadersDoNotRaceRunningPipeline ./pkg/manager/` and `-run TestCloneIsolatesStagesFromTheShared ./internal/blueprint/` both print `ok`. |
+| Review §2: empty lint/test commands auto-pass | fixed in `48b66b2d` | `internal/blueprint/executor.go:186-188` fails closed. The comment at `engine.go:159` ("empty = auto-pass") is stale. |
+| Review §4: daemon listens on all interfaces | fixed in `12cbd35f` | `serverListenAddress` defaults to `127.0.0.1`, and `start.go:852` defaults `--listen` to `127.0.0.1`. |
+| Review §4: unauthenticated HTTP approval handlers (also AHB status) | not reproducible | The handlers have no authentication, but no gate is wired, so every call returns 503 (see D4). The authenticated answer path is roadmap (AHB step 2). |
+| Review §4: `--dangerously-skip-permissions` in CLI runners | out of scope: roadmap (OS sandbox) | The flag is a deliberate runner design (`internal/loop/process.go:263`). The overstated documentation claim is covered by D1. |
+| Review §3 (unwired capabilities), §5 (Replay placeholder, DCP-only views) | out of scope: roadmap | These are unfinished features, not regressions. |
+| Review §5: `golangci-lint` is advisory | out of scope: documented debt | `ci.yml:57-64` records 142 historical issues. |
+| Review §6: broken local links in CONFIGURATION.md | not reproducible | All 4 local `.md` links resolve. |
+| Review §8: installer downloads without a checksum | not reproducible | `scripts/install.sh:29` builds from source. |
+| Review, Pro findings (`executeContractDirect` runs `git add -A`, 80 KB diff cut, and others) | out of scope: separate `openexec-pro` repository, not revalidated | Recorded so they are not lost. They need their own inventory. |
+| SYMBOL_TOOLS: `mcp-serve` resolves the allowlist, config and approvals from `os.Getwd()` | fixed in `674b50f0` | `resolveServeRoot` (`internal/cli/mcp_serve.go:31`) gives one root. The working directory is only the last fallback. |
+| SYMBOL_TOOLS: `TestPythonIncrementalRefreshPreservesTypeScriptCapability` fails when `tsc` is installed | not reproducible | The test passes with `tsc` on PATH (`/home/perttu/.npm-global/bin/tsc`). |
+| SYMBOL_TOOLS: `RelatedTest` is not wired to the test stage; symbol tools are allowed in every mode | out of scope: roadmap / open design question | |
+| VERIFICATION_FAILURE_INSPECTION: a populated result is lost when an error is also returned | fixed in `2fc03214` (#66) | `engine.go` calls `failedStageResult`. |
+| VERIFICATION_FAILURE_INSPECTION: durable diagnostics handoff | fixed in `4290c0d2` (#69) | `CheckFailure.Command/Output`. |
+| VERIFICATION_FAILURE_INSPECTION: in-queue recovery of legacy failures | fixed in `e5d026ab` (#65) and `a7327a56` (#70) | |
+| VERIFICATION_FAILURE_INSPECTION: `make check` / `make pr-gate` do not exist | not a defect | The canonical gate is the declared `lint`/`test` checks. |
+| NATIVE_EMPTY_RESPONSE: `reasoning_content` vs `thinking` key mismatch | fixed in `63628e85` (#50) | `pkg/execution/api_provider.go:551-552` reads both keys. |
+| NATIVE_EMPTY_RESPONSE / NATIVE_CONTEXT: unknown generation cause, second inference refused | not reproducible here | Needs live local-model inference under a separate resource grant. The controller-continuation work is roadmap. |
+| AHB status / PR #67: binding terminal completions to task/stage/attempt | out of scope: roadmap (parked Goal 21d181ed) | PR #67 (head `1bee658d`) is 29 commits behind main (merge base `3463de8e`), and its own NOTES report `TestPersistedExitOneRecovery` failing after sync. Its behaviour stays with that goal. |
+| verification F2 / D2 (Console private capture, receipts) | out of scope: Agent Console roadmap (US-012) | |
+| plan-identity: Agent Console goal-mode verifier mismatch | not reproducible | The source docs also say it was not reproduced. It is on the Agent Console side. |
+| Issues #18, #19: missing tests for `pkg/telemetry/redact.go` and `internal/schema` | not a defect: coverage request | Both packages have no test files. |
+| Local Agent Console checkout `/mnt/data1/projects/agent-console` | out of scope: owner's uncommitted local state (not touched) | `HEAD` is `1d8aa1d8`, 872 commits behind origin and dirty. Its untracked `go.work` uses `../openexec/.worktrees/autonomous-human-boundaries` (`b1d738c4`), so a build from that checkout would ignore the go.mod pin. Agent Console `origin/main` tracks `go.work` as `use .`. |
