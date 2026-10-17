@@ -4,6 +4,17 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [FIX2 D1 verification access, 2026-10-18] make test now runs verify-d1.py
+  before the Go/UI suites, exposing the baseline/current comparison through
+  the existing host run_declared_check(test). Fresh host result: "test exited 0",
+  including "PROVEN: original code permits outside reads and writes" and
+  "PROVEN: current code passes the same ordinary regression", followed by
+  Go packages and 635 UI tests across 40 files. Declared lint exited 0.
+  Local inventory rerun exited 1 with FIXED? D1 and REPRODUCED D2-D8; the
+  prior review's FIXED? D7 discrepancy remains unexplained. Direct D1 tagged
+  test exited 1 with "D1 not reproduced" and "outside workspace".
+  This pass changes verification wiring only; independent acceptance pending.
+
 - [FIX2 D1, 2026-10-18] API file tools now reject lexical workspace escapes
   before reads, writes or directory creation via resolveFilePath. Dispatcher
   regression TestAPIFileToolsWorkspaceBoundary failed before the repair (outside

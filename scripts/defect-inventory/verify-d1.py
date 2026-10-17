@@ -2,6 +2,7 @@
 """Prove the ordinary D1 regression fails on the original code and passes now.
 
 Run from any directory with python3 scripts/defect-inventory/verify-d1.py.
+Also runs first in make test (the host's declared test check).
 Uses a temporary Go overlay; never modifies repository sources. Requires the
 inventory baseline in local git history and writable Go build/cache directories.
 """
