@@ -4,6 +4,23 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [FIX2 D1, 2026-10-18] API file tools now reject lexical workspace escapes
+  before reads, writes or directory creation via resolveFilePath. Dispatcher
+  regression TestAPIFileToolsWorkspaceBoundary failed before the repair (outside
+  contents returned and overwritten), then passed with persisted in-workspace
+  round trips and refusal side-effect checks. Original defect-tag reproducer
+  passed before; after repair it fails with "D1 not reproduced" and the inventory
+  script prints FIXED? D1 (exit 1), while D2-D8 remain REPRODUCED.
+  SECURITY_MODEL scopes its guarantee to infrastructure/MCP and documents sh -c,
+  lexical-only checks and the OS-sandbox roadmap. Existing resolver does not
+  resolve symlinks; no symlink-resolution or sandbox mechanism added.
+  No project format, loading, migration or legacy fallback changes.
+  Declared checks returned "test exited 0" (make test: Go packages and 635 UI
+  tests in 40 files) and "lint exited 0" (go vet and UI ESLint). UI output
+  included a WebSocket port-in-use warning and React warnings without failures.
+  git diff --check passed. Independent verification remains required.
+  Publication owns the eventual fixing PR number; D1 identifies its carrying PR.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
