@@ -4,6 +4,17 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Defect D3, 2026-10-18] Added required serial Vitest step to GitHub CI
+  after UI dependency installation/build. `TestCIRequiresUIUnitTests` failed
+  before the fix and passed afterward; removal, ignored failure, conditional
+  skip and wrong-directory mutations each fail. Direct Vitest run passed all
+  635 tests in 40 files. Inventory reproducer prints `FIXED? D3` (exit 1 by
+  design). Inventory row identifies this task's delivery PR by title; its
+  number is assigned at publication. Host `run_declared_check` returned
+  `lint exited 0` (Go vet + UI ESLint) and `test exited 0` (make test: Go
+  suite + 635 UI tests). UI output includes existing React warnings and
+  `WebSocket server error: Port is already in use`; no tests failed.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
