@@ -4,6 +4,18 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D7 deterministic list routing, 2026-10-18] Only FIX2 row D7 is changed.
+  `list` now requires a following filesystem noun; conceptual lists use chat.
+  Regular ListObject and corrected DiffWordBoundary tests failed on the old
+  implementation and pass after the fix. Inventory reproducer changed D7 from
+  REPRODUCED to FIXED? (exit 1 is its documented stale-row signal); other rows
+  remain REPRODUCED. Host declared lint and test both exited 0 (make test:
+  Go packages passed, UI 40 files / 635 tests passed). The initial sandbox
+  router suite refused a test socket; the host suite passed that package.
+  Inventory identifies this task's repair PR; numeric reference awaits Console
+  publication. Independent verification remains pending. No schema, loading,
+  migration, persistence or legacy fallback behavior changed.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait

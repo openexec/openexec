@@ -96,9 +96,17 @@ var wordBoundaryKeywords = map[string]*regexp.Regexp{
 	"diff": regexp.MustCompile(`\bdiff\b`),
 }
 
-// keywordMatches reports whether kw is present in text. Keywords listed in
-// wordBoundaryKeywords require a whole-word match; all others match as substrings.
+// listObjectPattern requires a filesystem object after "list", optionally
+// qualified by common determiners. Bare or conceptual lists are not file actions.
+var listObjectPattern = regexp.MustCompile(`\blist\s+(?:(?:the|all|current)\s+)*(?:files?|directories|directory|folders?)\b`)
+
+// keywordMatches reports whether kw is present in text. "list" requires a
+// filesystem object; wordBoundaryKeywords require a whole-word match; all
+// others match as substrings.
 func keywordMatches(text, kw string) bool {
+	if kw == "list" {
+		return listObjectPattern.MatchString(text)
+	}
 	if re, ok := wordBoundaryKeywords[kw]; ok {
 		return re.MatchString(text)
 	}
