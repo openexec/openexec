@@ -46,12 +46,12 @@ has gone stale.
 |---|---|---|---|
 | D1 | **FIX2 repair implemented; pending independent verification.** API runner file tools previously accepted workspace escapes; the security claim was overbroad. | Original tagged reproducer now refuses the first escape; `scripts/defect-inventory/reproduce.sh` prints `FIXED? D1`. `python3 scripts/defect-inventory/verify-d1.py` runs the regular `TestAPIFileToolsWorkspaceBoundary`, which fails on the original implementation and passes with this repair, exercising both tools, refusal before directory creation, and persisted in-workspace round trips. | Fixing PR: openexec/openexec#112. `resolveFilePath` rejects `filepath.Rel` equal to `..` or beginning with a parent-directory component before file effects. SECURITY_MODEL limits its claim to infrastructure/MCP and explicitly describes `sh -c`. Existing code does not resolve symlinks; OS sandboxing remains roadmap. |
 | D2 | Every CLI command that prints with cobra `cmd.Printf`/`Println` writes to **stderr**, because `rootCmd` never calls `SetOut`. 17 files in `internal/cli` are affected, including `version`, `status`, `release`, `approve` and `skills`. Scripts that pipe this output get nothing: the graph deploy guard refused on 10-11 for this reason (#108 worked around it). | `go run ./cmd/openexec version 2>/dev/null \| wc -c` prints `0`. | Call `rootCmd.SetOut(os.Stdout)` in `Execute`, with a test that does not call `SetOut` itself. `version_test.go` hides the bug because it does. |
-| D3 | GitHub CI never runs the UI unit tests. `ci.yml` builds the UI but has no vitest step. They run only in the local `make test` gate. | `grep -E 'vitest\|npm (run )?test' .github/workflows/ci.yml` finds no match. | Add a `npx vitest run --fileParallelism=false` step in `ui/`. |
+| D3 | Fixed in [PR #113](https://github.com/openexec/openexec/pull/113). CI previously built the UI without running its unit tests. | `scripts/defect-inventory/reproduce.sh` now prints `FIXED? D3`. Ordinary regression `TestCIRequiresUIUnitTests` fails without the step and passes with it; it also requires dependency installation, `ui/` as the working directory and unconditional failure propagation. | Added `npx vitest run --fileParallelism=false` in `ui/` after the UI build, for both CI matrix platforms. |
 | D4 | **Fixed in [PR #115](https://github.com/openexec/openexec/pull/115).** The hook and standalone panel now append `/v1/approvals` to the API base for list, approve and reject. An exact HTTP 503 `approval gate not configured` response clears stale approvals (hiding the ChatPage panel) and hides the standalone panel; other errors remain visible. | `scripts/defect-inventory/reproduce.sh` prints `FIXED? D4`. Regular regression: `ui/src/components/chat/blueprint/ApprovalsPanel.test.tsx`; browser/real API regression: `ui/e2e/approvals-d4.spec.ts` via `node ui/node_modules/@playwright/test/cli.js test --config ui/playwright.d4.config.ts`. | No production gate was wired. The API still refuses list/approve/reject without a configured gate. Repair: [PR #115](https://github.com/openexec/openexec/pull/115); FIX1 inventory history remains in #111. |
 | D5 | Knowledge Hub always shows "Some knowledge endpoints failed to load". It fetches `/api/v1/knowledge/policies`, and no server registers that route (`internal/server/server.go:409-410` has only symbols and envs). | `grep -rn knowledge/policies --include=*.go internal pkg` finds no handler. | Remove the policies fetch, or add a handler backed by the existing policy data. |
 | D6 | The UI stage timeline drops the default blueprint's `fix_lint` and `production_readiness_check` stages. `StageName`/`BLUEPRINT_STAGES` omit them, and `useBlueprint.ts:158` ignores events for unlisted stages. | `ui/src/types/blueprint.ts:29-35` compared with `internal/blueprint/engine.go:164,189`. | Add the missing stages, or build the list from the blueprint returned by the backend. |
 | D7 | The deterministic router sends the question "what is the difference between a list and a tuple?" to `list_directory`, because of the bare `list` keyword. This affects only the toolset hint in runs without an injected StageExecutor, so it does not affect the Agent Console path. | `internal/router/deterministic_test.go:104` pins this as the actual result, and the test passes. | Match `list` only when a file or directory object follows it, as #20 did for `diff`. |
-| D8 | Build artifacts are tracked in git: 469 `.gocache` files, `bin/openexec`, a root `openexec` binary and `data/fwus.jso`. | `git ls-files .gocache bin/openexec openexec data/fwus.jso \| wc -l` prints `472`. | Run `git rm --cached` on them and add them to `.gitignore`. Rewriting history is not proposed. |
+| D8 | **Repair submitted for verification:** untrack 469 `.gocache` files, `bin/openexec`, root `openexec` and `data/fwus.jso` (472 artifacts). | `git ls-files .gocache bin/openexec openexec data/fwus.jso \| wc -l` now prints `0`; reproducer reports `FIXED? D8`. Ordinary regression: `go test -count=1 ./internal/repositoryhygiene`. | Root-anchored `.gitignore` rules prevent recurrence; no history rewrite. Fixing PR: openexec/openexec#118. |
 
 ## Revalidated: fixed, not reproducible, or out of scope
 
@@ -82,3 +82,36 @@ has gone stale.
 | plan-identity: Agent Console goal-mode verifier mismatch | not reproducible | The source docs also say it was not reproduced. It is on the Agent Console side. |
 | Issues #18, #19: missing tests for `pkg/telemetry/redact.go` and `internal/schema` | not a defect: coverage request | Both packages have no test files. |
 | Local Agent Console checkout `/mnt/data1/projects/agent-console` | out of scope: owner's uncommitted local state (not touched) | `HEAD` is `1d8aa1d8`, 872 commits behind origin and dirty. Its untracked `go.work` uses `../openexec/.worktrees/autonomous-human-boundaries` (`b1d738c4`), so a build from that checkout would ignore the go.mod pin. Agent Console `origin/main` tracks `go.work` as `use .`. |
+
+### D8 build dependency evaluation
+
+`make build` generates UI assets and then `bin/openexec` from source. CI
+(`.github/workflows/ci.yml`), `scripts/install.sh`, `scripts/release.sh`, and
+`Dockerfile.build` also compile from source. `scripts/reviewed-deploy-graph.sh`
+runs `make build` before executing or copying `bin/openexec`. No build, CI or
+deploy script reads the removed root binary, cache entries or `data/fwus.jso`.
+The similarly named `data/fwus.json` is not removed or ignored.
+
+Reproduce through `python3 scripts/defect-inventory/verify-d8.py`, also run by
+`make test`: a temporary index loaded from inventory baseline `59f009c6`
+makes the ordinary regression fail specifically on tracked artifacts; the
+current index passes. A temporary source copy excludes all four artifact
+locations, links the installed UI dependencies, runs `make build`, and executes
+the rebuilt CLI. It never changes the real index or removes local artifacts.
+
+Prior verification removed all four artifact locations from disk, ran `make build`
+(exit 0), and executed the newly built `bin/openexec version` (exit 0).
+`TestBuildArtifactsUntrackedAndIgnored` failed against the original index and
+ignore rules, then passed with the repair. It checks the real Git index, ignore
+rules for regenerated files, and that source/data/helper paths remain visible.
+No project loading, migration, configuration or runtime behavior changed.
+
+Rework declared verification: `test exited 0`, including the D8 baseline/current
+regression and artifact-free build/CLI verifier, Go suite and 635 UI tests;
+`lint exited 0`. Independent verification remains pending.
+
+Prior-pass declared verification: `lint exited 0`; final `test exited 0` (`make test`, Go
+suite plus 40 UI files / 635 tests). The first test attempt exited 2 at
+`TestRetentionUnitNativeCallbacksAndStorageRefusal` with `receipt missing`.
+An isolated rerun and then the unchanged full declared check passed; the cause
+of the initial failure is not established. `git diff --check` also passed.
