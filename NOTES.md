@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D7 integration with D5, 2026-10-18] Resolved the sole NOTES.md conflict
+  against supplied main 40e5d930, retaining both sides verbatim. No executable
+  changes this pass; incoming D5 and earlier sibling repairs remain intact.
+  Focused router regressions passed. Fresh declared checks returned
+  "test exited 0" (639 UI tests / 41 files) and "lint exited 0".
+  Host test output was truncated; mandatory D7 verifier remains in make test.
+  git diff --check passed. PR #117 description updated for this integration;
+  independent verification pending, no D7 deployed journey claimed.
+
 - [D7 integration rework, 2026-10-18] Resolved the NOTES.md conflict with
   supplied main 230b1d45, retaining both sides and incoming D3 CI behavior.
   No routing code changed. Fresh declared checks returned "test exited 0"
@@ -48,6 +57,43 @@ Raw capture. One line per thought, any grammar.
   Rework host declared checks returned "lint exited 0" and "test exited 0"
   (Go packages; UI 40 files / 635 tests). git diff --check passed.
   No schema, loading, migration, persistence or legacy fallback behavior changed.
+- [D5 merge conflict repair, 2026-10-18] Resolved the NOTES.md conflict by
+  retaining D5 implementation/live-server evidence and main's D3 notes.
+  Main's CI step, regression and D3 inventory disposition remain intact;
+  no executable changes in this pass. Focused CI regression exited 0.
+  Fresh declared checks returned "test exited 0" (including D5 baseline/current,
+  UI types, controlled and coordinator-backed browser journeys, Go suite and
+  639 UI tests) and "lint exited 0". Inventory reproducer printed FIXED? D5
+  with expected exit 1. git diff --check passed. Independent verification
+  remains pending; no production deployment claim.
+
+- [FIX2 D5 live-server rework, 2026-10-18] Added tagged
+  TestKnowledgeHubBrowser, invoked by verify-d5.py/make test, serving the
+  compiled UI with actual coordinator-backed API routes and isolated SQLite.
+  Browser context supplies test bearer/checkout credentials; no API interception.
+  Checks actual supported 200 payloads, missing-bearer 401, open/away/back/reload,
+  persisted records and no policies requests. Controlled failure/Retry tests
+  remain. Declared checks returned "test exited 0" (639 UI tests, Go suite,
+  baseline four failures/current four passes, types and three browser journeys)
+  and "lint exited 0". Renamed live journey to .journey.ts so generic E2E
+  discovery cannot run it without its Go harness; focused host rerun returned
+  "1 passed (1.6s)" and "PASS: TestKnowledgeHubBrowser". Inventory script
+  printed FIXED? D5, exit 1. Local sandbox browser startup failed; host checks
+  succeeded. Server also logged D4's /api/api/v1/approvals 404; no D4 changes.
+  Inventory references PR #119 and exact local server configuration. No
+  production deployment claim. Independent verification pending.
+
+- [FIX2 D5, 2026-10-18] Removed Knowledge Hub policies request, state/type and
+  unsupported enforcement section. Regular regression failed all four cases on
+  baseline a6afc8a, then passed after repair. verify-d5.py exposes the same
+  comparison, UI type check and isolated Chromium journey through make test.
+  Browser responses are controlled; no live coordinator/deployment claim.
+  Inventory reproducer returned exit 1 with FIXED? D5. Declared lint exited 0.
+  First declared test failed on an overly strict browser request count (18 vs
+  10); app main.tsx uses StrictMode. Test now checks every request is supported
+  and each endpoint was requested for all loads. Final declared test exited 0:
+  baseline/current comparison, UI types, both Chromium journeys, Go suite and
+  639 Vitest tests in 41 files passed. Independent verification pending.
 - [D3 merge conflict repair, 2026-10-18] Retained both D1 and D3 notes and
   inventory dispositions while resolving main 960edd36621d. No executable
   change in this pass. Focused workflow regression and seven negative controls
