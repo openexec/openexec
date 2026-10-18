@@ -4,6 +4,31 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D3 merge conflict repair, 2026-10-18] Retained both D1 and D3 notes and
+  inventory dispositions while resolving main 960edd36621d. No executable
+  change in this pass. Focused workflow regression and seven negative controls
+  pass. Full inventory reproducer exits 1 with FIXED? D1/D3 and REPRODUCED
+  D2/D4-D8; D3 predicate on supplied main returns REPRODUCED. Direct Vitest
+  with CI flags passes 635 tests in 40 files (exit 0), with React warnings and
+  WebSocket listen EPERM output. Fresh declared gates returned "test exited 0"
+  (including main's D1 baseline/current check, Go suite and 635 UI tests) and
+  "lint exited 0". git diff --check passed; no conflict markers remain.
+  Independent verification and GitHub-hosted execution remain pending.
+
+- [Defect D3, 2026-10-18] PR #113 adds required serial Vitest to GitHub CI
+  after UI dependency installation/build. Rework extracts the existing workflow
+  validator and adds seven ordinary in-memory negative controls: removed step,
+  conditional step, ignored failure, wrong directory, missing installation,
+  conditional job and ignored job failure. Focused tests pass; the regular
+  workflow test fails against origin/main 59f009c6 with
+  `CI build is missing required UI vitest step` and passes after restoration.
+  Full inventory reproducer prints `FIXED? D3` and exits 1 as documented;
+  other rows still print REPRODUCED. Inventory now links #113.
+  Host declared gates returned `test exited 0` (make test, Go suite and
+  635 UI tests in 40 files) and `lint exited 0` (Go vet and UI ESLint).
+  React test warnings did not fail the gate. Hosted CI remains unverified.
+  Submitted for independent verification, not task completion.
+
 - [D8, 2026-10-18] Remove 472 tracked build/cache artifacts without history
   rewriting; add exact root ignore rules and an ordinary Go Git-index/ignore
   regression. Artifact-free `make build` and rebuilt CLI version passed; D8
