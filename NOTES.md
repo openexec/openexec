@@ -4,6 +4,63 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D4 integration, 2026-10-18, PR #115] Resolve the notes-only conflict
+  with supplied main 25906e2d, preserving both sides and incoming D2/D6
+  implementation, inventory dispositions and verification targets. D4 approval
+  behavior is unchanged. Fresh declared checks: "test exited 0" (661 UI
+  tests / 44 files, FIXED? D4, seven expected original-source failures and
+  passing real-503/reload/refusal browser journey); "lint exited 0".
+  TypeScript and whitespace checks passed. Main notes/inventory/Makefile
+  preservation assertions passed; MERGE_HEAD equals supplied main.
+  Independent published-head verification remains pending.
+
+- [D4 current-main integration, 2026-10-18, PR #115] Resolved the pending
+  merge of 40e5d930 in NOTES and inventory by retaining both D4 and D5
+  dispositions/evidence. Main's D1/D3/D5/D8 code and checks are preserved;
+  only D4 paths differ from supplied main. Approval behavior is unchanged.
+  Fresh declared checks returned "test exited 0" (651 UI tests, FIXED? D4,
+  seven expected original-source failures, passing real-503/reload/refusal
+  browser journey) and "lint exited 0". Preservation assertions and
+  git diff --check passed. Current contract identifies this task's PR as #115.
+  Typed continue_sync refused the nightly task ID: "feature_key must name an
+  accepted Goal in this repository: not found". The existing MERGE_HEAD is
+  supplied main; preserve it for the nightly publication workflow. Independent
+  review of the resulting published head remains pending; no completion claim.
+
+- [D4 integration repair, 2026-10-18] Preserve D1/D3/D8 main changes and D4
+  evidence; remove leftover merge markers without changing approval behavior.
+  Fresh declared test and lint both exited 0: 647 UI tests, FIXED? D4,
+  seven expected baseline failures and the browser reload/refusal journey pass.
+  Main sibling files and notes preservation checked. Exact published-head
+  review remains pending; typed preflight refused the task ID as an accepted Goal.
+
+- [D4 PR report rework, 2026-10-18] Replace PR #115 description with the
+  final scope and reproducible evidence using describe_pull_request. Preserve
+  both D4 and incoming D1 notes during the main sync. Fresh declared checks:
+  "test exited 0" (647 UI tests, FIXED? D4, seven expected negative-control
+  failures, browser journey passed); "lint exited 0". TypeScript and diff
+  checks passed. describe_pull_request confirmed GitHub reports the new body.
+  Independent verification remains pending.
+
+- [D4, 2026-10-18, PR #115] Approval URLs use the API base plus
+  `/v1/approvals`. Exact not-configured 503 clears stale hook approvals and
+  hides the standalone panel; ordinary failures stay visible. No production
+  gate wiring, schema, migration, project loading or compatibility behavior changed.
+  Browser rework opens the right panel, shows a seeded pending approval, starts
+  real polling via a stage event, observes the real Go API's unconfigured 503
+  remove the approval while the panel remains open, then reloads and reopens.
+  Both action routes still refuse with 503. Initial host `make d4-test` passed.
+  `scripts/defect-inventory/verify-d4.py` requires reproducer exit 1 plus
+  `FIXED? D4`, and runs the regular regression against original production
+  sources in an isolated temporary copy: seven of twelve tests fail as expected.
+  `make test` now includes this proof and browser check through `d4-test`, making
+  them reproducible with the declared test runner. Inventory links PR #115.
+  UI TypeScript check passed. Declared test returned `test exited 0`: Go tests,
+  647 UI tests, the reproducer assertion, seven expected original-source
+  failures and the strengthened browser test passed. Declared lint returned
+  `lint exited 0` (Go vet and UI ESLint).
+  Independent verification remains pending; no acceptance claimed.
+
 - [D6 integration, 2026-10-18] Resolve the notes-only conflict with main
   29e88a7c, retaining both D6 and incoming D2 records. Preserve all incoming
   implementation, inventory dispositions and Makefile verification targets.

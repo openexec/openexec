@@ -210,10 +210,17 @@ export function useBlueprint(config: UseBlueprintConfig): UseBlueprintReturn {
       if (runId) params.set('run_id', runId)
       params.set('status', 'pending')
 
-      const response = await fetch(`${apiUrl}/api/v1/approvals?${params}`, {
+      const response = await fetch(`${apiUrl}/v1/approvals?${params}`, {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
       })
 
+      if (response.status === 503) {
+        const data = await response.clone().json().catch(() => null)
+        if (data?.error === 'approval gate not configured') {
+          setApprovals([])
+          return
+        }
+      }
       if (!response.ok) {
         throw new Error(`Failed to fetch approvals: ${response.statusText}`)
       }
@@ -233,7 +240,7 @@ export function useBlueprint(config: UseBlueprintConfig): UseBlueprintReturn {
       if (!apiUrl) return
 
       try {
-        const response = await fetch(`${apiUrl}/api/v1/approvals/${id}/approve`, {
+        const response = await fetch(`${apiUrl}/v1/approvals/${id}/approve`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -264,7 +271,7 @@ export function useBlueprint(config: UseBlueprintConfig): UseBlueprintReturn {
       if (!apiUrl) return
 
       try {
-        const response = await fetch(`${apiUrl}/api/v1/approvals/${id}/reject`, {
+        const response = await fetch(`${apiUrl}/v1/approvals/${id}/reject`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

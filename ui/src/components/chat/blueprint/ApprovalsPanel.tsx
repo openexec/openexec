@@ -51,6 +51,8 @@ const ApprovalsPanel: React.FC<ApprovalsPanelProps> = ({
   const [error, setError] = useState<string | undefined>(externalError)
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
 
+  const [gateUnavailable, setGateUnavailable] = useState(false)
+
   // Sync with external approvals
   useEffect(() => {
     if (externalApprovals) {
@@ -72,12 +74,21 @@ const ApprovalsPanel: React.FC<ApprovalsPanelProps> = ({
       if (runId) params.set('run_id', runId)
       params.set('status', 'pending')
 
-      const response = await fetch(`${apiUrl}/api/v1/approvals?${params}`, {
+      const response = await fetch(`${apiUrl}/v1/approvals?${params}`, {
         headers: authToken
           ? { Authorization: `Bearer ${authToken}` }
           : undefined,
       })
 
+      if (response.status === 503) {
+        const data = await response.clone().json().catch(() => null)
+        if (data?.error === 'approval gate not configured') {
+          setApprovals([])
+          setGateUnavailable(true)
+          return
+        }
+      }
+      setGateUnavailable(false)
       if (!response.ok) {
         throw new Error(`Failed to fetch approvals: ${response.statusText}`)
       }
@@ -85,6 +96,7 @@ const ApprovalsPanel: React.FC<ApprovalsPanelProps> = ({
       const data = await response.json()
       setApprovals(data.approvals || [])
     } catch (err) {
+      setGateUnavailable(false)
       setError(err instanceof Error ? err.message : 'Failed to fetch approvals')
     } finally {
       setIsLoading(false)
@@ -104,7 +116,7 @@ const ApprovalsPanel: React.FC<ApprovalsPanelProps> = ({
 
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/approvals/${approval.id}/approve`,
+          `${apiUrl}/v1/approvals/${approval.id}/approve`,
           {
             method: 'POST',
             headers: {
@@ -146,7 +158,7 @@ const ApprovalsPanel: React.FC<ApprovalsPanelProps> = ({
 
       try {
         const response = await fetch(
-          `${apiUrl}/api/v1/approvals/${approval.id}/reject`,
+          `${apiUrl}/v1/approvals/${approval.id}/reject`,
           {
             method: 'POST',
             headers: {
@@ -202,6 +214,8 @@ const ApprovalsPanel: React.FC<ApprovalsPanelProps> = ({
 
   const loading = externalLoading !== undefined ? externalLoading : isLoading
   const displayError = externalError !== undefined ? externalError : error
+
+  if (gateUnavailable && externalApprovals === undefined) return null
 
   return (
     <div className="approvals-panel" style={styles.container}>
