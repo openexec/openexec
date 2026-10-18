@@ -4,6 +4,15 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D8, 2026-10-18] Remove 472 tracked build/cache artifacts without history
+  rewriting; add exact root ignore rules and an ordinary Go Git-index/ignore
+  regression. Artifact-free `make build` and rebuilt CLI version passed; D8
+  reproducer reports FIXED? with zero tracked artifacts. Declared lint exited 0.
+  First declared test exited 2: TestRetentionUnitNativeCallbacksAndStorageRefusal,
+  `receipt missing`; isolated rerun passed, then unchanged declared test exited 0
+  (Go suite and UI 40 files / 635 tests). Cause of initial failure not established.
+  Inventory updated; numerical PR reference awaits Console publication.
+
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
   `go test -v ./...` passed, and race-enabled API duplicate-start plus both Wait
