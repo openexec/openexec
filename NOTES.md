@@ -4,6 +4,17 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D7 final sibling integration, 2026-10-18, PR #117] Resolved NOTES and
+  inventory conflicts against MERGE_HEAD/origin/main
+  0d937748cc39db41f9d8798ea78d1c7647c14fc5. Preserved both sides of notes,
+  main's D6 inventory repair and all other main inventory/Makefile lines.
+  Only D7 paths differ from main; no executable changes in this pass.
+  Focused router regressions passed. Fresh declared checks returned
+  "test exited 0" (661 UI tests / 44 files, D4 browser passed) and
+  "lint exited 0". D7 negative control remains mandatory in make test;
+  host output was truncated. Whitespace/preservation checks passed.
+  Independent verification and published merge-parent validation pending.
+
 - [D7 integration with D2, 2026-10-18] Resolved the sole NOTES.md conflict
   against supplied main 29e88a7c, preserving every line of both sides in order.
   Incoming D2 code/tests/verifier match main; no executable change this pass.
@@ -65,6 +76,124 @@ Raw capture. One line per thought, any grammar.
   Rework host declared checks returned "lint exited 0" and "test exited 0"
   (Go packages; UI 40 files / 635 tests). git diff --check passed.
   No schema, loading, migration, persistence or legacy fallback behavior changed.
+- [D4 integration, 2026-10-18, PR #115] Resolve the notes-only conflict
+  with supplied main 25906e2d, preserving both sides and incoming D2/D6
+  implementation, inventory dispositions and verification targets. D4 approval
+  behavior is unchanged. Fresh declared checks: "test exited 0" (661 UI
+  tests / 44 files, FIXED? D4, seven expected original-source failures and
+  passing real-503/reload/refusal browser journey); "lint exited 0".
+  TypeScript and whitespace checks passed. Main notes/inventory/Makefile
+  preservation assertions passed; MERGE_HEAD equals supplied main.
+  Independent published-head verification remains pending.
+
+- [D4 current-main integration, 2026-10-18, PR #115] Resolved the pending
+  merge of 40e5d930 in NOTES and inventory by retaining both D4 and D5
+  dispositions/evidence. Main's D1/D3/D5/D8 code and checks are preserved;
+  only D4 paths differ from supplied main. Approval behavior is unchanged.
+  Fresh declared checks returned "test exited 0" (651 UI tests, FIXED? D4,
+  seven expected original-source failures, passing real-503/reload/refusal
+  browser journey) and "lint exited 0". Preservation assertions and
+  git diff --check passed. Current contract identifies this task's PR as #115.
+  Typed continue_sync refused the nightly task ID: "feature_key must name an
+  accepted Goal in this repository: not found". The existing MERGE_HEAD is
+  supplied main; preserve it for the nightly publication workflow. Independent
+  review of the resulting published head remains pending; no completion claim.
+
+- [D4 integration repair, 2026-10-18] Preserve D1/D3/D8 main changes and D4
+  evidence; remove leftover merge markers without changing approval behavior.
+  Fresh declared test and lint both exited 0: 647 UI tests, FIXED? D4,
+  seven expected baseline failures and the browser reload/refusal journey pass.
+  Main sibling files and notes preservation checked. Exact published-head
+  review remains pending; typed preflight refused the task ID as an accepted Goal.
+
+- [D4 PR report rework, 2026-10-18] Replace PR #115 description with the
+  final scope and reproducible evidence using describe_pull_request. Preserve
+  both D4 and incoming D1 notes during the main sync. Fresh declared checks:
+  "test exited 0" (647 UI tests, FIXED? D4, seven expected negative-control
+  failures, browser journey passed); "lint exited 0". TypeScript and diff
+  checks passed. describe_pull_request confirmed GitHub reports the new body.
+  Independent verification remains pending.
+
+- [D4, 2026-10-18, PR #115] Approval URLs use the API base plus
+  `/v1/approvals`. Exact not-configured 503 clears stale hook approvals and
+  hides the standalone panel; ordinary failures stay visible. No production
+  gate wiring, schema, migration, project loading or compatibility behavior changed.
+  Browser rework opens the right panel, shows a seeded pending approval, starts
+  real polling via a stage event, observes the real Go API's unconfigured 503
+  remove the approval while the panel remains open, then reloads and reopens.
+  Both action routes still refuse with 503. Initial host `make d4-test` passed.
+  `scripts/defect-inventory/verify-d4.py` requires reproducer exit 1 plus
+  `FIXED? D4`, and runs the regular regression against original production
+  sources in an isolated temporary copy: seven of twelve tests fail as expected.
+  `make test` now includes this proof and browser check through `d4-test`, making
+  them reproducible with the declared test runner. Inventory links PR #115.
+  UI TypeScript check passed. Declared test returned `test exited 0`: Go tests,
+  647 UI tests, the reproducer assertion, seven expected original-source
+  failures and the strengthened browser test passed. Declared lint returned
+  `lint exited 0` (Go vet and UI ESLint).
+  Independent verification remains pending; no acceptance claimed.
+
+- [D6 integration, 2026-10-18] Resolve the notes-only conflict with main
+  29e88a7c, retaining both D6 and incoming D2 records. Preserve all incoming
+  implementation, inventory dispositions and Makefile verification targets.
+  Fresh declared checks returned "test exited 0" (649 UI tests / 43 files)
+  and "lint exited 0". TypeScript and diff checks exited 0; inventory
+  reproducer printed FIXED? D6 (documented exit 1). The host test log was
+  truncated. Independent verification remains pending.
+
+- [D6 integration, 2026-10-18] Resolve conflicts with main 40e5d930
+  by preserving both sides of NOTES.md and the repaired D5 and D6 inventory
+  rows. Retain incoming D5 implementation and verification alongside D6.
+  Fresh declared checks returned "test exited 0" (649 UI tests / 43 files)
+  and "lint exited 0". TypeScript and diff checks exited 0; inventory
+  reproducer printed FIXED? D6 with documented exit 1. Independent acceptance
+  remains pending.
+
+- [D6 integration, 2026-10-18] Resolve the notes-only conflict with main
+  230b1d45 by retaining D6 and incoming D3 entries. Preserve D1/D3/D8
+  implementation and inventory changes. Fresh declared checks returned
+  "test exited 0" (645 UI tests / 42 files) and "lint exited 0".
+  TypeScript and diff checks passed; reproducer printed FIXED? D6 (exit 1
+  by contract). Independent verification remains pending.
+
+- [D6 PR report, 2026-10-18] Replace PR #116 narration with the current
+  change, reproducible acceptance evidence and fixture limitation. Resolved
+  current-main notes conflict by retaining both D6 and D8 entries. Fresh
+  declared checks returned "test exited 0" (645 UI tests / 42 files) and
+  "lint exited 0"; TypeScript and diff checks passed. Reproducer returned
+  FIXED? D6 (exit 1 by contract). Independent verification remains pending.
+
+- [D6 verification access, PR #116, 2026-10-18] make test now invokes
+  scripts/defect-inventory/verify-d6.py and ui/scripts/verify-d6.mjs so the
+  independent reviewer can reproduce both through run_declared_check(test).
+  The negative control uses the inventory baseline in a temporary Go test
+  overlay, changes only the input file path, requires all four missing-stage
+  diagnostics, and then runs the unchanged regression against the current list.
+  Local verifier exited 0; browser sandbox attempt returned listen EPERM.
+  Declared host test returned "test exited 0": original-list failure, repaired
+  list PASS, "D6 browser PASS" (real page/WebSocket fixtures, failure, retry,
+  completion, unknown stage, panel reopen and reload reset), Go suite and
+  645 UI tests / 42 files. Declared lint returned "lint exited 0"; TypeScript
+  and diff checks exited 0. Reproducer printed FIXED? D6 with exit 1.
+  Preserved both D6 and incoming D1 notes when resolving their text conflict.
+
+- [D6 timeline repair, PR #116, 2026-10-18] Rework adds a ChatPage
+  guard against reprocessing the latest event on blueprint state updates.
+  ChatPage.test.tsx exercises real WebSocket decoding, hooks and page rendering
+  with only network fixtures; includes failure/retry/completion, unknown-stage
+  rejection, panel reopening and remount reset. ui/scripts/verify-d6.mjs passed
+  in Chromium via run_command after sandbox listen EPERM; real application,
+  deterministic network fixtures, reload reset, no page errors. This is not a
+  provider-backed blueprint execution claim. Timeline state is transient.
+  TestDefaultBlueprintStagesAppearInUI executed with origin/main 59f009c6's
+  original list: exit 1, all four omissions named; restored list: exit 0.
+  The page regression also fails with the event guard removed (effect-loop
+  diagnostic), then passes restored. Reproducer prints FIXED? D6 (exit 1 by
+  its documented contract); TypeScript and diff checks pass. Inventory links
+  #116. Declared test passed (645 tests / 42 UI files plus Go); lint passed.
+  Final declared rerun after the bounded effect-loop assertion: test exited 0
+  (645 UI tests / 42 files), lint exited 0. Original-list reproducer also
+  executed and printed REPRODUCED D6; restored file re-read and diff checked.
 
 - [D2 current-main integration, 2026-10-18] Resolved NOTES.md against
   supplied main 40e5d930, retaining both sides and D1/D2/D3/D5/D8 records.
@@ -199,6 +328,7 @@ Raw capture. One line per thought, any grammar.
   current regression passes; fresh make build and rebuilt version pass.
   Rework declared checks: test exited 0 (including D8 verifier and 635 UI
   tests / 40 files); lint exited 0. Independent verification pending.
+
 - [FIX2 D1 verification access, 2026-10-18] make test now runs verify-d1.py
   before the Go/UI suites, exposing the baseline/current comparison through
   the existing host run_declared_check(test). Fresh host result: "test exited 0",
