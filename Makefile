@@ -64,6 +64,8 @@ test:
 	node ui/scripts/verify-d6.mjs
 	@echo "🧪 Verifying D1 regression against original and current code..."
 	python3 scripts/defect-inventory/verify-d1.py
+	@echo "🧪 Verifying D7 regression and inventory before/after..."
+	python3 scripts/defect-inventory/verify-d7.py
 	python3 scripts/defect-inventory/verify-d8.py
 	python3 scripts/defect-inventory/verify-d5.py
 	@echo "🧪 Running Go tests..."

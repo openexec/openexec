@@ -4,6 +4,78 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D7 final sibling integration, 2026-10-18, PR #117] Resolved NOTES and
+  inventory conflicts against MERGE_HEAD/origin/main
+  0d937748cc39db41f9d8798ea78d1c7647c14fc5. Preserved both sides of notes,
+  main's D6 inventory repair and all other main inventory/Makefile lines.
+  Only D7 paths differ from main; no executable changes in this pass.
+  Focused router regressions passed. Fresh declared checks returned
+  "test exited 0" (661 UI tests / 44 files, D4 browser passed) and
+  "lint exited 0". D7 negative control remains mandatory in make test;
+  host output was truncated. Whitespace/preservation checks passed.
+  Independent verification and published merge-parent validation pending.
+
+- [D7 integration with D2, 2026-10-18] Resolved the sole NOTES.md conflict
+  against supplied main 29e88a7c, preserving every line of both sides in order.
+  Incoming D2 code/tests/verifier match main; no executable change this pass.
+  Focused router tests passed. Declared checks returned "test exited 0"
+  (639 UI tests / 41 files) and "lint exited 0". Host output was truncated;
+  D7 before/after verifier remains mandatory in make test. Whitespace check
+  passed. PR #117 final account refreshed; independent verification pending.
+
+- [D7 integration with D5, 2026-10-18] Resolved the sole NOTES.md conflict
+  against supplied main 40e5d930, retaining both sides verbatim. No executable
+  changes this pass; incoming D5 and earlier sibling repairs remain intact.
+  Focused router regressions passed. Fresh declared checks returned
+  "test exited 0" (639 UI tests / 41 files) and "lint exited 0".
+  Host test output was truncated; mandatory D7 verifier remains in make test.
+  git diff --check passed. PR #117 description updated for this integration;
+  independent verification pending, no D7 deployed journey claimed.
+
+- [D7 integration rework, 2026-10-18] Resolved the NOTES.md conflict with
+  supplied main 230b1d45, retaining both sides and incoming D3 CI behavior.
+  No routing code changed. Fresh declared checks returned "test exited 0"
+  (635 UI tests / 40 files; host output truncated) and "lint exited 0".
+  D7 before/after verifier remains mandatory in make test. git diff --check
+  passed. Replaced PR #117 description through describe_pull_request and
+  fetched the published GitHub body: exact match. Independent verification
+  pending; no deployed application journey claimed.
+
+- [D7 final description rework, 2026-10-18] Resolved current-main a6afc8a
+  conflicts in Makefile, notes and inventory, retaining D8 verification and
+  cleanup. Fresh declared checks returned "test exited 0" (635 UI tests /
+  40 files) and "lint exited 0"; git diff --check passed. Test output was
+  truncated by the host; prior D7 negative-control evidence remains recorded
+  below. PR #117 transcript replaced through describe_pull_request and
+  fetched from GitHub afterward: exact body matched;
+  independent verification remains pending. No routing implementation changed
+  in this pass.
+
+- [D7 declared verification rework, 2026-10-18] make test now invokes
+  verify-d7.py so the host declared test exposes the baseline assertion
+  failure, fixed regression pass and inventory REPRODUCED/FIXED? pair.
+  Preserved both D7 and incoming D1 notes while resolving their sync conflict.
+  Fresh host declared test returned "test exited 0", including
+  "PASS D7: regression red/green and inventory REPRODUCED/FIXED?",
+  Go packages and 635 UI tests across 40 files. Baseline 59f009c yielded
+  the expected routing assertion failure (exit 1); fixed source passed
+  (exit 0); inventory exits were 0 before and 1 after. Declared lint
+  returned "lint exited 0" (go vet and UI ESLint). git diff --check passed.
+
+- [D7 deterministic list routing, 2026-10-18] Only FIX2 row D7 is changed.
+  `list` requires a following filesystem noun; conceptual lists use chat.
+  PR: https://github.com/openexec/openexec/pull/117. Independent verification
+  remains pending. Rework adds scripts/defect-inventory/verify-d7.py: a temporary
+  snapshot of baseline 59f009c runs the original inventory reproducer, then
+  candidate tests against baseline source (routing assertion failures, exit 1),
+  then fixed source (exit 0) and the reproducer again. Sandbox and host runs
+  both printed PASS D7: regression red/green and inventory REPRODUCED/FIXED?.
+  Reproducer exits were 0 before / 1 after; its HEAD label identifies the source
+  checkout, while the snapshot source is explicitly pinned by the verifier.
+  This supersedes the prior unsupported before/after and all-other-rows claims.
+  Rework host declared checks returned "lint exited 0" and "test exited 0"
+  (Go packages; UI 40 files / 635 tests). git diff --check passed.
+  No schema, loading, migration, persistence or legacy fallback behavior changed.
 - [D4 integration, 2026-10-18, PR #115] Resolve the notes-only conflict
   with supplied main 25906e2d, preserving both sides and incoming D2/D6
   implementation, inventory dispositions and verification targets. D4 approval

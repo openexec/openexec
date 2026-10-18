@@ -97,11 +97,7 @@ func TestDeterministicRouter_ParseIntent_DiffWordBoundary(t *testing.T) {
 		{"git diff HEAD~1", "git_diff"},
 		// "diff" embedded in another word must NOT route to git_diff.
 		{"what is the difference between these two approaches?", GeneralChatTool},
-		// Contract AC #1: the literal example query must NOT route to git_diff.
-		// It resolves to list_directory (the "list" keyword precedes the diff
-		// rule), which is the honest actual result; the invariant this change
-		// delivers is only that "difference" no longer reaches git_diff.
-		{"what is the difference between a list and a tuple?", "list_directory"},
+		{"what is the difference between a list and a tuple?", GeneralChatTool},
 	}
 	for _, tc := range cases {
 		intent, err := r.ParseIntent(context.Background(), tc.query)
@@ -143,5 +139,43 @@ func TestDeterministicRouter_ConfidenceRange(t *testing.T) {
 		if intent.Confidence < 0.5 || intent.Confidence > 0.8 {
 			t.Errorf("query %q: confidence %.2f outside expected range [0.5, 0.8]", q, intent.Confidence)
 		}
+	}
+}
+
+// D7: list needs a filesystem object; conceptual lists are chat.
+func TestDeterministicRouter_ParseIntent_ListObject(t *testing.T) {
+	r := NewDeterministicRouter()
+	for _, tc := range []struct{ query, want string }{
+		{"what is the difference between a list and a tuple?", GeneralChatTool},
+		{"explain a linked list", GeneralChatTool},
+		{"list", GeneralChatTool},
+		{"list the benefits", GeneralChatTool},
+		{"playlist files", GeneralChatTool},
+		{"list filenames", GeneralChatTool},
+		{"list files", "list_directory"},
+		{"list file", "list_directory"},
+		{"list directories", "list_directory"},
+		{"list directory", "list_directory"},
+		{"list folders", "list_directory"},
+		{"list folder", "list_directory"},
+		{"please LIST the FILES in src", "list_directory"},
+		{"list all files", "list_directory"},
+		{"list the current files", "list_directory"},
+		{"list\tfiles", "list_directory"},
+		{"ls src", "list_directory"},
+		{"show directory contents", "list_directory"},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			intent, err := r.ParseIntent(context.Background(), tc.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if intent.ToolName != tc.want {
+				t.Errorf("got %q, want %q", intent.ToolName, tc.want)
+			}
+			if intent.Args["query"] != tc.query {
+				t.Errorf("query not preserved: %#v", intent.Args)
+			}
+		})
 	}
 }
