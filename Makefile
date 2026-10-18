@@ -66,6 +66,8 @@ test:
 	python3 scripts/defect-inventory/verify-d5.py
 	@echo "🧪 Running Go tests..."
 	go test ./...
+	@echo "🧪 Verifying D2 stdout wiring and negative control..."
+	python3 scripts/defect-inventory/verify-d2.py
 	@$(MAKE) ui-test
 
 compat-test:
