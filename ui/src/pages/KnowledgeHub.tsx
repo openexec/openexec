@@ -15,12 +15,6 @@ interface EnvironmentRecord {
   topology: string;
 }
 
-interface PolicyRecord {
-  key: string;
-  value: string;
-  description: string;
-}
-
 const styles = {
   container: {
     padding: '2rem',
@@ -60,7 +54,6 @@ const styles = {
 export const KnowledgeHub: React.FC = () => {
   const [symbols, setSymbols] = useState<SymbolRecord[]>([]);
   const [envs, setEnvs] = useState<EnvironmentRecord[]>([]);
-  const [policies, setPolicies] = useState<PolicyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,10 +61,9 @@ export const KnowledgeHub: React.FC = () => {
     setError(null)
     setLoading(true)
     try {
-      const [symRes, envRes, polRes] = await Promise.all([
+      const [symRes, envRes] = await Promise.all([
         fetch('/api/v1/knowledge/symbols'),
-        fetch('/api/v1/knowledge/envs'),
-        fetch('/api/v1/knowledge/policies')
+        fetch('/api/v1/knowledge/envs')
       ]);
 
       if (symRes.ok) {
@@ -82,12 +74,7 @@ export const KnowledgeHub: React.FC = () => {
         const data = await envRes.json();
         setEnvs(data.environments || []);
       }
-      if (polRes.ok) {
-        const data = await polRes.json();
-        setPolicies(data.policies || []);
-      }
-
-      if (!symRes.ok || !envRes.ok || !polRes.ok) {
+      if (!symRes.ok || !envRes.ok) {
         setError('Some knowledge endpoints failed to load')
       }
     } catch (e: any) {
@@ -150,21 +137,7 @@ export const KnowledgeHub: React.FC = () => {
         </ul>
       </div>
 
-      <div style={styles.section}>
-        <h2>Safety Guardrails (Policies)</h2>
-        <p>Rules that OpenExec enforces automatically before saving any code.</p>
-        <ul style={styles.list}>
-          {policies.length === 0 ? <li style={styles.item}>No policies recorded.</li> : 
-            policies.map(p => (
-              <li key={p.key} style={styles.item}>
-                <strong>{p.key}</strong>
-                <pre style={{...styles.code, padding: '1rem', marginTop: '0.5rem'}}>{p.value}</pre>
-                <p>{p.description}</p>
-              </li>
-            ))
-          }
-        </ul>
-      </div>
+
     </div>
   );
 };
