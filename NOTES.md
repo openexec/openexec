@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D5 merge conflict repair, 2026-10-18] Resolved the NOTES.md conflict by
+  retaining D5 implementation/live-server evidence and main's D3 notes.
+  Main's CI step, regression and D3 inventory disposition remain intact;
+  no executable changes in this pass. Focused CI regression exited 0.
+  Fresh declared checks returned "test exited 0" (including D5 baseline/current,
+  UI types, controlled and coordinator-backed browser journeys, Go suite and
+  639 UI tests) and "lint exited 0". Inventory reproducer printed FIXED? D5
+  with expected exit 1. git diff --check passed. Independent verification
+  remains pending; no production deployment claim.
+
 - [FIX2 D5 live-server rework, 2026-10-18] Added tagged
   TestKnowledgeHubBrowser, invoked by verify-d5.py/make test, serving the
   compiled UI with actual coordinator-backed API routes and isolated SQLite.
@@ -31,6 +41,30 @@ Raw capture. One line per thought, any grammar.
   and each endpoint was requested for all loads. Final declared test exited 0:
   baseline/current comparison, UI types, both Chromium journeys, Go suite and
   639 Vitest tests in 41 files passed. Independent verification pending.
+- [D3 merge conflict repair, 2026-10-18] Retained both D1 and D3 notes and
+  inventory dispositions while resolving main 960edd36621d. No executable
+  change in this pass. Focused workflow regression and seven negative controls
+  pass. Full inventory reproducer exits 1 with FIXED? D1/D3 and REPRODUCED
+  D2/D4-D8; D3 predicate on supplied main returns REPRODUCED. Direct Vitest
+  with CI flags passes 635 tests in 40 files (exit 0), with React warnings and
+  WebSocket listen EPERM output. Fresh declared gates returned "test exited 0"
+  (including main's D1 baseline/current check, Go suite and 635 UI tests) and
+  "lint exited 0". git diff --check passed; no conflict markers remain.
+  Independent verification and GitHub-hosted execution remain pending.
+
+- [Defect D3, 2026-10-18] PR #113 adds required serial Vitest to GitHub CI
+  after UI dependency installation/build. Rework extracts the existing workflow
+  validator and adds seven ordinary in-memory negative controls: removed step,
+  conditional step, ignored failure, wrong directory, missing installation,
+  conditional job and ignored job failure. Focused tests pass; the regular
+  workflow test fails against origin/main 59f009c6 with
+  `CI build is missing required UI vitest step` and passes after restoration.
+  Full inventory reproducer prints `FIXED? D3` and exits 1 as documented;
+  other rows still print REPRODUCED. Inventory now links #113.
+  Host declared gates returned `test exited 0` (make test, Go suite and
+  635 UI tests in 40 files) and `lint exited 0` (Go vet and UI ESLint).
+  React test warnings did not fail the gate. Hosted CI remains unverified.
+  Submitted for independent verification, not task completion.
 
 - [D8, 2026-10-18] Remove 472 tracked build/cache artifacts without history
   rewriting; add exact root ignore rules and an ordinary Go Git-index/ignore
