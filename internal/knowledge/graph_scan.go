@@ -221,9 +221,14 @@ func gitListedFiles(root string) ([]string, bool) {
 		return nil, false
 	}
 	var files []string
+	seen := make(map[string]bool)
 	for _, rel := range strings.Split(string(output), "\x00") {
-		if rel != "" {
-			files = append(files, filepath.ToSlash(rel))
+		rel = filepath.ToSlash(rel)
+		// An unmerged index lists one path for each conflict stage. The
+		// scanner reads the worktree file, so include that path only once.
+		if rel != "" && !seen[rel] {
+			seen[rel] = true
+			files = append(files, rel)
 		}
 	}
 	// A successful empty result is still authoritative. Falling back to the
