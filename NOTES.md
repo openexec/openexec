@@ -4,6 +4,20 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D6 verification access, PR #116, 2026-10-18] make test now invokes
+  scripts/defect-inventory/verify-d6.py and ui/scripts/verify-d6.mjs so the
+  independent reviewer can reproduce both through run_declared_check(test).
+  The negative control uses the inventory baseline in a temporary Go test
+  overlay, changes only the input file path, requires all four missing-stage
+  diagnostics, and then runs the unchanged regression against the current list.
+  Local verifier exited 0; browser sandbox attempt returned listen EPERM.
+  Declared host test returned "test exited 0": original-list failure, repaired
+  list PASS, "D6 browser PASS" (real page/WebSocket fixtures, failure, retry,
+  completion, unknown stage, panel reopen and reload reset), Go suite and
+  645 UI tests / 42 files. Declared lint returned "lint exited 0"; TypeScript
+  and diff checks exited 0. Reproducer printed FIXED? D6 with exit 1.
+  Preserved both D6 and incoming D1 notes when resolving their text conflict.
+
 - [D6 timeline repair, PR #116, 2026-10-18] Rework adds a ChatPage
   guard against reprocessing the latest event on blueprint state updates.
   ChatPage.test.tsx exercises real WebSocket decoding, hooks and page rendering
@@ -21,6 +35,42 @@ Raw capture. One line per thought, any grammar.
   Final declared rerun after the bounded effect-loop assertion: test exited 0
   (645 UI tests / 42 files), lint exited 0. Original-list reproducer also
   executed and printed REPRODUCED D6; restored file re-read and diff checked.
+- [FIX2 D1 verification access, 2026-10-18] make test now runs verify-d1.py
+  before the Go/UI suites, exposing the baseline/current comparison through
+  the existing host run_declared_check(test). Fresh host result: "test exited 0",
+  including "PROVEN: original code permits outside reads and writes" and
+  "PROVEN: current code passes the same ordinary regression", followed by
+  Go packages and 635 UI tests across 40 files. Declared lint exited 0.
+  Local inventory rerun exited 1 with FIXED? D1 and REPRODUCED D2-D8; the
+  prior review's FIXED? D7 discrepancy remains unexplained. Direct D1 tagged
+  test exited 1 with "D1 not reproduced" and "outside workspace".
+  This pass changes verification wiring only; independent acceptance pending.
+
+- [FIX2 D1, 2026-10-18] API file tools now reject lexical workspace escapes
+  before reads, writes or directory creation via resolveFilePath. Dispatcher
+  regression TestAPIFileToolsWorkspaceBoundary failed before the repair (outside
+  contents returned and overwritten), then passed with persisted in-workspace
+  round trips and refusal side-effect checks. Original defect-tag reproducer
+  passed before; after repair it fails with "D1 not reproduced" and the inventory
+  script prints FIXED? D1 (exit 1). This implementation run printed
+  REPRODUCED for D2-D8; the independent review printed FIXED? D7 despite
+  its standalone D7 test passing. Cause unknown; no D7 repair is claimed.
+  SECURITY_MODEL scopes its guarantee to infrastructure/MCP and documents sh -c,
+  lexical-only checks and the OS-sandbox roadmap. Existing resolver does not
+  resolve symlinks; no symlink-resolution or sandbox mechanism added.
+  No project format, loading, migration or legacy fallback changes.
+  Declared checks returned "test exited 0" (make test: Go packages and 635 UI
+  tests in 40 files) and "lint exited 0" (go vet and UI ESLint). UI output
+  included a WebSocket port-in-use warning and React warnings without failures.
+  git diff --check passed. Independent verification remains required.
+  Rework: inventory now names openexec/openexec#112. The executable
+  python3 scripts/defect-inventory/verify-d1.py uses a temporary Go overlay
+  of api_runner.go from baseline 59f009c690e859e2accd259cdadc5e00c4b34439.
+  It exited 0: the ordinary regression failed with unauthorized outside reads
+  and writes on the baseline, then passed all 15 cases on current code. It
+  rejects build failures as evidence and leaves repository sources untouched.
+  Fresh declared checks after rework returned "test exited 0" (Go packages,
+  635 UI tests across 40 files) and "lint exited 0". git diff --check passed.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
