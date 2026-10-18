@@ -4,6 +4,18 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [FIX2 D5, 2026-10-18] Removed Knowledge Hub policies request, state/type and
+  unsupported enforcement section. Regular regression failed all four cases on
+  baseline a6afc8a, then passed after repair. verify-d5.py exposes the same
+  comparison, UI type check and isolated Chromium journey through make test.
+  Browser responses are controlled; no live coordinator/deployment claim.
+  Inventory reproducer returned exit 1 with FIXED? D5. Declared lint exited 0.
+  First declared test failed on an overly strict browser request count (18 vs
+  10); app main.tsx uses StrictMode. Test now checks every request is supported
+  and each endpoint was requested for all loads. Final declared test exited 0:
+  baseline/current comparison, UI types, both Chromium journeys, Go suite and
+  639 Vitest tests in 41 files passed. Independent verification pending.
+
 - [D8, 2026-10-18] Remove 472 tracked build/cache artifacts without history
   rewriting; add exact root ignore rules and an ordinary Go Git-index/ignore
   regression. Artifact-free `make build` and rebuilt CLI version passed; D8
