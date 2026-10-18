@@ -4,6 +4,19 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D4 current-main integration, 2026-10-18, PR #115] Resolved the pending
+  merge of 40e5d930 in NOTES and inventory by retaining both D4 and D5
+  dispositions/evidence. Main's D1/D3/D5/D8 code and checks are preserved;
+  only D4 paths differ from supplied main. Approval behavior is unchanged.
+  Fresh declared checks returned "test exited 0" (651 UI tests, FIXED? D4,
+  seven expected original-source failures, passing real-503/reload/refusal
+  browser journey) and "lint exited 0". Preservation assertions and
+  git diff --check passed. Current contract identifies this task's PR as #115.
+  Typed continue_sync refused the nightly task ID: "feature_key must name an
+  accepted Goal in this repository: not found". The existing MERGE_HEAD is
+  supplied main; preserve it for the nightly publication workflow. Independent
+  review of the resulting published head remains pending; no completion claim.
+
 - [D4 integration repair, 2026-10-18] Preserve D1/D3/D8 main changes and D4
   evidence; remove leftover merge markers without changing approval behavior.
   Fresh declared test and lint both exited 0: 647 UI tests, FIXED? D4,
@@ -38,6 +51,43 @@ Raw capture. One line per thought, any grammar.
   `lint exited 0` (Go vet and UI ESLint).
   Independent verification remains pending; no acceptance claimed.
 
+- [D5 merge conflict repair, 2026-10-18] Resolved the NOTES.md conflict by
+  retaining D5 implementation/live-server evidence and main's D3 notes.
+  Main's CI step, regression and D3 inventory disposition remain intact;
+  no executable changes in this pass. Focused CI regression exited 0.
+  Fresh declared checks returned "test exited 0" (including D5 baseline/current,
+  UI types, controlled and coordinator-backed browser journeys, Go suite and
+  639 UI tests) and "lint exited 0". Inventory reproducer printed FIXED? D5
+  with expected exit 1. git diff --check passed. Independent verification
+  remains pending; no production deployment claim.
+
+- [FIX2 D5 live-server rework, 2026-10-18] Added tagged
+  TestKnowledgeHubBrowser, invoked by verify-d5.py/make test, serving the
+  compiled UI with actual coordinator-backed API routes and isolated SQLite.
+  Browser context supplies test bearer/checkout credentials; no API interception.
+  Checks actual supported 200 payloads, missing-bearer 401, open/away/back/reload,
+  persisted records and no policies requests. Controlled failure/Retry tests
+  remain. Declared checks returned "test exited 0" (639 UI tests, Go suite,
+  baseline four failures/current four passes, types and three browser journeys)
+  and "lint exited 0". Renamed live journey to .journey.ts so generic E2E
+  discovery cannot run it without its Go harness; focused host rerun returned
+  "1 passed (1.6s)" and "PASS: TestKnowledgeHubBrowser". Inventory script
+  printed FIXED? D5, exit 1. Local sandbox browser startup failed; host checks
+  succeeded. Server also logged D4's /api/api/v1/approvals 404; no D4 changes.
+  Inventory references PR #119 and exact local server configuration. No
+  production deployment claim. Independent verification pending.
+
+- [FIX2 D5, 2026-10-18] Removed Knowledge Hub policies request, state/type and
+  unsupported enforcement section. Regular regression failed all four cases on
+  baseline a6afc8a, then passed after repair. verify-d5.py exposes the same
+  comparison, UI type check and isolated Chromium journey through make test.
+  Browser responses are controlled; no live coordinator/deployment claim.
+  Inventory reproducer returned exit 1 with FIXED? D5. Declared lint exited 0.
+  First declared test failed on an overly strict browser request count (18 vs
+  10); app main.tsx uses StrictMode. Test now checks every request is supported
+  and each endpoint was requested for all loads. Final declared test exited 0:
+  baseline/current comparison, UI types, both Chromium journeys, Go suite and
+  639 Vitest tests in 41 files passed. Independent verification pending.
 - [D3 merge conflict repair, 2026-10-18] Retained both D1 and D3 notes and
   inventory dispositions while resolving main 960edd36621d. No executable
   change in this pass. Focused workflow regression and seven negative controls
