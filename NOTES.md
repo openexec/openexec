@@ -4,6 +4,22 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [FIX2 D5 live-server rework, 2026-10-18] Added tagged
+  TestKnowledgeHubBrowser, invoked by verify-d5.py/make test, serving the
+  compiled UI with actual coordinator-backed API routes and isolated SQLite.
+  Browser context supplies test bearer/checkout credentials; no API interception.
+  Checks actual supported 200 payloads, missing-bearer 401, open/away/back/reload,
+  persisted records and no policies requests. Controlled failure/Retry tests
+  remain. Declared checks returned "test exited 0" (639 UI tests, Go suite,
+  baseline four failures/current four passes, types and three browser journeys)
+  and "lint exited 0". Renamed live journey to .journey.ts so generic E2E
+  discovery cannot run it without its Go harness; focused host rerun returned
+  "1 passed (1.6s)" and "PASS: TestKnowledgeHubBrowser". Inventory script
+  printed FIXED? D5, exit 1. Local sandbox browser startup failed; host checks
+  succeeded. Server also logged D4's /api/api/v1/approvals 404; no D4 changes.
+  Inventory references PR #119 and exact local server configuration. No
+  production deployment claim. Independent verification pending.
+
 - [FIX2 D5, 2026-10-18] Removed Knowledge Hub policies request, state/type and
   unsupported enforcement section. Regular regression failed all four cases on
   baseline a6afc8a, then passed after repair. verify-d5.py exposes the same
