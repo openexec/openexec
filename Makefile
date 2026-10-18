@@ -58,12 +58,18 @@ ui-lint:
 	cd ui && npm run lint
 
 test:
+	@echo "🧪 Verifying D6 regression against original and current stage lists..."
+	python3 scripts/defect-inventory/verify-d6.py
+	@echo "🧪 Verifying D6 in Chromium..."
+	node ui/scripts/verify-d6.mjs
 	@echo "🧪 Verifying D1 regression against original and current code..."
 	python3 scripts/defect-inventory/verify-d1.py
 	python3 scripts/defect-inventory/verify-d8.py
 	python3 scripts/defect-inventory/verify-d5.py
 	@echo "🧪 Running Go tests..."
 	go test ./...
+	@echo "🧪 Verifying D2 stdout wiring and negative control..."
+	python3 scripts/defect-inventory/verify-d2.py
 	@$(MAKE) ui-test
 	@$(MAKE) d4-test
 
