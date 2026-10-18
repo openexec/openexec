@@ -7,7 +7,7 @@
  * @module pages/ChatPage
  */
 
-import React, { useEffect, useMemo, useCallback, useState } from 'react'
+import React, { useEffect, useMemo, useCallback, useState, useRef } from 'react'
 import {
   ChatLayout,
   ChatMain,
@@ -73,11 +73,15 @@ const ChatPage: React.FC<ChatPageProps> = ({ config }) => {
     approvalPollInterval: 5000,
   })
 
-  // Process loop events through blueprint hook
+  const lastBlueprintEvent = useRef<(typeof chat.events)[number]>()
+
+  // Process each latest event once, even when blueprint state rerenders the page.
   useEffect(() => {
     // Subscribe to events and process them for blueprint state
     if (chat.events.length > 0) {
       const latestEvent = chat.events[chat.events.length - 1]
+      if (latestEvent === lastBlueprintEvent.current) return
+      lastBlueprintEvent.current = latestEvent
       // Only process blueprint-related events
       if (latestEvent.type.includes('stage') || latestEvent.type.includes('blueprint')) {
         blueprint.processEvent(latestEvent)
