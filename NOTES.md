@@ -5,16 +5,19 @@ Raw capture. One line per thought, any grammar.
 ## Now
 
 - [D7 deterministic list routing, 2026-10-18] Only FIX2 row D7 is changed.
-  `list` now requires a following filesystem noun; conceptual lists use chat.
-  Regular ListObject and corrected DiffWordBoundary tests failed on the old
-  implementation and pass after the fix. Inventory reproducer changed D7 from
-  REPRODUCED to FIXED? (exit 1 is its documented stale-row signal); other rows
-  remain REPRODUCED. Host declared lint and test both exited 0 (make test:
-  Go packages passed, UI 40 files / 635 tests passed). The initial sandbox
-  router suite refused a test socket; the host suite passed that package.
-  Inventory identifies this task's repair PR; numeric reference awaits Console
-  publication. Independent verification remains pending. No schema, loading,
-  migration, persistence or legacy fallback behavior changed.
+  `list` requires a following filesystem noun; conceptual lists use chat.
+  PR: https://github.com/openexec/openexec/pull/117. Independent verification
+  remains pending. Rework adds scripts/defect-inventory/verify-d7.py: a temporary
+  snapshot of baseline 59f009c runs the original inventory reproducer, then
+  candidate tests against baseline source (routing assertion failures, exit 1),
+  then fixed source (exit 0) and the reproducer again. Sandbox and host runs
+  both printed PASS D7: regression red/green and inventory REPRODUCED/FIXED?.
+  Reproducer exits were 0 before / 1 after; its HEAD label identifies the source
+  checkout, while the snapshot source is explicitly pinned by the verifier.
+  This supersedes the prior unsupported before/after and all-other-rows claims.
+  Rework host declared checks returned "lint exited 0" and "test exited 0"
+  (Go packages; UI 40 files / 635 tests). git diff --check passed.
+  No schema, loading, migration, persistence or legacy fallback behavior changed.
 
 - [CI repair verification manifest, 2026-10-01]
   Durable job openexec-identity-ci-repair verified b9c7dc97704e with Go 1.25.14:
