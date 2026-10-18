@@ -51,7 +51,7 @@ has gone stale.
 | D5 | Knowledge Hub always shows "Some knowledge endpoints failed to load". It fetches `/api/v1/knowledge/policies`, and no server registers that route (`internal/server/server.go:409-410` has only symbols and envs). | `grep -rn knowledge/policies --include=*.go internal pkg` finds no handler. | Remove the policies fetch, or add a handler backed by the existing policy data. |
 | D6 | The UI stage timeline drops the default blueprint's `fix_lint` and `production_readiness_check` stages. `StageName`/`BLUEPRINT_STAGES` omit them, and `useBlueprint.ts:158` ignores events for unlisted stages. | `ui/src/types/blueprint.ts:29-35` compared with `internal/blueprint/engine.go:164,189`. | Add the missing stages, or build the list from the blueprint returned by the backend. |
 | D7 | **Repaired; independent verification pending.** The deterministic router sent "what is the difference between a list and a tuple?" to `list_directory` because of bare `list`. | `TestDeterministicRouter_ParseIntent_DiffWordBoundary` now expects `general_chat`; `TestDeterministicRouter_ParseIntent_ListObject` covers conceptual refusals, filesystem objects, case/whitespace and retained `ls`/`directory` routing. `make test` runs `python3 scripts/defect-inventory/verify-d7.py`, which reproduces assertion failures against baseline `59f009c` and passes the same tests with the fixed source in a temporary snapshot. `scripts/defect-inventory/reproduce.sh` changed D7 from `REPRODUCED` to `FIXED?` (exit 1 by design). | `keywordMatches` requires whole-word `list` followed by file/directory/folder nouns, optionally qualified by the/all/current. Fix PR: [PR #117](https://github.com/openexec/openexec/pull/117). |
-| D8 | Build artifacts are tracked in git: 469 `.gocache` files, `bin/openexec`, a root `openexec` binary and `data/fwus.jso`. | `git ls-files .gocache bin/openexec openexec data/fwus.jso \| wc -l` prints `472`. | Run `git rm --cached` on them and add them to `.gitignore`. Rewriting history is not proposed. |
+| D8 | **Repair submitted for verification:** untrack 469 `.gocache` files, `bin/openexec`, root `openexec` and `data/fwus.jso` (472 artifacts). | `git ls-files .gocache bin/openexec openexec data/fwus.jso \| wc -l` now prints `0`; reproducer reports `FIXED? D8`. Ordinary regression: `go test -count=1 ./internal/repositoryhygiene`. | Root-anchored `.gitignore` rules prevent recurrence; no history rewrite. Fixing PR: openexec/openexec#118. |
 
 ## Revalidated: fixed, not reproducible, or out of scope
 
@@ -82,3 +82,36 @@ has gone stale.
 | plan-identity: Agent Console goal-mode verifier mismatch | not reproducible | The source docs also say it was not reproduced. It is on the Agent Console side. |
 | Issues #18, #19: missing tests for `pkg/telemetry/redact.go` and `internal/schema` | not a defect: coverage request | Both packages have no test files. |
 | Local Agent Console checkout `/mnt/data1/projects/agent-console` | out of scope: owner's uncommitted local state (not touched) | `HEAD` is `1d8aa1d8`, 872 commits behind origin and dirty. Its untracked `go.work` uses `../openexec/.worktrees/autonomous-human-boundaries` (`b1d738c4`), so a build from that checkout would ignore the go.mod pin. Agent Console `origin/main` tracks `go.work` as `use .`. |
+
+### D8 build dependency evaluation
+
+`make build` generates UI assets and then `bin/openexec` from source. CI
+(`.github/workflows/ci.yml`), `scripts/install.sh`, `scripts/release.sh`, and
+`Dockerfile.build` also compile from source. `scripts/reviewed-deploy-graph.sh`
+runs `make build` before executing or copying `bin/openexec`. No build, CI or
+deploy script reads the removed root binary, cache entries or `data/fwus.jso`.
+The similarly named `data/fwus.json` is not removed or ignored.
+
+Reproduce through `python3 scripts/defect-inventory/verify-d8.py`, also run by
+`make test`: a temporary index loaded from inventory baseline `59f009c6`
+makes the ordinary regression fail specifically on tracked artifacts; the
+current index passes. A temporary source copy excludes all four artifact
+locations, links the installed UI dependencies, runs `make build`, and executes
+the rebuilt CLI. It never changes the real index or removes local artifacts.
+
+Prior verification removed all four artifact locations from disk, ran `make build`
+(exit 0), and executed the newly built `bin/openexec version` (exit 0).
+`TestBuildArtifactsUntrackedAndIgnored` failed against the original index and
+ignore rules, then passed with the repair. It checks the real Git index, ignore
+rules for regenerated files, and that source/data/helper paths remain visible.
+No project loading, migration, configuration or runtime behavior changed.
+
+Rework declared verification: `test exited 0`, including the D8 baseline/current
+regression and artifact-free build/CLI verifier, Go suite and 635 UI tests;
+`lint exited 0`. Independent verification remains pending.
+
+Prior-pass declared verification: `lint exited 0`; final `test exited 0` (`make test`, Go
+suite plus 40 UI files / 635 tests). The first test attempt exited 2 at
+`TestRetentionUnitNativeCallbacksAndStorageRefusal` with `receipt missing`.
+An isolated rerun and then the unchanged full declared check passed; the cause
+of the initial failure is not established. `git diff --check` also passed.

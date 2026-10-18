@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [D7 final description rework, 2026-10-18] Resolved current-main a6afc8a
+  conflicts in Makefile, notes and inventory, retaining D8 verification and
+  cleanup. Fresh declared checks returned "test exited 0" (635 UI tests /
+  40 files) and "lint exited 0"; git diff --check passed. Test output was
+  truncated by the host; prior D7 negative-control evidence remains recorded
+  below. PR #117 transcript replaced through describe_pull_request and
+  fetched from GitHub afterward: exact body matched;
+  independent verification remains pending. No routing implementation changed
+  in this pass.
+
 - [D7 declared verification rework, 2026-10-18] make test now invokes
   verify-d7.py so the host declared test exposes the baseline assertion
   failure, fixed regression pass and inventory REPRODUCED/FIXED? pair.
@@ -29,6 +39,19 @@ Raw capture. One line per thought, any grammar.
   Rework host declared checks returned "lint exited 0" and "test exited 0"
   (Go packages; UI 40 files / 635 tests). git diff --check passed.
   No schema, loading, migration, persistence or legacy fallback behavior changed.
+- [D8, 2026-10-18] Remove 472 tracked build/cache artifacts without history
+  rewriting; add exact root ignore rules and an ordinary Go Git-index/ignore
+  regression. Artifact-free `make build` and rebuilt CLI version passed; D8
+  reproducer reports FIXED? with zero tracked artifacts. Declared lint exited 0.
+  First declared test exited 2: TestRetentionUnitNativeCallbacksAndStorageRefusal,
+  `receipt missing`; isolated rerun passed, then unchanged declared test exited 0
+  (Go suite and UI 40 files / 635 tests). Cause of initial failure not established.
+  Inventory references PR #118. Rework adds verify-d8.py to make test for
+  reproducible baseline-index failure and an artifact-free build/CLI journey.
+  Local verifier exited 0: baseline regression fails on tracked artifacts,
+  current regression passes; fresh make build and rebuilt version pass.
+  Rework declared checks: test exited 0 (including D8 verifier and 635 UI
+  tests / 40 files); lint exited 0. Independent verification pending.
 - [FIX2 D1 verification access, 2026-10-18] make test now runs verify-d1.py
   before the Go/UI suites, exposing the baseline/current comparison through
   the existing host run_declared_check(test). Fresh host result: "test exited 0",
