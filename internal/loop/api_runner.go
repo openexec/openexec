@@ -225,7 +225,10 @@ func (h *MCPToolHandler) readFile(input json.RawMessage) (string, error) {
 		return "", fmt.Errorf("path is required")
 	}
 
-	path := h.resolvePath(req.Path)
+	path, err := h.resolveFilePath(req.Path)
+	if err != nil {
+		return "", err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read file: %w", err)
@@ -246,7 +249,10 @@ func (h *MCPToolHandler) writeFile(input json.RawMessage) (string, error) {
 		return "", fmt.Errorf("path is required")
 	}
 
-	path := h.resolvePath(req.Path)
+	path, err := h.resolveFilePath(req.Path)
+	if err != nil {
+		return "", err
+	}
 
 	if req.CreateDirectories {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -323,6 +329,26 @@ func (h *MCPToolHandler) gitApplyPatch(ctx context.Context, input json.RawMessag
 		return "", fmt.Errorf("git apply failed: %s\n%v", string(out), err)
 	}
 	return fmt.Sprintf("Patch applied successfully.\n%s", string(out)), nil
+}
+
+// resolveFilePath confines file-tool paths lexically before any filesystem effects.
+// Like resolvePath, this does not resolve symlinks and is not an OS sandbox.
+func (h *MCPToolHandler) resolveFilePath(path string) (string, error) {
+	workspace, err := filepath.Abs(h.workDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace: %w", err)
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(workspace, path)
+	}
+	rel, err := filepath.Rel(workspace, path)
+	if err != nil {
+		return "", fmt.Errorf("resolve file path: %w", err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q is outside workspace", path)
+	}
+	return filepath.Clean(path), nil
 }
 
 func (h *MCPToolHandler) resolvePath(path string) string {
