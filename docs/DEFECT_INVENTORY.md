@@ -1,8 +1,8 @@
 # OpenExec defect inventory (FIX1)
 
 FIX1 of Goal 14a5a33b "Verified OpenExec defect closure". This file is the
-inventory only. It contains no fixes. Each **confirmed** row is meant to
-become one FIX2 task.
+original FIX1 inventory, with FIX2 dispositions recorded below. Each **confirmed**
+row is meant to become one FIX2 task.
 
 ## Pinned revisions (2026-10-17)
 
@@ -44,7 +44,7 @@ has gone stale.
 
 | ID | Defect | Reproducer / evidence | Proposed fix (one line) |
 |---|---|---|---|
-| D1 | The API runner's `write_file` and `read_file` resolve `../x` and absolute paths outside the workspace (`internal/loop/api_runner.go` `resolvePath`), and `run_shell_command` runs `sh -c`. `docs/SECURITY_MODEL.md` states "No model output … is ever executed directly" without limiting that claim to the infra MCP plane. Relevant to ISO 27001. | `go test -tags defectrepro -run TestDefectD1WriteFileEscapesWorkDir ./internal/loop/` passes: both escapes are written. | Refuse paths whose `filepath.Rel` from `workDir` starts with `..`, and limit the SECURITY_MODEL claim to the infra/MCP plane. OS sandboxing stays roadmap. |
+| D1 | **FIX2 repair implemented; pending independent verification.** API runner file tools previously accepted workspace escapes; the security claim was overbroad. | Original tagged reproducer now refuses the first escape; `scripts/defect-inventory/reproduce.sh` prints `FIXED? D1`. `python3 scripts/defect-inventory/verify-d1.py` runs the regular `TestAPIFileToolsWorkspaceBoundary`, which fails on the original implementation and passes with this repair, exercising both tools, refusal before directory creation, and persisted in-workspace round trips. | Fixing PR: openexec/openexec#112. `resolveFilePath` rejects `filepath.Rel` equal to `..` or beginning with a parent-directory component before file effects. SECURITY_MODEL limits its claim to infrastructure/MCP and explicitly describes `sh -c`. Existing code does not resolve symlinks; OS sandboxing remains roadmap. |
 | D2 | Every CLI command that prints with cobra `cmd.Printf`/`Println` writes to **stderr**, because `rootCmd` never calls `SetOut`. 17 files in `internal/cli` are affected, including `version`, `status`, `release`, `approve` and `skills`. Scripts that pipe this output get nothing: the graph deploy guard refused on 10-11 for this reason (#108 worked around it). | `go run ./cmd/openexec version 2>/dev/null \| wc -c` prints `0`. | Call `rootCmd.SetOut(os.Stdout)` in `Execute`, with a test that does not call `SetOut` itself. `version_test.go` hides the bug because it does. |
 | D3 | GitHub CI never runs the UI unit tests. `ci.yml` builds the UI but has no vitest step. They run only in the local `make test` gate. | `grep -E 'vitest\|npm (run )?test' .github/workflows/ci.yml` finds no match. | Add a `npx vitest run --fileParallelism=false` step in `ui/`. |
 | D4 | **Fixed in [PR #115](https://github.com/openexec/openexec/pull/115).** The hook and standalone panel now append `/v1/approvals` to the API base for list, approve and reject. An exact HTTP 503 `approval gate not configured` response clears stale approvals (hiding the ChatPage panel) and hides the standalone panel; other errors remain visible. | `scripts/defect-inventory/reproduce.sh` prints `FIXED? D4`. Regular regression: `ui/src/components/chat/blueprint/ApprovalsPanel.test.tsx`; browser/real API regression: `ui/e2e/approvals-d4.spec.ts` via `node ui/node_modules/@playwright/test/cli.js test --config ui/playwright.d4.config.ts`. | No production gate was wired. The API still refuses list/approve/reject without a configured gate. Repair: [PR #115](https://github.com/openexec/openexec/pull/115); FIX1 inventory history remains in #111. |
