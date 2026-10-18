@@ -65,6 +65,7 @@ test:
 	@echo "🧪 Verifying D1 regression against original and current code..."
 	python3 scripts/defect-inventory/verify-d1.py
 	python3 scripts/defect-inventory/verify-d8.py
+	python3 scripts/defect-inventory/verify-d5.py
 	@echo "🧪 Running Go tests..."
 	go test ./...
 	@$(MAKE) ui-test
