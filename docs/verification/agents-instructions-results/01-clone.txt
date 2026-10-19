@@ -1,0 +1,6 @@
+cwd: /home/perttu/.agent-console/worktrees/525889e0ef737896ec32efed757f5f30
+argv: ["git", "clone", "--local", "--no-hardlinks", "/home/perttu/.agent-console/worktrees/525889e0ef737896ec32efed757f5f30", "/tmp/openexec-instructions-fukjpter/checkout"]
+Cloning into '/tmp/openexec-instructions-fukjpter/checkout'...
+done.
+
+exit_status: 0

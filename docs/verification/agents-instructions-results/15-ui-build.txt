@@ -1,0 +1,16 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout/ui
+argv: ["npm", "run", "build"]
+
+> @openexec/ui@0.1.0 build
+> tsc && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 112 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  1.56 kB │ gzip:   0.76 kB
+dist/assets/index-DObLT63E.js  386.27 kB │ gzip: 100.82 kB
+✓ built in 574ms
+
+exit_status: 0

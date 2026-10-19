@@ -1,0 +1,360 @@
+{
+  "collected_at": "2026-10-19T04:35:13.529435+00:00",
+  "source_commit": "4c6c99f2632060422df0a65cab36055e44a746cb",
+  "checkout": "/tmp/openexec-instructions-fukjpter/checkout",
+  "commands": [
+    {
+      "name": "01-clone",
+      "argv": [
+        "git",
+        "clone",
+        "--local",
+        "--no-hardlinks",
+        "/home/perttu/.agent-console/worktrees/525889e0ef737896ec32efed757f5f30",
+        "/tmp/openexec-instructions-fukjpter/checkout"
+      ],
+      "cwd": "/home/perttu/.agent-console/worktrees/525889e0ef737896ec32efed757f5f30",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "f3d77689d710346f1554ca8e2cfbe6d6b4ce7828f628dd78d74c54c3844ddbad"
+    },
+    {
+      "name": "02-identity",
+      "argv": [
+        "git",
+        "status",
+        "--porcelain=v1"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "07e7fd3341569787e4a43ba47f524713f473e483961f406a159cae048844b7ac"
+    },
+    {
+      "name": "03-head",
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "f0a1eb1228926b6002f240461470f829bc829669ba90ccb1472f3253be493622"
+    },
+    {
+      "name": "version-go",
+      "argv": [
+        "go",
+        "version"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "7934939e0f333614bd29f586a416b4cae2427670776eef1aa77622e817701da7"
+    },
+    {
+      "name": "version-node",
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "f761d923769073e1da3d4aeebf20e9f82b626c594f7b5674999fa1f3197d1d96"
+    },
+    {
+      "name": "version-npm",
+      "argv": [
+        "npm",
+        "--version"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "2d3d77745b4ad61d1c8b0984a69bbf545306494acd19887f9dda2ed5c99d2afa"
+    },
+    {
+      "name": "version-python",
+      "argv": [
+        "python3",
+        "--version"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "7e831448b8cbd48df80688e6d10ba030f3e918506411206a3882773284f7b1ee"
+    },
+    {
+      "name": "version-git",
+      "argv": [
+        "git",
+        "--version"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "923c89b64ddc2e5576eedd5668f8477812f2d7cd20dcb45a70cff5073a96a699"
+    },
+    {
+      "name": "04-modules",
+      "argv": [
+        "go",
+        "mod",
+        "download"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "e6dde403c49b6ebf24d94c19b84b5b84c55d4d297444f397be3a173793852dae"
+    },
+    {
+      "name": "05-npm-ci",
+      "argv": [
+        "npm",
+        "ci"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "b2e1316df5be8b8f85654dd6dc29674eef98b1261d05767f86e67a489d226bac"
+    },
+    {
+      "name": "06-chromium",
+      "argv": [
+        "npx",
+        "playwright",
+        "install",
+        "chromium"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "f1f32d8b65a8cf62e148d725019b29477d32d8d0d81d1476af7efcafec3b6f4b"
+    },
+    {
+      "name": "07-build",
+      "argv": [
+        "make",
+        "build"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "f10de6f14384a927393167f62d27cfee00cfa6a9108b1ead9f6ac351764bb809"
+    },
+    {
+      "name": "08-direct-build",
+      "argv": [
+        "go",
+        "build",
+        "-buildvcs=false",
+        "-o",
+        "openexec",
+        "./cmd/openexec"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "84e5291a2df9081ee86d57063452cf65f5cfc9c35929603c72d63b4966863d8e"
+    },
+    {
+      "name": "09-test",
+      "argv": [
+        "make",
+        "test"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "3a6f01be2cd6556dd6accb52bfb099a2b60df2b7e3c2bc6bd65798deb8c1c047"
+    },
+    {
+      "name": "10-go-test",
+      "argv": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "001ec511783c5bc69cdb96bbc66f7abf15ed3dcdf30c0f9f94289dc3336d7b4e"
+    },
+    {
+      "name": "11-focused-loop",
+      "argv": [
+        "go",
+        "test",
+        "-v",
+        "./internal/loop/...",
+        "-run",
+        "TestLoop"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "e66402311faad5479d8ecd87002bd5eaf0074cba465ddb11ea6ec4ca9a5e42d1"
+    },
+    {
+      "name": "12-compat",
+      "argv": [
+        "make",
+        "compat-test"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "cf8211e53289eecd5e7e22dad460fe43d198465ed3188348002b5d3ae0805f6b"
+    },
+    {
+      "name": "13-lint",
+      "argv": [
+        "make",
+        "lint"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "071e5220d2e9fc55a50854cf4a20894a067d27b44761876f558865c7aedbf05f"
+    },
+    {
+      "name": "14-type-check",
+      "argv": [
+        "make",
+        "type-check"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "870c78e5604c23bab7bea340b9c2dafc196aeeab810b6d276356cde6084ed36b"
+    },
+    {
+      "name": "15-ui-build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "98de94f0762092320837cc564887fa27daf2a794375a65921d8e5cb6686613a9"
+    },
+    {
+      "name": "16-ui-lint",
+      "argv": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "a5cb06718ad38f32570f9c96050ca84b7e88042fb9e57ba6689f4102c0bbc992"
+    },
+    {
+      "name": "17-ui-serial",
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "--fileParallelism=false",
+        "--maxWorkers=1",
+        "--minWorkers=1"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "3e23b9d8afc9480d4e93a6bf7e6de5e28c3a0fd8556150f9b1012fdf5d460207"
+    },
+    {
+      "name": "18-coverage",
+      "argv": [
+        "npm",
+        "run",
+        "test:coverage"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "681fb02818b729530a9476af7f04035e18f632d70b2fe38eb6ae72ddeef6fddd"
+    },
+    {
+      "name": "19-watch",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 0,
+      "termination": "readiness timeout",
+      "sha256": "03bfa23707be4207fc88cf24dc5f47df4703a432559a7f6331f29d35dcf1c2e3"
+    },
+    {
+      "name": "20-dev",
+      "argv": [
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3001"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": -2,
+      "termination": "readiness observed; controlled SIGINT",
+      "sha256": "ec72798de0c5632896870f9156ccdbb9a9edb17983a26bb10a765b7c1e43b422"
+    },
+    {
+      "name": "21-docker",
+      "argv": [
+        "make",
+        "build-all"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 2,
+      "termination": null,
+      "sha256": "58636a3ae2e6490320f7f43d1f06c1cdbb7d171dd1b0588b53ece5e989ef3dc8"
+    },
+    {
+      "name": "22-init",
+      "argv": [
+        "./bin/openexec",
+        "init",
+        "--yes"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout",
+      "exit_status": 0,
+      "termination": null,
+      "sha256": "2c246247e4f8f0924ba70944cc49fe7c972b14df7341ca8232f8559744309a85"
+    },
+    {
+      "name": "23-generic-e2e",
+      "argv": [
+        "npm",
+        "run",
+        "test:e2e"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "exit_status": 1,
+      "termination": null,
+      "sha256": "3de5e81f97366df4234f93d5144407bf983ed00cba6733582242c5aacb32010e"
+    },
+    {
+      "name": "24-watch-terminal",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "cwd": "/tmp/openexec-instructions-fukjpter/checkout/ui",
+      "terminal": true,
+      "environment_change": "CI removed",
+      "readiness_observed": true,
+      "exit_status": -2,
+      "termination": "controlled SIGINT",
+      "sha256": "a0443f73e9d56d7a0ee6631ba431d066d9411e78038e078e4a79ad8a3fac4867"
+    }
+  ]
+}

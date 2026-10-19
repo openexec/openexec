@@ -1,0 +1,5 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["python3", "--version"]
+Python 3.12.3
+
+exit_status: 0

@@ -1,0 +1,36 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["make", "build-all"]
+🚀 Building multi-platform binaries v0.13.1-165-g4c6c99f2 (4c6c99f2) via Docker...
+docker build -f Dockerfile.build \
+	--build-arg VERSION=0.13.1-165-g4c6c99f2 \
+	--build-arg COMMIT=4c6c99f2 \
+	-t openexec-builder .
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.build
+#1 transferring dockerfile: 1.60kB done
+#1 DONE 0.2s
+
+#2 [internal] load metadata for docker.io/library/node:20-slim
+#2 ...
+
+#3 [internal] load metadata for docker.io/library/golang:1.25-bullseye
+#3 ERROR: docker.io/library/golang:1.25-bullseye: not found
+
+#2 [internal] load metadata for docker.io/library/node:20-slim
+#2 CANCELED
+------
+ > [internal] load metadata for docker.io/library/golang:1.25-bullseye:
+------
+Dockerfile.build:10
+--------------------
+   8 |     
+   9 |     # Stage 2: Build the Multi-Platform Binaries
+  10 | >>> FROM golang:1.25-bullseye AS go-builder
+  11 |     WORKDIR /app
+  12 |     
+--------------------
+ERROR: failed to build: failed to solve: golang:1.25-bullseye: failed to resolve source metadata for docker.io/library/golang:1.25-bullseye: docker.io/library/golang:1.25-bullseye: not found
+make: *** [Makefile:37: build-all] Error 1
+
+exit_status: 2

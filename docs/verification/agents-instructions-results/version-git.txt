@@ -1,0 +1,5 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["git", "--version"]
+git version 2.43.0
+
+exit_status: 0
