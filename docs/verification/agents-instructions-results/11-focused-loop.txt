@@ -1,0 +1,24 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["go", "test", "-v", "./internal/loop/...", "-run", "TestLoop"]
+=== RUN   TestLoop_BlueprintMode_Initialization
+--- PASS: TestLoop_BlueprintMode_Initialization (0.00s)
+=== RUN   TestLoop_BlueprintMode_Disabled
+--- PASS: TestLoop_BlueprintMode_Disabled (0.00s)
+=== RUN   TestLoop_BlueprintMode_DefaultBlueprint
+--- PASS: TestLoop_BlueprintMode_DefaultBlueprint (0.00s)
+=== RUN   TestLoop_BlueprintMode_SimpleExecution
+--- PASS: TestLoop_BlueprintMode_SimpleExecution (0.00s)
+=== RUN   TestLoop_BlueprintMode_Callbacks
+--- PASS: TestLoop_BlueprintMode_Callbacks (0.00s)
+=== RUN   TestLoop_BlueprintMode_StageFailureWithRetry
+--- PASS: TestLoop_BlueprintMode_StageFailureWithRetry (0.00s)
+=== RUN   TestLoop_Run
+=== RUN   TestLoop_Run/successful_run
+=== RUN   TestLoop_Run/run_with_signal
+--- PASS: TestLoop_Run (0.00s)
+    --- PASS: TestLoop_Run/successful_run (0.00s)
+    --- PASS: TestLoop_Run/run_with_signal (0.00s)
+PASS
+ok  	github.com/openexec/openexec/internal/loop	0.007s
+
+exit_status: 0

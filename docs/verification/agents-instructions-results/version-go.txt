@@ -1,0 +1,5 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["go", "version"]
+go version go1.26.5 linux/amd64
+
+exit_status: 0

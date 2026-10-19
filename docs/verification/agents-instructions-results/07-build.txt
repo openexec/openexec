@@ -1,0 +1,19 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["make", "build"]
+cd ui && npm run build
+
+> @openexec/ui@0.1.0 build
+> tsc && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 112 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  1.56 kB │ gzip:   0.76 kB
+dist/assets/index-DObLT63E.js  386.27 kB │ gzip: 100.82 kB
+✓ built in 1.15s
+🚀 Building OpenExec binary...
+go build -tags ui_dist -ldflags "-X github.com/openexec/openexec/pkg/version.Version=0.13.1-165-g4c6c99f2 -X github.com/openexec/openexec/pkg/version.Commit=4c6c99f2 -X github.com/openexec/openexec/internal/cli.BuildDate=2026-10-19T04:22:23Z" -o bin/openexec ./cmd/openexec
+
+exit_status: 0

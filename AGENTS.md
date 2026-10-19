@@ -111,7 +111,7 @@ never install into or modify that shared directory.
 | `make build-all` | Docker release build/extraction to `dist/`: Linux and macOS amd64/arm64, Windows amd64. Requires Docker daemon, base-image network access and build disk space. Known baseline failure: `Dockerfile.build` references `golang:1.25-bullseye`, which the registry returned as not found during instructions verification; do not claim release builds pass. |
 | **ui/** `npm run build` | TypeScript compile and Vite production assets. |
 | **ui/** `npm run lint` | ESLint; warnings fail. |
-| **ui/** `npm test` | Vitest watch mode; stop with Ctrl-C after startup/tests. |
+| **ui/** `npm test` | Vitest watch mode in an interactive terminal with `CI` unset; stop with Ctrl-C after startup/tests. In noninteractive/CI environments Vitest runs once and exits. |
 | **ui/** `npx vitest run --fileParallelism=false --maxWorkers=1 --minWorkers=1` | Bounded serial UI suite, also used by `make test`. |
 | **ui/** `npm run test:coverage` | Vitest run with V8 coverage. |
 | **ui/** `npm run dev -- --port 3001` | Vite HMR server; stop with Ctrl-C after use. Needs free port 3001. |

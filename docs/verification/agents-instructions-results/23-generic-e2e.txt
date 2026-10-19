@@ -1,0 +1,853 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout/ui
+argv: ["npm", "run", "test:e2e"]
+
+> @openexec/ui@0.1.0 test:e2e
+> playwright test
+
+[WebServer] 2026/10/19 07:33:40 [StateStore] Initialized: path=/tmp/openexec-instructions-fukjpter/checkout/.openexec/openexec.db, schema=v1, async_queue_size=1000
+[WebServer] 2026/10/19 07:33:40 [Server] Runner: model=sonnet command=/home/perttu/.local/bin/claude args=[--output-format stream-json --verbose --max-turns 50]
+[WebServer] [MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[WebServer] [MIGRATION] Importing stories/goals from /tmp/openexec-instructions-fukjpter/checkout/.openexec/stories.json
+[WebServer] 2026/10/19 07:33:40 [Bootstrap] parsed stories.json: 5 goals, 8 stories
+[WebServer] [MIGRATION] Imported 5 goals
+[WebServer] 2026/10/19 07:33:40 [Bootstrap] creating 8 stories and 26 tasks
+[WebServer] [MIGRATION] Imported 8 stories
+[WebServer] [MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[WebServer] 2026/10/19 07:33:40 [Server] DCP disabled: using Pipeline/Manager only
+[WebServer] 2026/10/19 07:33:40 [Watchdog] Started monitoring with stall threshold 5m0s
+[WebServer] 2026/10/19 07:33:40 [Server] Feature flags enabled: UnifiedReads
+[WebServer] 2026/10/19 07:33:40 [Server] Feature flags disabled: DCP, LegacyFWU
+[WebServer] 2026/10/19 07:33:40 [Telemetry] Active: service=openexec-daemon, sampling=5%, endpoint=
+[WebServer] 2026/10/19 07:33:40 [Server] Unified OpenExec API listening on 127.0.0.1:8080
+[WebServer] (node:1997881) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 73 tests using 1 worker
+(node:1998265) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1998265) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/providers 200 (68.378µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/v1/approvals 503 (31.018µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/projects 200 (308.497µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (269.021µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/providers 200 (57.299µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/v1/approvals 503 (24.676µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/projects 200 (293.231µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (172.142µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/models 200 (185.29µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/models 200 (126.176µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (164.44µs)
+·[WebServer] 2026/10/19 07:33:42 [API] GET /api/providers 200 (44.622µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/v1/approvals 503 (18.616µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (167.917µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/projects 200 (267.59µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/providers 200 (67.845µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/v1/approvals 503 (20.249µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (172.213µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/projects 200 (307.926µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/models 200 (87.873µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/models 200 (89.568µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (175.955µs)
+·[WebServer] 2026/10/19 07:33:42 [API] GET /api/providers 200 (35.936µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/v1/approvals 503 (32.065µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (866.388µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/projects 200 (1.340331ms)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/providers 200 (52.194µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/v1/approvals 503 (22.414µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (139.422µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/projects 200 (185.169µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/models 200 (106.278µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/models 200 (86.819µs)
+[WebServer] 2026/10/19 07:33:42 [API] GET /api/sessions 200 (188.762µs)
+·[WebServer] 2026/10/19 07:33:43 [API] GET /api/providers 200 (39.392µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/v1/approvals 503 (25.092µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/projects 200 (239.688µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (222.829µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/providers 200 (46.983µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/v1/approvals 503 (34.117µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (194.743µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/projects 200 (277.108µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/models 200 (89.07µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/models 200 (104.259µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (186.525µs)
+·[WebServer] 2026/10/19 07:33:43 [API] GET /api/providers 200 (56.806µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/v1/approvals 503 (19.497µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (158.18µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/projects 200 (257.391µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/providers 200 (34.401µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/v1/approvals 503 (19.152µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (95.49µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/projects 200 (223.353µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/models 200 (89.568µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/models 200 (67.496µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (181.349µs)
+·[WebServer] 2026/10/19 07:33:43 [API] GET /api/v1/approvals 503 (38.955µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/providers 200 (67.637µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (216.091µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/projects 200 (293.002µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/v1/approvals 503 (28.566µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/providers 200 (38.969µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (195.075µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/projects 200 (234.162µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/models 200 (78.86µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/models 200 (96.435µs)
+[WebServer] 2026/10/19 07:33:43 [API] GET /api/sessions 200 (174.006µs)
+·[WebServer] 2026/10/19 07:33:48 [API] GET /api/v1/approvals 503 (24.206µs)
+[WebServer] 2026/10/19 07:33:48 [Indexer] Indexed 13684 symbols across 1058 files in 3.259s
+[WebServer] 2026/10/19 07:33:48 [API] GET /api/v1/approvals 503 (48.104µs)
+[WebServer] 2026/10/19 07:33:48 [API] GET /api/v1/approvals 503 (33.926µs)
+×(node:2005720) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2005720) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:33:55 [API] GET /api/v1/approvals 503 (42.82µs)
+[WebServer] 2026/10/19 07:33:55 [API] GET /api/v1/approvals 503 (45.79µs)
+[WebServer] 2026/10/19 07:33:55 [API] GET /api/v1/approvals 503 (16.847µs)
+×(node:2017206) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2017206) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:34:02 [API] GET /api/v1/approvals 503 (32.021µs)
+[WebServer] 2026/10/19 07:34:02 [API] GET /api/v1/approvals 503 (31.565µs)
+[WebServer] 2026/10/19 07:34:02 [API] GET /api/v1/approvals 503 (30.696µs)
+F(node:2030768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2030768) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/providers 200 (51.599µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/v1/approvals 503 (19.574µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/projects 200 (260.385µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/sessions 200 (158.24µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/v1/approvals 503 (21.949µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/providers 200 (34.16µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/projects 200 (239.676µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/sessions 200 (157.239µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/providers 200 (49.795µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/v1/approvals 503 (30.92µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/sessions 200 (121.943µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/projects 200 (245.745µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/providers 200 (259.513µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/v1/approvals 503 (333.54µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/sessions 200 (199.022µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/projects 200 (394.354µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/providers 200 (90.727µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/v1/approvals 503 (33.952µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/sessions 200 (316.907µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/projects 200 (280.933µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/models 200 (102.65µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/models 200 (107.683µs)
+[WebServer] 2026/10/19 07:34:03 [API] GET /api/sessions 200 (235.667µs)
+·[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (43.483µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (19.241µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (266.486µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (164.457µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (24.258µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (35.129µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (124.744µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (239.583µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (48.404µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (23.242µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (182.532µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (361.957µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (47.969µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (29.385µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (203.599µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (351.406µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/models 200 (122.175µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/models 200 (86.929µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (223.649µs)
+[WebServer] 2026/10/19 07:34:04 [API] POST /api/sessions 201 (290.79µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions/38117ec8-e6d6-4d09-a2cf-d47b70ac7c43 200 (206.894µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions/38117ec8-e6d6-4d09-a2cf-d47b70ac7c43/messages 200 (323.631µs)
+·[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (54.517µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (34.129µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (340.999µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (197.824µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (37.034µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (37.085µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (151.842µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (308.01µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (238.217µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (35.525µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (19.548µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (345.406µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/providers 200 (53.155µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/v1/approvals 503 (25.831µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/projects 200 (330.649µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (292.784µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/models 200 (808.221µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/sessions 200 (296.906µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/models 200 (93.752µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/directories 200 (135.54µs)
+[WebServer] 2026/10/19 07:34:04 [API] GET /api/directories 200 (108.862µs)
+[WebServer] 2026/10/19 07:34:05 [API] GET /api/directories 500 (59.267µs)
+[WebServer] 2026/10/19 07:34:05 [API] POST /api/projects/init 201 (377.591µs)
+[WebServer] 2026/10/19 07:34:05 [API] GET /api/projects 200 (307.016µs)
+[WebServer] 2026/10/19 07:34:05 [API] GET /api/projects 200 (250.426µs)
+[WebServer] 2026/10/19 07:34:05 [API] GET /api/sessions 200 (217.253µs)
+×(node:2054445) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2054445) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/providers 200 (48.273µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/v1/approvals 503 (30.647µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (250.055µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (185.758µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/providers 200 (45.407µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/v1/approvals 503 (26.903µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (518.477µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (461.972µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/models 200 (99.26µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/models 200 (139.79µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (268.598µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/providers 200 (48.075µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/v1/approvals 503 (28.888µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (273.753µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (288.436µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/providers 200 (63.636µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/v1/approvals 503 (35.23µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (296.593µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (299.069µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/models 200 (111.52µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/models 200 (116.883µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/v1/approvals 503 (19.725µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/providers 200 (49.22µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (214.173µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (291.795µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/v1/approvals 503 (27.95µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/providers 200 (36.767µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (261.754µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (226.586µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/models 200 (213.769µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/models 200 (112.761µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/directories 200 (94.078µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/directories 200 (72.212µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/directories 500 (50.084µs)
+[WebServer] 2026/10/19 07:34:18 [API] POST /api/projects/init 201 (298.437µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (884.202µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/projects 200 (260.831µs)
+[WebServer] 2026/10/19 07:34:18 [API] GET /api/sessions 200 (268.341µs)
+×(node:2080009) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2080009) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/providers 200 (63.29µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/v1/approvals 503 (31.436µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/projects 200 (346.33µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/sessions 200 (235.591µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/providers 200 (59.186µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/projects 200 (214.757µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/v1/approvals 503 (24.009µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/sessions 200 (203.363µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/v1/approvals 503 (55.892µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/providers 200 (44.695µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/projects 200 (348.664µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/sessions 200 (260.891µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/v1/approvals 503 (34.499µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/providers 200 (53.034µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/sessions 200 (260.213µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/projects 200 (319.67µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/models 200 (113.451µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/models 200 (70.665µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/sessions 200 (302.926µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/directories 200 (105.705µs)
+[WebServer] 2026/10/19 07:34:32 [API] GET /api/directories 200 (75.758µs)
+[WebServer] 2026/10/19 07:34:33 [API] GET /api/directories 500 (44.966µs)
+[WebServer] 2026/10/19 07:34:33 [API] POST /api/projects/init 201 (232.15µs)
+[WebServer] 2026/10/19 07:34:33 [API] GET /api/projects 200 (315.002µs)
+[WebServer] 2026/10/19 07:34:33 [API] GET /api/projects 200 (345.246µs)
+[WebServer] 2026/10/19 07:34:33 [API] GET /api/sessions 200 (253.299µs)
+F(node:2093744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2093744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/providers 200 (39.675µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/v1/approvals 503 (33.723µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/projects 200 (242.536µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/sessions 200 (222.93µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/v1/approvals 503 (30.529µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/providers 200 (39.941µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/projects 200 (166.445µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/sessions 200 (207.703µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/providers 200 (47.742µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/v1/approvals 503 (21.255µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/sessions 200 (156.124µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/projects 200 (267.82µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/v1/approvals 503 (36.035µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/providers 200 (36.472µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/sessions 200 (220.462µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/projects 200 (225.53µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/v1/approvals 503 (34.837µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/providers 200 (51.514µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/sessions 200 (166.564µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/projects 200 (192.572µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/models 200 (68.262µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/models 200 (98.277µs)
+[WebServer] 2026/10/19 07:34:46 [API] GET /api/sessions 200 (246.481µs)
+···[WebServer] 2026/10/19 07:34:49 [API] GET /api/v1/approvals 503 (42.405µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/projects 200 (314.61µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/v1/approvals 503 (37.109µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/projects 200 (306.155µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/models 200 (101.845µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/models 200 (93.467µs)
+·[WebServer] 2026/10/19 07:34:49 [API] GET /api/v1/approvals 503 (30.268µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/projects 200 (250.071µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/v1/approvals 503 (27.437µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/projects 200 (251.754µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/models 200 (84.84µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/models 200 (47.307µs)
+·[WebServer] 2026/10/19 07:34:49 [API] GET /api/v1/approvals 503 (29.287µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/projects 200 (266.59µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/v1/approvals 503 (19.087µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/projects 200 (155.987µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/models 200 (90.879µs)
+[WebServer] 2026/10/19 07:34:49 [API] GET /api/models 200 (58.193µs)
+·[WebServer] 2026/10/19 07:34:50 [API] GET /api/v1/approvals 503 (36.539µs)
+[WebServer] 2026/10/19 07:34:50 [API] GET /api/projects 200 (243.209µs)
+[WebServer] 2026/10/19 07:34:50 [API] GET /api/v1/approvals 503 (19.227µs)
+[WebServer] 2026/10/19 07:34:50 [API] GET /api/projects 200 (251.225µs)
+[WebServer] 2026/10/19 07:34:50 [API] GET /api/models 200 (81.399µs)
+[WebServer] 2026/10/19 07:34:50 [API] GET /api/models 200 (91.156µs)
+·[WebServer] 2026/10/19 07:34:51 [API] GET /api/v1/approvals 503 (51.649µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/projects 200 (918.909µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/v1/approvals 503 (29.654µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/projects 200 (263.427µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/models 200 (111.499µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/models 200 (79.566µs)
+·[WebServer] 2026/10/19 07:34:51 [API] GET /api/v1/approvals 503 (31.928µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/projects 200 (286.334µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/v1/approvals 503 (25.346µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/projects 200 (276.452µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/models 200 (103.69µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/models 200 (61.714µs)
+·[WebServer] 2026/10/19 07:34:51 [API] GET /api/v1/approvals 503 (33.103µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/projects 200 (266.502µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/v1/approvals 503 (24.083µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/projects 200 (223.35µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/models 200 (102.752µs)
+[WebServer] 2026/10/19 07:34:51 [API] GET /api/models 200 (67.884µs)
+·[WebServer] 2026/10/19 07:34:52 [API] GET /api/v1/approvals 503 (29.979µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/projects 200 (316.334µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/v1/approvals 503 (34.401µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/projects 200 (293.543µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/models 200 (137.533µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/models 200 (64.357µs)
+·[WebServer] 2026/10/19 07:34:52 [API] GET /api/v1/approvals 503 (33.371µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/projects 200 (322.389µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/projects 200 (303.116µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/v1/approvals 503 (19.326µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/models 200 (118.826µs)
+[WebServer] 2026/10/19 07:34:52 [API] GET /api/models 200 (119.326µs)
+·[WebServer] 2026/10/19 07:34:53 [API] GET /api/projects 200 (791.653µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/v1/approvals 503 (20.229µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/v1/approvals 503 (34.029µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/projects 200 (376.704µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/models 200 (102.895µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/models 200 (50.309µs)
+·[WebServer] 2026/10/19 07:34:53 [API] GET /api/v1/approvals 503 (49.918µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/projects 200 (275.327µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/v1/approvals 503 (23.823µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/projects 200 (203.486µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/models 200 (96.682µs)
+[WebServer] 2026/10/19 07:34:53 [API] GET /api/models 200 (62.901µs)
+·[WebServer] 2026/10/19 07:34:54 [API] GET /api/v1/approvals 503 (31.718µs)
+[WebServer] 2026/10/19 07:34:54 [API] GET /api/projects 200 (560.754µs)
+[WebServer] 2026/10/19 07:34:54 [API] GET /api/v1/approvals 503 (32.484µs)
+[WebServer] 2026/10/19 07:34:54 [API] GET /api/projects 200 (252.527µs)
+[WebServer] 2026/10/19 07:34:54 [API] GET /api/models 200 (119.458µs)
+[WebServer] 2026/10/19 07:34:54 [API] GET /api/models 200 (80.794µs)
+·[WebServer] 2026/10/19 07:34:55 [API] GET /api/v1/approvals 503 (42.029µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/projects 200 (267.626µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/v1/approvals 503 (27.332µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/projects 200 (173.424µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/models 200 (74.086µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/models 200 (277.895µs)
+·[WebServer] 2026/10/19 07:34:55 [API] GET /api/v1/approvals 503 (43.204µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/projects 200 (234.05µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/v1/approvals 503 (22.573µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/projects 200 (199.976µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/models 200 (89.163µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/models 200 (114.067µs)
+·[WebServer] 2026/10/19 07:34:55 [API] GET /api/v1/approvals 503 (39.284µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/projects 200 (379.126µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/v1/approvals 503 (52.661µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/projects 200 (322.603µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/models 200 (95.765µs)
+[WebServer] 2026/10/19 07:34:55 [API] GET /api/models 200 (109.222µs)
+·[WebServer] 2026/10/19 07:34:56 [API] GET /api/v1/approvals 503 (87.763µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/projects 200 (342.432µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/v1/approvals 503 (81.898µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/projects 200 (279.353µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/models 200 (135.229µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/models 200 (173.136µs)
+·[WebServer] 2026/10/19 07:34:56 [API] GET /api/v1/approvals 503 (45.583µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/projects 200 (286.781µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/v1/approvals 503 (31.622µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/projects 200 (166.042µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/models 200 (117.465µs)
+[WebServer] 2026/10/19 07:34:56 [API] GET /api/models 200 (95.099µs)
+·[WebServer] 2026/10/19 07:34:57 [API] GET /api/v1/approvals 503 (36.056µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/projects 200 (293.295µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/v1/approvals 503 (36.252µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/projects 200 (231.413µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/models 200 (69.603µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/models 200 (110.239µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/v1/approvals 503 (31.823µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/projects 200 (276.708µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/v1/approvals 503 (32.643µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/projects 200 (235.581µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/models 200 (94.089µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/models 200 (113.938µs)
+·[WebServer] 2026/10/19 07:34:57 [API] GET /api/v1/approvals 503 (27.622µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/projects 200 (675.029µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/v1/approvals 503 (42.297µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/projects 200 (288.24µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/models 200 (115.266µs)
+[WebServer] 2026/10/19 07:34:57 [API] GET /api/models 200 (111.593µs)
+·[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (31.641µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (278.984µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (33.155µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (264.777µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (97.418µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (83.391µs)
+·[WebServer] 2026/10/19 07:34:58 [API] GET /api/providers 200 (38.163µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (23.01µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (288.292µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/providers 200 (52.225µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (15.417µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (243.773µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (189.124µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (74.973µs)
+·[WebServer] 2026/10/19 07:34:58 [API] GET /api/providers 200 (67.343µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (40.888µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/providers 200 (31.353µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (405.665µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (301.825µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (21.175µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (115.439µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (88.317µs)
+·[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (41.574µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (279.158µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/v1/approvals 503 (32.312µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/projects 200 (203.163µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (101.567µs)
+[WebServer] 2026/10/19 07:34:58 [API] GET /api/models 200 (85.103µs)
+·[WebServer] 2026/10/19 07:34:59 [API] GET /api/v1/approvals 503 (32.461µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/projects 200 (252.332µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/v1/approvals 503 (30.514µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/projects 200 (327.801µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/models 200 (122.354µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/models 200 (47.67µs)
+·[WebServer] 2026/10/19 07:34:59 [API] GET /api/v1/approvals 503 (35.456µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/projects 200 (259.885µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/v1/approvals 503 (28.661µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/projects 200 (257.151µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/models 200 (93.165µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/models 200 (721.481µs)
+·[WebServer] 2026/10/19 07:34:59 [API] GET /api/v1/approvals 503 (25.676µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/v1/approvals 503 (16.792µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/projects 200 (421.68µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/projects 200 (448.108µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/models 200 (113.315µs)
+[WebServer] 2026/10/19 07:34:59 [API] GET /api/models 200 (80.393µs)
+·[WebServer] 2026/10/19 07:35:00 [API] GET /api/v1/approvals 503 (32.515µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/projects 200 (250.052µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/v1/approvals 503 (32.331µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/projects 200 (280.115µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/models 200 (108.137µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/models 200 (67.592µs)
+·[WebServer] 2026/10/19 07:35:00 [API] GET /api/v1/approvals 503 (41.349µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/projects 200 (347.962µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/v1/approvals 503 (21.844µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/projects 200 (288.718µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/models 200 (141.041µs)
+[WebServer] 2026/10/19 07:35:00 [API] GET /api/models 200 (75.309µs)
+·[WebServer] 2026/10/19 07:35:01 [API] GET /api/v1/approvals 503 (106.533µs)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/v1/approvals 503 (29.716µs)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/projects 200 (2.069591ms)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/projects 200 (1.048297ms)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/models 200 (132.824µs)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/models 200 (236.274µs)
+·[WebServer] 2026/10/19 07:35:01 [API] GET /api/v1/approvals 503 (23.114µs)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/projects 200 (289.259µs)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/v1/approvals 503 (26.02µs)
+[WebServer] 2026/10/19 07:35:01 [API] GET /api/projects 200 (174.839µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/models 200 (90.272µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/models 200 (61.426µs)
+·[WebServer] 2026/10/19 07:35:02 [API] GET /api/v1/approvals 503 (33.413µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/projects 200 (189.766µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/v1/approvals 503 (38.285µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/projects 200 (293.052µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/models 200 (91.615µs)
+[WebServer] 2026/10/19 07:35:02 [API] GET /api/models 200 (72.291µs)
+·[WebServer] 2026/10/19 07:35:03 [API] GET /api/v1/approvals 503 (36.65µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/projects 200 (313.518µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/v1/approvals 503 (30.881µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/projects 200 (283.018µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/models 200 (80.024µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/models 200 (80.448µs)
+·[WebServer] 2026/10/19 07:35:03 [API] GET /api/v1/approvals 503 (28.846µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/projects 200 (267.695µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/v1/approvals 503 (21.84µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/projects 200 (157.016µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/models 200 (100.287µs)
+[WebServer] 2026/10/19 07:35:03 [API] GET /api/models 200 (34.27µs)
+·[WebServer] 2026/10/19 07:35:04 [API] GET /api/v1/approvals 503 (28.694µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/projects 200 (185.805µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/v1/approvals 503 (33.132µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/projects 200 (247.569µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/models 200 (125.694µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/models 200 (151.568µs)
+·[WebServer] 2026/10/19 07:35:04 [API] GET /api/v1/approvals 503 (37.768µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/projects 200 (367.531µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/sessions 200 (251.263µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/projects 200 (281.493µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/v1/approvals 503 (16.891µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/sessions 200 (277.018µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/models 200 (110.253µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/models 200 (120.299µs)
+·[WebServer] 2026/10/19 07:35:04 [API] GET /api/v1/approvals 503 (36.138µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/projects 200 (299.332µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/v1/approvals 503 (39.58µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/sessions 200 (342.205µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/projects 200 (310.213µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/sessions 200 (281.528µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/models 200 (98.418µs)
+[WebServer] 2026/10/19 07:35:04 [API] GET /api/models 200 (86.642µs)
+·[WebServer] 2026/10/19 07:35:05 [API] GET /api/v1/approvals 503 (32.262µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/projects 200 (281.505µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/v1/approvals 503 (28.298µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/projects 200 (257.855µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/models 200 (103.294µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/models 200 (49.108µs)
+·[WebServer] 2026/10/19 07:35:05 [API] GET /api/v1/approvals 503 (44.721µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/projects 200 (352.275µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/v1/approvals 503 (32.563µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/projects 200 (190.338µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/models 200 (109.124µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/models 200 (73.192µs)
+·[WebServer] 2026/10/19 07:35:05 [API] GET /api/v1/approvals 503 (31.097µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/projects 200 (288.118µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/v1/approvals 503 (37.745µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/projects 200 (320.541µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/models 200 (118.781µs)
+[WebServer] 2026/10/19 07:35:05 [API] GET /api/models 200 (85.746µs)
+·[WebServer] 2026/10/19 07:35:06 [API] GET /api/v1/approvals 503 (42.287µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/projects 200 (265.86µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/v1/approvals 503 (39.038µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/projects 200 (303.021µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/models 200 (92.642µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/models 200 (66.116µs)
+·[WebServer] 2026/10/19 07:35:06 [API] GET /api/v1/approvals 503 (61.521µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/projects 200 (301.088µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/v1/approvals 503 (42.01µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/projects 200 (343.684µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/models 200 (72.718µs)
+[WebServer] 2026/10/19 07:35:06 [API] GET /api/models 200 (50.108µs)
+·[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (33.278µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (707.813µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (298.723µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (16.082µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (135.672µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (108.296µs)
+·[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (30.458µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (178.987µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (29.387µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (280.412µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (103.946µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (93.188µs)
+·[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (28.697µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (310.309µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (33.628µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (188.781µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (102.288µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (84.299µs)
+·[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (33.103µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (268.377µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/v1/approvals 503 (30.041µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/projects 200 (219.453µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (94.446µs)
+[WebServer] 2026/10/19 07:35:07 [API] GET /api/models 200 (71.57µs)
+·[WebServer] 2026/10/19 07:35:08 [API] GET /api/v1/approvals 503 (35.491µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/projects 200 (307.872µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/projects 200 (260.563µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/v1/approvals 503 (14.288µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/models 200 (98.997µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/models 200 (95.738µs)
+·[WebServer] 2026/10/19 07:35:08 [API] GET /api/v1/approvals 503 (52.812µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/projects 200 (332.711µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/v1/approvals 503 (39.524µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/projects 200 (379.97µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/models 200 (134.402µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/models 200 (56.182µs)
+·[WebServer] 2026/10/19 07:35:08 [API] GET /api/v1/approvals 503 (35.965µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/v1/approvals 503 (28.172µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/projects 200 (263.809µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/projects 200 (208.306µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/models 200 (119.787µs)
+[WebServer] 2026/10/19 07:35:08 [API] GET /api/models 200 (125.144µs)
+·[WebServer] 2026/10/19 07:35:09 [API] GET /api/v1/approvals 503 (36.09µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/projects 200 (300.036µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/v1/approvals 503 (46.391µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/projects 200 (949.451µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/models 200 (135.843µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/models 200 (82.094µs)
+·[WebServer] 2026/10/19 07:35:09 [API] GET /api/v1/approvals 503 (36.881µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/projects 200 (343.335µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/v1/approvals 503 (24.036µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/projects 200 (182.438µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/models 200 (120.914µs)
+[WebServer] 2026/10/19 07:35:09 [API] GET /api/models 200 (180.406µs)
+·[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (35.404µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (192.529µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (26.084µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (134.621µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (138.753µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (156.787µs)
+·[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (39.486µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (320.383µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (29.33µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (274.766µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (78.899µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (106.431µs)
+·[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (50.863µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (348.164µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (32.934µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (276.032µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (120.71µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (61.983µs)
+·[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (34.766µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (179.223µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/v1/approvals 503 (24.002µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/projects 200 (143.454µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (105.794µs)
+[WebServer] 2026/10/19 07:35:10 [API] GET /api/models 200 (74.335µs)
+·[WebServer] 2026/10/19 07:35:11 [API] GET /api/v1/approvals 503 (45.231µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/v1/approvals 503 (45.48µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/projects 200 (321.919µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/projects 200 (618.139µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/models 200 (90.771µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/models 200 (62.719µs)
+·[WebServer] 2026/10/19 07:35:11 [API] GET /api/v1/approvals 503 (28.297µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/projects 200 (243.81µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/v1/approvals 503 (16.003µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/projects 200 (266.839µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/models 200 (276.751µs)
+[WebServer] 2026/10/19 07:35:11 [API] GET /api/models 200 (46.472µs)
+·[WebServer] 2026/10/19 07:35:12 [API] GET /api/v1/approvals 503 (47.012µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/projects 200 (314.428µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/v1/approvals 503 (28.568µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/projects 200 (360.515µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/models 200 (139.896µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/models 200 (139.362µs)
+·[WebServer] 2026/10/19 07:35:12 [API] GET /api/v1/approvals 503 (44.414µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/projects 200 (399.942µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/v1/approvals 503 (33.545µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/projects 200 (359.989µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/models 200 (167.212µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/models 200 (76.643µs)
+·[WebServer] 2026/10/19 07:35:12 [API] GET /api/v1/approvals 503 (36.571µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/projects 200 (340.159µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/v1/approvals 503 (34.786µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/projects 200 (304.106µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/models 200 (68.724µs)
+[WebServer] 2026/10/19 07:35:12 [API] GET /api/models 200 (82.281µs)
+·[WebServer] 2026/10/19 07:35:13 [API] GET /api/v1/approvals 503 (44.402µs)
+[WebServer] 2026/10/19 07:35:13 [API] GET /api/projects 200 (306.443µs)
+[WebServer] 2026/10/19 07:35:13 [API] GET /api/v1/approvals 503 (32.562µs)
+[WebServer] 2026/10/19 07:35:13 [API] GET /api/projects 200 (206.612µs)
+[WebServer] 2026/10/19 07:35:13 [API] GET /api/models 200 (94.196µs)
+[WebServer] 2026/10/19 07:35:13 [API] GET /api/models 200 (69.85µs)
+·
+
+  1) [chromium] › e2e/approvals-d4.spec.ts:3:1 › D4 default app requests the real approval route and hides an unconfigured gate after reload 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:18080
+    Call log:
+    [2m  - → POST http://127.0.0.1:18080/api/v1/approvals/a1/approve[22m
+    [2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36[22m
+    [2m    - accept: */*[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+
+
+      49 |   // No approval effects become available without a gate.
+      50 |   for (const action of ['approve', 'reject']) {
+    > 51 |     const res = await request.post(`http://127.0.0.1:18080/api/v1/approvals/a1/${action}`)
+         |                               ^
+      52 |     expect(res.status()).toBe(503)
+      53 |     expect(await res.json()).toEqual({ error: 'approval gate not configured' })
+      54 |   }
+        at /tmp/openexec-instructions-fukjpter/checkout/ui/e2e/approvals-d4.spec.ts:51:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:18080
+    Call log:
+    [2m  - → POST http://127.0.0.1:18080/api/v1/approvals/a1/approve[22m
+    [2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36[22m
+    [2m    - accept: */*[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+
+
+      49 |   // No approval effects become available without a gate.
+      50 |   for (const action of ['approve', 'reject']) {
+    > 51 |     const res = await request.post(`http://127.0.0.1:18080/api/v1/approvals/a1/${action}`)
+         |                               ^
+      52 |     expect(res.status()).toBe(503)
+      53 |     expect(await res.json()).toEqual({ error: 'approval gate not configured' })
+      54 |   }
+        at /tmp/openexec-instructions-fukjpter/checkout/ui/e2e/approvals-d4.spec.ts:51:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium-retry1/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: apiRequestContext.post: connect ECONNREFUSED 127.0.0.1:18080
+    Call log:
+    [2m  - → POST http://127.0.0.1:18080/api/v1/approvals/a1/approve[22m
+    [2m    - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.7632.6 Safari/537.36[22m
+    [2m    - accept: */*[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+
+
+      49 |   // No approval effects become available without a gate.
+      50 |   for (const action of ['approve', 'reject']) {
+    > 51 |     const res = await request.post(`http://127.0.0.1:18080/api/v1/approvals/a1/${action}`)
+         |                               ^
+      52 |     expect(res.status()).toBe(503)
+      53 |     expect(await res.json()).toEqual({ error: 'approval gate not configured' })
+      54 |   }
+        at /tmp/openexec-instructions-fukjpter/checkout/ui/e2e/approvals-d4.spec.ts:51:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium-retry2/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/approvals-d4-D4-default-ap-246ed-onfigured-gate-after-reload-chromium-retry2/error-context.md
+
+  2) [chromium] › e2e/integration.spec.ts:69:3 › OpenExec Integration › should initialize a new project 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#project-select')
+    Expected substring: [32m"e2e-project-1792384445017"[39m
+    Received string:    [31m"Select Project...OpenExec Project"[39m
+    Timeout: 10000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('#project-select')[22m
+    [2m    14 × locator resolved to <select id="project-select">…</select>[22m
+    [2m       - unexpected value "Select Project...OpenExec Project"[22m
+
+
+      93 |
+      94 |     // Wait for the new project option to appear in the select dropdown by its display name (text)
+    > 95 |     await expect(page.locator('#project-select')).toContainText(projectName, { timeout: 10000 });
+         |                                                   ^
+      96 |     
+      97 |     // Verify project is selected in dropdown (value is the path)
+      98 |     await expect(page.locator('#project-select')).toHaveValue(new RegExp(projectName))
+        at /tmp/openexec-instructions-fukjpter/checkout/ui/e2e/integration.spec.ts:95:51
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#project-select')
+    Expected substring: [32m"e2e-project-1792384458793"[39m
+    Received string:    [31m"Select Project...OpenExec Project"[39m
+    Timeout: 10000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('#project-select')[22m
+    [2m    14 × locator resolved to <select id="project-select">…</select>[22m
+    [2m       - unexpected value "Select Project...OpenExec Project"[22m
+
+
+      93 |
+      94 |     // Wait for the new project option to appear in the select dropdown by its display name (text)
+    > 95 |     await expect(page.locator('#project-select')).toContainText(projectName, { timeout: 10000 });
+         |                                                   ^
+      96 |     
+      97 |     // Verify project is selected in dropdown (value is the path)
+      98 |     await expect(page.locator('#project-select')).toHaveValue(new RegExp(projectName))
+        at /tmp/openexec-instructions-fukjpter/checkout/ui/e2e/integration.spec.ts:95:51
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium-retry1/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#project-select')
+    Expected substring: [32m"e2e-project-1792384472994"[39m
+    Received string:    [31m"Select Project...OpenExec Project"[39m
+    Timeout: 10000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('#project-select')[22m
+    [2m    14 × locator resolved to <select id="project-select">…</select>[22m
+    [2m       - unexpected value "Select Project...OpenExec Project"[22m
+
+
+      93 |
+      94 |     // Wait for the new project option to appear in the select dropdown by its display name (text)
+    > 95 |     await expect(page.locator('#project-select')).toContainText(projectName, { timeout: 10000 });
+         |                                                   ^
+      96 |     
+      97 |     // Verify project is selected in dropdown (value is the path)
+      98 |     await expect(page.locator('#project-select')).toHaveValue(new RegExp(projectName))
+        at /tmp/openexec-instructions-fukjpter/checkout/ui/e2e/integration.spec.ts:95:51
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium-retry2/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/integration-OpenExec-Integ-72162-ld-initialize-a-new-project-chromium-retry2/error-context.md
+
+  2 failed
+    [chromium] › e2e/approvals-d4.spec.ts:3:1 › D4 default app requests the real approval route and hides an unconfigured gate after reload 
+    [chromium] › e2e/integration.spec.ts:69:3 › OpenExec Integration › should initialize a new project 
+  71 passed (1.6m)
+
+exit_status: 1

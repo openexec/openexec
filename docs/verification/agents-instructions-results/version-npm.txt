@@ -1,0 +1,5 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["npm", "--version"]
+10.9.8
+
+exit_status: 0

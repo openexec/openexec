@@ -1,0 +1,14 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["make", "type-check"]
+⌨️ Checking Go types...
+go build -v ./...
+make[1]: Entering directory '/tmp/openexec-instructions-fukjpter/checkout'
+⌨️ Checking UI types...
+cd ui && npm run type-check
+
+> @openexec/ui@0.1.0 type-check
+> tsc --noEmit
+
+make[1]: Leaving directory '/tmp/openexec-instructions-fukjpter/checkout'
+
+exit_status: 0

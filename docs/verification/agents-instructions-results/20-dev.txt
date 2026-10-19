@@ -1,0 +1,14 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout/ui
+argv: ["npm", "run", "dev", "--", "--port", "3001"]
+
+> @openexec/ui@0.1.0 dev
+> vite --port 3001
+
+
+  VITE v5.4.21  ready in 124 ms
+
+  ➜  Local:   http://localhost:3001/
+  ➜  Network: http://192.168.1.171:3001/
+
+exit_status: -2
+termination: readiness observed; controlled SIGINT

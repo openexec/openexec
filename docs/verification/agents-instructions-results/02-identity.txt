@@ -1,0 +1,4 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["git", "status", "--porcelain=v1"]
+
+exit_status: 0
