@@ -545,6 +545,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	// Create engine with callbacks that emit events
 	engineConfig := blueprint.DefaultEngineConfig()
 	engineConfig.OnStageStart = func(run *blueprint.Run, stageName string) {
+		stage, _ := bp.GetStage(stageName)
 		if trustedGates != nil {
 			trustedGates.receipt = nil
 		}
@@ -552,6 +553,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			Type:      loop.EventStageStart,
 			FWUID:     p.cfg.FWUID,
 			StageName: stageName,
+			StageType: string(stage.Type),
 		})
 	}
 	engineConfig.OnStageComplete = func(run *blueprint.Run, result *blueprint.StageResult) {

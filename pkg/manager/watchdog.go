@@ -3,7 +3,6 @@ package manager
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 )
 
@@ -79,7 +78,7 @@ func (w *Watchdog) checkPipeline(id string) {
 	}
 
 	// Skip terminal states
-	if isTerminal(info.Status) {
+	if isTerminal(info.Status) || info.Status == StatusPaused || info.StageType == "deterministic" {
 		return
 	}
 
@@ -100,27 +99,7 @@ func (w *Watchdog) checkPipeline(id string) {
 func (w *Watchdog) remediateStall(id string, info PipelineInfo) {
 	log.Printf("[Watchdog] [%s] remediating stall...", id)
 
-	// 1. Kill stuck process if PID exists
-	if info.CurrentPID > 0 {
-		log.Printf("[Watchdog] [%s] killing stuck process PID %d", id, info.CurrentPID)
-		proc, err := os.FindProcess(info.CurrentPID)
-		if err == nil {
-			_ = proc.Kill()
-		}
-	}
-
-	// 2. Stop the pipeline to clean up state
-	_ = w.manager.Stop(id)
-
-	// 3. AUTO-HEAL: Automatically restart the pipeline
-	log.Printf("[Watchdog] [%s] stall remediated. Triggering auto-restart...", id)
-	go func() {
-		// Give it a moment to fully cleanup
-		time.Sleep(2 * time.Second)
-		if err := w.manager.Start(context.Background(), id); err != nil {
-			log.Printf("[Watchdog] [%s] auto-restart failed: %v", id, err)
-		} else {
-			log.Printf("[Watchdog] [%s] ✨ Successfully auto-restarted pipeline", id)
-		}
-	}()
+	// Cancel through the native attempt context. The task queue owns resumption;
+	// a detached restart could override an explicit Stop or the caller's authority.
+	_ = w.manager.stopWithCause(id, ErrWatchdogStall, w.StallThreshold)
 }

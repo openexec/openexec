@@ -45,8 +45,35 @@ const (
 	StatusStopped  PipelineStatus = "stopped"
 )
 
+// Cancellation causes are attempt-scoped and never inferred from error text.
+var (
+	ErrWatchdogStall     = errors.New("watchdog_stall")
+	ErrOwnerStop         = errors.New("owner_stop")
+	ErrAllowanceExceeded = errors.New("allowance_exceeded")
+)
+
+func cancellationCause(ctx context.Context) string {
+	cause := context.Cause(ctx)
+	switch {
+	case cause == nil:
+		return ""
+	case errors.Is(cause, ErrWatchdogStall):
+		return "watchdog_stall"
+	case errors.Is(cause, ErrOwnerStop):
+		return "owner_stop"
+	case errors.Is(cause, ErrAllowanceExceeded):
+		return "allowance_exceeded"
+	case errors.Is(cause, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return "unknown"
+	}
+}
+
 // PipelineInfo is the external status snapshot of a managed pipeline.
 type PipelineInfo struct {
+	CancellationCause string         `json:"cancellation_cause,omitempty"`
+	StageType         string         `json:"stage_type,omitempty"`
 	FailureEvidenceID string         `json:"failure_evidence_id,omitempty"`
 	FWUID             string         `json:"fwu_id"`
 	Status            PipelineStatus `json:"status"`
@@ -69,6 +96,8 @@ type entry struct {
 	done        chan struct{}
 	pipeline    *pipeline.Pipeline
 	info        PipelineInfo
+	ctx         context.Context
+	cancelCause context.CancelCauseFunc
 	cancel      context.CancelFunc
 	subs        []chan loop.Event
 	subsMu      sync.Mutex
@@ -468,7 +497,7 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 	}
 
 	runCtx, runSpan := telemetry.StartRunSpan(ctx, fwuID, m.cfg.WorkDir, pCfg.ExecMode)
-	pipeCtx, cancel := context.WithCancel(runCtx)
+	pipeCtx, cancelCause := context.WithCancelCause(runCtx)
 
 	e := &entry{
 		taskAttempt: taskAttempt,
@@ -479,8 +508,10 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 			Status:    StatusStarting,
 			StartedAt: time.Now(),
 		},
-		cancel:  cancel,
-		runSpan: runSpan,
+		ctx:         pipeCtx,
+		cancelCause: cancelCause,
+		cancel:      func() { cancelCause(nil) },
+		runSpan:     runSpan,
 	}
 	m.pipelines[fwuID] = e
 
@@ -492,6 +523,7 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 	go func() { defer close(eventsDone); m.consumeEvents(fwuID, events) }()
 	go func() {
 		defer close(e.done)
+		defer cancelCause(nil)
 		if executionLock != nil {
 			defer executionLock.Close()
 		}
@@ -507,6 +539,14 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 			} else {
 				log.Printf("[Manager] Pipeline %s: finished status=%s", fwuID, e.info.Status)
 			}
+			if e.ctx.Err() != nil {
+				e.info.Status = StatusStopped
+				e.info.CancellationCause = cancellationCause(e.ctx)
+				e.info.Error = e.info.CancellationCause
+			}
+			if m.state != nil {
+				_ = m.state.UpdateRunStatus(context.Background(), fwuID, string(e.info.Status), e.info.Error)
+			}
 			e.runSpan.End()
 		}
 		m.mu.Unlock()
@@ -517,14 +557,30 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 
 // Stop terminates the pipeline.
 func (m *Manager) Stop(fwuID string) error {
+	return m.stopWithCause(fwuID, ErrOwnerStop, 0)
+}
+
+func (m *Manager) stopWithCause(fwuID string, cause error, stallThreshold time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e, ok := m.pipelines[fwuID]
 	if !ok || isTerminal(e.info.Status) {
 		return nil
 	}
+	// Recheck under the same lock as activity ingestion; a stale snapshot
+	// must not stop an active or newly waiting attempt.
+	if stallThreshold > 0 && (e.info.Status == StatusPaused || e.info.StageType == "deterministic" || e.info.LastActivity.IsZero() || time.Since(e.info.LastActivity) <= stallThreshold) {
+		return nil
+	}
+	if e.ctx != nil && e.ctx.Err() != nil {
+		return nil
+	} // First cause wins.
 	e.info.Status = StatusStopped
-	if e.cancel != nil {
+	e.info.CancellationCause = cause.Error()
+	e.info.Error = cause.Error()
+	if e.cancelCause != nil {
+		e.cancelCause(cause)
+	} else if e.cancel != nil {
 		e.cancel() // Deterministic checks share the attempt context too.
 	}
 	e.pipeline.Stop()

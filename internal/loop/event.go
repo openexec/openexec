@@ -86,18 +86,19 @@ type StepResult struct {
 
 // Event represents a single occurrence in the loop lifecycle.
 type Event struct {
-	Type         EventType              `json:"type"`
-	Kind         EventKind              `json:"kind,omitempty"`
-	Iteration    int                    `json:"iteration,omitempty"`
-	Text         string                 `json:"text,omitempty"`
-	Tool         string                 `json:"tool,omitempty"`
-	ToolInput    map[string]interface{} `json:"tool_input,omitempty"`
-	Err          error                  `json:"-"`
-	ErrText      string                 `json:"error,omitempty"`
-	SignalType   string                 `json:"signal_type,omitempty"`
-	SignalTarget string                 `json:"signal_target,omitempty"`
-	Cost         *CostInfo              `json:"cost,omitempty"`
-	SessionID    string                 `json:"session_id,omitempty"`
+	CancellationCause string                 `json:"cancellation_cause,omitempty"`
+	Type              EventType              `json:"type"`
+	Kind              EventKind              `json:"kind,omitempty"`
+	Iteration         int                    `json:"iteration,omitempty"`
+	Text              string                 `json:"text,omitempty"`
+	Tool              string                 `json:"tool,omitempty"`
+	ToolInput         map[string]interface{} `json:"tool_input,omitempty"`
+	Err               error                  `json:"-"`
+	ErrText           string                 `json:"error,omitempty"`
+	SignalType        string                 `json:"signal_type,omitempty"`
+	SignalTarget      string                 `json:"signal_target,omitempty"`
+	Cost              *CostInfo              `json:"cost,omitempty"`
+	SessionID         string                 `json:"session_id,omitempty"`
 
 	// Pipeline context fields (V4). Omitted for standalone Loop usage.
 	Phase       string `json:"phase,omitempty"`

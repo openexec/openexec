@@ -55,6 +55,9 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
         var becameTerminal bool
         if ok {
             prev := e.info.Status
+            if e.ctx != nil && e.ctx.Err() != nil {
+                event.CancellationCause = cancellationCause(e.ctx)
+            }
             updateInfo(&e.info, event)
             if failureEvidenceID != "" { e.info.FailureEvidenceID = failureEvidenceID }
             newStatus = e.info.Status
@@ -95,6 +98,7 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     "review_cycles":   event.ReviewCycle,
                     "text":            event.Text,
                     "error":           event.ErrText,
+                    "cancellation_cause": event.CancellationCause,
                     "prompt_hash":     event.PromptHash,
                     "cache_key":       event.CacheKey, // Stable hash for deterministic replay
                     "artifact_hashes": []string{},
@@ -162,6 +166,20 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 
 // updateInfo applies a single event to PipelineInfo.
 func updateInfo(info *PipelineInfo, event loop.Event) {
+	// Receipt time measures real ingestion, not a fabricated timer heartbeat.
+	if event.Type != loop.EventHeartbeat {
+		info.LastActivity = time.Now()
+	}
+	if event.CancellationCause != "" {
+		info.Status = StatusStopped
+		info.CancellationCause = event.CancellationCause
+		info.Error = event.CancellationCause
+	}
+	// Late buffered stage/error events must not overwrite an interruption.
+	if info.CancellationCause != "" {
+		return
+	}
+
 	switch event.Type {
 	case loop.EventIterationStart:
 		info.Iteration = event.Iteration
@@ -191,7 +209,9 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 
 	// Blueprint events
 	case loop.EventBlueprintStart:
-		info.Status = StatusRunning
+		if info.Status != StatusPaused {
+			info.Status = StatusRunning
+		}
 		info.Stage = "blueprint:" + event.BlueprintID
 
 	case loop.EventBlueprintComplete:
@@ -203,7 +223,10 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 
 	case loop.EventStageStart:
 		info.Stage = event.StageName
-		info.Status = StatusRunning
+		info.StageType = event.StageType
+		if info.Status != StatusPaused {
+			info.Status = StatusRunning
+		}
 		info.Iteration = event.Iteration
 
 	case loop.EventStageComplete:
