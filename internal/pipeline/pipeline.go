@@ -542,6 +542,8 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 		executor = defaultExecutor
 	}
 
+	executor = activityStageExecutor{executor: executor, emit: p.emit}
+
 	// Create engine with callbacks that emit events
 	engineConfig := blueprint.DefaultEngineConfig()
 	engineConfig.OnStageStart = func(run *blueprint.Run, stageName string) {
@@ -550,10 +552,11 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 			trustedGates.receipt = nil
 		}
 		p.emit(loop.Event{
-			Type:      loop.EventStageStart,
-			FWUID:     p.cfg.FWUID,
-			StageName: stageName,
-			StageType: string(stage.Type),
+			Type:              loop.EventStageStart,
+			FWUID:             p.cfg.FWUID,
+			StageName:         stageName,
+			StageType:         string(stage.Type),
+			SilenceMonitoring: p.cfg.StageExecutor == nil,
 		})
 	}
 	engineConfig.OnStageComplete = func(run *blueprint.Run, result *blueprint.StageResult) {

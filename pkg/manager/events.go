@@ -167,7 +167,9 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
 // updateInfo applies a single event to PipelineInfo.
 func updateInfo(info *PipelineInfo, event loop.Event) {
 	// Receipt time measures real ingestion, not a fabricated timer heartbeat.
-	if event.Type != loop.EventHeartbeat {
+	if event.Type != loop.EventHeartbeat && (event.Type != loop.EventExecutionActivity ||
+		event.ExecutionActivity == "monitor" || event.ExecutionActivity == "progress" ||
+		event.ExecutionActivity == "check_start" || event.ExecutionActivity == "check_end") {
 		info.LastActivity = time.Now()
 	}
 	if event.CancellationCause != "" {
@@ -181,6 +183,18 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 	}
 
 	switch event.Type {
+	case loop.EventExecutionActivity:
+		switch event.ExecutionActivity {
+		case "monitor":
+			info.SilenceMonitoring = true
+		case "check_start":
+			info.PendingChecks++
+		case "check_end":
+			if info.PendingChecks > 0 {
+				info.PendingChecks--
+			}
+		}
+
 	case loop.EventIterationStart:
 		info.Iteration = event.Iteration
 
@@ -222,6 +236,8 @@ func updateInfo(info *PipelineInfo, event loop.Event) {
 		info.Error = event.ErrText
 
 	case loop.EventStageStart:
+		info.SilenceMonitoring = event.SilenceMonitoring
+		info.PendingChecks = 0
 		info.Stage = event.StageName
 		info.StageType = event.StageType
 		if info.Status != StatusPaused {

@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"github.com/openexec/openexec/internal/loop"
+	"sync"
 
 	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/execution/evidence"
@@ -39,3 +41,25 @@ type publicExecutionError struct{ error }
 
 func (e publicExecutionError) Error() string { return evidence.Public(e.error.Error(), nil) }
 func (e publicExecutionError) Unwrap() error { return e.error }
+
+// activityStageExecutor scopes reporting to one Execute call. Late provider
+// callbacks cannot refresh or exempt a successor stage.
+type activityStageExecutor struct {
+	executor blueprint.StageExecutor
+	emit     func(loop.Event)
+}
+
+func (a activityStageExecutor) Execute(ctx context.Context, stage *blueprint.Stage, input *blueprint.StageInput) (*blueprint.StageResult, error) {
+	scoped := *input
+	var mu sync.Mutex
+	active := true
+	scoped.OnExecutionActivity = func(kind string) {
+		mu.Lock()
+		defer mu.Unlock()
+		if active && ctx.Err() == nil {
+			a.emit(loop.Event{Type: loop.EventExecutionActivity, FWUID: input.RunID, StageName: stage.Name, ExecutionActivity: kind})
+		}
+	}
+	defer func() { mu.Lock(); active = false; mu.Unlock() }()
+	return a.executor.Execute(ctx, stage, &scoped)
+}

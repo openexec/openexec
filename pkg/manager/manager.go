@@ -72,6 +72,9 @@ func cancellationCause(ctx context.Context) string {
 
 // PipelineInfo is the external status snapshot of a managed pipeline.
 type PipelineInfo struct {
+	SilenceMonitoring bool `json:"silence_monitoring,omitempty"`
+	PendingChecks     int  `json:"pending_checks,omitempty"`
+
 	CancellationCause string         `json:"cancellation_cause,omitempty"`
 	StageType         string         `json:"stage_type,omitempty"`
 	FailureEvidenceID string         `json:"failure_evidence_id,omitempty"`
@@ -504,9 +507,10 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 		done:        make(chan struct{}),
 		pipeline:    p,
 		info: PipelineInfo{
-			FWUID:     fwuID,
-			Status:    StatusStarting,
-			StartedAt: time.Now(),
+			SilenceMonitoring: m.cfg.StageExecutor == nil,
+			FWUID:             fwuID,
+			Status:            StatusStarting,
+			StartedAt:         time.Now(),
 		},
 		ctx:         pipeCtx,
 		cancelCause: cancelCause,
@@ -569,7 +573,7 @@ func (m *Manager) stopWithCause(fwuID string, cause error, stallThreshold time.D
 	}
 	// Recheck under the same lock as activity ingestion; a stale snapshot
 	// must not stop an active or newly waiting attempt.
-	if stallThreshold > 0 && (e.info.Status == StatusPaused || e.info.StageType == "deterministic" || e.info.LastActivity.IsZero() || time.Since(e.info.LastActivity) <= stallThreshold) {
+	if stallThreshold > 0 && (!e.info.SilenceMonitoring || e.info.PendingChecks > 0 || e.info.Status == StatusPaused || e.info.StageType == "deterministic" || e.info.LastActivity.IsZero() || time.Since(e.info.LastActivity) <= stallThreshold) {
 		return nil
 	}
 	if e.ctx != nil && e.ctx.Err() != nil {

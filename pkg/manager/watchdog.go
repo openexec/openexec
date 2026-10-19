@@ -78,7 +78,7 @@ func (w *Watchdog) checkPipeline(id string) {
 	}
 
 	// Skip terminal states
-	if isTerminal(info.Status) || info.Status == StatusPaused || info.StageType == "deterministic" {
+	if !info.SilenceMonitoring || info.PendingChecks > 0 || isTerminal(info.Status) || info.Status == StatusPaused || info.StageType == "deterministic" {
 		return
 	}
 

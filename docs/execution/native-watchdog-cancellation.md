@@ -1,12 +1,29 @@
 # Native watchdog cancellation evidence
 
 The manager's existing watchdog measures time since real pipeline-event ingestion.
-Blueprint start/stage events establish activity even when the admitted provider
-never produces output. Timer heartbeats do not establish activity. Paused or
-operator-attention execution and deterministic stages (including silent checks)
-are excluded from silence detection; their own command deadlines and explicit
-Stop remain effective. The watchdog rechecks eligibility under the activity lock
-before cancelling the current attempt.
+Standalone native stage-start events enable silence monitoring. Admitted
+executors opt in per stage using the exported `runtime.StageInput` methods:
+
+- Call `input.MonitorActivity()` before starting a provider only after connecting
+  its actual progress callbacks to `input.ReportActivity()`.
+- Report observed output/progress, never timer heartbeats or synthetic output.
+- Before a blocking check inside an agentic stage, call
+  `endCheck := input.BeginCheck()` and `defer endCheck()`. Scopes nest, completion
+  is idempotent, and silence detection resumes with a fresh activity window when
+  the last check finishes.
+- Callbacks are scoped to one executor call; late reports cannot refresh or
+  exempt a successor stage. Each stage resets its monitoring and wait state.
+
+Uninstrumented admitted adapters (including Console's current adapter) are
+excluded from silence detection: their silence is not evidence of a stall.
+They retain explicit Stop, context deadlines and allowance cancellation. Console
+must wire provider progress and check scopes before opting in; upgrading the
+dependency alone does not prove integrated watchdog cancellation.
+
+Paused/operator-attention execution and deterministic stages are also excluded.
+The default executor brackets quality gates even when they run inside an
+agentic stage. Check scopes do not exempt Stop or deadlines. The watchdog
+rechecks eligibility under the activity lock before cancelling the attempt.
 
 Cancellation uses the native attempt context, including context-bound commands.
 It does not kill an unvalidated PID or launch a detached background restart.
@@ -43,10 +60,15 @@ the persisted run record is the restart evidence. Audit metadata also includes
 `pkg/manager/watchdog_native_test.go` exercises disposable native standard-task
 execution with short watchdog thresholds, a real silent subprocess, terminal
 subscription, retained useful work/checkpoint evidence and a reopened SQLite
-store. It checks owner/unknown/plain/allowance/deadline cancellation, active work,
-paused work and a silent deterministic check. Its removal controls rerun the
-native silent probe with activity ingestion removed and watchdog cause relabelled
-as owner Stop; both must fail. All run under the declared `test` gate.
+store. It checks owner/unknown/plain/allowance/deadline cancellation, real
+admitted subprocess output, uninstrumented adapters, paused work, a silent
+deterministic subprocess and a silent gate executed by DefaultExecutor inside an
+agentic stage. Stop and deadlines interrupt check scopes; silent inference
+is cancelled after its check finishes. Executable removal
+controls reject missing activity ingestion, relabelled cancellation, disconnected
+admitted progress and a missing agentic quality-gate scope. All run under the
+declared `test` gate. The pipeline suite also verifies nested/idempotent scopes
+and rejection of late callbacks.
 
 Console task 222c2f84cfe48fd6e6bab27e819b3ef6 (Needs you fix 3) still owes its
 dependency-pin update and integrated browser/server cancellation proof after this

@@ -44,6 +44,7 @@ const (
 	EventBlueprintStart    EventType = "blueprint_start"
 	EventBlueprintComplete EventType = "blueprint_complete"
 	EventBlueprintFailed   EventType = "blueprint_failed"
+	EventExecutionActivity EventType = "execution_activity"
 	EventStageStart        EventType = "stage_start"
 	EventStageComplete     EventType = "stage_complete"
 	EventStageFailed       EventType = "stage_failed"
@@ -126,8 +127,10 @@ type Event struct {
 	StepID  int    `json:"step_id,omitempty"`
 
 	// Blueprint execution context
-	BlueprintID string `json:"blueprint_id,omitempty"`
-	StageName   string `json:"stage_name,omitempty"`
-	StageType   string `json:"stage_type,omitempty"` // "deterministic" or "agentic"
-	Attempt     int    `json:"attempt,omitempty"`
+	BlueprintID       string `json:"blueprint_id,omitempty"`
+	StageName         string `json:"stage_name,omitempty"`
+	ExecutionActivity string `json:"execution_activity,omitempty"`
+	SilenceMonitoring bool   `json:"silence_monitoring,omitempty"`
+	StageType         string `json:"stage_type,omitempty"` // "deterministic" or "agentic"
+	Attempt           int    `json:"attempt,omitempty"`
 }

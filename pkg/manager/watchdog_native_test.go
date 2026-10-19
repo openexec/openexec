@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,7 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openexec/openexec/internal/actions"
+	"github.com/openexec/openexec/internal/blueprint"
 	"github.com/openexec/openexec/internal/loop"
+	"github.com/openexec/openexec/internal/types"
 	"github.com/openexec/openexec/pkg/db/state"
 	"github.com/openexec/openexec/pkg/runtime"
 )
@@ -33,7 +37,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	releaseStage := make(chan struct{})
 	finished := make(chan struct{})
 	marker := filepath.Join(dir, "completed.txt")
-	executor := admittedFixture(func(ctx context.Context, s *runtime.Stage, _ *runtime.StageInput) (*runtime.StageResult, error) {
+	executor := admittedFixture(func(ctx context.Context, s *runtime.Stage, input *runtime.StageInput) (*runtime.StageResult, error) {
 		result := &runtime.StageResult{StageName: s.Name, Status: runtime.StageStatusCompleted}
 		if s.Name == "gather_context" {
 			if err := os.WriteFile(marker, []byte("retained useful work"), 0600); err != nil {
@@ -46,10 +50,64 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 			target = "test"
 		}
 		if s.Name == target {
+			if mode != "legacy" {
+				input.MonitorActivity()
+			}
+			var endCheck func()
+			if mode == "check-stop" || mode == "check-timeout" {
+				endCheck = input.BeginCheck()
+				defer endCheck()
+			}
 			entered <- ctx
 			defer close(finished)
 			// A real silent subprocess is killed by the native attempt context.
-			if mode == "watchdog" {
+			if mode == "active" {
+				// Actual admitted subprocess output reaches the public executor hook.
+				cmd := exec.CommandContext(ctx, "sh", "-c", "for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo progress; sleep 0.05; done")
+				stdout, err := cmd.StdoutPipe()
+				if err != nil {
+					return result, err
+				}
+				if err := cmd.Start(); err != nil {
+					return result, err
+				}
+				scanner := bufio.NewScanner(stdout)
+				for scanner.Scan() {
+					input.ReportActivity()
+				}
+				if err := cmd.Wait(); err != nil {
+					return result, err
+				}
+				return result, scanner.Err()
+			}
+			if mode == "check" {
+				// Default deterministic execution, with a real silent child.
+				check := *s
+				check.Action = ""
+				check.Commands = []string{"exec sleep 0.6"}
+				return blueprint.NewDefaultExecutor(dir).Execute(ctx, &check, input)
+			}
+			if mode == "agentic-check" || mode == "check-then-silent" {
+				// Default executor runs gates inside this still-agentic implement stage.
+				executor := blueprint.NewDefaultExecutor(dir)
+				executor.AgenticRunner = &blueprint.SimpleAgenticRunner{RunFunc: func(context.Context, *blueprint.Stage, *blueprint.StageInput) (string, map[string]string, error) {
+					return "implemented", nil, nil
+				}}
+				executor.ActionRegistry = actions.NewRegistry()
+				executor.ActionRegistry.Overwrite(watchdogCheckAction{})
+				check := *s
+				check.RunQualityGates = true
+				checked, err := executor.Execute(ctx, &check, input)
+				if mode == "check-then-silent" {
+					if err != nil || !strings.Contains(checked.Output, "check finished") {
+						t.Error("check did not finish before silent inference")
+						return checked, err
+					}
+					return checked, exec.CommandContext(ctx, "sh", "-c", "exec sleep 30").Run()
+				}
+				return checked, err
+			}
+			if mode == "watchdog" || mode == "check-stop" || mode == "check-timeout" {
 				err := exec.CommandContext(ctx, "sh", "-c", "exec sleep 30").Run()
 				return result, err
 			}
@@ -73,7 +131,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
 	attemptTimeout := 4 * time.Second
-	if mode == "timeout" {
+	if mode == "timeout" || mode == "check-timeout" {
 		attemptTimeout = 2 * time.Second
 	}
 	deadline, cleanup := context.WithTimeout(ctx, attemptTimeout)
@@ -95,9 +153,9 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	defer unsub()
 	expected := mode
 	switch mode {
-	case "watchdog":
+	case "watchdog", "check-then-silent":
 		expected = "watchdog_stall"
-	case "owner":
+	case "owner", "check-stop":
 		expected = "owner_stop"
 		if err := m.Stop("probe"); err != nil {
 			t.Fatal(err)
@@ -110,37 +168,18 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	case "plain":
 		expected = "unknown"
 		cancel(nil)
-	case "timeout":
+	case "timeout", "check-timeout":
+		expected = "timeout"
 	// Let the real parent deadline expire.
-	case "check", "paused", "active":
+	case "check", "agentic-check", "paused", "active", "legacy":
 		if mode == "paused" {
 			if err := m.Pause("probe"); err != nil {
 				t.Fatal(err)
 			}
 		}
-		// More than three stall windows. Active receives actual provider output
-		// through consumeEvents, not direct timestamp writes or fake heartbeats.
-		if mode == "active" {
-			input := make(chan loop.Event)
-			consumed := make(chan struct{})
-			go func() { m.consumeEvents("probe", input); close(consumed) }()
-			ticker := time.NewTicker(30 * time.Millisecond)
-			timer := time.NewTimer(500 * time.Millisecond)
-		active:
-			for {
-				select {
-				case <-ticker.C:
-					input <- loop.Event{Type: loop.EventAssistantText, Text: "useful progress"}
-				case <-timer.C:
-					break active
-				}
-			}
-			ticker.Stop()
-			close(input)
-			<-consumed
-		} else {
-			<-time.After(500 * time.Millisecond)
-		}
+		// More than three stall windows, while the executor itself reports
+		// actual output or runs a silent check. No private manager injection.
+		<-time.After(500 * time.Millisecond)
 		if stageCtx.Err() != nil {
 			t.Fatalf("legitimate %s killed: %v", mode, context.Cause(stageCtx))
 		}
@@ -223,7 +262,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 
 func TestNativeWatchdogSilent(t *testing.T) { nativeWatchdogProbe(t, "watchdog") }
 func TestNativeWatchdogBoundaries(t *testing.T) {
-	for _, mode := range []string{"owner", "unknown", "plain", "allowance", "timeout", "check", "paused", "active"} {
+	for _, mode := range []string{"owner", "unknown", "plain", "allowance", "timeout", "check", "agentic-check", "paused", "active", "legacy", "check-stop", "check-timeout", "check-then-silent"} {
 		t.Run(mode, func(t *testing.T) { nativeWatchdogProbe(t, mode) })
 	}
 }
@@ -231,9 +270,11 @@ func TestNativeWatchdogBoundaries(t *testing.T) {
 // These controls actually compile and run the silent-stage reproducer with
 // each correction removed. go test ./... (the declared test gate) runs them.
 func TestNativeWatchdogRemovalControls(t *testing.T) {
-	for _, control := range []struct{ name, path, old, replacement string }{
-		{"activity", "events.go", "info.LastActivity = time.Now()", "info.LastActivity = time.Time{}"},
-		{"cause", "watchdog.go", "ErrWatchdogStall, w.StallThreshold", "ErrOwnerStop, w.StallThreshold"},
+	for _, control := range []struct{ name, path, old, replacement, probe string }{
+		{"activity", "events.go", "info.LastActivity = time.Now()", "info.LastActivity = time.Time{}", "^TestNativeWatchdogSilent$"},
+		{"cause", "watchdog.go", "ErrWatchdogStall, w.StallThreshold", "ErrOwnerStop, w.StallThreshold", "^TestNativeWatchdogSilent$"},
+		{"admitted-progress", "../../internal/blueprint/stage.go", `i.activity("progress")`, `i.activity("ignored")`, "^TestNativeWatchdogBoundaries$/active$"},
+		{"agentic-check", "../../internal/blueprint/executor.go", "endCheck := input.BeginCheck()", "endCheck := func() {}", "^TestNativeWatchdogBoundaries$/agentic-check$"},
 	} {
 		t.Run(control.name, func(t *testing.T) {
 			source, err := filepath.Abs(control.path)
@@ -259,9 +300,9 @@ func TestNativeWatchdogRemovalControls(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "go", "test", "-buildvcs=false", "-overlay", path, "-run", "^TestNativeWatchdogSilent$", "-count=1", ".")
+			cmd := exec.CommandContext(ctx, "go", "test", "-buildvcs=false", "-overlay", path, "-run", control.probe, "-count=1", ".")
 			output, err := cmd.CombinedOutput()
-			if ctx.Err() != nil || err == nil || !strings.Contains(string(output), "--- FAIL: TestNativeWatchdogSilent") {
+			if ctx.Err() != nil || err == nil || !strings.Contains(string(output), "--- FAIL: TestNativeWatchdog") {
 				t.Fatalf("removal was not detected: %v\n%s", err, output)
 			}
 			t.Logf("%s correction removed: reproducer rejected it\n%s", control.name, output)
@@ -271,7 +312,7 @@ func TestNativeWatchdogRemovalControls(t *testing.T) {
 
 func TestWatchdogActivityAndStaleSnapshot(t *testing.T) {
 	old := time.Now().Add(-time.Hour)
-	info := PipelineInfo{Status: StatusRunning, LastActivity: old}
+	info := PipelineInfo{Status: StatusRunning, SilenceMonitoring: true, LastActivity: old}
 	updateInfo(&info, loop.Event{Type: loop.EventHeartbeat})
 	if !info.LastActivity.Equal(old) {
 		t.Fatal("timer heartbeat manufactured activity")
@@ -282,10 +323,14 @@ func TestWatchdogActivityAndStaleSnapshot(t *testing.T) {
 	}
 	// The watchdog's earlier status snapshot cannot override activity or a
 	// legitimate wait that was ingested before cancellation acquires the lock.
-	for _, mode := range []string{"active", "paused", "deterministic"} {
+	for _, mode := range []string{"active", "paused", "deterministic", "check", "legacy"} {
 		t.Run(mode, func(t *testing.T) {
-			current := PipelineInfo{Status: StatusRunning, LastActivity: old}
+			current := PipelineInfo{Status: StatusRunning, SilenceMonitoring: true, LastActivity: old}
 			switch mode {
+			case "check":
+				current.PendingChecks = 1
+			case "legacy":
+				current.SilenceMonitoring = false
 			case "active":
 				current.LastActivity = time.Now()
 			case "paused":
@@ -296,10 +341,47 @@ func TestWatchdogActivityAndStaleSnapshot(t *testing.T) {
 			stopped := false
 			m := &Manager{pipelines: map[string]*entry{"probe": {info: current, cancel: func() { stopped = true }}}}
 			w := &Watchdog{manager: m, StallThreshold: time.Minute}
-			w.remediateStall("probe", PipelineInfo{Status: StatusRunning, LastActivity: old})
+			w.remediateStall("probe", PipelineInfo{Status: StatusRunning, SilenceMonitoring: true, LastActivity: old})
 			if stopped {
 				t.Fatal("stale snapshot cancelled changed attempt")
 			}
 		})
+	}
+}
+
+// The gate itself launches a real silent command, rather than simulating a
+// wait with a channel. It is called by DefaultExecutor.runQualityGates.
+type watchdogCheckAction struct{}
+
+func (watchdogCheckAction) Name() string { return "run_gates" }
+func (watchdogCheckAction) Execute(ctx context.Context, _ actions.ActionRequest) (actions.ActionResponse, error) {
+	err := exec.CommandContext(ctx, "sh", "-c", "exec sleep 0.6").Run()
+	if err != nil {
+		return actions.ActionResponse{}, err
+	}
+	return actions.ActionResponse{Status: types.StageStatusCompleted, Output: "check finished"}, nil
+}
+
+func TestWatchdogCheckScopesReset(t *testing.T) {
+	info := PipelineInfo{}
+	event := func(kind string) {
+		updateInfo(&info, loop.Event{Type: loop.EventExecutionActivity, ExecutionActivity: kind})
+	}
+	event("monitor")
+	event("check_start")
+	event("check_start")
+	event("check_end")
+	if !info.SilenceMonitoring || info.PendingChecks != 1 {
+		t.Fatal(info)
+	}
+	event("check_end")
+	event("check_end")
+	if info.PendingChecks != 0 {
+		t.Fatal("check count underflow", info)
+	}
+	event("check_start")
+	updateInfo(&info, loop.Event{Type: loop.EventStageStart, StageName: "successor", StageType: "agentic"})
+	if info.SilenceMonitoring || info.PendingChecks != 0 {
+		t.Fatal("successor inherited scope", info)
 	}
 }

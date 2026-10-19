@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/openexec/openexec/internal/types"
@@ -144,6 +145,10 @@ type StageExecutor interface {
 
 // StageInput contains the input data for a stage execution.
 type StageInput struct {
+	// OnExecutionActivity connects an executor's observed work to native monitoring.
+	// Use the methods below; do not serialize or persist the callback.
+	OnExecutionActivity func(string) `json:"-"`
+
 	// RunID is the ID of the current run.
 	RunID string `json:"run_id"`
 
@@ -219,5 +224,27 @@ func (i *StageInput) SetContextFromPack(items []ContextPackItem) {
 			key = item.Type
 		}
 		i.ContextPack[key] = item.Content
+	}
+}
+
+// MonitorActivity opts this stage into silence detection. Call before starting
+// a provider only when every actual progress event will call ReportActivity.
+// Legacy adapters without an activity connection must not opt in.
+func (i *StageInput) MonitorActivity() { i.activity("monitor") }
+
+// ReportActivity reports observed provider progress, never a timer heartbeat.
+func (i *StageInput) ReportActivity() { i.activity("progress") }
+
+// BeginCheck exempts a legitimate blocking check from silence detection.
+// Always defer the returned function. Stop and context deadlines still apply.
+func (i *StageInput) BeginCheck() func() {
+	i.activity("check_start")
+	var once sync.Once
+	return func() { once.Do(func() { i.activity("check_end") }) }
+}
+
+func (i *StageInput) activity(kind string) {
+	if i != nil && i.OnExecutionActivity != nil {
+		i.OnExecutionActivity(kind)
 	}
 }
