@@ -40,6 +40,7 @@ type Config struct {
 	StageExecutor blueprint.StageExecutor
 	// RecaptureStage restricts this run to one resolved deterministic check.
 	RecaptureStage       *blueprint.Stage
+	TaskAttempt          int
 	FWUID                string
 	WorkDir              string
 	AgentsFS             fs.FS
@@ -656,6 +657,7 @@ func (p *Pipeline) runBlueprintMode(ctx context.Context) error {
 	}
 
 	input := blueprint.NewStageInput(p.cfg.FWUID, p.cfg.TaskDescription, p.cfg.WorkDir)
+	input.TaskAttempt = p.cfg.TaskAttempt
 
 	// Inject rich context from ReleaseManager briefing if available
 	if p.factory != nil && p.factory.cfg.ReleaseManager != nil {

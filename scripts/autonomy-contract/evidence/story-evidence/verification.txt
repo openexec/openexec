@@ -1,0 +1,56 @@
+story-evidence: candidate fcbc3e61b137c76d76f2b02dd91426fde923d1c1
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case behavioral-reproduction
+pkg/manager: verified 1 required tests (no skips)
+pre-fix behavioral failure reproduced at 245746baaa66372c4641d137053e330fbc75f679
+pkg/manager: verified 3 required tests (no skips)
+behavioral-reproduction: PASS
+RESULT: behavioral-reproduction: PASS
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case runtime-boundary
+pkg/runtime: verified 56 required tests (no skips)
+internal/execution/gates: verified 1 required tests (no skips)
+internal/pipeline: verified 11 required tests (no skips)
+internal/blueprint: verified 1 required tests (no skips)
+runtime-boundary: PASS
+RESULT: runtime-boundary: PASS
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case exit-1-slice
+pkg/manager: verified 1 required tests (no skips)
+pre-fix behavioral failure reproduced at 245746baaa66372c4641d137053e330fbc75f679
+pkg/runtime: verified 56 required tests (no skips)
+internal/execution/gates: verified 1 required tests (no skips)
+internal/pipeline: verified 11 required tests (no skips)
+internal/blueprint: verified 1 required tests (no skips)
+pkg/manager: verified 49 required tests (no skips)
+exit-1-slice: PASS
+RESULT: exit-1-slice: PASS
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case native-recovery-tracer
+pkg/manager: verified 49 required tests (no skips)
+native-recovery-tracer: PASS
+RESULT: native-recovery-tracer: PASS
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case recovery-matrix
+pkg/runtime: verified 56 required tests (no skips)
+internal/execution/gates: verified 1 required tests (no skips)
+internal/pipeline: verified 11 required tests (no skips)
+internal/blueprint: verified 1 required tests (no skips)
+pkg/manager: verified 49 required tests (no skips)
+recovery-matrix: PASS
+RESULT: recovery-matrix: PASS
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case compatibility-refusal
+pkg/runtime: verified 56 required tests (no skips)
+internal/execution/gates: verified 1 required tests (no skips)
+internal/pipeline: verified 11 required tests (no skips)
+internal/blueprint: verified 1 required tests (no skips)
+pkg/manager: verified 49 required tests (no skips)
+internal/validation: verified 7 required tests (no skips)
+compatibility-refusal: PASS
+RESULT: compatibility-refusal: PASS
+COMMAND: bash -euo pipefail /mnt/data1/projects/openexec/.openexec/outcome-candidates/21d181edd63f7f60fd833e9c2ddb4225/scripts/autonomy-contract/verify-runtime-evidence.sh --case implementation-unit-coverage
+Coverage JSON: ../implementation-unit-coverage/final.json
+RESULT: implementation-unit-coverage: PASS
+COMMAND: python3 -B -m unittest discover -s scripts/autonomy-contract -p test_*.py
+....................................................................
+----------------------------------------------------------------------
+Ran 68 tests in 2.326s
+
+OK
+RESULT: harness-tests: PASS
+story-evidence: PASS candidate fcbc3e61b137c76d76f2b02dd91426fde923d1c1

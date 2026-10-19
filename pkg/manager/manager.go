@@ -358,6 +358,7 @@ func (m *Manager) start(ctx context.Context, fwuID string, queueOwned bool, opts
 
 	pCfg := pipeline.Config{
 		StageExecutor:        m.cfg.StageExecutor,
+		TaskAttempt:          taskAttempt,
 		FWUID:                fwuID,
 		WorkDir:              m.cfg.WorkDir,
 		AgentsFS:             m.cfg.AgentsFS,

@@ -16,8 +16,15 @@ type admittedStageExecutor struct {
 }
 
 func (a admittedStageExecutor) Execute(ctx context.Context, stage *blueprint.Stage, input *blueprint.StageInput) (*blueprint.StageResult, error) {
+	expected := gates.TerminalBinding{}
+	if input != nil {
+		expected = gates.TerminalBinding{TaskID: input.RunID, Stage: stage.Name, TaskAttempt: input.TaskAttempt, StageAttempt: input.StageAttempt, Source: "deterministic-runner"}
+	}
 	result, err := a.executor.Execute(ctx, stage, input)
-	a.evidence.receipt = gates.VerificationFailureArtifacts(err)
+	a.evidence.receipt = nil
+	if ctx.Err() == nil {
+		a.evidence.receipt = gates.VerificationFailureArtifactsForStage(err, expected)
+	}
 	if stage.Type != types.StageTypeDeterministic {
 		return result, err
 	}

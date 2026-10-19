@@ -465,6 +465,7 @@ func (e *Engine) Execute(ctx context.Context, run *Run, input *StageInput) error
 
 		// Execute stage
 		attempt := run.GetRetries(stage.Name) + 1
+		input.StageAttempt = attempt
 		result, err := e.executor.Execute(ctx, stage, input)
 		if err != nil {
 			result = failedStageResult(result, stage.Name, attempt, err)
@@ -528,6 +529,7 @@ func (e *Engine) ExecuteStage(ctx context.Context, run *Run, stageName string, i
 	}
 
 	run.CurrentStage = stageName
+	input.StageAttempt = run.GetRetries(stage.Name) + 1
 	result, err := e.executor.Execute(ctx, stage, input)
 	if err != nil {
 		if result == nil {

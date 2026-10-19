@@ -39,3 +39,16 @@ func VerificationCommandFailureWithOutput(ctx context.Context, name string, err 
 func VerificationCommandFailureWithEvidence(ctx context.Context, name string, err error, hash, path string) error {
 	return gates.CommandFailureWithEvidence(ctx, name, err, hash, path)
 }
+
+// Structured completion types cross the same admitted verification boundary.
+type TerminalBinding = gates.TerminalBinding
+type TerminalCompletion = gates.TerminalCompletion
+type TerminalLoader = gates.TerminalLoader
+
+// VerificationTerminalFailure consumes an immutable completion through a trusted
+// loader owned by the admitting caller. Never implement the loader with worker
+// output or an unauthenticated terminal record. The native pipeline independently
+// matches the returned typed evidence to the executing task/stage/attempt.
+func VerificationTerminalFailure(ctx context.Context, expected TerminalBinding, id string, load TerminalLoader) error {
+	return gates.NewTerminalFailure(ctx, expected, id, load)
+}

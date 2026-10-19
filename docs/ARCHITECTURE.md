@@ -1,4 +1,228 @@
-# OpenExec Architecture
+# OpenExec execution and recovery architecture
+
+## Evidence scope
+
+Updated for US-010 / T-US-010-001 from implementation baseline
+`722a7a7f` on 2026-09-29. This is a checkout map, not deployment evidence.
+The supplied Project context describes the accepted goal as restoring trusted
+persisted deterministic-runner verification failure recovery while rejecting
+unauthorized evidence. AGENTS.md, AGENTS.local.md, docs/AGENTS.md and NOTES.md
+were read. No separate live Console Project-context endpoint was available;
+the supplied briefing and local plan are context, not proof of implementation.
+
+## Restored resources
+
+The earlier discovery baseline lacked `pkg/runtime/execution.go`,
+`internal/execution/gates/failure.go` and `pkg/manager/task_failure.go`.
+All three exist in the US-010 candidate. The current map below supersedes
+those absence claims. Exact final check status belongs in
+`docs/runtime-verification-handoff.md`; source existence is not a passing check.
+
+## Module and API map
+
+Source links use Go declaration names after `#`; the verifier resolves these
+against declarations, including receiver methods, rather than Markdown anchors.
+
+| Module | Current API / source | Responsibility |
+|---|---|---|
+| Trusted terminal boundary | [VerificationTerminalFailure](../pkg/runtime/execution.go#VerificationTerminalFailure), [NewTerminalFailure](../internal/execution/gates/terminal.go#NewTerminalFailure) | Caller-owned authenticated loader; immutable terminal and task/stage/attempt/source matching. |
+| Failure conversion | [VerificationFailureArtifacts](../internal/execution/gates/failure.go#VerificationFailureArtifacts) | Typed failed checks only; refuses mixed errors. |
+| Native repair | [persistTaskVerificationFailure](../pkg/manager/task_failure.go#persistTaskVerificationFailure), [repairTaskFromRetainedFailure](../pkg/manager/task_failure.go#repairTaskFromRetainedFailure) | Durable failed-step receipt and existing same-story repair queue. |
+| Public execution | [Request](../pkg/execution/execution.go#Request), [Result](../pkg/execution/execution.go#Result), [Provider](../pkg/execution/execution.go#Provider) | Provider requests, terminal outcome/reason and streaming execution; runtime classification is exposed separately above. |
+| CLI transport | [serveExecutionProtocol](../internal/cli/execution_stdio.go#serveExecutionProtocol) | Versioned stdio describe/probe/execute; accepts protocol 1/2/3, refuses replay in version 1. |
+| Provider construction | [newConfiguredAPIProvider](../internal/cli/execution_stdio.go#newConfiguredAPIProvider) | Project-selected API configuration and gateway/workspace sandbox restrictions. |
+| Stage execution | [executeDeterministic](../internal/blueprint/executor.go#executeDeterministic) | Registered actions or local shell commands produce stage status, output, error and artifacts. |
+| Gate execution | [RunGate](../internal/execution/gates/runner.go#RunGate) | Local command execution with timeout, exit code, warning mode and fix hints. |
+| Blueprint control | [Execute](../internal/blueprint/engine.go#Execute) | Stage transitions, checkpoints and bounded failure-handler retries. |
+| Task scheduling | [ExecuteTasks](../pkg/manager/scheduler.go#ExecuteTasks), [filterAutoDispatchable](../pkg/manager/scheduler.go#filterAutoDispatchable) | Pending dependency graph dispatch; holds HITL tasks and their dependents; cascades failed dependencies. |
+| Persistence producer | [writeRunStepAsync](../pkg/manager/events.go#writeRunStepAsync) | Asynchronous event-to-step/artifact/checkpoint writes; errors are logged. |
+| State storage | [WriteRunStepWithArtifacts](../pkg/db/state/store.go#WriteRunStepWithArtifacts), [GetRunStep](../pkg/db/state/store.go#GetRunStep) | Store and retrieve structured execution state. |
+| Resume | [GetLatestCheckpoint](../pkg/db/state/store.go#GetLatestCheckpoint), [WithResumeCheckpoint](../pkg/manager/manager.go#WithResumeCheckpoint) | Read a run checkpoint and supply it, with applied tool calls, to pipeline configuration. |
+| Validation | [LinkValidationEvidence](../pkg/db/state/verification.go#LinkValidationEvidence), [ReadCompletionReport](../pkg/db/state/verification.go#ReadCompletionReport) | Bind validation evidence and reload frozen completion reports. |
+
+## Producer, persistence and reload
+
+The local deterministic executor first tries a registered action, then configured
+shell commands. An unknown action without commands, or an empty deterministic
+stage, fails. Command failure becomes stage error text; the callback also receives
+the original command error. The separate gate runner extracts `exec.ExitError`
+exit codes, uses -1 for other command errors, and allows configured warning mode.
+These are observed local producers, not authenticated persisted-runner imports.
+
+Manager events can write run steps, artifacts and checkpoints asynchronously.
+The inspected step writer selects start/complete events and maps completion events
+to `completed`; it does not establish the requested trusted failure producer.
+[writeCheckpointJSONL](../pkg/manager/checkpoints.go#writeCheckpointJSONL) and
+[writeCheckpointSQLite](../pkg/manager/checkpoints.go#writeCheckpointSQLite)
+record run, phase/stage, iteration and artifacts; their write errors are ignored.
+A write attempt alone therefore cannot prove durable evidence.
+
+The Store exposes checkpoint and run-step reads, while
+[FinalizeEvidenceCoverage](../pkg/db/state/verification.go#FinalizeEvidenceCoverage)
+transactionally freezes the first completion report for an accepted validation
+revision. Reloading that report is a supported path distinct from importing a
+terminal runner failure into native repair. The admitted recovery fixtures now close and reopen SQLite and the manager,
+reloading failed-step receipts, completed repair/original/remaining tasks and
+replaying evidence without another dispatch. The admitting caller persists and
+reloads terminal evidence before classification; its loader remains the
+producer authentication and integrity boundary.
+
+## Binding validation
+
+`LinkValidationEvidence` requires an accepted plan and accepted item, matching
+worktree-state and patch hashes, a run step belonging to the supplied run,
+matching evidence/step status, and an existing artifact when its hash is supplied.
+[EvidenceStatusMatchesRunStep](../pkg/db/state/verification.go#EvidenceStatusMatchesRunStep)
+maps passed/completed, failed/failed, inconclusive/inconclusive and
+not_run or unavailable/unavailable. Coverage also checks the current repository
+state; finalization refuses moved state and accepted items without evidence.
+
+These checks bind repository state, plan/item and run/step. They are not proof
+of trusted producer identity or of task/stage/attempt/source binding for imported
+runner completions. `NewTerminalFailure` checks terminal identity, exact expected binding, terminal
+outcome and exit range. The admitted pipeline independently matches the typed
+receipt against its native executing task and stage attempts. A source label
+alone cannot authenticate a worker-writable record.
+Public `Result` has executor/model/sandbox/session/time/outcome/reason fields;
+it is not a native repair authorization receipt.
+
+## Native recovery and receipts
+
+Blueprint `Execute` follows `OnSuccess` or `OnFailure`, counts stage retries,
+and enforces a total retry limit. [Resume](../internal/blueprint/engine.go#Resume)
+resumes a paused run. The restored native task queue additionally consumes a
+validated failure receipt, creates and runs one same-story repair, resumes the
+original task and continues remaining tasks. The US-008 running matrix covers
+A -> repair -> A -> B, receipt-boundary restart and duplicate replay. Refusal
+branches reopen storage and require zero unauthorized receipts or repair tasks.
+See the candidate-bound US-008 evidence and final US-010 handoff for check status.
+
+## Related tests and verification
+
+Existing source coverage includes
+[TestDeterministicStageWithUnregisteredActionFails](../internal/blueprint/executor_failclosed_test.go#TestDeterministicStageWithUnregisteredActionFails),
+[TestDeterministicStageWithCommandsStillPasses](../internal/blueprint/executor_failclosed_test.go#TestDeterministicStageWithCommandsStillPasses),
+[TestRunner_RunGate](../internal/execution/gates/runner_test.go#TestRunner_RunGate),
+[TestAuditIncludesArtifactsAndCheckpointWritten](../pkg/manager/events_artifacts_test.go#TestAuditIncludesArtifactsAndCheckpointWritten), and
+[TestValidationEvidenceAndCompletionRefuseInconsistentIrreversibleState](../pkg/db/state/verification_test.go#TestValidationEvidenceAndCompletionRefuseInconsistentIrreversibleState).
+Their existence alone is not a passing test result.
+
+Run this task's document/source verification with:
+
+```sh
+bash -euo pipefail scripts/autonomy-contract/verify-runtime-evidence.sh --case architecture-contracts
+python3 scripts/autonomy-contract/test_architecture_contracts.py
+```
+
+The first checks required sections, resolvable Go source declarations and restored
+resource references. The second exercises the actual command in isolated
+fixtures, including missing documents, broken references and unsupported cases.
+Current executed results are recorded once in Discovery verification evidence
+below. Existing Go tests listed above were inspected, not run for this
+documentation/tooling change.
+Documentation checks alone do not prove the engine recovery lifecycle. This documentation and
+verifier change does not modify loading, migration, `.openexec`/`.uaos` handling
+or runtime behavior; compatibility-sensitive product support is unchanged.
+
+## Accepted obligation traceability
+
+Mapped for US-007 / T-US-007-002 against source baseline
+`f598478da3cce87e641659c95d14218b275664e7`. The supplied accepted Goal and
+owner request, plus local plan
+`.openexec/artifacts/plans/6f65394f312469446aa0ac378593b1293961d0f92c8e5388ca39e3928ff58bb0.json`,
+provide the obligation context. That local planning artifact is not a delivery
+receipt or an independently retrieved accepted-contract record. D1 and D2 below
+use the supplied plan's meanings; no REQ identifiers or new grants are introduced.
+Rows are evidence obligations, not assertions of implemented behavior.
+
+| Obligation | Responsible party | Required evidence | Current finding |
+|---|---|---|---|
+| acceptedContract.goal | OpenExec engine | Trusted persisted deterministic-runner terminal evidence crosses the exported verification boundary into existing native repair; unauthorized failure evidence is rejected. | Unverified: final US-010 rerun pending; prior US-008 recovery evidence exists. |
+| D1 engine reproduction and recovery | OpenExec engine | Behavioral pre-fix reproduction and post-fix exported runtime API plus admitted executor regression; actual exit 1, persistence reload, validated task/stage/attempt/source bindings, native repair execution, original-task resumption and queue continuation with durable receipts. | Unverified: final candidate rerun pending; US-008 exercised the admitted lifecycle and reopened receipts. |
+| D1 engine refusal and compatibility | OpenExec engine | Exit 0 without repair; qualifying exits 1 through 125; replay/restart without duplicate repairs; refusal of untrusted, missing, stale, tampered or worker-forged evidence, invalid bindings/exits, cancellation, timeout, launch/transport and mixed errors; reopened state contains no unauthorized repair or receipt. Preserve local exec.ExitError and legacy .openexec/.uaos/tasks.json behavior. | Unverified: final candidate rerun pending; US-008 refusal and protected-project checks are recorded separately. |
+| D1 engine validation | OpenExec engine | Strictly greater than 90% unit statement coverage over all added and complete modified production functions; external consumer fixture; make test, make compat-test and make type-check; candidate-bound commands, results and reopened persistence. | Unverified: final coverage, external consumer and required make checks await runner evidence; see the US-010 handoff. |
+| D1 downstream producer/projection | Agent Console | Structured runner producer/projection evidence preserves actual terminal exit and task/stage/attempt/source bindings through trusted persistence and reload into the consumable engine revision; worker artifacts alone cannot establish provenance. | Pending: Console producer/projection source and authentic run receipts were not inspected. |
+| D1 downstream production wiring and policy matching | Agent Console | Exact engine revision consumed by production wiring; launch request, effective execution policy and completion evidence prove policy matching through the real integration. | Pending: no current module pin, deployed engine identity or production policy result was independently verified. |
+| D1 downstream verification | Agent Console | Authentic passing results from the waiting Console's unchanged launch-and-policy verifier, native-stage and real-HTTP completion/policy contracts, coverage and repository gates, bound to the integrated candidate. | Pending: engine tests and reported Console process identity cannot satisfy downstream verification. |
+| D2 default-branch merge | Agent Console delivery, with owner decision | Published pull request, canonical gate, independent review, exact candidate-bound owner merge decision and authentic default-branch merge evidence identifying the merged fix. | Pending: local commits and owner acceptance do not prove merge or deployment. |
+
+## Promotion controls and retained owner boundary
+
+The current owner request assigns delivery after queue preparation to Agent
+Console: candidate commit, pull-request publication, canonical gate, independent
+review and presentation of the exact merge decision to the owner. Task stages
+prepare evidence and commit authorized workspace changes; they do not publish,
+raise the owner's decision, merge or deploy. The full repository gate belongs in
+the socket-capable repository runner. These are supplied operating controls;
+this study does not claim to have verified Console's enforcement implementation.
+
+The local scheduler's `filterAutoDispatchable` (linked in the API map) excludes
+HITL tasks and their transitive dependents from automatic dispatch. This observed
+hold is not itself authentication of a decision or a promotion authorization.
+
+The retained final boundary from the supplied plan is:
+
+- Task: `T-US-010-002`
+- Mode: `hitl`
+- Depends on: `T-US-010-001`
+- Decision reason: The owner must make the exact merge decision after Agent Console attaches the published pull request and required review evidence; accepted repair scope does not supply that candidate-specific decision.
+- Decision reference: absent; no authentic candidate-bound owner decision was supplied.
+
+Preserve that single boundary, identity, reason and dependency. AFK preparation
+must not depend on a future owner decision. Console presents the candidate and PR;
+the final task consumes only an authentic authorized decision matching both.
+Missing, unauthorized or candidate/PR-mismatched records must be refused by the
+later owner-acceptance verifier; synthetic fixtures never constitute acceptance.
+No grant or decision reference is invented here. Acceptance does not establish
+that downstream D1 passed or that D2 merged.
+
+## Traceability verification
+
+```sh
+bash -euo pipefail scripts/autonomy-contract/verify-runtime-evidence.sh --case architecture-traceability
+python3 scripts/autonomy-contract/test_architecture_traceability.py
+```
+
+The traceability case validates the document/source contract, unique obligation
+rows with responsible parties and evidence/status fields, retained boundary and
+historical-evidence qualification. Its isolated command tests mutate persisted
+fixtures to exercise missing obligations, authority drift and failed checks.
+Current results are recorded in Discovery verification evidence below. The command
+re-reads saved documentation and sources; fixtures exercise the real shell entry
+point. This verifies documentation consistency, not engine behavior, Console
+policy enforcement, owner acceptance or delivery.
+
+## Discovery verification evidence
+
+Historical US-007 command tests passed at
+`5762115710d445717edd5670e4882bf085d9bac1` against its then-current absence
+observations. They did not validate the restored implementation. US-010 updates
+the checker to require restored declarations and reject missing resources.
+Final verification status, reproduction commands and blockers are maintained
+once in `docs/runtime-verification-handoff.md`.
+
+Complexity delta: no runtime concepts, persistent product state, transitions,
+owner decisions or replacement machinery. Added only verification tooling and
+an external consumer fixture. Project loading and migration code are unchanged;
+existing compatibility/refusal checks are reused. No delivery actions occur.
+
+## Historical claims and external evidence
+
+The previous March architecture overview described broad orchestration intent;
+its assertions of shipped functionality are not retained as current proof.
+The supplied Console revision `e6745def` and start time `2026-09-29T16:21:34Z`
+are historical, unverified observations identifying a reported Console process only.
+Checkout notes, earlier summaries and module-pin claims remain historical unless
+independently verified against current repository/deployment evidence. They establish neither this engine's deployed revision nor merge,
+downstream policy matching, or native-stage/HTTP verification. Those resources
+were not inspected. Publication, independent review, canonical gates and the exact
+owner merge decision remain Console-owned delivery activities outside this stage.
+
+## Retained diagnostic evidence and recapture architecture
+
+The following upstream PR #66 map is retained alongside the structured-terminal
+contract above. Its revision-bound evidence remains historical; syncing these
+implementations requires fresh combined validation.
 
 Current validation: US-015 / T-US-015-001, 2026-09-30, accepted G-007.
 Final evidence and finding dispositions: [delivery evidence](verification-evidence-delivery.md).
@@ -31,7 +255,7 @@ Complexity delta: concepts added/removed 0; new persistent state, transitions,
 owner decisions and runtime failure modes 0; existing machinery replaced none.
 This validation stage changes verification and documentation only; production behavior is unchanged.
 
-Read root/docs instructions, NOTES and [project intent](../PROJECT_INTENT.md).
+Read root/docs instructions, NOTES and project intent (`PROJECT_INTENT.md`).
 Fresh Console Project context reports accepted Goal/Ready revision 4 and
 interpretation 10 (Professional Portfolio Stewardship). The selected G-007 and
 US-010 ledger contract narrow this work to the study. The candidate ledger was

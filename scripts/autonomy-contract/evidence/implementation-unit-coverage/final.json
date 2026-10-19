@@ -1,0 +1,248 @@
+{
+  "baseline": "245746baaa66372c4641d137053e330fbc75f679",
+  "unit_inventory": "final",
+  "commands": [
+    [
+      "go",
+      "test",
+      "./internal/blueprint",
+      "-json",
+      "-count=1",
+      "-timeout=60s",
+      "-run",
+      "^(TestEngine_Execute_SimpleFlow|TestEngine_Execute_WithRetry|TestEngine_Execute_MaxRetriesExceeded|TestEngine_Execute_ContextCancellation|TestEngineUnitFailureAndSingleStage|TestEngine_Callbacks|TestEngine_Execute_StageError)$",
+      "-covermode=count",
+      "-coverpkg=./internal/blueprint,./internal/execution/gates,./internal/pipeline,./pkg/manager,./pkg/runtime",
+      "-coverprofile=<temporary>"
+    ],
+    [
+      "go",
+      "test",
+      "./internal/execution/gates",
+      "-json",
+      "-count=1",
+      "-timeout=60s",
+      "-run",
+      "^(TestReceiptUnitMalformedChecks)$",
+      "-covermode=count",
+      "-coverpkg=./internal/blueprint,./internal/execution/gates,./internal/pipeline,./pkg/manager,./pkg/runtime",
+      "-coverprofile=<temporary>"
+    ],
+    [
+      "go",
+      "test",
+      "./internal/pipeline",
+      "-json",
+      "-count=1",
+      "-timeout=60s",
+      "-run",
+      "^(TestAdmittedTerminalBindingAndReceiptReset|TestBlueprintUnitInputsAndOutcomes|TestBlueprintUnitNativeContext)$",
+      "-covermode=count",
+      "-coverpkg=./internal/blueprint,./internal/execution/gates,./internal/pipeline,./pkg/manager,./pkg/runtime",
+      "-coverprofile=<temporary>"
+    ],
+    [
+      "go",
+      "test",
+      "./pkg/manager",
+      "-json",
+      "-count=1",
+      "-timeout=60s",
+      "-run",
+      "^(TestStartUnitConfigurationAndRefusals)$",
+      "-covermode=count",
+      "-coverpkg=./internal/blueprint,./internal/execution/gates,./internal/pipeline,./pkg/manager,./pkg/runtime",
+      "-coverprofile=<temporary>"
+    ],
+    [
+      "go",
+      "test",
+      "./pkg/runtime",
+      "-json",
+      "-count=1",
+      "-timeout=60s",
+      "-run",
+      "^(TestTerminalBoundary|TestTerminalMixedErrorsAndNativeBinding)$",
+      "-covermode=count",
+      "-coverpkg=./internal/blueprint,./internal/execution/gates,./internal/pipeline,./pkg/manager,./pkg/runtime",
+      "-coverprofile=<temporary>"
+    ]
+  ],
+  "functions": [
+    {
+      "file": "internal/blueprint/engine.go",
+      "name": "Engine.Execute",
+      "start": 442,
+      "end": 523,
+      "covered": 40,
+      "total": 40,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/blueprint/engine.go",
+      "name": "Engine.ExecuteStage",
+      "start": 526,
+      "end": 541,
+      "covered": 10,
+      "total": 10,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/execution/gates/failure.go",
+      "name": "ValidateVerificationFailureArtifacts",
+      "start": 106,
+      "end": 109,
+      "covered": 2,
+      "total": 2,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/execution/gates/failure.go",
+      "name": "decodeChecks",
+      "start": 111,
+      "end": 130,
+      "covered": 13,
+      "total": 13,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/execution/gates/terminal.go",
+      "name": "TerminalBinding.valid",
+      "start": 20,
+      "end": 22,
+      "covered": 1,
+      "total": 1,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/execution/gates/terminal.go",
+      "name": "NewTerminalFailure",
+      "start": 39,
+      "end": 64,
+      "covered": 17,
+      "total": 17,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/execution/gates/terminal.go",
+      "name": "VerificationFailureArtifactsForStage",
+      "start": 68,
+      "end": 83,
+      "covered": 10,
+      "total": 10,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/pipeline/admitted_executor.go",
+      "name": "admittedStageExecutor.Execute",
+      "start": 16,
+      "end": 24,
+      "covered": 6,
+      "total": 6,
+      "uncovered_lines": []
+    },
+    {
+      "file": "internal/pipeline/pipeline.go",
+      "name": "Pipeline.runBlueprintMode",
+      "start": 365,
+      "end": 712,
+      "covered": 132,
+      "total": 144,
+      "uncovered_lines": [
+        [
+          411,
+          418
+        ],
+        [
+          506,
+          508
+        ],
+        [
+          558,
+          561
+        ],
+        [
+          562,
+          568
+        ],
+        [
+          579,
+          580
+        ],
+        [
+          580,
+          581
+        ],
+        [
+          581,
+          583
+        ],
+        [
+          621,
+          623
+        ],
+        [
+          634,
+          636
+        ],
+        [
+          642,
+          643
+        ],
+        [
+          643,
+          646
+        ]
+      ]
+    },
+    {
+      "file": "pkg/manager/manager.go",
+      "name": "Manager.start",
+      "start": 325,
+      "end": 517,
+      "covered": 93,
+      "total": 100,
+      "uncovered_lines": [
+        [
+          339,
+          341
+        ],
+        [
+          345,
+          347
+        ],
+        [
+          351,
+          353
+        ],
+        [
+          355,
+          357
+        ],
+        [
+          405,
+          407
+        ],
+        [
+          409,
+          411
+        ],
+        [
+          508,
+          510
+        ]
+      ]
+    },
+    {
+      "file": "pkg/runtime/execution.go",
+      "name": "VerificationTerminalFailure",
+      "start": 38,
+      "end": 40,
+      "covered": 1,
+      "total": 1,
+      "uncovered_lines": []
+    }
+  ],
+  "covered": 325,
+  "total": 344
+}
