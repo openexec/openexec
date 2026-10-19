@@ -22,7 +22,13 @@ dependency alone does not prove integrated watchdog cancellation.
 
 Paused/operator-attention execution and deterministic stages are also excluded.
 The default executor brackets quality gates even when they run inside an
-agentic stage. Check scopes do not exempt Stop or deadlines. The watchdog
+agentic stage. The standalone API runner also brackets `run_shell_command`
+with these same check events: shell output is buffered until exit, so lack of
+output cannot establish a stall while that bounded tool is running. The tool's
+own timeout and the attempt context remain in force. This applies to all shell
+commands without guessing whether command text names a check. Provider inference
+becomes eligible again after the tool returns; no timer activity is fabricated.
+Check scopes do not exempt Stop or deadlines. The watchdog
 rechecks eligibility under the activity lock before cancelling the attempt.
 
 Cancellation uses the native attempt context, including context-bound commands.
@@ -66,7 +72,12 @@ deterministic subprocess and a silent gate executed by DefaultExecutor inside an
 agentic stage. Stop and deadlines interrupt check scopes; silent inference
 is cancelled after its check finishes. Executable removal
 controls reject missing activity ingestion, relabelled cancellation, disconnected
-admitted progress and a missing agentic quality-gate scope. All run under the
+admitted progress, a missing agentic quality-gate scope and a missing API shell
+scope. `TestNativeWatchdogAPIShell` runs a disposable HTTP provider through the
+standalone native pipeline, a real buffered shell subprocess and the manager's
+watchdog. It covers healthy completion beyond the silence threshold, owner Stop,
+attempt deadline, tool timeout and silent inference after a completed tool;
+completed files/checkpoints and separately reopened SQLite receipts are checked. All run under the
 declared `test` gate. The pipeline suite also verifies nested/idempotent scopes
 and rejection of late callbacks.
 
