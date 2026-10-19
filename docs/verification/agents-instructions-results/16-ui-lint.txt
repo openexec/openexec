@@ -1,0 +1,8 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout/ui
+argv: ["npm", "run", "lint"]
+
+> @openexec/ui@0.1.0 lint
+> eslint src --max-warnings 0
+
+
+exit_status: 0

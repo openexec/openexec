@@ -1,0 +1,101 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["go", "test", "./..."]
+?   	github.com/openexec/openexec	[no test files]
+?   	github.com/openexec/openexec/cmd/openexec	[no test files]
+?   	github.com/openexec/openexec/cmd/outcome-evaluate	[no test files]
+?   	github.com/openexec/openexec/internal	[no test files]
+?   	github.com/openexec/openexec/internal/actions	[no test files]
+ok  	github.com/openexec/openexec/internal/agent	(cached)
+ok  	github.com/openexec/openexec/internal/approval	(cached)
+ok  	github.com/openexec/openexec/internal/blueprint	(cached)
+ok  	github.com/openexec/openexec/internal/botseed	(cached)
+ok  	github.com/openexec/openexec/internal/budget	(cached)
+ok  	github.com/openexec/openexec/internal/cache	(cached)
+ok  	github.com/openexec/openexec/internal/checkpoint	(cached)
+ok  	github.com/openexec/openexec/internal/cli	(cached)
+ok  	github.com/openexec/openexec/internal/config	(cached)
+ok  	github.com/openexec/openexec/internal/context	(cached)
+ok  	github.com/openexec/openexec/internal/contracts	(cached)
+ok  	github.com/openexec/openexec/internal/conversation	(cached)
+ok  	github.com/openexec/openexec/internal/dcp	(cached)
+?   	github.com/openexec/openexec/internal/execution/audit	[no test files]
+ok  	github.com/openexec/openexec/internal/execution/evidence	(cached)
+ok  	github.com/openexec/openexec/internal/execution/gates	(cached)
+?   	github.com/openexec/openexec/internal/execution/health	[no test files]
+ok  	github.com/openexec/openexec/internal/externalcap	(cached)
+ok  	github.com/openexec/openexec/internal/git	0.181s
+?   	github.com/openexec/openexec/internal/graphjourney	[no test files]
+ok  	github.com/openexec/openexec/internal/health	(cached)
+ok  	github.com/openexec/openexec/internal/infra	(cached)
+ok  	github.com/openexec/openexec/internal/intent	(cached)
+ok  	github.com/openexec/openexec/internal/knowledge	(cached)
+ok  	github.com/openexec/openexec/internal/logging	(cached)
+ok  	github.com/openexec/openexec/internal/loop	(cached)
+ok  	github.com/openexec/openexec/internal/mcp	7.452s
+ok  	github.com/openexec/openexec/internal/memory	(cached)
+ok  	github.com/openexec/openexec/internal/mode	(cached)
+?   	github.com/openexec/openexec/internal/patch	[no test files]
+ok  	github.com/openexec/openexec/internal/pipeline	(cached)
+ok  	github.com/openexec/openexec/internal/planner	(cached)
+ok  	github.com/openexec/openexec/internal/policy	(cached)
+ok  	github.com/openexec/openexec/internal/project	(cached)
+ok  	github.com/openexec/openexec/internal/prompt	(cached)
+ok  	github.com/openexec/openexec/internal/prompt/manifest	(cached)
+ok  	github.com/openexec/openexec/internal/prompt/persona	(cached)
+ok  	github.com/openexec/openexec/internal/prompt/render	(cached)
+ok  	github.com/openexec/openexec/internal/prompt/workflow	(cached)
+ok  	github.com/openexec/openexec/internal/protocol	(cached)
+ok  	github.com/openexec/openexec/internal/quality	(cached)
+ok  	github.com/openexec/openexec/internal/quality/architecture	(cached)
+ok  	github.com/openexec/openexec/internal/quality/checklist	(cached)
+ok  	github.com/openexec/openexec/internal/quality/nostubs	(cached)
+ok  	github.com/openexec/openexec/internal/release	(cached)
+ok  	github.com/openexec/openexec/internal/repository	(cached)
+ok  	github.com/openexec/openexec/internal/repositoryhygiene	(cached)
+ok  	github.com/openexec/openexec/internal/router	(cached)
+ok  	github.com/openexec/openexec/internal/runner	(cached)
+?   	github.com/openexec/openexec/internal/runtime	[no test files]
+?   	github.com/openexec/openexec/internal/schema	[no test files]
+?   	github.com/openexec/openexec/internal/security	[no test files]
+ok  	github.com/openexec/openexec/internal/server	(cached)
+ok  	github.com/openexec/openexec/internal/skills	(cached)
+ok  	github.com/openexec/openexec/internal/summarize	(cached)
+ok  	github.com/openexec/openexec/internal/telegram	(cached)
+?   	github.com/openexec/openexec/internal/testutil/admittedevidence	[no test files]
+ok  	github.com/openexec/openexec/internal/tools	(cached)
+ok  	github.com/openexec/openexec/internal/toolset	(cached)
+?   	github.com/openexec/openexec/internal/tui	[no test files]
+ok  	github.com/openexec/openexec/internal/twilio	(cached)
+?   	github.com/openexec/openexec/internal/types	[no test files]
+ok  	github.com/openexec/openexec/internal/uploader	(cached)
+ok  	github.com/openexec/openexec/internal/user	(cached)
+ok  	github.com/openexec/openexec/internal/validation	(cached)
+?   	github.com/openexec/openexec/internal/worktree	[no test files]
+?   	github.com/openexec/openexec/pkg/actions	[no test files]
+ok  	github.com/openexec/openexec/pkg/agent	(cached)
+ok  	github.com/openexec/openexec/pkg/api	(cached)
+ok  	github.com/openexec/openexec/pkg/audit	(cached)
+ok  	github.com/openexec/openexec/pkg/db/session	(cached)
+ok  	github.com/openexec/openexec/pkg/db/sqlitecfg	(cached)
+ok  	github.com/openexec/openexec/pkg/db/state	(cached)
+ok  	github.com/openexec/openexec/pkg/execution	(cached)
+?   	github.com/openexec/openexec/pkg/git	[no test files]
+?   	github.com/openexec/openexec/pkg/infracontract	[no test files]
+ok  	github.com/openexec/openexec/pkg/manager	(cached)
+?   	github.com/openexec/openexec/pkg/mcptool	[no test files]
+?   	github.com/openexec/openexec/pkg/openexec	[no test files]
+ok  	github.com/openexec/openexec/pkg/outcome	(cached)
+?   	github.com/openexec/openexec/pkg/plugin	[no test files]
+ok  	github.com/openexec/openexec/pkg/project	(cached)
+?   	github.com/openexec/openexec/pkg/runner	[no test files]
+ok  	github.com/openexec/openexec/pkg/runtime	(cached)
+ok  	github.com/openexec/openexec/pkg/security	(cached)
+?   	github.com/openexec/openexec/pkg/telemetry	[no test files]
+ok  	github.com/openexec/openexec/pkg/util	(cached)
+?   	github.com/openexec/openexec/pkg/version	[no test files]
+?   	github.com/openexec/openexec/scripts/defect-inventory/d4-server	[no test files]
+?   	github.com/openexec/openexec/scripts/verification/retentioncoverage	[no test files]
+?   	github.com/openexec/openexec/templates	[no test files]
+?   	github.com/openexec/openexec/ui/node_modules/flatted/golang/pkg/flatted	[no test files]
+
+exit_status: 0

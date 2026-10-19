@@ -1,0 +1,5 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["node", "--version"]
+v22.23.2
+
+exit_status: 0

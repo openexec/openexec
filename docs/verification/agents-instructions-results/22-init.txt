@@ -1,0 +1,13 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["./bin/openexec", "init", "--yes"]
+
+✓ Project initialized successfully
+  Project name: checkout
+  Local configuration: /tmp/openexec-instructions-fukjpter/checkout/.openexec/config.json
+
+Next steps:
+  1. Run 'openexec wizard' to define your project requirements
+  2. Run 'openexec plan INTENT.md' to generate stories
+  3. Run 'openexec run' to execute tasks
+
+exit_status: 0

@@ -1,0 +1,5 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["git", "rev-parse", "HEAD"]
+4c6c99f2632060422df0a65cab36055e44a746cb
+
+exit_status: 0

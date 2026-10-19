@@ -1,0 +1,14 @@
+cwd: /tmp/openexec-instructions-fukjpter/checkout
+argv: ["make", "lint"]
+🔍 Linting Go (vet)...
+go vet ./...
+make[1]: Entering directory '/tmp/openexec-instructions-fukjpter/checkout'
+🔍 Linting UI...
+cd ui && npm run lint
+
+> @openexec/ui@0.1.0 lint
+> eslint src --max-warnings 0
+
+make[1]: Leaving directory '/tmp/openexec-instructions-fukjpter/checkout'
+
+exit_status: 0
