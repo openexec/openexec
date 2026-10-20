@@ -139,7 +139,7 @@ func (r *APIRunner) Run(ctx context.Context) error {
 				Tool: tc.ToolName,
 			})
 
-			output, toolErr := r.tools.ExecuteTool(ctx, tc.ToolName, tc.ToolInput)
+			output, toolErr := r.executeTool(ctx, tc.ToolName, tc.ToolInput)
 
 			if toolErr != nil {
 				r.emit(Event{
@@ -175,6 +175,17 @@ func (r *APIRunner) Run(ctx context.Context) error {
 		},
 	})
 	return nil
+}
+
+// executeTool brackets buffered shell execution with the existing check scope.
+// These bounded commands may be silent until exit; their tool timeout and the
+// attempt context still apply. Provider inference resumes silence monitoring.
+func (r *APIRunner) executeTool(ctx context.Context, name string, input json.RawMessage) (string, error) {
+	if name == "run_shell_command" {
+		r.emit(Event{Type: EventExecutionActivity, ExecutionActivity: "check_start"})
+		defer r.emit(Event{Type: EventExecutionActivity, ExecutionActivity: "check_end"})
+	}
+	return r.tools.ExecuteTool(ctx, name, input)
 }
 
 // usageArtifacts reports the peak context size for smart-zone flagging, or

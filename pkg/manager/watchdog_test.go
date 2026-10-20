@@ -27,6 +27,9 @@ func TestWatchdogDetection(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer m.Close()
+	defer stateStore.Close()
+
 	// Create a dummy pipeline
 	fwuID := "STALL-01"
 	p, _ := pipeline.New(pipeline.Config{FWUID: fwuID})
@@ -34,10 +37,11 @@ func TestWatchdogDetection(t *testing.T) {
 	e := &entry{
 		pipeline: p,
 		info: PipelineInfo{
-			FWUID:        fwuID,
-			Status:       StatusRunning,
-			StartedAt:    time.Now().Add(-1 * time.Hour),
-			LastActivity: time.Now().Add(-1 * time.Hour), // Explicitly old activity
+			SilenceMonitoring: true, // This fixture models an instrumented native stage.
+			FWUID:             fwuID,
+			Status:            StatusRunning,
+			StartedAt:         time.Now().Add(-1 * time.Hour),
+			LastActivity:      time.Now().Add(-1 * time.Hour), // Explicitly old activity
 		},
 	}
 

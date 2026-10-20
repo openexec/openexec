@@ -35,6 +35,10 @@ type Parser struct {
 	lastFailureSig      string
 	consecutiveFailures int
 	thrashWarned        bool
+
+	// CLI tools buffer their results while executing. Correlate actual tool
+	// boundaries, including parallel calls, rather than guessing from command text.
+	pendingTools map[string]string
 }
 
 // NewParser creates a Parser that sends events to ch.
@@ -46,6 +50,7 @@ func NewParser(ch chan<- Event, iteration int) *Parser {
 // Parse reads from r until EOF, sending an Event for each recognized JSON line.
 // Unrecognized or malformed lines are silently skipped.
 func (p *Parser) Parse(r io.Reader) error {
+	defer p.finishToolChecks()
 	scanner := bufio.NewScanner(r)
 	// Allow up to 1 MB per line (Claude Code can emit large tool inputs).
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -67,7 +72,8 @@ type rawMessage struct {
 	Message json.RawMessage `json:"message,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	// tool_result fields
-	Content json.RawMessage `json:"content,omitempty"`
+	Content   json.RawMessage `json:"content,omitempty"`
+	ToolUseID string          `json:"tool_use_id,omitempty"`
 }
 
 // messageBody is the shape of the "message" field.
@@ -92,10 +98,13 @@ func (u *usageBody) contextTokens() int64 {
 
 // contentItem is a single item inside message.content[].
 type contentItem struct {
-	Type  string                 `json:"type"`
-	Text  string                 `json:"text,omitempty"`
-	Name  string                 `json:"name,omitempty"`
-	Input map[string]interface{} `json:"input,omitempty"`
+	ID        string                 `json:"id,omitempty"`
+	ToolUseID string                 `json:"tool_use_id,omitempty"`
+	Content   json.RawMessage        `json:"content,omitempty"`
+	Type      string                 `json:"type"`
+	Text      string                 `json:"text,omitempty"`
+	Name      string                 `json:"name,omitempty"`
+	Input     map[string]interface{} `json:"input,omitempty"`
 }
 
 func (p *Parser) parseLine(line []byte) {
@@ -113,9 +122,24 @@ func (p *Parser) parseLine(line []byte) {
 		p.parseAssistant(raw.Message)
 
 	case "tool_result":
+		p.endToolCheck(raw.ToolUseID)
 		p.parseToolResult(raw.Content)
 
+	case "user":
+		// Claude stream-json delivers MCP and built-in tool results inside
+		// user.message.content, not only as top-level tool_result envelopes.
+		var body messageBody
+		if json.Unmarshal(raw.Message, &body) == nil {
+			for _, item := range body.Content {
+				if item.Type == "tool_result" {
+					p.endToolCheck(item.ToolUseID)
+					p.parseToolResult(item.Content)
+				}
+			}
+		}
+
 	case "result":
+		p.finishToolChecks()
 		// End of output — process about to exit. Surface the peak per-call
 		// context size observed this session so the stage result can flag
 		// smart-zone overruns (see blueprint.DefaultSmartZoneTokens).
@@ -203,6 +227,7 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				p.emitSignal(item.Input)
 			} else {
 				p.lastToolName = item.Name
+				p.beginToolCheck(item.ID, item.Name)
 				p.emit(Event{
 					Type:      EventToolStart,
 					Iteration: p.iteration,
@@ -211,6 +236,34 @@ func (p *Parser) parseAssistant(data json.RawMessage) {
 				})
 			}
 		}
+	}
+}
+
+func (p *Parser) beginToolCheck(id, name string) {
+	if id == "" {
+		return // No identity: cannot safely correlate a completion.
+	}
+	if p.pendingTools == nil {
+		p.pendingTools = make(map[string]string)
+	}
+	if _, exists := p.pendingTools[id]; exists {
+		return
+	}
+	p.pendingTools[id] = name
+	p.emit(Event{Type: EventExecutionActivity, Iteration: p.iteration, ExecutionActivity: "check_start"})
+}
+
+func (p *Parser) endToolCheck(id string) {
+	if name, exists := p.pendingTools[id]; exists {
+		delete(p.pendingTools, id)
+		p.lastToolName = name
+		p.emit(Event{Type: EventExecutionActivity, Iteration: p.iteration, ExecutionActivity: "check_end"})
+	}
+}
+
+func (p *Parser) finishToolChecks() {
+	for id := range p.pendingTools {
+		p.endToolCheck(id)
 	}
 }
 

@@ -209,6 +209,9 @@ func (e *DefaultExecutor) runQualityGates(ctx context.Context, stage *Stage, inp
 		return
 	}
 
+	endCheck := input.BeginCheck()
+	defer endCheck()
+
 	gateResp, err := runGates.Execute(ctx, actions.ActionRequest{
 		RunID:        input.RunID,
 		WorkspaceDir: e.WorkDir,

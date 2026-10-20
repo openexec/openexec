@@ -3,7 +3,6 @@ package manager
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 )
 
@@ -67,6 +66,13 @@ func (w *Watchdog) checkPipelines() {
 }
 
 func (w *Watchdog) checkPipeline(id string) {
+	w.checkPipelineWithClock(id, time.Now)
+}
+
+// Keep observation and the locked eligibility recheck on the same clock.
+// Production uses wall time; native activity probes can sample exact boundaries
+// without mistaking subprocess startup or host scheduling delays for silence.
+func (w *Watchdog) checkPipelineWithClock(id string, now func() time.Time) {
 	defer func() {
 		if r := recover(); r != nil {
 			// Pipeline may have been cleaned up during check — ignore
@@ -79,14 +85,14 @@ func (w *Watchdog) checkPipeline(id string) {
 	}
 
 	// Skip terminal states
-	if isTerminal(info.Status) {
+	if !info.SilenceMonitoring || info.PendingChecks > 0 || isTerminal(info.Status) || info.Status == StatusPaused || info.StageType == "deterministic" {
 		return
 	}
 
 	// 1. Detect Stalls (No activity for X minutes)
-	if !info.LastActivity.IsZero() && time.Since(info.LastActivity) > w.StallThreshold {
-		log.Printf("[Watchdog] [%s] STALL DETECTED: No activity for %v (PID: %d)", id, time.Since(info.LastActivity), info.CurrentPID)
-		w.remediateStall(id, info)
+	if !info.LastActivity.IsZero() && now().Sub(info.LastActivity) > w.StallThreshold {
+		log.Printf("[Watchdog] [%s] STALL DETECTED: No activity for %v (PID: %d)", id, now().Sub(info.LastActivity), info.CurrentPID)
+		w.remediateStallWithClock(id, info, now)
 		return
 	}
 
@@ -98,29 +104,13 @@ func (w *Watchdog) checkPipeline(id string) {
 }
 
 func (w *Watchdog) remediateStall(id string, info PipelineInfo) {
+	w.remediateStallWithClock(id, info, time.Now)
+}
+
+func (w *Watchdog) remediateStallWithClock(id string, info PipelineInfo, now func() time.Time) {
 	log.Printf("[Watchdog] [%s] remediating stall...", id)
 
-	// 1. Kill stuck process if PID exists
-	if info.CurrentPID > 0 {
-		log.Printf("[Watchdog] [%s] killing stuck process PID %d", id, info.CurrentPID)
-		proc, err := os.FindProcess(info.CurrentPID)
-		if err == nil {
-			_ = proc.Kill()
-		}
-	}
-
-	// 2. Stop the pipeline to clean up state
-	_ = w.manager.Stop(id)
-
-	// 3. AUTO-HEAL: Automatically restart the pipeline
-	log.Printf("[Watchdog] [%s] stall remediated. Triggering auto-restart...", id)
-	go func() {
-		// Give it a moment to fully cleanup
-		time.Sleep(2 * time.Second)
-		if err := w.manager.Start(context.Background(), id); err != nil {
-			log.Printf("[Watchdog] [%s] auto-restart failed: %v", id, err)
-		} else {
-			log.Printf("[Watchdog] [%s] ✨ Successfully auto-restarted pipeline", id)
-		}
-	}()
+	// Cancel through the native attempt context. The task queue owns resumption;
+	// a detached restart could override an explicit Stop or the caller's authority.
+	_ = w.manager.stopWithCauseWithClock(id, ErrWatchdogStall, w.StallThreshold, now)
 }

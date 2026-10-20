@@ -2,9 +2,60 @@ package loop
 
 import (
 	"bytes"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestParserToolWaitScopes(t *testing.T) {
+	ch := make(chan Event, 100)
+	p := NewParser(ch, 1)
+	for _, line := range []string{
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"a","name":"Bash","input":{"command":"anything"}},{"type":"tool_use","id":"b","name":"mcp__openexec-signal__run_shell_command","input":{}}]}}`,
+		// A replayed start and unrelated/duplicate completions cannot leak or
+		// prematurely close another pending call's scope.
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"a","name":"Bash"}]}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"unknown","content":"ignored"},{"type":"tool_result","tool_use_id":"b","is_error":true,"content":[{"type":"text","text":"error: refused"}]}]}}`,
+		`{"type":"tool_result","tool_use_id":"b","content":"duplicate"}`,
+		`{"type":"tool_result","tool_use_id":"a","content":"done"}`,
+	} {
+		p.parseLine([]byte(line))
+	}
+	var scopes []string
+	for len(ch) > 0 {
+		e := <-ch
+		if e.Type == EventExecutionActivity {
+			scopes = append(scopes, e.ExecutionActivity)
+		}
+	}
+	if !reflect.DeepEqual(scopes, []string{"check_start", "check_start", "check_end", "check_end"}) || len(p.pendingTools) != 0 {
+		t.Fatalf("scopes=%v pending=%v", scopes, p.pendingTools)
+	}
+}
+
+func TestParserToolWaitClosesAtStreamEnd(t *testing.T) {
+	for _, terminal := range []string{"", "\n{\"type\":\"result\"}"} {
+		ch := make(chan Event, 20)
+		p := NewParser(ch, 1)
+		stream := `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"a","name":"Bash"}]}}` + terminal
+		if err := p.Parse(strings.NewReader(stream)); err != nil {
+			t.Fatal(err)
+		}
+		var starts, ends int
+		for len(ch) > 0 {
+			e := <-ch
+			if e.ExecutionActivity == "check_start" {
+				starts++
+			}
+			if e.ExecutionActivity == "check_end" {
+				ends++
+			}
+		}
+		if starts != 1 || ends != 1 || len(p.pendingTools) != 0 {
+			t.Fatalf("start=%d end=%d pending=%v", starts, ends, p.pendingTools)
+		}
+	}
+}
 
 func TestParser_ExtractsPatchArtifact(t *testing.T) {
 	ch := make(chan Event, 2) // Buffer must hold heartbeat + tool result
