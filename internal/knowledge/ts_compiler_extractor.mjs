@@ -19,12 +19,25 @@ const inferredOptions = {
   noEmit: true,
 };
 const requestedFiles = request.files.map((file) => path.resolve(root, file));
+const excludedDirectories = new Set(request.excluded_directories ?? []);
 const parsedConfigs = new Map();
 const configurationDiagnostics = [];
 
 function withinRoot(candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+// Declarations a configuration includes but the graph does not scan, such as
+// the ambient.d.ts that `svelte-kit sync` generates under .svelte-kit/ and
+// that brings the $app/* module declarations into the program. They are
+// compiler context only: never extracted, and never taken from outside the
+// repository or from a directory the graph excludes (node_modules, _archive).
+function configuredDeclarations(parsed) {
+  return parsed.fileNames
+    .map((configured) => path.resolve(configured))
+    .filter((configured) => /\.d\.[cm]?ts$/.test(configured) && withinRoot(configured))
+    .filter((configured) => !path.relative(root, configured).split(path.sep).some((part) => excludedDirectories.has(part)));
 }
 
 function parseConfig(configPath) {
@@ -88,6 +101,7 @@ for (const file of requestedFiles) {
   if (!groups.has(key)) {
     groups.set(key, {
       files: [],
+      declarations: configured ? configuredDeclarations(configured.parsed) : [],
       options: configured ? { ...configured.parsed.options, noEmit: true } : inferredOptions,
       configuration: configured ? path.relative(root, configured.configPath).split(path.sep).join("/") : "inferred",
     });
@@ -134,7 +148,7 @@ function pushSymbol(result, sourceFile, node, name, kind, parent = "", isExporte
 }
 
 for (const group of groups.values()) {
-  const program = ts.createProgram({ rootNames: group.files, options: group.options });
+  const program = ts.createProgram({ rootNames: [...new Set([...group.files, ...group.declarations])], options: group.options });
   const checker = program.getTypeChecker();
   const groupFiles = new Set(group.files.map((file) => path.resolve(file)));
 

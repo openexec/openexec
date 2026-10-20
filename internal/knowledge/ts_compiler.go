@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +19,8 @@ import (
 var typeScriptCompilerScript []byte
 
 type tsCompilerRequest struct {
-	Files []string `json:"files"`
+	Files               []string `json:"files"`
+	ExcludedDirectories []string `json:"excluded_directories"`
 }
 
 type tsCompilerResponse struct {
@@ -82,7 +84,14 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	if err := script.Close(); err != nil {
 		return nil, "", nil, err
 	}
-	request, _ := json.Marshal(tsCompilerRequest{Files: files})
+	// Declarations a tsconfig includes are loaded as compiler context, but
+	// never from a directory the graph itself excludes.
+	excluded := make([]string, 0, len(graphIgnoredDirectories))
+	for directory := range graphIgnoredDirectories {
+		excluded = append(excluded, directory)
+	}
+	sort.Strings(excluded)
+	request, _ := json.Marshal(tsCompilerRequest{Files: files, ExcludedDirectories: excluded})
 	commandCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(commandCtx, node, scriptPath, compiler, root)
