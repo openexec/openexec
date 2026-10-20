@@ -19,12 +19,48 @@ const inferredOptions = {
   noEmit: true,
 };
 const requestedFiles = request.files.map((file) => path.resolve(root, file));
+const excludedDirectories = new Set(request.excluded_directories ?? []);
 const parsedConfigs = new Map();
 const configurationDiagnostics = [];
 
 function withinRoot(candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+let canonicalRoot = null;
+try {
+  canonicalRoot = fs.realpathSync(root);
+} catch {
+  canonicalRoot = null;
+}
+
+// The scan manifest refuses source symlinks that escape the repository; a
+// configured declaration is not in the manifest, so its canonical target is
+// checked here instead. A file or parent-directory symlink that leads outside
+// the repository or into a tree the graph excludes (node_modules, _archive)
+// is refused, and so is any path whose target cannot be resolved.
+function canonicallyAdmitted(configured) {
+  if (!canonicalRoot) return false;
+  let canonical;
+  try {
+    canonical = fs.realpathSync(configured);
+  } catch {
+    return false;
+  }
+  const relative = path.relative(canonicalRoot, canonical);
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) return false;
+  return !relative.split(path.sep).some((part) => excludedDirectories.has(part));
+}
+
+// Declarations a configuration includes but the graph does not scan, such as
+// the ambient.d.ts that `svelte-kit sync` generates under .svelte-kit/ and
+// that brings the $app/* module declarations into the program. They are
+// compiler context only and never extracted.
+function configuredDeclarations(parsed) {
+  return parsed.fileNames
+    .map((configured) => path.resolve(configured))
+    .filter((configured) => /\.d\.[cm]?ts$/.test(configured) && canonicallyAdmitted(configured));
 }
 
 function parseConfig(configPath) {
@@ -88,6 +124,7 @@ for (const file of requestedFiles) {
   if (!groups.has(key)) {
     groups.set(key, {
       files: [],
+      declarations: configured ? configuredDeclarations(configured.parsed) : [],
       options: configured ? { ...configured.parsed.options, noEmit: true } : inferredOptions,
       configuration: configured ? path.relative(root, configured.configPath).split(path.sep).join("/") : "inferred",
     });
@@ -134,7 +171,7 @@ function pushSymbol(result, sourceFile, node, name, kind, parent = "", isExporte
 }
 
 for (const group of groups.values()) {
-  const program = ts.createProgram({ rootNames: group.files, options: group.options });
+  const program = ts.createProgram({ rootNames: [...new Set([...group.files, ...group.declarations])], options: group.options });
   const checker = program.getTypeChecker();
   const groupFiles = new Set(group.files.map((file) => path.resolve(file)));
 
