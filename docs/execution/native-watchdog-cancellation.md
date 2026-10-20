@@ -28,6 +28,15 @@ output cannot establish a stall while that bounded tool is running. The tool's
 own timeout and the attempt context remain in force. This applies to all shell
 commands without guessing whether command text names a check. Provider inference
 becomes eligible again after the tool returns; no timer activity is fabricated.
+The standalone CLI parser brackets identified `tool_use` calls with the same
+check events, including built-in Bash and MCP calls. It matches results by
+`tool_use_id` in Claude's `user.message.content` envelope (and the supported
+top-level result format). Parallel calls keep separate scopes; duplicate in-flight starts
+or results and unrelated results cannot close another call's scope. Error
+results also end the matching scope. EOF or a terminal result closes remaining
+scopes; cancellation joins the parser before closing its event stream. This is
+a wait for an observed tool call, not a blanket agentic-stage exemption. The
+CLI/tool retains its own timeout and effect authorization responsibilities.
 Check scopes do not exempt Stop or deadlines. The watchdog
 rechecks eligibility under the activity lock before cancelling the attempt.
 
@@ -72,13 +81,22 @@ deterministic subprocess and a silent gate executed by DefaultExecutor inside an
 agentic stage. Stop and deadlines interrupt check scopes; silent inference
 is cancelled after its check finishes. Executable removal
 controls reject missing activity ingestion, relabelled cancellation, disconnected
-admitted progress, a missing agentic quality-gate scope and a missing API shell
-scope. `TestNativeWatchdogAPIShell` runs a disposable HTTP provider through the
-standalone native pipeline, a real buffered shell subprocess and the manager's
+admitted progress, a missing agentic quality-gate scope, a missing API shell
+scope and a missing CLI tool scope. `TestNativeWatchdogAPIShell` runs a disposable
+HTTP provider through the standalone native pipeline, a real buffered shell subprocess and the manager's
 watchdog. It covers healthy completion beyond the silence threshold, owner Stop,
 attempt deadline, tool timeout and silent inference after a completed tool;
-completed files/checkpoints and separately reopened SQLite receipts are checked. All run under the
-declared `test` gate. The pipeline suite also verifies nested/idempotent scopes
+completed files/checkpoints and separately reopened SQLite receipts are checked.
+`TestNativeWatchdogCLITool` runs a disposable stream-json CLI process around an
+actual OpenExec MCP `tools/call` and buffered shell subprocess. It proves healthy
+completion across the threshold, tool timeout feedback, native owner Stop and
+attempt deadline receipts during waits, and resumed watchdog cancellation after
+tool return. Files, checkpoints and reopened SQLite receipts are checked here
+too. This proves native attempt cancellation; it does not prove an external
+provider CLI's descendant process cleanup. `TestParserToolWaitScopes` covers
+parallel, duplicate, unrelated and error-result correlation; stream-end tests
+check scopes are balanced. All run under the declared `test` gate. The pipeline
+suite also verifies nested/idempotent scopes
 and rejection of late callbacks.
 
 Console task 222c2f84cfe48fd6e6bab27e819b3ef6 (Needs you fix 3) still owes its

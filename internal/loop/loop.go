@@ -120,6 +120,12 @@ func (l *Loop) runStandalone(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		// Join the parser before Run closes events. It may still emit tool
+		// scope completions when cancellation closes a buffered CLI stream.
+		_ = proc.Kill()
+		_ = proc.Stdout.Close()
+		<-parseErr
+		_ = proc.Wait()
 		return ctx.Err()
 	case err := <-parseErr:
 		if err != nil && err != io.EOF {

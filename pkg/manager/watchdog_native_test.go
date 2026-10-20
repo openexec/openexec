@@ -275,6 +275,7 @@ func TestNativeWatchdogRemovalControls(t *testing.T) {
 		{"cause", "watchdog.go", "ErrWatchdogStall, w.StallThreshold", "ErrOwnerStop, w.StallThreshold", "^TestNativeWatchdogSilent$"},
 		{"admitted-progress", "../../internal/blueprint/stage.go", `i.activity("progress")`, `i.activity("ignored")`, "^TestNativeWatchdogBoundaries$/active$"},
 		{"api-shell-check", "../../internal/loop/api_runner.go", `if name == "run_shell_command" {`, `if false {`, "^TestNativeWatchdogAPIShell$/healthy$"},
+		{"cli-tool-check", "../../internal/loop/parser.go", `p.beginToolCheck(item.ID, item.Name)`, `// tool scope removed`, "^TestNativeWatchdogCLITool$/healthy$"},
 		{"agentic-check", "../../internal/blueprint/executor.go", "endCheck := input.BeginCheck()", "endCheck := func() {}", "^TestNativeWatchdogBoundaries$/agentic-check$"},
 	} {
 		t.Run(control.name, func(t *testing.T) {
