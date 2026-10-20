@@ -565,6 +565,10 @@ func (m *Manager) Stop(fwuID string) error {
 }
 
 func (m *Manager) stopWithCause(fwuID string, cause error, stallThreshold time.Duration) error {
+	return m.stopWithCauseWithClock(fwuID, cause, stallThreshold, time.Now)
+}
+
+func (m *Manager) stopWithCauseWithClock(fwuID string, cause error, stallThreshold time.Duration, now func() time.Time) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	e, ok := m.pipelines[fwuID]
@@ -573,7 +577,7 @@ func (m *Manager) stopWithCause(fwuID string, cause error, stallThreshold time.D
 	}
 	// Recheck under the same lock as activity ingestion; a stale snapshot
 	// must not stop an active or newly waiting attempt.
-	if stallThreshold > 0 && (!e.info.SilenceMonitoring || e.info.PendingChecks > 0 || e.info.Status == StatusPaused || e.info.StageType == "deterministic" || e.info.LastActivity.IsZero() || time.Since(e.info.LastActivity) <= stallThreshold) {
+	if stallThreshold > 0 && (!e.info.SilenceMonitoring || e.info.PendingChecks > 0 || e.info.Status == StatusPaused || e.info.StageType == "deterministic" || e.info.LastActivity.IsZero() || now().Sub(e.info.LastActivity) <= stallThreshold) {
 		return nil
 	}
 	if e.ctx != nil && e.ctx.Err() != nil {

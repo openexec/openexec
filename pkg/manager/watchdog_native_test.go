@@ -35,6 +35,9 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	defer store.Close()
 	entered := make(chan context.Context, 1)
 	releaseStage := make(chan struct{})
+	activeStart := make(chan struct{})
+	nextProgress := make(chan struct{})
+	active := mode == "active" || mode == "active-then-silent"
 	finished := make(chan struct{})
 	marker := filepath.Join(dir, "completed.txt")
 	executor := admittedFixture(func(ctx context.Context, s *runtime.Stage, input *runtime.StageInput) (*runtime.StageResult, error) {
@@ -50,7 +53,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 			target = "test"
 		}
 		if s.Name == target {
-			if mode != "legacy" {
+			if mode != "legacy" && !active {
 				input.MonitorActivity()
 			}
 			var endCheck func()
@@ -61,9 +64,24 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 			entered <- ctx
 			defer close(finished)
 			// A real silent subprocess is killed by the native attempt context.
-			if mode == "active" {
+			if active {
+				// Subscribe before starting the provider, and acknowledge each real
+				// progress event before asking it to do the next piece of work.
+				select {
+				case <-activeStart:
+				case <-ctx.Done():
+					return result, ctx.Err()
+				}
+				input.MonitorActivity()
 				// Actual admitted subprocess output reaches the public executor hook.
-				cmd := exec.CommandContext(ctx, "sh", "-c", "for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo progress; sleep 0.05; done")
+				// Deliberately exceed the former 150 ms startup assumption. The
+				// watchdog is sampled explicitly here, never by a racing wall timer.
+				cmd := exec.CommandContext(ctx, "sh", "-c", "sleep 0.2; for i in 1 2 3 4; do read request || exit; echo progress-$i; done")
+				stdin, err := cmd.StdinPipe()
+				if err != nil {
+					return result, err
+				}
+				defer stdin.Close()
 				stdout, err := cmd.StdoutPipe()
 				if err != nil {
 					return result, err
@@ -72,13 +90,32 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 					return result, err
 				}
 				scanner := bufio.NewScanner(stdout)
-				for scanner.Scan() {
+				for range 4 {
+					select {
+					case <-nextProgress:
+					case <-ctx.Done():
+						_ = cmd.Wait()
+						return result, ctx.Err()
+					}
+					if _, err := stdin.Write([]byte("work\n")); err != nil {
+						_ = cmd.Wait()
+						return result, err
+					}
+					if !scanner.Scan() {
+						_ = cmd.Wait()
+						return result, errors.New("provider produced no progress")
+					}
 					input.ReportActivity()
 				}
 				if err := cmd.Wait(); err != nil {
 					return result, err
 				}
-				return result, scanner.Err()
+				select {
+				case <-releaseStage:
+					return result, scanner.Err()
+				case <-ctx.Done():
+					return result, ctx.Err()
+				}
 			}
 			if mode == "check" {
 				// Default deterministic execution, with a real silent child.
@@ -123,7 +160,13 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	if mode == "timeout" {
 		stallThreshold = 3 * time.Second
 	}
-	m, err := New(Config{WorkDir: dir, StateStore: store, StageExecutor: executor, WatchdogStallThreshold: stallThreshold, WatchdogCheckInterval: 10 * time.Millisecond})
+	checkInterval := 10 * time.Millisecond
+	if active {
+		// Only the active probe drives explicit clock samples. Silent/check/API/
+		// CLI probes still exercise the real autonomous watchdog timer.
+		checkInterval = time.Hour
+	}
+	m, err := New(Config{WorkDir: dir, StateStore: store, StageExecutor: executor, WatchdogStallThreshold: stallThreshold, WatchdogCheckInterval: checkInterval})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,6 +196,60 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	defer unsub()
 	expected := mode
 	switch mode {
+	case "active", "active-then-silent":
+		close(activeStart)
+		awaitActivity := func() PipelineInfo {
+			t.Helper()
+			for {
+				select {
+				case event, ok := <-events:
+					if !ok {
+						t.Fatal("execution ended before real progress ingestion")
+					}
+					if event.Type == loop.EventExecutionActivity {
+						info, err := m.Status("probe")
+						if err != nil {
+							t.Fatal(err)
+						}
+						return info
+					}
+				case <-deadline.Done():
+					t.Fatal("real admitted progress did not reach manager")
+				}
+			}
+		}
+		previous := awaitActivity() // Actual monitor callback, after subscribing.
+		for range 4 {
+			select {
+			case nextProgress <- struct{}{}:
+			case <-deadline.Done():
+				t.Fatal("provider did not accept work")
+			}
+			current := awaitActivity()
+			if !current.LastActivity.After(previous.LastActivity) {
+				t.Fatal("real admitted output did not refresh activity")
+			}
+			// Sample the exact healthy boundary using the ingested timestamp.
+			// Host scheduling after this receipt cannot change the decision.
+			now := func() time.Time { return current.LastActivity.Add(stallThreshold) }
+			m.watchdog.checkPipelineWithClock("probe", now)
+			m.watchdog.remediateStallWithClock("probe", previous, now)
+			if stageCtx.Err() != nil {
+				t.Fatalf("legitimate active killed: %v", context.Cause(stageCtx))
+			}
+			previous = current
+		}
+		if mode == "active-then-silent" {
+			// One nanosecond beyond the same boundary must cancel after output
+			// stops, through the real native context/status/persistence path.
+			m.watchdog.checkPipelineWithClock("probe", func() time.Time {
+				return previous.LastActivity.Add(stallThreshold + time.Nanosecond)
+			})
+			expected = "watchdog_stall"
+		} else {
+			close(releaseStage)
+			expected = ""
+		}
 	case "watchdog", "check-then-silent":
 		expected = "watchdog_stall"
 	case "owner", "check-stop":
@@ -171,7 +268,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 	case "timeout", "check-timeout":
 		expected = "timeout"
 	// Let the real parent deadline expire.
-	case "check", "agentic-check", "paused", "active", "legacy":
+	case "check", "agentic-check", "paused", "legacy":
 		if mode == "paused" {
 			if err := m.Pause("probe"); err != nil {
 				t.Fatal(err)
@@ -226,7 +323,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 		if !terminal {
 			t.Fatal("no native terminal event")
 		}
-		if mode == "watchdog" && !errors.Is(context.Cause(stageCtx), ErrWatchdogStall) {
+		if (mode == "watchdog" || mode == "active-then-silent") && !errors.Is(context.Cause(stageCtx), ErrWatchdogStall) {
 			t.Fatalf("context cause lost: %v", context.Cause(stageCtx))
 		}
 		// A later Stop cannot relabel the first interruption.
@@ -262,7 +359,7 @@ func nativeWatchdogProbe(t *testing.T, mode string) {
 
 func TestNativeWatchdogSilent(t *testing.T) { nativeWatchdogProbe(t, "watchdog") }
 func TestNativeWatchdogBoundaries(t *testing.T) {
-	for _, mode := range []string{"owner", "unknown", "plain", "allowance", "timeout", "check", "agentic-check", "paused", "active", "legacy", "check-stop", "check-timeout", "check-then-silent"} {
+	for _, mode := range []string{"owner", "unknown", "plain", "allowance", "timeout", "check", "agentic-check", "paused", "active", "active-then-silent", "legacy", "check-stop", "check-timeout", "check-then-silent"} {
 		t.Run(mode, func(t *testing.T) { nativeWatchdogProbe(t, mode) })
 	}
 }
@@ -277,6 +374,8 @@ func TestNativeWatchdogRemovalControls(t *testing.T) {
 		{"api-shell-check", "../../internal/loop/api_runner.go", `if name == "run_shell_command" {`, `if false {`, "^TestNativeWatchdogAPIShell$/healthy$"},
 		{"cli-tool-check", "../../internal/loop/parser.go", `p.beginToolCheck(item.ID, item.Name)`, `// tool scope removed`, "^TestNativeWatchdogCLITool$/healthy$"},
 		{"agentic-check", "../../internal/blueprint/executor.go", "endCheck := input.BeginCheck()", "endCheck := func() {}", "^TestNativeWatchdogBoundaries$/agentic-check$"},
+		{"active-boundary", "manager.go", "now().Sub(e.info.LastActivity) <= stallThreshold", "now().Sub(e.info.LastActivity) < stallThreshold", "^TestNativeWatchdogBoundaries$/active$"},
+		{"startup-scheduling", "watchdog_native_test.go", "\t\tcheckInterval = time.Hour\n", "\t\tcheckInterval = 10 * time.Millisecond\n", "^TestNativeWatchdogBoundaries$/active$"},
 	} {
 		t.Run(control.name, func(t *testing.T) {
 			source, err := filepath.Abs(control.path)

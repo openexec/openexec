@@ -79,10 +79,23 @@ store. It checks owner/unknown/plain/allowance/deadline cancellation, real
 admitted subprocess output, uninstrumented adapters, paused work, a silent
 deterministic subprocess and a silent gate executed by DefaultExecutor inside an
 agentic stage. Stop and deadlines interrupt check scopes; silent inference
-is cancelled after its check finishes. Executable removal
+is cancelled after its check finishes. The admitted active probe subscribes before
+starting its provider and acknowledges each real subprocess output through the
+public activity hook, native ingestion and subscription. Its subprocess deliberately
+takes longer than 150 ms to start. This probe samples the existing watchdog with
+an explicit clock at the ingested activity timestamp plus exactly the threshold:
+both the initial scan and the locked stale-snapshot recheck must preserve healthy
+execution. The `active-then-silent` variant samples one nanosecond later and must
+cancel with retained context, terminal and durable cause evidence. Only these
+active probes drive clock samples; production still uses `time.Now` at both
+decisions and all silent/check/API/CLI probes retain the autonomous wall timer.
+This separates observed progress from CI startup/scheduling jitter without
+fabricating activity or changing production thresholds. Executable removal
 controls reject missing activity ingestion, relabelled cancellation, disconnected
 admitted progress, a missing agentic quality-gate scope, a missing API shell
-scope and a missing CLI tool scope. `TestNativeWatchdogAPIShell` runs a disposable
+scope, a missing CLI tool scope, early cancellation at the exact active boundary,
+and restoring the active probe's wall-timer/startup race.
+`TestNativeWatchdogAPIShell` runs a disposable
 HTTP provider through the standalone native pipeline, a real buffered shell subprocess and the manager's
 watchdog. It covers healthy completion beyond the silence threshold, owner Stop,
 attempt deadline, tool timeout and silent inference after a completed tool;

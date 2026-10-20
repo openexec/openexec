@@ -66,6 +66,13 @@ func (w *Watchdog) checkPipelines() {
 }
 
 func (w *Watchdog) checkPipeline(id string) {
+	w.checkPipelineWithClock(id, time.Now)
+}
+
+// Keep observation and the locked eligibility recheck on the same clock.
+// Production uses wall time; native activity probes can sample exact boundaries
+// without mistaking subprocess startup or host scheduling delays for silence.
+func (w *Watchdog) checkPipelineWithClock(id string, now func() time.Time) {
 	defer func() {
 		if r := recover(); r != nil {
 			// Pipeline may have been cleaned up during check — ignore
@@ -83,9 +90,9 @@ func (w *Watchdog) checkPipeline(id string) {
 	}
 
 	// 1. Detect Stalls (No activity for X minutes)
-	if !info.LastActivity.IsZero() && time.Since(info.LastActivity) > w.StallThreshold {
-		log.Printf("[Watchdog] [%s] STALL DETECTED: No activity for %v (PID: %d)", id, time.Since(info.LastActivity), info.CurrentPID)
-		w.remediateStall(id, info)
+	if !info.LastActivity.IsZero() && now().Sub(info.LastActivity) > w.StallThreshold {
+		log.Printf("[Watchdog] [%s] STALL DETECTED: No activity for %v (PID: %d)", id, now().Sub(info.LastActivity), info.CurrentPID)
+		w.remediateStallWithClock(id, info, now)
 		return
 	}
 
@@ -97,9 +104,13 @@ func (w *Watchdog) checkPipeline(id string) {
 }
 
 func (w *Watchdog) remediateStall(id string, info PipelineInfo) {
+	w.remediateStallWithClock(id, info, time.Now)
+}
+
+func (w *Watchdog) remediateStallWithClock(id string, info PipelineInfo, now func() time.Time) {
 	log.Printf("[Watchdog] [%s] remediating stall...", id)
 
 	// Cancel through the native attempt context. The task queue owns resumption;
 	// a detached restart could override an explicit Stop or the caller's authority.
-	_ = w.manager.stopWithCause(id, ErrWatchdogStall, w.StallThreshold)
+	_ = w.manager.stopWithCauseWithClock(id, ErrWatchdogStall, w.StallThreshold, now)
 }
