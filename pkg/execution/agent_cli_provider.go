@@ -312,12 +312,22 @@ func safeCLIEnv(path string) []string {
 	allowed := map[string]bool{"HOME": true, "USER": true, "LOGNAME": true, "TMPDIR": true, "LANG": true, "LC_ALL": true, "TERM": true, "XDG_CONFIG_HOME": true, "XDG_DATA_HOME": true, "CODEX_HOME": true, "CLAUDE_CONFIG_DIR": true}
 	out := []string{"PATH=" + path, "NO_COLOR=1"}
 	for _, entry := range os.Environ() {
-		name, _, ok := strings.Cut(entry, "=")
-		if ok && allowed[name] {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok && (allowed[name] || name == "GOCACHE" && isConfiguredGoCache(value)) {
 			out = append(out, entry)
 		}
 	}
 	return out
+}
+
+// isConfiguredGoCache reports whether a caller-configured GOCACHE is carried
+// to the agent. Dropping it sent every nested go build back to the default
+// cache under HOME, outside the caller's cache placement. It is a location,
+// not a credential, and grants no writable root: the agent can write it only
+// where the request's sandbox already allows. Go refuses a relative GOCACHE,
+// so one is dropped and the agent keeps Go's default instead of failing.
+func isConfiguredGoCache(value string) bool {
+	return filepath.IsAbs(value)
 }
 
 func compactOutput(output []byte, fallback error) string {

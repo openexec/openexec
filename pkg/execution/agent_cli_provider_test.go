@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -170,4 +173,179 @@ func writeProviderScript(t *testing.T, dir, name, body string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// The Go build cache a caller configured must reach the agent CLI. These run
+// the real go command inside a provider-launched helper, so the evidence is
+// what Go itself resolves and writes, not the string the filter emitted.
+func TestAgentCLIProviderCarriesConfiguredGoCache(t *testing.T) {
+	for _, kind := range []string{"claude", "codex"} {
+		t.Run(kind, func(t *testing.T) {
+			fixture := newGoCacheFixture(t, kind, true)
+			cache := filepath.Join(fixture.repo, ".cache", "go-build")
+			t.Setenv("GOCACHE", cache)
+			fixture.execute(t, Request{
+				ID: "gocache-" + kind, WorkingDir: fixture.repo, Prompt: "build", Model: "default",
+				Sandbox: Sandbox{Mode: "workspace-write"}, WritableRoots: []string{fixture.repo},
+			})
+			if got := fixture.read(t, "gocache"); got != cache {
+				t.Fatalf("agent go env GOCACHE = %q, want configured %q", got, cache)
+			}
+			if _, err := os.Stat(filepath.Join(cache, "README")); err != nil {
+				t.Fatalf("agent go build did not use the configured cache: %v", err)
+			}
+			if rel, err := filepath.Rel(fixture.repo, cache); err != nil || strings.HasPrefix(rel, "..") {
+				t.Fatalf("configured cache %q is outside the granted writable root %q", cache, fixture.repo)
+			}
+			if _, err := os.Stat(fixture.defaultCache); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("agent wrote the default cache %q: %v", fixture.defaultCache, err)
+			}
+			args := fixture.read(t, "args")
+			if kind == "claude" && (strings.Count(args, "--add-dir") != 1 || !strings.Contains(args, "--add-dir "+fixture.repo+" ")) ||
+				kind == "codex" && !strings.Contains(args, `sandbox_workspace_write.writable_roots=["`+fixture.repo+`"]`) {
+				t.Fatalf("writable roots changed: %s", args)
+			}
+			fixture.assertFiltered(t, "GOCACHE="+cache)
+		})
+	}
+}
+
+// Without a usable configured cache the agent keeps Go's documented default.
+// A relative GOCACHE is one Go itself refuses, so it is dropped, not passed on.
+func TestAgentCLIProviderKeepsGoDefaultWithoutConfiguredCache(t *testing.T) {
+	for _, kind := range []string{"claude", "codex"} {
+		for _, configured := range []string{"", "relative/go-build"} {
+			name := "absent"
+			if configured != "" {
+				name = "relative"
+			}
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				fixture := newGoCacheFixture(t, kind, false)
+				t.Setenv("GOCACHE", configured)
+				if configured == "" {
+					if err := os.Unsetenv("GOCACHE"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				fixture.execute(t, Request{
+					ID: "gocache-default-" + kind, WorkingDir: fixture.repo, Prompt: "inspect", Model: "default",
+					Sandbox: Sandbox{Mode: "read-only"},
+				})
+				if got := fixture.read(t, "gocache"); got != fixture.defaultCache {
+					t.Fatalf("agent go env GOCACHE = %q, want Go's default %q", got, fixture.defaultCache)
+				}
+				if args := fixture.read(t, "args"); strings.Contains(args, "--add-dir") || strings.Contains(args, "writable_roots") {
+					t.Fatalf("read-only request gained writable roots: %s", args)
+				}
+				fixture.assertFiltered(t, "")
+				if strings.Contains(fixture.read(t, "env"), "GOCACHE=") {
+					t.Fatal("unconfigured GOCACHE reached the agent")
+				}
+			})
+		}
+	}
+}
+
+type goCacheFixture struct {
+	kind, dir, repo, home, searchPath, defaultCache string
+}
+
+const goCacheFixtureSecret = "fixture-credential-sentinel"
+
+// newGoCacheFixture isolates everything Go reads: HOME and XDG_CONFIG_HOME
+// point into a temp tree, so neither the owner's caches nor their go env file
+// can leak in. A credential-like sentinel is planted to prove it stays out.
+func newGoCacheFixture(t *testing.T, kind string, build bool) goCacheFixture {
+	t.Helper()
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		goBin = filepath.Join(runtime.GOROOT(), "bin", "go")
+		if _, statErr := os.Stat(goBin); statErr != nil {
+			t.Skipf("go command unavailable: %v", err)
+		}
+	}
+	root := t.TempDir()
+	f := goCacheFixture{kind: kind, dir: filepath.Join(root, "bin"), repo: filepath.Join(root, "repo"), home: filepath.Join(root, "home")}
+	for _, dir := range []string{f.dir, filepath.Join(f.repo, "lib"), f.home} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for path, body := range map[string]string{
+		filepath.Join(f.repo, "go.mod"):        "module fixture\n\ngo 1.21\n",
+		filepath.Join(f.repo, "lib", "lib.go"): "package lib\n\nfunc Answer() int { return 42 }\n",
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("HOME", f.home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(f.home, ".config"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "outer-cache"))
+	t.Setenv("OPENEXEC_FIXTURE_TOKEN", goCacheFixtureSecret)
+	t.Setenv("GITHUB_TOKEN", goCacheFixtureSecret)
+	f.searchPath = f.dir + string(os.PathListSeparator) + filepath.Dir(goBin)
+
+	// Go's documented default, as Go computes it for the agent's environment.
+	probe := exec.Command(goBin, "env", "GOCACHE")
+	probe.Dir, probe.Env = f.repo, []string{"PATH=" + f.searchPath, "HOME=" + f.home, "XDG_CONFIG_HOME=" + filepath.Join(f.home, ".config")}
+	out, err := probe.Output()
+	if err != nil {
+		t.Fatalf("go env GOCACHE: %v", err)
+	}
+	f.defaultCache = strings.TrimSpace(string(out))
+	if !strings.HasPrefix(f.defaultCache, f.home+string(filepath.Separator)) {
+		t.Fatalf("Go's default cache %q is not isolated under %q", f.defaultCache, f.home)
+	}
+
+	event := `{"type":"assistant","session_id":"native-go","message":{"content":[{"type":"text","text":"ok"}]}}`
+	if kind == "codex" {
+		event = `{"type":"item.completed","thread_id":"native-go","item":{"type":"agent_message","text":"ok"}}`
+	}
+	body := `out="${0%/*}"
+printf '%s\n' "$*" >"$out/args"
+/usr/bin/env >"$out/env"
+go env GOCACHE >"$out/gocache"
+`
+	if build {
+		body += "go build ./lib\n"
+	}
+	writeProviderScript(t, f.dir, kind, body+"printf '%s\\n' '"+event+"'")
+	return f
+}
+
+func (f goCacheFixture) execute(t *testing.T, req Request) {
+	t.Helper()
+	provider, err := NewAgentCLIProvider(AgentCLIConfig{Kind: f.kind, Binary: filepath.Join(f.dir, f.kind), SearchPath: f.searchPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := provider.Execute(context.Background(), req, nil)
+	if err != nil || result.Outcome != OutcomeSucceeded || result.FinalText != "ok" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func (f goCacheFixture) read(t *testing.T, name string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(f.dir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+// assertFiltered checks PATH is the provider search path, HOME still reaches
+// the agent, want (when set) is present, and no credential or unlisted
+// variable came along.
+func (f goCacheFixture) assertFiltered(t *testing.T, want string) {
+	t.Helper()
+	env := f.read(t, "env")
+	if strings.Contains(env, goCacheFixtureSecret) || strings.Contains(env, "XDG_CACHE_HOME=") {
+		t.Fatalf("unlisted environment reached the agent:\n%s", env)
+	}
+	lines := strings.Split(env, "\n")
+	if !slices.Contains(lines, "PATH="+f.searchPath) || !slices.Contains(lines, "HOME="+f.home) || want != "" && !slices.Contains(lines, want) {
+		t.Fatalf("agent environment missing PATH/HOME/%q:\n%s", want, env)
+	}
 }
