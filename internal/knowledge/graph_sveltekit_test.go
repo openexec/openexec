@@ -23,6 +23,10 @@ type svelteKitFixture struct {
 	// outsideInclude makes the project tsconfig include declarations from a
 	// directory beside the repository, which must never enter the program.
 	outsideInclude bool
+	// declarationSymlink replaces a generated declaration path with a
+	// symlink whose target would satisfy $app/environment: "file-outside",
+	// "file-archive", "dir-outside" or "dir-archive".
+	declarationSymlink string
 }
 
 func writeSvelteKitFixture(t *testing.T, fixture svelteKitFixture) string {
@@ -41,6 +45,7 @@ func writeSvelteKitFixture(t *testing.T, fixture svelteKitFixture) string {
 	root := filepath.Join(base, "repo")
 	// Outside the repository: satisfies $app/environment if it were loaded.
 	writeTestFile(t, base, "outside/kit.d.ts", "declare module '$app/environment' {\n\texport const browser: boolean;\n}\n")
+	writeTestFile(t, base, "outside/types/src/routes/$types.d.ts", "declare module '$app/environment' {\n\texport const browser: boolean;\n}\n")
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -83,6 +88,29 @@ func writeSvelteKitFixture(t *testing.T, fixture svelteKitFixture) string {
 		if fixture.ambientTypes {
 			writeTestFile(t, root, ".svelte-kit/ambient.d.ts", "// this file is generated — do not edit it\n\n/// <reference types=\"@sveltejs/kit\" />\n")
 			writeTestFile(t, root, ".svelte-kit/non-ambient.d.ts", "// this file is generated — do not edit it\n\n/// <reference types=\"@sveltejs/kit\" />\n\nexport {};\n")
+		}
+		linkTarget := map[string]string{
+			"file-outside": filepath.Join(base, "outside", "kit.d.ts"),
+			"file-archive": filepath.Join(root, "_archive", "kit.d.ts"),
+			"dir-outside":  filepath.Join(base, "outside", "types"),
+			"dir-archive":  filepath.Join(root, "_archive", "types"),
+		}[fixture.declarationSymlink]
+		if fixture.declarationSymlink != "" {
+			if linkTarget == "" {
+				t.Fatalf("unknown declaration symlink %q", fixture.declarationSymlink)
+			}
+			// The archived targets satisfy $app/environment on their own.
+			writeTestFile(t, root, "_archive/kit.d.ts", "declare module '$app/environment' {\n\texport const browser: boolean;\n}\n")
+			writeTestFile(t, root, "_archive/types/src/routes/$types.d.ts", "declare module '$app/environment' {\n\texport const browser: boolean;\n}\n")
+			// A file symlink at ambient.d.ts, or a directory symlink at the
+			// generated types/ tree the configuration includes.
+			link := filepath.Join(root, ".svelte-kit", "ambient.d.ts")
+			if strings.HasPrefix(fixture.declarationSymlink, "dir-") {
+				link = filepath.Join(root, ".svelte-kit", "types")
+			}
+			if err := os.Symlink(linkTarget, link); err != nil {
+				t.Skipf("cannot create declaration symlink: %v", err)
+			}
 		}
 	}
 	writeTestFile(t, root, "src/lib/util.ts", "export function helper(): number {\n\treturn 1;\n}\n")
@@ -246,6 +274,23 @@ func TestScanIgnoresSvelteKitDeclarationsOutsideRepository(t *testing.T) {
 	assertNoArchivedGraphState(t, store, result)
 }
 
+// symlinkedDeclarationCases are the generated declaration paths whose targets
+// leave the authorized boundary through a file or a parent-directory symlink.
+var symlinkedDeclarationCases = []string{"file-outside", "file-archive", "dir-outside", "dir-archive"}
+
+func TestScanRefusesSymlinkedSvelteKitDeclarationsLeavingBoundary(t *testing.T) {
+	for _, link := range symlinkedDeclarationCases {
+		t.Run(link, func(t *testing.T) {
+			root := writeSvelteKitFixture(t, svelteKitFixture{generatedConfig: true, git: true, declarationSymlink: link})
+			store, result := scanSvelteKitFixture(t, root)
+			if len(appEnvironmentLimitations(result)) == 0 {
+				t.Fatalf("a symlinked declaration leaving the boundary satisfied $app/environment: %v", result.Limitations)
+			}
+			assertNoArchivedGraphState(t, store, result)
+		})
+	}
+}
+
 // mutateTypeScriptExtractor replaces exactly one site in the embedded
 // extractor for the rest of the test. Requiring a single match fails closed if
 // the extractor changes, so an unrelated failure is never taken as evidence.
@@ -270,22 +315,46 @@ func TestSvelteKitScanGuardsAreCausal(t *testing.T) {
 			t.Fatalf("without generated declarations $app/environment still resolved: %v", result.Limitations)
 		}
 	})
-	t.Run("excluded directory declarations refused", func(t *testing.T) {
-		mutateTypeScriptExtractor(t, "\n    .filter((configured) => !path.relative(root, configured).split(path.sep).some((part) => excludedDirectories.has(part)));", ";")
-		root := writeSvelteKitFixture(t, svelteKitFixture{generatedConfig: true, git: true})
-		_, result := scanSvelteKitFixture(t, root)
-		if found := appEnvironmentLimitations(result); len(found) != 0 {
-			t.Fatalf("archived declaration did not mask the stale generated config: %v", found)
+	// Each boundary check is removed in turn; every fixture that crosses
+	// that boundary must then resolve $app/environment through the refused
+	// declaration, hiding the stale generated config.
+	boundaries := []struct {
+		name, before, after string
+		fixtures            []svelteKitFixture
+	}{
+		{
+			name:   "outside repository refused",
+			before: "\n  if (relative === \"\" || relative.startsWith(\"..\") || path.isAbsolute(relative)) return false;",
+			after:  "",
+			fixtures: []svelteKitFixture{
+				{generatedConfig: true, git: true, outsideInclude: true},
+				{generatedConfig: true, git: true, declarationSymlink: "file-outside"},
+				{generatedConfig: true, git: true, declarationSymlink: "dir-outside"},
+			},
+		},
+		{
+			name:   "excluded directory refused",
+			before: "return !relative.split(path.sep).some((part) => excludedDirectories.has(part));",
+			after:  "return true;",
+			fixtures: []svelteKitFixture{
+				{generatedConfig: true, git: true},
+				{generatedConfig: true, git: true, declarationSymlink: "file-archive"},
+				{generatedConfig: true, git: true, declarationSymlink: "dir-archive"},
+			},
+		},
+	}
+	for _, boundary := range boundaries {
+		for _, fixture := range boundary.fixtures {
+			t.Run(fmt.Sprintf("%s outside=%v symlink=%q", boundary.name, fixture.outsideInclude, fixture.declarationSymlink), func(t *testing.T) {
+				mutateTypeScriptExtractor(t, boundary.before, boundary.after)
+				root := writeSvelteKitFixture(t, fixture)
+				_, result := scanSvelteKitFixture(t, root)
+				if found := appEnvironmentLimitations(result); len(found) != 0 {
+					t.Fatalf("refused declaration did not mask the stale generated config: %v", found)
+				}
+			})
 		}
-	})
-	t.Run("outside repository declarations refused", func(t *testing.T) {
-		mutateTypeScriptExtractor(t, "/\\.d\\.[cm]?ts$/.test(configured) && withinRoot(configured)", "/\\.d\\.[cm]?ts$/.test(configured)")
-		root := writeSvelteKitFixture(t, svelteKitFixture{generatedConfig: true, git: true, outsideInclude: true})
-		_, result := scanSvelteKitFixture(t, root)
-		if found := appEnvironmentLimitations(result); len(found) != 0 {
-			t.Fatalf("outside declaration did not mask the stale generated config: %v", found)
-		}
-	})
+	}
 	for _, git := range []bool{true, false} {
 		t.Run(fmt.Sprintf("archive excluded git=%v", git), func(t *testing.T) {
 			if !graphIgnoredDirectories["_archive"] {
