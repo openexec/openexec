@@ -17,23 +17,41 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # Owner, 10-23: Linux leg on Namespace (cache volume below); macOS stays hosted.
+        os: [namespace-profile-perttu, macos-latest]
         go-version: ['1.25']
 
     steps:
     - uses: actions/checkout@v5
 
+    # Namespace cache volume: Go module/build cache and npm cache persist on the
+    # runner's attached disk. Soft-fails to a cold run if no volume is attached.
+    - name: Resolve home for cache paths
+      if: startsWith(matrix.os, 'namespace-')
+      run: echo "CI_HOME=$HOME" >> "$GITHUB_ENV"
+
+    - name: Namespace cache volume
+      if: startsWith(matrix.os, 'namespace-')
+      continue-on-error: true
+      uses: namespacelabs/nscloud-cache-action@15799a6b54e5765f85b2aac25b3f0df43ed571c0 # v1.4.3
+      with:
+        path: |
+          ${{ env.CI_HOME }}/go/pkg/mod
+          ${{ env.CI_HOME }}/.cache/go-build
+          ${{ env.CI_HOME }}/.npm
+
+    # setup-go/setup-node GitHub caches only where there is no cache volume (macOS).
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
-        cache: true
+        cache: ${{ !startsWith(matrix.os, 'namespace-') }}
 
     - name: Set up Node
       uses: actions/setup-node@v5
       with:
         node-version: '22'
-        cache: 'npm'
+        cache: ${{ !startsWith(matrix.os, 'namespace-') && 'npm' || '' }}
         cache-dependency-path: ui/package-lock.json
 
     # Release-style builds explicitly embed the generated UI. Ordinary module
