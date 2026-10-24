@@ -39,9 +39,9 @@ func readFile(t *testing.T, path string) string {
 	return string(raw)
 }
 
-// assertBacklogUntouched reopens the fixture's ledger and requires every
+// assertPlanGateBacklogUntouched reopens the fixture's ledger and requires every
 // pre-existing task to still be pending.
-func assertBacklogUntouched(t *testing.T, dir string) {
+func assertPlanGateBacklogUntouched(t *testing.T, dir string) {
 	t.Helper()
 	backlog, err := release.NewManager(dir, nil)
 	if err != nil {
@@ -168,7 +168,7 @@ func TestRunStopsWhenAutoPlanningFailsOrIsRejected(t *testing.T) {
 			if readFile(t, configPath) != configBefore {
 				t.Fatal("refused run changed .openexec/config.json")
 			}
-			assertBacklogUntouched(t, f.dir)
+			assertPlanGateBacklogUntouched(t, f.dir)
 		})
 	}
 }
@@ -318,7 +318,7 @@ func TestRunRealHandlerRefusesFailedPlanBeforeExecute(t *testing.T) {
 			if readFile(t, configPath) != configBefore {
 				t.Fatal("refused run changed .openexec/config.json")
 			}
-			assertBacklogUntouched(t, f.dir)
+			assertPlanGateBacklogUntouched(t, f.dir)
 		})
 	}
 }

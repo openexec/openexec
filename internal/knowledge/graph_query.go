@@ -37,6 +37,9 @@ func (s *Store) FindModuleDependencies(ctx context.Context, identity RepositoryI
 }
 
 // moduleDependenciesIn walks import edges within one already-gated generation.
+// A clamped depth and any import edge the edge budget left unread are disclosed
+// through Limitations/Truncated, so a bounded walk is never read as the full
+// reach; a graph that fits the edge budget exactly stays complete.
 func (s *Store) moduleDependenciesIn(ctx context.Context, generation GraphGeneration, state RepositoryState, module string, reverse bool, depth int, limits GraphLimits) (QueryEnvelope[ModuleDependencyResult], error) {
 	if limits.MaxDepth <= 0 {
 		limits = DefaultGraphLimits()
@@ -44,13 +47,22 @@ func (s *Store) moduleDependenciesIn(ctx context.Context, generation GraphGenera
 	if depth <= 0 {
 		depth = 1
 	}
+	var depthLimitation string
 	if depth > limits.MaxDepth {
+		depthLimitation = depthLimitationNote(depth, limits.MaxDepth)
 		depth = limits.MaxDepth
+	}
+	limitations := append([]string(nil), generation.Limitations...)
+	if depthLimitation != "" {
+		limitations = append(limitations, depthLimitation)
 	}
 	root, err := s.findModuleNode(ctx, generation.ID, module)
 	if err != nil {
 		return QueryEnvelope[ModuleDependencyResult]{}, err
 	}
+	// Each node enters the frontier once (seen), so its edges are read at most
+	// once: an edge reported as omitted is never one already returned through
+	// a cycle.
 	seen := map[string]bool{root.ID: true}
 	frontier := []string{root.ID}
 	nodes := []GraphNode{}
@@ -59,15 +71,31 @@ func (s *Store) moduleDependenciesIn(ctx context.Context, generation GraphGenera
 	for level := 0; level < depth && len(frontier) > 0; level++ {
 		var next []string
 		for _, nodeID := range frontier {
-			found, err := s.loadImportEdges(ctx, generation.ID, nodeID, reverse, limits.MaxEdges-len(edges))
-			if err != nil {
-				return QueryEnvelope[ModuleDependencyResult]{}, err
-			}
-			for _, edge := range found {
-				if len(edges) >= limits.MaxEdges {
+			remaining := limits.MaxEdges - len(edges)
+			if remaining <= 0 {
+				if truncated {
+					break
+				}
+				// The budget is spent exactly; only an unread edge on a node
+				// still to be expanded makes the result incomplete.
+				unread, _, err := s.loadImportEdges(ctx, generation.ID, nodeID, reverse, 1)
+				if err != nil {
+					return QueryEnvelope[ModuleDependencyResult]{}, err
+				}
+				if len(unread) > 0 {
 					truncated = true
 					break
 				}
+				continue
+			}
+			found, edgeLimitReached, err := s.loadImportEdges(ctx, generation.ID, nodeID, reverse, remaining)
+			if err != nil {
+				return QueryEnvelope[ModuleDependencyResult]{}, err
+			}
+			if edgeLimitReached {
+				truncated = true
+			}
+			for _, edge := range found {
 				edges = append(edges, edge)
 				target := edge.ToNodeID
 				if reverse {
@@ -100,7 +128,7 @@ func (s *Store) moduleDependenciesIn(ctx context.Context, generation GraphGenera
 		Query: QueryMeta{Type: queryType, Roots: []string{root.ID}}, Generation: state,
 		Result:      ModuleDependencyResult{Root: root, Nodes: nodes, Edges: edges},
 		Resolution:  ResolutionMeta{Status: "bounded", Methods: edgeMethods(edges)},
-		Limitations: generation.Limitations, Truncated: truncated,
+		Limitations: limitations, Truncated: truncated || depthLimitation != "",
 	}, nil
 }
 
@@ -131,18 +159,23 @@ func jsonUnmarshalStringMap(data string, target *map[string]string) error {
 	return json.Unmarshal([]byte(data), target)
 }
 
-func (s *Store) loadImportEdges(ctx context.Context, generationID, nodeID string, reverse bool, limit int) ([]GraphEdge, error) {
+// loadImportEdges returns up to limit import edges of one node in ID order and
+// reports whether more exist. It reads one row past the limit (as
+// loadTypedImpactEdges does) so an omitted edge is observed rather than
+// inferred from a spent budget. Unlike that loader it keeps edge metadata (the
+// import specifier), which the public module-dependency result carries.
+func (s *Store) loadImportEdges(ctx context.Context, generationID, nodeID string, reverse bool, limit int) ([]GraphEdge, bool, error) {
 	if limit <= 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 	direction := "from_node_id"
 	if reverse {
 		direction = "to_node_id"
 	}
 	query := fmt.Sprintf(`SELECT id, generation_id, from_node_id, to_node_id, edge_type, resolution_status, source_file_path, source_start_byte, source_end_byte, metadata FROM graph_edges WHERE generation_id = ? AND edge_type = 'imports' AND %s = ? ORDER BY id LIMIT ?`, direction)
-	rows, err := s.db.QueryContext(ctx, query, generationID, nodeID, limit)
+	rows, err := s.db.QueryContext(ctx, query, generationID, nodeID, limit+1)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 	var result []GraphEdge
@@ -150,13 +183,19 @@ func (s *Store) loadImportEdges(ctx context.Context, generationID, nodeID string
 		var edge GraphEdge
 		var metadata string
 		if err := rows.Scan(&edge.ID, &edge.GenerationID, &edge.FromNodeID, &edge.ToNodeID, &edge.Type, &edge.Resolution, &edge.SourceFilePath, &edge.SourceStartByte, &edge.SourceEndByte, &metadata); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		edge.Metadata = map[string]string{}
 		_ = jsonUnmarshalStringMap(metadata, &edge.Metadata)
 		result = append(result, edge)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	if len(result) > limit {
+		return result[:limit], true, nil
+	}
+	return result, false, nil
 }
 
 func edgeMethods(edges []GraphEdge) []ResolutionStatus {
