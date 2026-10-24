@@ -37,18 +37,30 @@ func newMigratedDaemon(t *testing.T) migratedDaemon {
 	}
 	fixture.server.KnowledgeStore = store
 	root := fixture.identity.RootPath
-	padding := strings.Repeat("// realistic padding so the input set is hashed, not only listed.\n", 12)
-	for i := 0; i < 240; i++ {
-		dir := filepath.Join(root, fmt.Sprintf("pkg%03d", i/40))
+	// Extraction must cost far more than a walk on every platform. Each read
+	// rehashes every input file and the repository context probes exported
+	// symbols and call edges, so files, bytes and functions slow the walk as
+	// much as extraction. Every json-tagged field is an ambiguous candidate for
+	// each same-named field, which extraction stores as one edge per pair and
+	// a walk only counts: a few dense files of unexported tagged types make
+	// extraction expensive without making the walk so.
+	const files, types = 12, 20
+	for i := 0; i < files; i++ {
+		dir := filepath.Join(root, fmt.Sprintf("pkg%03d", i/4))
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
 		next := i + 1
-		if next%40 == 0 {
-			next = i - 39
+		if next%4 == 0 {
+			next = i - 3
 		}
-		source := fmt.Sprintf("package pkg%03d\n\n%stype Kind%d struct{ Name string `json:\"name\"` }\n\nfunc Run%d(value string) string { return Step%d(value) }\n\nfunc Step%d(value string) string { return value }\n\nfunc Use%d() string { return Run%d(\"x\") }\n", i/40, padding, i, i, i, i, i, next)
-		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.go", i)), []byte(source), 0o600); err != nil {
+		var source strings.Builder
+		fmt.Fprintf(&source, "package pkg%03d\n", i/4)
+		for j := 0; j < types; j++ {
+			fmt.Fprintf(&source, "\ntype kind%d_%d struct {\n\tname  string `json:\"name\"`\n\tlabel string `json:\"label\"`\n}\n", i, j)
+		}
+		fmt.Fprintf(&source, "\nfunc Run%d(value string) string { return Step%d(value) }\n\nfunc Step%d(value string) string { return value }\n\nfunc Use%d() string { return Run%d(\"x\") }\n", i, i, i, i, next)
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.go", i)), []byte(source.String()), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
