@@ -184,7 +184,7 @@ func chatFixture(t *testing.T, execMode string) string {
 	return dir
 }
 
-func assertBacklogUntouched(t *testing.T, dir string) {
+func assertChatBacklogUntouched(t *testing.T, dir string) {
 	t.Helper()
 	backlog, err := release.NewManager(dir, nil)
 	if err != nil {
@@ -286,7 +286,7 @@ func TestChatEscalationDeliversLineInRequestedMode(t *testing.T) {
 	if got := d.persistedMode(t, runID); got != "read-only" {
 		t.Fatalf("persisted mode %q; want read-only", got)
 	}
-	assertBacklogUntouched(t, dir)
+	assertChatBacklogUntouched(t, dir)
 
 	// Restart: a new daemon on the same database reads the same mode back.
 	d2 := startChatDaemon(t, dir)
@@ -421,7 +421,7 @@ func TestChatEscalationRefusalsLeaveNoTrace(t *testing.T) {
 			}
 		})
 	}
-	assertBacklogUntouched(t, dir)
+	assertChatBacklogUntouched(t, dir)
 }
 
 // Without OPENEXEC_PROVIDER/OPENEXEC_MODEL the daemon refuses the session.
@@ -526,5 +526,5 @@ func TestChatEscalationStopAndBacklog(t *testing.T) {
 	if got := d.persistedMode(t, runID); got != "read-only" {
 		t.Fatalf("persisted mode %q; want read-only", got)
 	}
-	assertBacklogUntouched(t, dir)
+	assertChatBacklogUntouched(t, dir)
 }
