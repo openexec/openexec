@@ -237,8 +237,11 @@ All orchestration is handled by the daemon via /api/v1/runs endpoints.
 The CLI is a thin client that triggers and monitors server-side execution.
 
 Examples:
-  openexec run             # Execute all pending tasks
-  openexec run T-001       # Execute specific task
+  openexec run             # Plan from INTENT.md, then execute all pending tasks
+  openexec run T-001       # Execute only existing pending task T-001 (no planning)
+
+A named task must already exist, be pending and have its dependencies done;
+otherwise the engine refuses the run and nothing executes.
 
 For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<description>"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -304,8 +307,10 @@ For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<des
 		// 2. TRIGGER SERVER-SIDE EXECUTION
 		// Thin client: CLI only initiates and monitors.
 
-		// Plan first if needed
-		if !runNoAutoPlan {
+		// Plan first if needed. A named task must already exist: planning or
+		// re-importing before the engine checks the selection would be a side
+		// effect of a request that may be refused.
+		if !runNoAutoPlan && len(args) == 0 {
 			planReq := map[string]any{
 				"intent_file": "INTENT.md",
 				"auto_import": true,
@@ -365,6 +370,12 @@ For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<des
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusAccepted {
+			var rejected struct {
+				Error string `json:"error"`
+			}
+			if raw, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10)); json.Unmarshal(raw, &rejected) == nil && rejected.Error != "" {
+				return fmt.Errorf("server rejected execution request: %d: %s", resp.StatusCode, rejected.Error)
+			}
 			return fmt.Errorf("server rejected execution request: %d", resp.StatusCode)
 		}
 

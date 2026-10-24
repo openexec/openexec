@@ -251,7 +251,7 @@ func TestRunNormalInvocationsUnchanged(t *testing.T) {
 		}
 	})
 
-	t.Run("task id keeps auto-plan and scopes execute", func(t *testing.T) {
+	t.Run("task id skips auto-plan and scopes execute", func(t *testing.T) {
 		f := newRunFixture(t, true)
 		if out, err := f.run(t, "T-001"); err != nil {
 			t.Fatalf("run T-001: %v\n%s", err, out)
@@ -267,8 +267,10 @@ func TestRunNormalInvocationsUnchanged(t *testing.T) {
 			paths = append(paths, r.Path)
 			exec = r
 		}
-		if strings.Join(paths, ",") != "/api/v1/runs:plan,/api/v1/runs:execute" {
-			t.Fatalf("requests = %s; want plan then execute", describeRequests(reqs))
+		// A named task must already exist; planning first would import
+		// before the engine can refuse the selection.
+		if strings.Join(paths, ",") != "/api/v1/runs:execute" {
+			t.Fatalf("requests = %s; want execute only", describeRequests(reqs))
 		}
 		ids, _ := exec.Body["task_ids"].([]any)
 		if len(ids) != 1 || ids[0] != "T-001" {
