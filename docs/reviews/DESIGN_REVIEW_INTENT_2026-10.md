@@ -121,3 +121,5 @@ file (L) as its source, not Agent Console's.
 The five later audits (`c2986112…`, `344c8390…`, `bb19d2e4…`, `869ef988…`,
 `8a800117…`) keep their dependency on this report. Their findings are not
 anticipated here.
+
+Consolidated, re-checked at `131b9ce8`: [DESIGN_REVIEW_CONSOLIDATED_2026-10.md](DESIGN_REVIEW_CONSOLIDATED_2026-10.md).
