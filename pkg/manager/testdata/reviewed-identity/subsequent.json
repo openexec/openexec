@@ -1,4 +1,11 @@
 {
+  "baseline": {
+    "approach": "One chat on the real example",
+    "result": "A list without delivery",
+    "bar": "Delivered and verified",
+    "verdict": "build",
+    "source": "INTENT.md"
+  },
   "goals": [
     {
       "id": "G-001",
@@ -15,6 +22,8 @@
     {
       "id": "US-001",
       "goal_id": "G-002",
+      "role": "skeleton",
+      "real_example": "examples/real-input",
       "title": "Story 001",
       "description": "Changed content for US-001",
       "acceptance_criteria": [
@@ -35,6 +44,7 @@
     {
       "id": "US-005",
       "goal_id": "G-002",
+      "role": "core",
       "title": "Story 005",
       "description": "Changed content for US-005",
       "acceptance_criteria": [

@@ -7,7 +7,7 @@ package prompt
 //   - MAJOR: Breaking changes to prompt structure or expected outputs
 //   - MINOR: New capabilities or non-breaking additions
 //   - PATCH: Bug fixes, typo corrections, clarifications
-const PromptVersion = "1.0.0"
+const PromptVersion = "1.1.0"
 
 // RunStateMachineVersion is the version of the run state machine logic.
 // Increment when the stage transitions or completion conditions change.

@@ -460,10 +460,10 @@ func TestProcessWizardMessage_HandlesMarkdownWrappedJSON(t *testing.T) {
 // Story Schema Compatibility Tests (T-US-001-003)
 // =============================================================================
 
-// TestProjectPlan_SchemaVersion verifies that generated stories use schema version "1.1"
-// This is a key contract for story compatibility across the system.
+// TestProjectPlan_SchemaVersion verifies that generated plans carry this
+// build's schema version, whatever the model wrote.
 func TestProjectPlan_SchemaVersion(t *testing.T) {
-	t.Run("GeneratePlan returns schema version 1.1", func(t *testing.T) {
+	t.Run("GeneratePlan stamps the current schema over the model's 1.1", func(t *testing.T) {
 		// GIVEN a mock LLM provider that returns a valid ProjectPlan with schema version
 		mock := &mockProvider{
 			response: `{
@@ -482,12 +482,12 @@ func TestProjectPlan_SchemaVersion(t *testing.T) {
 		// WHEN GeneratePlan is called
 		plan, err := p.GeneratePlan(ctx, "# Test Intent", nil)
 
-		// THEN schema_version is "1.1"
+		// THEN schema_version is the build's own
 		if err != nil {
 			t.Fatalf("GeneratePlan failed: %v", err)
 		}
-		if plan.SchemaVersion != "1.1" {
-			t.Errorf("SchemaVersion = %q, want \"1.1\"", plan.SchemaVersion)
+		if plan.SchemaVersion != PlanSchemaVersion {
+			t.Errorf("SchemaVersion = %q, want %q", plan.SchemaVersion, PlanSchemaVersion)
 		}
 	})
 

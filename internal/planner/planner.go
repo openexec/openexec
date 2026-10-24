@@ -50,16 +50,59 @@ type Story struct {
 	VerificationScript string   `json:"verification_script"`
 	Contract           string   `json:"contract"`
 	Tasks              []Task   `json:"tasks"`
+	// Role and RoleReason are the story's place in the outcome shape
+	// (LintOutcomeShape). The model declares them and the reviewer judges
+	// them; nothing infers a role from a title.
+	Role       string `json:"role,omitempty"`
+	RoleReason string `json:"role_reason,omitempty"`
+	// RealExample names the real input a skeleton runs on end to end: a path,
+	// URL or name. It never holds the input itself.
+	RealExample string `json:"real_example,omitempty"`
 }
 
-// PlanSchemaVersion is the current version of the plan artifact schema.
-const PlanSchemaVersion = "1.0.0"
+// Story roles of the outcome shape.
+const (
+	RoleStudy          = "study"
+	RoleSkeleton       = "skeleton"
+	RoleCore           = "core"
+	RoleInfrastructure = "infrastructure"
+	RolePrerequisite   = "prerequisite"
+	RoleValidation     = "validation"
+)
+
+// Baseline is what the cheapest approach gives, recorded before a build is
+// planned, and how the plan beats it. It records the planner's reading of the
+// evidence in the intent; it is not proof that the result is useful.
+type Baseline struct {
+	Approach string `json:"approach"`
+	Result   string `json:"result"`
+	Bar      string `json:"bar"`
+	Verdict  string `json:"verdict"`
+	Source   string `json:"source"`
+}
+
+// Baseline verdicts.
+const (
+	VerdictBuild           = "build"
+	VerdictBuildOnBaseline = "build_on_baseline"
+	VerdictDoNotBuild      = "do_not_build"
+)
+
+// PlanSchemaVersion is the current version of the plan artifact schema. Every
+// plan that generation or refinement returns carries it (parseResponse),
+// whatever the model wrote; plans persisted earlier keep their own version.
+const PlanSchemaVersion = "1.2"
+
+// legacyPlanSchemaVersion is what Validate gives a plan that carries no
+// version: this build's parser did not return it.
+const legacyPlanSchemaVersion = "1.0.0"
 
 // ProjectPlan is the complete output schema for story generation
 type ProjectPlan struct {
-	SchemaVersion string  `json:"schema_version"`
-	Goals         []Goal  `json:"goals"`
-	Stories       []Story `json:"stories"`
+	SchemaVersion string    `json:"schema_version"`
+	Baseline      *Baseline `json:"baseline,omitempty"`
+	Goals         []Goal    `json:"goals"`
+	Stories       []Story   `json:"stories"`
 	// Continues names the persisted goals, stories and tasks this plan lists
 	// as they are (ContinueRetainedWork). Import leaves those rows alone.
 	Continues []string `json:"continues,omitempty"`
@@ -75,7 +118,7 @@ func (p *ProjectPlan) Validate() error {
 		return fmt.Errorf("plan is nil")
 	}
 	if p.SchemaVersion == "" {
-		p.SchemaVersion = PlanSchemaVersion
+		p.SchemaVersion = legacyPlanSchemaVersion
 	}
 	// Ensure at least one story or goal exists
 	if len(p.Goals) == 0 && len(p.Stories) == 0 {
@@ -165,7 +208,6 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 	plan := &ProjectPlan{}
 	var err error
 	if strings.HasPrefix(strings.TrimSpace(jsonText), "[") {
-		plan.SchemaVersion = "1.1"
 		err = json.Unmarshal([]byte(jsonText), &plan.Stories)
 	} else {
 		err = json.Unmarshal([]byte(jsonText), plan)
@@ -176,6 +218,10 @@ func (p *Planner) parseResponse(response string) (*ProjectPlan, error) {
 	if len(plan.Stories) == 0 {
 		return nil, fmt.Errorf("failed to parse LLM response as JSON: no stories found\nResponse was: %s", response)
 	}
+	// This build wrote the plan, so it carries this build's schema. Taking the
+	// model's version would let a plan skip the outcome-shape check by
+	// omitting it or writing an older one.
+	plan.SchemaVersion = PlanSchemaVersion
 	return plan, nil
 }
 

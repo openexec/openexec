@@ -60,6 +60,10 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 		wire.PlanReview.Approved = false
 		wire.Assessment += fmt.Sprintf("; human boundary lint refused: %v", issues)
 	}
+	if issues := LintOutcomeShape(plan); len(issues) != 0 {
+		wire.PlanReview.Approved = false
+		wire.Assessment += fmt.Sprintf("; outcome shape lint refused: %v", issues)
+	}
 	for _, story := range plan.Stories {
 		for _, task := range story.Tasks {
 			if len(task.AllowedPaths) > 0 {
@@ -139,6 +143,12 @@ func carryGoals(original, refined *ProjectPlan) {
 	if refined.SchemaVersion == "" {
 		refined.SchemaVersion = original.SchemaVersion
 	}
+	// The baseline belongs to the plan, not to a story: a fix that returns
+	// only stories still answers it. A fix may replace it, never erase it.
+	if refined.Baseline == nil && original.Baseline != nil {
+		b := *original.Baseline
+		refined.Baseline = &b
+	}
 	present := make(map[string]bool, len(refined.Goals))
 	for _, g := range refined.Goals {
 		present[g.ID] = true
@@ -175,11 +185,18 @@ func carryGoals(original, refined *ProjectPlan) {
 }
 
 // DeterministicPlanIssues are the checks every plan must pass, with or without
-// a reviewer: verification lint, the stale-base rule and the human-boundary
-// lint. ReviewPlan applies them to the reviewer's verdict; a plan imported
-// after its one fix, without a second review, must pass them on its own.
+// a reviewer: verification lint, the stale-base rule, the human-boundary lint
+// and the outcome shape. ReviewPlan applies them to the reviewer's verdict; a
+// plan imported after its one fix, without a second review, must pass them on
+// its own.
 func DeterministicPlanIssues(plan *ProjectPlan) []string {
-	return append(VerificationPlanIssues(plan), boundaryPlanIssues(plan)...)
+	issues := append(VerificationPlanIssues(plan), boundaryPlanIssues(plan)...)
+	if shape := LintOutcomeShape(plan); len(shape) != 0 {
+		// Refused, not check-repaired: putting the skeleton first changes
+		// what the plan does, which a check repair may not do.
+		issues = append(issues, fmt.Sprintf("outcome shape lint refused: %v", shape))
+	}
+	return issues
 }
 
 // VerificationPlanIssues are the deterministic failures of a plan's
