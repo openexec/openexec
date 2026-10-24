@@ -29,10 +29,10 @@ func TestReplanNeverRenamesPersistedWork(t *testing.T) {
 	first := planner.ProjectPlan{
 		Goals: []planner.Goal{{ID: "G-001", Title: "Observers", Description: "Observe V1-V6"}},
 		Stories: []planner.Story{
-			{ID: "US-001", GoalID: "G-001", Title: "Map observer inputs", Tasks: []planner.Task{
+			{ID: "US-001", GoalID: "G-001", Title: "Map observer inputs", Role: planner.RoleStudy, Tasks: []planner.Task{
 				{ID: "T-US-001-001", Title: "Map inputs", Description: "Map them", VerificationScript: "true"},
 			}},
-			{ID: "US-002", GoalID: "G-001", Title: "Goal Validation: full check, owner acceptance", DependsOn: []string{"US-001"}, Tasks: []planner.Task{
+			{ID: "US-002", GoalID: "G-001", Title: "Goal Validation: full check, owner acceptance", Role: planner.RoleValidation, DependsOn: []string{"US-001"}, Tasks: []planner.Task{
 				{ID: "T-US-002-001", Title: "Run make check", Description: "Check it", VerificationScript: "make check"},
 				{ID: "T-US-002-002", Title: "Owner accepts merging the observer repairs", Description: "Ask the owner", Mode: planner.TaskModeHITL, DecisionReason: "Merging needs the owner", DependsOn: []string{"T-US-002-001"}},
 			}},
@@ -59,13 +59,13 @@ func TestReplanNeverRenamesPersistedWork(t *testing.T) {
 	second := planner.ProjectPlan{
 		Goals: []planner.Goal{{ID: "G-001", Title: "Observers, closed loop", Description: "Observe V1-V6 in production"}},
 		Stories: []planner.Story{
-			{ID: "US-001", GoalID: "G-001", Title: "Map observer inputs again", Tasks: []planner.Task{
+			{ID: "US-001", GoalID: "G-001", Title: "Map observer inputs again", Role: planner.RoleStudy, Tasks: []planner.Task{
 				{ID: "T-US-001-001", Title: "Map production inputs", Description: "Map them again", VerificationScript: "true"},
 			}},
-			{ID: "US-003", GoalID: "G-001", Title: "V2 counts a gap verdict", Tasks: []planner.Task{
+			{ID: "US-003", GoalID: "G-001", Title: "V2 counts a gap verdict", Role: planner.RoleSkeleton, RealExample: "production observer inputs", Tasks: []planner.Task{
 				{ID: "T-US-003-001", Title: "Count gap verdicts", Description: "Count them in US-001's map", VerificationScript: "true"},
 			}},
-			{ID: "US-002", GoalID: "G-001", Title: "Owner acceptance of the candidate", DependsOn: []string{"US-003"}, Tasks: []planner.Task{
+			{ID: "US-002", GoalID: "G-001", Title: "Owner acceptance of the candidate", Role: planner.RoleValidation, DependsOn: []string{"US-003"}, Tasks: []planner.Task{
 				{ID: "T-US-002-002", Title: "Owner decides on the exact candidate", Description: "Ask", Mode: planner.TaskModeHITL, DecisionReason: "The owner merges", DependsOn: []string{"T-US-002-001", "T-US-003-001"}},
 				{ID: "T-US-002-003", Title: "Record the decision", Description: "After T-US-002-002", VerificationScript: "true", DependsOn: []string{"T-US-002-002"}},
 			}},

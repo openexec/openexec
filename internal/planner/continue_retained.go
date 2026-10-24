@@ -132,6 +132,12 @@ func ContinueRetainedWork(plan *ProjectPlan, ledger RetainedLedger) []string {
 				story.RequirementID = s.RequirementID
 				continued[s.ID] = story
 			}
+			// Nor does it persist the outcome-shape role; the plan's is the
+			// only one, or an exact replay of the plan loses it.
+			if story.Role == "" {
+				story.Role, story.RoleReason, story.RealExample = s.Role, s.RoleReason, s.RealExample
+				continued[s.ID] = story
+			}
 			emit(s.ID)
 			for _, id := range held {
 				emit(id)

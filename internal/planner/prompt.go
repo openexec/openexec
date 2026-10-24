@@ -138,6 +138,48 @@ messages, destructive actions or privilege expansion. Check actual effect author
 Do not include secrets in decision reasons or references.
 `
 
+// OutcomeShapeRule is shared by generation, review and refinement of
+// multi-story plans; LintOutcomeShape refuses plans that break its structure.
+// A finished plan whose tasks each passed review on fixtures, while the
+// owner's first real input produced nothing, is what it prevents: the first
+// end-to-end run was the owner's upload, and billing was done before the core
+// worked (laskenta/Kanavat, 2026-10-23).
+const OutcomeShapeRule = `OUTCOME SHAPE (plans with two or more implementation stories):
+1. BASELINE FIRST: Before planning a build, record in the plan's "baseline"
+   object what the cheapest approach gives on the real example: "approach"
+   (for example one chat with a current frontier model, an existing tool or a
+   short script), "result" (what it produces), "bar" (how this plan beats that
+   result, measurably), "verdict" ("build", "build_on_baseline" or
+   "do_not_build") and "source" (where in the intent or repository the
+   evidence comes from). Use only evidence the intent or repository supplies;
+   never call an external or billed model to produce it. When the baseline is
+   good enough, recommend "do_not_build" or "build_on_baseline" instead of a
+   plan that only re-creates it. Write it so the owner can read it as one short
+   paragraph. The baseline records reasoning; it does not prove usefulness.
+2. WALKING SKELETON FIRST: Give every story a "role": "study", "skeleton",
+   "core", "infrastructure", "prerequisite" or "validation". The first
+   implementation story is the "skeleton": the thinnest end-to-end slice that
+   runs on the real example input (input -> result -> preview or deployed
+   candidate), however crude. Its "real_example" names that input by path,
+   URL or name and never contains it. If the intent names no real example,
+   reference the most realistic input it or the repository supplies and say so
+   in the story's contract. The skeleton depends only on study or prerequisite
+   stories. Never start a plan with layers (models, storage, accounts) that
+   have no end-to-end slice before them.
+3. CORE BEFORE INFRASTRUCTURE: Billing, accounts or tenancy hardening,
+   commercial work and production operations are "infrastructure": they
+   depend, directly or through other stories, on the skeleton, and carry a
+   "role_reason". Work the skeleton itself needs, such as tenant isolation
+   for a private real example, or an order the owner stated, is a
+   "prerequisite" with a "role_reason" naming why; keep owner-stated tasks and
+   dependencies as stated. Cut stories by outcome, not by brief section: each
+   one measurably improves the end-to-end result, or is infrastructure with
+   its reason.
+Roles are declared, not inferred from titles; the reviewer judges whether
+each role and reason is honest, and refuses a plan that mislabels work to
+satisfy this shape.
+`
+
 const StoryGenerationPrompt = `You are a software architect generating user stories from an intent document.
 
 Analyze the intent document below and generate a JSON array of user stories.
@@ -175,9 +217,17 @@ RULES:
 ` + RepositoryScopeRule + `
 ` + DeliveryEvidenceRule + `
 ` + CandidateCommitRule + `
+` + OutcomeShapeRule + `
 OUTPUT FORMAT (JSON object):
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
+  "baseline": {
+    "approach": "One chat with a current frontier model on the real example",
+    "result": "A usable list of the services to containerise, without a runnable environment",
+    "bar": "A running environment from one command, rebuilt on source change",
+    "verdict": "build",
+    "source": "INTENT.md section Context"
+  },
   "goals": [
     {
       "id": "G-001",
@@ -194,6 +244,8 @@ OUTPUT FORMAT (JSON object):
       "description": "As a developer, I want a Docker-based development environment so that I can develop locally with hot-reload",
       "requirement_id": "REQ-001",
       "goal_id": "G-001",
+      "role": "skeleton",
+      "real_example": "examples/app (the project the intent names)",
       "depends_on": [],
       "acceptance_criteria": [
         "Container starts with 'docker compose up'",
@@ -280,6 +332,7 @@ dependency modeling for parallel execution.
 ` + RepositoryScopeRule + `
 ` + DeliveryEvidenceRule + `
 ` + CandidateCommitRule + `
+` + OutcomeShapeRule + `
 Reject unjustified human boundaries and missing concrete decision_reason on new HITL tasks.
 
 REVIEW THE STORIES AGAINST THESE CRITERIA:
@@ -330,6 +383,15 @@ REVIEW THE STORIES AGAINST THESE CRITERIA:
    without the plan restating it. A fix cannot create goals, so never propose
    a new goal; name the existing goal the work serves.
 
+11. **Outcome Shape**: For a plan with two or more implementation stories,
+   apply OUTCOME SHAPE above. REJECT a plan with no baseline, a baseline whose
+   bar the plan does not beat, a first implementation story that is not an
+   end-to-end skeleton on the real example, or billing, accounts, commercial
+   or production-ops work ahead of the skeleton. Judge each role honestly: a
+   layer called a skeleton, or infrastructure called a prerequisite without a
+   real need, is a REJECT. Persisted stories listed in "continues" carry no
+   role and are not judged for one.
+
 ORIGINAL INTENT:
 %s
 
@@ -374,6 +436,7 @@ The reviewer has analyzed the stories and provided a refactoring plan. Follow it
 ` + RepositoryScopeRule + `
 ` + DeliveryEvidenceRule + `
 ` + CandidateCommitRule + `
+` + OutcomeShapeRule + `
 ORIGINAL INTENT:
 %s
 
@@ -392,6 +455,11 @@ Follow the reviewer's refactoring_plan exactly. Generate the proposed stories wi
 5. DEPENDENCIES: Model dependencies via "depends_on" lists for stories and tasks.
 6. GOALS: A story's "goal_id" names a goal in CURRENT STORIES' "goals" or
    "persisted_goals". You cannot create goals; never cite any other goal id.
+7. OUTCOME SHAPE: Keep every story's "role", "role_reason" and
+   "real_example" as OUTCOME SHAPE requires. The plan's current "baseline" is
+   kept. To supply a missing baseline or correct it, return a JSON object
+   instead of the array: {"baseline": {"approach": "...", "result": "...",
+   "bar": "...", "verdict": "build", "source": "..."}, "stories": [the array]}.
 
 OUTPUT FORMAT - JSON array:
 [
@@ -400,6 +468,8 @@ OUTPUT FORMAT - JSON array:
     "title": "Story title from refactoring plan",
     "description": "As a developer, I want...",
     "requirement_id": "REQ-001",
+    "role": "skeleton",
+    "real_example": "path, URL or name of the real input",
     "depends_on": [],
     "acceptance_criteria": ["Specific criteria from intent"],
     "verification_script": "npm test",
@@ -416,7 +486,7 @@ OUTPUT FORMAT - JSON array:
   }
 ]
 
-Output ONLY valid JSON array, no markdown or explanations.`
+Output ONLY valid JSON, no markdown or explanations.`
 
 const WizardSystemPrompt = `You are an expert Software Architect interviewing a user to gather project requirements for the OpenExec orchestration engine.
 

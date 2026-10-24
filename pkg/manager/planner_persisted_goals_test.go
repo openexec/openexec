@@ -19,7 +19,7 @@ func TestReplanReviewSeesPersistedGoalsAndFixCannotCiteAnInventedOne(t *testing.
 	if err := e.rel.CreateGoal(&release.Goal{ID: "G-9", Title: "The console watches itself and OpenExec (SR6)"}); err != nil {
 		t.Fatal(err)
 	}
-	fixed := `[{"id":"US-1","title":"Edit","goal_id":"G-1","verification_script":"go test ./...","tasks":[{"id":"T-1","title":"Implement edit","description":"Implement and verify editing","mode":"afk"}]},{"id":"US-2","title":"Watch OpenExec","goal_id":"G-SR6","verification_script":"go test ./...","tasks":[{"id":"T-3","title":"Observe OpenExec","description":"Observe the peer project","mode":"afk"}]}]`
+	fixed := `{"baseline":{"approach":"One chat","result":"Notes","bar":"Working edit","verdict":"build","source":"intent"},"stories":[{"id":"US-1","title":"Edit","goal_id":"G-1","role":"skeleton","real_example":"examples/edit","verification_script":"go test ./...","tasks":[{"id":"T-1","title":"Implement edit","description":"Implement and verify editing","mode":"afk"}]},{"id":"US-2","title":"Watch OpenExec","goal_id":"G-SR6","role":"core","verification_script":"go test ./...","tasks":[{"id":"T-3","title":"Observe OpenExec","description":"Observe the peer project","mode":"afk"}]}]}`
 	var prompts []string
 	e.mgr.cfg.PlanGenerator = planCompletionFunc(func(_ context.Context, prompt string) (string, error) {
 		prompts = append(prompts, prompt)
