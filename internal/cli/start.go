@@ -30,6 +30,7 @@ import (
 	"github.com/openexec/openexec/internal/runner"
 	"github.com/openexec/openexec/internal/server"
 	"github.com/openexec/openexec/internal/tools"
+	"github.com/openexec/openexec/pkg/manager"
 	"github.com/spf13/cobra"
 )
 
@@ -310,9 +311,40 @@ For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<des
 				"auto_import": true,
 			}
 			body, _ := json.Marshal(planReq)
-			_, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs:plan", startPort), "application/json", bytes.NewReader(body))
+			resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs:plan", startPort), "application/json", bytes.NewReader(body))
 			if err != nil {
 				return fmt.Errorf("auto-planning failed: %w", err)
+			}
+			// A failed or rejected plan stops here: executing next would start
+			// whatever pending work the backlog already held.
+			raw, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				return fmt.Errorf("auto-planning failed: reading response: %w", err)
+			}
+			if resp.StatusCode != http.StatusOK {
+				var apiErr struct {
+					Error string `json:"error"`
+				}
+				msg := strings.TrimSpace(string(raw))
+				if json.Unmarshal(raw, &apiErr) == nil && apiErr.Error != "" {
+					msg = apiErr.Error
+				}
+				return fmt.Errorf("auto-planning failed: server returned %d: %s; nothing was executed", resp.StatusCode, msg)
+			}
+			var res manager.PlanResult
+			if err := json.Unmarshal(raw, &res); err != nil {
+				return fmt.Errorf("auto-planning failed: invalid plan response: %w; nothing was executed", err)
+			}
+			if !res.Valid {
+				cmd.Println(color.RedString("\nPLANNING GATE FAILED:"))
+				for _, issue := range res.Issues {
+					cmd.Printf("  - %s\n", issue)
+				}
+				return fmt.Errorf("auto-planning failed: intent validation failed; nothing was executed (use --no-auto-plan to run the existing backlog)")
+			}
+			if res.Plan == nil {
+				return fmt.Errorf("auto-planning failed: server returned no plan; nothing was executed")
 			}
 		}
 

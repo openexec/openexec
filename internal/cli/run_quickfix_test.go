@@ -33,7 +33,11 @@ type runRequest struct {
 type runDaemon struct {
 	mu       sync.Mutex
 	requests []runRequest
+	// plan answers runs:plan; nil answers with an accepted, valid plan.
+	plan http.HandlerFunc
 }
+
+const validPlanResponse = `{"plan":{"schema_version":"1","goals":[{"id":"G-001","title":"Fixture"}],"stories":[]},"valid":true}`
 
 func (d *runDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body)
@@ -43,8 +47,15 @@ func (d *runDaemon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.requests = append(d.requests, runRequest{Path: r.URL.Path, Body: body})
 	d.mu.Unlock()
 	switch r.URL.Path {
-	case "/api/ready", "/api/v1/runs:plan":
+	case "/api/ready":
 		w.WriteHeader(http.StatusOK)
+	case "/api/v1/runs:plan":
+		if d.plan != nil {
+			d.plan(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, validPlanResponse)
 	case "/api/v1/runs:execute":
 		w.WriteHeader(http.StatusAccepted)
 	default:
