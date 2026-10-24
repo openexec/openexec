@@ -152,10 +152,10 @@ type ExecutionConfig struct {
 	// Values: "suggest" (read-only), "workspace-write" (default), "danger-full-access" (skip all permissions)
 	ExecMode string `json:"exec_mode,omitempty"`
 	// LintCommands overrides the default lint commands in the blueprint.
-	// If empty, the lint stage is skipped (auto-pass).
+	// If empty, the lint stage fails: nothing was verified.
 	LintCommands []string `json:"lint_commands,omitempty"`
 	// TestCommands overrides the default test commands in the blueprint.
-	// If empty, the test stage is skipped (auto-pass).
+	// If empty, the test stage fails: nothing was verified.
 	TestCommands []string `json:"test_commands,omitempty"`
 
 	// Feature flags for V2 subsystems
@@ -355,15 +355,9 @@ func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 		return nil, fmt.Errorf("failed to save project configuration: %w", err)
 	}
 
-	// Also create openexec.yaml for discovery and quality gates
-	yamlContent := fmt.Sprintf(`project:
-  name: %s
-  type: fullstack-webapp
-
-quality:
-  gates:
-    - lint
-`, projectName)
+	// Also create openexec.yaml for discovery and quality gates. A gate is
+	// declared only together with a command the project itself supplies.
+	yamlContent := openexecYAML(projectName, inferQualityGateCommand(projectDir))
 	yamlPath := filepath.Join(projectDir, "openexec.yaml")
 	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0644); err != nil {
 		return nil, fmt.Errorf("failed to create openexec.yaml: %w", err)

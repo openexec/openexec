@@ -105,11 +105,11 @@ retry:
 # QUALITY GATES
 # ============================================================================
 quality:
-  # Built-in gates: lint, typecheck, test, security, format
+  # No built-in gates: each name must be defined under custom
   gates:
-    - lint
-    - typecheck
-    - test
+    - go_fmt
+    - go_lint
+    - go_test
 
   # Custom gate definitions
   custom:
@@ -540,17 +540,36 @@ requires provider reauthorization. See
 
 ## Quality Gate Configuration
 
-### Built-in Gates
+### Declaring Gates
+
+There are no built-in gates. Every name under `quality.gates` must have a
+matching `quality.custom` entry with the command to run; an undefined name
+fails as `gate '<name>' not found in config`, and an `openexec.yaml` that
+declares no gate fails the `quick_fix` verify stage, because nothing was
+verified. Without any `openexec.yaml`, gates are skipped as before.
+
+`openexec init` declares a `lint` gate only when the project supplies the
+check itself:
+
+| Project | Declared command |
+|---------|------------------|
+| `go.mod` with at least one Go package | `go vet ./...` |
+| `package.json` with a `scripts.lint` entry | `npm run lint` |
+| anything else | no gate; init prints where to declare one |
 
 ```yaml
 quality:
-  gates:
-    - lint          # Uses configured linter
-    - typecheck     # Type checking (mypy, tsc, etc.)
-    - test          # Run test suite
-    - security      # Security scanning
-    - format        # Code formatting check
+  gates: [lint]
+  custom:
+    - name: lint
+      command: "go vet ./..."
+      mode: blocking
 ```
+
+These gates back the `quick_fix` blueprint's verify stage. The default
+`standard_task` blueprint's lint and test stages read
+`execution.lint_commands` and `execution.test_commands` in
+`.openexec/config.json` instead, and fail when those are empty.
 
 ### Custom Gates by Language
 
