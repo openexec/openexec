@@ -293,6 +293,15 @@ func (e *ExecutionConfig) IsLocalPreResolveEnabled() bool {
 	return *e.LocalPreResolve
 }
 
+// EffectiveExecMode returns the configured execution mode, or the daemon's
+// default "workspace-write" when none is configured. It does not validate.
+func (e *ExecutionConfig) EffectiveExecMode() string {
+	if e.ExecMode != "" {
+		return e.ExecMode
+	}
+	return "workspace-write"
+}
+
 // Initialize initializes a new OpenExec project
 func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 	// Use provided directory or current working directory

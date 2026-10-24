@@ -227,10 +227,10 @@ func New(cfg Config) (*Server, error) {
 			return 0
 		}(),
 		ExecMode: func() string {
-			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.ExecMode != "" {
-				return pc.Execution.ExecMode
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
+				return pc.Execution.EffectiveExecMode()
 			}
-			return "workspace-write"
+			return (&project.ExecutionConfig{}).EffectiveExecMode()
 		}(),
 		// The review choice saved by `openexec init` gates the native review stage.
 		ReviewEnabled: func() bool {
