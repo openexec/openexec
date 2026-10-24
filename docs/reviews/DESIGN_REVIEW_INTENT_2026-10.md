@@ -13,7 +13,7 @@ behaviour.
 
 | ID | Source | Revision / identity | Authorship as stated by the source |
 |---|---|---|---|
-| **N** | native `openexec` `origin/main` `PROJECT_INTENT.md` | commit `35e2125bca8544582d84c20c0cb5dc38a5041eea`; blob `73de905a2cf8da6652c5ef63dc772d30bc03574f`; last changed by `75e3bd87` (2026-08-22), introduced by `90569c7f` | "accepted 2026-08-22. Owner-authored through the recorded interview. The answers below are the owner's words" (lines 3-5) |
+| **N** | native `openexec` `origin/main` `PROJECT_INTENT.md` | commit `35e2125bca8544582d84c20c0cb5dc38a5041eea`; blob `73de905a2cf8da6652c5ef63dc772d30bc03574f`; last changed by `75e3bd87` (2026-08-22); first added by `00916e45`, deleted by `ffde08ee`, re-added by `90569c7f` (all 2026-08-22) | "accepted 2026-08-22. Owner-authored through the recorded interview. The answers below are the owner's words" (lines 3-5) |
 | **Q** | native `origin/main` `docs/OPENEXEC_PROJECT_INTENT_QUESTIONS.md` | same commit | interview record; "The machine organized the questions and transcribed the answers; it did not supply or polish them" (lines 5-6) |
 | **L** | owner checkout `/mnt/data1/projects/openexec/PROJECT_INTENT.md`, **uncommitted** working-tree modification | file blob `508f1df45c683a69bf78f3c097077c16f88f378f`, mtime 2026-09-05 22:50 +0300; checkout HEAD `186646ee` (ancestor of N's commit, reported "behind 68") | "updated by owner instruction on 2026-09-05 … a synthesis of the owner's adopted Professional Portfolio Stewardship goal … It is not a verbatim quote." |
 | **G** | owner checkout `GOAL.md`, **untracked** | file blob `c3afa418fe7270eff32d2cb413f176981d25926e`, same mtime | "Owner-adopted: 2026-09-05. Professional Portfolio Stewardship." |
@@ -61,7 +61,8 @@ is read as jobs below.
 
 ### What must remain true
 - **N:27-32**: "It should handle coding like senior engineers do and process is ISO 27001 compliant."
-- **L**: four bullets: per-outcome Intent/Goal/Ready/authority/route/evidence/lifecycle; the owner holds destination, values, acceptance and consequential authority; evidence determines Ready, with senior-engineering practice, tested working code, reviewable delivery and ISO 27001 retained ("this declaration is not evidence of compliance or certification"); quiet projects create no guilt or artificial urgency.
+- **L:25-35**: four bullets: per-outcome Intent/Goal/Ready/authority/route/evidence/lifecycle; the owner holds destination, values, acceptance and consequential authority, and "Machine scheduling stays within delegated authority and budgets" (L:30); evidence determines Ready, with senior-engineering practice, tested working code, reviewable delivery and ISO 27001 retained ("this declaration is not evidence of compliance or certification"); quiet projects create no guilt or artificial urgency.
+- **G:23**: "Effect and spending authority are unchanged."
 - **C Constraints**: exclusive repository membership; one authoritative ProjectOutcome; consequential effects policy-controlled.
 
 ### Non-goals
@@ -86,7 +87,7 @@ open, but it is answered only off `origin/main` (see the provenance finding).
 | U2 | Who: "whose needs may be deliberately secondary?" (Q:27-28) | not addressed | No. L names the owner's portfolio only. **Unanswered.** |
 | U3 | Experience: "do, leave, and return to" (Q:36) | "do" only | Yes (L: leave, switch, return). |
 | U4 | Experience: "Which parts should remain under owner judgment?" (Q:37) | not addressed | Yes (L: owner holds destination, values, acceptance, consequential authority; C authority interpretation). |
-| U5 | Must remain true: authority, safety, evidence, compatibility, **cost**, product boundaries (Q:44-45) | engineering practice and ISO 27001 only | Authority, evidence: yes (L). Cost/spend: C's interpretation reserves spend to the owner and bounds machine work by budgets; L names no cost boundary. Compatibility: present only in C's interpretation constraints (text truncated in the delivered context), not in L. **Not declared in either intent file: a cost boundary and a compatibility boundary.** |
+| U5 | Must remain true: authority, safety, evidence, compatibility, **cost**, product boundaries (Q:44-45) | engineering practice and ISO 27001 only | Authority, evidence: yes (L). Cost/spend: partly yes. L:30 "Machine scheduling stays within delegated authority and budgets"; G:23 "Effect and spending authority are unchanged"; C's authority interpretation reserves spend to the owner and bounds route work by a persisted NavigationBudget. The newer record therefore answers cost at least in part. Compatibility: present only in C's interpretation constraints (text truncated in the delivered context), not in L or G. **Not declared in L, G or N: a compatibility boundary.** |
 | U6 | Success: owner-observable evidence "independently of task counts, agent activity, commits, or green unit tests" (Q:58-60) | "ships tested and working code" (a delivery outcome, not an observable test) | Yes at goal level (L, C success measures). G says the ten validation conditions live in `../agent-console/docs/GOAL_V5_PROFESSIONAL_PORTFOLIO_STEWARDSHIP.md`. That file is **absent** from the local Agent Console checkout and has no history there. **The conditions' source is unverified.** |
 | U7 | Purpose: the meaning of "production quality data" (N:11) | not clarified | Superseded in L by a different purpose (see X1). Unanswered for N. |
 
