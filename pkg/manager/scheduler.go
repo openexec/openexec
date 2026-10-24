@@ -1,11 +1,12 @@
 package manager
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,9 +17,13 @@ import (
 type RunOptions struct {
 	TaskOriented bool     `json:"task_oriented,omitempty"`
 	StoryIDs     []string `json:"story_ids,omitempty"`
-	MaxParallel  int      `json:"worker_count"` // Fix mismatch: CLI sends worker_count
-	IsStudy      bool     `json:"is_study"`
-	Mode         string   `json:"mode"`
+	// TaskIDs, when non-nil, narrows the batch scheduler to exactly these
+	// existing pending tasks. A non-nil empty list is refused, never read as
+	// "all"; see CheckTaskSelection.
+	TaskIDs     []string `json:"task_ids,omitempty"`
+	MaxParallel int      `json:"worker_count"` // Fix mismatch: CLI sends worker_count
+	IsStudy     bool     `json:"is_study"`
+	Mode        string   `json:"mode"`
 	// Yield, when set, is asked before each task of a task-oriented queue
 	// starts. Answering true ends the queue there with ErrQueueYielded: the
 	// task that finished stays finished, the next one is not started and
@@ -99,8 +104,121 @@ func holdReason(t *release.Task) string {
 	return "depends on a human-in-the-loop task"
 }
 
-// ExecuteTasks runs all pending tasks in the dependency graph.
+// TaskSelectionError is a task selection the batch scheduler cannot honour.
+// It is the caller's input that is wrong, so the API answers it with 400.
+type TaskSelectionError struct{ Reason string }
+
+func (e *TaskSelectionError) Error() string { return "task selection refused: " + e.Reason }
+
+// CheckTaskSelection reports why opts.TaskIDs cannot be run as given, before
+// anything executes. A nil TaskIDs is the ordinary unscoped run and passes.
+func (m *Manager) CheckTaskSelection(opts RunOptions) error {
+	if opts.TaskIDs == nil {
+		return nil
+	}
+	rel, err := m.GetInternalReleaseManager()
+	if err != nil {
+		return err
+	}
+	_, err = selectTasks(rel, opts)
+	return err
+}
+
+// selectTasks returns the selected tasks when every one exists, is pending,
+// is auto-dispatchable and has each task and story dependency either finished
+// or also selected — otherwise the batch scheduler would skip it or wait on it
+// forever.
+func selectTasks(rel *release.Manager, opts RunOptions) ([]*release.Task, error) {
+	refuse := func(format string, a ...any) error {
+		return &TaskSelectionError{Reason: fmt.Sprintf(format, a...)}
+	}
+	if opts.TaskOriented || len(opts.StoryIDs) > 0 {
+		return nil, refuse("task_ids cannot be combined with task_oriented or story_ids")
+	}
+	if len(opts.TaskIDs) == 0 {
+		return nil, refuse("task_ids is empty; omit it to run every pending task")
+	}
+
+	finished := func(t *release.Task) bool { return t.Status == "done" || t.Status == "approved" }
+	selected := make(map[string]bool, len(opts.TaskIDs))
+	var tasks []*release.Task
+	for _, raw := range opts.TaskIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			return nil, refuse("blank task id")
+		}
+		if selected[id] {
+			return nil, refuse("duplicate task id %s", id)
+		}
+		t := rel.GetTask(id)
+		if t == nil {
+			return nil, refuse("unknown task %s; run 'openexec run' (plan) first to create it", id)
+		}
+		if t.Status != "pending" && t.Status != "" {
+			return nil, refuse("task %s is %s, not pending", id, t.Status)
+		}
+		selected[id] = true
+		tasks = append(tasks, t)
+	}
+
+	storyMap := make(map[string]*release.Story)
+	for _, s := range rel.GetStories() {
+		storyMap[s.ID] = s
+	}
+	var pending []*release.Task
+	for _, t := range rel.GetTasks() {
+		if t.Status == "pending" || t.Status == "" {
+			pending = append(pending, t)
+		}
+	}
+	_, held := filterAutoDispatchable(pending, storyMap)
+	for _, t := range held {
+		if selected[t.ID] {
+			return nil, refuse("task %s %s; the batch scheduler never auto-dispatches it", t.ID, holdReason(t))
+		}
+	}
+
+	for _, t := range tasks {
+		for _, dep := range t.DependsOn {
+			if selected[dep] {
+				continue
+			}
+			d := rel.GetTask(dep)
+			if d == nil {
+				return nil, refuse("task %s depends on %s, which does not exist", t.ID, dep)
+			}
+			if !finished(d) {
+				return nil, refuse("task %s depends on %s, which is %s and not selected", t.ID, dep, d.Status)
+			}
+		}
+		story, ok := storyMap[t.StoryID]
+		if !ok {
+			continue
+		}
+		for _, sdep := range story.DependsOn {
+			for _, st := range rel.GetTasksForStory(sdep) {
+				if !finished(st) && !selected[st.ID] {
+					return nil, refuse("task %s: story %s depends on story %s, whose task %s is %s and not selected", t.ID, story.ID, sdep, st.ID, st.Status)
+				}
+			}
+		}
+	}
+	return tasks, nil
+}
+
+// ExecuteTasks runs all pending tasks in the dependency graph, or only the
+// selected ones when opts.TaskIDs is set.
 func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
+	var selection []*release.Task
+	if opts.TaskIDs != nil {
+		rel, err := m.GetInternalReleaseManager()
+		if err != nil {
+			return err
+		}
+		if selection, err = selectTasks(rel, opts); err != nil {
+			return err
+		}
+	}
 	if opts.TaskOriented {
 		return m.executeTaskQueue(ctx, opts)
 	}
@@ -126,6 +244,9 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 		if t.Status == "pending" || t.Status == "" {
 			pending = append(pending, t)
 		}
+	}
+	if selection != nil {
+		pending = selection
 	}
 
 	if len(pending) == 0 {
