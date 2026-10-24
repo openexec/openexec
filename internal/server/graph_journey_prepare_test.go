@@ -135,12 +135,42 @@ func TestPreparedGraphJourneyWalksAfterExtractorMigration(t *testing.T) {
 // that refuses is final: it fails at once, after one read, and never turns a
 // stale or missing graph into a pass.
 func TestGraphPreparationRefusesWithoutWaiting(t *testing.T) {
+	// Refusal needs no slow migration: with refresh off the first read answers
+	// at once, so these cases build the small graph and never time extraction.
+	prepareSmall := func(t *testing.T, refresh, migrated bool) (graphjourney.Evidence, error) {
+		fixture := newGraphQueryFixture(t)
+		store, err := knowledge.NewStoreWithDB(fixture.server.StateStore.GetDB())
+		if err != nil {
+			t.Fatal(err)
+		}
+		store.SetRefreshOnRead(refresh)
+		fixture.server.KnowledgeStore = store
+		if migrated {
+			// The generation as the previous build left it: current for its extractor.
+			if _, err := fixture.server.StateStore.GetDB().Exec(`UPDATE graph_generations SET extractor_version = 'repository-graph-v2.3' WHERE status = 'current'`); err != nil {
+				t.Fatal(err)
+			}
+		}
+		daemon := httptest.NewServer(fixture.server.Mux)
+		t.Cleanup(daemon.Close)
+		return graphjourney.Prepare(t.Context(), graphjourney.Config{BaseURL: daemon.URL, Token: fixture.token}, time.Minute)
+	}
 	t.Run("stale graph the daemon will not refresh", func(t *testing.T) {
-		d := newMigratedDaemon(t)
-		d.store.SetRefreshOnRead(false)
-		prepared, err := graphjourney.Prepare(t.Context(), d.config(t, d.fixture.server.Mux), 30*d.extraction)
+		prepared, err := prepareSmall(t, false, true)
 		if err == nil || !strings.Contains(err.Error(), "answered 409 (graph_stale)") || len(prepared.Steps) != 2 {
 			t.Fatalf("prepare err = %v steps = %+v, want one explicit stale refusal", err, prepared.Steps)
+		}
+	})
+	// Near misses: the refusal comes from the stale generation and the
+	// disabled refresh together, not from the small fixture.
+	t.Run("stale graph the daemon refreshes", func(t *testing.T) {
+		if prepared, err := prepareSmall(t, true, true); err != nil {
+			t.Fatalf("prepare err = %v steps = %+v, want the refreshed graph", err, prepared.Steps)
+		}
+	})
+	t.Run("current graph with refresh off", func(t *testing.T) {
+		if prepared, err := prepareSmall(t, false, false); err != nil {
+			t.Fatalf("prepare err = %v steps = %+v, want the current graph", err, prepared.Steps)
 		}
 	})
 	t.Run("graph never built for the checkout", func(t *testing.T) {
