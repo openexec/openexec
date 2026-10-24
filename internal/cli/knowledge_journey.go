@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/openexec/openexec/internal/graphjourney"
 	"github.com/spf13/cobra"
@@ -17,6 +18,8 @@ var (
 	journeyEvidence  string
 	journeyRequery   string
 	journeyCommit    string
+	journeyPrepare   bool
+	journeyPrepareIn time.Duration
 )
 
 // knowledgeGraphJourneyCmd is the reviewed graph deploy's live acceptance
@@ -35,7 +38,12 @@ var knowledgeGraphJourneyCmd = &cobra.Command{
 		cfg := graphjourney.Config{BaseURL: journeyBaseURL, Token: token, Query: journeyQuery, WantCommit: journeyCommit}
 		var evidence graphjourney.Evidence
 		var walkErr error
-		if journeyRequery != "" {
+		if journeyPrepare && journeyRequery != "" {
+			return fmt.Errorf("--prepare and --requery are separate deploy steps")
+		}
+		if journeyPrepare {
+			evidence, walkErr = graphjourney.Prepare(cmd.Context(), cfg, journeyPrepareIn)
+		} else if journeyRequery != "" {
 			raw, err := os.ReadFile(journeyRequery)
 			if err != nil {
 				return err
@@ -102,6 +110,8 @@ func init() {
 	knowledgeGraphJourneyCmd.Flags().StringVar(&journeyQuery, "query", "Execute", "symbol search the journey starts from")
 	knowledgeGraphJourneyCmd.Flags().StringVar(&journeyEvidence, "evidence", "", "write journey evidence JSON here instead of stdout")
 	knowledgeGraphJourneyCmd.Flags().StringVar(&journeyRequery, "requery", "", "re-query the identity held in this earlier evidence file")
+	knowledgeGraphJourneyCmd.Flags().BoolVar(&journeyPrepare, "prepare", false, "only bring the daemon's graph current before the journey is walked")
+	knowledgeGraphJourneyCmd.Flags().DurationVar(&journeyPrepareIn, "prepare-within", 5*time.Minute, "how long --prepare waits for a refresh the daemon is still running")
 	knowledgeGraphJourneyCmd.Flags().StringVar(&journeyCommit, "want-commit", "", "refuse a daemon that does not report this build commit")
 	knowledgeGraphCmd.AddCommand(knowledgeGraphJourneyCmd)
 }

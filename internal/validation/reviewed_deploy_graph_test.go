@@ -42,10 +42,14 @@ cat > "$dir/bin/openexec" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = version ]; then echo "Commit: $commit" >&2; exit 0; fi
 mode=walk; out=""; want=""
-while [ \$# -gt 0 ]; do case "\$1" in --requery) mode=requery ;; --evidence) out="\$2" ;; --want-commit) want="\$2" ;; esac; shift; done
+while [ \$# -gt 0 ]; do case "\$1" in --requery) mode=requery ;; --prepare) mode=prepare ;; --evidence) out="\$2" ;; --want-commit) want="\$2" ;; esac; shift; done
 echo "\$mode \$want" >> "$STUB_STATE/journey.log"
 [ -n "\$out" ] && echo "{\"mode\":\"\$mode\",\"commit\":\"\$want\"}" > "\$out"
 [ "\$mode" = "\${STUB_FAIL_JOURNEY:-none}" ] && exit 1
+if [ "\$mode" = prepare ]; then
+  n=\$(( \$(cat "$STUB_STATE/prepares" 2>/dev/null || echo 0) + 1 )); echo "\$n" > "$STUB_STATE/prepares"
+  [ "\$n" = "\${STUB_FAIL_PREPARE_AT:-0}" ] && exit 1
+fi
 exit 0
 EOF
 chmod +x "$dir/bin/openexec"
@@ -237,18 +241,36 @@ func deployCases() []deployCase {
 					return fmt.Sprintf("deploy failed: %v", err)
 				case f.read("running") != commit || f.installedCommit() != commit:
 					return fmt.Sprintf("running=%q installed=%q, want %s", f.read("running"), f.installedCommit(), commit)
-				case f.read("journey.log") != "walk "+commit+"\nrequery "+commit:
-					return fmt.Sprintf("journey calls = %q, want walk then requery pinned to %s", f.read("journey.log"), commit)
+				case f.read("journey.log") != "prepare "+commit+"\nwalk "+commit+"\nprepare "+commit+"\nrequery "+commit:
+					return fmt.Sprintf("journey calls = %q, want prepare, walk, prepare, requery pinned to %s", f.read("journey.log"), commit)
 				case f.read("restarts") != "2":
 					return fmt.Sprintf("restarts = %s, want deploy plus reload", f.read("restarts"))
 				}
 				evidence, _ := filepath.Glob(filepath.Join(f.home, ".agent-console", "deploy-evidence", "openexec-graph", commit+"-*", "*.json"))
-				if len(evidence) != 2 {
+				if len(evidence) != 4 {
 					return fmt.Sprintf("evidence files = %v", evidence)
 				}
 				return ""
 			},
-			mutations: []mutation{{"journey is pinned to the installed commit", `--want-commit "$commit" `, ``, 2}},
+			mutations: []mutation{
+				{"journey is pinned to the installed commit", `--want-commit "$commit" `, ``, 4},
+				// The old ordering: the walk's first context read pays for the
+				// extractor migration inside its 30s request deadline.
+				{"graph is prepared before the walk", `--prepare --prepare-within "$prepare_within" --evidence "$evidence_dir/prepare.json"`, `--evidence "$evidence_dir/prepare.json"`, 1},
+				{"graph is prepared before the re-query", `--prepare --prepare-within "$prepare_within" --evidence "$evidence_dir/prepare-after-reload.json"`, `--evidence "$evidence_dir/prepare-after-reload.json"`, 1},
+			},
+		},
+		{
+			name: "rolls back when graph preparation is refused", withPrevious: true,
+			setup:     env("STUB_FAIL_PREPARE_AT=1"),
+			check:     rolledBack("graph preparation failed against " + deployUnit),
+			mutations: []mutation{neutralize("preparation guard", "graph preparation failed against $unit")},
+		},
+		{
+			name: "rolls back when graph preparation after reload is refused", withPrevious: true,
+			setup:     env("STUB_FAIL_PREPARE_AT=2"),
+			check:     rolledBack("graph preparation after reload failed against " + deployUnit),
+			mutations: []mutation{neutralize("reload preparation guard", "graph preparation after reload failed against $unit")},
 		},
 		{
 			name: "refuses outside its server-minted worktree", withPrevious: true,

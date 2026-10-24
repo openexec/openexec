@@ -92,10 +92,14 @@ func (s *Store) freshGeneration(ctx context.Context, identity RepositoryIdentity
 		state.Freshness = FreshnessStale
 		return GraphGeneration{}, state, &StaleGraphError{State: state, Cause: manifestErr}
 	}
-	if generation.ExtractorVersion == ExtractorVersion &&
-		generation.ManifestHash == manifest.ManifestHash &&
-		generation.ConfigurationDigest == manifest.ConfigurationDigest &&
-		generation.Status != GraphStale && generation.Status != GraphSuperseded {
+	inputsDrifted := generation.ManifestHash != manifest.ManifestHash ||
+		generation.ConfigurationDigest != manifest.ConfigurationDigest
+	// Only a promoted generation answers. With no current one the newest of
+	// any status is active, and a failed or abandoned build carries the very
+	// manifest it was cancelled on — answering from it served a cancelled
+	// extraction as the graph.
+	answerable := generation.Status == GraphCurrent || generation.Status == GraphPartial
+	if generation.ExtractorVersion == ExtractorVersion && !inputsDrifted && answerable {
 		return generation, state, nil
 	}
 	// Checked before the status write below: a non-refreshing reader must be
@@ -104,10 +108,21 @@ func (s *Store) freshGeneration(ctx context.Context, identity RepositoryIdentity
 		state.Freshness = FreshnessStale
 		return GraphGeneration{}, state, &StaleGraphError{State: state, Cause: errRefreshDisabled}
 	}
-	if generation.Status == GraphCurrent {
+	// Only drifted inputs make a generation stale for every reader. An
+	// extractor mismatch is this build's view alone: the generation is still
+	// current for the extractor that built it, and a rolled-back build reads
+	// it again. Labelling it stale made the restored build rescan too.
+	if generation.Status == GraphCurrent && inputsDrifted {
 		_, _ = s.db.ExecContext(ctx, `UPDATE graph_generations SET status = 'stale' WHERE id = ? AND status = 'current'`, generation.ID)
 	}
-	refresh, refreshErr := s.refreshRepository(ctx, identity.RootPath)
+	// The repair outlives the reader that started it. A full extraction can
+	// take longer than a caller's deadline — an extractor migration of this
+	// repository measured ~45s against the deploy journey's 30s client — and
+	// cancelling it discards the whole generation, so every later reader
+	// starts it again and none finishes. Correctness does not rest on the
+	// caller: the build revalidates its manifest and promotes atomically.
+	refreshCtx := context.WithoutCancel(ctx)
+	refresh, refreshErr := s.refreshRepository(refreshCtx, identity.RootPath)
 	if refreshErr != nil {
 		state.Freshness = FreshnessStale
 		return GraphGeneration{}, state, &StaleGraphError{State: state, Cause: refreshErr}
@@ -116,12 +131,12 @@ func (s *Store) freshGeneration(ctx context.Context, identity RepositoryIdentity
 		// A stale status with identical bytes still needs a promoted generation;
 		// returning it would make the label rather than the read-time check the
 		// authority. A full scan creates that generation atomically.
-		if _, scanErr := s.scanRepository(ctx, identity.RootPath, nil); scanErr != nil {
+		if _, scanErr := s.scanRepository(refreshCtx, identity.RootPath, nil); scanErr != nil {
 			state.Freshness = FreshnessStale
 			return GraphGeneration{}, state, &StaleGraphError{State: state, Cause: scanErr}
 		}
 	}
-	generation, err = s.activeGeneration(ctx, identity.WorktreeID)
+	generation, err = s.activeGeneration(refreshCtx, identity.WorktreeID)
 	if err == sql.ErrNoRows {
 		missing := missingGraph(identity)
 		return GraphGeneration{}, missing.State, missing

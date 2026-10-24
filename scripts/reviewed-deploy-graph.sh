@@ -5,7 +5,9 @@
 # refuses unauthenticated reads, walks the Explore journey (search → explicit
 # selection → both call directions → impact → source, plus bearer, checkout,
 # fabricated-symbol, direction and bound refusals), and after a second restart
-# re-reads the held identity. Both journey files record the commit the daemon
+# re-reads the held identity. Before each walk the daemon is asked to bring its
+# graph current: a build whose extractor changed re-extracts the repository on
+# its first read, which outlasts the journey's 30s request deadline. Both journey files record the commit the daemon
 # reported and each answer it gave (source bodies as digests only). Any failure — including a failed restart —
 # restores the previous binary. The journey evidence is kept per deploy.
 #
@@ -21,6 +23,8 @@ binary_path="$HOME/.local/bin/openexec"
 unit="openexec-graph.service"
 base_url="http://127.0.0.1:8765"
 wait_seconds=60
+# Bounds graph preparation only; every journey request keeps its own deadline.
+prepare_within=5m
 # The daemon's own EnvironmentFile: the journey authenticates as Console does.
 token_file="$HOME/.agent-console/openexec-evidence.env"
 journey_query="Execute"
@@ -31,6 +35,7 @@ while [ $# -gt 0 ]; do
     --unit) unit="$2"; shift 2 ;;
     --base-url) base_url="$2"; shift 2 ;;
     --wait-seconds) wait_seconds="$2"; shift 2 ;;
+    --prepare-within) prepare_within="$2"; shift 2 ;;
     --token-file) token_file="$2"; shift 2 ;;
     --journey-query) journey_query="$2"; shift 2 ;;
     --evidence-root) evidence_root="$2"; shift 2 ;;
@@ -140,6 +145,10 @@ if [ "$status" != "401" ]; then
 fi
 
 if ! "$built" knowledge graph journey --base-url "$base_url" --token-file "$token_file" \
+  --want-commit "$commit" --prepare --prepare-within "$prepare_within" --evidence "$evidence_dir/prepare.json"; then
+  rollback "graph preparation failed against $unit"
+fi
+if ! "$built" knowledge graph journey --base-url "$base_url" --token-file "$token_file" \
   --want-commit "$commit" --query "$journey_query" --evidence "$evidence_dir/journey.json"; then
   rollback "live Explore journey failed against $unit"
 fi
@@ -149,6 +158,10 @@ if ! systemctl --user restart "$unit"; then
 fi
 if ! wait_for_commit "$commit"; then
   rollback "$unit did not come back on commit $commit after reload"
+fi
+if ! "$built" knowledge graph journey --base-url "$base_url" --token-file "$token_file" \
+  --want-commit "$commit" --prepare --prepare-within "$prepare_within" --evidence "$evidence_dir/prepare-after-reload.json"; then
+  rollback "graph preparation after reload failed against $unit"
 fi
 if ! "$built" knowledge graph journey --base-url "$base_url" --token-file "$token_file" \
   --want-commit "$commit" --requery "$evidence_dir/journey.json" --evidence "$evidence_dir/requery.json"; then
