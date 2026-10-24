@@ -31,13 +31,18 @@ func (a *RunGatesAction) Execute(ctx context.Context, req ActionRequest) (Action
 	report := runner.RunAll(ctx)
 
 	status := types.StageStatusCompleted
+	failure := strings.Join(report.FailedGates, ", ")
 	if !report.Passed {
 		status = types.StageStatusFailed
+		if failure == "" {
+			// A refusal with no failed gate, e.g. none declared.
+			failure = report.Summary
+		}
 	}
 
 	return ActionResponse{
 		Status: status,
 		Output: report.Summary,
-		Error:  strings.Join(report.FailedGates, ", "),
+		Error:  failure,
 	}, nil
 }

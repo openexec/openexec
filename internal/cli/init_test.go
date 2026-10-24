@@ -54,6 +54,11 @@ func TestInitCmd(t *testing.T) {
 	if !strings.Contains(b.String(), "Project initialized successfully") {
 		t.Errorf("unexpected output: %s", b.String())
 	}
+	// A README-only repository declares no check: init says so instead of
+	// writing a gate it cannot run.
+	if !strings.Contains(b.String(), "Quality gate: none inferred") || !strings.Contains(b.String(), "quality.custom") {
+		t.Errorf("init did not report the missing quality gate: %s", b.String())
+	}
 
 	// Verify files created
 	if _, err := os.Stat(filepath.Join(tmpDir, ".openexec", "config.json")); err != nil {
@@ -180,5 +185,28 @@ func TestInitCmd_NoReviewFlag(t *testing.T) {
 	}
 	if cfg.Execution.ReviewEnabled {
 		t.Fatal("--no-review should disable review in non-interactive init")
+	}
+}
+
+func TestInitCmd_ReportsInferredQualityGate(t *testing.T) {
+	tmpDir := t.TempDir()
+	runGit(t, tmpDir, "init")
+	for name, body := range map[string]string{"go.mod": "module example.com/m\n\ngo 1.21\n", "m.go": "package m\n"} {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	oldCwd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldCwd)
+
+	b := bytes.NewBufferString("")
+	rootCmd.SetOut(b)
+	rootCmd.SetArgs([]string{"init", "go-project", "-y"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if !strings.Contains(b.String(), `Quality gate: lint runs "go vet ./..."`) || strings.Contains(b.String(), "none inferred") {
+		t.Errorf("init did not report the inferred gate: %s", b.String())
 	}
 }

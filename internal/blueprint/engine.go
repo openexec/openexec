@@ -156,7 +156,7 @@ var DefaultBlueprint = &Blueprint{
 			Description: "Run linting checks",
 			Type:        types.StageTypeDeterministic,
 			Toolset:     "coding_backend",
-			Commands:    nil, // Set from project config; empty = auto-pass
+			Commands:    nil, // Set from project config; empty fails the stage
 			OnSuccess:   "test",
 			OnFailure:   "fix_lint",
 		},
@@ -173,7 +173,7 @@ var DefaultBlueprint = &Blueprint{
 			Description: "Run tests",
 			Type:        types.StageTypeDeterministic,
 			Toolset:     "coding_backend",
-			Commands:    nil, // Set from project config; empty = auto-pass
+			Commands:    nil, // Set from project config; empty fails the stage
 			OnSuccess:   "production_readiness_check",
 			OnFailure:   "fix_tests",
 		},

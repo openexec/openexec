@@ -14,6 +14,7 @@ import (
 type GateResult struct {
 	artifacts    map[string]string
 	verifiedExit bool          // Set only by the local command runner, never report JSON.
+	undefined    bool          // Declared in quality.gates with no quality.custom entry.
 	Name         string        `json:"name"`
 	Passed       bool          `json:"passed"`
 	Output       string        `json:"output"`
@@ -32,6 +33,9 @@ type GateReport struct {
 	FailedGates []string      `json:"failed_gates,omitempty"`
 	Summary     string        `json:"summary"`
 }
+
+// NoGatesDeclared is the refusal for an openexec.yaml that declares no gate.
+const NoGatesDeclared = "No quality gates declared in openexec.yaml, so nothing was verified: list a gate under quality.gates and define its command under quality.custom"
 
 // Runner executes quality gates.
 type Runner struct {
@@ -72,7 +76,9 @@ func (r *Runner) RunAll(ctx context.Context) *GateReport {
 
 	enabledGates := r.config.GetEnabledGates()
 	if len(enabledGates) == 0 {
-		report.Summary = "No gates configured"
+		// An empty report verified nothing, so it cannot be a pass.
+		report.Passed = false
+		report.Summary = NoGatesDeclared
 		return report
 	}
 
@@ -109,7 +115,9 @@ func (r *Runner) RunGate(ctx context.Context, name string) GateResult {
 	gate := r.config.GetGate(name)
 	if gate == nil {
 		result.Passed = false
+		result.undefined = true
 		result.Error = fmt.Sprintf("gate '%s' not found in config", name)
+		result.FixHint = fmt.Sprintf("Gates resolve only through quality.custom in openexec.yaml: add an entry with name: %s and the command that checks this project, or remove %s from quality.gates.", name, name)
 		return result
 	}
 
@@ -210,7 +218,18 @@ func (r *Runner) generateSummary(report *GateReport) string {
 		return fmt.Sprintf("✓ All %d gates passed", total)
 	}
 
-	return fmt.Sprintf("✗ %d/%d gates failed: %s", failed, total, strings.Join(report.FailedGates, ", "))
+	summary := fmt.Sprintf("✗ %d/%d gates failed: %s", failed, total, strings.Join(report.FailedGates, ", "))
+	var undefined []string
+	for _, res := range report.Results {
+		if res.undefined {
+			undefined = append(undefined, res.Name)
+		}
+	}
+	if len(undefined) > 0 {
+		// These never ran: say so rather than let them read as failed checks.
+		summary += fmt.Sprintf(" (not defined under quality.custom in openexec.yaml: %s)", strings.Join(undefined, ", "))
+	}
+	return summary
 }
 
 // generateFixHint provides guidance on how to fix a failed gate.
