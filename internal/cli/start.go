@@ -86,6 +86,10 @@ var (
 	runVerify        string
 	runMode          string
 
+	// runUpdateCheck is the run command's update check; tests replace it to
+	// observe that a refused invocation never reaches it.
+	runUpdateCheck = checkForUpdate
+
 	// Blueprint command flags
 	blueprintID      string
 	blueprintClarify bool
@@ -234,10 +238,20 @@ The CLI is a thin client that triggers and monitors server-side execution.
 Examples:
   openexec run             # Execute all pending tasks
   openexec run T-001       # Execute specific task
-  openexec run --quickfix "Fix typo" --verify "make test"`,
+
+For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<description>"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// --quickfix and --verify were never wired to the daemon: honouring them
+		// silently ran the whole pending plan and dropped the verification.
+		// Refuse before any update check, daemon start, plan or execute.
+		for _, name := range []string{"quickfix", "verify"} {
+			if cmd.Flags().Changed(name) {
+				return fmt.Errorf("run --%s is not supported: it would start the full plan-and-execute run instead of a focused fix; use 'openexec blueprint --blueprint-id quick_fix \"<description>\"' (it verifies with the project's configured quality gates)", name)
+			}
+		}
+
 		// Check for updates in background
-		go checkForUpdate()
+		go runUpdateCheck()
 
 		config, err := project.LoadProjectConfig(".")
 		if err != nil {
@@ -861,8 +875,8 @@ func init() {
 	runCmd.Flags().IntVar(&runTimeout, "timeout", 1800, "Timeout")
 	runCmd.Flags().BoolVarP(&runVerbose, "verbose", "v", false, "Verbose logs")
 	runCmd.Flags().BoolVar(&runNoAutoPlan, "no-auto-plan", false, "Disable automatic planning")
-	runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Execute a single deterministic quickfix without planning (task title)")
-	runCmd.Flags().StringVar(&runVerify, "verify", "", "Verification script for --quickfix (defaults to echo quickfix-verify)")
+	runCmd.Flags().StringVar(&runQuickfix, "quickfix", "", "Unsupported; refused. Use 'openexec blueprint --blueprint-id quick_fix'")
+	runCmd.Flags().StringVar(&runVerify, "verify", "", "Unsupported; refused. quick_fix verifies with the project's quality gates")
 	runCmd.Flags().StringVar(&runMode, "mode", "danger-full-access", "Execution mode: read-only | workspace-write | danger-full-access")
 
 	blueprintCmd.Flags().IntVar(&startPort, "port", 8765, "Execution engine port")
