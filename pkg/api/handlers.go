@@ -3,7 +3,9 @@ package api
 import (
     "context"
     "encoding/json"
+    "errors"
     "fmt"
+    "io"
     "log"
     "net/http"
     "strconv"
@@ -55,9 +57,33 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 
 // handleExecuteRuns triggers the orchestration of multiple tasks on the server.
 func (s *Server) handleExecuteRuns(w http.ResponseWriter, r *http.Request) {
-	var req manager.RunOptions
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	var req manager.RunOptions
+	var present struct {
+		TaskIDs json.RawMessage `json:"task_ids"`
+	}
+	if json.Unmarshal(raw, &req) != nil || json.Unmarshal(raw, &present) != nil {
+		WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	// A task_ids field that is present but null still asks for a selection;
+	// it must be refused as empty, not read as "run everything".
+	if present.TaskIDs != nil && req.TaskIDs == nil {
+		req.TaskIDs = []string{}
+	}
+	// Refuse an unusable selection here: the run below starts in the
+	// background after 202, where an error only reaches the log.
+	if err := s.Mgr.CheckTaskSelection(req); err != nil {
+		var sel *manager.TaskSelectionError
+		if errors.As(err, &sel) {
+			WriteError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
