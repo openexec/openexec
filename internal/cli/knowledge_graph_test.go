@@ -99,6 +99,116 @@ func TestKnowledgeGraphImpactFilesJSONUsesBatchResponse(t *testing.T) {
 	}
 }
 
+// Deterministic disposable fixture (no provider): the public dependencies
+// command must disclose a clamped depth and an edge-limit cut in both JSON and
+// text output, and must not flag a graph that fits the limits exactly.
+func TestKnowledgeGraphDependenciesDisclosesDepthAndEdgeCuts(t *testing.T) {
+	root := t.TempDir()
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("leaf.ts", "export function leaf(): number { return 1 }\n")
+	write("mid.ts", "import { leaf } from './leaf'\nexport const mid = () => leaf()\n")
+	write("top.ts", "import { mid } from './mid'\nexport const top = () => mid()\n")
+	store, err := knowledge.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ScanRepository(t.Context(), root); err != nil {
+		_ = store.Close()
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	previousDirectory, previousJSON := graphDirectory, graphJSON
+	previousDepth, previousReverse := graphDepth, graphReverse
+	previousOut, previousErr := rootCmd.OutOrStdout(), rootCmd.ErrOrStderr()
+	t.Cleanup(func() {
+		graphDirectory, graphJSON = previousDirectory, previousJSON
+		graphDepth, graphReverse = previousDepth, previousReverse
+		rootCmd.SetOut(previousOut)
+		rootCmd.SetErr(previousErr)
+		rootCmd.SetArgs(nil)
+	})
+	var output bytes.Buffer
+	rootCmd.SetOut(&output)
+	rootCmd.SetErr(&output)
+	runJSON := func(depth string) knowledge.QueryEnvelope[knowledge.ModuleDependencyResult] {
+		t.Helper()
+		output.Reset()
+		graphJSON = false
+		rootCmd.SetArgs([]string{"knowledge", "graph", "dependencies", "top.ts", "--directory", root, "--depth", depth, "--json"})
+		if err := rootCmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		var result knowledge.QueryEnvelope[knowledge.ModuleDependencyResult]
+		if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+			t.Fatalf("decode dependencies output: %v\n%s", err, output.String())
+		}
+		return result
+	}
+	runText := func(depth string) string {
+		t.Helper()
+		output.Reset()
+		graphJSON = false
+		rootCmd.SetArgs([]string{"knowledge", "graph", "dependencies", "top.ts", "--directory", root, "--depth", depth})
+		if err := rootCmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		return output.String()
+	}
+	depthNote := "requested depth 99 exceeds the traversal limit 2; traversal bounded to depth 2"
+
+	clamped := runJSON("99")
+	if !clamped.Truncated || !strings.Contains(strings.Join(clamped.Limitations, "\n"), depthNote) {
+		t.Fatalf("--depth 99 JSON = truncated %t, limitations %q; want depth note and truncated", clamped.Truncated, clamped.Limitations)
+	}
+	if len(clamped.Result.Edges) != 2 || len(clamped.Result.Nodes) != 2 {
+		t.Fatalf("--depth 99 should return the depth-2 reach, got %d edges %d nodes", len(clamped.Result.Edges), len(clamped.Result.Nodes))
+	}
+	if text := runText("99"); !strings.Contains(text, "result truncated by graph limits") {
+		t.Fatalf("--depth 99 text output hid the depth cut:\n%s", text)
+	}
+	atLimit := runJSON("2")
+	if atLimit.Truncated || strings.Contains(strings.Join(atLimit.Limitations, "\n"), "exceeds the traversal limit") {
+		t.Fatalf("--depth 2 JSON = truncated %t, limitations %q; want complete", atLimit.Truncated, atLimit.Limitations)
+	}
+	if text := runText("2"); strings.Contains(text, "result truncated") {
+		t.Fatalf("--depth 2 text output reported a cut on a complete graph:\n%s", text)
+	}
+
+	// The CLI uses the default edge limit; one file with exactly that many
+	// import statements is complete, one more import is a disclosed cut. The
+	// imports share 100 packages so the default node limit is not reached.
+	maxEdges := knowledge.DefaultGraphLimits().MaxEdges
+	importing := func(count int) string {
+		var source strings.Builder
+		for index := 0; index < count; index++ {
+			source.WriteString(fmt.Sprintf("import p%d from 'pkg-%03d'\n", index, index%100))
+		}
+		source.WriteString("export const top = () => 1\n")
+		return source.String()
+	}
+	write("top.ts", importing(maxEdges))
+	exact := runJSON("1")
+	if exact.Truncated || len(exact.Result.Edges) != maxEdges || len(exact.Result.Nodes) != 100 {
+		t.Fatalf("exactly %d imports = truncated %t, %d edges; want complete", maxEdges, exact.Truncated, len(exact.Result.Edges))
+	}
+	write("top.ts", importing(maxEdges+1))
+	over := runJSON("1")
+	if !over.Truncated || len(over.Result.Edges) != maxEdges {
+		t.Fatalf("%d imports = truncated %t, %d edges; want truncated at %d", maxEdges+1, over.Truncated, len(over.Result.Edges), maxEdges)
+	}
+	if text := runText("1"); !strings.Contains(text, "result truncated by graph limits") {
+		t.Fatalf("edge-limit cut hidden in text output:\n%s", text)
+	}
+}
+
 func TestKnowledgeGraphCallsDirections(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc Target() {}\nfunc Caller() { Target() }\n"), 0o644); err != nil {
