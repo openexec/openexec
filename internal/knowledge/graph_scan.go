@@ -899,7 +899,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 	for _, file := range files {
 		from := moduleNodes[file.Path]
 		for _, imp := range file.Imports {
-			to, resolution := resolveImportNode(generation.ID, file, imp.Target, moduleNodes)
+			to, resolution := resolveImportNode(file, imp, moduleNodes)
 			if to == "" {
 				to = externalNodes[imp.Target]
 				if to == "" {
@@ -919,7 +919,7 @@ func (s *Store) storeExtractedGraph(ctx context.Context, identity RepositoryIden
 				edgeCount++
 			}
 			if isTestFile(file.Path) && moduleNodesByID(moduleNodes, to) {
-				inserted, err := insertEdge(ctx, tx, generation.ID, to, from, "tested_by", resolution, file.Path, imp.StartByte, imp.EndByte, map[string]string{"reason": "test module imports module", "test_file": file.Path})
+				inserted, err := insertEdge(ctx, tx, generation.ID, to, from, "tested_by", derivedTestResolution(resolution), file.Path, imp.StartByte, imp.EndByte, map[string]string{"reason": "test module imports module", "test_file": file.Path})
 				if err != nil {
 					return 0, 0, 0, err
 				}
@@ -1247,9 +1247,19 @@ func insertEdge(ctx context.Context, tx *sql.Tx, generationID, from, to, edgeTyp
 	return inserted == 1, err
 }
 
-func resolveImportNode(generationID string, file ExtractedFile, target string, modules map[string]string) (string, ResolutionStatus) {
+// resolveImportNode finds the module an import names. Matching a module path
+// proves the file exists, not how the import was resolved, so the edge keeps
+// the import's own evidence: the TypeScript compiler's imports stay exact, the
+// Python extractor's lexical path guesses stay lexical. A label that claims
+// nothing (empty, or unresolved as stored by an earlier generation) is a
+// lexical path match.
+func resolveImportNode(file ExtractedFile, imp ExtractedImport, modules map[string]string) (string, ResolutionStatus) {
+	target := imp.Target
 	if node := modules[target]; node != "" {
-		return node, ResolutionCompilerExact
+		if imp.Resolution == "" || imp.Resolution == ResolutionUnresolved {
+			return node, ResolutionStaticLexical
+		}
+		return node, imp.Resolution
 	}
 	if strings.HasPrefix(target, ".") {
 		base := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(file.Path), target)))
@@ -1260,6 +1270,20 @@ func resolveImportNode(generationID string, file ExtractedFile, target string, m
 		}
 	}
 	return "", ResolutionUnresolved
+}
+
+// derivedTestResolution grades a tested_by edge derived from a test module's
+// import. Which modules are tests is a path convention, not a compiler fact,
+// so the edge is at most configuration_derived — like the shared-package
+// tested_by edge — and never stronger than the import it came from.
+func derivedTestResolution(importResolution ResolutionStatus) ResolutionStatus {
+	switch importResolution {
+	case ResolutionCompilerExact, ResolutionASTExact:
+		return ResolutionConfigurationDerived
+	case "":
+		return ResolutionStaticLexical
+	}
+	return importResolution
 }
 
 func isExportedIdentifier(name string) bool {
