@@ -125,7 +125,11 @@ func (s *Store) refreshRepository(ctx context.Context, root string) (RefreshResu
 	// A partial generation omitted source. Carrying its extracted files into a
 	// later generation could silently turn missing coverage into "current".
 	// Only a full extraction may clear partial status.
-	if previousGeneration.Status == GraphPartial {
+	// The same holds for a build that never completed: a failed, abandoned or
+	// inconsistent generation may hold only some of its files.
+	switch previousGeneration.Status {
+	case GraphCurrent, GraphStale, GraphSuperseded:
+	default:
 		plan.Scope, plan.FullScan = InvalidationRepository, true
 	}
 	if previousManifest.ManifestHash == currentManifest.ManifestHash && !plan.FullScan {

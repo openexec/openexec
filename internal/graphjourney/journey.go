@@ -10,8 +10,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -227,6 +229,49 @@ func Requery(ctx context.Context, cfg Config, prior Evidence) (Evidence, error) 
 		return *ev, fmt.Errorf("requery source changed under unchanged graph version %s", ev.GraphVersion)
 	}
 	return *ev, nil
+}
+
+// Prepare brings the daemon's graph current before the journey is judged.
+// A new build whose extractor changed must re-extract the whole repository on
+// its first read, which can outlast the journey's per-request deadline. The
+// daemon keeps that refresh running when a reader gives up, so Prepare asks
+// again with the same client until the context read answers or budget runs
+// out. Only a request that timed out is asked again: an answer that refuses —
+// stale, missing, unauthorized or anything but a current 200 — fails at once.
+func Prepare(ctx context.Context, cfg Config, budget time.Duration) (Evidence, error) {
+	w, err := newWalker(cfg)
+	if err != nil {
+		return Evidence{}, err
+	}
+	ev := w.evidence
+	if err := w.identify(ctx); err != nil {
+		return *ev, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	for {
+		var projection struct {
+			CheckoutID   string `json:"checkout_id"`
+			GraphVersion string `json:"graph_version"`
+			Freshness    string `json:"freshness"`
+		}
+		status, err := w.get(ctx, "prepare repository context", "/api/v1/repository-context", "", cfg.Token, 0, &projection)
+		var netErr net.Error
+		switch {
+		case err != nil && ctx.Err() == nil && errors.As(err, &netErr) && netErr.Timeout():
+			continue
+		case err != nil && ctx.Err() != nil:
+			return *ev, fmt.Errorf("prepare repository context: graph not current within %s: %w", budget, err)
+		case err != nil:
+			return *ev, err
+		case status != http.StatusOK:
+			return *ev, fmt.Errorf("prepare repository context: answered %d (%s), want a current 200", status, ev.Steps[len(ev.Steps)-1].Reason)
+		case projection.CheckoutID == "" || projection.GraphVersion == "" || projection.Freshness != "current":
+			return *ev, fmt.Errorf("prepare repository context: answered checkout %q generation %q freshness %q, want a current generation", projection.CheckoutID, projection.GraphVersion, projection.Freshness)
+		}
+		ev.CheckoutID, ev.GraphVersion = projection.CheckoutID, projection.GraphVersion
+		return *ev, nil
+	}
 }
 
 func newWalker(cfg Config) (*walker, error) {
