@@ -584,3 +584,5 @@ Each keeps its dependency on the step before it. Step 4 will face the same
 absence of a layer-3 document that I0 records for layer 2, since native
 OpenExec's owner surface is a CLI and daemon API rather than screens; this
 report does not decide how step 4 handles that.
+
+Consolidated, re-checked at `131b9ce8`: [DESIGN_REVIEW_CONSOLIDATED_2026-10.md](DESIGN_REVIEW_CONSOLIDATED_2026-10.md).
