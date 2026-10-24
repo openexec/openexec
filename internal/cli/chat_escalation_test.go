@@ -40,7 +40,8 @@ mkdir -p "$out"
 {
 	printf 'stage=%s\nmode=%s\nskip_permissions=%s\ncwd=%s\n' "$stage" "$OPENEXEC_MODE" "$skip" "$(pwd -P)"
 	printf '%s\n' "$*"
-} > "$out/$stage-$$.txt"
+} > "$out/.$stage-$$.tmp"
+mv "$out/.$stage-$$.tmp" "$out/$stage-$$.txt"
 if [ "$stage" = "implement" ] && [ -f "$(pwd -P)/.openexec/fixture-block" ]; then
 	exec sleep 60
 fi
