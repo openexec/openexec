@@ -232,6 +232,19 @@ func New(cfg Config) (*Server, error) {
 			}
 			return "workspace-write"
 		}(),
+		// The review choice saved by `openexec init` gates the native review stage.
+		ReviewEnabled: func() bool {
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
+				return pc.Execution.ReviewEnabled
+			}
+			return false
+		}(),
+		ReviewerModel: func() string {
+			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil {
+				return pc.Execution.ReviewerModel
+			}
+			return ""
+		}(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("manager initialization failed: %w", err)
