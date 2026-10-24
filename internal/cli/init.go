@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/openexec/openexec/internal/execution/gates"
 	"github.com/openexec/openexec/internal/git"
 	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/templates"
@@ -242,6 +243,13 @@ The project name defaults to the current directory name if not provided.`,
 		cmd.Printf("\n✓ Project initialized successfully\n")
 		cmd.Printf("  Project name: %s\n", cfg.Name)
 		cmd.Printf("  Local configuration: %s/.openexec/config.json\n", cfg.ProjectDir)
+		if gateCfg, err := gates.LoadConfig(cfg.ProjectDir); err == nil {
+			if declared := gateCfg.GetEnabledGates(); len(declared) == 0 {
+				cmd.Printf("  Quality gate: none inferred for this project; quick_fix verification refuses until openexec.yaml declares one under quality.custom (standard_task reads execution.lint_commands/test_commands)\n")
+			} else if gate := gateCfg.GetGate(declared[0]); gate != nil {
+				cmd.Printf("  Quality gate: %s runs %q (openexec.yaml)\n", gate.Name, gate.Command)
+			}
+		}
 		cmd.Printf("\nNext steps:\n")
 		cmd.Printf("  1. Run 'openexec wizard' to define your project requirements\n")
 		cmd.Printf("  2. Run 'openexec plan INTENT.md' to generate stories\n")

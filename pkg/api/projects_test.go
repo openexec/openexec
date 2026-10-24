@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/openexec/openexec/internal/execution/gates"
 )
 
 func TestHandleListProjects(t *testing.T) {
@@ -71,5 +73,20 @@ func TestHandleInitProject(t *testing.T) {
 	// Verify filesystem
 	if _, err := os.Stat(filepath.Join(tmpDir, "new-app", "openexec.yaml")); os.IsNotExist(err) {
 		t.Error("openexec.yaml was not created")
+	}
+	// The empty project created over the API declares no gate it cannot run,
+	// and its persisted openexec.yaml still lists as a project.
+	cfg, err := gates.LoadConfig(filepath.Join(tmpDir, "new-app"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.GetEnabledGates()) != 0 || cfg.Project.Name != "new-app" {
+		t.Fatalf("API-created project declared %v (name %q)", cfg.GetEnabledGates(), cfg.Project.Name)
+	}
+	list := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(list, httptest.NewRequest("GET", "/api/projects", nil))
+	var projects []ProjectInfo
+	if err := json.Unmarshal(list.Body.Bytes(), &projects); err != nil || len(projects) != 1 || projects[0].Name != "new-app" {
+		t.Fatalf("created project not listed: %s %v", list.Body.String(), err)
 	}
 }
