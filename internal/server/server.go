@@ -151,7 +151,16 @@ func New(cfg Config) (*Server, error) {
 
 	// Legacy adapters for backward compatibility during transition
 	db := stateStore.GetDB()
-	auditLogger, _ := audit.NewLoggerWithDB(db)
+	// The daemon's run and stage audit records share the state DB. Audit is
+	// non-critical (degraded mode is allowed), but a failed logger must stay a
+	// nil interface so the audit_db preflight reports the degradation instead
+	// of a typed-nil logger posing as active.
+	var auditLogger audit.Logger
+	if l, err := audit.NewLoggerWithDB(db); err != nil {
+		log.Printf("[Server] ⚠ Audit logging degraded: failed to init audit logger: %v", err)
+	} else {
+		auditLogger = l
+	}
 	sessionRepo, _ := session.NewSQLiteRepository(db)
 
 	// 2. Initialize Core Engine
@@ -225,6 +234,7 @@ func New(cfg Config) (*Server, error) {
 		CommandName: loopCmd,
 		CommandArgs: loopArgs,
 		StateStore:  stateStore,
+		AuditLogger: auditLogger,
 		TaskTimeout: func() time.Duration {
 			if pc, _ := project.LoadProjectConfig(cfg.ProjectsDir); pc != nil && pc.Execution.TimeoutSeconds > 0 {
 				return time.Duration(pc.Execution.TimeoutSeconds) * time.Second
