@@ -646,6 +646,11 @@ func (m *Manager) CreateTask(task *Task) error {
 	if task.Status == "" {
 		task.Status = TaskStatusPending
 	}
+	// The schema's default, as planner and backlog imports set it: the task
+	// queue never runs a task with no attempts.
+	if task.MaxAttempts == 0 {
+		task.MaxAttempts = 3
+	}
 
 	// Initialize git info if enabled
 	if m.config.GitEnabled {

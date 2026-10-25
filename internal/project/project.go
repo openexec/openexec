@@ -144,7 +144,9 @@ type ExecutionConfig struct {
 	ReviewEnabled bool `json:"review_enabled"`
 	// ReviewerModel is the model to use for code review
 	ReviewerModel string `json:"reviewer_model,omitempty"`
-	// WorkerCount is the number of concurrent workers for parallel execution
+	// WorkerCount is the number of concurrent workers for parallel execution.
+	// `openexec run` uses the task queue, which runs one task at a time and
+	// repairs failed checks; it reports a larger value instead of using it.
 	WorkerCount int `json:"worker_count,omitempty"`
 	// TimeoutSeconds sets the default per-task timeout used by run/start when flags are not provided.
 	TimeoutSeconds int `json:"timeout_seconds,omitempty"`

@@ -169,6 +169,10 @@ API mode enables true multi-agent parallel execution with the coordinator patter
 }
 ```
 
+`openexec run` executes tasks one at a time through the task queue, whatever
+`worker_count` says: a task that fails its check is closed with a fix task,
+which runs next, and the remaining work continues.
+
 ---
 
 ## Quick Start

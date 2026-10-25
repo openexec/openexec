@@ -340,7 +340,7 @@ func TestRecaptureUnitAttemptRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			f.restart(t)
-			if err := f.env.mgr.reconcileInterruptedTasks(context.Background(), f.env.rel, []string{"S"}); err != nil {
+			if err := f.env.mgr.reconcileInterruptedTasks(context.Background(), f.env.rel, []string{"S"}, selectedWork(nil)); err != nil {
 				t.Fatal(err)
 			}
 			f.env.mgr.taskQueueActive = true

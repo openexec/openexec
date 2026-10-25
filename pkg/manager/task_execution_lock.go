@@ -74,12 +74,15 @@ func entryFinished(e *entry) bool {
 // A repair task's failed check does not: repair creation refuses a repair of a
 // repair, so its receipt sent it there only to fail the whole queue with
 // "recursive repair creation is not authorized" while it had attempts left.
-func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Manager, storyIDs []string) error {
+//
+// keep limits reconciliation to the queue's selected work: a task outside an
+// exact selection keeps the status it had.
+func (m *Manager) reconcileInterruptedTasks(ctx context.Context, rel *release.Manager, storyIDs []string, keep func(*release.Task) bool) error {
 	tasks, err := rel.TasksInStories(ctx, storyIDs)
 	if err != nil {
 		return err
 	}
-	for _, task := range tasks {
+	for _, task := range filterTasks(tasks, keep) {
 		// A task closed with its fix is finished, whatever its status says:
 		// reopened, it ran again beside its own fix and, stopped once more,
 		// was refused a second fix, ending the run (voice-output Goal

@@ -126,20 +126,29 @@ func (m *Manager) CheckTaskSelection(opts RunOptions) error {
 
 // selectTasks returns the selected tasks when every one exists, is pending,
 // is auto-dispatchable and has each task and story dependency either finished
-// or also selected — otherwise the batch scheduler would skip it or wait on it
-// forever.
+// or also selected — otherwise the scheduler would skip it or wait on it
+// forever. The task-oriented queue also counts a task closed with a delivered
+// fix as finished, and refuses a task with no attempts left, as it would
+// never run it.
 func selectTasks(rel *release.Manager, opts RunOptions) ([]*release.Task, error) {
 	refuse := func(format string, a ...any) error {
 		return &TaskSelectionError{Reason: fmt.Sprintf(format, a...)}
 	}
-	if opts.TaskOriented || len(opts.StoryIDs) > 0 {
-		return nil, refuse("task_ids cannot be combined with task_oriented or story_ids")
+	if len(opts.StoryIDs) > 0 {
+		return nil, refuse("task_ids cannot be combined with story_ids")
 	}
 	if len(opts.TaskIDs) == 0 {
 		return nil, refuse("task_ids is empty; omit it to run every pending task")
 	}
 
 	finished := func(t *release.Task) bool { return t.Status == "done" || t.Status == "approved" }
+	if opts.TaskOriented {
+		byID := make(map[string]*release.Task)
+		for _, t := range rel.GetTasks() {
+			byID[t.ID] = t
+		}
+		finished = func(t *release.Task) bool { return release.Delivered(t, byID) }
+	}
 	selected := make(map[string]bool, len(opts.TaskIDs))
 	var tasks []*release.Task
 	for _, raw := range opts.TaskIDs {
@@ -156,6 +165,9 @@ func selectTasks(rel *release.Manager, opts RunOptions) ([]*release.Task, error)
 		}
 		if t.Status != "pending" && t.Status != "" {
 			return nil, refuse("task %s is %s, not pending", id, t.Status)
+		}
+		if opts.TaskOriented && (t.MaxAttempts <= 0 || t.AttemptCount >= t.MaxAttempts) {
+			return nil, refuse("task %s has used %d of %d attempts", id, t.AttemptCount, t.MaxAttempts)
 		}
 		selected[id] = true
 		tasks = append(tasks, t)
@@ -196,6 +208,9 @@ func selectTasks(rel *release.Manager, opts RunOptions) ([]*release.Task, error)
 			continue
 		}
 		for _, sdep := range story.DependsOn {
+			if opts.TaskOriented && len(rel.GetTasksForStory(sdep)) == 0 {
+				return nil, refuse("task %s: story %s depends on story %s, which has no delivered tasks", t.ID, story.ID, sdep)
+			}
 			for _, st := range rel.GetTasksForStory(sdep) {
 				if !finished(st) && !selected[st.ID] {
 					return nil, refuse("task %s: story %s depends on story %s, whose task %s is %s and not selected", t.ID, story.ID, sdep, st.ID, st.Status)
@@ -204,6 +219,35 @@ func selectTasks(rel *release.Manager, opts RunOptions) ([]*release.Task, error)
 		}
 	}
 	return tasks, nil
+}
+
+func storiesOf(tasks []*release.Task) []string {
+	seen := make(map[string]bool)
+	var ids []string
+	for _, t := range tasks {
+		if !seen[t.StoryID] {
+			seen[t.StoryID] = true
+			ids = append(ids, t.StoryID)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// AllTaskStories is the story scope of an unscoped task-oriented run: every
+// story holding a task, the same work the batch scheduler would take.
+func (m *Manager) AllTaskStories() ([]string, error) {
+	rel, err := m.GetInternalReleaseManager()
+	if err != nil {
+		return nil, err
+	}
+	var tasks []*release.Task
+	for _, t := range rel.GetTasks() {
+		if rel.GetStory(t.StoryID) != nil {
+			tasks = append(tasks, t)
+		}
+	}
+	return storiesOf(tasks), nil
 }
 
 // ExecuteTasks runs all pending tasks in the dependency graph, or only the
@@ -220,6 +264,10 @@ func (m *Manager) ExecuteTasks(ctx context.Context, opts RunOptions) error {
 		}
 	}
 	if opts.TaskOriented {
+		// An exact selection is scoped to its own tasks' stories.
+		if selection != nil {
+			opts.StoryIDs = storiesOf(selection)
+		}
 		return m.executeTaskQueue(ctx, opts)
 	}
 	rel, err := m.GetInternalReleaseManager()
