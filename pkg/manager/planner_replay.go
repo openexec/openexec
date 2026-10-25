@@ -455,7 +455,11 @@ func (m *Manager) replayIntent(req PlanRequest) (string, error) {
 			return "", err
 		}
 		if !res.Valid {
-			return "", &PlanInputError{Message: "intent validation failed"}
+			msg := "intent validation failed"
+			for _, issue := range res.Critical {
+				msg += "\n  - " + issue.Message
+			}
+			return "", &PlanInputError{Message: msg}
 		}
 	}
 	raw, err := os.ReadFile(path)

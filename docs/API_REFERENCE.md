@@ -618,9 +618,14 @@ Generates a project plan from an intent file and persists it as an artifact.
 ```json
 {
   "intent_file": "INTENT.md",
-  "no_validate": false
+  "no_validate": false,
+  "auto_import": true,
+  "review": true,
+  "request_id": "cli-intent-<sha256>"
 }
 ```
+
+With `request_id` and `review`, the plan takes the reviewed, retained route: it is generated, reviewed by a separate call, fixed once if the review rejects it, and imported (with `auto_import`) only after that. The plan, its review and a `plan-request-*` receipt are retained; repeating the same `request_id` and input replays them without another model call or import. A `request_id` reused with different input is refused. The daemon composes the configured planner CLI as generator and reviewer for this route. `openexec run` (bare) and `openexec plan` send this form, with a `request_id` derived from the intent file name, its content and `no_validate`. An invalid intent is refused with `400` and its validation issues. Without `request_id` the unreviewed request above still works.
 
 **Input Validation:**
 - `intent_file` must be a valid path within the workspace root (no path traversal)
@@ -647,6 +652,8 @@ Generates a project plan from an intent file and persists it as an artifact.
 | `artifact_hash` | SHA-256 hash of the serialized JSON bytes (content-addressed) |
 | `artifact_path` | Path to the persisted artifact file |
 | `prompt_version` | Version of prompt templates used for generation |
+| `review` | The review verdict (`approved`, `assessment`, …), on the reviewed route |
+| `review_artifact_path` | Path to the retained review of exactly this plan, on the reviewed route |
 
 **Artifact Hashing:**
 

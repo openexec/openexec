@@ -2,6 +2,9 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,8 +29,15 @@ var (
 var planCmd = &cobra.Command{
 	Use:   "plan [intent-file]",
 	Short: "Advanced: Generate a project plan manually (Deprecated: use 'openexec run' instead)",
-	Long: `Generate a project plan from an intent document. 
-Note: 'openexec run' now performs this step automatically if your plan is missing or stale.`,
+	Long: `Generate a project plan from an intent document.
+Note: 'openexec run' now performs this step automatically if your plan is missing or stale.
+
+The plan is reviewed before it is imported: the configured planner generates
+it, a separate reviewer call (Execution.ReviewerModel, else the planner model)
+reviews it, and a rejected plan is fixed once and imported. A reviewer that
+fails or cannot be reached imports nothing. The plan and its review are kept
+under .openexec/artifacts/plans; running again with an unchanged intent file
+replays them without another model call or import.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		intentFile := "INTENT.md"
@@ -50,9 +60,13 @@ Note: 'openexec run' now performs this step automatically if your plan is missin
 		}
 		defer sStore.Close()
 
+		planGenerator, planReviewer := manager.NativePlanAdapters(config.ProjectDir, config.Execution.ExecutorModel)
 		mgr, err := manager.New(manager.Config{
-			WorkDir:    config.ProjectDir,
-			StateStore: sStore,
+			PlanGenerator: planGenerator,
+			PlanReviewer:  planReviewer,
+			WorkDir:       config.ProjectDir,
+			ExecutorModel: config.Execution.ExecutorModel,
+			StateStore:    sStore,
 		})
 		if err != nil {
 			return err
@@ -62,11 +76,7 @@ Note: 'openexec run' now performs this step automatically if your plan is missin
 		cmd.Printf("Generating plan from: %s\n", intentFile)
 		cmd.Println("  Planning...")
 
-		res, err := mgr.Plan(cmd.Context(), manager.PlanRequest{
-			IntentFile: intentFile,
-			NoValidate: planNoValidate,
-			AutoImport: true, // Always import to SQLite
-		})
+		res, err := mgr.Plan(cmd.Context(), reviewedPlanRequest(config.ProjectDir, intentFile, planNoValidate))
 		if err != nil {
 			return err
 		}
@@ -80,6 +90,7 @@ Note: 'openexec run' now performs this step automatically if your plan is missin
 		}
 
 		cmd.Printf("✓ Stories generated and imported to SQLite (%d stories)\n", len(res.Plan.Stories))
+		printPlanEvidence(cmd, res)
 
 		// 3. Optional Export
 		if planExport {
@@ -92,6 +103,39 @@ Note: 'openexec run' now performs this step automatically if your plan is missin
 
 		return nil
 	},
+}
+
+// reviewedPlanRequest is the planning request of `openexec plan` and a bare
+// `openexec run`: the plan is independently reviewed (and fixed once if the
+// review rejects it) before import. Its ID is derived from the intent file and
+// its content, so the same INTENT replays the retained reviewed plan without
+// another model call or import, and a changed INTENT is a new request. A file
+// that cannot be read still gets an ID; the engine refuses it.
+func reviewedPlanRequest(projectDir, intentFile string, noValidate bool) manager.PlanRequest {
+	content, _ := os.ReadFile(filepath.Join(projectDir, intentFile))
+	raw, _ := json.Marshal(struct {
+		IntentFile string
+		Intent     string
+		NoValidate bool
+	}{intentFile, string(content), noValidate})
+	sum := sha256.Sum256(raw)
+	return manager.PlanRequest{
+		RequestID:  "cli-intent-" + hex.EncodeToString(sum[:]),
+		IntentFile: intentFile,
+		NoValidate: noValidate,
+		AutoImport: true,
+		Review:     true,
+	}
+}
+
+// printPlanEvidence names the retained plan and its review.
+func printPlanEvidence(cmd *cobra.Command, res *manager.PlanResult) {
+	if res.ArtifactPath != "" {
+		cmd.Printf("  Plan: %s\n", res.ArtifactPath)
+	}
+	if res.ReviewArtifactPath != "" {
+		cmd.Printf("  Review: %s\n", res.ReviewArtifactPath)
+	}
 }
 
 type cliLLMProvider struct {
