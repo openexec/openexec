@@ -129,6 +129,13 @@ func (s *Store) Init() error {
 		{"tasks", "completed_at", "DATETIME DEFAULT NULL"},
 		{"tasks", "error_message", "TEXT DEFAULT ''"},
 		{"tasks", "metadata", "TEXT DEFAULT '{}'"},
+		// audit_entries columns written by pkg/audit Logger.Log; this schema
+		// creates the table first, so the logger's own definition is skipped.
+		{"audit_entries", "message_id", "TEXT"},
+		{"audit_entries", "tool_call_id", "TEXT"},
+		{"audit_entries", "iteration", "INTEGER"},
+		{"audit_entries", "ip_address", "TEXT"},
+		{"audit_entries", "user_agent", "TEXT"},
 	}
 	for _, m := range migrations {
 		if err := s.ensureColumn(m[0], m[1], m[2]); err != nil {
