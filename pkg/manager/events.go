@@ -127,10 +127,17 @@ func (m *Manager) consumeEvents(fwuID string, events <-chan loop.Event) {
                     scrubber := security.NewPIIScrubber(m.cfg.PIIScrubLevel)
                     md = scrubber.ScrubMapInterface(md)
                 }
-                e, _ := builder.WithProject(m.cfg.WorkDir).
+                e, err := builder.WithProject(m.cfg.WorkDir).
                     WithSeverity(severity).
                     WithMetadata(md).Build()
-                _ = m.cfg.AuditLogger.Log(context.Background(), e)
+                if err == nil {
+                    err = m.cfg.AuditLogger.Log(context.Background(), e)
+                }
+                if err != nil {
+                    log.Printf("[Manager] Audit write (run_step %s %s) failed: %v", fwuID, event.Type, err)
+                }
+            } else {
+                log.Printf("[Manager] Audit entry (run_step %s %s) failed: %v", fwuID, event.Type, err)
             }
         }
 
@@ -335,6 +342,7 @@ func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
     m.state.WriteAsync(context.Background(), func(ctx context.Context) error {
         // Write run step for stage events
         if event.Type == loop.EventStageStart || event.Type == loop.EventStageComplete ||
+           event.Type == loop.EventStageFailed ||
            event.Type == loop.EventIterationStart || event.Type == loop.EventComplete {
             stepID := fmt.Sprintf("%s-%d", runID, event.StepID)
 
@@ -345,11 +353,20 @@ func (m *Manager) writeRunStepAsync(runID string, event loop.Event) {
                 "prompt_hash":  event.PromptHash,
                 "review_cycle": event.ReviewCycle,
             }
+            if event.ErrText != "" {
+                md["error"] = event.ErrText
+            }
             mdJSON, _ := json.Marshal(md)
 
+            // Each event is its own step row (StepID is the event sequence):
+            // the stage_start row stays historical and the terminal row
+            // records the stage's actual result.
             status := "running"
-            if event.Type == loop.EventStageComplete || event.Type == loop.EventComplete {
+            switch event.Type {
+            case loop.EventStageComplete, loop.EventComplete:
                 status = "completed"
+            case loop.EventStageFailed:
+                status = "failed"
             }
 
             err := m.state.AddRunStepFull(ctx,
