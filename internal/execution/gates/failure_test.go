@@ -46,6 +46,15 @@ func TestVerificationFailureEvidence(t *testing.T) {
 			}
 		})
 	}
+	// The shell exits 1 at once, but a background child holds its output open
+	// past the gate timeout: the runner sees exit 1 only after it timed out.
+	r := &Runner{projectDir: t.TempDir(), timeout: 200 * time.Millisecond, config: &Config{}}
+	r.config.Quality.Gates = []string{"test"}
+	r.config.Quality.Custom = []CustomGate{{Name: "test", Command: "sleep 1 & exit 1"}}
+	timedOut := r.RunAll(context.Background())
+	if len(timedOut.Results) != 1 || timedOut.Results[0].ExitCode != 1 || VerificationFailureArtifacts(NewFailure(timedOut)) != nil {
+		t.Fatalf("timed-out check classified: %+v", timedOut)
+	}
 	report := &GateReport{Summary: "untrusted", Results: []GateResult{{Name: "test", ExitCode: 1}}}
 	if VerificationFailureArtifacts(NewFailure(report)) != nil {
 		t.Fatal("fabricated report classified")
