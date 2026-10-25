@@ -37,18 +37,30 @@ func newMigratedDaemon(t *testing.T) migratedDaemon {
 	}
 	fixture.server.KnowledgeStore = store
 	root := fixture.identity.RootPath
-	padding := strings.Repeat("// realistic padding so the input set is hashed, not only listed.\n", 12)
-	for i := 0; i < 240; i++ {
-		dir := filepath.Join(root, fmt.Sprintf("pkg%03d", i/40))
+	// Extraction must cost far more than a walk on every platform. Each read
+	// rehashes every input file and the repository context probes exported
+	// symbols and call edges, so files, bytes and functions slow the walk as
+	// much as extraction. Every json-tagged field is an ambiguous candidate for
+	// each same-named field, which extraction stores as one edge per pair and
+	// a walk only counts: a few dense files of unexported tagged types make
+	// extraction expensive without making the walk so.
+	const files, types = 12, 20
+	for i := 0; i < files; i++ {
+		dir := filepath.Join(root, fmt.Sprintf("pkg%03d", i/4))
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
 		next := i + 1
-		if next%40 == 0 {
-			next = i - 39
+		if next%4 == 0 {
+			next = i - 3
 		}
-		source := fmt.Sprintf("package pkg%03d\n\n%stype Kind%d struct{ Name string `json:\"name\"` }\n\nfunc Run%d(value string) string { return Step%d(value) }\n\nfunc Step%d(value string) string { return value }\n\nfunc Use%d() string { return Run%d(\"x\") }\n", i/40, padding, i, i, i, i, i, next)
-		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.go", i)), []byte(source), 0o600); err != nil {
+		var source strings.Builder
+		fmt.Fprintf(&source, "package pkg%03d\n", i/4)
+		for j := 0; j < types; j++ {
+			fmt.Fprintf(&source, "\ntype kind%d_%d struct {\n\tname  string `json:\"name\"`\n\tlabel string `json:\"label\"`\n}\n", i, j)
+		}
+		fmt.Fprintf(&source, "\nfunc Run%d(value string) string { return Step%d(value) }\n\nfunc Step%d(value string) string { return value }\n\nfunc Use%d() string { return Run%d(\"x\") }\n", i, i, i, i, next)
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("f%04d.go", i)), []byte(source.String()), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -135,12 +147,42 @@ func TestPreparedGraphJourneyWalksAfterExtractorMigration(t *testing.T) {
 // that refuses is final: it fails at once, after one read, and never turns a
 // stale or missing graph into a pass.
 func TestGraphPreparationRefusesWithoutWaiting(t *testing.T) {
+	// Refusal needs no slow migration: with refresh off the first read answers
+	// at once, so these cases build the small graph and never time extraction.
+	prepareSmall := func(t *testing.T, refresh, migrated bool) (graphjourney.Evidence, error) {
+		fixture := newGraphQueryFixture(t)
+		store, err := knowledge.NewStoreWithDB(fixture.server.StateStore.GetDB())
+		if err != nil {
+			t.Fatal(err)
+		}
+		store.SetRefreshOnRead(refresh)
+		fixture.server.KnowledgeStore = store
+		if migrated {
+			// The generation as the previous build left it: current for its extractor.
+			if _, err := fixture.server.StateStore.GetDB().Exec(`UPDATE graph_generations SET extractor_version = 'repository-graph-v2.3' WHERE status = 'current'`); err != nil {
+				t.Fatal(err)
+			}
+		}
+		daemon := httptest.NewServer(fixture.server.Mux)
+		t.Cleanup(daemon.Close)
+		return graphjourney.Prepare(t.Context(), graphjourney.Config{BaseURL: daemon.URL, Token: fixture.token}, time.Minute)
+	}
 	t.Run("stale graph the daemon will not refresh", func(t *testing.T) {
-		d := newMigratedDaemon(t)
-		d.store.SetRefreshOnRead(false)
-		prepared, err := graphjourney.Prepare(t.Context(), d.config(t, d.fixture.server.Mux), 30*d.extraction)
+		prepared, err := prepareSmall(t, false, true)
 		if err == nil || !strings.Contains(err.Error(), "answered 409 (graph_stale)") || len(prepared.Steps) != 2 {
 			t.Fatalf("prepare err = %v steps = %+v, want one explicit stale refusal", err, prepared.Steps)
+		}
+	})
+	// Near misses: the refusal comes from the stale generation and the
+	// disabled refresh together, not from the small fixture.
+	t.Run("stale graph the daemon refreshes", func(t *testing.T) {
+		if prepared, err := prepareSmall(t, true, true); err != nil {
+			t.Fatalf("prepare err = %v steps = %+v, want the refreshed graph", err, prepared.Steps)
+		}
+	})
+	t.Run("current graph with refresh off", func(t *testing.T) {
+		if prepared, err := prepareSmall(t, false, false); err != nil {
+			t.Fatalf("prepare err = %v steps = %+v, want the current graph", err, prepared.Steps)
 		}
 	})
 	t.Run("graph never built for the checkout", func(t *testing.T) {
