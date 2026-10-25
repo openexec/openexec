@@ -186,11 +186,12 @@ func TestRunAcceptedPlanAndNoAutoPlanStillExecute(t *testing.T) {
 			t.Fatalf("requests = %s; want one plan and one execute", describeRequests(reqs))
 		}
 		exec := reqs[len(reqs)-1]
-		if exec.Path != "/api/v1/runs:execute" || exec.Body["mode"] != "danger-full-access" || len(exec.Body) != 2 {
-			t.Fatalf("execute = %s; want the unchanged {worker_count, mode} body", describeRequests([]runRequest{exec}))
+		if exec.Path != "/api/v1/runs:execute" || exec.Body["mode"] != "danger-full-access" || len(exec.Body) != 3 {
+			t.Fatalf("execute = %s; want the {task_oriented, worker_count, mode} body", describeRequests([]runRequest{exec}))
 		}
-		if _, ok := exec.Body["worker_count"]; !ok {
-			t.Fatalf("execute body lost worker_count: %v", exec.Body)
+		// The task queue is the repairing route and runs one task at a time.
+		if exec.Body["task_oriented"] != true || exec.Body["worker_count"] != float64(1) {
+			t.Fatalf("execute body does not ask for the task queue: %v", exec.Body)
 		}
 		if !strings.Contains(out, "Execution orchestrated by daemon") {
 			t.Fatalf("output = %s", out)

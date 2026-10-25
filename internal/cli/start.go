@@ -243,6 +243,10 @@ Examples:
 A named task must already exist, be pending and have its dependencies done;
 otherwise the engine refuses the run and nothing executes.
 
+A task that fails its check is closed and gets a fix task, which runs next;
+its dependents wait on the fix. A named run executes only that task and its
+fixes. Tasks run one at a time.
+
 For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<description>"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// --quickfix and --verify were never wired to the daemon: honouring them
@@ -353,10 +357,16 @@ For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<des
 			}
 		}
 
-		// Execute all pending tasks
+		// Execute through the native task queue: a failed check gets its fix
+		// task, which runs first, and the rest of the work continues. The
+		// queue runs one task at a time whatever worker_count says.
 		runOpts := map[string]any{
-			"worker_count": config.Execution.WorkerCount,
-			"mode":         runMode,
+			"task_oriented": true,
+			"worker_count":  1,
+			"mode":          runMode,
+		}
+		if config.Execution.WorkerCount > 1 {
+			cmd.Printf("Note: worker_count is %d; the task queue runs one task at a time.\n", config.Execution.WorkerCount)
 		}
 		if len(args) > 0 {
 			runOpts["task_ids"] = []string{args[0]}

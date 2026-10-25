@@ -43,7 +43,8 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 	if _, err := rel.TasksInStories(ctx, opts.StoryIDs); err != nil {
 		return fmt.Errorf("invalid task scope: %w", err)
 	}
-	if err := m.reconcileInterruptedTasks(ctx, rel, opts.StoryIDs); err != nil {
+	keep := selectedWork(opts.TaskIDs)
+	if err := m.reconcileInterruptedTasks(ctx, rel, opts.StoryIDs, keep); err != nil {
 		return err
 	}
 	for {
@@ -62,7 +63,7 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 		}
 		processedFailure := false
 		for _, task := range retained {
-			if task.Status != release.TaskStatusFailed {
+			if task.Status != release.TaskStatusFailed || !keep(task) {
 				continue
 			}
 			// A failed fix is closed and fixed like any failed task; only a
@@ -85,11 +86,13 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 		if err != nil {
 			return err
 		}
+		ready = filterTasks(ready, keep)
 		if len(ready) == 0 {
 			current, err := rel.TasksInStories(ctx, opts.StoryIDs)
 			if err != nil {
 				return err
 			}
+			current = filterTasks(current, keep)
 			if len(current) == 0 {
 				return fmt.Errorf("scoped stories have no tasks; completion is unproven")
 			}
@@ -165,6 +168,32 @@ func (m *Manager) executeTaskQueue(ctx context.Context, opts RunOptions) error {
 			}
 		}
 	}
+}
+
+// selectedWork limits a queue to an exact task selection and the fixes made
+// for it; a fix names its root task in repair_of. Nil selects all scoped work.
+func selectedWork(taskIDs []string) func(*release.Task) bool {
+	if taskIDs == nil {
+		return func(*release.Task) bool { return true }
+	}
+	selected := make(map[string]bool, len(taskIDs))
+	for _, id := range taskIDs {
+		selected[strings.TrimSpace(id)] = true
+	}
+	return func(task *release.Task) bool {
+		root, _ := task.Metadata["repair_of"].(string)
+		return selected[task.ID] || (root != "" && selected[root])
+	}
+}
+
+func filterTasks(tasks []*release.Task, keep func(*release.Task) bool) []*release.Task {
+	var out []*release.Task
+	for _, task := range tasks {
+		if keep(task) {
+			out = append(out, task)
+		}
+	}
+	return out
 }
 
 func (m *Manager) waitTaskQueueRun(ctx context.Context, id string) error {

@@ -64,6 +64,8 @@ test:
 	python3 scripts/verify-native-cli-gocache.py
 	@echo "🧪 Verifying run task selection and negative control..."
 	python3 scripts/verify-run-task-selection.py
+	@echo "🧪 Verifying run repairs a failed check and negative control..."
+	python3 scripts/verify-run-native-repair.py
 	@echo "🧪 Verifying run plan gate regression and negative control..."
 	python3 scripts/verify-run-plan-gate.py
 	@echo "🧪 Verifying native init review choice reaches the daemon and negative control..."

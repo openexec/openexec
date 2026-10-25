@@ -86,6 +86,20 @@ func (s *Server) handleExecuteRuns(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// An unscoped task-oriented run (what `openexec run` sends) covers every
+	// story, as an unscoped batch run does; a selection scopes itself.
+	if req.TaskOriented && req.TaskIDs == nil && len(req.StoryIDs) == 0 {
+		stories, err := s.Mgr.AllTaskStories()
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if len(stories) == 0 {
+			WriteJSON(w, http.StatusAccepted, map[string]string{"status": "execution_started"})
+			return
+		}
+		req.StoryIDs = stories
+	}
 
 	// Use background context for the long-running execution
 	go func() {

@@ -253,12 +253,51 @@ func TestRunsExecuteRefusesUnusableSelection(t *testing.T) {
 		{"depends on hitl via story", `{"task_ids":["T-005"]}`, "task T-005 depends on a human-in-the-loop task"},
 		{"unmet story dependency", `{"task_ids":["T-008"]}`, "story US-004 depends on story US-003, whose task T-007 is pending and not selected"},
 		{"one refused among valid", `{"task_ids":["T-001","T-004"]}`, "task T-004 depends on T-002"},
-		{"with task_oriented", `{"task_ids":["T-001"],"task_oriented":true}`, "task_ids cannot be combined"},
-		{"with story_ids", `{"task_ids":["T-001"],"story_ids":["US-001"]}`, "task_ids cannot be combined"},
+		{"with story_ids", `{"task_ids":["T-001"],"story_ids":["US-001"]}`, "task_ids cannot be combined with story_ids"},
 	}
+	refuseSelections(t, cases, nil)
+}
+
+// The task-oriented queue refuses the same unusable selections before any
+// task runs, plus a task with no attempts left, which it would never run.
+func TestRunsExecuteTaskOrientedRefusesUnusableSelection(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"unknown id", `{"task_oriented":true,"task_ids":["T-404"]}`, "unknown task T-404"},
+		{"explicit empty", `{"task_oriented":true,"task_ids":[]}`, "task_ids is empty"},
+		{"done task", `{"task_oriented":true,"task_ids":["T-DONE"]}`, "task T-DONE is done, not pending"},
+		{"in progress task", `{"task_oriented":true,"task_ids":["T-PROG"]}`, "task T-PROG is in_progress, not pending"},
+		{"hitl task", `{"task_oriented":true,"task_ids":["T-HITL"]}`, "task T-HITL requires a human in the loop"},
+		{"unmet task dependency", `{"task_oriented":true,"task_ids":["T-004"]}`, "task T-004 depends on T-002"},
+		{"unmet story dependency", `{"task_oriented":true,"task_ids":["T-008"]}`, "story US-004 depends on story US-003, whose task T-007 is pending and not selected"},
+		{"no attempts left", `{"task_oriented":true,"task_ids":["T-SPENT"]}`, "task T-SPENT has used 3 of 3 attempts"},
+		{"failed without fix", `{"task_oriented":true,"task_ids":["T-AFTER-FAILED"]}`, "task T-AFTER-FAILED depends on T-FAILED, which is failed"},
+		{"with story_ids", `{"task_oriented":true,"task_ids":["T-001"],"story_ids":["US-001"]}`, "task_ids cannot be combined with story_ids"},
+	}
+	refuseSelections(t, cases, func(t *testing.T, f *selectionFixture) {
+		rel, _ := f.m.GetInternalReleaseManager()
+		for _, task := range []*release.Task{
+			{ID: "T-SPENT", StoryID: "US-001", Status: "pending", AttemptCount: 3, MaxAttempts: 3},
+			{ID: "T-FAILED", StoryID: "US-001", Status: release.TaskStatusFailed},
+			{ID: "T-AFTER-FAILED", StoryID: "US-001", Status: "pending", DependsOn: []string{"T-FAILED"}},
+		} {
+			task.Title, task.Description = "Task "+task.ID, "work "+task.ID
+			if err := rel.CreateTask(task); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+}
+
+func refuseSelections(t *testing.T, cases []struct{ name, body, want string }, seed func(*testing.T, *selectionFixture)) {
+	t.Helper()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newSelectionFixture(t)
+			if seed != nil {
+				seed(t, f)
+			}
 			before := f.statuses(t)
 			r := f.execute(tc.body)
 			if r.Code != 400 {
@@ -275,6 +314,78 @@ func TestRunsExecuteRefusesUnusableSelection(t *testing.T) {
 				t.Fatalf("refused selection changed statuses:\nbefore %v\nafter  %v", before, after)
 			}
 		})
+	}
+}
+
+// The task-oriented queue honours an exact selection: only the selected tasks
+// run, in dependency order, and every unrelated task in the same and other
+// stories keeps its status after a reload.
+func TestRunsExecuteTaskOrientedRunsOnlySelectedInDependencyOrder(t *testing.T) {
+	f := newSelectionFixture(t)
+	r := f.execute(`{"task_oriented":true,"task_ids":["T-003","T-001"],"worker_count":1}`)
+	if r.Code != 202 {
+		t.Fatalf("status %d: %s", r.Code, r.Body.String())
+	}
+	f.awaitDone(t, "T-001", "T-003")
+	if got := f.rec.ran(); !reflect.DeepEqual(got, []string{"T-001", "T-003"}) {
+		t.Fatalf("recorder ran %v; want [T-001 T-003] in dependency order", got)
+	}
+	st := f.reopenStatuses(t)
+	for id, want := range map[string]string{"T-002": "pending", "T-004": "pending", "T-HITL": "pending", "T-PROG": "in_progress", "T-005": "pending", "T-007": "pending", "T-008": "pending"} {
+		if st[id] != want {
+			t.Fatalf("%s = %q after reload; want %s (unselected)", id, st[id], want)
+		}
+	}
+}
+
+// An unscoped task-oriented run, as `openexec run` sends it, takes the same
+// work as an unscoped batch run across every story, and still holds back the
+// hitl task and what waits on it. The interrupted in_progress task resumes,
+// as the queue's restart reconciliation resumes it.
+func TestRunsExecuteTaskOrientedUnscopedRunsEveryStory(t *testing.T) {
+	f := newSelectionFixture(t)
+	r := f.execute(`{"task_oriented":true,"worker_count":1}`)
+	if r.Code != 202 {
+		t.Fatalf("status %d: %s", r.Code, r.Body.String())
+	}
+	f.awaitDone(t, "T-001", "T-002", "T-003", "T-004", "T-PROG", "T-007", "T-008")
+	got := map[string]bool{}
+	for _, id := range f.rec.ran() {
+		got[id] = true
+	}
+	if want := map[string]bool{"T-001": true, "T-002": true, "T-003": true, "T-004": true, "T-PROG": true, "T-007": true, "T-008": true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("recorder ran %v; want %v", f.rec.ran(), want)
+	}
+	st := f.reopenStatuses(t)
+	for _, id := range []string{"T-HITL", "T-005"} {
+		if st[id] != "pending" {
+			t.Fatalf("%s = %q; want pending (held back)", id, st[id])
+		}
+	}
+}
+
+// Near miss for the task-oriented dependency rule: a dependency closed with a
+// delivered fix counts as finished, as the queue itself counts it.
+func TestRunsExecuteTaskOrientedAcceptsDependencyClosedWithFix(t *testing.T) {
+	f := newSelectionFixture(t)
+	rel, _ := f.m.GetInternalReleaseManager()
+	for _, task := range []*release.Task{
+		{ID: "T-FIX", StoryID: "US-001", Status: "done", Metadata: map[string]any{"repair_of": "T-ORIG"}},
+		{ID: "T-ORIG", StoryID: "US-001", Status: release.TaskStatusFailed, Metadata: map[string]any{"fixed_by": "T-FIX"}},
+		{ID: "T-NEXT", StoryID: "US-001", Status: "pending", DependsOn: []string{"T-ORIG"}},
+	} {
+		task.Title, task.Description = "Task "+task.ID, "work "+task.ID
+		if err := rel.CreateTask(task); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := f.execute(`{"task_oriented":true,"task_ids":["T-NEXT"]}`)
+	if r.Code != 202 {
+		t.Fatalf("status %d: %s", r.Code, r.Body.String())
+	}
+	f.awaitDone(t, "T-NEXT")
+	if got := f.rec.ran(); !reflect.DeepEqual(got, []string{"T-NEXT"}) {
+		t.Fatalf("recorder ran %v; want [T-NEXT]", got)
 	}
 }
 
