@@ -681,6 +681,28 @@ This enables deduplication and allows clients to verify artifact integrity by re
 {"a": {"x": 1, "y": 2}, "z": 1}
 ```
 
+#### Execution mode on run routes
+
+These routes take an optional `mode` field in the request body:
+
+- `POST /api/v1/runs` (recorded in the RunSpec when `intent` and a `session_id` are given)
+- `POST /api/v1/runs/{id}/start`
+- `POST /api/v1/runs/parallel` (one mode for every listed run)
+- `POST /api/v1/runs:blueprint`
+- `POST /api/v1/sessions/{id}/run`
+
+| `mode` | Effect |
+|--------|--------|
+| omitted or `""` | `workspace-write` |
+| `read-only`, `workspace-write`, `danger-full-access` | Used as given |
+| anything else | `400 Bad Request` (`invalid mode: …`); no RunSpec, audit entry or run is created |
+
+The mode used, not the raw request value, is what the run record, the RunSpec and the `run.created` audit entry hold. The routes do not read the project's `exec_mode`. They also do not grant any authority by themselves: explicit `danger-full-access` keeps its meaning, and approval and effect controls still apply.
+
+`workspace-write` sets `OPENEXEC_MODE=workspace-write` for the runner. The MCP tool tier follows it. It is not a full sandbox: the Claude CLI runner receives `--dangerously-skip-permissions` under `workspace-write` as it does under `danger-full-access`.
+
+**Compatibility:** before this change an omitted `mode` meant `danger-full-access` on all five routes, and four of them (all except the session route) passed any mode string through unchecked. A client that relied on omission for shell or infra tools must now send `"mode": "danger-full-access"`. A client that sent a non-standard mode string now gets `400`. The `openexec run`, `openexec blueprint` and `openexec chat` commands always send a mode, so they are unaffected.
+
 ---
 
 ### Tool Call Idempotency

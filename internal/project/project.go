@@ -304,6 +304,16 @@ func (e *ExecutionConfig) EffectiveExecMode() string {
 	return "workspace-write"
 }
 
+// ValidExecMode reports whether mode is one of the execution modes a run
+// accepts: "read-only", "workspace-write" or "danger-full-access".
+func ValidExecMode(mode string) bool {
+	switch mode {
+	case "read-only", "workspace-write", "danger-full-access":
+		return true
+	}
+	return false
+}
+
 // Initialize initializes a new OpenExec project
 func Initialize(projectName string, projectDir string) (*ProjectConfig, error) {
 	// Use provided directory or current working directory
