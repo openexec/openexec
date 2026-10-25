@@ -11,6 +11,12 @@ import (
 	"github.com/openexec/openexec/internal/types"
 )
 
+// wantApplyPatchRefusal is the refusal text apply_patch must return. It is
+// spelled out rather than referencing the production constant, so this test
+// still compiles against the unfixed action and fails on its assertions.
+const wantApplyPatchRefusal = "action apply_patch is not implemented and applied no changes to the workspace; " +
+	"apply the patch from an agentic stage with the git_apply_patch tool, or remove this stage from the blueprint"
+
 // applyPatchBlueprint is a custom blueprint whose first stage dispatches the
 // registered apply_patch action with a valid diff. handler is the YAML for the
 // stage's failure route ("" means none).
@@ -77,7 +83,7 @@ func TestCustomBlueprintApplyPatchRefusalTakesFailurePath(t *testing.T) {
 			if apply.Status != types.StageStatusFailed {
 				t.Fatalf("apply stage status = %q (output %q), want failed", apply.Status, apply.Output)
 			}
-			if apply.Error != actions.ApplyPatchUnsupported {
+			if apply.Error != wantApplyPatchRefusal {
 				t.Fatalf("stage-failed callback error = %q, want the refusal", apply.Error)
 			}
 			if b, _ := os.ReadFile(probe); string(b) != "before\n" {
@@ -93,10 +99,10 @@ func TestCustomBlueprintApplyPatchRefusalTakesFailurePath(t *testing.T) {
 				}
 				return
 			}
-			if execErr == nil || !strings.Contains(execErr.Error(), actions.ApplyPatchUnsupported) {
+			if execErr == nil || !strings.Contains(execErr.Error(), wantApplyPatchRefusal) {
 				t.Fatalf("run without a handler returned %v, want the refusal", execErr)
 			}
-			if run.Status != RunStatusFailed || run.Error != actions.ApplyPatchUnsupported {
+			if run.Status != RunStatusFailed || run.Error != wantApplyPatchRefusal {
 				t.Fatalf("run status=%q error=%q, want failed with the refusal", run.Status, run.Error)
 			}
 			if len(visited) != 1 {

@@ -9,10 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openexec/openexec/internal/actions"
 	"github.com/openexec/openexec/pkg/audit"
 	"github.com/openexec/openexec/pkg/db/state"
 )
+
+// wantApplyPatchRefusal is the refusal text apply_patch must return. It is
+// spelled out rather than referencing the production constant, so this test
+// still compiles against the unfixed action and fails on its assertions.
+const wantApplyPatchRefusal = "action apply_patch is not implemented and applied no changes to the workspace; " +
+	"apply the patch from an agentic stage with the git_apply_patch tool, or remove this stage from the blueprint"
 
 // applyPatchChildEnv names the disposable project a child test process runs;
 // the parent reads what that process left behind after it has exited.
@@ -120,7 +125,7 @@ func TestApplyPatchRefusalPersistsAfterReopen(t *testing.T) {
 			if run.Status != tc.wantStatus {
 				t.Fatalf("persisted run status = %q (error %q), want %q", run.Status, run.ErrorMessage.String, tc.wantStatus)
 			}
-			if tc.handler == "" && !strings.Contains(run.ErrorMessage.String, actions.ApplyPatchUnsupported) {
+			if tc.handler == "" && !strings.Contains(run.ErrorMessage.String, wantApplyPatchRefusal) {
 				t.Fatalf("persisted run error = %q, want the refusal", run.ErrorMessage.String)
 			}
 			steps, err := store.ListRunSteps(ctx, "apply-probe", 100, 0)
@@ -159,7 +164,7 @@ func TestApplyPatchRefusalPersistsAfterReopen(t *testing.T) {
 				}
 				switch md["type"] {
 				case "stage_failed":
-					if md["error"] != actions.ApplyPatchUnsupported {
+					if md["error"] != wantApplyPatchRefusal {
 						t.Fatalf("persisted stage_failed error = %v, want the refusal", md["error"])
 					}
 					stageFailed = true

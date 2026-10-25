@@ -10,6 +10,12 @@ import (
 	"github.com/openexec/openexec/internal/types"
 )
 
+// wantApplyPatchRefusal is the refusal text apply_patch must return. It is
+// spelled out rather than referencing the production constant, so this test
+// still compiles against the unfixed action and fails on its assertions.
+const wantApplyPatchRefusal = "action apply_patch is not implemented and applied no changes to the workspace; " +
+	"apply the patch from an agentic stage with the git_apply_patch tool, or remove this stage from the blueprint"
+
 // snapshotDir returns every regular file under dir with its contents, so a
 // test can prove an action wrote, removed or created nothing.
 func snapshotDir(t *testing.T, dir string) map[string]string {
@@ -58,7 +64,7 @@ func TestApplyPatchRefusesValidPatchWithoutEffect(t *testing.T) {
 	if resp.Status != types.StageStatusFailed {
 		t.Fatalf("status = %q, want failed (output %q)", resp.Status, resp.Output)
 	}
-	if resp.Error != ApplyPatchUnsupported {
+	if resp.Error != wantApplyPatchRefusal {
 		t.Fatalf("error = %q, want the unsupported refusal", resp.Error)
 	}
 	for _, want := range []string{"apply_patch is not implemented", "applied no changes", "git_apply_patch", "remove this stage"} {
