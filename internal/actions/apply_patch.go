@@ -6,7 +6,14 @@ import (
 	"github.com/openexec/openexec/internal/types"
 )
 
-// ApplyPatchAction applies implementation results to the workspace.
+// ApplyPatchUnsupported is the refusal apply_patch returns for every valid
+// request. The action has no patch engine, so it must not report an effect it
+// never had; patches are applied by agentic stages through git_apply_patch.
+const ApplyPatchUnsupported = "action apply_patch is not implemented and applied no changes to the workspace; " +
+	"apply the patch from an agentic stage with the git_apply_patch tool, or remove this stage from the blueprint"
+
+// ApplyPatchAction is the registered apply_patch action. It validates its
+// input and then refuses, because applying patches is not implemented here.
 type ApplyPatchAction struct {
 	projectDir string
 }
@@ -20,10 +27,6 @@ func (a *ApplyPatchAction) Name() string {
 }
 
 func (a *ApplyPatchAction) Execute(ctx context.Context, req ActionRequest) (ActionResponse, error) {
-	// In a real implementation, this would parse a diff or implementation result
-	// and apply it safely to the workspace.
-	// For v0.7.0, we provide the native boundary.
-
 	implementation, ok := req.Inputs["implementation"].(string)
 	if !ok || implementation == "" {
 		return ActionResponse{
@@ -32,9 +35,8 @@ func (a *ApplyPatchAction) Execute(ctx context.Context, req ActionRequest) (Acti
 		}, nil
 	}
 
-	// Placeholder: In v1.0 this would use internal/patch logic
 	return ActionResponse{
-		Status: types.StageStatusCompleted,
-		Output: "Applied implementation changes to workspace",
+		Status: types.StageStatusFailed,
+		Error:  ApplyPatchUnsupported,
 	}, nil
 }
