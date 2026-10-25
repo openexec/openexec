@@ -666,3 +666,5 @@ The playbook order (Console `internal/playbook/playbook.go:251-301`) is
 interface (step 4, on `origin/main` as `0a6849bb`) → accessibility (this
 report) → the consolidating report (`8a800117…`), which keeps its dependency on
 this one.
+
+Consolidated, re-checked at `131b9ce8`: [DESIGN_REVIEW_CONSOLIDATED_2026-10.md](DESIGN_REVIEW_CONSOLIDATED_2026-10.md).

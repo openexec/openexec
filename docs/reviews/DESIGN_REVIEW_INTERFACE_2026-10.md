@@ -607,3 +607,5 @@ The playbook order (Console `internal/playbook/playbook.go:251-301`) is:
 Each keeps its dependency on the step before it. Step 5 has two web screens
 and a TUI to check. CR's "Accessibility" section (CR:387-393) is the only
 declared accessibility clause for them.
+
+Consolidated, re-checked at `131b9ce8`: [DESIGN_REVIEW_CONSOLIDATED_2026-10.md](DESIGN_REVIEW_CONSOLIDATED_2026-10.md).
