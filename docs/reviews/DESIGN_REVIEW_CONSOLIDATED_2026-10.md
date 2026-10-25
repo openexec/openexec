@@ -5,8 +5,10 @@ last step of the OpenExec `design-review` run).
 
 **Source revision:** native `openexec` `origin/main`
 `131b9ce8d3473c63c1aea1b0eab0f5b4dfa3db6b` (#141). This was current native
-main when this pass started, and it has not moved since triage named it. Every
-`path:line` under "At 131b9ce8" is at this commit.
+main when this pass started. Every `path:line` under "At 131b9ce8" is at this
+commit. Main has since moved to `0e39075b` (#142). That commit changes only
+`internal/server/graph_journey_prepare_test.go`, which no entry here cites, so
+every citation also holds at `0e39075b`.
 
 **This report is advisory. It grants no authority**: no implementation scope,
 merge, deploy, spend, provider access or other effect. It does not rewrite any
