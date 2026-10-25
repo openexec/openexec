@@ -14,6 +14,7 @@ import (
     "time"
 
     "github.com/openexec/openexec/internal/approval"
+    "github.com/openexec/openexec/internal/project"
     "github.com/openexec/openexec/internal/release"
     "github.com/openexec/openexec/pkg/audit"
     "github.com/openexec/openexec/pkg/db/session"
@@ -114,6 +115,20 @@ func (s *Server) handleExecuteRuns(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// admitExecMode resolves the execution mode a run route starts with. An
+// omitted mode takes the documented "workspace-write" default, never
+// unrestricted access; anything that is not an execution mode is refused so
+// the caller can answer 400 before a RunSpec, audit entry or run exists.
+func admitExecMode(requested string) (string, error) {
+	if requested == "" {
+		return (&project.ExecutionConfig{}).EffectiveExecMode(), nil
+	}
+	if !project.ValidExecMode(requested) {
+		return "", fmt.Errorf("invalid mode: %s (valid: read-only, workspace-write, danger-full-access)", requested)
+	}
+	return requested, nil
+}
+
 // handleCreateRun creates a new run from an explicit request and returns a run_id.
 // This improves determinism by persisting the inputs up front.
 // When StateStore is available, creates a RunSpec for deterministic replay.
@@ -133,6 +148,11 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
         WriteError(w, http.StatusBadRequest, "invalid request body")
         return
     }
+    mode, err := admitExecMode(req.Mode)
+    if err != nil {
+        WriteError(w, http.StatusBadRequest, err.Error())
+        return
+    }
 
     // Derive a run_id (reusing the FWU ID pattern)
     now := time.Now().UTC().Format("20060102-150405")
@@ -144,10 +164,6 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
     // Create RunSpec for deterministic replay if StateStore is available
     var specID string
     if s.StateStore != nil && req.Intent != "" {
-        mode := req.Mode
-        if mode == "" {
-            mode = "danger-full-access"
-        }
         spec := &state.RunSpec{
             SessionID:   req.SessionID,
             Intent:      req.Intent,
@@ -174,7 +190,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
                 "work_dir":       req.WorkDir,
                 "quickfix_title": req.QuickfixTitle,
                 "verify_script":  req.VerifyScript,
-                "mode":           req.Mode,
+                "mode":           mode,
             }
             if specID != "" {
                 md["spec_id"] = specID
@@ -211,12 +227,14 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
     }
     _ = json.NewDecoder(r.Body).Decode(&body)
 
+    mode, err := admitExecMode(body.Mode)
+    if err != nil {
+        WriteError(w, http.StatusBadRequest, err.Error())
+        return
+    }
+
     var opts []manager.StartOption
     if body.IsStudy { opts = append(opts, manager.WithIsStudy(true)) }
-    mode := body.Mode
-    if mode == "" {
-        mode = "danger-full-access"
-    }
     opts = append(opts, manager.WithExecMode(mode))
     if body.BlueprintID != "" { opts = append(opts, manager.WithBlueprint(body.BlueprintID)) }
     if body.TaskDescription != "" { opts = append(opts, manager.WithTaskDescription(body.TaskDescription)) }
@@ -582,6 +600,12 @@ func (s *Server) handleStartParallelRuns(w http.ResponseWriter, r *http.Request)
         return
     }
 
+    mode, err := admitExecMode(req.Mode)
+    if err != nil {
+        WriteError(w, http.StatusBadRequest, err.Error())
+        return
+    }
+
     // Start runs in parallel
     results := make([]map[string]interface{}, 0, len(req.RunIDs))
     var mu sync.Mutex
@@ -592,14 +616,7 @@ func (s *Server) handleStartParallelRuns(w http.ResponseWriter, r *http.Request)
         go func(id string) {
             defer wg.Done()
 
-            var opts []manager.StartOption
-            mode := req.Mode
-            if mode == "" {
-                mode = "danger-full-access"
-            }
-            opts = append(opts, manager.WithExecMode(mode))
-
-            err := s.Mgr.Start(context.Background(), id, opts...)
+            err := s.Mgr.Start(context.Background(), id, manager.WithExecMode(mode))
 
             mu.Lock()
             defer mu.Unlock()
@@ -662,6 +679,12 @@ func (s *Server) handleStartBlueprintRun(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	mode, err := admitExecMode(req.Mode)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// Use default blueprint if not specified
 	blueprintID := req.BlueprintID
 	if blueprintID == "" {
@@ -676,12 +699,8 @@ func (s *Server) handleStartBlueprintRun(w http.ResponseWriter, r *http.Request)
 	opts := []manager.StartOption{
 		manager.WithBlueprint(blueprintID),
 		manager.WithTaskDescription(req.TaskDescription),
+		manager.WithExecMode(mode),
 	}
-	mode := req.Mode
-	if mode == "" {
-		mode = "danger-full-access"
-	}
-	opts = append(opts, manager.WithExecMode(mode))
 
 	// Log blueprint run creation to audit
 	if s.AuditLogger != nil {
@@ -692,7 +711,7 @@ func (s *Server) handleStartBlueprintRun(w http.ResponseWriter, r *http.Request)
 				"run_id":           runID,
 				"blueprint_id":     blueprintID,
 				"task_description": req.TaskDescription,
-				"mode":             req.Mode,
+				"mode":             mode,
 				"session_id":       req.SessionID,
 			}
 			e, _ := builder.WithProject(s.ProjectsDir).WithMetadata(md).Build()
@@ -898,18 +917,9 @@ func (s *Server) handleStartRunFromSession(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Default mode
-	mode := req.Mode
-	if mode == "" {
-		mode = "danger-full-access"
-	}
-
-	// Validate mode
-	switch mode {
-	case "read-only", "workspace-write", "danger-full-access":
-		// valid
-	default:
-		WriteError(w, http.StatusBadRequest, fmt.Sprintf("invalid mode: %s (valid: read-only, workspace-write, danger-full-access)", mode))
+	mode, err := admitExecMode(req.Mode)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 

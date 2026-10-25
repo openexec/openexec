@@ -209,9 +209,11 @@ func assertChatBacklogUntouched(t *testing.T, dir string) {
 const chatLine = "Add a greeting line to README.md"
 
 // Criterion 1 (old-source control): the create→start pair chat used to send
-// loses the line and runs with full access although read-only was asked for.
-// The /runs routes are unchanged on purpose (other callers rely on them), so
-// this records the original bad result the new escalation must not produce.
+// loses the line and does not run in the read-only mode create was given:
+// start takes its own mode, and its body is empty. The start route no longer
+// widens an omitted mode to danger-full-access; it takes the documented
+// workspace-write default, and the claude argv still skips permissions under
+// it. This records the bad result the new escalation must not produce.
 func TestChatLegacyCreateStartLosesRequestAndWidensMode(t *testing.T) {
 	installChatProvider(t)
 	dir := chatFixture(t, "read-only")
@@ -245,11 +247,11 @@ func TestChatLegacyCreateStartLosesRequestAndWidensMode(t *testing.T) {
 	if strings.Contains(call.Argv, chatLine) {
 		t.Fatal("legacy create→start delivered the line; the old-source control no longer reproduces the defect")
 	}
-	if call.Mode != "danger-full-access" || call.SkipPermissions != "yes" {
-		t.Fatalf("legacy executor mode=%q skip_permissions=%s; want the broadened danger-full-access", call.Mode, call.SkipPermissions)
+	if call.Mode != "workspace-write" || call.SkipPermissions != "yes" {
+		t.Fatalf("legacy executor mode=%q skip_permissions=%s; want the start route's workspace-write default", call.Mode, call.SkipPermissions)
 	}
-	if got := d.persistedMode(t, runID); got != "danger-full-access" {
-		t.Fatalf("legacy persisted mode %q; want danger-full-access", got)
+	if got := d.persistedMode(t, runID); got != "workspace-write" {
+		t.Fatalf("legacy persisted mode %q; want workspace-write", got)
 	}
 }
 

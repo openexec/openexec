@@ -225,8 +225,7 @@ func chatExecMode(projectDir string) (string, error) {
 		}
 		mode, source = cfg.Execution.EffectiveExecMode(), "project exec_mode"
 	}
-	switch mode {
-	case "read-only", "workspace-write", "danger-full-access":
+	if project.ValidExecMode(mode) {
 		return mode, nil
 	}
 	return "", fmt.Errorf("%s %q is not an execution mode (valid: read-only, workspace-write, danger-full-access); no run was started", source, mode)

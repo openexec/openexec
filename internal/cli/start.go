@@ -520,18 +520,12 @@ Examples:
 			return fmt.Errorf("engine failed to become ready on port %d: %w\n\n  Check .openexec/daemon.log for details", startPort, err)
 		}
 
-		// Trigger blueprint run via API
-		// Blueprint runs use "run" mode for full automation
-		blueprintRunMode := runMode
-		if blueprintRunMode == "" || blueprintRunMode == "workspace-write" {
-			// Map execution permission mode to operational mode
-			// Default to "run" mode for blueprint execution
-			blueprintRunMode = "run"
-		}
+		// Trigger blueprint run via API with the requested execution mode;
+		// the daemon refuses anything that is not an execution mode.
 		payload := map[string]any{
 			"blueprint_id":     blueprintID,
 			"task_description": taskDescription,
-			"mode":             blueprintRunMode,
+			"mode":             runMode,
 		}
 		body, _ := json.Marshal(payload)
 
