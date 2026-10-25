@@ -1,23 +1,14 @@
 package cli
 
 import (
-	"context"
-	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/openexec/openexec/internal/release"
-	"github.com/openexec/openexec/pkg/api"
-	"github.com/openexec/openexec/pkg/db/state"
-	"github.com/openexec/openexec/pkg/manager"
-	"github.com/openexec/openexec/pkg/runtime"
 )
 
 func countPath(reqs []runRequest, path string) int {
@@ -210,42 +201,25 @@ func TestRunAcceptedPlanAndNoAutoPlanStillExecute(t *testing.T) {
 	})
 }
 
-// recordingStages is a deterministic stage executor: it never calls a
-// provider, it only records that a task was started.
-type recordingStages struct {
-	mu     sync.Mutex
-	stages []string
-}
-
-func (r *recordingStages) Execute(_ context.Context, s *runtime.Stage, _ *runtime.StageInput) (*runtime.StageResult, error) {
-	r.mu.Lock()
-	r.stages = append(r.stages, s.Name)
-	r.mu.Unlock()
-	return &runtime.StageResult{StageName: s.Name, Status: runtime.StageStatusCompleted, Attempt: 1}, nil
-}
-
-type failingPlanner struct{ t *testing.T }
-
-func (p failingPlanner) Complete(context.Context, string) (string, error) {
-	p.t.Error("planner was called for an intent that should fail validation")
-	return "", io.EOF
-}
-
-// The real runs:plan handler and native Manager.Plan, with an invalid
-// INTENT.md (HTTP 200, valid:false) or a missing one (HTTP 400), behind the
-// project's PID file. The unrelated pending backlog must not start.
+// The real daemon composition (server.New) and its runs:plan handler, with an
+// invalid INTENT.md or a missing one, behind the project's PID file. The
+// reviewed route refuses either before any planner or reviewer call (HTTP
+// 400 naming what is wrong), and the unrelated pending backlog must not start.
 func TestRunRealHandlerRefusesFailedPlanBeforeExecute(t *testing.T) {
 	cases := []struct {
 		name    string
 		intent  *string
-		wantErr string
+		wantErr []string
 	}{
-		{"invalid intent returns valid false", strPtr("no heading, no goals, no requirements\n"), "intent validation failed"},
-		{"missing intent returns 400", nil, "server returned 400"},
+		{"invalid intent is refused with its issues", strPtr("no heading, no goals, no requirements\n"), []string{"server returned 400", "intent validation failed", "Document title not found", "Goals section not found"}},
+		{"missing intent returns 400", nil, []string{"server returned 400", "INTENT.md"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newRunFixture(t, false)
+			p := installPlannerFixture(t, f.dir)
+			p.answer(t, "generate", incompletePlan)
+			p.answer(t, "review", approvingReview)
 			intentPath := filepath.Join(f.dir, "INTENT.md")
 			_ = os.Remove(intentPath)
 			if tc.intent != nil {
@@ -255,62 +229,27 @@ func TestRunRealHandlerRefusesFailedPlanBeforeExecute(t *testing.T) {
 			}
 			configPath := filepath.Join(f.dir, ".openexec", "config.json")
 			configBefore := readFile(t, configPath)
-
-			db, err := state.NewStore(filepath.Join(f.dir, ".openexec", "openexec.db"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			stages := &recordingStages{}
-			mgr, err := manager.New(manager.Config{
-				WorkDir:       f.dir,
-				StateStore:    db,
-				PlanGenerator: failingPlanner{t},
-				StageExecutor: stages,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			rec := &runDaemon{}
-			real := api.New(mgr, nil, nil, "", ":0").Handler()
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				raw, _ := io.ReadAll(r.Body)
-				rec.mu.Lock()
-				rec.requests = append(rec.requests, runRequest{Path: r.URL.Path})
-				rec.mu.Unlock()
-				// The daemon's readiness probe lives in internal/server, which
-				// wraps this handler; answer it here, everything else is real.
-				if r.URL.Path == "/api/ready" {
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-				r.Body = io.NopCloser(strings.NewReader(string(raw)))
-				real.ServeHTTP(w, r)
-			}))
-			u, _ := url.Parse(srv.URL)
-			if err := os.WriteFile(filepath.Join(f.dir, ".openexec", "openexec.pid"), []byte(fmt.Sprintf("%d:%s", os.Getpid(), u.Port())), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			e := startReviewedEngine(t, f.dir)
 
 			out, runErr := f.run(t)
-			srv.Close()
-			mgr.Close()
-			_ = db.Close()
 
-			reqs := rec.recorded()
+			reqs := e.recorded()
 			if n := countPath(reqs, "/api/v1/runs:execute"); n != 0 {
 				t.Fatalf("real handler path sent %d execute request(s) after a failed plan:%s", n, describeRequests(reqs))
 			}
 			if countPath(reqs, "/api/v1/runs:plan") != 1 {
 				t.Fatalf("requests = %s; want one plan request (err=%v)\n%s", describeRequests(reqs), runErr, out)
 			}
-			if runErr == nil || !strings.Contains(runErr.Error(), tc.wantErr) {
-				t.Fatalf("error = %v; want %q\n%s", runErr, tc.wantErr, out)
+			for _, want := range append(tc.wantErr, "nothing was executed") {
+				if runErr == nil || !strings.Contains(runErr.Error(), want) {
+					t.Fatalf("error = %v; want %q\n%s", runErr, want, out)
+				}
 			}
-			stages.mu.Lock()
-			started := append([]string(nil), stages.stages...)
-			stages.mu.Unlock()
-			if len(started) != 0 {
-				t.Fatalf("pending work started: stages %v", started)
+			if calls := p.calls(t); len(calls) != 0 {
+				t.Fatalf("planner or reviewer was called for a refused intent: %v", calls)
+			}
+			if receipts := planReceipts(t, e.srv.StateStore.GetDB()); len(receipts) != 0 {
+				t.Fatalf("a refused intent left a plan receipt: %v", receipts)
 			}
 			if _, err := os.Stat(filepath.Join(f.dir, ".openexec", "artifacts", "plans")); !os.IsNotExist(err) {
 				t.Fatalf("a plan artifact directory appeared: %v", err)

@@ -116,17 +116,7 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 	}
 
 	// 2. Load Config
-	projCfg, err := project.LoadProjectConfig(m.cfg.WorkDir)
-	if err != nil {
-		projCfg = &project.ProjectConfig{
-			Execution: project.ExecutionConfig{PlannerModel: "sonnet"},
-		}
-	}
-
-	plannerModel := projCfg.Execution.PlannerModel
-	if plannerModel == "" {
-		plannerModel = m.cfg.ExecutorModel
-	}
+	plannerModel, reviewerModel := nativePlanModels(m.cfg.WorkDir, m.cfg.ExecutorModel)
 
 	// 3. Run Planner
 	intentContent, err := os.ReadFile(absIntentPath)
@@ -160,11 +150,7 @@ func (m *Manager) Plan(ctx context.Context, req PlanRequest) (*PlanResult, error
 	if req.Review {
 		reviewer := m.cfg.PlanReviewer
 		if reviewer == nil {
-			model := projCfg.Execution.ReviewerModel
-			if model == "" {
-				model = plannerModel
-			}
-			reviewer = &cliLLMProvider{model: model}
+			reviewer = &cliLLMProvider{model: reviewerModel}
 		}
 		review, err = planner.New(reviewer).ReviewPlan(ctx, string(intentContent), plan)
 		if err != nil {
@@ -443,6 +429,50 @@ func (m *Manager) importBoundPlan(plan *planner.ProjectPlan, reviewed bool) erro
 
 	log.Printf("[Planner] Imported %d goals, %d stories, %d tasks into database", importedGoals, importedStories, importedTasks)
 	return nil
+}
+
+// nativePlanModels resolves the configured planner and reviewer models: the
+// planner falls back to the executor model, the reviewer to the planner.
+func nativePlanModels(workDir, executorModel string) (plannerModel, reviewerModel string) {
+	projCfg, err := project.LoadProjectConfig(workDir)
+	if err != nil {
+		projCfg = &project.ProjectConfig{
+			Execution: project.ExecutionConfig{PlannerModel: "sonnet"},
+		}
+	}
+	plannerModel = projCfg.Execution.PlannerModel
+	if plannerModel == "" {
+		plannerModel = executorModel
+	}
+	reviewerModel = projCfg.Execution.ReviewerModel
+	if reviewerModel == "" {
+		reviewerModel = plannerModel
+	}
+	return plannerModel, reviewerModel
+}
+
+// NativePlanAdapters returns the configured native CLI runner as the plan
+// generator and, as a separate invocation, the plan reviewer. The native
+// composition roots (daemon, `openexec plan`) set them as PlanGenerator and
+// PlanReviewer so CLI planning takes the reviewed, retained route. They run
+// under the same configured authority as the unreviewed fallback and resolve
+// models from the project config at each call.
+func NativePlanAdapters(workDir, executorModel string) (generator, reviewer planner.LLMProvider) {
+	return &nativePlanProvider{workDir: workDir, executorModel: executorModel},
+		&nativePlanProvider{workDir: workDir, executorModel: executorModel, review: true}
+}
+
+type nativePlanProvider struct {
+	workDir, executorModel string
+	review                 bool
+}
+
+func (p *nativePlanProvider) Complete(ctx context.Context, prompt string) (string, error) {
+	plannerModel, reviewerModel := nativePlanModels(p.workDir, p.executorModel)
+	if p.review {
+		plannerModel = reviewerModel
+	}
+	return (&cliLLMProvider{model: plannerModel}).Complete(ctx, prompt)
 }
 
 type cliLLMProvider struct {

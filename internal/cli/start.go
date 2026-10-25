@@ -240,6 +240,11 @@ Examples:
   openexec run             # Plan from INTENT.md, then execute all pending tasks
   openexec run T-001       # Execute only existing pending task T-001 (no planning)
 
+The plan is reviewed before import and execution: a separate reviewer call
+reviews it, a rejected plan is fixed once, and a reviewer that fails imports
+and executes nothing. An unchanged INTENT.md replays the retained reviewed
+plan without another model call or import.
+
 A named task must already exist, be pending and have its dependencies done;
 otherwise the engine refuses the run and nothing executes.
 
@@ -311,11 +316,7 @@ For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<des
 		// re-importing before the engine checks the selection would be a side
 		// effect of a request that may be refused.
 		if !runNoAutoPlan && len(args) == 0 {
-			planReq := map[string]any{
-				"intent_file": "INTENT.md",
-				"auto_import": true,
-			}
-			body, _ := json.Marshal(planReq)
+			body, _ := json.Marshal(reviewedPlanRequest(config.ProjectDir, "INTENT.md", false))
 			resp, err := http.Post(fmt.Sprintf("http://localhost:%d/api/v1/runs:plan", startPort), "application/json", bytes.NewReader(body))
 			if err != nil {
 				return fmt.Errorf("auto-planning failed: %w", err)
@@ -351,6 +352,7 @@ For a single focused fix, use: openexec blueprint --blueprint-id quick_fix "<des
 			if res.Plan == nil {
 				return fmt.Errorf("auto-planning failed: server returned no plan; nothing was executed")
 			}
+			printPlanEvidence(cmd, &res)
 		}
 
 		// Execute all pending tasks

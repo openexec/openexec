@@ -200,7 +200,12 @@ func New(cfg Config) (*Server, error) {
 		loopArgs = nil
 	}
 
+	// CLI planning takes the reviewed, retained route: the configured runner
+	// generates the plan and, as a separate call, reviews it before import.
+	planGenerator, planReviewer := manager.NativePlanAdapters(projectsAbs, modelUsed)
 	mgr, err := manager.New(manager.Config{
+		PlanGenerator: planGenerator,
+		PlanReviewer:  planReviewer,
 		WorkDir:       projectsAbs,
 		AgentsFS:      agentsFS,
 		LogDir:        logDir,

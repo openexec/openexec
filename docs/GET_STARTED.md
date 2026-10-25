@@ -95,6 +95,8 @@ Now, turn that intent into concrete tasks:
 
 OpenExec will generate a plan stored in the SQLite database (`.openexec/openexec.db`) containing the execution DAG (Directed Acyclic Graph) of tasks.
 
+Before anything is imported, a separate reviewer call (your configured `reviewer_model`, else the planner model) reviews the plan; a rejected plan is fixed once and then imported. If the reviewer fails or cannot be reached, nothing is imported (and `openexec run` executes nothing). The plan and its review are kept under `.openexec/artifacts/plans/`, and running `plan` or `run` again with an unchanged `INTENT.md` reuses them without another model call or a duplicate import.
+
 ## 5. Running the System
 
 ### Blueprint Execution
