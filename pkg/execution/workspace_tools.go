@@ -11,15 +11,14 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/openexec/openexec/pkg/agent"
 )
 
-// maxToolOutputBytes caps what one tool call may return to the model. A file
-// larger than this is truncated with a marker rather than silently cut: a
-// model that believes it read a whole file and did not will edit from a false
-// premise.
-const maxToolOutputBytes = 128 << 10
+// Bound each file read before it enters the model's retained tool history.
+// Large source files remain accessible through explicit continuation offsets.
+const maxReadFileBytes = 8 << 10
 
 // deniedComponents are path components no tool may traverse into, whatever the
 // roots say.
@@ -83,10 +82,14 @@ func WorkspaceTools(sandbox Sandbox) []agent.ToolDefinition {
 	tools := []agent.ToolDefinition{
 		{
 			Name:        "read_file",
-			Description: "Read a file's contents. Paths are relative to the working directory unless absolute.",
+			Description: "Read up to 8192 bytes of a file. Use offset_bytes and limit_bytes for the relevant section; a partial read reports the next offset. Paths are relative to the working directory unless absolute.",
 			InputSchema: json.RawMessage(`{
 				"type": "object",
-				"properties": {"path": {"type": "string", "description": "Path to the file to read."}},
+				"properties": {
+					"path": {"type": "string", "description": "Path to the file to read."},
+					"offset_bytes": {"type": "integer", "minimum": 0, "description": "Byte offset to start reading; defaults to 0."},
+					"limit_bytes": {"type": "integer", "minimum": 1, "maximum": 8192, "description": "Maximum bytes to return; defaults to 8192."}
+				},
 				"required": ["path"]
 			}`),
 		},
@@ -169,10 +172,19 @@ func (e *WorkspaceToolExecutor) ExecuteTool(_ context.Context, request ToolReque
 
 func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
 	var input struct {
-		Path string `json:"path"`
+		Path   string `json:"path"`
+		Offset int64  `json:"offset_bytes"`
+		Limit  *int   `json:"limit_bytes"`
 	}
 	if err := json.Unmarshal(request.Input, &input); err != nil {
 		return "", fmt.Errorf("invalid input: %w", err)
+	}
+	limit := maxReadFileBytes
+	if input.Limit != nil {
+		limit = *input.Limit
+	}
+	if input.Offset < 0 || limit < 1 || limit > maxReadFileBytes {
+		return "", fmt.Errorf("offset_bytes must be nonnegative and limit_bytes must be between 1 and %d", maxReadFileBytes)
 	}
 	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		file, err := root.Open(relative)
@@ -183,15 +195,26 @@ func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
 		if err := refuseDeniedOpenedTarget(root, file, relative, input.Path); err != nil {
 			return "", err
 		}
+		if _, err := file.Seek(input.Offset, io.SeekStart); err != nil {
+			return "", fmt.Errorf("seek file: %w", err)
+		}
 		// One byte past the cap distinguishes "exactly at the limit" from
 		// "truncated", so the marker is never a lie in either direction.
-		data, err := io.ReadAll(io.LimitReader(file, maxToolOutputBytes+1))
+		data, err := io.ReadAll(io.LimitReader(file, int64(limit)+1))
 		if err != nil {
 			return "", fmt.Errorf("read file: %w", err)
 		}
-		if len(data) > maxToolOutputBytes {
-			return string(data[:maxToolOutputBytes]) +
-				fmt.Sprintf("\n\n[truncated at %d bytes]", maxToolOutputBytes), nil
+		if len(data) > limit {
+			end := limit
+			// The continuation starts on the same UTF-8 boundary as this page
+			// ends, so reassembling source never loses a split character.
+			for end > 0 && !utf8.RuneStart(data[end]) {
+				end--
+			}
+			if end == 0 {
+				return "", fmt.Errorf("limit_bytes is too small for the next UTF-8 character")
+			}
+			return string(data[:end]) + fmt.Sprintf("\n\n[more file content; continue with offset_bytes=%d]", input.Offset+int64(end)), nil
 		}
 		return string(data), nil
 	})
