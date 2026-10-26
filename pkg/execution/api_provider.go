@@ -56,6 +56,10 @@ type APIProviderConfig struct {
 	MaxSteps     int
 }
 
+// DefaultAPIMaxTurns is the tool-round allowance when a provider has no override.
+// A round may contain multiple tool calls; final synthesis is outside this cap.
+const DefaultAPIMaxTurns = 160
+
 // APIProvider adapts OpenAI-compatible and other API adapters to the same
 // authorization boundary as CLI providers. Tools receive the exact sandbox
 // and roots from the authorized request.
@@ -97,8 +101,11 @@ func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if len(config.Tools) > 0 && config.ToolExecutor == nil {
 		return nil, errors.New("tool executor is required when API tools are configured")
 	}
-	if config.MaxSteps <= 0 {
-		config.MaxSteps = 16
+	if config.MaxSteps < 0 {
+		return nil, errors.New("API provider max_turns must be positive or zero for the default")
+	}
+	if config.MaxSteps == 0 {
+		config.MaxSteps = DefaultAPIMaxTurns
 	}
 	return &APIProvider{config: config, gateway: gateway}, nil
 }

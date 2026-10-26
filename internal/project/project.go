@@ -221,6 +221,8 @@ type ProviderConfig struct {
 	BaseURL string `json:"base_url"`
 	APIKey  string `json:"api_key"`
 	Model   string `json:"model"`
+	// MaxTurns bounds API tool rounds. Zero uses the executor default.
+	MaxTurns int `json:"max_turns,omitempty"`
 }
 
 // ActiveAPI resolves the currently active API endpoint. It returns the

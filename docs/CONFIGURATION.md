@@ -1,7 +1,8 @@
 # OpenExec Configuration Guide
 
-**Status:** built, partial coverage. Everything documented here is `openexec.yaml`
-and its `OPENEXEC_*` overrides, written 2026-03-15. Configuration added since is
+**Status:** built, partial coverage. The API round limits below use project JSON;
+the remaining settings cover `openexec.yaml` and its `OPENEXEC_*` overrides,
+written 2026-03-15. Other configuration added since is
 **not** here: the operator-owned infra allowlist `.openexec/infra.yaml`
 ([SRE_ORCHESTRATION_ROADMAP.md](SRE_ORCHESTRATION_ROADMAP.md) — deliberately a
 separate file, and unknown keys fail the load), the approval gate's
@@ -11,6 +12,45 @@ separate file, and unknown keys fail the load), the approval gate's
 (`CLAUDE.md`).
 
 This guide covers the `openexec.yaml` configuration options for OpenExec, including agent selection, execution settings, quality gates, toolsets, blueprints, and more.
+
+## API execution round limits
+
+Agent Console's `execution-stdio` API providers read their configuration from
+the registered project's `.openexec/config.json`. Set `max_turns` on the named
+provider to control its tool-round allowance:
+
+```json
+{
+  "execution": {
+    "providers": {
+      "qwen-27b": {
+        "base_url": "http://127.0.0.1:11436/v1",
+        "api_key": "local",
+        "model": "qwen38-27b-mtp2-128k",
+        "max_turns": 100
+      }
+    }
+  }
+}
+```
+
+Merge the field into the existing provider entry, preserving other settings.
+The default is **160** when the field is omitted or zero. Use **100** for the
+initial Qwen trial; unusually hard tasks can use **900**. Negative values and
+non-integers are refused. This setting applies to workspace, standalone gateway
+and combined workspace/gateway API runs; native CLI providers keep their own
+limits.
+
+A round is one model completion followed by its tool calls, which may be more
+than one. The final answer request and its bounded recovery are outside the
+round allowance. Reaching the cap still reports `inconclusive: max_turns` even
+when final synthesis returns text. Existing token, context, timeout, cancellation
+and tool authorization limits continue to apply independently.
+
+The provider configuration is re-read for each new run. Editing this value needs
+no Console restart and does not change runs already in flight. For isolated
+task worktrees, edit the registered project's configuration, which the Console
+supplies through `ConfigDir`, rather than a temporary task checkout.
 
 ## Configuration File
 
