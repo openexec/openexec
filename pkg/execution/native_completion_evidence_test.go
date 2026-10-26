@@ -65,7 +65,7 @@ func TestNativeThinkingOnlyIsNotMisreportedAsNoReasoning(t *testing.T) {
 		{Metadata: map[string]any{"thinking": "PRIVATE_REASONING"}},
 	}}
 	p := &APIProvider{config: APIProviderConfig{Adapter: a}}
-	_, err := p.completeWithEmptyRecovery(context.Background(), agent.Request{})
+	_, err := p.completeWithEmptyRecovery(context.Background(), agent.Request{Messages: []agent.Message{agent.NewTextMessage(agent.RoleUser, "perform assigned work")}})
 	if err == nil || !strings.Contains(err.Error(), "returned reasoning but neither") || strings.Contains(err.Error(), "PRIVATE_REASONING") || len(a.requests) != 2 {
 		t.Fatalf("native reasoning misclassified or leaked: %v", err)
 	}

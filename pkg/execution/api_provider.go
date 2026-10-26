@@ -422,14 +422,14 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 // failing throws away an otherwise useful turn. A second empty response is a
 // real provider/protocol failure and remains visible to the caller.
 func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request agent.Request) (*agent.Response, error) {
-	response, err := p.config.Adapter.Complete(ctx, request)
+	response, err := p.completeChecked(ctx, request)
 	if err != nil || responseHasVisibleOutcome(response) {
 		return response, err
 	}
 	reasoningOnly := responseHasReasoning(response)
 	firstObservation := nativeCompletionEvidence(response)
 	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
-	response, err = p.config.Adapter.Complete(ctx, request)
+	response, err = p.completeChecked(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider empty-response recovery failed%s: %w", firstObservation, err)
 	}
@@ -467,7 +467,7 @@ func nativeCompletionEvidence(response *agent.Response) string {
 // for strict endpoints, then make one grammar-free direct-answer retry and
 // accept only non-empty assistant text.
 func (p *APIProvider) completeFinalSynthesis(ctx context.Context, request agent.Request) (*agent.Response, error) {
-	response, err := p.config.Adapter.Complete(ctx, request)
+	response, err := p.completeChecked(ctx, request)
 	if err != nil || responseHasFinalAnswerText(response) {
 		return response, err
 	}
@@ -482,7 +482,7 @@ func (p *APIProvider) completeFinalSynthesis(ctx context.Context, request agent.
 		recovery = "/no_think\n" + recovery
 	}
 	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, recovery))
-	response, err = p.config.Adapter.Complete(ctx, request)
+	response, err = p.completeChecked(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider final-synthesis recovery failed: %w", err)
 	}
@@ -577,6 +577,79 @@ func replayMessages(request Request) []agent.Message {
 		messages = append(messages, agent.NewTextMessage(role, message.Content))
 	}
 	return append(messages, agent.NewTextMessage(agent.RoleUser, request.Prompt))
+}
+
+// completeChecked is the single transport gate for the tool loop: no request
+// leaves for the endpoint unless its conversation is one a chat template can
+// render. Qwen-style templates raise "No user query found in messages" (HTTP
+// 500, with the prompt tokens already spent) when no plain user turn remains,
+// so refuse locally with a precise reason instead.
+func (p *APIProvider) completeChecked(ctx context.Context, request agent.Request) (*agent.Response, error) {
+	if err := validateTransportConversation(request.Messages); err != nil {
+		return nil, err
+	}
+	return p.config.Adapter.Complete(ctx, request)
+}
+
+// isPlainUserQuery reports whether a message is a user turn a chat template
+// will treat as the owner's query: non-empty text that is not itself a wrapped
+// tool response.
+func isPlainUserQuery(message agent.Message) bool {
+	if message.Role != agent.RoleUser {
+		return false
+	}
+	text := strings.TrimSpace(message.GetText())
+	if text == "" {
+		return false
+	}
+	return !(strings.HasPrefix(text, "<tool_response>") && strings.HasSuffix(text, "</tool_response>"))
+}
+
+// validateTransportConversation fails closed on conversations that are
+// malformed for a compatible endpoint: an empty conversation, a foreign role,
+// no plain user query, an orphan tool result, or a tool call left unanswered
+// before the next turn.
+func validateTransportConversation(messages []agent.Message) error {
+	if len(messages) == 0 {
+		return errors.New("API conversation is empty")
+	}
+	hasQuery := false
+	pending := map[string]bool{}
+	for index, message := range messages {
+		switch message.Role {
+		case agent.RoleUser, agent.RoleAssistant:
+			if len(pending) > 0 {
+				return fmt.Errorf("API conversation message %d follows an unanswered tool call", index)
+			}
+			if message.Role == agent.RoleUser {
+				hasQuery = hasQuery || isPlainUserQuery(message)
+			}
+			for _, call := range message.GetToolCalls() {
+				if message.Role == agent.RoleAssistant {
+					pending[call.ToolUseID] = true
+				}
+			}
+		case agent.RoleTool:
+			for _, block := range message.Content {
+				if block.Type != agent.ContentTypeToolResult {
+					continue
+				}
+				if !pending[block.ToolResultID] {
+					return fmt.Errorf("API conversation message %d has a tool result with no matching call", index)
+				}
+				delete(pending, block.ToolResultID)
+			}
+		default:
+			return fmt.Errorf("API conversation message %d has foreign role %q", index, message.Role)
+		}
+	}
+	if len(pending) > 0 {
+		return errors.New("API conversation ends with an unanswered tool call")
+	}
+	if !hasQuery {
+		return errors.New("API conversation has no plain user query for the endpoint template")
+	}
+	return nil
 }
 
 var _ Provider = (*APIProvider)(nil)
