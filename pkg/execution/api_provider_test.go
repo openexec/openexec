@@ -245,6 +245,55 @@ func TestAPIProviderSynthesizesFinalAnswerWhenToolBudgetIsReached(t *testing.T) 
 	}
 }
 
+// toolInvitedAdapter models the observed configured-Qwen behaviour at the
+// tool-budget boundary: with tools present it answers synthesis with a real tool
+// call, and with tools removed it serializes a <tool_call> block exactly when
+// the instructions it was given still offer a tool call.
+type toolInvitedAdapter struct {
+	fakeAPIAdapter
+}
+
+func (a *toolInvitedAdapter) Complete(_ context.Context, request agent.Request) (*agent.Response, error) {
+	a.requests = append(a.requests, request)
+	text := request.System
+	for _, message := range request.Messages {
+		text += "\n" + message.GetText()
+	}
+	if len(request.Tools) > 0 && len(a.requests) > 1 || len(a.requests) == 1 {
+		return &agent.Response{Content: []agent.ContentBlock{{
+			Type: agent.ContentTypeToolUse, ToolUseID: fmt.Sprintf("call-%d", len(a.requests)), ToolName: "read_file",
+			ToolInput: json.RawMessage(`{"path":"evidence.txt"}`),
+		}}, StopReason: agent.StopReasonToolUse}, nil
+	}
+	if strings.Contains(text, "issue one valid tool call") {
+		return &agent.Response{Content: []agent.ContentBlock{{
+			Type: agent.ContentTypeText, Text: "<tool_call>\n<function=read_file>\n</function>\n</tool_call>",
+		}}, StopReason: agent.StopReasonEnd}, nil
+	}
+	return &agent.Response{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "final contract"}}, StopReason: agent.StopReasonEnd}, nil
+}
+
+func TestAPIProviderSynthesisRecoveryDoesNotInviteToolCalls(t *testing.T) {
+	adapter := &toolInvitedAdapter{}
+	provider, err := NewAPIProvider(APIProviderConfig{
+		Adapter: adapter, ToolExecutor: &recordingToolExecutor{}, MaxSteps: 1,
+		Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := provider.Execute(context.Background(), Request{
+		ID: "boundary", WorkingDir: t.TempDir(), Prompt: "inspect", Model: "qwen38-27b-mtp2-128k",
+		Sandbox: Sandbox{Mode: "read-only"},
+	}, func(Event) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Reason != ReasonMaxTurns || result.FinalText != "final contract" {
+		t.Fatalf("budget boundary yielded no usable text: %+v", result)
+	}
+}
+
 func TestAPIProviderRecoversReasoningOnlyFinalSynthesisWithoutToolGrammar(t *testing.T) {
 	toolCall := &agent.Response{Content: []agent.ContentBlock{{
 		Type: agent.ContentTypeToolUse, ToolUseID: "call-1", ToolName: "read_file",
@@ -293,7 +342,9 @@ func TestAPIProviderRecoversReasoningOnlyFinalSynthesisWithoutToolGrammar(t *tes
 	}
 	last := recovery.Messages[len(recovery.Messages)-1]
 	if last.Role != agent.RoleUser || !strings.Contains(last.GetText(), "/no_think") ||
-		!strings.Contains(recovery.System, emptyCompletionRecoveryInstruction) {
+		!strings.Contains(recovery.System, finalSynthesisRecoveryInstruction) ||
+		strings.Contains(recovery.System, "issue one valid tool call") ||
+		strings.Contains(last.GetText(), "issue one valid tool call") {
 		t.Fatalf("recovery did not end with a direct visible-answer request: %+v", recovery)
 	}
 	for _, event := range events {

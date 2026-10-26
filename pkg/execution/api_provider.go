@@ -70,6 +70,12 @@ const finalSynthesisInstruction = "The tool-call budget for this turn is exhaust
 
 const emptyCompletionRecoveryInstruction = "Your previous completion contained no user-visible assistant text and no tool call. Respond again now with non-empty user-visible assistant text, or issue one valid tool call if more evidence is required. Do not return private reasoning by itself."
 
+// The synthesis recovery must not reuse emptyCompletionRecoveryInstruction: that
+// text invites "one valid tool call if more evidence is required", which after
+// the budget is spent made the configured Qwen model answer the recovery with a
+// serialized tool call and end the run as inconclusive:max_turns with no answer.
+const finalSynthesisRecoveryInstruction = "Your previous completion contained no user-visible answer. The tool-call budget is exhausted: tools are unavailable and no tool call will be run, so do not emit a tool call or a <tool_call> block. Using the tool results already in the conversation, respond now with non-empty user-visible assistant text that gives the final answer. Do not return private reasoning by itself."
+
 func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if config.Adapter == nil {
 		return nil, errors.New("API adapter is required")
@@ -483,10 +489,10 @@ func (p *APIProvider) completeFinalSynthesis(ctx context.Context, request agent.
 	firstHadReasoning := responseHasReasoning(response)
 	firstHadToolCall := response != nil && len(response.GetToolCalls()) > 0
 	firstHadSerializedToolCall := responseContainsSerializedToolCall(response)
-	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
+	request.System = appendSystemInstruction(request.System, finalSynthesisRecoveryInstruction)
 	request.Tools = nil
 	request.ToolChoice = "none"
-	recovery := emptyCompletionRecoveryInstruction
+	recovery := finalSynthesisRecoveryInstruction
 	if strings.Contains(strings.ToLower(request.Model), "qwen") {
 		recovery = "/no_think\n" + recovery
 	}
