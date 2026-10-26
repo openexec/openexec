@@ -43,7 +43,7 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		// powers of two. Do not shrink it as prior requests consume capacity:
 		// that made a valid 23K prompt reach a newly reduced 16K context.
 		p.contextCap = 2048
-		ceiling := int64(32768)
+		ceiling := MaxAPIContextTokens
 		if p.contextLimit > 0 && p.contextLimit < ceiling {
 			ceiling = p.contextLimit
 		}

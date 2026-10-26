@@ -47,6 +47,14 @@ round allowance. Reaching the cap still reports `inconclusive: max_turns` even
 when final synthesis returns text. Existing token, context, timeout, cancellation
 and tool authorization limits continue to apply independently.
 
+Bounded API execution now has a **65,536-token context ceiling** per inference.
+An explicit `ContextTokenLimit` between 2,048 and 65,536 can narrow it. The
+executor selects a stable power-of-two context that its existing cumulative
+token grant can reserve, including 2,048 output tokens; a smaller remaining
+grant can therefore still admit only 32K or less. This does not increase the
+total grant or the output allowance. Native requests keep `truncate=false`,
+and oversized input is refused before inference rather than silently cut.
+
 The provider configuration is re-read for each new run. Editing this value needs
 no Console restart and does not change runs already in flight. For isolated
 task worktrees, edit the registered project's configuration, which the Console

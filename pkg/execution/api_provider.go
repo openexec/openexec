@@ -60,6 +60,10 @@ type APIProviderConfig struct {
 // A round may contain multiple tool calls; final synthesis is outside this cap.
 const DefaultAPIMaxTurns = 160
 
+// MaxAPIContextTokens is the default per-inference ceiling when the cumulative
+// grant can reserve it. Explicit smaller ceilings and remaining grants narrow it.
+const MaxAPIContextTokens int64 = 65536
+
 // APIProvider adapts OpenAI-compatible and other API adapters to the same
 // authorization boundary as CLI providers. Tools receive the exact sandbox
 // and roots from the authorized request.
@@ -176,8 +180,8 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 			return Result{}, err
 		}
 	}
-	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > 32768 || request.TokenBudget <= 0) {
-		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and 32768")
+	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > MaxAPIContextTokens || request.TokenBudget <= 0) {
+		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and %d", MaxAPIContextTokens)
 	}
 	if request.TokenBudget < 0 {
 		return Result{}, fmt.Errorf("negative token grant")
