@@ -146,6 +146,15 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 }
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
+	started := time.Now().UTC()
+	result, err := p.execute(ctx, request, sink)
+	if result.Outcome == OutcomeFailed || result.Outcome == OutcomeInconclusive {
+		captureRequest(p.config.Adapter, started, result, err)
+	}
+	return result, err
+}
+
+func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	if request.NonThinking {
 		if request.TokenBudget <= 0 || !supportsNativeNonThinking(p.config.Adapter) {
 			return Result{}, fmt.Errorf("native non-thinking mode requires a supported adapter and hard token grant")
@@ -172,7 +181,7 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		request.TokenBudget = 0
 		request.ContextTokenLimit = 0
 		request.NonThinking = false // The run-local adapter retains it for every call/retry.
-		result, err := bounded.Execute(ctx, request, sink)
+		result, err := bounded.execute(ctx, request, sink)
 		if errors.Is(err, errHardTokenGrantExhausted) {
 			// Empty-response/final-synthesis recovery may wrap this refusal.
 			// Preserve the existing typed transport spelling for Console's
