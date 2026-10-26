@@ -85,6 +85,26 @@ type OpenAIProvider struct {
 	models               []string
 	modelInfo            map[string]*ModelInfo
 	name                 string
+	// last is the most recent request body sent, for a failure capture
+	// (LastRequest); never logged or sent anywhere by this package.
+	lastMu sync.Mutex
+	last   []byte
+	lastAt time.Time
+}
+
+// LastRequest is the most recent chat completion body this provider sent,
+// when it sent it, and the endpoint it went to. The body carries no
+// credential: the key travels in the Authorization header only.
+func (p *OpenAIProvider) LastRequest() ([]byte, time.Time, string) {
+	p.lastMu.Lock()
+	defer p.lastMu.Unlock()
+	return append([]byte(nil), p.last...), p.lastAt, p.config.BaseURL
+}
+
+func (p *OpenAIProvider) remember(body []byte) {
+	p.lastMu.Lock()
+	p.last, p.lastAt = body, time.Now().UTC()
+	p.lastMu.Unlock()
 }
 
 // Compile-time check that OpenAIProvider implements ProviderAdapter.
@@ -207,6 +227,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 		}
 	}
 
+	p.remember(body)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.config.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, &ProviderError{
@@ -253,6 +274,7 @@ func (p *OpenAIProvider) Stream(ctx context.Context, req Request) (<-chan Stream
 		}
 	}
 
+	p.remember(body)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.config.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, &ProviderError{
