@@ -59,6 +59,69 @@ Fidelity, stated rather than assumed:
   **not** `scripts/api-replay.py`, which replays one captured request; that
   script was not run on the new format and compatibility is not claimed.
 
+## Run 7a722: structural diagnosis (revision `b5894311`)
+
+Status: **the native loop's behaviour for this sequence is explained; the cause
+of the model's behaviour is not reproduced at the configured endpoint; the
+caller-visible half is unknown.** Source: the operator's metadata-only receipt
+of the private trace (18 entries, 72 events, final text 6021 characters,
+`droppedEntries` 0, `incomplete` false, `imagesOmitted` false,
+`redactionChangedContent` true). The private trace itself was not opened by this
+task, and no content, endpoint, token or tool argument is recorded here.
+
+Structural facts (from the receipt):
+
+- Entries 1-16: tools sent (2 definitions), `tool_choice` `auto`; every response
+  was `tool_use` with 2,1,1,1,2,2,1,2,1,1,2,2,1,1,1,2 calls = 23 calls, matching
+  23 `tool.proposed`/`started`/`completed` events and no response text.
+- Entry 17: the synthesis request. Tools still sent (2), `tool_choice` `none`.
+  The response was **another `tool_use`** (1 block, stop reason `tool_use`, 0 text
+  characters). That call was not executed (23 tool events, not 24).
+- Entry 18: the final-synthesis recovery request: no tools on the request or the
+  wire, `tool_choice` `none`. The response was one text block of 6021 characters,
+  stop reason `end_turn`, containing all seven contract section names.
+- Events end `tool.completed, assistant.delta, execution.inconclusive`
+  (`max_turns`); no `execution.completed`.
+
+Diagnosis. This is the code's documented path, not a second fault:
+`completeFinalSynthesis` (`pkg/execution/api_provider.go`) sends the synthesis
+request with tools kept for strict endpoints; when the endpoint ignores
+`tool_choice: none` and returns a tool call, it makes one tool-less retry with
+`finalSynthesisRecoveryInstruction`; that retry produced the draft; the loop then
+ends `inconclusive:max_turns` because every end of the tool loop does. So the
+16-round budget was spent on research (the supervisor's reading of the private
+trace is that the model searched for a split-task symbol with only `read_file`
+and `list_directory`; that is a contributing capability gap tracked by PR #159,
+not established here as a sufficient cause), the model ignored `tool_choice:
+none` once, and the recovery returned a complete draft. The empty `tools` of the
+9fc capture is explained for 7a722 by entry 18 being the recovery request.
+
+Authored-surrogate reproduction (`pkg/execution/sequence_7a722_test.go`): a local
+server scripts exactly this shape through the real `APIProvider` and OpenAI
+adapter. The run ends `inconclusive:max_turns` with the 6021-character text, 18
+recorded entries with the structure above, 23 tool events and the terminal event
+order; the written trace replays offline through `traceReplayAdapter` with the
+same 18 requests, outcome, final text and event types. Near miss: with a
+recovery that is also a tool call, no assistant text is emitted. This is a
+fixture; it is not the configured endpoint.
+
+Observed directly by the trace: OpenExec's requests, the endpoint's responses
+and OpenExec's events. **Not observable from OpenExec:** the caller-visible
+result and whether the Console persisted or dropped the draft (Console 7154).
+**Limits:** `redactionChangedContent` true means the trace is not byte-identical
+to the wire, so an offline replay of the private trace may differ from the real
+request sequence; this task did not replay the private trace.
+
+Not reproduced: why the endpoint returned a tool call under `tool_choice: none`
+at entry 17, and why the operator's last-request replay against the same endpoint timed out (120.1 s).
+Missing observation and command (supervisor-run, protected, structural output
+only): replay the private trace's requests in order through the existing
+`traceReplayAdapter` consumer against the original endpoint (not a single-request
+`scripts/api-replay.py` run), and report per entry only the tool count,
+`tool_choice`, response block types and stop reason. No repair is claimed or
+authorized by this finding; a later repair must name a reproduced cause and a
+failing-then-passing test.
+
 ## The OpenExec to Console boundary
 
 Proven in this repository (tests above and `terminal_draft_boundary_test.go`):
