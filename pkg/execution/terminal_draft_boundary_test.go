@@ -15,7 +15,7 @@ import (
 
 const authoredDraft = "## Contract\n1. Do the thing.\n2. Prove it."
 
-// roundsWithCalls returns tool-using responses carrying total calls (37 is the
+// roundsWithCalls returns tool-using responses carrying total calls (36 is the
 // count observed for run b93662ba), spread as evenly as possible.
 func roundsWithCalls(rounds, total int) []*agent.Response {
 	out := make([]*agent.Response, 0, rounds)
@@ -49,7 +49,7 @@ func eventTypes(events []Event) []string {
 // draft is in FinalText and was streamed as an assistant delta. The inconclusive
 // event carries no text.
 func TestCompleteDraftAfterRoundLimitStillEndsMaxTurns(t *testing.T) {
-	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(16, 37), draftResponse())}
+	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(16, 36), draftResponse())}
 	tools := &recordingToolExecutor{}
 
 	result, events, err := runBoundary(t, context.Background(), adapter, tools, 0)
@@ -57,7 +57,7 @@ func TestCompleteDraftAfterRoundLimitStillEndsMaxTurns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.requests) != 37 || len(adapter.requests) != 17 {
+	if len(tools.requests) != 36 || len(adapter.requests) != 17 {
 		t.Fatalf("tool calls = %d, model requests = %d", len(tools.requests), len(adapter.requests))
 	}
 	if result.Outcome != OutcomeInconclusive || result.Reason != ReasonMaxTurns {
@@ -73,7 +73,7 @@ func TestCompleteDraftAfterRoundLimitStillEndsMaxTurns(t *testing.T) {
 	if last.Type != EventInconclusive || last.Reason != ReasonMaxTurns || last.Text != "" {
 		t.Fatalf("terminal event = %+v", last)
 	}
-	// 37 calls give 74 tool events, then the draft delta, then the terminal.
+	// 36 calls give 72 tool events, then the draft delta, then the terminal.
 	// Agent Console turns that terminal into turn.error then turn.inconclusive
 	// and saves a triage contract only for a completed run.
 	delta := events[len(events)-2]
@@ -89,15 +89,15 @@ func TestCompleteDraftAfterRoundLimitStillEndsMaxTurns(t *testing.T) {
 			t.Fatalf("a completed event was emitted: %v", eventTypes(events))
 		}
 	}
-	if completed != 37 {
+	if completed != 36 {
 		t.Fatalf("tool.completed events = %d", completed)
 	}
 }
 
-// Smallest changed ordering: the same 37 calls in 15 rounds, then the draft as a
+// Smallest changed ordering: the same 36 calls in 15 rounds, then the draft as a
 // normal round with tools available, succeed. Nothing else differs.
 func TestSameDraftWithinRoundLimitSucceeds(t *testing.T) {
-	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(15, 37), draftResponse())}
+	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(15, 36), draftResponse())}
 	tools := &recordingToolExecutor{}
 
 	result, events, err := runBoundary(t, context.Background(), adapter, tools, 0)
@@ -105,7 +105,7 @@ func TestSameDraftWithinRoundLimitSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.requests) != 37 {
+	if len(tools.requests) != 36 {
 		t.Fatalf("tool calls = %d", len(tools.requests))
 	}
 	if result.Outcome != OutcomeSucceeded || result.Reason != "" {
@@ -130,7 +130,7 @@ func TestFailedSynthesisIsMaxTurnsWithoutDraft(t *testing.T) {
 		Content:    []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "<tool_call>{}</tool_call>"}},
 		StopReason: agent.StopReasonEnd,
 	}
-	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(16, 37), toolCall, toolCall)}
+	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(16, 36), toolCall, toolCall)}
 
 	result, events, err := runBoundary(t, context.Background(), adapter, &recordingToolExecutor{}, 0)
 
