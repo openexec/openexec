@@ -95,7 +95,7 @@ func WorkspaceTools(sandbox Sandbox) []agent.ToolDefinition {
 		},
 		{
 			Name:        "search_files",
-			Description: "Find a literal string in files beneath a directory or in one file. Returns matching paths, line numbers and text, bounded to 8192 output bytes, 4096 entries and 16 MiB read. Skips symbolic links and private configuration directories. Use a narrow path; a partial scan is marked incomplete.",
+			Description: "Find a literal string in files beneath a directory or in one file. Returns matching paths, line numbers and text, bounded to 8192 output bytes, 4096 entries and 16 MiB read. Paths can be passed to read_file. Skips symbolic links and private configuration directories. Long matching lines are truncated, unreadable entries skipped, and partial scans marked incomplete. No pagination: narrow the path or text to continue.",
 			InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {

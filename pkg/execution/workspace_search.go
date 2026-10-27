@@ -11,12 +11,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
-	maxSearchEntries = 4096
-	maxSearchBytes   = 16 << 20
-	searchIncomplete = "[incomplete search: limit reached; narrow the path or text]\n"
+	maxSearchEntries   = 4096
+	maxSearchBytes     = 16 << 20
+	maxSearchLineBytes = 1024
+	searchIncomplete   = "[incomplete search: limits, truncated lines or unreadable entries; narrow the path or text]\n"
 )
 
 // searchFiles reuses the workspace read boundary; it cannot execute commands,
@@ -46,7 +48,11 @@ func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolReq
 				return fs.SkipAll
 			}
 			if walkErr != nil {
-				return walkErr
+				if path == filepath.ToSlash(relative) {
+					return walkErr
+				}
+				incomplete = true
+				return nil
 			}
 			if _, denied := deniedComponent(path); denied {
 				if entry.IsDir() {
@@ -62,7 +68,11 @@ func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolReq
 			}
 			file, err := root.Open(path)
 			if err != nil {
-				return err
+				if path == filepath.ToSlash(relative) {
+					return err
+				}
+				incomplete = true
+				return nil
 			}
 			defer file.Close()
 			if err := refuseDeniedOpenedTarget(root, file, path, input.Path); err != nil {
@@ -84,7 +94,25 @@ func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolReq
 				if !strings.Contains(text, input.Text) {
 					continue
 				}
-				match := fmt.Sprintf("%s:%d:%s\n", path, line+1, text)
+				// Results obey the same WorkingDir anchoring as read_file, even
+				// when withinRoots selected a parent or sibling readable root.
+				absolute, err := filepath.Abs(filepath.Join(root.Name(), filepath.FromSlash(path)))
+				if err != nil {
+					return err
+				}
+				displayPath, err := filepath.Rel(request.WorkingDir, absolute)
+				if err != nil {
+					return err
+				}
+				if len(text) > maxSearchLineBytes {
+					end := maxSearchLineBytes
+					for end > 0 && !utf8.RuneStart(text[end]) {
+						end--
+					}
+					text = text[:end] + " [line truncated]"
+					incomplete = true
+				}
+				match := fmt.Sprintf("%s:%d:%s\n", filepath.ToSlash(displayPath), line+1, text)
 				if out.Len()+len(match)+len(searchIncomplete) > maxReadFileBytes {
 					incomplete = true
 					return fs.SkipAll

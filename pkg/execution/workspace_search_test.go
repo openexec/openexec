@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/openexec/openexec/pkg/agent"
 )
@@ -100,7 +101,7 @@ func TestWorkspaceSearchContainsReadsAndSkipsPrivateFiles(t *testing.T) {
 	request := searchRequest(root, outside, "Needle")
 	request.ReadableRoots = []string{outside}
 	got, err = e.ExecuteTool(context.Background(), request)
-	if err != nil || !strings.Contains(got, "outside:1:Needle outside-secret") {
+	if err != nil || !strings.Contains(got, ":1:Needle outside-secret") {
 		t.Fatalf("explicit readable root was not searched: %q %v", got, err)
 	}
 	if _, err := e.ExecuteTool(context.Background(), writeRequest(root, "forbidden", "x", nil)); err == nil {
@@ -148,5 +149,71 @@ func TestWorkspaceSearchLimitsAndCancellation(t *testing.T) {
 	got, err := NewWorkspaceToolExecutor().ExecuteTool(context.Background(), searchRequest(root, ".", "Needle"))
 	if err != nil || !strings.HasPrefix(got, "No matches") {
 		t.Fatalf("empty search was not explicit: %q %v", got, err)
+	}
+}
+
+// Additional readable roots must produce paths with the same anchoring as read_file.
+func TestWorkspaceSearchPathsCanBeRead(t *testing.T) {
+	base := t.TempDir()
+	root, sibling := filepath.Join(base, "work"), filepath.Join(base, "other")
+	searchFile(t, root, "local.go", "Needle local\n")
+	searchFile(t, sibling, "target.go", "Needle sibling\n")
+	for _, granted := range []string{sibling, base} {
+		request := searchRequest(root, sibling, "Needle")
+		request.ReadableRoots = []string{granted}
+		executor := NewWorkspaceToolExecutor()
+		got, err := executor.ExecuteTool(context.Background(), request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path, _, ok := strings.Cut(got, ":1:")
+		if !ok {
+			t.Fatalf("search returned no actionable path: %q", got)
+		}
+		request.Name = "read_file"
+		request.Input, _ = json.Marshal(map[string]string{"path": path})
+		content, err := executor.ExecuteTool(context.Background(), request)
+		if err != nil || content != "Needle sibling\n" {
+			t.Fatalf("search path cannot be read: path=%q content=%q err=%v", path, content, err)
+		}
+	}
+}
+
+func TestWorkspaceSearchLongMatchKeepsLocations(t *testing.T) {
+	root := t.TempDir()
+	searchFile(t, root, "a.js", "Needle "+strings.Repeat("x", maxSearchLineBytes-8)+"🙂"+strings.Repeat("x", maxReadFileBytes*2)+"\n")
+	searchFile(t, root, "z.go", "Needle useful\n")
+	got, err := NewWorkspaceToolExecutor().ExecuteTool(context.Background(), searchRequest(root, ".", "Needle"))
+	if err != nil || !strings.Contains(got, "a.js:1:Needle") || !strings.Contains(got, "z.go:1:Needle useful") || !strings.Contains(got, "incomplete search") || len(got) > maxReadFileBytes {
+		t.Fatalf("long match hid usable locations: bytes=%d result=%q err=%v", len(got), got, err)
+	}
+	if !utf8.ValidString(got) {
+		t.Fatal("long match split a UTF-8 character")
+	}
+}
+
+func TestWorkspaceSearchSkipsUnreadableEntries(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission denial requires an unprivileged user")
+	}
+	for _, directory := range []bool{false, true} {
+		t.Run(fmt.Sprint(directory), func(t *testing.T) {
+			root := t.TempDir()
+			searchFile(t, root, "z.go", "Needle useful\n")
+			denied := filepath.Join(root, "a")
+			if directory {
+				searchFile(t, root, "a/secret", "Needle unreadable\n")
+			} else {
+				searchFile(t, root, "a", "Needle unreadable\n")
+			}
+			if err := os.Chmod(denied, 0); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(denied, 0o700) })
+			got, err := NewWorkspaceToolExecutor().ExecuteTool(context.Background(), searchRequest(root, ".", "Needle"))
+			if err != nil || !strings.Contains(got, "z.go:1:Needle useful") || !strings.Contains(got, "incomplete search") || strings.Contains(got, "Needle unreadable") {
+				t.Fatalf("unreadable entry aborted search or leaked: %q %v", got, err)
+			}
+		})
 	}
 }

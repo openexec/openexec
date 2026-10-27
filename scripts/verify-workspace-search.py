@@ -15,6 +15,11 @@ cases=[
  ('cancel','workspace_search.go','if err := ctx.Err(); err != nil {','if err := ctx.Err(); err != nil && false {','TestWorkspaceSearchLimitsAndCancellation$','cancelled search ran'),
  ('binary','workspace_search.go','if bytes.IndexByte(data, 0) >= 0 {','if false && bytes.IndexByte(data, 0) >= 0 {','TestWorkspaceSearchContainsReadsAndSkipsPrivateFiles','search leaked or missed'),
  ('literal','workspace_search.go','if input.Text == "" || strings.ContainsAny(input.Text, "\\r\\n") {','if false && (input.Text == "" || strings.ContainsAny(input.Text, "\\r\\n")) {','TestWorkspaceSearchLimitsAndCancellation$','invalid literal was accepted'),
+ ('result-path','workspace_search.go','filepath.ToSlash(displayPath), line+1, text','filepath.ToSlash(path + displayPath[:0]), line+1, text','TestWorkspaceSearchPathsCanBeRead','search path cannot be read'),
+ ('long-line','workspace_search.go','if len(text) > maxSearchLineBytes {','if false && len(text) > maxSearchLineBytes {','TestWorkspaceSearchLongMatchKeepsLocations','long match hid usable locations'),
+ ('unreadable-directory','workspace_search.go','if path == filepath.ToSlash(relative) {\n\t\t\t\t\treturn walkErr','if true {\n\t\t\t\t\treturn walkErr','TestWorkspaceSearchSkipsUnreadableEntries/true','unreadable entry aborted search or leaked'),
+ ('unreadable-file','workspace_search.go','if path == filepath.ToSlash(relative) {\n\t\t\t\t\treturn err','if true {\n\t\t\t\t\treturn err','TestWorkspaceSearchSkipsUnreadableEntries/false','unreadable entry aborted search or leaked'),
+ ('line-utf8','workspace_search.go','for end > 0 && !utf8.RuneStart(text[end]) {','for false && end > 0 && !utf8.RuneStart(text[end]) {','TestWorkspaceSearchLongMatchKeepsLocations','long match split a UTF-8 character'),
 ]
 results=[]
 with tempfile.TemporaryDirectory(prefix='workspace-search-controls-')as td:
