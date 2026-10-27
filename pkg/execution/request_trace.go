@@ -124,7 +124,7 @@ func (t *runTrace) cleanMap(tree map[string]any) map[string]any {
 	return out
 }
 
-// write stores the trace for a run that ended failed or inconclusive. Best
+// write stores the trace for a run that ended failed, inconclusive or cancelled. Best
 // effort, like the capture.
 func (t *runTrace) write(adapter agent.ProviderAdapter, request Request, result Result, runErr error) {
 	if t == nil {
@@ -132,6 +132,9 @@ func (t *runTrace) write(adapter agent.ProviderAdapter, request Request, result 
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if len(t.entries) == 0 && t.dropped == 0 {
+		return // no model request was sent: nothing to replay
+	}
 	message := ""
 	if runErr != nil {
 		message = runErr.Error()
