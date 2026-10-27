@@ -175,7 +175,9 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 		sink = trace.wrapSink(sink)
 	}
 	result, err := run.execute(ctx, request, sink)
-	if result.Outcome == OutcomeFailed || result.Outcome == OutcomeInconclusive {
+	// Cancelled is the caller's context ending the run (its absolute budget
+	// included); without it that ending left no witness at all.
+	if result.Outcome == OutcomeFailed || result.Outcome == OutcomeInconclusive || result.Outcome == OutcomeCancelled {
 		captureRequest(p.config.Adapter, started, result, err)
 		run.trace.write(p.config.Adapter, request, result, err)
 	}
