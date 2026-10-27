@@ -238,9 +238,10 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 
 	p.setHeaders(httpReq)
 
+	sent := time.Now()
 	resp, err := p.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, p.handleHTTPError(err)
+		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
 	}
 	defer resp.Body.Close()
 
@@ -285,9 +286,10 @@ func (p *OpenAIProvider) Stream(ctx context.Context, req Request) (<-chan Stream
 
 	p.setHeaders(httpReq)
 
+	sent := time.Now()
 	resp, err := p.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, p.handleHTTPError(err)
+		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -766,10 +768,15 @@ func (p *OpenAIProvider) processStreamResponse(ctx context.Context, resp *http.R
 }
 
 // handleHTTPError converts an HTTP error to a ProviderError.
-func (p *OpenAIProvider) handleHTTPError(err error) error {
+//
+// The original error text is kept verbatim; the elapsed wait, the effective
+// client timeout and the request body size are appended so a header timeout
+// can be told apart from a too-small budget. Code and Retryable are unchanged.
+func (p *OpenAIProvider) handleHTTPError(err error, elapsed time.Duration, bodyBytes int) error {
 	return &ProviderError{
-		Code:      ErrCodeServerError,
-		Message:   fmt.Sprintf("HTTP error: %v", err),
+		Code: ErrCodeServerError,
+		Message: fmt.Sprintf("HTTP error: %v (waited %s of %s request timeout; request body %d bytes)",
+			err, elapsed.Round(time.Millisecond), p.RequestTimeout(), bodyBytes),
 		Retryable: true,
 	}
 }
