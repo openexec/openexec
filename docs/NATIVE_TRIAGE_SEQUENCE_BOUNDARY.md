@@ -66,8 +66,8 @@ of the model's behaviour is not reproduced at the configured endpoint; the
 caller-visible half is unknown.** Source: the operator's metadata-only receipt
 of the private trace (18 entries, 72 events, final text 6021 characters,
 `droppedEntries` 0, `incomplete` false, `imagesOmitted` false,
-`redactionChangedContent` true). The private trace itself was not opened by this
-task, and no content, endpoint, token or tool argument is recorded here.
+`redactionChangedContent` true). This task's tooling never opened the private trace;
+the supervisor ran the offline reader on it (result below). No content, endpoint, token or tool argument is recorded here.
 
 Structural facts (from the receipt):
 
@@ -110,7 +110,17 @@ and OpenExec's events. **Not observable from OpenExec:** the caller-visible
 result and whether the Console persisted or dropped the draft (Console 7154).
 **Limits:** `redactionChangedContent` true means the trace is not byte-identical
 to the wire, so an offline replay of the private trace may differ from the real
-request sequence; this task did not replay the private trace.
+request sequence.
+
+**Original trace replay result (operator-run, reader from `0abdcebe`).** The
+supervisor ran the offline reader on the original private trace. It ran (not
+skipped), exited 0, and its replay verdict was "stopped after 14 of 18
+requests: request 14 differs in fields [messages]". That is an operational
+reader pass and an offline sequence **divergence**. It is not an 18/18 replay,
+not a same-endpoint reproduction and not a proven cause. At that revision the
+reader named only the differing field, so it could not say whether the
+difference is redaction altering content or the loop building a different
+request.
 
 Not reproduced: why the endpoint returned a tool call under `tool_choice: none`
 at entry 17, and why the operator's last-request replay against the same endpoint timed out (120.1 s).
@@ -128,10 +138,23 @@ it serves the trace's recorded responses back and never contacts an endpoint.
    types, text length, stop reason), the event counts and terminal order, the
    outcome fields, and a replay verdict: whether the loop, rebuilt from entry 1,
    re-derives all 18 recorded requests, or the first request that differs and
-   the names of the differing top-level fields only. A divergence there is the
-   redaction-fidelity limit or a loop change since the run, and is itself the
-   observation. It answers "does OpenExec re-derive this sequence" and nothing
+   the names of the differing top-level fields only. When the differing field is
+   `messages`, it also prints a content-free message comparison: the rebuilt
+   and recorded message counts, the first differing message index, and for that
+   message the role and each block's type and character count, labelled
+   "role and block types equal, character counts or non-text values differ"
+   (the content changed in place, which is what redaction does) or "role or
+   block types differ" / "message count differs" (the loop built a different
+   request). It answers "does OpenExec re-derive this sequence" and nothing
    about the endpoint.
+
+   **The open observation** is that comparison for request 14 of the original
+   trace: the already-observed result (14 of 18, request 14 differs in
+   `messages`) must be re-run with the reader at this revision, using the same
+   command, and its first-differing-message line recorded. Until it is, the
+   divergence is unexplained and the cause stays "no reproduced cause". A
+   reader pass is not full-sequence proof, and the 14-of-18 result must not be
+   read as redaction or as a loop change without that line.
 2. Endpoint side (why entry 17 returned a tool call under `tool_choice: none`,
    and why the operator's last-request replay timed out at 120.1 s): no command
    exists. `scripts/api-replay.py` sends one captured request; the recorded

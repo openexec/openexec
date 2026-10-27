@@ -118,6 +118,11 @@ func (a *divergenceAdapter) Complete(_ context.Context, request agent.Request) (
 		}
 		sort.Strings(fields)
 		a.diverge = fmt.Sprintf("request %d differs in fields %v", a.next, fields)
+		for _, f := range fields {
+			if f == "messages" {
+				a.diverge += "; " + messageDivergence(asList(got["messages"]), asList(want["messages"]))
+			}
+		}
 		return nil, fmt.Errorf("%s", a.diverge)
 	}
 	raw, _ = json.Marshal(entry["response"])
@@ -126,6 +131,74 @@ func (a *divergenceAdapter) Complete(_ context.Context, request agent.Request) (
 		return nil, err
 	}
 	return &response, nil
+}
+
+// stringChars counts the characters of every string value under a node except
+// "type" values, so a block's size is visible without any of its content.
+func stringChars(v any) int {
+	switch x := v.(type) {
+	case string:
+		return len([]rune(x))
+	case []any:
+		n := 0
+		for _, e := range x {
+			n += stringChars(e)
+		}
+		return n
+	case map[string]any:
+		n := 0
+		for k, e := range x {
+			if k != "type" {
+				n += stringChars(e)
+			}
+		}
+		return n
+	}
+	return 0
+}
+
+// messageShape returns the role and, per content block, its type and
+// character count; the second result is the same without the counts.
+func messageShape(message any) (withCounts, withoutCounts string) {
+	m := asMap(message)
+	var full, bare []string
+	for _, b := range asList(m["content"]) {
+		ty := asString(asMap(b)["type"])
+		full = append(full, fmt.Sprintf("%s:%d", ty, stringChars(b)))
+		bare = append(bare, ty)
+	}
+	role := asString(m["role"])
+	return fmt.Sprintf("%s[%s]", role, strings.Join(full, ",")), fmt.Sprintf("%s[%s]", role, strings.Join(bare, ","))
+}
+
+// messageDivergence compares two message lists structurally (role, block
+// types, character counts) and names the first index that differs. When the
+// block structure is identical and only counts differ the content changed in
+// place (redaction-like); a different message count, role, block type or order
+// points at the loop building a different request. Names and numbers only,
+// never content.
+func messageDivergence(rebuilt, recorded []any) string {
+	out := fmt.Sprintf("messages rebuilt=%d recorded=%d", len(rebuilt), len(recorded))
+	n := len(rebuilt)
+	if len(recorded) < n {
+		n = len(recorded)
+	}
+	for i := 0; i < n; i++ {
+		if reflect.DeepEqual(rebuilt[i], recorded[i]) {
+			continue
+		}
+		r, rBare := messageShape(rebuilt[i])
+		w, wBare := messageShape(recorded[i])
+		kind := "role and block types equal, character counts or non-text values differ"
+		if rBare != wBare {
+			kind = "role or block types differ"
+		}
+		return fmt.Sprintf("%s; first differing message index %d (%s): rebuilt=%s recorded=%s", out, i, kind, r, w)
+	}
+	if len(rebuilt) != len(recorded) {
+		return out + "; all common messages equal, message count differs"
+	}
+	return out + "; messages equal"
 }
 
 // traceReplayVerdict re-runs the real loop over the recorded responses and
@@ -233,5 +306,58 @@ func TestTraceStructureReportIsContentFree(t *testing.T) {
 	diverged := traceReplayVerdict(trace)
 	if !strings.Contains(diverged, "stopped after 5 of 18 requests: request 5 differs in fields [system]") || strings.Contains(diverged, marker) {
 		t.Fatalf("diverged verdict: %s", diverged)
+	}
+}
+
+// The message-level discriminator on authored data: a changed text length at
+// the same structure is reported as a counts-only change, a dropped message as
+// a structural one, an untouched trace reports no divergence; no content.
+func TestTraceStructureMessageDivergenceDiscriminates(t *testing.T) {
+	const marker = "CONTENT-MARKER-MUST-NOT-APPEAR"
+	server := sequence7a722Server(t, true)
+	path := filepath.Join(t.TempDir(), "traces", "trace.json")
+	t.Setenv(RequestTraceEnv, path)
+	if _, err := sequence7a722Provider(t, compatible(t, server.URL), &fixtureTools{}).Execute(context.Background(), fixtureRequest(t),
+		func(Event) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(RequestTraceEnv, "")
+
+	// Same structure, longer text in the last message of request 5.
+	trace := readTrace(t, path)
+	messages := asList(entryRequest(asList(trace["entries"])[4])["messages"])
+	last := asMap(asList(asMap(messages[len(messages)-1])["content"])[0])
+	if _, ok := last["tool_output"].(string); !ok {
+		t.Fatalf("last block has no tool output to lengthen (type %v)", last["type"])
+	}
+	last["tool_output"] = asString(last["tool_output"]) + marker
+	got := traceReplayVerdict(trace)
+	if !strings.Contains(got, "request 5 differs in fields [messages]") ||
+		!strings.Contains(got, "role and block types equal, character counts or non-text values differ") ||
+		!strings.Contains(got, "first differing message index") || strings.Contains(got, marker) {
+		t.Fatalf("counts-only divergence: %s", got)
+	}
+
+	// Structural: the last message of request 5 is missing.
+	trace = readTrace(t, path)
+	request := entryRequest(asList(trace["entries"])[4])
+	request["messages"] = asList(request["messages"])[:len(asList(request["messages"]))-1]
+	got = traceReplayVerdict(trace)
+	if !strings.Contains(got, "request 5 differs in fields [messages]") || !strings.Contains(got, "messages rebuilt=") ||
+		strings.Contains(got, "character counts or non-text values differ") {
+		t.Fatalf("structural divergence: %s", got)
+	}
+
+	// Structural: a block type changed.
+	trace = readTrace(t, path)
+	messages = asList(entryRequest(asList(trace["entries"])[4])["messages"])
+	asMap(asList(asMap(messages[len(messages)-1])["content"])[0])["type"] = "other"
+	got = traceReplayVerdict(trace)
+	if !strings.Contains(got, "role or block types differ") {
+		t.Fatalf("block-type divergence: %s", got)
+	}
+
+	if v := traceReplayVerdict(readTrace(t, path)); strings.Contains(v, "messages rebuilt") {
+		t.Fatalf("clean replay reported a divergence: %s", v)
 	}
 }
