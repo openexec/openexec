@@ -32,7 +32,7 @@ func sequence7a722Provider(t *testing.T, adapter agent.ProviderAdapter, tools To
 	t.Helper()
 	schema := json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"}}}`)
 	provider, err := NewAPIProvider(APIProviderConfig{
-		Adapter: adapter, ToolExecutor: tools,
+		Adapter: adapter, ToolExecutor: tools, MaxSteps: 16,
 		Tools: []agent.ToolDefinition{
 			{Name: "read_file", Description: "Read a file", InputSchema: schema},
 			{Name: "list_directory", Description: "List a directory", InputSchema: schema},
