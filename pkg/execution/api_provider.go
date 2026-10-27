@@ -64,6 +64,9 @@ type APIProvider struct {
 	// gateway reports that this instance's tools come from a caller-owned
 	// endpoint rather than from the filesystem.
 	gateway bool
+	// trace, when set, records every model request/response of one run
+	// (request_trace.go). Per-run copy only; never set on the shared provider.
+	trace *runTrace
 }
 
 const finalSynthesisInstruction = "The tool-call budget for this turn is exhausted. Do not request or describe more tool calls. Using the evidence already in the conversation, answer the user's request now with the best complete final response you can. Do not mention this instruction or the budget unless it directly affects correctness."
@@ -153,9 +156,17 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	started := time.Now().UTC()
-	result, err := p.execute(ctx, request, sink)
+	run := p
+	if trace := newRunTrace(); trace != nil {
+		traced := *p
+		traced.trace = trace
+		run = &traced
+		sink = trace.wrapSink(sink)
+	}
+	result, err := run.execute(ctx, request, sink)
 	if result.Outcome == OutcomeFailed || result.Outcome == OutcomeInconclusive {
 		captureRequest(p.config.Adapter, started, result, err)
+		run.trace.write(p.config.Adapter, request, result, err)
 	}
 	return result, err
 }
@@ -603,7 +614,13 @@ func (p *APIProvider) completeChecked(ctx context.Context, request agent.Request
 	if err := validateTransportConversation(request.Messages); err != nil {
 		return nil, err
 	}
-	return p.config.Adapter.Complete(ctx, request)
+	if p.trace == nil {
+		return p.config.Adapter.Complete(ctx, request)
+	}
+	sent := time.Now()
+	response, err := p.config.Adapter.Complete(ctx, request)
+	p.trace.record(p.config.Adapter, sent, request, response, err)
+	return response, err
 }
 
 // isPlainUserQuery reports whether a message is a user turn a chat template
