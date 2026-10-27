@@ -114,13 +114,34 @@ request sequence; this task did not replay the private trace.
 
 Not reproduced: why the endpoint returned a tool call under `tool_choice: none`
 at entry 17, and why the operator's last-request replay against the same endpoint timed out (120.1 s).
-Missing observation and command (supervisor-run, protected, structural output
-only): replay the private trace's requests in order through the existing
-`traceReplayAdapter` consumer against the original endpoint (not a single-request
-`scripts/api-replay.py` run), and report per entry only the tool count,
-`tool_choice`, response block types and stop reason. No repair is claimed or
-authorized by this finding; a later repair must name a reproduced cause and a
-failing-then-passing test.
+Missing observations and the exact commands (supervisor-run, protected,
+structural output only). `traceReplayAdapter` is a **recorded-response replay**:
+it serves the trace's recorded responses back and never contacts an endpoint.
+
+1. Offline, runnable now against the private trace (no endpoint, no content
+   printed; run from the repository root of the reviewed revision):
+
+   `go test ./pkg/execution/ -run TestTraceStructureReader -v -count=1 -args -trace-structure=<path to the private 7a722 trace.json>`
+
+   (`pkg/execution/trace_structure_test.go`.) It prints one line per entry
+   (tool counts on the request and the wire, `tool_choice`, roles, response block
+   types, text length, stop reason), the event counts and terminal order, the
+   outcome fields, and a replay verdict: whether the loop, rebuilt from entry 1,
+   re-derives all 18 recorded requests, or the first request that differs and
+   the names of the differing top-level fields only. A divergence there is the
+   redaction-fidelity limit or a loop change since the run, and is itself the
+   observation. It answers "does OpenExec re-derive this sequence" and nothing
+   about the endpoint.
+2. Endpoint side (why entry 17 returned a tool call under `tool_choice: none`,
+   and why the operator's last-request replay timed out at 120.1 s): no command
+   exists. `scripts/api-replay.py` sends one captured request; the recorded
+   requests of the trace could be sent one at a time to the original endpoint,
+   but a model-driven sequence cannot be re-driven from recorded data, so a
+   whole-sequence same-endpoint reproduction is not available and is not
+   claimed. The timeout and the entry-17 behaviour are different observations.
+
+No repair is claimed or authorized by this finding; a later repair must name a
+reproduced cause and a failing-then-passing test.
 
 ## The OpenExec to Console boundary
 
