@@ -94,6 +94,18 @@ func WorkspaceTools(sandbox Sandbox) []agent.ToolDefinition {
 			}`),
 		},
 		{
+			Name:        "search_files",
+			Description: "Find a literal string in files beneath a directory or in one file. Returns matching paths, line numbers and text, bounded to 8192 output bytes, 4096 entries and 16 MiB read. Paths can be passed to read_file. Skips symbolic links and private configuration directories. Long matching lines are truncated, unreadable entries skipped, and partial scans marked incomplete. No pagination: narrow the path or text to continue.",
+			InputSchema: json.RawMessage(`{
+				"type": "object",
+				"properties": {
+					"path": {"type": "string", "description": "File or directory to search, relative to the working directory unless absolute."},
+					"text": {"type": "string", "minLength": 1, "description": "Case-sensitive literal text to find, such as a function name."}
+				},
+				"required": ["path", "text"]
+			}`),
+		},
+		{
 			Name:        "list_directory",
 			Description: "List the entries of a directory. Paths are relative to the working directory unless absolute.",
 			InputSchema: json.RawMessage(`{
@@ -154,7 +166,7 @@ func (e *WorkspaceToolExecutor) ValidateAccess(workingDir string, sandbox Sandbo
 	}
 }
 
-func (e *WorkspaceToolExecutor) ExecuteTool(_ context.Context, request ToolRequest) (string, error) {
+func (e *WorkspaceToolExecutor) ExecuteTool(ctx context.Context, request ToolRequest) (string, error) {
 	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
 		return "", err
 	}
@@ -163,6 +175,8 @@ func (e *WorkspaceToolExecutor) ExecuteTool(_ context.Context, request ToolReque
 		return e.readFile(request)
 	case "list_directory":
 		return e.listDirectory(request)
+	case "search_files":
+		return e.searchFiles(ctx, request)
 	case "write_file":
 		return e.writeFile(request)
 	default:

@@ -58,6 +58,7 @@ ui-lint:
 	cd ui && npm run lint
 
 test:
+	python3 scripts/verify-workspace-search.py
 	@echo "🧪 Verifying graph scan unmerged-index regression and negative control..."
 	python3 scripts/verify-graph-scan-unmerged.py
 	@echo "🧪 Verifying native CLI GOCACHE preservation and negative control..."
