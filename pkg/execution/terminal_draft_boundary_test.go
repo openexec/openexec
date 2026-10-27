@@ -52,7 +52,7 @@ func TestCompleteDraftAfterRoundLimitStillEndsMaxTurns(t *testing.T) {
 	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(16, 36), draftResponse())}
 	tools := &recordingToolExecutor{}
 
-	result, events, err := runBoundary(t, context.Background(), adapter, tools, 0)
+	result, events, err := runBoundary(t, context.Background(), adapter, tools, 16)
 
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func TestSameDraftWithinRoundLimitSucceeds(t *testing.T) {
 	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(15, 36), draftResponse())}
 	tools := &recordingToolExecutor{}
 
-	result, events, err := runBoundary(t, context.Background(), adapter, tools, 0)
+	result, events, err := runBoundary(t, context.Background(), adapter, tools, 16)
 
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +132,7 @@ func TestFailedSynthesisIsMaxTurnsWithoutDraft(t *testing.T) {
 	}
 	adapter := &fakeAPIAdapter{responses: append(roundsWithCalls(16, 36), toolCall, toolCall)}
 
-	result, events, err := runBoundary(t, context.Background(), adapter, &recordingToolExecutor{}, 0)
+	result, events, err := runBoundary(t, context.Background(), adapter, &recordingToolExecutor{}, 16)
 
 	if err != nil {
 		t.Fatal(err)

@@ -150,7 +150,7 @@ func TestRoundLimitCountsRoundsNotToolCallsAndIsNotBudgetExhausted(t *testing.T)
 	adapter := &fakeAPIAdapter{responses: responses}
 	tools := &recordingToolExecutor{}
 
-	result, _, err := runBoundary(t, context.Background(), adapter, tools, 0) // default limit
+	result, _, err := runBoundary(t, context.Background(), adapter, tools, 16) // observed historical limit
 
 	if err != nil {
 		t.Fatal(err)
