@@ -36,6 +36,42 @@ func TestExecutionStdioWitnessChild(t *testing.T) {
 	os.Exit(0) // keep the Go test runner's PASS line out of the line protocol
 }
 
+// Go 1.25's signal.NotifyContext cancels without a signal-specific cause;
+// Go 1.26 adds that cause and net/http includes it in the completion error.
+// OpenAIProvider.handleHTTPError appends accounting after the HTTP error.
+func witnessCancellationError(message string) bool {
+	detail, _, ok := strings.Cut(message, " (waited ")
+	return ok && (strings.HasSuffix(detail, ": "+context.Canceled.Error()) ||
+		strings.HasSuffix(detail, ": "+syscall.SIGTERM.String()+" signal received"))
+}
+
+func TestExecutionStdioWitnessCancellationError(t *testing.T) {
+	for _, tc := range []struct {
+		name, cause string
+		want        bool
+	}{
+		{"go125", "context canceled", true},
+		{"go126", "terminated signal received", true},
+		{"deadline", "context deadline exceeded", false},
+		{"connection-refused", "connection refused", false},
+		{"other-signal", "interrupt signal received", false},
+		{"embedded-cancellation", "context canceled before unrelated failure", false},
+		{"embedded-signal", "terminated signal received before unrelated failure", false},
+		{"empty", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			message := `server_error: HTTP error: Post "http://fixture.invalid/v1/chat/completions": ` + tc.cause +
+				" (waited 1ms of 15m0s request timeout; request body 6046 bytes)"
+			if got := witnessCancellationError(message); got != tc.want {
+				t.Fatalf("cancellation classification=%v, want %v", got, tc.want)
+			}
+		})
+	}
+	if witnessCancellationError(`server_error: HTTP error: Post "http://fixture.invalid/v1/chat/completions": context canceled`) {
+		t.Fatal("cancellation without provider accounting was accepted")
+	}
+}
+
 // Audit the retained, content-free operational extract, not a fabricated
 // request. This proves its timeline/counts are internally consistent; it
 // cannot supply the missing historical child's identity or environment.
@@ -253,6 +289,7 @@ func TestExecutionStdioWitnessBoundary(t *testing.T) {
 				envelopes = append(envelopes, envelope)
 			}
 			waitErr := cmd.Wait()
+			var resultError string
 			if mode != "kill" && ctx.Err() != nil {
 				t.Fatal("finite fixture exceeded deadline")
 			}
@@ -275,6 +312,7 @@ func TestExecutionStdioWitnessBoundary(t *testing.T) {
 					t.Fatalf("CLI exit: %v (stderr bytes=%d)", waitErr, stderr.Len())
 				}
 				last := envelopes[len(envelopes)-1]
+				resultError = last.Error
 				want := execution.OutcomeFailed // cancellation during model Complete
 				if mode == "success" {
 					want = execution.OutcomeSucceeded
@@ -346,8 +384,10 @@ func TestExecutionStdioWitnessBoundary(t *testing.T) {
 				if err := json.Unmarshal(raw, &doc); err != nil {
 					t.Fatal(err)
 				}
-				if doc["outcome"] != execution.OutcomeFailed || doc["baseURL"] != server.URL+"/v1" || !strings.Contains(doc["error"].(string), "terminated signal received") {
-					t.Fatal("read-back did not retain actual endpoint/signal cancellation")
+				witnessError, ok := doc["error"].(string)
+				if doc["outcome"] != execution.OutcomeFailed || doc["baseURL"] != server.URL+"/v1" || !ok ||
+					witnessError != resultError || !witnessCancellationError(witnessError) {
+					t.Fatal("read-back did not retain actual endpoint and CLI cancellation error")
 				}
 				if path == capture {
 					if doc["truncated"] != true || bytes.Contains(raw, []byte(longText)) || len(raw) > 512<<10 {
