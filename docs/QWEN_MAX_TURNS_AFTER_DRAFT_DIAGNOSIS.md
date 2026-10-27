@@ -20,7 +20,9 @@ Replay of the captured first request (`scripts/api-replay.py`, same endpoint,
 model, 120 s timeout, budget 8) PASSED for `b936` and `575f`: **not reproduced**.
 One request cannot reproduce a 16-round loop.
 
-## Actual source and limits (OpenExec 0286f602, Console 1d8aa1d8; the task says the run's source was refreshed to `5dbbee26`, which is not verified here)
+## Actual source and limits
+
+The run's Console source `5dbbee26` is verified by the run's own `base.refreshed` event (seq 2). The installed CLI that ran it reports `18ade4bb`. `0286f602` is only the registered checkout's HEAD, not the deployed native identity: the code references below were read from that checkout, not from the deployed binary, and `18ade4bb`'s code was not inspected here.
 
 - `APIProvider` counts model **rounds**, default `MaxSteps` 16
   (`pkg/execution/api_provider.go`, `NewAPIProvider`; `internal/cli/execution_stdio.go`
@@ -41,14 +43,13 @@ One request cannot reproduce a 16-round loop.
 
 ## Explanation of the observed sequence (consistent with, not proof of, the cause)
 
-For `b936` (corrected counts: 36 `tool.started`, 5699-char final delta): 36
-calls give 72 forwarded tool events (started+completed), but the draft is at seq
-75, so **two forwarded events before it are unexplained** (usage or other events
-are candidates; that is a guess and the history was not re-read). Then `turn.error`
-76 (the inconclusive event) and `turn.inconclusive` 77. A final delta followed by a
-textless terminal fits a draft from the **synthesis request after round 16**, but
-the event arithmetic does not close exactly, so this is consistent with, not proof
-of, that origin. The persisted result is empty because a *complete draft arrived
+For `b936` (observed event history): seq 1 `turn.started`, seq 2 `base.refreshed`
+(announcing `5dbbee26`), seqs 3-74 are 36 `tool.started`/`tool.completed` pairs (72
+events), seq 75 is the 5699-char `assistant.delta`, seq 76 `turn.error`, seq 77
+`turn.inconclusive` (`max_turns`). The arithmetic closes: 2 + 72 + 1 + 1 + 1 = 77.
+A final delta followed by a textless terminal is consistent with a draft from the
+**synthesis request after round 16**, but this history does not show round grouping
+or the cause, so it is consistent with, not proof of, that origin. The persisted result is empty because a *complete draft arrived
 under a non-completed terminal*, and the Console only persists completed runs. Whether the model would have drafted
 earlier with fewer reads, and why it spent 16 rounds (the note observes an
 unauthorized absolute-path first call, then many directory reads), is unknown.
@@ -79,7 +80,7 @@ Same-endpoint causal reproduction is still required before any repair. Needed
 from the next occurrence (bounded, redacted): per-round tool-call counts and
 timestamps; whether the first draft text arrived in a round with tool calls
 available or in the `ToolChoice: none` request; the exact forwarded event list
-with types for sequences ~70-77 (the two events between the 72 tool events and the draft at seq 75 are a missing capture field); the last request capture
+with types for sequences ~70-77; the last request capture
 (`request_capture`, native 151) with message count and size; and the Console
 run `status`/`error` plus task status after the run. A repair candidate to
 evaluate *later*, not claimed here: whether a complete synthesis answer should
