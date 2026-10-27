@@ -42,7 +42,14 @@ end = '\t\t\t\treturn fmt.Errorf("auto-planning failed: server returned no plan;
 require(original.count(start) == 1 and original.count(end) == 1, "FAIL: expected one plan-gate mutation site")
 head, rest = original.split(start, 1)
 _, tail = rest.split(end, 1)
-mutated = head + "\t\t\tresp.Body.Close()\n\t\t\tvar _ manager.PlanResult\n" + tail
+# Retain decoding for the evidence printer below the gate. Only validation is
+# removed: a rejected/malformed response must still reach runs:execute in this
+# negative control, rather than failing to compile after the printer was added.
+mutated = head + (
+    "\t\t\tvar res manager.PlanResult\n"
+    "\t\t\t_ = json.NewDecoder(resp.Body).Decode(&res)\n"
+    "\t\t\tresp.Body.Close()\n"
+) + tail
 
 failing = [
     "valid_false_with_issues",

@@ -2,15 +2,68 @@ package execution
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/openexec/openexec/pkg/agent"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+func Test64KContextAdmitsLargerInputWithoutRaisingTotalGrant(t *testing.T) {
+	for _, ceiling := range []int64{0, 65536} {
+		t.Run(fmt.Sprint(ceiling), func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/version" {
+					w.Write([]byte(`{"version":"0.32.13"}`))
+					return
+				}
+				calls++
+				var body struct {
+					Truncate *bool          `json:"truncate"`
+					Options  map[string]int `json:"options"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Truncate == nil || *body.Truncate || body.Options["num_ctx"] != 65536 || body.Options["num_predict"] != 2048 {
+					t.Error("64K native context or non-truncating behavior lost", body, err)
+				}
+				w.Write([]byte(`{"done":true,"prompt_eval_count":40000,"eval_count":5,"message":{"content":"done"}}`))
+			}))
+			defer server.Close()
+			a, _ := agent.NewOpenAIProvider(agent.OpenAIProviderConfig{APIKey: "fixture", BaseURL: server.URL + "/v1"})
+			if !a.EnableLocalOllamaBounds(context.Background()) {
+				t.Fatal("missing native bounds")
+			}
+			p, _ := NewAPIProvider(APIProviderConfig{Adapter: a})
+			r := Request{ID: "64k", WorkingDir: t.TempDir(), Prompt: strings.Repeat("evidence ", 12000), Model: "local", Sandbox: Sandbox{Mode: SandboxReadOnly}, TokenBudget: 250000, ContextTokenLimit: 32768}
+			_, err := p.Execute(context.Background(), r, nil)
+			var overflow *agent.ContextOverflowError
+			if !errors.As(err, &overflow) || overflow.Dispatched || calls != 0 {
+				t.Fatal("32K ceiling did not refuse before inference", err, calls)
+			}
+			r.ContextTokenLimit = ceiling
+			var final Event
+			result, err := p.Execute(context.Background(), r, func(e Event) error {
+				if e.UsageFinal {
+					final = e
+				}
+				return nil
+			})
+			if err != nil || result.Outcome != OutcomeSucceeded || calls != 1 || final.InputTokens != 40000 || final.OutputTokens != 5 {
+				t.Fatal("64K request or actual usage accounting failed", result, final, err, calls)
+			}
+		})
+	}
+}
 
 func TestExplicitContextCeilingIndependentOfTotalGrant(t *testing.T) {
 	for _, tc := range []struct{ grant, ceiling, want int64 }{
 		{65536, 16384, 16384}, {250000, 16384, 16384},
 		{65536, 15000, 8192}, {7001, 16384, 4096}, {65536, 0, 32768},
+		{250000, 65536, 65536}, {250000, 0, 65536},
+		{250000, 32768, 32768}, {67584, 65536, 65536}, {67583, 65536, 32768},
 	} {
 		a := &boundedFake{fakeAPIAdapter: fakeAPIAdapter{responses: []*agent.Response{
 			{Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: "read-1", ToolName: "read", ToolInput: []byte(`{}`)}}},
@@ -36,7 +89,7 @@ func TestExplicitContextCeilingIndependentOfTotalGrant(t *testing.T) {
 }
 
 func TestExplicitContextCeilingRefusesInvalidAndUnsupported(t *testing.T) {
-	for _, tc := range []struct{ grant, ceiling int64 }{{65536, -1}, {65536, 2047}, {65536, 32769}, {0, 16384}} {
+	for _, tc := range []struct{ grant, ceiling int64 }{{65536, -1}, {65536, 2047}, {250000, 65537}, {0, 65536}, {0, 16384}} {
 		a := &boundedFake{}
 		p, _ := NewAPIProvider(APIProviderConfig{Adapter: a})
 		if _, err := p.Execute(context.Background(), Request{TokenBudget: tc.grant, ContextTokenLimit: tc.ceiling}, nil); err == nil || a.calls != 0 {
