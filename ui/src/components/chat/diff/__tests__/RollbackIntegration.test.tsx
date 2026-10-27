@@ -325,8 +325,8 @@ describe('RollbackIntegration', () => {
     it('deletes backup and calls callback', async () => {
       const user = userEvent.setup()
       const backups = [
-        createMockBackup('backup-1', '/path/to/file1.ts'),
-        createMockBackup('backup-2', '/path/to/file2.ts'),
+        createMockBackup('backup-1', '/path/to/file1.ts', { createdAt: '2026-01-01T00:00:00Z' }),
+        createMockBackup('backup-2', '/path/to/file2.ts', { createdAt: '2026-01-02T00:00:00Z' }),
       ]
       const mockDeleteBackup = vi.fn().mockResolvedValue(true)
 
@@ -342,13 +342,13 @@ describe('RollbackIntegration', () => {
         />
       )
 
-      // Click delete button on first backup
+      // The panel sorts newest first: delete backup-2, regardless of fixture insertion order.
       const deleteButtons = screen.getAllByText('Delete')
       await user.click(deleteButtons[0])
 
-      expect(mockDeleteBackup).toHaveBeenCalledWith('backup-1')
+      expect(mockDeleteBackup).toHaveBeenCalledWith('backup-2')
       await waitFor(() => {
-        expect(mockOnDeleteComplete).toHaveBeenCalledWith('backup-1')
+        expect(mockOnDeleteComplete).toHaveBeenCalledWith('backup-2')
       })
     })
   })

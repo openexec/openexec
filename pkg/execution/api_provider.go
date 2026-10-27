@@ -56,6 +56,14 @@ type APIProviderConfig struct {
 	MaxSteps     int
 }
 
+// DefaultAPIMaxTurns is the tool-round allowance when a provider has no override.
+// A round may contain multiple tool calls; final synthesis is outside this cap.
+const DefaultAPIMaxTurns = 160
+
+// MaxAPIContextTokens is the default per-inference ceiling when the cumulative
+// grant can reserve it. Explicit smaller ceilings and remaining grants narrow it.
+const MaxAPIContextTokens int64 = 65536
+
 // APIProvider adapts OpenAI-compatible and other API adapters to the same
 // authorization boundary as CLI providers. Tools receive the exact sandbox
 // and roots from the authorized request.
@@ -100,8 +108,11 @@ func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if len(config.Tools) > 0 && config.ToolExecutor == nil {
 		return nil, errors.New("tool executor is required when API tools are configured")
 	}
-	if config.MaxSteps <= 0 {
-		config.MaxSteps = 16
+	if config.MaxSteps < 0 {
+		return nil, errors.New("API provider max_turns must be positive or zero for the default")
+	}
+	if config.MaxSteps == 0 {
+		config.MaxSteps = DefaultAPIMaxTurns
 	}
 	return &APIProvider{config: config, gateway: gateway}, nil
 }
@@ -180,8 +191,8 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 			return Result{}, err
 		}
 	}
-	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > 32768 || request.TokenBudget <= 0) {
-		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and 32768")
+	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > MaxAPIContextTokens || request.TokenBudget <= 0) {
+		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and %d", MaxAPIContextTokens)
 	}
 	if request.TokenBudget < 0 {
 		return Result{}, fmt.Errorf("negative token grant")

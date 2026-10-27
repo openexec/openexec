@@ -155,7 +155,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 			return nil, err
 		}
 		return execution.NewAPIProvider(execution.APIProviderConfig{
-			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor,
+			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor, MaxSteps: entry.MaxTurns,
 		})
 	}
 	// The caller's execution verbs beside the workspace tools: an agent that
@@ -191,7 +191,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 			return nil, err
 		}
 		return execution.NewAPIProvider(execution.APIProviderConfig{
-			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor,
+			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor, MaxSteps: entry.MaxTurns,
 		})
 	}
 	// Tools in both modes, filtered by the sandbox: a read-only reviewer that
@@ -202,6 +202,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 		Adapter:      adapter,
 		Tools:        execution.WorkspaceTools(sandbox),
 		ToolExecutor: execution.NewWorkspaceToolExecutor(),
+		MaxSteps:     entry.MaxTurns,
 	})
 }
 

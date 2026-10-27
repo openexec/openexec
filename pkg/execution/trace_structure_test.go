@@ -225,7 +225,7 @@ func traceReplayVerdict(trace map[string]any) string {
 		}
 	}
 	adapter := &divergenceAdapter{entries: entries}
-	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, ToolExecutor: &recordedTools{outputs: outputs}, Tools: recorded.Tools})
+	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, ToolExecutor: &recordedTools{outputs: outputs}, Tools: recorded.Tools, MaxSteps: 16})
 	if err != nil {
 		return "replay: provider not constructible"
 	}

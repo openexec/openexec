@@ -77,7 +77,7 @@ func fixtureServer(t *testing.T, answer string) (*httptest.Server, *[]string) {
 func fixtureProvider(t *testing.T, adapter agent.ProviderAdapter, tools ToolExecutor) *APIProvider {
 	t.Helper()
 	provider, err := NewAPIProvider(APIProviderConfig{
-		Adapter: adapter, ToolExecutor: tools,
+		Adapter: adapter, ToolExecutor: tools, MaxSteps: fixtureRounds,
 		Tools: []agent.ToolDefinition{{Name: "read_file", Description: "Read a file", InputSchema: json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"}}}`)}},
 	})
 	if err != nil {

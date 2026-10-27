@@ -4,6 +4,14 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Owner Qwen trial, 2026-10-26] API providers now accept per-provider
+  `execution.providers.<name>.max_turns` in project JSON, reusing MaxSteps.
+  Default 160; owner requested Qwen trial 100, with 900 available for hard work.
+  Protocol fixtures cover >16-round completion, exact 100/160/900 caps, all
+  three tool modes, invalid values and config reload/save. Project/execution/CLI
+  suites and vet passed; removing each wiring, the default and negative guard
+  failed the intended assertions. No Console loop or outcome semantics changed.
+
 - [D7 final sibling integration, 2026-10-18, PR #117] Resolved NOTES and
   inventory conflicts against MERGE_HEAD/origin/main
   0d937748cc39db41f9d8798ea78d1c7647c14fc5. Preserved both sides of notes,
