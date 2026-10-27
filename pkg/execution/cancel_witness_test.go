@@ -130,3 +130,20 @@ func TestNoWitnessWithoutASentRequestOrForSuccess(t *testing.T) {
 	}
 	assertNone("cancel before any request")
 }
+
+// Pins the runTrace.write early return on its own: with only the trace opted
+// in, a refused run (outcome failed, no model request) must not leave an empty
+// trace. Without the guard the file is written with zero entries.
+func TestTraceNotWrittenForFailedRunThatSentNothing(t *testing.T) {
+	tracePath := filepath.Join(t.TempDir(), "trace.json")
+	t.Setenv(RequestCaptureEnv, "")
+	t.Setenv(RequestTraceEnv, tracePath)
+	req := fixtureRequest(t)
+	req.NativeSessionID = "not-for-api"
+	if _, err := fixtureProvider(t, &fakeAPIAdapter{}, &fixtureTools{}).Execute(context.Background(), req, nil); err == nil {
+		t.Fatal("refused request ran")
+	}
+	if _, err := os.Stat(tracePath); !os.IsNotExist(err) {
+		t.Fatalf("empty trace written: %v", err)
+	}
+}
