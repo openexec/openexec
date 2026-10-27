@@ -59,6 +59,113 @@ Fidelity, stated rather than assumed:
   **not** `scripts/api-replay.py`, which replays one captured request; that
   script was not run on the new format and compatibility is not claimed.
 
+## Run 7a722: structural diagnosis (revision `b5894311`)
+
+Status: **the native loop's behaviour for this sequence is explained; the cause
+of the model's behaviour is not reproduced at the configured endpoint; the
+caller-visible half is unknown.** Source: the operator's metadata-only receipt
+of the private trace (18 entries, 72 events, final text 6021 characters,
+`droppedEntries` 0, `incomplete` false, `imagesOmitted` false,
+`redactionChangedContent` true). This task's tooling never opened the private trace;
+the supervisor ran the offline reader on it (result below). No content, endpoint, token or tool argument is recorded here.
+
+Structural facts (from the receipt):
+
+- Entries 1-16: tools sent (2 definitions), `tool_choice` `auto`; every response
+  was `tool_use` with 2,1,1,1,2,2,1,2,1,1,2,2,1,1,1,2 calls = 23 calls, matching
+  23 `tool.proposed`/`started`/`completed` events and no response text.
+- Entry 17: the synthesis request. Tools still sent (2), `tool_choice` `none`.
+  The response was **another `tool_use`** (1 block, stop reason `tool_use`, 0 text
+  characters). That call was not executed (23 tool events, not 24).
+- Entry 18: the final-synthesis recovery request: no tools on the request or the
+  wire, `tool_choice` `none`. The response was one text block of 6021 characters,
+  stop reason `end_turn`, containing all seven contract section names.
+- Events end `tool.completed, assistant.delta, execution.inconclusive`
+  (`max_turns`); no `execution.completed`.
+
+Diagnosis. This is the code's documented path, not a second fault:
+`completeFinalSynthesis` (`pkg/execution/api_provider.go`) sends the synthesis
+request with tools kept for strict endpoints; when the endpoint ignores
+`tool_choice: none` and returns a tool call, it makes one tool-less retry with
+`finalSynthesisRecoveryInstruction`; that retry produced the draft; the loop then
+ends `inconclusive:max_turns` because every end of the tool loop does. So the
+16-round budget was spent on research (the supervisor's reading of the private
+trace is that the model searched for a split-task symbol with only `read_file`
+and `list_directory`; that is a contributing capability gap tracked by PR #159,
+not established here as a sufficient cause), the model ignored `tool_choice:
+none` once, and the recovery returned a complete draft. The empty `tools` of the
+9fc capture is explained for 7a722 by entry 18 being the recovery request.
+
+Authored-surrogate reproduction (`pkg/execution/sequence_7a722_test.go`): a local
+server scripts exactly this shape through the real `APIProvider` and OpenAI
+adapter. The run ends `inconclusive:max_turns` with the 6021-character text, 18
+recorded entries with the structure above, 23 tool events and the terminal event
+order; the written trace replays offline through `traceReplayAdapter` with the
+same 18 requests, outcome, final text and event types. Near miss: with a
+recovery that is also a tool call, no assistant text is emitted. This is a
+fixture; it is not the configured endpoint.
+
+Observed directly by the trace: OpenExec's requests, the endpoint's responses
+and OpenExec's events. **Not observable from OpenExec:** the caller-visible
+result and whether the Console persisted or dropped the draft (Console 7154).
+**Limits:** `redactionChangedContent` true means the trace is not byte-identical
+to the wire, so an offline replay of the private trace may differ from the real
+request sequence.
+
+**Original trace replay result (operator-run, reader from `0abdcebe`).** The
+supervisor ran the offline reader on the original private trace. It ran (not
+skipped), exited 0, and its replay verdict was "stopped after 14 of 18
+requests: request 14 differs in fields [messages]". That is an operational
+reader pass and an offline sequence **divergence**. It is not an 18/18 replay,
+not a same-endpoint reproduction and not a proven cause. At that revision the
+reader named only the differing field, so it could not say whether the
+difference is redaction altering content or the loop building a different
+request.
+
+Not reproduced: why the endpoint returned a tool call under `tool_choice: none`
+at entry 17, and why the operator's last-request replay against the same endpoint timed out (120.1 s).
+Missing observations and the exact commands (supervisor-run, protected,
+structural output only). `traceReplayAdapter` is a **recorded-response replay**:
+it serves the trace's recorded responses back and never contacts an endpoint.
+
+1. Offline, runnable now against the private trace (no endpoint, no content
+   printed; run from the repository root of the reviewed revision):
+
+   `go test ./pkg/execution/ -run TestTraceStructureReader -v -count=1 -args -trace-structure=<path to the private 7a722 trace.json>`
+
+   (`pkg/execution/trace_structure_test.go`.) It prints one line per entry
+   (tool counts on the request and the wire, `tool_choice`, roles, response block
+   types, text length, stop reason), the event counts and terminal order, the
+   outcome fields, and a replay verdict: whether the loop, rebuilt from entry 1,
+   re-derives all 18 recorded requests, or the first request that differs and
+   the names of the differing top-level fields only. When the differing field is
+   `messages`, it also prints a content-free message comparison: the rebuilt
+   and recorded message counts, the first differing message index, and for that
+   message the role and each block's type and character count, labelled
+   "role and block types equal, character counts or non-text values differ"
+   (the content changed in place, which is what redaction does) or "role or
+   block types differ" / "message count differs" (the loop built a different
+   request). It answers "does OpenExec re-derive this sequence" and nothing
+   about the endpoint.
+
+   **The open observation** is that comparison for request 14 of the original
+   trace: the already-observed result (14 of 18, request 14 differs in
+   `messages`) must be re-run with the reader at this revision, using the same
+   command, and its first-differing-message line recorded. Until it is, the
+   divergence is unexplained and the cause stays "no reproduced cause". A
+   reader pass is not full-sequence proof, and the 14-of-18 result must not be
+   read as redaction or as a loop change without that line.
+2. Endpoint side (why entry 17 returned a tool call under `tool_choice: none`,
+   and why the operator's last-request replay timed out at 120.1 s): no command
+   exists. `scripts/api-replay.py` sends one captured request; the recorded
+   requests of the trace could be sent one at a time to the original endpoint,
+   but a model-driven sequence cannot be re-driven from recorded data, so a
+   whole-sequence same-endpoint reproduction is not available and is not
+   claimed. The timeout and the entry-17 behaviour are different observations.
+
+No repair is claimed or authorized by this finding; a later repair must name a
+reproduced cause and a failing-then-passing test.
+
 ## The OpenExec to Console boundary
 
 Proven in this repository (tests above and `terminal_draft_boundary_test.go`):
