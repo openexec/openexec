@@ -476,10 +476,8 @@ func (p *OpenAIProvider) convertToOpenAIMessage(msg Message) openAIMessage {
 				} else {
 					openAIMsg.Content = block.ToolOutput
 				}
-				// Content is omitempty, so an empty result (a listing of an
-				// empty directory) would go out with no content at all, and
-				// llama.cpp rejects the whole turn: "invalid message content
-				// type: <nil>".
+				// Keep empty tool output visible to the model, including a
+				// listing of an empty directory.
 				if openAIMsg.Content == "" {
 					openAIMsg.Content = emptyToolResultContent
 				}
@@ -1074,8 +1072,10 @@ type openAIStreamOptions struct {
 }
 
 type openAIMessage struct {
-	Role             string `json:"role"`
-	Content          string `json:"content,omitempty"`
+	Role string `json:"role"`
+	// Some compatible endpoints require this field even when an assistant
+	// returns only tool calls. Preserve the empty string on continuation.
+	Content          string `json:"content"`
 	ReasoningContent string `json:"reasoning_content,omitempty"`
 	// Ollama's OpenAI-compatible endpoint returns the same private model state
 	// under "reasoning". Keep accepting reasoning_content for providers that
