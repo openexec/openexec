@@ -1,0 +1,122 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+// Models the live comparison: a valid user query followed by oversized tool
+// evidence fails inside the compatibility template; native truncate=false
+// refuses the context without losing that query. No resource grant is supplied.
+func TestUnboundedLocalOllamaCompletePreservesContextAndDefaults(t *testing.T) {
+	for _, overflow := range []bool{false, true} {
+		t.Run(map[bool]string{false: "fits", true: "overflow"}[overflow], func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/version" {
+					w.Write([]byte(`{"version":"0.32.13"}`))
+					return
+				}
+				calls++
+				if r.URL.Path != "/api/chat" {
+					w.WriteHeader(500)
+					w.Write([]byte(`{"error":{"message":"No user query found in messages."}}`))
+					return
+				}
+				var body struct {
+					Truncate *bool            `json:"truncate"`
+					Options  map[string]any   `json:"options"`
+					Messages []map[string]any `json:"messages"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+				}
+				if body.Truncate == nil || *body.Truncate {
+					t.Error("ungranted continuation permits truncation")
+				}
+				if len(body.Options) != 0 {
+					t.Errorf("zero grant changed model defaults: %v", body.Options)
+				}
+				if len(body.Messages) != 3 || body.Messages[0]["role"] != "user" || body.Messages[0]["content"] != "keep the actual query" || body.Messages[2]["tool_name"] != "read_file" || body.Messages[2]["content"] != "actual tool evidence" {
+					t.Errorf("conversation changed: %v", body.Messages)
+				}
+				if overflow {
+					w.WriteHeader(400)
+					w.Write([]byte(`{"error":"request exceeds the available context size"}`))
+					return
+				}
+				w.Write([]byte(`{"done":true,"done_reason":"stop","prompt_eval_count":120000,"eval_count":3000,"message":{"content":"useful answer"}}`))
+			}))
+			defer srv.Close()
+			p, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "local", Models: []string{"local"}, BaseURL: srv.URL + "/v1"})
+			if !p.EnableLocalOllamaBounds(context.Background()) {
+				t.Fatal("native negotiation failed")
+			}
+			messages := []Message{NewTextMessage(RoleUser, "keep the actual query"), {Role: RoleAssistant, Content: []ContentBlock{{Type: ContentTypeToolUse, ToolUseID: "call-1", ToolName: "read_file", ToolInput: json.RawMessage(`{"path":"fixture.txt"}`)}}}, NewToolResultMessage("call-1", "actual tool evidence", nil)}
+			res, err := p.Complete(context.Background(), Request{Model: "local", Messages: messages})
+			if calls != 1 {
+				t.Fatalf("inference retried: %d", calls)
+			}
+			if overflow {
+				var contextErr *ContextOverflowError
+				if !errors.As(err, &contextErr) || !contextErr.Dispatched {
+					t.Fatalf("ungranted context failure lost its typed refusal: %v", err)
+				}
+			} else if err != nil || res.GetText() != "useful answer" || res.Usage.TotalTokens != 123000 {
+				t.Fatalf("ungranted native completion lost actual usage/result: %v %v", res, err)
+			}
+		})
+	}
+}
+
+func TestUnboundedLocalOllamaCompletePreservesExplicitOptionsAndFallbacks(t *testing.T) {
+	for _, mode := range []string{"options", "forced-tool", "media", "unnegotiated"} {
+		t.Run(mode, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/version" {
+					w.Write([]byte(`{"version":"0.32.13"}`))
+					return
+				}
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
+				}
+				if mode == "options" {
+					if r.URL.Path != "/api/chat" {
+						t.Errorf("wrong route: %s", r.URL.Path)
+					}
+					o, _ := body["options"].(map[string]any)
+					if len(o) != 4 || o["num_predict"] != float64(17) || o["temperature"] != 0.4 || o["top_p"] != 0.7 || len(o["stop"].([]any)) != 1 {
+						t.Errorf("explicit generation options changed: %v", o)
+					}
+					w.Write([]byte(`{"done":true,"prompt_eval_count":10,"eval_count":2,"message":{"content":"ok"}}`))
+				} else {
+					if r.URL.Path != "/v1/chat/completions" {
+						t.Errorf("compatibility fallback lost for %s: %s", mode, r.URL.Path)
+					}
+					w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+				}
+			}))
+			defer srv.Close()
+			p, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "local", Models: []string{"local"}, BaseURL: srv.URL + "/v1"})
+			if mode != "unnegotiated" && !p.EnableLocalOllamaBounds(context.Background()) {
+				t.Fatal("negotiation failed")
+			}
+			temperature, topP := 0.4, 0.7
+			req := Request{Model: "local", Messages: []Message{NewTextMessage(RoleUser, "query")}, MaxTokens: 17, Temperature: &temperature, TopP: &topP, StopSequences: []string{"END"}}
+			if mode == "forced-tool" {
+				req.ToolChoice = "required"
+			}
+			if mode == "media" {
+				req.Messages[0].Content = append(req.Messages[0].Content, ContentBlock{Type: ContentTypeImage})
+			}
+			if _, err := p.Complete(context.Background(), req); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

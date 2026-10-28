@@ -4,6 +4,18 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Local tool-history context boundary, 2026-10-28] Real Console run c691396f
+  had a plain user query but failed in Ollama's chat template after its preceding
+  request used 130275 of 131072 context tokens. A synthetic tool-history control
+  reproduced compatibility HTTP 500; the same native request with truncate=false
+  refused 612369 tokens against the unchanged 131072 context with HTTP 400.
+  Reuse the negotiated native text transport for ordinary ungranted completions,
+  retaining actual usage, explicit generation options and model defaults. Media,
+  forced tool choice and unnegotiated endpoints retain their existing route.
+  No model, grants, Stop, task state or implementation loop changes. Focused,
+  removal, package, vet and build validation is recorded by the watch; hosted
+  review/delivery and original-task recovery remain separate proof obligations.
+
 - [Native line reads, 2026-10-28] Natural run 59614721 found an OpenAPI
   definition at line 6591 but spent its remaining inspection on byte-offset
   guesses and helpers. Existing read_file now accepts one-based start_line,
