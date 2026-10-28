@@ -1,0 +1,871 @@
+{
+  "source": "/home/perttu/.agent-console/state.json",
+  "sourceRevision": 954887106,
+  "extractedAt": "2026-10-27T18:20:54.915411+00:00",
+  "scope": "Structural historical evidence only. Tool inputs except the twelve observational argv arrays, tool outputs, assistant text, request bodies, environment and owner content are omitted. Not an original wire request or replay trace.",
+  "installation": {
+    "source": "/home/perttu/.agent-console/deploy-evidence/openexec-graph/3e3550d2-20261027T160050Z/requery.json",
+    "at": "2026-10-27T16:01:01.191044076Z",
+    "commit": "3e3550d2",
+    "version": "0.13.1-204-g3e3550d2"
+  },
+  "run": {
+    "id": "60a3dddb9c387861d369c5a4aba5dea0",
+    "status": "inconclusive",
+    "error": "inconclusive: budget_exhausted\nIt had made 52 tool calls and changed 128 files.\nThis run did not finish; completed effects are not undone.",
+    "startedAt": "2026-10-27T16:03:01.270006156Z",
+    "finishedAt": "2026-10-27T18:03:05.00362075Z",
+    "lastSequence": 114
+  },
+  "events": [
+    {
+      "sequence": 1,
+      "type": "turn.started",
+      "createdAt": "2026-10-27T16:03:01.511805688Z"
+    },
+    {
+      "sequence": 2,
+      "type": "base.refreshed",
+      "createdAt": "2026-10-27T16:03:03.758198936Z"
+    },
+    {
+      "sequence": 3,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:03:50.151220458Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "git",
+            "status",
+            "--short",
+            "--branch"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 4,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:03:50.20496252Z"
+    },
+    {
+      "sequence": 5,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:03:50.230317645Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "git",
+            "log",
+            "--oneline",
+            "-15"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 6,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:03:50.286229712Z"
+    },
+    {
+      "sequence": 7,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:08:23.051683874Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "git",
+            "diff",
+            "internal/store/blocked.go"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 8,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:08:23.109159103Z"
+    },
+    {
+      "sequence": 9,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:08:23.112108686Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 10,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:08:23.145810175Z"
+    },
+    {
+      "sequence": 11,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:11:01.940563108Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 12,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:11:01.997054767Z"
+    },
+    {
+      "sequence": 13,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:11:02.023300568Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 14,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:11:02.052422768Z"
+    },
+    {
+      "sequence": 15,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:11:36.417108618Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 16,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:11:36.496838603Z"
+    },
+    {
+      "sequence": 17,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:12:50.854851595Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 18,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:12:50.882688392Z"
+    },
+    {
+      "sequence": 19,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:13:32.667004667Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 20,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:13:32.709271532Z"
+    },
+    {
+      "sequence": 21,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:13:32.709413498Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 22,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:13:32.745162837Z"
+    },
+    {
+      "sequence": 23,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:14:17.478463837Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 24,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:14:17.545018419Z"
+    },
+    {
+      "sequence": 25,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:14:17.548146872Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 26,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:14:17.576343035Z"
+    },
+    {
+      "sequence": 27,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:14:17.576522127Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 28,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:14:17.607571887Z"
+    },
+    {
+      "sequence": 29,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:16:24.446306456Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 30,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:16:24.476339723Z"
+    },
+    {
+      "sequence": 31,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:16:24.476458293Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 32,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:16:24.505045107Z"
+    },
+    {
+      "sequence": 33,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T16:18:03.018036318Z"
+    },
+    {
+      "sequence": 34,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:18:03.020917969Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 35,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:18:03.073008627Z"
+    },
+    {
+      "sequence": 36,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:18:03.098550482Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "git",
+            "grep",
+            "-n",
+            "route's_follow_up_missing",
+            "--",
+            "internal/server"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 37,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:18:03.13590391Z"
+    },
+    {
+      "sequence": 38,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:19:34.61359395Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 39,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:19:34.680262881Z"
+    },
+    {
+      "sequence": 40,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:20:57.525615196Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 41,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:20:57.580212626Z"
+    },
+    {
+      "sequence": 42,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:22:27.415997444Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 43,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:22:27.417208892Z"
+    },
+    {
+      "sequence": 44,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T16:24:02.588028757Z"
+    },
+    {
+      "sequence": 45,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:24:02.58815876Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 46,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:24:02.925190364Z"
+    },
+    {
+      "sequence": 47,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:26:27.175428499Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 48,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:26:27.246543743Z"
+    },
+    {
+      "sequence": 49,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:30:07.077638316Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 50,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:30:07.146094226Z"
+    },
+    {
+      "sequence": 51,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:30:07.149584445Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 52,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:30:07.182536461Z"
+    },
+    {
+      "sequence": 53,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:33:32.716781479Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 54,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:33:32.768111796Z"
+    },
+    {
+      "sequence": 55,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T16:41:22.887647917Z"
+    },
+    {
+      "sequence": 56,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:41:22.898470188Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 57,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:41:22.998632911Z"
+    },
+    {
+      "sequence": 58,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:46:05.468421739Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 59,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:46:05.524835753Z"
+    },
+    {
+      "sequence": 60,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:50:14.875054467Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 61,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:50:14.909032151Z"
+    },
+    {
+      "sequence": 62,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:57:23.04490505Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "go",
+            "doc",
+            "-all",
+            "github.com/openexec/agent-console/internal/server 2>/dev/null || true"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 63,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:57:23.682304294Z"
+    },
+    {
+      "sequence": 64,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T16:57:23.709067602Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 65,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T16:57:23.76892924Z"
+    },
+    {
+      "sequence": 66,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:03:04.833692843Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "sed",
+            "-n",
+            "405,560p",
+            "internal/server/lane_pass_budget.go"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 67,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:03:04.891382206Z"
+    },
+    {
+      "sequence": 68,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T17:10:40.503123065Z"
+    },
+    {
+      "sequence": 69,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:10:40.503303364Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 70,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:10:40.561466488Z"
+    },
+    {
+      "sequence": 71,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:10:40.58817902Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 72,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:10:40.61397445Z"
+    },
+    {
+      "sequence": 73,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:10:40.616780479Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 74,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:10:40.643273964Z"
+    },
+    {
+      "sequence": 75,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:10:40.669294831Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 76,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:10:40.72345507Z"
+    },
+    {
+      "sequence": 77,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:14:16.90359133Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 78,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:14:16.962513821Z"
+    },
+    {
+      "sequence": 79,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:14:16.989188265Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 80,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:14:17.017863322Z"
+    },
+    {
+      "sequence": 81,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:16:29.797782158Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "cat",
+            "internal/server/testdata/pass_budget_split/3f2a2703_triage_contract.md"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 82,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:16:29.907313443Z"
+    },
+    {
+      "sequence": 83,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:18:37.267495536Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "sed",
+            "-n",
+            "300,360p",
+            "internal/server/lane_pass_budget.go"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 84,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:18:37.345392724Z"
+    },
+    {
+      "sequence": 85,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:18:37.372759997Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 86,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:18:37.404037752Z"
+    },
+    {
+      "sequence": 87,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:21:49.847798869Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "ls",
+            "Makefile"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 88,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:21:49.930626633Z"
+    },
+    {
+      "sequence": 89,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:21:49.931213782Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "cat",
+            "AGENTS.md"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 90,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:21:50.04665993Z"
+    },
+    {
+      "sequence": 91,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T17:26:12.286809994Z"
+    },
+    {
+      "sequence": 92,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:26:12.311880428Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "sed",
+            "-n",
+            "100,160p",
+            "internal/server/supervisor_task_guard.go"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 93,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:26:12.393863367Z"
+    },
+    {
+      "sequence": 94,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:26:12.394417186Z",
+      "tool": {
+        "name": "run_command",
+        "input": {
+          "command": [
+            "git",
+            "grep",
+            "-n",
+            "parseRoute\\|ParseBlockRoute",
+            "--",
+            "internal"
+          ]
+        }
+      }
+    },
+    {
+      "sequence": 95,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:26:12.514089039Z"
+    },
+    {
+      "sequence": 96,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T17:33:19.793536958Z"
+    },
+    {
+      "sequence": 97,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:33:19.798653853Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 98,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:33:19.964725628Z"
+    },
+    {
+      "sequence": 99,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:33:19.969978948Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 100,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:33:20.043116083Z"
+    },
+    {
+      "sequence": 101,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:36:56.937077512Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 102,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:36:56.997237777Z"
+    },
+    {
+      "sequence": 103,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:40:54.957212169Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 104,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:40:54.95793547Z"
+    },
+    {
+      "sequence": 105,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:45:34.135218537Z",
+      "tool": {
+        "name": "read_file"
+      }
+    },
+    {
+      "sequence": 106,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:45:34.193394417Z"
+    },
+    {
+      "sequence": 107,
+      "type": "assistant.delta",
+      "createdAt": "2026-10-27T17:51:24.047750849Z"
+    },
+    {
+      "sequence": 108,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:51:24.051686574Z",
+      "tool": {
+        "name": "record_route_judgment"
+      }
+    },
+    {
+      "sequence": 109,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:51:24.46717603Z"
+    },
+    {
+      "sequence": 110,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:56:19.732510534Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 111,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:56:19.767555457Z"
+    },
+    {
+      "sequence": 112,
+      "type": "tool.started",
+      "createdAt": "2026-10-27T17:56:19.770322758Z",
+      "tool": {
+        "name": "search_files"
+      }
+    },
+    {
+      "sequence": 113,
+      "type": "tool.completed",
+      "createdAt": "2026-10-27T17:56:19.80306136Z"
+    },
+    {
+      "sequence": 114,
+      "type": "turn.inconclusive",
+      "createdAt": "2026-10-27T18:03:05.00362075Z"
+    }
+  ],
+  "witnessFileObservations": [
+    {
+      "path": "/home/perttu/.agent-console/run-requests/60a3dddb9c387861d369c5a4aba5dea0.json",
+      "exists": false
+    },
+    {
+      "path": "/home/perttu/.agent-console/run-requests/60a3dddb9c387861d369c5a4aba5dea0.trace.json",
+      "exists": false
+    }
+  ],
+  "historicalAPIChild": {
+    "executableIdentity": null,
+    "captureEnvironment": null,
+    "traceEnvironment": null,
+    "limitation": "Not retained in inspected run/events. Current executable and surviving processes cannot establish these historical values."
+  },
+  "preInstallRuns": [
+    {
+      "id": "6d230c9560c73575205bc8f927fea479",
+      "startedAt": "2026-10-27T16:00:26.240260634Z",
+      "finishedAt": "2026-10-27T18:00:26.609316334Z",
+      "status": "inconclusive"
+    },
+    {
+      "id": "f112f8dc37edccce3562fbcb8ea1a8c3",
+      "startedAt": "2026-10-27T16:00:51.769149476Z",
+      "finishedAt": "2026-10-27T18:00:51.874059189Z",
+      "status": "inconclusive"
+    }
+  ]
+}

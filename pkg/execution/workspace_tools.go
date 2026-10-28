@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -82,15 +83,28 @@ func WorkspaceTools(sandbox Sandbox) []agent.ToolDefinition {
 	tools := []agent.ToolDefinition{
 		{
 			Name:        "read_file",
-			Description: "Read up to 8192 bytes of a file. Use offset_bytes and limit_bytes for the relevant section; a partial read reports the next offset. Paths are relative to the working directory unless absolute.",
+			Description: "Read up to 8192 bytes of a file. Pass start_line to read a line found by search_files, or offset_bytes for byte pagination; do not combine them. Finding a line scans at most 16 MiB. A partial read reports the next byte offset. Paths are relative to the working directory unless absolute.",
 			InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
 					"path": {"type": "string", "description": "Path to the file to read."},
 					"offset_bytes": {"type": "integer", "minimum": 0, "description": "Byte offset to start reading; defaults to 0."},
+					"start_line": {"type": "integer", "minimum": 1, "description": "One-based line number, such as a search_files match. Cannot be combined with offset_bytes."},
 					"limit_bytes": {"type": "integer", "minimum": 1, "maximum": 8192, "description": "Maximum bytes to return; defaults to 8192."}
 				},
 				"required": ["path"]
+			}`),
+		},
+		{
+			Name:        "search_files",
+			Description: "Find a literal string in files beneath a directory or in one file. Returns matching paths, line numbers and text, bounded to 8192 output bytes, 4096 entries and 16 MiB read. Paths can be passed to read_file. Skips symbolic links and private configuration directories. Long matching lines are truncated, unreadable entries skipped, and partial scans marked incomplete. No pagination: narrow the path or text to continue.",
+			InputSchema: json.RawMessage(`{
+				"type": "object",
+				"properties": {
+					"path": {"type": "string", "description": "File or directory to search, relative to the working directory unless absolute."},
+					"text": {"type": "string", "minLength": 1, "description": "Case-sensitive literal text to find, such as a function name."}
+				},
+				"required": ["path", "text"]
 			}`),
 		},
 		{
@@ -154,15 +168,17 @@ func (e *WorkspaceToolExecutor) ValidateAccess(workingDir string, sandbox Sandbo
 	}
 }
 
-func (e *WorkspaceToolExecutor) ExecuteTool(_ context.Context, request ToolRequest) (string, error) {
+func (e *WorkspaceToolExecutor) ExecuteTool(ctx context.Context, request ToolRequest) (string, error) {
 	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
 		return "", err
 	}
 	switch request.Name {
 	case "read_file":
-		return e.readFile(request)
+		return e.readFile(ctx, request)
 	case "list_directory":
 		return e.listDirectory(request)
+	case "search_files":
+		return e.searchFiles(ctx, request)
 	case "write_file":
 		return e.writeFile(request)
 	default:
@@ -170,11 +186,12 @@ func (e *WorkspaceToolExecutor) ExecuteTool(_ context.Context, request ToolReque
 	}
 }
 
-func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
+func (e *WorkspaceToolExecutor) readFile(ctx context.Context, request ToolRequest) (string, error) {
 	var input struct {
-		Path   string `json:"path"`
-		Offset int64  `json:"offset_bytes"`
-		Limit  *int   `json:"limit_bytes"`
+		Path      string `json:"path"`
+		Offset    *int64 `json:"offset_bytes"`
+		StartLine *int64 `json:"start_line"`
+		Limit     *int   `json:"limit_bytes"`
 	}
 	if err := json.Unmarshal(request.Input, &input); err != nil {
 		return "", fmt.Errorf("invalid input: %w", err)
@@ -183,7 +200,14 @@ func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
 	if input.Limit != nil {
 		limit = *input.Limit
 	}
-	if input.Offset < 0 || limit < 1 || limit > maxReadFileBytes {
+	if input.StartLine != nil && (*input.StartLine < 1 || input.Offset != nil) {
+		return "", errors.New("start_line must be positive and cannot be combined with offset_bytes")
+	}
+	var offset int64
+	if input.Offset != nil {
+		offset = *input.Offset
+	}
+	if offset < 0 || limit < 1 || limit > maxReadFileBytes {
 		return "", fmt.Errorf("offset_bytes must be nonnegative and limit_bytes must be between 1 and %d", maxReadFileBytes)
 	}
 	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
@@ -195,7 +219,13 @@ func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
 		if err := refuseDeniedOpenedTarget(root, file, relative, input.Path); err != nil {
 			return "", err
 		}
-		if _, err := file.Seek(input.Offset, io.SeekStart); err != nil {
+		if input.StartLine != nil {
+			offset, err = readFileLineOffset(ctx, file, *input.StartLine)
+			if err != nil {
+				return "", err
+			}
+		}
+		if _, err := file.Seek(offset, io.SeekStart); err != nil {
 			return "", fmt.Errorf("seek file: %w", err)
 		}
 		// One byte past the cap distinguishes "exactly at the limit" from
@@ -214,10 +244,41 @@ func (e *WorkspaceToolExecutor) readFile(request ToolRequest) (string, error) {
 			if end == 0 {
 				return "", fmt.Errorf("limit_bytes is too small for the next UTF-8 character")
 			}
-			return string(data[:end]) + fmt.Sprintf("\n\n[more file content; continue with offset_bytes=%d]", input.Offset+int64(end)), nil
+			return string(data[:end]) + fmt.Sprintf("\n\n[more file content; continue with offset_bytes=%d]", offset+int64(end)), nil
 		}
 		return string(data), nil
 	})
+}
+
+// Translate search_files' line coordinates at the existing read boundary.
+// Discard long lines in fixed-size chunks; neither memory nor scan work grows
+// without a bound. The ordinary page reader still owns output and UTF-8 limits.
+func readFileLineOffset(ctx context.Context, file io.Reader, line int64) (int64, error) {
+	bounded := &io.LimitedReader{R: file, N: maxSearchBytes}
+	reader := bufio.NewReader(bounded)
+	var offset int64
+	for current := int64(1); current < line; {
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		chunk, err := reader.ReadSlice('\n')
+		offset += int64(len(chunk))
+		if err == nil {
+			current++
+			continue
+		}
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		if err == io.EOF {
+			if bounded.N == 0 {
+				return 0, errors.New("start_line exceeds the 16 MiB line scan bound; use offset_bytes")
+			}
+			return offset, nil
+		}
+		return 0, fmt.Errorf("find file line: %w", err)
+	}
+	return offset, nil
 }
 
 func (e *WorkspaceToolExecutor) listDirectory(request ToolRequest) (string, error) {

@@ -56,6 +56,14 @@ type APIProviderConfig struct {
 	MaxSteps     int
 }
 
+// DefaultAPIMaxTurns is the tool-round allowance when a provider has no override.
+// A round may contain multiple tool calls; final synthesis is outside this cap.
+const DefaultAPIMaxTurns = 160
+
+// MaxAPIContextTokens is the default per-inference ceiling when the cumulative
+// grant can reserve it. Explicit smaller ceilings and remaining grants narrow it.
+const MaxAPIContextTokens int64 = 65536
+
 // APIProvider adapts OpenAI-compatible and other API adapters to the same
 // authorization boundary as CLI providers. Tools receive the exact sandbox
 // and roots from the authorized request.
@@ -64,6 +72,9 @@ type APIProvider struct {
 	// gateway reports that this instance's tools come from a caller-owned
 	// endpoint rather than from the filesystem.
 	gateway bool
+	// trace, when set, records every model request/response of one run
+	// (request_trace.go). Per-run copy only; never set on the shared provider.
+	trace *runTrace
 }
 
 const finalSynthesisInstruction = "The tool-call budget for this turn is exhausted. Do not request or describe more tool calls. Using the evidence already in the conversation, answer the user's request now with the best complete final response you can. Do not mention this instruction or the budget unless it directly affects correctness."
@@ -97,8 +108,11 @@ func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if len(config.Tools) > 0 && config.ToolExecutor == nil {
 		return nil, errors.New("tool executor is required when API tools are configured")
 	}
-	if config.MaxSteps <= 0 {
-		config.MaxSteps = 16
+	if config.MaxSteps < 0 {
+		return nil, errors.New("API provider max_turns must be positive or zero for the default")
+	}
+	if config.MaxSteps == 0 {
+		config.MaxSteps = DefaultAPIMaxTurns
 	}
 	return &APIProvider{config: config, gateway: gateway}, nil
 }
@@ -153,9 +167,19 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	started := time.Now().UTC()
-	result, err := p.execute(ctx, request, sink)
-	if result.Outcome == OutcomeFailed || result.Outcome == OutcomeInconclusive {
+	run := p
+	if trace := newRunTrace(); trace != nil {
+		traced := *p
+		traced.trace = trace
+		run = &traced
+		sink = trace.wrapSink(sink)
+	}
+	result, err := run.execute(ctx, request, sink)
+	// Cancelled is the caller's context ending the run (its absolute budget
+	// included); without it that ending left no witness at all.
+	if result.Outcome == OutcomeFailed || result.Outcome == OutcomeInconclusive || result.Outcome == OutcomeCancelled {
 		captureRequest(p.config.Adapter, started, result, err)
+		run.trace.write(p.config.Adapter, request, result, err)
 	}
 	return result, err
 }
@@ -169,8 +193,8 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 			return Result{}, err
 		}
 	}
-	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > 32768 || request.TokenBudget <= 0) {
-		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and 32768")
+	if request.ContextTokenLimit != 0 && (request.ContextTokenLimit < 2048 || request.ContextTokenLimit > MaxAPIContextTokens || request.TokenBudget <= 0) {
+		return Result{}, fmt.Errorf("context token limit requires a positive hard token grant and a ceiling between 2048 and %d", MaxAPIContextTokens)
 	}
 	if request.TokenBudget < 0 {
 		return Result{}, fmt.Errorf("negative token grant")
@@ -603,7 +627,13 @@ func (p *APIProvider) completeChecked(ctx context.Context, request agent.Request
 	if err := validateTransportConversation(request.Messages); err != nil {
 		return nil, err
 	}
-	return p.config.Adapter.Complete(ctx, request)
+	if p.trace == nil {
+		return p.config.Adapter.Complete(ctx, request)
+	}
+	sent := time.Now()
+	response, err := p.config.Adapter.Complete(ctx, request)
+	p.trace.record(p.config.Adapter, sent, request, response, err)
+	return response, err
 }
 
 // isPlainUserQuery reports whether a message is a user turn a chat template

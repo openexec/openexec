@@ -111,9 +111,10 @@ func TestProjectConfig_JSONRoundTrip_NamedProviders(t *testing.T) {
 			ActiveProvider: "kimi-prod",
 			Providers: map[string]ProviderConfig{
 				"kimi-prod": {
-					BaseURL: "https://api.moonshot.cn/v1",
-					APIKey:  "$KIMI_API_KEY",
-					Model:   "moonshot-v1-128k",
+					BaseURL:  "https://api.moonshot.cn/v1",
+					APIKey:   "$KIMI_API_KEY",
+					Model:    "moonshot-v1-128k",
+					MaxTurns: 100,
 				},
 			},
 		},
