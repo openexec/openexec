@@ -178,6 +178,9 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 	sent := time.Now()
 	res, err := client.Do(wire)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
 	}
 	defer res.Body.Close()

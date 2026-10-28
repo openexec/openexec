@@ -223,3 +223,60 @@ func TestUnboundedLocalOllamaCompleteErrorContract(t *testing.T) {
 		})
 	}
 }
+
+func TestLocalOllamaCompletePreservesCallerCancellation(t *testing.T) {
+	for _, bounded := range []bool{false, true} {
+		for _, deadline := range []bool{false, true} {
+			t.Run(fmt.Sprintf("bounded=%t/deadline=%t", bounded, deadline), func(t *testing.T) {
+				received := make(chan struct{})
+				release := make(chan struct{})
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/api/version" {
+						fmt.Fprint(w, `{"version":"0.32.13"}`)
+						return
+					}
+					close(received)
+					<-release
+				}))
+				defer srv.Close()
+				defer close(release)
+				p, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "local", Models: []string{"local"}, BaseURL: srv.URL + "/v1"})
+				if !p.EnableLocalOllamaBounds(context.Background()) {
+					t.Fatal("native negotiation failed")
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				want := context.Canceled
+				if deadline {
+					cancel()
+					ctx, cancel = context.WithTimeout(context.Background(), 250*time.Millisecond)
+					want = context.DeadlineExceeded
+				}
+				defer cancel()
+				if !deadline {
+					go func() {
+						select {
+						case <-received:
+							cancel()
+						case <-ctx.Done():
+						}
+					}()
+				}
+				req := Request{Model: "local", Messages: []Message{NewTextMessage(RoleUser, "query")}}
+				var err error
+				if bounded {
+					_, err = p.CompleteBounded(ctx, req, 2048, 16)
+				} else {
+					_, err = p.Complete(ctx, req)
+				}
+				if !errors.Is(err, want) {
+					t.Fatalf("caller cancellation identity lost: got %v, want %v", err, want)
+				}
+				select {
+				case <-received:
+				default:
+					t.Fatal("cancellation fixture never reached native inference")
+				}
+			})
+		}
+	}
+}
