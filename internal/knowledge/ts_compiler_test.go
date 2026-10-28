@@ -82,7 +82,7 @@ func TestExtractorFailureNamesWhoEndedIt(t *testing.T) {
 		{name: "deadline", body: "exec sleep 30", timeout: 300 * time.Millisecond, want: "extractor deadline 300ms exceeded", notWant: "killed from outside"},
 		{name: "external kill", body: "kill -9 $$", timeout: 30 * time.Second, want: "killed from outside this process", notWant: "exceeded"},
 		{name: "caller cancel", body: "exec sleep 30", timeout: 30 * time.Second, cancel: true, want: "caller context ended", notWant: "killed from outside"},
-		{name: "plain failure", body: "echo boom >&2; exit 3", timeout: 30 * time.Second, want: "exit status 3", notWant: "signal"},
+		{name: "plain failure", body: "echo boom >&2; exit 3", timeout: 30 * time.Second, want: "exited on its own", notWant: "killed from outside"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -105,6 +105,9 @@ func TestExtractorFailureNamesWhoEndedIt(t *testing.T) {
 			}
 			if tc.notWant != "" && strings.Contains(msg, tc.notWant) {
 				t.Fatalf("error %q must not contain %q", msg, tc.notWant)
+			}
+			if tc.name == "plain failure" && (!strings.Contains(msg, "exit status 3") || strings.Contains(msg, "signal")) {
+				t.Fatalf("exit 3 misdescribed: %q", msg)
 			}
 			if tc.name == "plain failure" && !strings.Contains(msg, "boom") {
 				t.Fatalf("stderr dropped: %q", msg)

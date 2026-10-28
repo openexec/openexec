@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -104,7 +105,7 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	started := time.Now()
 	if err := cmd.Run(); err != nil {
-		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, describeExtractorEnding(ctx, commandCtx, time.Since(started)), strings.TrimSpace(stderr.String()))
+		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, describeExtractorEnding(ctx, commandCtx, err, time.Since(started)), strings.TrimSpace(stderr.String()))
 	}
 	var response tsCompilerResponse
 	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
@@ -143,16 +144,21 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 // kills the child with SIGKILL when its context ends, so "signal: killed" alone
 // is the same text for the 45 second deadline, a cancelled caller and a kill
 // from outside the process (for example the host OOM killer).
-func describeExtractorEnding(parent, command context.Context, elapsed time.Duration) string {
+func describeExtractorEnding(parent, command context.Context, runErr error, elapsed time.Duration) string {
 	elapsed = elapsed.Round(time.Millisecond)
 	switch {
 	case parent.Err() != nil:
 		return fmt.Sprintf("caller context ended after %s: %v", elapsed, parent.Err())
 	case command.Err() != nil:
 		return fmt.Sprintf("extractor deadline %s exceeded after %s", typeScriptExtractorTimeout, elapsed)
-	default:
-		return fmt.Sprintf("extractor ended after %s with no context deadline or cancellation; killed from outside this process", elapsed)
 	}
+	// ExitCode is -1 when the process was ended by a signal rather than by
+	// exiting, so an ordinary nonzero exit is never blamed on an outside kill.
+	var exitErr *exec.ExitError
+	if errors.As(runErr, &exitErr) && exitErr.ExitCode() == -1 {
+		return fmt.Sprintf("extractor ended after %s by a signal with no context deadline or cancellation; killed from outside this process", elapsed)
+	}
+	return fmt.Sprintf("extractor exited on its own after %s with no context deadline or cancellation", elapsed)
 }
 
 func findCompatibleNode(ctx context.Context) (string, error) {
