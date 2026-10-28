@@ -175,9 +175,10 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 	wire.Header.Set("Content-Type", "application/json")
 	client := *p.httpClient
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	sent := time.Now()
 	res, err := client.Do(wire)
 	if err != nil {
-		return nil, err
+		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -189,7 +190,11 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 		if res.StatusCode == 400 && strings.Contains(lower, "context") && (strings.Contains(lower, "exceed") || strings.Contains(lower, "too long")) {
 			return nil, &ContextOverflowError{EstimatedTokens: assembledContextEstimate(body, messageCount, toolCount), ContextTokens: inputCap, RequestBytes: len(body), Dispatched: true}
 		}
-		return nil, fmt.Errorf("bounded local inference HTTP %d", res.StatusCode)
+		// Reuse the compatibility error contract without exposing native error
+		// bodies, which may contain private prompt text.
+		sanitized := *res
+		sanitized.Body = io.NopCloser(strings.NewReader(fmt.Sprintf(`{"error":{"message":"local inference HTTP %d"}}`, res.StatusCode)))
+		return nil, p.parseErrorResponse(&sanitized)
 	}
 	var data struct {
 		Done       bool   `json:"done"`
@@ -221,6 +226,12 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 	switch data.DoneReason {
 	case "stop", "length", "load", "unload":
 		reason = data.DoneReason
+	}
+	result.StopReason = StopReasonEnd
+	if data.DoneReason == "length" {
+		result.StopReason = StopReasonMaxTokens
+	} else if len(data.Message.Calls) > 0 {
+		result.StopReason = StopReasonToolUse
 	}
 	result.Metadata["native_completion"] = NativeCompletionObservation{
 		NonThinkingRequested: req.NonThinking,

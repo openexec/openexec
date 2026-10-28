@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 // Models the live comparison: a valid user query followed by oversized tool
@@ -116,6 +119,106 @@ func TestUnboundedLocalOllamaCompletePreservesExplicitOptionsAndFallbacks(t *tes
 			}
 			if _, err := p.Complete(context.Background(), req); err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// Exercise Complete after real negotiation, so compatibility metadata cannot
+// silently disappear when ordinary calls start using the native transport.
+func TestUnboundedLocalOllamaCompleteStopReasons(t *testing.T) {
+	for _, tc := range []struct {
+		name, reason, calls string
+		want                StopReason
+	}{
+		{"end", "stop", "[]", StopReasonEnd},
+		{"length", "length", "[]", StopReasonMaxTokens},
+		{"tool", "stop", `[{"function":{"name":"read_file","arguments":{"path":"x"}}}]`, StopReasonToolUse},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/version" {
+					fmt.Fprint(w, `{"version":"0.32.13"}`)
+					return
+				}
+				if r.URL.Path != "/api/chat" {
+					t.Errorf("wrong route: %s", r.URL.Path)
+				}
+				fmt.Fprintf(w, `{"done":true,"done_reason":%q,"prompt_eval_count":3,"eval_count":2,"message":{"content":"ok","tool_calls":%s}}`, tc.reason, tc.calls)
+			}))
+			defer srv.Close()
+			p, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "local", Models: []string{"local"}, BaseURL: srv.URL + "/v1"})
+			if !p.EnableLocalOllamaBounds(context.Background()) {
+				t.Fatal("negotiation failed")
+			}
+			res, err := p.Complete(context.Background(), Request{Model: "local", Messages: []Message{NewTextMessage(RoleUser, "query")}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.StopReason != tc.want {
+				t.Fatalf("native stop reason lost: got %q want %q", res.StopReason, tc.want)
+			}
+			if res.Usage.TotalTokens != 5 {
+				t.Fatalf("actual usage changed: %+v", res.Usage)
+			}
+			if tc.want == StopReasonToolUse && len(res.GetToolCalls()) != 1 {
+				t.Fatal("tool call lost")
+			}
+		})
+	}
+}
+
+func TestUnboundedLocalOllamaCompleteErrorContract(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		code   string
+		retry  bool
+	}{
+		{400, ErrCodeInvalidRequest, false}, {401, ErrCodeAuthentication, false},
+		{403, ErrCodePermission, false}, {404, ErrCodeNotFound, false},
+		{429, ErrCodeRateLimit, true}, {503, ErrCodeServerError, true},
+		{0, ErrCodeServerError, true},
+	} {
+		t.Run(fmt.Sprint(tc.status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/version" {
+					fmt.Fprint(w, `{"version":"0.32.13"}`)
+					return
+				}
+				if r.URL.Path != "/api/chat" {
+					t.Errorf("wrong route: %s", r.URL.Path)
+				}
+				if tc.status == 0 {
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					conn.Close()
+					return
+				}
+				w.WriteHeader(tc.status)
+				fmt.Fprint(w, `{"error":"private prompt must not escape"}`)
+			}))
+			defer srv.Close()
+			p, _ := NewOpenAIProvider(OpenAIProviderConfig{APIKey: "local", Models: []string{"local"}, BaseURL: srv.URL + "/v1"})
+			if !p.EnableLocalOllamaBounds(context.Background()) {
+				t.Fatal("negotiation failed")
+			}
+			p.httpClient.Timeout = 50 * time.Millisecond
+			_, err := p.Complete(context.Background(), Request{Model: "local", Messages: []Message{NewTextMessage(RoleUser, "query")}})
+			var pe *ProviderError
+			if !errors.As(err, &pe) {
+				t.Fatalf("native error classification lost: %v", err)
+			}
+			if pe.Code != tc.code || pe.StatusCode != tc.status || pe.Retryable != tc.retry {
+				t.Fatalf("native error fields changed: %+v", pe)
+			}
+			if strings.Contains(err.Error(), "private prompt") {
+				t.Fatal("native error leaked provider content")
+			}
+			if tc.status == 0 && !strings.Contains(pe.Message, "request timeout") {
+				t.Fatalf("transport timing lost: %v", pe)
 			}
 		})
 	}
