@@ -65,3 +65,99 @@ error will state the wait against the budget and body size, which separates a
 stalled endpoint (wait equals budget, small body) from an oversize request.
 Supervisor-side, the same-endpoint replay should be run with the captured body
 size recorded against queue state at the failing time.
+
+## Reopened on run 1685d4be (task bd2b0715, installed `f3310a1a`)
+
+Same diagnosis, new occurrence. Every row is tagged **established**,
+**inferred** or **unknown**, with its source. Cause remains **unknown**: there
+is no reproducer. This section holds metadata only and no capture content.
+
+### New facts (verbatim)
+
+| Fact | Tag | Source |
+| --- | --- | --- |
+| Run `1685d4be96c6d36a48b9ad0b389eec8a` started 11:18:19Z on installed `f3310a1a` and ended 11:46:21Z after 77 inspection tools, with no product source authoring. | established | supervisor evidence, 2026-10-28 12:03Z |
+| Last request body was **289,936 bytes**. | established | error text written by `handleHTTPError` (`request body 289936 bytes`) |
+| It waited **15m0.006s of the 15 min** request timeout for headers, then `context deadline exceeded (Client.Timeout exceeded while awaiting headers)`. | established | same error text; budget from `loopbackRequestBudget` |
+| Last tool completed **11:31:17Z**. | established | supervisor evidence |
+| Private capture metadata: sentAt 11:31:16Z, capturedAt 11:46:16Z, outcome failed, textLimit 2000, truncated true. Its error equals the Console terminal error. | established | supervisor-read host metadata, not in this checkout |
+| The stdio loopback path (15 min budget) is the likely caller. Duration alone does not uniquely identify the caller. | inferred | `internal/cli/execution_stdio.go`; the pipeline path would use 120 s |
+| Native 166 line-coordinate reads were adopted, but useful authoring was not reached. | established | supervisor evidence; not a cause of the timeout |
+
+### What the new facts close from the #155 Unknown list
+
+- **Final request size:** closed for this run, 289,936 bytes (the #155 run's
+  size is still unknown).
+- **Full-budget wait:** closed. The wait is measured, 15m0.006s of 15 min, not
+  inferred from timestamps. One request waited the whole client budget without
+  receiving headers.
+- **Stdio vs pipeline path:** narrowed to inferred stdio, not proven.
+
+### What stays open
+
+- **Unknown:** endpoint queue depth and inference state at 11:31–11:46Z.
+- **Unknown:** time-to-first-header and whether the endpoint ever began
+  generating (server-side first-byte time).
+- **Unknown:** retry count inside the 15 min. The provider does not retry;
+  callers are not shown to.
+- **Unknown:** why replays differ from the failure (below).
+
+### Capture vs terminal signature
+
+- A capture has both `sentAt` and `capturedAt`. For this run they are
+  11:31:16Z and 11:46:16Z, 15 min apart: the capture was written when the
+  request failed, not at send time. (established: host metadata)
+- Here the capture error and the Console terminal error are **identical**: the
+  same header timeout, 15m0.006s of 15 min, 289,936 bytes. There is one
+  failure, seen twice. (established)
+- This differs from the historical budget captures, where the capture recorded
+  a cancellation and the caller's terminal recorded the caller budget. No
+  capture-versus-terminal difference exists for run 1685. (established)
+
+### What the short replays do and do not mean
+
+The 28 October 11:50Z same-endpoint replay at 45 s / budget 1 failed with a
+**different, generic 45 s timeout**. It is not a reproduction: it shows the
+endpoint did not return headers within 45 s for that replay, not that the 15
+min runtime failure recurred, what the minimum is, or the cause. The earlier
+b56/523 replays likewise ended in 30 s timeouts, not their captures'
+cancellation signatures; the 01:30Z replay of run e35efd1e passed. Mixed
+pass/timeout across short replays fits a variable endpoint but is not evidence
+of one (inferred only). Replays used a truncated capture (textLimit 2000), so
+none is identical to the original full request. (established)
+
+### Fixture decision
+
+The existing httptest fixture (`TestOpenAIHeaderTimeoutReportsWaitAndBudget`)
+already witnesses the header-wait path at a small scale. One new case adds
+something it did not: `TestOpenAIHeaderTimeoutLargeBodyReportsReceivedSize`
+sends a body near 290 KB that the server fully reads before stalling, and
+asserts the reported `request body N bytes` equals the bytes received, with
+code `server_error` and `Retryable: true` unchanged. It shows the
+instrumentation stays correct at this size. It does not witness endpoint
+queueing or inference, and does not reproduce the failure.
+
+### Exact missing observation
+
+The single observation that would separate a stalled endpoint from a slow
+inference or oversize prompt is the **endpoint-side time-to-first-byte (and
+queue state) for the request that begins at the `sentAt` of the next
+occurrence**, matched against the error text's body size. It is host-held and
+outside this repository. A retained full trace is the other candidate; full
+tracing was deliberately retired, so none is expected.
+
+### Evidence route for the supervisor (next occurrence)
+
+1. Read the terminal error text: `waited X of Y request timeout; request body N
+   bytes`. X≈Y with no headers means a full-budget wait.
+2. Read the capture metadata (`sentAt`, `capturedAt`, outcome) with the
+   existing request-capture writer (`pkg/execution/request_trace.go`,
+   `OPENEXEC_REQUEST_TRACE`), metadata only.
+3. From the endpoint's own logs, read queue depth, prompt-processing start and
+   first-byte time for the request starting at `sentAt`. Compare with N.
+4. Record whether a replay of the same capture at the same time of day
+   returns headers, with the timeout used. A pass or short timeout is not a
+   reproduction.
+
+No deadline, cap, provider, model, Stop, accounting or context change is made
+or implied. A diagnosis alone does not self-heal 18da or bd2b0715.
