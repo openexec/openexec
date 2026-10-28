@@ -218,6 +218,23 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 		return nil, err
 	}
 
+	// The configured local native protocol can refuse oversized text without
+	// silently dropping the user query from a tool continuation. A zero
+	// cumulative grant is not permission for the compatibility route to truncate.
+	if p.SupportsHardTokenBudget() && (req.ToolChoice == "" || req.ToolChoice == "auto" || req.ToolChoice == "none") {
+		textOnly := true
+		for _, message := range req.Messages {
+			for _, block := range message.Content {
+				if block.Type == ContentTypeImage {
+					textOnly = false
+				}
+			}
+		}
+		if textOnly {
+			return p.completeLocalOllama(ctx, req, 0, 0)
+		}
+	}
+
 	openAIReq := p.buildOpenAIRequest(req, false)
 	body, err := json.Marshal(openAIReq)
 	if err != nil {

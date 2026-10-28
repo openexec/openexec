@@ -81,6 +81,13 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	if !p.SupportsHardTokenBudget() || inputCap < 2048 || outputCap < 1 {
 		return nil, fmt.Errorf("hard token admission unavailable")
 	}
+	return p.completeLocalOllama(ctx, req, inputCap, outputCap)
+}
+
+// Zero caps preserve the configured model's context and generation defaults;
+// they do not create a grant or claim bounded usage. Both routes retain the
+// native no-truncation refusal and report actual usage through the same parser.
+func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, inputCap, outputCap int) (*Response, error) {
 	messages := []map[string]any{}
 	if req.System != "" {
 		messages = append(messages, map[string]any{"role": "system", "content": req.System})
@@ -126,7 +133,24 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 			tools = append(tools, map[string]any{"type": "function", "function": map[string]any{"name": t.Name, "description": t.Description, "parameters": t.InputSchema}})
 		}
 	}
-	wireBody := map[string]any{"model": req.Model, "messages": messages, "tools": tools, "stream": false, "truncate": false, "options": map[string]any{"num_ctx": inputCap, "num_predict": outputCap}}
+	options := map[string]any{}
+	if inputCap > 0 {
+		options["num_ctx"], options["num_predict"] = inputCap, outputCap
+	} else {
+		if req.MaxTokens > 0 {
+			options["num_predict"] = req.MaxTokens
+		}
+		if req.Temperature != nil {
+			options["temperature"] = req.Temperature
+		}
+		if req.TopP != nil {
+			options["top_p"] = req.TopP
+		}
+		if len(req.StopSequences) > 0 {
+			options["stop"] = req.StopSequences
+		}
+	}
+	wireBody := map[string]any{"model": req.Model, "messages": messages, "tools": tools, "stream": false, "truncate": false, "options": options}
 	if req.NonThinking {
 		if err := p.ValidateNativeNonThinking(ctx, req.Model); err != nil {
 			return nil, err
@@ -138,9 +162,12 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 		return nil, err
 	}
 	messageCount, toolCount := boundedRequestShape(body)
-	if err := p.admitObservedContext(body, inputCap, outputCap, messageCount, toolCount); err != nil {
-		return nil, err
+	if inputCap > 0 {
+		if err := p.admitObservedContext(body, inputCap, outputCap, messageCount, toolCount); err != nil {
+			return nil, err
+		}
 	}
+	p.remember(body)
 	wire, err := http.NewRequestWithContext(ctx, http.MethodPost, p.ollamaBudgetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -148,9 +175,13 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	wire.Header.Set("Content-Type", "application/json")
 	client := *p.httpClient
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	sent := time.Now()
 	res, err := client.Do(wire)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -162,7 +193,11 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 		if res.StatusCode == 400 && strings.Contains(lower, "context") && (strings.Contains(lower, "exceed") || strings.Contains(lower, "too long")) {
 			return nil, &ContextOverflowError{EstimatedTokens: assembledContextEstimate(body, messageCount, toolCount), ContextTokens: inputCap, RequestBytes: len(body), Dispatched: true}
 		}
-		return nil, fmt.Errorf("bounded local inference HTTP %d", res.StatusCode)
+		// Reuse the compatibility error contract without exposing native error
+		// bodies, which may contain private prompt text.
+		sanitized := *res
+		sanitized.Body = io.NopCloser(strings.NewReader(fmt.Sprintf(`{"error":{"message":"local inference HTTP %d"}}`, res.StatusCode)))
+		return nil, p.parseErrorResponse(&sanitized)
 	}
 	var data struct {
 		Done       bool   `json:"done"`
@@ -183,7 +218,7 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	if err = json.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(&data); err != nil {
 		return nil, err
 	}
-	if !data.Done || data.Prompt == nil || data.Output == nil || *data.Prompt < 0 || *data.Output < 0 || *data.Prompt > inputCap || *data.Output > outputCap {
+	if !data.Done || data.Prompt == nil || data.Output == nil || *data.Prompt < 0 || *data.Output < 0 || (inputCap > 0 && (*data.Prompt > inputCap || *data.Output > outputCap)) {
 		return nil, fmt.Errorf("bounded local inference returned invalid usage")
 	}
 	p.observeNativeContext(body, *data.Prompt)
@@ -194,6 +229,12 @@ func (p *OpenAIProvider) CompleteBounded(ctx context.Context, req Request, input
 	switch data.DoneReason {
 	case "stop", "length", "load", "unload":
 		reason = data.DoneReason
+	}
+	result.StopReason = StopReasonEnd
+	if data.DoneReason == "length" {
+		result.StopReason = StopReasonMaxTokens
+	} else if len(data.Message.Calls) > 0 {
+		result.StopReason = StopReasonToolUse
 	}
 	result.Metadata["native_completion"] = NativeCompletionObservation{
 		NonThinkingRequested: req.NonThinking,
