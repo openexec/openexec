@@ -4,6 +4,16 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Native line reads, 2026-10-28] Natural run 59614721 found an OpenAPI
+  definition at line 6591 but spent its remaining inspection on byte-offset
+  guesses and helpers. Existing read_file now accepts one-based start_line,
+  with the same authorized roots, private-file refusals, 8 KiB UTF-8 page cap
+  and absolute-byte continuation. Line seeking scans at most 16 MiB and
+  observes cancellation. No provider/model/limit, task state or executor change.
+  Search-to-line-to-byte round-trip and native transport regressions added;
+  original source and four guard removals fail behavioral assertions.
+  Original productive task recovery remains unproved until installed use.
+
 - [Owner Qwen trial, 2026-10-26] API providers now accept per-provider
   `execution.providers.<name>.max_turns` in project JSON, reusing MaxSteps.
   Default 160; owner requested Qwen trial 100, with 900 available for hard work.
