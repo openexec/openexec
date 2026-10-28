@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+// typeScriptExtractorTimeout bounds one extractor run. It is a variable only so
+// tests can exercise the deadline branch quickly; production keeps 45 seconds.
+var typeScriptExtractorTimeout = 45 * time.Second
+
 //go:embed ts_compiler_extractor.mjs
 var typeScriptCompilerScript []byte
 
@@ -92,14 +96,15 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	}
 	sort.Strings(excluded)
 	request, _ := json.Marshal(tsCompilerRequest{Files: files, ExcludedDirectories: excluded})
-	commandCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	commandCtx, cancel := context.WithTimeout(ctx, typeScriptExtractorTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(commandCtx, node, scriptPath, compiler, root)
 	cmd.Stdin = bytes.NewReader(request)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	started := time.Now()
 	if err := cmd.Run(); err != nil {
-		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, describeExtractorEnding(ctx, commandCtx, time.Since(started)), strings.TrimSpace(stderr.String()))
 	}
 	var response tsCompilerResponse
 	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
@@ -132,6 +137,22 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 		}
 	}
 	return result, response.Configuration, limitations, nil
+}
+
+// describeExtractorEnding says who ended the extractor. exec.CommandContext
+// kills the child with SIGKILL when its context ends, so "signal: killed" alone
+// is the same text for the 45 second deadline, a cancelled caller and a kill
+// from outside the process (for example the host OOM killer).
+func describeExtractorEnding(parent, command context.Context, elapsed time.Duration) string {
+	elapsed = elapsed.Round(time.Millisecond)
+	switch {
+	case parent.Err() != nil:
+		return fmt.Sprintf("caller context ended after %s: %v", elapsed, parent.Err())
+	case command.Err() != nil:
+		return fmt.Sprintf("extractor deadline %s exceeded after %s", typeScriptExtractorTimeout, elapsed)
+	default:
+		return fmt.Sprintf("extractor ended after %s with no context deadline or cancellation; killed from outside this process", elapsed)
+	}
 }
 
 func findCompatibleNode(ctx context.Context) (string, error) {
