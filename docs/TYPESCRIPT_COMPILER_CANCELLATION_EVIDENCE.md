@@ -1,10 +1,13 @@
 # TypeScript compiler cancellation: real-extraction evidence (follow-up of PR #165)
 
-Status: **historical kill not reproduced; new extractor-own-deadline supplied
-by supervisor; cause unknown, no fix or recovery claimed.** The
+Status: **historical kill and new extractor-own-deadline not reproduced by the
+three actual observed-request controls supplied on 2026-10-29; cause unknown,
+no fix or recovery claimed.** The
 blocker stays retained. Evidence only; no compiler semantics, fallback, corpus or
-assertion change, and the 45 s extractor bound is unchanged. No credentials or
-file contents are recorded; every source input is a public immutable Console
+impact assertion change, and the 45 s extractor bound is unchanged. The
+control fixture now expects the canonical database path for a symlinked root;
+its exact location, filesystem identity and refusal assertions remain enforced.
+No credentials or file contents are recorded; every source input is a public immutable Console
 commit.
 
 ## What was run (supervisor, 2026-10-28, operator host, own disposable worktrees)
@@ -153,7 +156,7 @@ its mtime changes. These differences prevent treating a successful replay as a
 causal passing minimum.
 
 Finite budget fixed before external extraction: **one native scan and one
-direct replay of its captured bytes**, with the existing 45 s child bound and
+direct replay of its captured bytes per distinct source**, with the existing 45 s child bound and
 a separate 600 s observer parent for each. No unchanged retries, file-set
 reductions, Node/compiler switches or deadline changes. If either reaches its
 own deadline, preserve artifacts and stop this budget; any reduction requires
@@ -167,9 +170,10 @@ go test -c -o /tmp/openexec-native-request.test ./internal/knowledge
 /tmp/openexec-native-request.test -test.run=^TestConsoleNativeRequestCapture$ -test.v -test.timeout=15m -console-native-checkout=<own-fresh-checkout-of-2ebcc487ae0a2cd588840f10902038d34da5fc8d> -console-capture-dir=<new-directory-outside-checkout>
 ```
 
-The second line is the exact extraction argv, not an instruction to keep a
-session alive for a multi-minute scan. After the candidate is recorded, the
-supervisor should hand it to the existing durable runner:
+The second line is the reusable extraction argv, not an instruction to keep a
+session alive for a multi-minute scan. External execution belongs to the
+supervisor using the existing durable runner (the completed run below must
+not be repeated):
 
 ```text
 python3 /mnt/data1/projects/owner-model/job_runner.py start --name typescript-native-request-e763 --project openexec --cwd <candidate-repository> -- /tmp/openexec-native-request.test -test.run=^TestConsoleNativeRequestCapture$ -test.v -test.timeout=15m -console-native-checkout=<own-fresh-checkout-of-2ebcc487ae0a2cd588840f10902038d34da5fc8d> -console-capture-dir=<new-directory-outside-checkout>
@@ -213,9 +217,9 @@ classification is structured (`extractor_deadline`, `caller_cancellation`,
 never a substring match on `signal: killed`. A zero exit with malformed output
 has `response_decoded=false` and is not compiler success.
 
-### External proof status and exact refusal
+### Earlier refusal, superseded by supplied external execution
 
-This pass attempted supported authorized host execution to create its own
+The previous pass attempted supported authorized host execution to create its own
 disposable public fixture (not the owner checkout):
 
 ```json
@@ -226,13 +230,143 @@ The tool returned:
 
 > Refused: outside this unattended task's authority — git clone "https://github.com/openexec/agent-console.git": a task clones only its own checkout.
 
-No clone or external scan was performed, no denied path was retried, and no
-operator-only scratch receipt was accessed. The actual Console native request,
-new child measurements and reopened graph remain **unproven pending the
-supervisor-owned execution above**. There is no invented exact Console
-request or minimized failure. The supplied 466-file direct success still has
-unproved byte identity with native stdin. Unknown incident binary/toolchain
-identity, load, ancestor context and resolved storage are retained explicitly.
+That attempt performed no clone or external scan. No denied path was retried
+and no operator-only receipt was accessed by this pass. The supervisor then
+supplied the terminal execution and safe metadata below; the previous missing
+external-execution dependency is no longer pending. The older TypeScript 5.8.3
+466-file direct control still has unproved byte identity with incident native
+stdin. It is distinct from the new captured-request TypeScript 5.9.3 comparisons.
+
+### Actual observed Console request/control records (supervisor, 2026-10-29)
+
+The supervisor's 02:14Z safe addenda report completed job
+`watch-native-request-e763-corrected-20261029T0210`. This pass transcribes those
+supplied results in [the structured record](typescript-native-request-20261029.json);
+it did not rerun them or open supervisor-local artifacts. The JSON contains
+all supplied child measurements, commands, toolchain identities, UTC deadlines,
+CPU/rusage, graph metadata and original artifact hashes. Those hashes identify
+original artifacts, **not** this transcribed JSON. Full Go build info and exact
+`request.json` bytes remain supervisor-retained; only their hashes and request
+shape/byte counts were supplied here. No source filenames are invented.
+The executable control reconstructs and captures the exact attempted request
+from an explicitly authorized matching public checkout; the older manifest
+reconstructor is not a substitute for it.
+
+Clean native candidate `a3e10b77c93af56f180ec91def537d4316bffaed` was compiled
+with argv:
+
+```json
+["go", "test", "-c", "-o", "/home/perttu/.agent-console/watch-20261029T015700Z/native-request.test", "./internal/knowledge"]
+```
+
+Recorded build environment: `GOWORK` = `off`, `GOCACHE` =
+`/mnt/data1/projects/.agent-console-gate/go-build`. Linux/amd64, Go 1.26.5.
+Executable SHA-256:
+`55bfa892aecc9c6d6fa0a9248872bc163781a03c98411aa7419ff1615a77ba6c`.
+Go build-info SHA-256:
+`03791ae8aad7326a7fb111b5f7c85f6f2bee661dff6c5a4fac598071e8a0cdd5`.
+This is the **instrumented native Go test executable**, running the production
+scanner and real Node child, not the incident installed CLI. Runtime checkout
+HEAD and embedded build provenance remain explicitly separate. These runs
+precede the fixture assertion correction below; no production code changed
+in that correction.
+
+All cases used `/usr/bin/node` v22.23.4 (SHA-256
+`94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90`),
+TypeScript **5.9.3** resolved to
+`/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js`
+(SHA-256 `3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675`),
+and extractor script SHA-256
+`32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4`.
+No shared dependency was modified. Configuration on every child was
+`inferred,ui/tsconfig.app.json,ui/tsconfig.node.json`.
+
+| Case / exact Console source | Request bytes / files / source bytes | Actual native child | Identical-request direct child | Whole native scan | Node maxRSS KiB native / direct |
+| --- | --- | --- | --- | --- | --- |
+| New deadline `2ebcc487ae0a2cd588840f10902038d34da5fc8d` | 19342 / 466 / 4003045 | 8.213715667 s | 6.853639745 s | 45.664820245 s | 630996 / 870892 |
+| Original train `8ec35a445faec933bc0a129216f6ea45453cbcb9` | 18917 / 456 / 3845255 | 5.321143114 s | 9.350981676 s | 42.861531324 s | 611664 / 870832 |
+| Recorded main `bbbda1c6e7d746c4bb605f3ddb736283828811fb` | 19342 / 466 / 4003045 | 10.037453346 s | 8.646289124 s | 59.101986640 s | 630456 / 885428 |
+
+All six children: **exit 0, decoded compiler output, parent_error=none,
+child_error=none**; 45 s child, separate 600 s parents, 15 minute test timeout.
+Each source received exactly one native scan and one direct replay; no
+reductions or unchanged retries. Node maxRSS is per-child Linux rusage, not
+the earlier whole-tree peak. CPU, faults, I/O and context-switch counts are in
+the structured record; host load/cgroup evidence was not supplied.
+
+Native/direct request SHA-256 is identical within each pair:
+
+- New deadline and recorded main:
+  `e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009`.
+- Original train:
+  `4307b1db19213202ac1256640f5d0e685719783b82556c298a543480f4ea2913`.
+
+Each actual request has keys `files` and `excluded_directories` (null).
+The native scanner's order is retained in the captured bytes, not inferred
+from `git ls-files`. Each pair holds those bytes, source/configuration digests,
+argv (including temporary script path), Node/TypeScript/script hashes and
+45 s bound constant. Only the entry point changes (scanner child versus direct
+replay). Sequential cache/load and restored script mtime remain uncontrolled;
+these successful comparisons cannot identify cause. Across source revisions,
+the binary, Node/compiler/script hashes and bounds stay constant while the
+source revision and its file set/content change. Absolute source roots and
+temporary script paths differ across cases, and sequential load/cache is
+uncontrolled. They are not minimized failing/passing controls.
+
+All three stores were actually closed and reopened: status `current`,
+TypeScript definitions/imports/exports `compiler_exact`, compiler_fallback=false,
+source_inputs_unchanged_after_direct=true, scan_error=false. All persisted
+capabilities and limitations matched the scan result. Each has 29 limitations,
+SHA-256 `f0fd6fddb9ccd199975b2cdefe98325b6730a5e96543027a8e5ff9b55e3b7e23`;
+other capability levels remain explicit in the JSON (e.g. `effects.static` is
+still `static_lexical`; compiler success does not make every capability exact).
+Actual resolved databases are beneath each supervisor-owned source root:
+
+```text
+/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029/.openexec/openexec.db
+/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029/.openexec/openexec.db
+/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029/.openexec/openexec.db
+```
+
+This proves compiler success for these controls rather than inferring it from
+CLI exit 0. It does not change the supplied incident's lexical-fallback outcome.
+The original runner refused all three sources **before any extraction** because
+its dependency symlink was untracked. The supervisor corrected only its owned
+fixture to an ordinary ignored `node_modules` directory containing the exact
+TypeScript symlink and checked empty git status/pinned HEAD. Cleanliness
+refusals remain enabled; they are negative controls, not failed extractions.
+
+**Non-reproduction and remaining unknowns.** Neither the new own-deadline
+signature nor historical kill occurred. No reduction was attempted and no
+minimized failure or passing minimum is claimed. Differences from the new
+incident include the instrumented candidate versus configured installed
+`5fe138d`, TypeScript 5.9.3 versus supplied 5.8.3, locked dependency resolution,
+operator host versus CI, fresh resolved stores, observation overhead and
+sequential cache/load. The exact incident native stdin, full binary/toolchain
+hashes, ancestor cancellation and load remain unknown. The old reconstructed
+466-file direct success does not establish request identity with that incident.
+The eleven-expectation impact journey, causal repair and original recovery
+remain parent obligations; the blocker stays retained.
+
+### Portable database assertion regression
+
+Hosted run `40803649257` on candidate `a3e10b77…` reported Ubuntu success and
+macOS failure in `TestNativeCaptureDriverArtifactsAndRefusals`: SQLite reported
+`/private/var/.../.openexec/openexec.db`, while the test expected the equivalent
+`/var/...` spelling. The real-compiler roundtrip passed on macOS. The corrected
+fixture supplies a public symlink alias on every OS, resolves its expected root,
+checks the **exact** `.openexec/openexec.db` beneath it and verifies `os.SameFile`
+through the supplied alias. No production path handling or authority changed.
+
+On Linux the alias fixture with the previous raw-path expectation failed at
+`persisted graph evidence missing` despite reopened/current/compiler-exact
+metadata (2.903 s). With only the expectation correction and filesystem identity
+check it passed (7.542 s), including all existing refusal/mutation controls.
+A removal control restoring only the raw-root expectation failed again
+(2.489 s, the same persisted graph evidence error). The correction was restored;
+the alias regression remains in ordinary `go-test` for Linux and macOS. Hosted
+checks on the final head and independent exact-head review remain lane
+obligations.
 
 ### Offline executable evidence
 
@@ -255,8 +389,14 @@ The existing declared `go-test` / hosted `go test -v ./...` includes these tests
   existing graph. Separate comparisons deliberately change source or toolchain
   between native and direct runs and must be refused as invalid comparisons;
   both still delegate extraction to real Node/TypeScript. This is control
-  evidence, **not Console evidence**.
+  evidence, **not Console evidence**. Its source-root alias also exercises
+  canonical database identity on Linux as well as macOS.
 - `TestNativeCaptureStartFailureIsNotDeadline` rejects misleading error text.
+- `TestNativeCaptureSuppliedConsoleRecordIntegrity` reads the committed three-case
+  JSON in the declared suite and checks request/toolchain/argv equality, deadline
+  consistency, decoded exits and reopened graph metadata. It checks transcription
+  integrity; it does not authenticate unavailable private artifacts or re-execute
+  Console. The supplied supervisor execution remains the external evidence.
 
 Tests skip the optional public-source control unless explicitly supplied. The
 real-compiler tests explicitly skip when Node or the locked TypeScript package
@@ -270,7 +410,11 @@ Sibling-path review: full scan and incremental refresh both call
 `extractTypeScriptWithCompiler`. The observer covers both without changing
 either route. The historical reconstructed-manifest driver stays a historical
 control; the new observed driver does not reuse its filename filter or
-`signal: killed` substring classifier. No corpus filter was added.
+`signal: killed` substring classifier. No corpus filter was added. The only raw
+database-path expectation in the capture tests is now canonicalized; production
+scan/identity/store code already handles symlink roots. Artifact containment
+still resolves symlink redirects before refusing them, and its negative
+controls remain unchanged.
 
 Complexity delta: one private observation point, one opt-in test control;
 no runtime controller, persistent runtime state, execution/continuation

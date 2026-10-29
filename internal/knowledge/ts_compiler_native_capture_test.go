@@ -540,7 +540,16 @@ func TestNativeCaptureDriverArtifactsAndRefusals(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(compiler, "lib", "typescript.js")); err != nil {
 		t.Skip("locked repository TypeScript unavailable")
 	}
-	root := t.TempDir()
+	// Exercise the /var -> /private/var alias seen on macOS on every OS.
+	// The driver canonicalizes its supplied checkout before opening SQLite.
+	root := filepath.Join(t.TempDir(), "checkout-alias")
+	if err := os.Symlink(t.TempDir(), root); err != nil {
+		t.Fatal(err)
+	}
+	canonicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeTestFile(t, root, ".gitignore", ".openexec/\nnode_modules/\n")
 	writeTestFile(t, root, "tsconfig.json", `{"compilerOptions":{"target":"ES2022"},"include":["src"]}`)
 	writeTestFile(t, root, "src/main.ts", "export const example: number = 1\n")
@@ -639,8 +648,20 @@ func TestNativeCaptureDriverArtifactsAndRefusals(t *testing.T) {
 	if err := json.Unmarshal(graphBytes, &graph); err != nil {
 		t.Fatal(err)
 	}
-	if graph["reopened"] != true || graph["compiler_fallback"] != false || graph["database"] != filepath.Join(root, ".openexec", "openexec.db") {
+	if graph["reopened"] != true || graph["compiler_fallback"] != false || graph["database"] != filepath.Join(canonicalRoot, ".openexec", "openexec.db") {
 		t.Fatalf("persisted graph evidence missing: %s", graphBytes)
+	}
+	// Also prove the supplied alias reaches that exact persisted database.
+	aliasDB, err := os.Stat(filepath.Join(root, ".openexec", "openexec.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalDB, err := os.Stat(filepath.Join(canonicalRoot, ".openexec", "openexec.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(aliasDB, canonicalDB) {
+		t.Fatal("supplied checkout alias reaches a different database")
 	}
 	// The same checkout must never overwrite an existing graph or its receipt.
 	if out, err := invoke(filepath.Join(t.TempDir(), "second")); err == nil || !bytes.Contains(out, []byte("existing .openexec")) {

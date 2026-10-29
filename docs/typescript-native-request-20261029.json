@@ -1,0 +1,601 @@
+{
+  "provenance": "Transcription of supervisor-supplied safe external proof addenda, 2026-10-29T02:14Z. Not executions performed by this pass. Original artifact hashes identify supervisor-retained artifacts, not the JSON objects transcribed here. No operator-only paths were accessed.",
+  "outcome": "NON_REPRODUCTION; no causal repair or minimized failing fixture; blocker retained",
+  "candidate_source": "a3e10b77c93af56f180ec91def537d4316bffaed",
+  "build": {
+    "argv": [
+      "go",
+      "test",
+      "-c",
+      "-o",
+      "/home/perttu/.agent-console/watch-20261029T015700Z/native-request.test",
+      "./internal/knowledge"
+    ],
+    "environment": {
+      "GOWORK": "off",
+      "GOCACHE": "/mnt/data1/projects/.agent-console-gate/go-build"
+    },
+    "executable": "/home/perttu/.agent-console/watch-20261029T015700Z/native-request.test",
+    "executable_sha256": "55bfa892aecc9c6d6fa0a9248872bc163781a03c98411aa7419ff1615a77ba6c",
+    "build_info_sha256": "03791ae8aad7326a7fb111b5f7c85f6f2bee661dff6c5a4fac598071e8a0cdd5",
+    "go": "go1.26.5",
+    "os": "linux",
+    "arch": "amd64",
+    "instrumentation": "native Go test executable; production ScanRepository and child; observer after Wait; not incident CLI binary",
+    "source_provenance_note": "runtime checkout HEAD is separate from embedded build identity; Go test build info may omit VCS identity; candidate source, build argv and executable hash supplied by supervisor"
+  },
+  "limits": {
+    "native_scans_per_source": 1,
+    "direct_replays_per_source": 1,
+    "child_bound": "45s",
+    "each_parent_bound": "600s",
+    "test_timeout": "15m",
+    "reductions": 0,
+    "unchanged_retries": 0
+  },
+  "request_availability": "Exact native stdin retained as request.json by supervisor; only public relative filenames and excluded_directories=null. Raw bytes were not supplied to this pass. Per-case byte count/hash below identifies the exact attempted request; reconstruct only through the observed control with an explicitly authorized matching public checkout. Do not substitute the older git-ls-files request.",
+  "fixture_refusal": {
+    "extractions": 0,
+    "reason": "source must be a clean, authorized disposable git checkout",
+    "setup": "untracked ui/node_modules dependency symlink on all three sources",
+    "correction": "ordinary ignored node_modules directory containing exact TypeScript symlink; empty git status and pinned HEAD verified before scans; cleanliness guard retained"
+  },
+  "unknowns": [
+    "Historical incident binary hash and complete build identity, effective Node/TypeScript hashes, native stdin and ancestor cancellation state were not supplied.",
+    "Original CI host load, cgroup limits and incident resource data are not recorded.",
+    "No contemporaneous host load or cgroup measurements were supplied for these controls.",
+    "Full Go build info and exact public request bytes remain supervisor-retained, referenced by hashes; not independently reread by this pass.",
+    "Original eleven-expectation impact journey is outside this diagnosis and remains unresolved."
+  ],
+  "cases": [
+    {
+      "case": "new-deadline",
+      "source_head": "2ebcc487ae0a2cd588840f10902038d34da5fc8d",
+      "exit_code": 0,
+      "argv": [
+        "/home/perttu/.agent-console/watch-20261029T015700Z/native-request.test",
+        "-test.run=^TestConsoleNativeRequestCapture$",
+        "-test.v",
+        "-test.timeout=15m",
+        "-console-native-checkout=/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029",
+        "-console-capture-dir=/home/perttu/.agent-console/watch-20261029T015700Z/native-capture-new-deadline"
+      ],
+      "request_shape": {
+        "keys": [
+          "files",
+          "excluded_directories"
+        ],
+        "file_count": 466,
+        "excluded_directories": null
+      },
+      "artifact_sha256": {
+        "identity.json": "bd1da17581852216b5ed367ac5d930912919d11cfb1324e498fab9195a736eb3",
+        "native-child.json": "b06071394cb01b5d4fe23526437dd276e5b173485c4199db8560c6c5ce172a66",
+        "direct-child.json": "b54f67ac64c55bad159ddbc6de07c8a620161c0b17c85dbbdb77b482f705bf12",
+        "graph.json": "b36ae1851191af647e2103b3495e118da55727c4100ec71da51e51e4ad64362b",
+        "request.json": "e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009"
+      },
+      "native-child": {
+        "arguments": [
+          "/usr/bin/node",
+          "/tmp/openexec-ts-1900115239.mjs",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029/ui/node_modules/typescript/lib/typescript.js",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029"
+        ],
+        "request_sha256": "e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009",
+        "request_bytes": 19342,
+        "file_count": 466,
+        "source_bytes": 4003045,
+        "script_sha256": "32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4",
+        "node_sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "typescript_sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+        "node_resolved_path": "/usr/bin/node",
+        "typescript_resolved_path": "/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js",
+        "node_version": "v22.23.4",
+        "typescript_version": "5.9.3",
+        "started": "2026-10-29T02:10:07.969726248Z",
+        "elapsed_ns": 8213715667,
+        "parent_deadline": "2026-10-29T02:20:07.814698574Z",
+        "child_deadline": "2026-10-29T02:10:52.969720159Z",
+        "parent_error": "none",
+        "child_error": "none",
+        "extractor_bound": "45s",
+        "ending": "exit_0",
+        "exit_code": 0,
+        "process_state": "exit status 0",
+        "user_ns": 16469504000,
+        "system_ns": 469216000,
+        "os_usage": {
+          "Utime": {
+            "Sec": 16,
+            "Usec": 469504
+          },
+          "Stime": {
+            "Sec": 0,
+            "Usec": 469216
+          },
+          "Maxrss": 630996,
+          "Ixrss": 0,
+          "Idrss": 0,
+          "Isrss": 0,
+          "Minflt": 157687,
+          "Majflt": 0,
+          "Nswap": 0,
+          "Inblock": 1368,
+          "Oublock": 0,
+          "Msgsnd": 0,
+          "Msgrcv": 0,
+          "Nsignals": 0,
+          "Nvcsw": 4767,
+          "Nivcsw": 1252
+        },
+        "stdout_bytes": 13459437,
+        "stderr_bytes": 0,
+        "configuration": "inferred,ui/tsconfig.app.json,ui/tsconfig.node.json",
+        "extracted_files": 466,
+        "diagnostic_count": 7641,
+        "response_decoded": true
+      },
+      "direct-child": {
+        "arguments": [
+          "/usr/bin/node",
+          "/tmp/openexec-ts-1900115239.mjs",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029/ui/node_modules/typescript/lib/typescript.js",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029"
+        ],
+        "request_sha256": "e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009",
+        "request_bytes": 19342,
+        "file_count": 466,
+        "source_bytes": 4003045,
+        "script_sha256": "32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4",
+        "node_sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "typescript_sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+        "node_resolved_path": "/usr/bin/node",
+        "typescript_resolved_path": "/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js",
+        "node_version": "v22.23.4",
+        "typescript_version": "5.9.3",
+        "started": "2026-10-29T02:10:53.866882622Z",
+        "elapsed_ns": 6853639745,
+        "parent_deadline": "2026-10-29T02:20:53.866828017Z",
+        "child_deadline": "2026-10-29T02:11:38.866878317Z",
+        "parent_error": "none",
+        "child_error": "none",
+        "extractor_bound": "45s",
+        "ending": "exit_0",
+        "exit_code": 0,
+        "process_state": "exit status 0",
+        "user_ns": 14163283000,
+        "system_ns": 417713000,
+        "os_usage": {
+          "Utime": {
+            "Sec": 14,
+            "Usec": 163283
+          },
+          "Stime": {
+            "Sec": 0,
+            "Usec": 417713
+          },
+          "Maxrss": 870892,
+          "Ixrss": 0,
+          "Idrss": 0,
+          "Isrss": 0,
+          "Minflt": 157395,
+          "Majflt": 0,
+          "Nswap": 0,
+          "Inblock": 0,
+          "Oublock": 0,
+          "Msgsnd": 0,
+          "Msgrcv": 0,
+          "Nsignals": 0,
+          "Nvcsw": 4635,
+          "Nivcsw": 738
+        },
+        "stdout_bytes": 13459437,
+        "stderr_bytes": 0,
+        "configuration": "inferred,ui/tsconfig.app.json,ui/tsconfig.node.json",
+        "extracted_files": 466,
+        "diagnostic_count": 7641,
+        "response_decoded": true
+      },
+      "graph": {
+        "capabilities": {
+          "contracts.openapi": "configuration_derived",
+          "contracts.persistence": "compiler_exact",
+          "contracts.ui_surfaces": "configuration_derived",
+          "effects.static": "static_lexical",
+          "go.calls": "compiler_exact",
+          "go.definitions": "ast_exact",
+          "go.imports": "ast_exact",
+          "python.calls": "heuristic",
+          "python.definitions": "static_lexical",
+          "python.imports": "static_lexical",
+          "svelte.definitions": "static_lexical",
+          "svelte.imports": "static_lexical",
+          "svelte.routes": "configuration_derived",
+          "typescript.definitions": "compiler_exact",
+          "typescript.exports": "compiler_exact",
+          "typescript.imports": "compiler_exact"
+        },
+        "compiler_fallback": false,
+        "configuration_digest": "sha256:f1c52ce7e62998b55a9309aea23999e3bfa05a59f571df5a79baac1a3069617e",
+        "database": "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-new-deadline-20261029/.openexec/openexec.db",
+        "generation": "graph_bbe0fb32-d902-4e35-b64e-f637c62a88db",
+        "limitations_count": 29,
+        "limitations_sha256": "f0fd6fddb9ccd199975b2cdefe98325b6730a5e96543027a8e5ff9b55e3b7e23",
+        "manifest_sha256": "sha256:881ae3976558fbf45e5aeb646b9781b1260ee3e435e520b5ed64e2785ea86e59",
+        "parent_error": "none",
+        "reopened": true,
+        "scan_elapsed_ns": 45664820245,
+        "scan_error": false,
+        "source_inputs_unchanged_after_direct": true,
+        "status": "current"
+      }
+    },
+    {
+      "case": "original-train",
+      "source_head": "8ec35a445faec933bc0a129216f6ea45453cbcb9",
+      "exit_code": 0,
+      "argv": [
+        "/home/perttu/.agent-console/watch-20261029T015700Z/native-request.test",
+        "-test.run=^TestConsoleNativeRequestCapture$",
+        "-test.v",
+        "-test.timeout=15m",
+        "-console-native-checkout=/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029",
+        "-console-capture-dir=/home/perttu/.agent-console/watch-20261029T015700Z/native-capture-original-train"
+      ],
+      "request_shape": {
+        "keys": [
+          "files",
+          "excluded_directories"
+        ],
+        "file_count": 456,
+        "excluded_directories": null
+      },
+      "artifact_sha256": {
+        "identity.json": "0b0f990e064d1b32eabe66c340ebd2bdc7850cb33a0c07ef65b40f115a0f954d",
+        "native-child.json": "9839c31396120fa14f4e4db22348e180c0c69d0473ca26d9c4dbbbd5291e5dde",
+        "direct-child.json": "d6a4e7ac4b5a5172b9eb1b72c2e16fcac09290c9b53fa5de6101c181db85871f",
+        "graph.json": "c60bf9d31d78f555c875c97596939736445d8a2440dc98fad7b954215e7ccc12",
+        "request.json": "4307b1db19213202ac1256640f5d0e685719783b82556c298a543480f4ea2913"
+      },
+      "native-child": {
+        "arguments": [
+          "/usr/bin/node",
+          "/tmp/openexec-ts-2800249251.mjs",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029/ui/node_modules/typescript/lib/typescript.js",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029"
+        ],
+        "request_sha256": "4307b1db19213202ac1256640f5d0e685719783b82556c298a543480f4ea2913",
+        "request_bytes": 18917,
+        "file_count": 456,
+        "source_bytes": 3845255,
+        "script_sha256": "32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4",
+        "node_sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "typescript_sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+        "node_resolved_path": "/usr/bin/node",
+        "typescript_resolved_path": "/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js",
+        "node_version": "v22.23.4",
+        "typescript_version": "5.9.3",
+        "started": "2026-10-29T02:11:01.310856007Z",
+        "elapsed_ns": 5321143114,
+        "parent_deadline": "2026-10-29T02:21:01.222611134Z",
+        "child_deadline": "2026-10-29T02:11:46.310851395Z",
+        "parent_error": "none",
+        "child_error": "none",
+        "extractor_bound": "45s",
+        "ending": "exit_0",
+        "exit_code": 0,
+        "process_state": "exit status 0",
+        "user_ns": 12234300000,
+        "system_ns": 347639000,
+        "os_usage": {
+          "Utime": {
+            "Sec": 12,
+            "Usec": 234300
+          },
+          "Stime": {
+            "Sec": 0,
+            "Usec": 347639
+          },
+          "Maxrss": 611664,
+          "Ixrss": 0,
+          "Idrss": 0,
+          "Isrss": 0,
+          "Minflt": 152835,
+          "Majflt": 0,
+          "Nswap": 0,
+          "Inblock": 0,
+          "Oublock": 0,
+          "Msgsnd": 0,
+          "Msgrcv": 0,
+          "Nsignals": 0,
+          "Nvcsw": 4056,
+          "Nivcsw": 637
+        },
+        "stdout_bytes": 12827106,
+        "stderr_bytes": 0,
+        "configuration": "inferred,ui/tsconfig.app.json,ui/tsconfig.node.json",
+        "extracted_files": 456,
+        "diagnostic_count": 7381,
+        "response_decoded": true
+      },
+      "direct-child": {
+        "arguments": [
+          "/usr/bin/node",
+          "/tmp/openexec-ts-2800249251.mjs",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029/ui/node_modules/typescript/lib/typescript.js",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029"
+        ],
+        "request_sha256": "4307b1db19213202ac1256640f5d0e685719783b82556c298a543480f4ea2913",
+        "request_bytes": 18917,
+        "file_count": 456,
+        "source_bytes": 3845255,
+        "script_sha256": "32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4",
+        "node_sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "typescript_sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+        "node_resolved_path": "/usr/bin/node",
+        "typescript_resolved_path": "/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js",
+        "node_version": "v22.23.4",
+        "typescript_version": "5.9.3",
+        "started": "2026-10-29T02:11:44.624196203Z",
+        "elapsed_ns": 9350981676,
+        "parent_deadline": "2026-10-29T02:21:44.623996061Z",
+        "child_deadline": "2026-10-29T02:12:29.624189952Z",
+        "parent_error": "none",
+        "child_error": "none",
+        "extractor_bound": "45s",
+        "ending": "exit_0",
+        "exit_code": 0,
+        "process_state": "exit status 0",
+        "user_ns": 17760970000,
+        "system_ns": 446175000,
+        "os_usage": {
+          "Utime": {
+            "Sec": 17,
+            "Usec": 760970
+          },
+          "Stime": {
+            "Sec": 0,
+            "Usec": 446175
+          },
+          "Maxrss": 870832,
+          "Ixrss": 0,
+          "Idrss": 0,
+          "Isrss": 0,
+          "Minflt": 153491,
+          "Majflt": 0,
+          "Nswap": 0,
+          "Inblock": 0,
+          "Oublock": 0,
+          "Msgsnd": 0,
+          "Msgrcv": 0,
+          "Nsignals": 0,
+          "Nvcsw": 4795,
+          "Nivcsw": 1725
+        },
+        "stdout_bytes": 12827106,
+        "stderr_bytes": 0,
+        "configuration": "inferred,ui/tsconfig.app.json,ui/tsconfig.node.json",
+        "extracted_files": 456,
+        "diagnostic_count": 7381,
+        "response_decoded": true
+      },
+      "graph": {
+        "capabilities": {
+          "contracts.openapi": "configuration_derived",
+          "contracts.persistence": "compiler_exact",
+          "contracts.ui_surfaces": "configuration_derived",
+          "effects.static": "static_lexical",
+          "go.calls": "compiler_exact",
+          "go.definitions": "ast_exact",
+          "go.imports": "ast_exact",
+          "python.calls": "heuristic",
+          "python.definitions": "static_lexical",
+          "python.imports": "static_lexical",
+          "svelte.definitions": "static_lexical",
+          "svelte.imports": "static_lexical",
+          "svelte.routes": "configuration_derived",
+          "typescript.definitions": "compiler_exact",
+          "typescript.exports": "compiler_exact",
+          "typescript.imports": "compiler_exact"
+        },
+        "compiler_fallback": false,
+        "configuration_digest": "sha256:01be92d6820dcfd1e64b9f5b394e9adba4d0a0ee7b9c262fa1680e6d98ffea9c",
+        "database": "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-original-train-20261029/.openexec/openexec.db",
+        "generation": "graph_e07ed1d5-c244-4fcd-bd10-d0d0daee505c",
+        "limitations_count": 29,
+        "limitations_sha256": "f0fd6fddb9ccd199975b2cdefe98325b6730a5e96543027a8e5ff9b55e3b7e23",
+        "manifest_sha256": "sha256:d41249c13046536e5cdcd403867b9f5f6180a39f5798f586eb922ec1be231a35",
+        "parent_error": "none",
+        "reopened": true,
+        "scan_elapsed_ns": 42861531324,
+        "scan_error": false,
+        "source_inputs_unchanged_after_direct": true,
+        "status": "current"
+      }
+    },
+    {
+      "case": "recorded-main",
+      "source_head": "bbbda1c6e7d746c4bb605f3ddb736283828811fb",
+      "exit_code": 0,
+      "argv": [
+        "/home/perttu/.agent-console/watch-20261029T015700Z/native-request.test",
+        "-test.run=^TestConsoleNativeRequestCapture$",
+        "-test.v",
+        "-test.timeout=15m",
+        "-console-native-checkout=/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029",
+        "-console-capture-dir=/home/perttu/.agent-console/watch-20261029T015700Z/native-capture-recorded-main"
+      ],
+      "request_shape": {
+        "keys": [
+          "files",
+          "excluded_directories"
+        ],
+        "file_count": 466,
+        "excluded_directories": null
+      },
+      "artifact_sha256": {
+        "identity.json": "1a256ec4be166dff971e3ec25d86cbcb55dc28ec84a44f9b16a5e1657df79f4f",
+        "native-child.json": "fd11375d05e301a2cc28a40da85ff069e4cd9300cf5d224607b15bfc2cb44fbd",
+        "direct-child.json": "cde302db37303295cf5238ce421da133cf5ed81dfe2beccd32da186bcd08396f",
+        "graph.json": "7e7ad780759fa289bb219d8179c928c378de5df5712db9e6b997c07b4e4b7b4c",
+        "request.json": "e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009"
+      },
+      "native-child": {
+        "arguments": [
+          "/usr/bin/node",
+          "/tmp/openexec-ts-663104115.mjs",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029/ui/node_modules/typescript/lib/typescript.js",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029"
+        ],
+        "request_sha256": "e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009",
+        "request_bytes": 19342,
+        "file_count": 466,
+        "source_bytes": 4003045,
+        "script_sha256": "32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4",
+        "node_sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "typescript_sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+        "node_resolved_path": "/usr/bin/node",
+        "typescript_resolved_path": "/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js",
+        "node_version": "v22.23.4",
+        "typescript_version": "5.9.3",
+        "started": "2026-10-29T02:11:54.979741626Z",
+        "elapsed_ns": 10037453346,
+        "parent_deadline": "2026-10-29T02:21:54.79556987Z",
+        "child_deadline": "2026-10-29T02:12:39.979735954Z",
+        "parent_error": "none",
+        "child_error": "none",
+        "extractor_bound": "45s",
+        "ending": "exit_0",
+        "exit_code": 0,
+        "process_state": "exit status 0",
+        "user_ns": 18619855000,
+        "system_ns": 489996000,
+        "os_usage": {
+          "Utime": {
+            "Sec": 18,
+            "Usec": 619855
+          },
+          "Stime": {
+            "Sec": 0,
+            "Usec": 489996
+          },
+          "Maxrss": 630456,
+          "Ixrss": 0,
+          "Idrss": 0,
+          "Isrss": 0,
+          "Minflt": 157781,
+          "Majflt": 0,
+          "Nswap": 0,
+          "Inblock": 0,
+          "Oublock": 0,
+          "Msgsnd": 0,
+          "Msgrcv": 0,
+          "Nsignals": 0,
+          "Nvcsw": 5121,
+          "Nivcsw": 2054
+        },
+        "stdout_bytes": 13459442,
+        "stderr_bytes": 0,
+        "configuration": "inferred,ui/tsconfig.app.json,ui/tsconfig.node.json",
+        "extracted_files": 466,
+        "diagnostic_count": 7641,
+        "response_decoded": true
+      },
+      "direct-child": {
+        "arguments": [
+          "/usr/bin/node",
+          "/tmp/openexec-ts-663104115.mjs",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029/ui/node_modules/typescript/lib/typescript.js",
+          "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029"
+        ],
+        "request_sha256": "e7a3e66fcc532fa22ffbf36c275caef6b3cef1329acf415807e8acf9173b2009",
+        "request_bytes": 19342,
+        "file_count": 466,
+        "source_bytes": 4003045,
+        "script_sha256": "32cdd4664de00d1272f7e18b8a12767af7d12d0ab55e2810f2917b1b04e0b3a4",
+        "node_sha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+        "typescript_sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675",
+        "node_resolved_path": "/usr/bin/node",
+        "typescript_resolved_path": "/mnt/data1/projects/openexec/ui/node_modules/typescript/lib/typescript.js",
+        "node_version": "v22.23.4",
+        "typescript_version": "5.9.3",
+        "started": "2026-10-29T02:12:54.485007653Z",
+        "elapsed_ns": 8646289124,
+        "parent_deadline": "2026-10-29T02:22:54.484955352Z",
+        "child_deadline": "2026-10-29T02:13:39.485002572Z",
+        "parent_error": "none",
+        "child_error": "none",
+        "extractor_bound": "45s",
+        "ending": "exit_0",
+        "exit_code": 0,
+        "process_state": "exit status 0",
+        "user_ns": 16999905000,
+        "system_ns": 464571000,
+        "os_usage": {
+          "Utime": {
+            "Sec": 16,
+            "Usec": 999905
+          },
+          "Stime": {
+            "Sec": 0,
+            "Usec": 464571
+          },
+          "Maxrss": 885428,
+          "Ixrss": 0,
+          "Idrss": 0,
+          "Isrss": 0,
+          "Minflt": 157469,
+          "Majflt": 0,
+          "Nswap": 0,
+          "Inblock": 0,
+          "Oublock": 0,
+          "Msgsnd": 0,
+          "Msgrcv": 0,
+          "Nsignals": 0,
+          "Nvcsw": 5036,
+          "Nivcsw": 1493
+        },
+        "stdout_bytes": 13459442,
+        "stderr_bytes": 0,
+        "configuration": "inferred,ui/tsconfig.app.json,ui/tsconfig.node.json",
+        "extracted_files": 466,
+        "diagnostic_count": 7641,
+        "response_decoded": true
+      },
+      "graph": {
+        "capabilities": {
+          "contracts.openapi": "configuration_derived",
+          "contracts.persistence": "compiler_exact",
+          "contracts.ui_surfaces": "configuration_derived",
+          "effects.static": "static_lexical",
+          "go.calls": "compiler_exact",
+          "go.definitions": "ast_exact",
+          "go.imports": "ast_exact",
+          "python.calls": "heuristic",
+          "python.definitions": "static_lexical",
+          "python.imports": "static_lexical",
+          "svelte.definitions": "static_lexical",
+          "svelte.imports": "static_lexical",
+          "svelte.routes": "configuration_derived",
+          "typescript.definitions": "compiler_exact",
+          "typescript.exports": "compiler_exact",
+          "typescript.imports": "compiler_exact"
+        },
+        "compiler_fallback": false,
+        "configuration_digest": "sha256:f1c52ce7e62998b55a9309aea23999e3bfa05a59f571df5a79baac1a3069617e",
+        "database": "/mnt/data1/ac-watch/.watch-worktrees/console-native-capture-recorded-main-20261029/.openexec/openexec.db",
+        "generation": "graph_952c605b-3352-4ac7-9cb7-48e463ac4b9f",
+        "limitations_count": 29,
+        "limitations_sha256": "f0fd6fddb9ccd199975b2cdefe98325b6730a5e96543027a8e5ff9b55e3b7e23",
+        "manifest_sha256": "sha256:270623f13a90f751e3b54a7566bfc7888e7610aa502149e904ca4a6d81e9aac8",
+        "parent_error": "none",
+        "reopened": true,
+        "scan_elapsed_ns": 59101986640,
+        "scan_error": false,
+        "source_inputs_unchanged_after_direct": true,
+        "status": "current"
+      }
+    }
+  ]
+}
