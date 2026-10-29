@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "provider": "public-synthetic",
+  "baseURL": "https://synthetic.invalid/v1",
+  "capturedAt": "2000-01-01T00:00:00Z",
+  "sentAt": "2000-01-01T00:00:00Z",
+  "outcome": "failed",
+  "reason": "",
+  "error": "context canceled",
+  "textLimit": 2000,
+  "truncated": false,
+  "request": {
+    "model": "synthetic-model",
+    "messages": [
+      {"role": "user", "content": "Return the public value."},
+      {"role": "assistant", "content": "", "tool_calls": [
+        {"function": {"name": "public_echo", "arguments": {"value": "public value"}}}
+      ]},
+      {"role": "tool", "content": "public result", "tool_name": "public_echo"}
+    ],
+    "tools": [{"type": "function", "function": {
+      "name": "public_echo", "description": "Public synthetic echo",
+      "parameters": {"type": "object", "properties": {"value": {"type": "string"}}}
+    }}],
+    "stream": false,
+    "truncate": false,
+    "options": {}
+  }
+}
