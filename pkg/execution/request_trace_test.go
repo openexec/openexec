@@ -453,6 +453,9 @@ func TestRequestTraceSizeBoundIsReportedNotSilent(t *testing.T) {
 	if trace["incomplete"] != true || dropped == 0 || len(asList(trace["entries"]))+dropped != fixtureRounds+1 {
 		t.Fatalf("incomplete=%v dropped=%d kept=%d", trace["incomplete"], dropped, len(asList(trace["entries"])))
 	}
+	for _, entry := range asList(trace["entries"]) {
+		assertDispatch(t, asMap(asMap(entry)["dispatch"]), "POST", server.URL+"/chat/completions")
+	}
 }
 
 // Failed model requests are recorded too, with their error, so the request the

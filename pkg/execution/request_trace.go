@@ -87,10 +87,13 @@ func (t *runTrace) record(adapter agent.ProviderAdapter, sent time.Time, request
 		entry["error"] = redactSecrets(err.Error())
 	}
 	if last := lastRequestOf(adapter); last != nil {
-		if body, at, _ := last.LastRequest(); len(body) > 0 && !at.Before(sent) {
+		if body, at, _, dispatch := lastRequestSnapshot(last); len(body) > 0 && !at.Before(sent) {
 			var wire map[string]any
-			if json.Unmarshal(body, &wire) == nil {
+			if json.Unmarshal(body, &wire) == nil && wire != nil {
 				entry["wire"] = t.cleanMap(wire)
+				if dispatch != nil {
+					entry["dispatch"] = dispatch
+				}
 			}
 		}
 	}
@@ -148,7 +151,7 @@ func (t *runTrace) write(adapter agent.ProviderAdapter, request Request, result 
 		"kind":       "openexec-request-trace",
 		"capturedAt": time.Now().UTC().Format(time.RFC3339),
 		"provider":   adapter.GetName(),
-		"baseURL":    redactSecrets(baseURL),
+		"baseURL":    diagnosticBaseURL(baseURL),
 		"requestID":  request.ID,
 		"outcome":    result.Outcome,
 		"reason":     result.Reason,

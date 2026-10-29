@@ -87,23 +87,50 @@ type OpenAIProvider struct {
 	name                 string
 	// last is the most recent request body sent, for a failure capture
 	// (LastRequest); never logged or sent anywhere by this package.
-	lastMu sync.Mutex
-	last   []byte
-	lastAt time.Time
+	lastMu       sync.Mutex
+	last         []byte
+	lastAt       time.Time
+	lastDispatch *RequestDispatch
 }
 
-// LastRequest is the most recent chat completion body this provider sent,
-// when it sent it, and the endpoint it went to. The body carries no
+// RequestDispatch identifies the source-known initial transport attempt, not
+// server receipt, inference, or a redirect destination. It accompanies the
+// serializer's body; it must never be inferred from the body's shape.
+type RequestDispatch struct {
+	Method     string `json:"method"`
+	URL        string `json:"url"`
+	Provenance string `json:"provenance"`
+}
+
+// DispatchSourceKnown attests only the initial source-side Client.Do attempt.
+const DispatchSourceKnown = "source-known-transport-attempt"
+
+// LastRequest is the most recent chat completion body this provider attempted,
+// when it attempted it, and the configured base URL (not the dispatch URL).
+// Preserved for existing callers. The body carries no
 // credential: the key travels in the Authorization header only.
 func (p *OpenAIProvider) LastRequest() ([]byte, time.Time, string) {
-	p.lastMu.Lock()
-	defer p.lastMu.Unlock()
-	return append([]byte(nil), p.last...), p.lastAt, p.config.BaseURL
+	body, at, base, _ := p.LastRequestWithDispatch()
+	return body, at, base
 }
 
-func (p *OpenAIProvider) remember(body []byte) {
+// LastRequestWithDispatch reads body, timestamp, configured base and dispatch
+// evidence in one snapshot. Returned values are copies. A nil dispatch is unknown.
+func (p *OpenAIProvider) LastRequestWithDispatch() ([]byte, time.Time, string, *RequestDispatch) {
+	p.lastMu.Lock()
+	defer p.lastMu.Unlock()
+	var dispatch *RequestDispatch
+	if p.lastDispatch != nil {
+		copy := *p.lastDispatch
+		dispatch = &copy
+	}
+	return append([]byte(nil), p.last...), p.lastAt, p.config.BaseURL, dispatch
+}
+
+func (p *OpenAIProvider) remember(body []byte, request *http.Request) {
 	p.lastMu.Lock()
 	p.last, p.lastAt = body, time.Now().UTC()
+	p.lastDispatch = &RequestDispatch{Method: request.Method, URL: request.URL.String(), Provenance: DispatchSourceKnown}
 	p.lastMu.Unlock()
 }
 
@@ -244,7 +271,6 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 		}
 	}
 
-	p.remember(body)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.config.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, &ProviderError{
@@ -256,6 +282,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req Request) (*Response, 
 	p.setHeaders(httpReq)
 
 	sent := time.Now()
+	p.remember(body, httpReq)
 	resp, err := p.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
@@ -292,7 +319,6 @@ func (p *OpenAIProvider) Stream(ctx context.Context, req Request) (<-chan Stream
 		}
 	}
 
-	p.remember(body)
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.config.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, &ProviderError{
@@ -304,6 +330,7 @@ func (p *OpenAIProvider) Stream(ctx context.Context, req Request) (<-chan Stream
 	p.setHeaders(httpReq)
 
 	sent := time.Now()
+	p.remember(body, httpReq)
 	resp, err := p.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, p.handleHTTPError(err, time.Since(sent), len(body))
