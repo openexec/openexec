@@ -21,10 +21,10 @@ import (
 // hung caller or a context filled with someone else's payload.
 const (
 	gatewayTimeout = 60 * time.Second
-	// Tool execution is bounded by the caller. Console commands may run for
-	// thirty minutes; allow their terminal result and cleanup to return. The
-	// parent run still cancels the request immediately when it stops.
-	gatewayCallTimeout     = 31 * time.Minute
+	// Tool execution is bounded by the caller. Console declared checks allow
+	// one hour for admission and thirty minutes for execution; leave a minute
+	// for cleanup and the result. Parent cancellation still applies immediately.
+	gatewayCallTimeout     = 91 * time.Minute
 	gatewayMaxResponse     = 1 << 20
 	gatewayMaxToolResponse = 64 << 10
 )

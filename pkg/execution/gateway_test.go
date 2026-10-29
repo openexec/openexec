@@ -310,7 +310,7 @@ func TestGatewayCommandResultHasTimeToReturn(t *testing.T) {
 			t.Fatal(err)
 		}
 		if body.Method == "tools/call" {
-			if remaining < 15*time.Minute || remaining > 32*time.Minute {
+			if remaining < 15*time.Minute || remaining > 92*time.Minute {
 				t.Fatalf("900-second command cannot return within gateway transport deadline %s", remaining)
 			}
 			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"result":{"content":[{"type":"text","text":"build succeeded"}]}}`)), Header: make(http.Header)}, nil
@@ -366,5 +366,31 @@ func TestGatewaySlowCommandStillObeysRunDeadline(t *testing.T) {
 	}
 	if executor.client.Timeout != 10*time.Millisecond {
 		t.Fatal("a tool call mutated the shared client timeout")
+	}
+}
+
+// Console declared checks have one hour for admission and thirty minutes for
+// execution. The transport must return that bounded result even though an
+// ordinary run_command has a shorter execution bound.
+func TestGatewayQueuedDeclaredCheckHasTimeToReturn(t *testing.T) {
+	executor, err := NewGatewayToolExecutor(context.Background(), (&fakeGateway{}).start(t).URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor.tools[0].Name = "run_declared_check"
+	executor.client.Transport = gatewayTransportFunc(func(r *http.Request) (*http.Response, error) {
+		deadline, ok := r.Context().Deadline()
+		if !ok {
+			t.Fatal("declared check request has no finite transport deadline")
+		}
+		remaining := time.Until(deadline)
+		if remaining < 90*time.Minute || remaining > 92*time.Minute {
+			t.Fatalf("queued declared check cannot return within gateway transport deadline %s", remaining)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"result":{"content":[{"type":"text","text":"check exited 0"}]}}`)), Header: make(http.Header)}, nil
+	})
+	out, err := executor.ExecuteTool(context.Background(), ToolRequest{Name: "run_declared_check", Input: json.RawMessage(`{"check":"check"}`), Sandbox: Sandbox{Mode: SandboxReadOnly}})
+	if err != nil || out != "check exited 0" {
+		t.Fatalf("declared check result = %q, %v", out, err)
 	}
 }
