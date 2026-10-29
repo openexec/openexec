@@ -3,6 +3,8 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -283,5 +285,86 @@ func TestDescriptorReportsTheExecutorsRealCapability(t *testing.T) {
 	}
 	if plain.Descriptor().Capabilities.WorkspaceWrite || plain.Descriptor().Capabilities.ToolCalling {
 		t.Error("a provider with no executor advertised tools")
+	}
+}
+
+// A real Console command requested 900 seconds, but the gateway cancelled it
+// at 60 seconds before its result arrived. Inspect the actual HTTP deadline
+// rather than waiting a minute in the suite. The caller still owns execution
+// authority and its command timeout; this only bounds the transport.
+func TestGatewayCommandResultHasTimeToReturn(t *testing.T) {
+	executor, err := NewGatewayToolExecutor(context.Background(), (&fakeGateway{}).start(t).URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor.client.Transport = gatewayTransportFunc(func(r *http.Request) (*http.Response, error) {
+		deadline, ok := r.Context().Deadline()
+		if !ok {
+			t.Fatal("gateway HTTP request has no finite deadline")
+		}
+		remaining := time.Until(deadline)
+		var body struct {
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Method == "tools/call" {
+			if remaining < 15*time.Minute || remaining > 32*time.Minute {
+				t.Fatalf("900-second command cannot return within gateway transport deadline %s", remaining)
+			}
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"result":{"content":[{"type":"text","text":"build succeeded"}]}}`)), Header: make(http.Header)}, nil
+		}
+		if remaining > time.Minute || remaining <= 0 {
+			t.Fatalf("discovery deadline = %s", remaining)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"result":{"tools":[{"name":"run_command"}]}}`)), Header: make(http.Header)}, nil
+	})
+	executor.tools[0].Name = "run_command"
+	out, err := executor.ExecuteTool(context.Background(), ToolRequest{Name: "run_command", Input: json.RawMessage(`{"command":["make","build"],"timeout_seconds":900}`), Sandbox: Sandbox{Mode: SandboxReadOnly}})
+	if err != nil || out != "build succeeded" {
+		t.Fatalf("build result = %q, %v", out, err)
+	}
+	if _, err := executor.list(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type gatewayTransportFunc func(*http.Request) (*http.Response, error)
+
+func (f gatewayTransportFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// A slow synchronous result survives discovery's shorter timeout. A run's
+// earlier deadline must still cancel the HTTP request and its server work.
+func TestGatewaySlowCommandStillObeysRunDeadline(t *testing.T) {
+	server := (&fakeGateway{}).start(t)
+	executor, err := NewGatewayToolExecutor(context.Background(), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor.client.Timeout = 10 * time.Millisecond
+	executor.client.Transport = gatewayTransportFunc(func(r *http.Request) (*http.Response, error) {
+		select {
+		case <-time.After(50 * time.Millisecond):
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"result":{"content":[{"type":"text","text":"saved result"}]}}`)), Header: make(http.Header)}, nil
+		case <-r.Context().Done():
+			return nil, r.Context().Err()
+		}
+	})
+	request := ToolRequest{Name: "provider_status", Sandbox: Sandbox{Mode: SandboxReadOnly}}
+	out, err := executor.ExecuteTool(context.Background(), request)
+	if err != nil || out != "saved result" {
+		t.Fatalf("slow result lost: %q, %v", out, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+	if _, err := executor.ExecuteTool(ctx, request); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("run deadline not preserved: %v", err)
+	}
+	if _, err := executor.list(context.Background()); err == nil {
+		t.Fatal("discovery lost its shorter timeout")
+	}
+	if executor.client.Timeout != 10*time.Millisecond {
+		t.Fatal("a tool call mutated the shared client timeout")
 	}
 }
