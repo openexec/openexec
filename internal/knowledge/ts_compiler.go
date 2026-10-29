@@ -28,6 +28,25 @@ type tsCompilerRequest struct {
 	ExcludedDirectories []string `json:"excluded_directories"`
 }
 
+// compilerObservationKey is used only by the opt-in replay tests. No request,
+// output or process information is retained in ordinary scans. The observer
+// runs after Wait and before the deferred cancel, so it sees the actual child
+// context ending rather than the cleanup cancellation.
+type compilerObservationKey struct{}
+
+type compilerObservation struct {
+	Request     []byte
+	Command     *exec.Cmd
+	Started     time.Time
+	Elapsed     time.Duration
+	Parent      context.Context
+	Child       context.Context
+	RunError    error
+	StdoutBytes int
+	StderrBytes int
+	Stdout      []byte
+}
+
 type tsCompilerResponse struct {
 	Configuration string `json:"configuration"`
 	Files         []struct {
@@ -104,8 +123,15 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	started := time.Now()
-	if err := cmd.Run(); err != nil {
-		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, describeExtractorEnding(ctx, commandCtx, err, time.Since(started)), strings.TrimSpace(stderr.String()))
+	runErr := cmd.Run()
+	elapsed := time.Since(started)
+	if observe, ok := ctx.Value(compilerObservationKey{}).(func(compilerObservation)); ok {
+		observe(compilerObservation{Request: request, Command: cmd, Started: started,
+			Elapsed: elapsed, Parent: ctx, Child: commandCtx, RunError: runErr,
+			StdoutBytes: stdout.Len(), StderrBytes: stderr.Len(), Stdout: stdout.Bytes()})
+	}
+	if err := runErr; err != nil {
+		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, describeExtractorEnding(ctx, commandCtx, err, elapsed), strings.TrimSpace(stderr.String()))
 	}
 	var response tsCompilerResponse
 	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
