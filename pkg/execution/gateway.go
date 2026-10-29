@@ -20,7 +20,11 @@ import (
 // everything it returns is about to be handed to a model: unbounded means a
 // hung caller or a context filled with someone else's payload.
 const (
-	gatewayTimeout         = 60 * time.Second
+	gatewayTimeout = 60 * time.Second
+	// Tool execution is bounded by the caller. Console declared checks allow
+	// one hour for admission and thirty minutes for execution; leave a minute
+	// for cleanup and the result. Parent cancellation still applies immediately.
+	gatewayCallTimeout     = 91 * time.Minute
 	gatewayMaxResponse     = 1 << 20
 	gatewayMaxToolResponse = 64 << 10
 )
@@ -231,7 +235,14 @@ func (e *GatewayToolExecutor) call(ctx context.Context, method string, params ma
 		return nil, err
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
-	response, err := e.client.Do(httpRequest)
+	// Discovery is short, but a tools/call can synchronously wait for a build.
+	// Copy the client so concurrent calls retain the same redirect/transport
+	// policy without changing discovery's timeout or racing shared state.
+	client := *e.client
+	if method == "tools/call" {
+		client.Timeout = gatewayCallTimeout
+	}
+	response, err := client.Do(httpRequest)
 	if err != nil {
 		return nil, fmt.Errorf("tool gateway: %w", err)
 	}
