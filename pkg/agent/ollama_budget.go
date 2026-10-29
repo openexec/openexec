@@ -167,7 +167,6 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 			return nil, err
 		}
 	}
-	p.remember(body)
 	wire, err := http.NewRequestWithContext(ctx, http.MethodPost, p.ollamaBudgetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -176,6 +175,7 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 	client := *p.httpClient
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	sent := time.Now()
+	p.remember(body, wire)
 	res, err := client.Do(wire)
 	if err != nil {
 		if ctx.Err() != nil {

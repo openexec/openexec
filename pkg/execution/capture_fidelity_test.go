@@ -46,8 +46,9 @@ func fidelityAdapter(t *testing.T, base string) *agent.OpenAIProvider {
 }
 
 type fidelityDispatch struct {
-	path string
-	body []byte
+	path   string
+	method string
+	body   []byte
 }
 
 func fidelityEndpoint(t *testing.T) (*httptest.Server, <-chan fidelityDispatch) {
@@ -63,7 +64,7 @@ func fidelityEndpoint(t *testing.T) (*httptest.Server, <-chan fidelityDispatch) 
 			t.Error(err)
 			return
 		}
-		dispatches <- fidelityDispatch{r.URL.Path, body}
+		dispatches <- fidelityDispatch{path: r.URL.Path, method: r.Method, body: body}
 		if r.URL.Path == "/api/chat" {
 			// Native arguments are objects, as emitted by completeLocalOllama.
 			var req struct {
@@ -127,23 +128,26 @@ func fidelityArguments(tree map[string]any) any {
 }
 
 func TestCaptureFidelitySerializerDispatchAndReplay(t *testing.T) {
-	for _, mode := range []string{"compatible", "native", "bounded", "negotiated-stream", "forced-choice"} {
+	for _, mode := range []string{"compatible", "native", "bounded", "negotiated-stream", "compatible-stream", "forced-choice", "media"} {
 		t.Run(mode, func(t *testing.T) {
 			srv, dispatches := fidelityEndpoint(t)
 			adapter := fidelityAdapter(t, srv.URL+"/v1")
-			if mode != "compatible" && !adapter.EnableLocalOllamaBounds(context.Background()) {
+			if mode != "compatible" && mode != "compatible-stream" && !adapter.EnableLocalOllamaBounds(context.Background()) {
 				t.Fatal("public native negotiation failed")
 			}
 			req := fidelityRequest("public value")
 			if mode == "forced-choice" {
 				req.ToolChoice = "any"
 			}
+			if mode == "media" {
+				req.Messages[0].Content = append(req.Messages[0].Content, agent.ContentBlock{Type: agent.ContentTypeImage, ImageURL: "https://public.invalid/image.png"})
+			}
 			started := time.Now()
 			var err error
 			switch mode {
 			case "bounded":
 				_, err = adapter.CompleteBounded(context.Background(), req, 2048, 16)
-			case "negotiated-stream":
+			case "negotiated-stream", "compatible-stream":
 				var events <-chan agent.StreamEvent
 				events, err = adapter.Stream(context.Background(), req)
 				if err == nil {
@@ -172,6 +176,11 @@ func TestCaptureFidelitySerializerDispatchAndReplay(t *testing.T) {
 			if dispatched.path != wantPath {
 				t.Fatalf("route=%s, want %s", dispatched.path, wantPath)
 			}
+			_, _, _, dispatch := adapter.LastRequestWithDispatch()
+			assertDispatch(t, dispatchTree(t, dispatch), dispatched.method, srv.URL+dispatched.path)
+			if native && base == dispatch.URL {
+				t.Fatal("native configured base unexpectedly equals dispatch target")
+			}
 			tree := fidelityTree(t, body)
 			_, object := fidelityArguments(tree).(map[string]any)
 			if object != native {
@@ -196,9 +205,11 @@ func TestCaptureFidelitySerializerDispatchAndReplay(t *testing.T) {
 			t.Setenv(RequestCaptureEnv, path)
 			captureRequest(adapter, started, Result{Outcome: OutcomeFailed}, context.Canceled)
 			capture := readCapture(t, path)
-			if capture["truncated"] != false || capture["error"] != "context canceled" ||
-				!reflect.DeepEqual(tree, capture["request"]) || capture["baseURL"] != base {
-				t.Fatal("capture changed public types or recorded a dispatched route it does not know")
+			cleanTree, omitted := sanitizeCapture(tree, captureTextLimit)
+			assertDispatch(t, asMap(capture["dispatch"]), dispatched.method, srv.URL+dispatched.path)
+			if capture["truncated"] != omitted || capture["error"] != "context canceled" ||
+				!reflect.DeepEqual(cleanTree, capture["request"]) || capture["baseURL"] != base {
+				t.Fatal("capture changed public types or fidelity flags")
 			}
 			tracePath := filepath.Join(t.TempDir(), "trace", "run.json")
 			t.Setenv(RequestTraceEnv, tracePath)
@@ -206,9 +217,12 @@ func TestCaptureFidelitySerializerDispatchAndReplay(t *testing.T) {
 			trace.record(adapter, started, req, nil, context.Canceled)
 			trace.write(adapter, Request{ID: "public"}, Result{Outcome: OutcomeFailed}, context.Canceled)
 			persisted := readTrace(t, tracePath)
-			if !reflect.DeepEqual(asMap(asList(persisted["entries"])[0])["wire"], tree) ||
-				persisted["redactionChangedContent"] != false || persisted["imagesOmitted"] != false || persisted["incomplete"] != false {
-				t.Fatal("public trace tree/fidelity flags did not round trip")
+			assertDispatch(t, asMap(asMap(asList(persisted["entries"])[0])["dispatch"]), dispatched.method, srv.URL+dispatched.path)
+			// The trace also keeps the unified request, whose image is omitted
+			// even when the existing compatibility serializer sends text only.
+			if !reflect.DeepEqual(asMap(asList(persisted["entries"])[0])["wire"], cleanTree) ||
+				persisted["redactionChangedContent"] != false || persisted["imagesOmitted"] != (omitted || mode == "media") || persisted["incomplete"] != false {
+				t.Fatalf("public trace tree/fidelity flags did not round trip: wireEqual=%t redacted=%v omitted=%v wantOmitted=%v incomplete=%v", reflect.DeepEqual(asMap(asList(persisted["entries"])[0])["wire"], cleanTree), persisted["redactionChangedContent"], persisted["imagesOmitted"], omitted, persisted["incomplete"])
 			}
 			// Replay the persisted tree without converting any arguments. Only the
 			// destination is varied, exposing the base-URL/route ambiguity.
@@ -341,6 +355,8 @@ func TestCaptureFidelityNativeCancellationIsNotCallerVerdict(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "cancel.json")
 	t.Setenv(RequestCaptureEnv, path)
+	tracePath := filepath.Join(t.TempDir(), "trace", "cancel.json")
+	t.Setenv(RequestTraceEnv, tracePath)
 	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter,
 		Tools: fidelityRequest("").Tools, ToolExecutor: &recordingToolExecutor{}})
 	if err != nil {
@@ -359,6 +375,9 @@ func TestCaptureFidelityNativeCancellationIsNotCallerVerdict(t *testing.T) {
 		t.Fatalf("native cancellation/caller cause conflated: result=%+v err=%v cause=%v", result, err, context.Cause(ctx))
 	}
 	capture := readCapture(t, path)
+	assertDispatch(t, asMap(capture["dispatch"]), "POST", srv.URL+"/api/chat")
+	trace := readTrace(t, tracePath)
+	assertDispatch(t, asMap(asMap(asList(trace["entries"])[0])["dispatch"]), "POST", srv.URL+"/api/chat")
 	if capture["error"] != "context canceled" || capture["reason"] != "" || capture["outcome"] != OutcomeFailed {
 		t.Fatal("capture invented a caller verdict")
 	}

@@ -3,6 +3,8 @@ package execution
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,6 +50,51 @@ func lastRequestOf(adapter agent.ProviderAdapter) lastRequester {
 	return nil
 }
 
+// Read dispatch together with its body, never by a second accessor that could
+// describe another request. Older adapters and older captures remain unknown.
+func lastRequestSnapshot(last lastRequester) ([]byte, time.Time, string, *agent.RequestDispatch) {
+	if source, ok := last.(interface {
+		LastRequestWithDispatch() ([]byte, time.Time, string, *agent.RequestDispatch)
+	}); ok {
+		body, at, base, dispatch := source.LastRequestWithDispatch()
+		return body, at, base, safeDispatch(dispatch)
+	}
+	body, at, base := last.LastRequest()
+	return body, at, base, nil
+}
+
+// Privacy-altered or malformed evidence is unavailable, never a rewritten
+// replay destination. In particular, do not retain any userinfo or query,
+// even when it does not resemble one of our secret patterns.
+func safeDispatch(dispatch *agent.RequestDispatch) *agent.RequestDispatch {
+	if dispatch == nil || dispatch.Provenance != agent.DispatchSourceKnown || dispatch.Method != http.MethodPost {
+		return nil
+	}
+	u, err := url.Parse(dispatch.URL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.Opaque != "" ||
+		u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" ||
+		redactSecrets(dispatch.URL) != dispatch.URL || redactSecrets(u.Path) != u.Path {
+		return nil
+	}
+	copy := *dispatch
+	return &copy
+}
+
+func diagnosticBaseURL(base string) string {
+	if base == "" {
+		return ""
+	}
+	u, err := url.Parse(base)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.Opaque != "" {
+		return "<unavailable>"
+	}
+	u.User, u.RawQuery, u.Fragment, u.RawFragment, u.ForceQuery = nil, "", "", "", false
+	if path := redactSecrets(u.Path); path != u.Path {
+		u.Path, u.RawPath = path, ""
+	}
+	return redactSecrets(u.String())
+}
+
 // captureRequest writes the request the run last sent, when the caller asked
 // for captures and the request was sent by this run. Best effort: a capture
 // that cannot be written changes nothing about the run.
@@ -60,12 +107,12 @@ func captureRequest(adapter agent.ProviderAdapter, started time.Time, result Res
 	if last == nil {
 		return
 	}
-	body, sentAt, baseURL := last.LastRequest()
+	body, sentAt, baseURL, dispatch := lastRequestSnapshot(last)
 	if len(body) == 0 || sentAt.Before(started) {
 		return
 	}
 	var request map[string]any
-	if json.Unmarshal(body, &request) != nil {
+	if json.Unmarshal(body, &request) != nil || request == nil {
 		return
 	}
 	message := ""
@@ -79,10 +126,13 @@ func captureRequest(adapter agent.ProviderAdapter, started time.Time, result Res
 		"capturedAt": time.Now().UTC().Format(time.RFC3339),
 		"sentAt":     sentAt.UTC().Format(time.RFC3339),
 		"provider":   adapter.GetName(),
-		"baseURL":    redactSecrets(baseURL),
+		"baseURL":    diagnosticBaseURL(baseURL),
 		"outcome":    result.Outcome,
 		"reason":     result.Reason,
 		"error":      truncateText(redactSecrets(message), captureErrLimit),
+	}
+	if dispatch != nil {
+		capture["dispatch"] = dispatch
 	}
 	var data []byte
 	for limit := captureTextLimit; ; limit /= 4 {
