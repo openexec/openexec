@@ -26,7 +26,7 @@ func Test64KContextAdmitsLargerInputWithoutRaisingTotalGrant(t *testing.T) {
 					Truncate *bool          `json:"truncate"`
 					Options  map[string]int `json:"options"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Truncate == nil || *body.Truncate || body.Options["num_ctx"] != 65536 || body.Options["num_predict"] != 2048 {
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Truncate == nil || *body.Truncate || body.Options["num_ctx"] != 65536 || (body.Options["num_predict"] <= 2048 || body.Options["num_predict"] > 65536) {
 					t.Error("64K native context or non-truncating behavior lost", body, err)
 				}
 				w.Write([]byte(`{"done":true,"prompt_eval_count":40000,"eval_count":5,"message":{"content":"done"}}`))
@@ -77,10 +77,12 @@ func TestExplicitContextCeilingIndependentOfTotalGrant(t *testing.T) {
 		if len(a.limits) == 0 {
 			t.Fatal("no inference")
 		}
+		remaining := tc.grant
 		for _, limits := range a.limits {
-			if limits != [2]int{int(tc.want), 2048} {
+			if limits[0] != int(tc.want) || limits[1] < 2048 || limits[1] > limits[0] || int64(limits[0]+limits[1]) > remaining {
 				t.Fatalf("grant %d ceiling %d: limits %v", tc.grant, tc.ceiling, a.limits)
 			}
+			remaining -= int64(limits[0] + limits[1])
 		}
 		if tc.grant == 250000 && len(a.limits) != 2 {
 			t.Fatalf("second inference not exercised: %v", a.limits)
@@ -236,7 +238,7 @@ func TestHardBudgetHistoricalContextExhaustionYieldsBeforeHTTP(t *testing.T) {
 	if err != errHardTokenGrantExhausted || err.Error() != "hard token grant cannot admit another inference" {
 		t.Fatalf("wrapped recovery failed to preserve typed grant yield: %v", err)
 	}
-	if a.calls != 2 || len(a.limits) != 2 || a.limits[0] != [2]int{32768, 2048} || a.limits[1] != a.limits[0] {
+	if a.calls != 2 || len(a.limits) != 2 || a.limits[0] != [2]int{32768, 32768} || a.limits[1] != [2]int{32768, 10770} {
 		t.Fatalf("inference context shrank or a third HTTP request escaped: %+v", a.limits)
 	}
 	if !final.UsageFinal || final.InputTokens != 44116 || final.OutputTokens != 3346 {
@@ -250,7 +252,7 @@ func TestHardBudgetKeepsAdmittedContextForSmallUnevenGrant(t *testing.T) {
 	if _, err := meter.Complete(context.Background(), agent.Request{}); err != nil {
 		t.Fatal(err)
 	}
-	if a.limits[0] != [2]int{4096, 2048} || meter.remaining != 857 {
+	if a.limits[0] != [2]int{4096, 2905} || meter.remaining != 0 {
 		t.Fatalf("unsafe native context or accounting: limits%v remaining%d", a.limits, meter.remaining)
 	}
 	if _, err := meter.Complete(context.Background(), agent.Request{}); err != errHardTokenGrantExhausted || a.calls != 1 || meter.unknown {

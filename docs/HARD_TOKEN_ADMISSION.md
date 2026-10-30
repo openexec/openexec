@@ -56,3 +56,24 @@ The historical-sequence regression proves two requests, 47,462 finalized tokens
 and no third request, including the empty-response recovery path. Removing the
 admission guard makes it fail. Agent and execution package suites passed.
 This is local repair evidence, not deployment or a new successful live request.
+
+## Reply room for native planning
+
+Thinking models share their output allowance between reasoning and the visible
+answer. A fixed 2,048-token allowance caused native planning to return reasoning
+without a task plan; the one empty-answer recovery then repeated the same cap.
+
+The bounded executor now reserves output up to its admitted context ceiling
+(currently at most 65,536 tokens), within the original remaining total grant.
+An explicit request `MaxTokens` remains a restrictive ceiling. Native context
+preflight reduces output to leave room for the complete assembled prompt before
+any inference is submitted. The input context stays stable, and only unused
+capacity from an unsubmitted preparation is returned. A dispatched refusal is
+never retried or refunded by this preparation step. Exact duplicate-result
+compaction keeps the same admission checks.
+
+The execution tests cover a native task-plan response after more than 2,048
+output tokens, caller limits, scarce remaining capacity, stable input context,
+unsubmitted preparation refunds and retained reservations after dispatched
+failures. These controls establish bounded allocation; a production Goal still
+requires its own persisted task plan and independent completion evidence.
