@@ -21,6 +21,15 @@ func nativeContextShape(body []byte) ([32]byte, []json.RawMessage, bool) {
 		return [32]byte{}, nil, false
 	}
 	delete(fields, "messages")
+	// num_predict limits future output; it does not alter the serialized
+	// prompt or its native token count. Bounded planning adjusts it between
+	// calls to leave reply room, so keep that observation usable. Every other
+	// option (including num_ctx), model, tool and message remains bound.
+	var options map[string]json.RawMessage
+	if json.Unmarshal(fields["options"], &options) == nil && options != nil {
+		delete(options, "num_predict")
+		fields["options"], _ = json.Marshal(options)
+	}
 	shape, err := json.Marshal(fields)
 	return sha256.Sum256(shape), messages, err == nil
 }
@@ -40,7 +49,7 @@ func (p *OpenAIProvider) observeNativeContext(body []byte, tokens int) {
 }
 
 func (p *OpenAIProvider) admitObservedContext(body []byte, inputCap, outputCap, messages, tools int) error {
-	// A first request or any changed system/model/tools/options/prefix keeps
+	// A first request or any changed system/model/tools/input options/prefix keeps
 	// the existing conservative whole-request preflight. Never subtract an
 	// estimate from actual accounting or assume edited content costs the same.
 	estimate := assembledContextEstimate(body, messages, tools)
