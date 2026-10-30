@@ -77,3 +77,21 @@ output tokens, caller limits, scarce remaining capacity, stable input context,
 unsubmitted preparation refunds and retained reservations after dispatched
 failures. These controls establish bounded allocation; a production Goal still
 requires its own persisted task plan and independent completion evidence.
+
+### Reply allowance and observed prompt counts
+
+The bounded native planner adjusts `options.num_predict` to leave room for
+the complete prompt. That output allowance does not change prompt tokenization.
+An append-only request can reuse its successful native prefix count when only
+`num_predict` changes; the new reply allowance still participates in admission.
+Model, tools, system text, prefix bytes, input context and all other options
+remain bound to the observation. Unique source content is retained. Native
+`truncate=false`, cumulative reservations and reported usage remain authoritative.
+
+Regression: `TestNativeObservationSurvivesReplyAllowanceChange` exercises the
+native HTTP protocol, including refusal of a reply that cannot fit.
+`TestReplyAllowanceChangePreservesNativeToolProgress` exercises bounded
+read → draft write → completion, reopens the saved draft and checks exact native
+usage. Both fail when output normalization is removed. This fixture isolates
+the invalidation found while investigating Solar's original context failures;
+it does not establish that those real failures or the whole Goal are repaired.
