@@ -175,7 +175,10 @@ for (const group of groups.values()) {
   const checker = program.getTypeChecker();
   const groupFiles = new Set(group.files.map((file) => path.resolve(file)));
 
-  for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
+  // The Go consumer retains only the first 20 diagnostics, in group order.
+  // Once that budget is filled, checking later programs cannot change any
+  // retained limitation. Still build their checkers and extract every reference.
+  for (const diagnostic of output.diagnostics.length < 20 ? ts.getPreEmitDiagnostics(program) : []) {
     if (!diagnostic.file) continue;
     const rel = path.relative(root, diagnostic.file.fileName).split(path.sep).join("/");
     if (rel.startsWith("../")) continue;
