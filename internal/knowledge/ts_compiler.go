@@ -28,8 +28,8 @@ type tsCompilerRequest struct {
 	ExcludedDirectories []string `json:"excluded_directories"`
 }
 
-// compilerObservationKey is used only by the opt-in replay tests. No request,
-// output or process information is retained in ordinary scans. The observer
+// compilerObservationKey lets the replay tests observe the same child as the
+// opt-in CLI capture producer. Uninstrumented scans retain nothing. The observer
 // runs after Wait and before the deferred cancel, so it sees the actual child
 // context ending rather than the cleanup cancellation.
 type compilerObservationKey struct{}
@@ -116,6 +116,12 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	}
 	sort.Strings(excluded)
 	request, _ := json.Marshal(tsCompilerRequest{Files: files, ExcludedDirectories: excluded})
+	capture, captureErr := beginCompilerCapture(root, request, node, compiler)
+	if captureErr != nil {
+		// Never leak filenames or source through capture setup errors, and never
+		// turn an evidence failure into an extraction failure.
+		fmt.Fprintln(os.Stderr, "TypeScript compiler private capture refused; extraction continues without capture")
+	}
 	commandCtx, cancel := context.WithTimeout(ctx, typeScriptExtractorTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(commandCtx, node, scriptPath, compiler, root)
@@ -125,13 +131,26 @@ func extractTypeScriptWithCompiler(ctx context.Context, root string, files []str
 	started := time.Now()
 	runErr := cmd.Run()
 	elapsed := time.Since(started)
+	ending := describeExtractorEnding(ctx, commandCtx, runErr, elapsed)
+	observation := compilerObservation{Request: request, Command: cmd, Started: started,
+		Elapsed: elapsed, Parent: ctx, Child: commandCtx, RunError: runErr,
+		StdoutBytes: stdout.Len(), StderrBytes: stderr.Len(), Stdout: stdout.Bytes()}
+	if capture != nil {
+		// Freeze the ending before metadata probes or deferred cancellation can
+		// change the contexts. Probes run only after the extraction result is set.
+		record := childMeasurement(observation, root)
+		after := compilerProcessSnapshot()
+		defer func() {
+			if err := capture.finish(record, after); err != nil {
+				fmt.Fprintln(os.Stderr, "TypeScript compiler private capture incomplete; extraction result unchanged")
+			}
+		}()
+	}
 	if observe, ok := ctx.Value(compilerObservationKey{}).(func(compilerObservation)); ok {
-		observe(compilerObservation{Request: request, Command: cmd, Started: started,
-			Elapsed: elapsed, Parent: ctx, Child: commandCtx, RunError: runErr,
-			StdoutBytes: stdout.Len(), StderrBytes: stderr.Len(), Stdout: stdout.Bytes()})
+		observe(observation)
 	}
 	if err := runErr; err != nil {
-		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, describeExtractorEnding(ctx, commandCtx, err, elapsed), strings.TrimSpace(stderr.String()))
+		return nil, "", nil, fmt.Errorf("TypeScript compiler extractor: %w (%s): %s", err, ending, strings.TrimSpace(stderr.String()))
 	}
 	var response tsCompilerResponse
 	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {

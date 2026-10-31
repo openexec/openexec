@@ -3,11 +3,9 @@ package knowledge
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,139 +19,7 @@ import (
 
 var consoleNativeCheckout = flag.String("console-native-checkout", "", "explicitly authorized disposable public Console checkout; scanned and written")
 var consoleCaptureDirectory = flag.String("console-capture-dir", "", "new directory outside the checkout for source-safe native request and measurement artifacts")
-
-// All contents of this record are metadata. Neither compiler output, stderr,
-// diagnostics nor source bodies are serialized. request.json contains public
-// relative filenames and exclusions only, exactly as passed to cmd.Stdin.
-type nativeChildRecord struct {
-	Arguments        []string        `json:"arguments"`
-	RequestSHA256    string          `json:"request_sha256"`
-	RequestBytes     int             `json:"request_bytes"`
-	FileCount        int             `json:"file_count"`
-	SourceBytes      int64           `json:"source_bytes"`
-	ScriptSHA256     string          `json:"script_sha256"`
-	NodeSHA256       string          `json:"node_sha256"`
-	CompilerSHA256   string          `json:"typescript_sha256"`
-	NodeResolved     string          `json:"node_resolved_path"`
-	CompilerResolved string          `json:"typescript_resolved_path"`
-	NodeVersion      string          `json:"node_version"`
-	CompilerVersion  string          `json:"typescript_version"`
-	Started          time.Time       `json:"started"`
-	ElapsedNS        int64           `json:"elapsed_ns"`
-	ParentDeadline   string          `json:"parent_deadline"`
-	ChildDeadline    string          `json:"child_deadline"`
-	ParentError      string          `json:"parent_error"`
-	ChildError       string          `json:"child_error"`
-	Bound            string          `json:"extractor_bound"`
-	Ending           string          `json:"ending"`
-	ExitCode         int             `json:"exit_code"`
-	ProcessState     string          `json:"process_state"`
-	UserNS           int64           `json:"user_ns"`
-	SystemNS         int64           `json:"system_ns"`
-	OSUsage          json.RawMessage `json:"os_usage"`
-	StdoutBytes      int             `json:"stdout_bytes"`
-	StderrBytes      int             `json:"stderr_bytes"`
-	Configuration    string          `json:"configuration"`
-	ExtractedFiles   int             `json:"extracted_files"`
-	Diagnostics      int             `json:"diagnostic_count"`
-	ResponseDecoded  bool            `json:"response_decoded"`
-}
-
-func captureHash(b []byte) string { return fmt.Sprintf("%x", sha256.Sum256(b)) }
-
-func captureFileHash(path string) string {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return "unknown: file unreadable"
-	}
-	return captureHash(b)
-}
-
-func contextError(ctx context.Context) string {
-	if ctx.Err() == nil {
-		return "none"
-	}
-	return ctx.Err().Error()
-}
-
-func contextDeadline(ctx context.Context) string {
-	if d, ok := ctx.Deadline(); ok {
-		return d.UTC().Format(time.RFC3339Nano)
-	}
-	return "none"
-}
-
-func nativeEnding(parent, child context.Context, err error) string {
-	switch {
-	case parent.Err() != nil:
-		return "caller_cancellation"
-	case child.Err() != nil:
-		return "extractor_deadline"
-	case err == nil:
-		return "exit_0"
-	}
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
-		if exit.ExitCode() == -1 {
-			return "external_signal"
-		}
-		return "ordinary_nonzero_exit"
-	}
-	return "start_or_io_error"
-}
-
-func childMeasurement(o compilerObservation, root string) nativeChildRecord {
-	r := nativeChildRecord{
-		Arguments: append([]string(nil), o.Command.Args...), RequestSHA256: captureHash(o.Request),
-		RequestBytes: len(o.Request), Started: o.Started.UTC(), ElapsedNS: o.Elapsed.Nanoseconds(),
-		ParentDeadline: contextDeadline(o.Parent), ChildDeadline: contextDeadline(o.Child),
-		ParentError: contextError(o.Parent), ChildError: contextError(o.Child), Bound: typeScriptExtractorTimeout.String(),
-		Ending: nativeEnding(o.Parent, o.Child, o.RunError), ExitCode: -1,
-		StdoutBytes: o.StdoutBytes, StderrBytes: o.StderrBytes,
-		ScriptSHA256: captureHash(typeScriptCompilerScript),
-	}
-	var req tsCompilerRequest
-	if json.Unmarshal(o.Request, &req) == nil {
-		r.FileCount = len(req.Files)
-		for _, rel := range req.Files {
-			if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
-				r.SourceBytes += info.Size()
-			}
-		}
-	}
-	if state := o.Command.ProcessState; state != nil {
-		r.ExitCode, r.ProcessState = state.ExitCode(), state.String()
-		r.UserNS, r.SystemNS = state.UserTime().Nanoseconds(), state.SystemTime().Nanoseconds()
-		r.OSUsage, _ = json.Marshal(state.SysUsage())
-	}
-	var response tsCompilerResponse
-	if o.RunError == nil && json.Unmarshal(o.Stdout, &response) == nil {
-		r.ResponseDecoded = true
-		r.Configuration, r.ExtractedFiles, r.Diagnostics = response.Configuration, len(response.Files), len(response.Diagnostics)
-	}
-	return r
-}
-
-// Probes happen AFTER the measured run; they cannot eat its 45 second budget.
-func enrichChildMeasurement(t *testing.T, r *nativeChildRecord) {
-	t.Helper()
-	r.NodeSHA256 = captureFileHash(r.Arguments[0])
-	r.CompilerSHA256 = captureFileHash(r.Arguments[2])
-	r.NodeResolved, _ = filepath.EvalSymlinks(r.Arguments[0])
-	r.CompilerResolved, _ = filepath.EvalSymlinks(r.Arguments[2])
-	r.NodeVersion = captureProbe(r.Arguments[0], "--version")
-	r.CompilerVersion = captureProbe(r.Arguments[0], "-p", "require(process.argv[1]).version", r.Arguments[2])
-}
-
-func captureProbe(name string, args ...string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, name, args...).Output()
-	if err != nil {
-		return "unknown: metadata probe failed (" + contextError(ctx) + ")"
-	}
-	return strings.TrimSpace(string(out))
-}
+var compilerPrivateCapture = flag.String("compiler-private-capture", "", "private actual CLI capture directory to replay once, without scanning")
 
 // The replay uses the observed argv, bytes and 45s bound. The scanner already
 // removed its temp script; restore identical bytes at the SAME pathname using
@@ -222,6 +88,10 @@ func writeCapture(t *testing.T, dir, name string, data []byte) {
 // there is no retry, reduction, provider call or changed compiler budget. Only
 // a disposable, clean, explicitly supplied public checkout may be used.
 func TestConsoleNativeRequestCapture(t *testing.T) {
+	if *compilerPrivateCapture != "" {
+		replayPrivateCompilerCapture(t, *compilerPrivateCapture)
+		return
+	}
 	if *consoleNativeCheckout == "" {
 		t.Skip("requires -console-native-checkout and -console-capture-dir; offline by default")
 	}
@@ -304,7 +174,7 @@ func TestConsoleNativeRequestCapture(t *testing.T) {
 	if observations != 1 {
 		t.Fatalf("observed %d child runs, want exactly one; scan error=%v", observations, scanErr != nil)
 	}
-	enrichChildMeasurement(t, &native)
+	enrichChildMeasurement(&native)
 	b, _ := json.MarshalIndent(native, "", "  ")
 	writeCapture(t, dir, "native-child.json", b)
 	graph := map[string]any{"database": db, "scan_elapsed_ns": elapsed.Nanoseconds(), "scan_error": scanErr != nil,
@@ -325,7 +195,7 @@ func TestConsoleNativeRequestCapture(t *testing.T) {
 	directParent, directCancel := context.WithTimeout(context.Background(), 600*time.Second)
 	defer directCancel()
 	direct := replayNativeRequest(t, directParent, native.Arguments, request)
-	enrichChildMeasurement(t, &direct)
+	enrichChildMeasurement(&direct)
 	b, _ = json.MarshalIndent(direct, "", "  ")
 	writeCapture(t, dir, "direct-child.json", b)
 	after, manifestErr := BuildScanManifest(root)
@@ -485,6 +355,8 @@ func TestNativeCaptureRealCompilerRoundTrip(t *testing.T) {
 	writeTestFile(t, root, "src/a.ts", "export function a(): number { return 1 }\n")
 	writeTestFile(t, root, "src/b.ts", "import { a } from './a'; export const b = a()\n")
 	writeTestFile(t, root, "dist/near-miss.ts", "export const ignored = 3\n")
+	captureParent := privateCaptureParent(t)
+	t.Setenv(compilerCaptureEnv, captureParent)
 	var native nativeChildRecord
 	var request []byte
 	ctx := context.WithValue(context.Background(), compilerObservationKey{}, func(o compilerObservation) {
@@ -506,7 +378,11 @@ func TestNativeCaptureRealCompilerRoundTrip(t *testing.T) {
 	if g.Capabilities["typescript.imports"] != "compiler_exact" || native.Ending != "exit_0" || !native.ResponseDecoded || native.FileCount != 2 || native.ExtractedFiles != 2 {
 		t.Fatalf("compiler evidence missing: %+v; %v", native, g.Limitations)
 	}
-	direct := replayNativeRequest(t, context.Background(), native.Arguments, request)
+	dir, recorded := readPrivateCapture(t, captureParent)
+	if recorded.RequestSHA256 != captureHash(request) || recorded.Ending != native.Ending {
+		t.Fatal("private producer differs from native observer")
+	}
+	direct := replayPrivateCompilerCapture(t, dir)
 	if direct.Ending != "exit_0" || !direct.ResponseDecoded || direct.RequestSHA256 != native.RequestSHA256 || direct.Configuration != native.Configuration || direct.ExtractedFiles != native.ExtractedFiles || !reflect.DeepEqual(direct.Arguments, native.Arguments) {
 		t.Fatalf("exact replay differs: %+v", direct)
 	}
