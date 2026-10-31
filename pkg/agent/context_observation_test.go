@@ -32,7 +32,7 @@ func TestNativeObservationAdmitsAppendOnlyToolResult(t *testing.T) {
 	if err := p.admitObservedContext(next, 32768, 2048, len(more), 0); err != nil {
 		t.Fatal("observed prefix and bounded append refused", err)
 	}
-	for _, mode := range []string{"model", "prefix", "system", "tools", "options", "large-append"} {
+	for _, mode := range []string{"model", "prefix", "system", "tools", "options", "sampling", "thinking", "large-append"} {
 		t.Run(mode, func(t *testing.T) {
 			var wire map[string]any
 			json.Unmarshal(next, &wire)
@@ -47,6 +47,10 @@ func TestNativeObservationAdmitsAppendOnlyToolResult(t *testing.T) {
 				wire["tools"] = []any{map[string]any{"name": "different"}}
 			case "options":
 				wire["options"].(map[string]any)["num_ctx"] = 65536
+			case "sampling":
+				wire["options"].(map[string]any)["temperature"] = 0.5
+			case "thinking":
+				wire["think"] = false
 			case "large-append":
 				wire["messages"].([]any)[2].(map[string]any)["content"] = strings.Repeat("x", 40000)
 			}

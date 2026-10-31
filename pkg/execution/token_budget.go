@@ -37,7 +37,7 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 	if p.remaining < 4096 {
 		return nil, errHardTokenGrantExhausted
 	}
-	const output int64 = 2048
+	const minimumOutput int64 = 2048
 	if p.contextCap == 0 {
 		// Admit one stable context for this execution, using native-sized
 		// powers of two. Do not shrink it as prior requests consume capacity:
@@ -47,26 +47,51 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		if p.contextLimit > 0 && p.contextLimit < ceiling {
 			ceiling = p.contextLimit
 		}
-		for next := p.contextCap * 2; next <= ceiling && next <= p.remaining-output; next *= 2 {
+		for next := p.contextCap * 2; next <= ceiling && next <= p.remaining-minimumOutput; next *= 2 {
 			p.contextCap = next
 		}
 	}
 	input := p.contextCap
-	if p.remaining < input+output {
+	if p.remaining < input+minimumOutput {
 		// Conservative admission is intentional: preserve all request content
 		// and yield known usage before HTTP, rather than guess token counts,
 		// truncate authority, or enlarge the remaining grant.
 		return nil, errHardTokenGrantExhausted
 	}
+	// Reasoning and the visible answer share this reservation. A native
+	// planner exhausted a fixed 2K reply twice without returning any tasks.
+	// Admit more output within the SAME grant and context ceiling; keep an
+	// explicit caller maximum restrictive. The adapter's preflight below
+	// also leaves room for the complete serialized prompt.
+	output := min(input, p.remaining-input)
+	if r.MaxTokens > 0 {
+		output = min(output, int64(r.MaxTokens))
+	}
 	// Debit the worst case before inference. Unknown usage never returns capacity.
 	p.remaining -= input + output
-	res, err := p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, r, int(input), int(output))
+	prepare := func(request agent.Request) (*agent.Response, error) {
+		res, err := p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, request, int(input), int(output))
+		var overflow *agent.ContextOverflowError
+		if errors.As(err, &overflow) && !overflow.Dispatched {
+			room := input - int64(overflow.EstimatedTokens)
+			if room >= minimumOutput && room < output {
+				// No inference was submitted. Return only the unused output
+				// reservation, then prepare once with room for the whole prompt.
+				// Never shrink input, truncate authority, or retry a dispatched call.
+				p.remaining += output - room
+				output = room
+				return p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, request, int(input), int(output))
+			}
+		}
+		return res, err
+	}
+	res, err := prepare(r)
 	var overflow *agent.ContextOverflowError
 	if errors.As(err, &overflow) && !overflow.Dispatched {
 		// No inference was submitted. Rebuild once by removing only exact
 		// duplicate results. Unique obligations and owner authority stay intact.
 		if compacted, changed := compactRepeatedResults(r); changed {
-			res, err = p.ProviderAdapter.(agent.HardTokenAdapter).CompleteBounded(ctx, compacted, int(input), int(output))
+			res, err = prepare(compacted)
 		}
 		overflow = nil
 		if errors.As(err, &overflow) && !overflow.Dispatched {

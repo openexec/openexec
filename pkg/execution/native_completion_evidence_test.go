@@ -39,7 +39,7 @@ func TestNativeEmptyEvidenceSurvivesBudgetRefusal(t *testing.T) {
 			}
 			bounded := &boundedAPIAdapter{ProviderAdapter: a, remaining: 65536}
 			p := &APIProvider{config: APIProviderConfig{Adapter: bounded}}
-			_, err = p.completeWithEmptyRecovery(context.Background(), agent.Request{Model: "local", Messages: []agent.Message{agent.NewTextMessage(agent.RoleUser, "perform assigned work")}})
+			_, err = p.completeWithEmptyRecovery(context.Background(), agent.Request{MaxTokens: 2048, Model: "local", Messages: []agent.Message{agent.NewTextMessage(agent.RoleUser, "perform assigned work")}})
 			if !errors.Is(err, errHardTokenGrantExhausted) || calls != 1 || bounded.input != 32000 || bounded.output != 2048 || bounded.remaining != 31488 {
 				t.Fatalf("admission/accounting changed: calls=%d limiter=%+v err=%v", calls, bounded, err)
 			}

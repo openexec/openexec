@@ -45,12 +45,12 @@ func TestNativeNonThinkingRetryAndAccounting(t *testing.T) {
 				return
 			}
 			if mode == "ignored" {
-				if err == nil || !strings.Contains(err.Error(), "ignored non-thinking") || a.calls != 1 || !final.UsageFinal || final.InputTokens+final.OutputTokens != 18432 {
+				if err == nil || !strings.Contains(err.Error(), "ignored non-thinking") || a.calls != 1 || !final.UsageFinal || final.InputTokens+final.OutputTokens != 32768 {
 					t.Fatal("ignored mode was accepted or usage lost", err, final)
 				}
 				return
 			}
-			if err != nil || a.calls != 2 || !final.UsageFinal || final.InputTokens+final.OutputTokens != 36864 {
+			if err != nil || a.calls != 2 || !final.UsageFinal || final.InputTokens+final.OutputTokens != 65536 {
 				t.Fatal(err, a.calls, final)
 			}
 			for _, req := range a.requests {
@@ -59,7 +59,7 @@ func TestNativeNonThinkingRetryAndAccounting(t *testing.T) {
 				}
 			}
 			for _, caps := range a.limits {
-				if caps != [2]int{16384, 2048} {
+				if caps != [2]int{16384, 16384} {
 					t.Fatal("mode changed caps")
 				}
 			}

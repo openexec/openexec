@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "signal": "sig-8a9440cc6148",
+  "status": "report-only; cause unknown; no cause-proven repair or faithful reproduction",
+  "inspection_repository_revision": "7f1692da65e15b6db5f23377fb43340db9fc894d",
+  "private_state_root": "/home/perttu/.agent-console",
+  "privacy": "Allowlisted metadata only; no message bodies, tokens, credentials, response bodies or minimalRequest. File hashes identify private artifacts, not original wire bytes.",
+  "runs": [
+    {
+      "run_id": "377289c1b0a23df3a151553fc69fe67b",
+      "primary": true,
+      "sources": {
+        "capture": {
+          "path_relative_to_private_state_root": "run-requests/377289c1b0a23df3a151553fc69fe67b.json",
+          "file_sha256": "993416b5213e1deeca2e7e526614b37cd41c67d1b619b8d060c7b4aacc007b8f"
+        },
+        "events": {
+          "path_relative_to_private_state_root": "perttu/scratch/20261029T111647Z/events-377289c1b0a23df3a151553fc69fe67b.json",
+          "file_sha256": "b1770c1712c93f26f25c3e27b0feac3235536b6ee36390c9cfb14a019a95f892"
+        },
+        "run": {
+          "path_relative_to_private_state_root": "perttu/scratch/20261029T111647Z/run-377289c1b0a23df3a151553fc69fe67b.json",
+          "file_sha256": "4fb455f883987cb7b9dab4bddb9fe972047064aa2c71d9de198928e83cb4b349"
+        }
+      },
+      "capture": {
+        "version": 1,
+        "provider": "lumi-qwen38-27b",
+        "baseURL": "https://aitta-api.csc.fi/openai/v1",
+        "dispatch": {
+          "method": "POST",
+          "url": "https://aitta-api.csc.fi/openai/v1/chat/completions",
+          "provenance": "source-known-transport-attempt"
+        },
+        "sentAt": "2026-10-29T11:03:28Z",
+        "capturedAt": "2026-10-29T11:05:28Z",
+        "outcome": "failed",
+        "error": "server_error: HTTP error: Post \"https://aitta-api.csc.fi/openai/v1/chat/completions\": context deadline exceeded (Client.Timeout exceeded while awaiting headers) (waited 2m0.029s of 2m0s request timeout; request body 39599 bytes)",
+        "truncated": true,
+        "textLimit": 2000
+      },
+      "request_metadata": {
+        "model": "Qwen/Qwen3.8-27B",
+        "captured_message_roles": [
+          "system",
+          "user",
+          "assistant",
+          "user"
+        ],
+        "captured_message_characters": [
+          2026,
+          25,
+          5,
+          81
+        ],
+        "tool_count": 19,
+        "serialized_body_bytes_from_native_error": 39599,
+        "wait_seconds_from_native_error": 120.029,
+        "effective_timeout_seconds_from_native_error": 120
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "type": "outcome.source.observe",
+          "createdAt": "2026-10-29T11:03:22.357376086Z"
+        },
+        {
+          "sequence": 2,
+          "type": "turn.started",
+          "createdAt": "2026-10-29T11:03:25.48536947Z"
+        },
+        {
+          "sequence": 3,
+          "type": "turn.error",
+          "createdAt": "2026-10-29T11:05:28.9676906Z"
+        },
+        {
+          "sequence": 4,
+          "type": "turn.failed",
+          "createdAt": "2026-10-29T11:05:31.356130533Z"
+        }
+      ],
+      "event_error_equals_capture_error": true,
+      "tool_dispatch_event_count": 0,
+      "historical_executable_attestation": null,
+      "historical_launch_config_attestation": null,
+      "run": {
+        "sessionId": "51b131f680521e2db45cf40a7e2ab811",
+        "mode": "workspace-write",
+        "provenance": "owner",
+        "resolvedModel": "Qwen/Qwen3.8-27B",
+        "status": "failed",
+        "startedAt": "2026-10-29T11:03:24.467997878Z",
+        "finishedAt": "2026-10-29T11:05:31.356130533Z"
+      },
+      "run_error_equals_capture_error": true
+    },
+    {
+      "run_id": "f9a93297a10b6fab17c9bb0c6600a912",
+      "primary": true,
+      "sources": {
+        "capture": {
+          "path_relative_to_private_state_root": "run-requests/f9a93297a10b6fab17c9bb0c6600a912.json",
+          "file_sha256": "3726e541791a676bf339a6891132b58fb82ea3836092b835695080bb364815a7"
+        },
+        "events": {
+          "path_relative_to_private_state_root": "perttu/scratch/20261029T111647Z/events-f9a93297a10b6fab17c9bb0c6600a912.json",
+          "file_sha256": "24cd7e3501dcb816b9aab24b277cda5323e33f4a12c7b32a90cabcded9f79d20"
+        },
+        "run": {
+          "path_relative_to_private_state_root": "perttu/scratch/20261029T111647Z/run-f9a93297a10b6fab17c9bb0c6600a912.json",
+          "file_sha256": "37b069e8b748ba5162e6ca379a1d81933bc0b8aa13ed9a1cf8bf1f4f9f39d51c"
+        }
+      },
+      "capture": {
+        "version": 1,
+        "provider": "lumi-qwen38-27b",
+        "baseURL": "https://aitta-api.csc.fi/openai/v1",
+        "dispatch": {
+          "method": "POST",
+          "url": "https://aitta-api.csc.fi/openai/v1/chat/completions",
+          "provenance": "source-known-transport-attempt"
+        },
+        "sentAt": "2026-10-29T11:10:13Z",
+        "capturedAt": "2026-10-29T11:12:13Z",
+        "outcome": "failed",
+        "error": "server_error: HTTP error: Post \"https://aitta-api.csc.fi/openai/v1/chat/completions\": context deadline exceeded (Client.Timeout exceeded while awaiting headers) (waited 2m0.03s of 2m0s request timeout; request body 39547 bytes)",
+        "truncated": true,
+        "textLimit": 2000
+      },
+      "request_metadata": {
+        "model": "Qwen/Qwen3.8-27B",
+        "captured_message_roles": [
+          "system",
+          "user",
+          "assistant",
+          "user"
+        ],
+        "captured_message_characters": [
+          2026,
+          25,
+          5,
+          29
+        ],
+        "tool_count": 19,
+        "serialized_body_bytes_from_native_error": 39547,
+        "wait_seconds_from_native_error": 120.03,
+        "effective_timeout_seconds_from_native_error": 120
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "type": "outcome.source.observe",
+          "createdAt": "2026-10-29T11:10:04.657629075Z"
+        },
+        {
+          "sequence": 2,
+          "type": "turn.started",
+          "createdAt": "2026-10-29T11:10:08.782051528Z"
+        },
+        {
+          "sequence": 3,
+          "type": "turn.error",
+          "createdAt": "2026-10-29T11:12:13.653632777Z"
+        },
+        {
+          "sequence": 4,
+          "type": "turn.failed",
+          "createdAt": "2026-10-29T11:12:16.170488865Z"
+        }
+      ],
+      "event_error_equals_capture_error": true,
+      "tool_dispatch_event_count": 0,
+      "historical_executable_attestation": null,
+      "historical_launch_config_attestation": null,
+      "run": {
+        "sessionId": "51b131f680521e2db45cf40a7e2ab811",
+        "mode": "workspace-write",
+        "provenance": "owner",
+        "resolvedModel": "Qwen/Qwen3.8-27B",
+        "status": "failed",
+        "startedAt": "2026-10-29T11:10:06.289124892Z",
+        "finishedAt": "2026-10-29T11:12:16.170488865Z"
+      },
+      "run_error_equals_capture_error": true
+    },
+    {
+      "run_id": "9cb9c09f82ec37d3976358fc1972349c",
+      "primary": false,
+      "sources": {
+        "capture": {
+          "path_relative_to_private_state_root": "run-requests/9cb9c09f82ec37d3976358fc1972349c.json",
+          "file_sha256": "d74d4cbad613a3a7ed6f84d45178772180563f0fd6fe1c84763c80474429cfaf"
+        },
+        "events": {
+          "path_relative_to_private_state_root": "watch-20261029T113849Z/run-9cb9c09f82ec37d3976358fc1972349c.json",
+          "file_sha256": "98909fbb15e88d1f7752444a22c93cefc8c34110b2b189320e26c169b2868898"
+        }
+      },
+      "capture": {
+        "version": 1,
+        "provider": "lumi-qwen38-27b",
+        "baseURL": "https://aitta-api.csc.fi/openai/v1",
+        "dispatch": {
+          "method": "POST",
+          "url": "https://aitta-api.csc.fi/openai/v1/chat/completions",
+          "provenance": "source-known-transport-attempt"
+        },
+        "sentAt": "2026-10-29T11:33:21Z",
+        "capturedAt": "2026-10-29T11:35:21Z",
+        "outcome": "failed",
+        "error": "server_error: HTTP error: Post \"https://aitta-api.csc.fi/openai/v1/chat/completions\": context deadline exceeded (Client.Timeout exceeded while awaiting headers) (waited 2m0.028s of 2m0s request timeout; request body 39571 bytes)",
+        "truncated": true,
+        "textLimit": 2000
+      },
+      "request_metadata": {
+        "model": "Qwen/Qwen3.8-27B",
+        "captured_message_roles": [
+          "system",
+          "user",
+          "assistant",
+          "user"
+        ],
+        "captured_message_characters": [
+          2026,
+          25,
+          5,
+          53
+        ],
+        "tool_count": 19,
+        "serialized_body_bytes_from_native_error": 39571,
+        "wait_seconds_from_native_error": 120.028,
+        "effective_timeout_seconds_from_native_error": 120
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "type": "outcome.source.observe",
+          "createdAt": "2026-10-29T11:33:18.82636649Z"
+        },
+        {
+          "sequence": 2,
+          "type": "turn.started",
+          "createdAt": "2026-10-29T11:33:20.050719735Z"
+        },
+        {
+          "sequence": 3,
+          "type": "turn.error",
+          "createdAt": "2026-10-29T11:35:21.307417135Z"
+        },
+        {
+          "sequence": 4,
+          "type": "turn.failed",
+          "createdAt": "2026-10-29T11:35:22.652690603Z"
+        }
+      ],
+      "event_error_equals_capture_error": true,
+      "tool_dispatch_event_count": 0,
+      "historical_executable_attestation": null,
+      "historical_launch_config_attestation": null,
+      "persisted_run_record_inspected": false
+    },
+    {
+      "run_id": "3c538a9fc9716d51bff31689b9b7250f",
+      "primary": false,
+      "sources": {
+        "capture": {
+          "path_relative_to_private_state_root": "run-requests/3c538a9fc9716d51bff31689b9b7250f.json",
+          "file_sha256": "1a42063e753eb65484ec67b3c08315beff18cc2899e4a5a6540792380b0b2710"
+        },
+        "events": {
+          "path_relative_to_private_state_root": "watch-20261029T113849Z/run-3c538a9fc9716d51bff31689b9b7250f.json",
+          "file_sha256": "f53ef28a57f1cf2726ae63e9fededd251da064ff9f85783cd7e0d0cdbaae4782"
+        }
+      },
+      "capture": {
+        "version": 1,
+        "provider": "lumi-gpt-oss",
+        "baseURL": "https://aitta-api.csc.fi/openai/v1",
+        "dispatch": {
+          "method": "POST",
+          "url": "https://aitta-api.csc.fi/openai/v1/chat/completions",
+          "provenance": "source-known-transport-attempt"
+        },
+        "sentAt": "2026-10-29T11:36:16Z",
+        "capturedAt": "2026-10-29T11:38:16Z",
+        "outcome": "failed",
+        "error": "server_error: HTTP error: Post \"https://aitta-api.csc.fi/openai/v1/chat/completions\": context deadline exceeded (Client.Timeout exceeded while awaiting headers) (waited 2m0.03s of 2m0s request timeout; request body 39485 bytes)",
+        "truncated": true,
+        "textLimit": 2000
+      },
+      "request_metadata": {
+        "model": "openai/gpt-oss-120b",
+        "captured_message_roles": [
+          "system",
+          "user"
+        ],
+        "captured_message_characters": [
+          2026,
+          57
+        ],
+        "tool_count": 19,
+        "serialized_body_bytes_from_native_error": 39485,
+        "wait_seconds_from_native_error": 120.03,
+        "effective_timeout_seconds_from_native_error": 120
+      },
+      "events": [
+        {
+          "sequence": 1,
+          "type": "outcome.source.observe",
+          "createdAt": "2026-10-29T11:36:13.114398374Z"
+        },
+        {
+          "sequence": 2,
+          "type": "turn.started",
+          "createdAt": "2026-10-29T11:36:14.284350479Z"
+        },
+        {
+          "sequence": 3,
+          "type": "turn.error",
+          "createdAt": "2026-10-29T11:38:16.653203125Z"
+        },
+        {
+          "sequence": 4,
+          "type": "turn.failed",
+          "createdAt": "2026-10-29T11:38:18.351937602Z"
+        }
+      ],
+      "event_error_equals_capture_error": true,
+      "tool_dispatch_event_count": 0,
+      "historical_executable_attestation": null,
+      "historical_launch_config_attestation": null,
+      "persisted_run_record_inspected": false
+    }
+  ],
+  "replay": {
+    "sources": {
+      "safe_summary": {
+        "path_relative_to_private_state_root": "perttu/scratch/20261029T111647Z/replay-new-summary.json",
+        "file_sha256": "769064b4fbb15fe8b190e1f6f9050b3f52a877a65c6b6edeb5e117bf7d335128"
+      },
+      "private_result": {
+        "path_relative_to_private_state_root": "perttu/scratch/20261029T111647Z/replay-new.private.json",
+        "file_sha256": "e6565ee30c3585913fbe2d53a15c1f52c163260d81f98018b11cb288c58f0bf5"
+      }
+    },
+    "supervisor_reported_timeout_seconds": 120,
+    "supervisor_reported_budget": 1,
+    "supervisor_reported_route": "same configured endpoint/model; authenticated",
+    "safe_summary": {
+      "target": {
+        "cls": "timeout",
+        "message": "server_error: http error: post \"<url> context deadline exceeded (client.timeout exceeded while awaiting headers) (waited"
+      },
+      "reproduced": false,
+      "partial": false,
+      "requests": 1,
+      "first": {
+        "outcome": "fail",
+        "signature": {
+          "cls": "timeout",
+          "message": "http error: request timed out after #.#s"
+        }
+      },
+      "shape": {
+        "parameters": {
+          "model": "Qwen/Qwen3.8-27B",
+          "tool_choice": "auto"
+        },
+        "messages": [
+          "system (2026 chars)",
+          "user (25 chars)",
+          "assistant (5 chars)",
+          "user (29 chars)"
+        ],
+        "tools": [
+          "read_file",
+          "search_files",
+          "list_directory",
+          "write_file",
+          "approval_prompt",
+          "run_command",
+          "request_owner_decision",
+          "inspect_repository",
+          "observe_current_outcome",
+          "record_goal_relationship",
+          "record_route_judgment",
+          "list_route_judgments",
+          "record_route_result",
+          "git_push",
+          "advance_feature_candidate",
+          "request_feature_review",
+          "resolve_feature_review",
+          "merge_reviewed_feature",
+          "deploy_reviewed_feature"
+        ]
+      },
+      "seconds": 120.2
+    },
+    "reduction_attempts": 0,
+    "passing_single_changes": 0,
+    "original_wire_body_hash": null,
+    "replay_wire_body_hash": null,
+    "replay_wire_body_bytes": null,
+    "phase_timings": null,
+    "executable_attestation": null,
+    "replayer_source_attestation_in_result": null,
+    "pinned_comparator_source_sha256": "544bad733f239a063d7f1871e2175fd495ead1d194d3e19d141fdc6dda5b9195"
+  }
+}

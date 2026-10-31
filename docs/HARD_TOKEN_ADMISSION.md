@@ -56,3 +56,42 @@ The historical-sequence regression proves two requests, 47,462 finalized tokens
 and no third request, including the empty-response recovery path. Removing the
 admission guard makes it fail. Agent and execution package suites passed.
 This is local repair evidence, not deployment or a new successful live request.
+
+## Reply room for native planning
+
+Thinking models share their output allowance between reasoning and the visible
+answer. A fixed 2,048-token allowance caused native planning to return reasoning
+without a task plan; the one empty-answer recovery then repeated the same cap.
+
+The bounded executor now reserves output up to its admitted context ceiling
+(currently at most 65,536 tokens), within the original remaining total grant.
+An explicit request `MaxTokens` remains a restrictive ceiling. Native context
+preflight reduces output to leave room for the complete assembled prompt before
+any inference is submitted. The input context stays stable, and only unused
+capacity from an unsubmitted preparation is returned. A dispatched refusal is
+never retried or refunded by this preparation step. Exact duplicate-result
+compaction keeps the same admission checks.
+
+The execution tests cover a native task-plan response after more than 2,048
+output tokens, caller limits, scarce remaining capacity, stable input context,
+unsubmitted preparation refunds and retained reservations after dispatched
+failures. These controls establish bounded allocation; a production Goal still
+requires its own persisted task plan and independent completion evidence.
+
+### Reply allowance and observed prompt counts
+
+The bounded native planner adjusts `options.num_predict` to leave room for
+the complete prompt. That output allowance does not change prompt tokenization.
+An append-only request can reuse its successful native prefix count when only
+`num_predict` changes; the new reply allowance still participates in admission.
+Model, tools, system text, prefix bytes, input context and all other options
+remain bound to the observation. Unique source content is retained. Native
+`truncate=false`, cumulative reservations and reported usage remain authoritative.
+
+Regression: `TestNativeObservationSurvivesReplyAllowanceChange` exercises the
+native HTTP protocol, including refusal of a reply that cannot fit.
+`TestReplyAllowanceChangePreservesNativeToolProgress` exercises bounded
+read → draft write → completion, reopens the saved draft and checks exact native
+usage. Both fail when output normalization is removed. This fixture isolates
+the invalidation found while investigating Solar's original context failures;
+it does not establish that those real failures or the whole Goal are repaired.
