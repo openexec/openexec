@@ -117,7 +117,7 @@ reported truncated optional reach; no expectation was waived or hidden by a
 bound. Corpus SHA-256:
 `1c05a3b070b9a90baaf2da7420dc6161cbb6e994def201881a6cfb8a6ec37b86`.
 Building the Console replay printed this warning and still exited 0:
-`go: writing stat cache: open /home/perttu/go/pkg/mod/cache/download/github.com/openexec/agent-console/@v/v0.177.10-0.20261029112657-c727ba1e4409.info132048178.tmp: read-only file system`.
+`go: writing stat cache: open [module-cache]/github.com/openexec/agent-console/@v/v0.177.10-0.20261029112657-c727ba1e4409.info132048178.tmp: read-only file system` (local cache prefix redacted).
 
 The following focused checks also executed successfully:
 

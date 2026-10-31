@@ -7,12 +7,118 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/openexec/openexec/internal/knowledge"
 	statepkg "github.com/openexec/openexec/pkg/db/state"
 )
+
+// Runs the same Cobra scan entry point as the external CLI, with no package
+// observer. The synthetic child fails; evidence must survive lexical fallback.
+func TestKnowledgeGraphScanPrivateCompilerCapture(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX child fixture")
+	}
+	root, bin, capture := t.TempDir(), t.TempDir(), t.TempDir()
+	if err := os.Chmod(capture, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	compilerDir := filepath.Join(root, "node_modules", "typescript", "lib")
+	if err := os.MkdirAll(compilerDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for path, body := range map[string]string{
+		filepath.Join(root, "a.ts"):                 "export const PRIVATE_SOURCE = 1\n",
+		filepath.Join(compilerDir, "typescript.js"): "// synthetic compiler\n",
+		filepath.Join(bin, "node"):                  "#!/bin/sh\ncase \"$1\" in -e) printf 22; exit;; --version) echo v22.0.0; exit;; -p) echo 5.8.3; exit;; esac\ncat > \"$TS_TEST_STDIN\"\necho PRIVATE_STDERR >&2\nexit 3\n",
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("OPENEXEC_TS_COMPILER_CAPTURE_DIR", capture)
+	t.Setenv("TS_TEST_STDIN", filepath.Join(bin, "consumed.json"))
+	oldDirectory, oldJSON := graphDirectory, graphJSON
+	oldDepth, oldFiles := graphImpactDepth, graphImpactFiles
+	oldOut, oldErr := rootCmd.OutOrStdout(), rootCmd.ErrOrStderr()
+	t.Cleanup(func() {
+		graphDirectory, graphJSON = oldDirectory, oldJSON
+		graphImpactDepth, graphImpactFiles = oldDepth, oldFiles
+		rootCmd.SetOut(oldOut)
+		rootCmd.SetErr(oldErr)
+		rootCmd.SetArgs(nil)
+	})
+	var output bytes.Buffer
+	rootCmd.SetOut(&output)
+	rootCmd.SetErr(&output)
+	rootCmd.SetArgs([]string{"knowledge", "graph", "scan", "--directory", root, "--json"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var scan knowledge.ScanResult
+	if err := json.Unmarshal(output.Bytes(), &scan); err != nil {
+		t.Fatal(err)
+	}
+	if scan.Generation.Capabilities["typescript.definitions"] != "static_lexical" || !strings.Contains(strings.Join(scan.Limitations, "\n"), "exit status 3") {
+		t.Fatal("CLI hid compiler failure")
+	}
+	entries, err := os.ReadDir(capture)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("ordinary CLI scan did not capture: %v %v", entries, err)
+	}
+	dir := filepath.Join(capture, entries[0].Name())
+	request, err := os.ReadFile(filepath.Join(dir, "request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumed, err := os.ReadFile(filepath.Join(bin, "consumed.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(request, consumed) {
+		t.Fatal("CLI capture is not actual stdin")
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "result.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		Child struct {
+			Ending string `json:"ending"`
+			Bound  string `json:"extractor_bound"`
+			Exit   int    `json:"exit_code"`
+		} `json:"child"`
+	}
+	if err := json.Unmarshal(b, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Child.Ending != "ordinary_nonzero_exit" || result.Child.Exit != 3 || result.Child.Bound != "45s" {
+		t.Fatalf("bad actual CLI result: %s", b)
+	}
+	if bytes.Contains(b, []byte("PRIVATE_STDERR")) || bytes.Contains(b, []byte("PRIVATE_SOURCE")) {
+		t.Fatal("private body captured")
+	}
+	output.Reset()
+	rootCmd.SetArgs([]string{"knowledge", "graph", "impact", "--directory", root, "--files", "a.ts", "--max-depth", "1", "--json"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var impact knowledge.ChangedImpactResponse
+	if err := json.Unmarshal(output.Bytes(), &impact); err != nil {
+		t.Fatal(err)
+	}
+	if impact.Provenance.GraphVersion != scan.Generation.ID {
+		t.Fatal("CLI fallback graph did not round-trip")
+	}
+	entries, err = os.ReadDir(capture)
+	if err != nil || len(entries) != 1 {
+		t.Fatal("reopen unexpectedly rescanned")
+	}
+
+}
 
 type recordingRepositoryContextPublisher struct {
 	called     bool
