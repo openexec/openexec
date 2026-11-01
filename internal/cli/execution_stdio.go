@@ -28,6 +28,7 @@ import (
 // answering as though the conversation had just begun.
 const (
 	executionProtocolVersion       = 3
+	executionProtocolBoundRoots    = 4
 	executionProtocolVersionReplay = 2
 	executionProtocolVersionLegacy = 1
 )
@@ -241,9 +242,19 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		return fmt.Errorf("decode execution request: %w", err)
 	}
 	switch request.Version {
-	case executionProtocolVersion, executionProtocolVersionReplay, executionProtocolVersionLegacy:
+	case executionProtocolBoundRoots, executionProtocolVersion, executionProtocolVersionReplay, executionProtocolVersionLegacy:
 	default:
 		return fmt.Errorf("unsupported execution protocol version %d", request.Version)
+	}
+	if request.Operation == "execute" && request.Request != nil {
+		roots := request.Request.ReadableRoots
+		identities := request.Request.ReadableRootIdentities
+		if request.Version == executionProtocolBoundRoots && (len(roots) == 0 || len(roots) != len(identities)) {
+			return fmt.Errorf("protocol version 4 requires an identity for every readable root")
+		}
+		if request.Version != executionProtocolBoundRoots && len(identities) > 0 {
+			return fmt.Errorf("readable root identities require protocol version 4")
+		}
 	}
 	// Reply in the requester's version. This lets v1/v2 callers keep working
 	// while a v3 caller can require the new capability contract. Unknown fields
@@ -283,6 +294,12 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		return err
 	}
 	descriptor := provider.Descriptor()
+	if request.Version == executionProtocolBoundRoots && request.Operation == "execute" {
+		bound, ok := provider.(interface{ BoundReadableRootsAvailable() bool })
+		if !ok || !bound.BoundReadableRootsAvailable() {
+			return fmt.Errorf("provider cannot enforce bound readable roots")
+		}
+	}
 	switch request.Operation {
 	case "describe":
 		// The terminal contract belongs to this v3 transport, not to a provider

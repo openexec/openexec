@@ -141,6 +141,14 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	}
 }
 
+// BoundReadableRootsAvailable is the protocol's fail-closed feature check.
+func (p *APIProvider) BoundReadableRootsAvailable() bool {
+	_, ok := p.config.ToolExecutor.(interface {
+		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+	})
+	return ok && ReadableRootIdentitySupported()
+}
+
 func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 	models := p.config.Adapter.GetModels()
 	if len(models) == 0 {
@@ -171,17 +179,21 @@ func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSi
 	// them alive until this invocation ends, including retries and synthesis.
 	copy := *p
 	run := &copy
-	if len(request.ReadableRoots) > 0 {
+	if len(request.ReadableRootIdentities) > 0 && len(request.ReadableRoots) > 0 {
 		if pinner, ok := p.config.ToolExecutor.(interface {
-			pinReadableRoots([]string) (ToolExecutor, func(), error)
+			pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
 		}); ok {
-			executor, closeRoots, err := pinner.pinReadableRoots(request.ReadableRoots)
+			executor, closeRoots, err := pinner.pinReadableRoots(request.ReadableRoots, request.ReadableRootIdentities)
 			if err != nil {
 				return Result{}, err
 			}
 			defer closeRoots()
 			run.config.ToolExecutor = executor
+		} else if len(request.ReadableRootIdentities) > 0 {
+			return Result{}, errors.New("tool executor cannot bind readable root identities")
 		}
+	} else if len(request.ReadableRootIdentities) > 0 {
+		return Result{}, errors.New("readable root identities without roots")
 	}
 	if trace := newRunTrace(); trace != nil {
 		traced := *run

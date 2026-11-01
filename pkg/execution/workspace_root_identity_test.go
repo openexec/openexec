@@ -1,3 +1,5 @@
+//go:build linux || darwin
+
 package execution
 
 import (
@@ -48,8 +50,16 @@ func TestAPIWorkspaceReadableRootStaysBoundAfterAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			info, err := os.Stat(sibling)
+			if err != nil {
+				t.Fatal(err)
+			}
+			identity, err := ReadableRootIdentityOf(sibling, info)
+			if err != nil {
+				t.Fatal(err)
+			}
 			var toolOutput string
-			result, err := p.Execute(context.Background(), Request{ID: "scope", WorkingDir: working, Prompt: "read witness", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{sibling}}, func(event Event) error {
+			result, err := p.Execute(context.Background(), Request{ID: "scope", WorkingDir: working, Prompt: "read witness", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{sibling}, ReadableRootIdentities: []ReadableRootIdentity{identity}}, func(event Event) error {
 				if event.Type == EventStarted && scenario.swap {
 					if err := os.Rename(sibling, sibling+"-old"); err != nil {
 						return err
@@ -91,7 +101,51 @@ func TestAPIWorkspaceRefusesSymlinkAtAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.Execute(context.Background(), Request{ID: "refuse", WorkingDir: target, Prompt: "read", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{alias}}, nil); err == nil {
+	info, err := os.Stat(alias)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := ReadableRootIdentityOf(alias, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Execute(context.Background(), Request{ID: "refuse", WorkingDir: target, Prompt: "read", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{alias}, ReadableRootIdentities: []ReadableRootIdentity{identity}}, nil); err == nil {
 		t.Fatal("symlink admitted as a registered root")
+	}
+}
+
+func TestAPIWorkspaceRefusesRootReplacedBetweenCallerAndAdmission(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := filepath.Join(base, "selected")
+	other := filepath.Join(base, "other")
+	for _, path := range []string{selected, other} {
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	info, err := os.Stat(selected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := ReadableRootIdentityOf(selected, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(selected, selected+"-old"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(other, selected); err != nil {
+		t.Fatal(err)
+	}
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{}, ToolExecutor: NewWorkspaceToolExecutor()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.Execute(context.Background(), Request{WorkingDir: base, Prompt: "read", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{selected}, ReadableRootIdentities: []ReadableRootIdentity{identity}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "changed since caller admission") {
+		t.Fatalf("replacement not rejected: %v", err)
 	}
 }
