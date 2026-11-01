@@ -34,7 +34,7 @@ func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolReq
 	if input.Text == "" || strings.ContainsAny(input.Text, "\r\n") {
 		return "", errors.New("text must be a non-empty single-line literal")
 	}
-	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		var out strings.Builder
 		entries, remaining := 0, maxSearchBytes
 		incomplete := false
