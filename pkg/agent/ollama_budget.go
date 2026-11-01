@@ -221,7 +221,6 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 	if !data.Done || data.Prompt == nil || data.Output == nil || *data.Prompt < 0 || *data.Output < 0 || (inputCap > 0 && (*data.Prompt > inputCap || *data.Output > outputCap)) {
 		return nil, fmt.Errorf("bounded local inference returned invalid usage")
 	}
-	p.observeNativeContext(body, *data.Prompt)
 	result := &Response{Model: req.Model, Usage: Usage{PromptTokens: *data.Prompt, CompletionTokens: *data.Output, TotalTokens: *data.Prompt + *data.Output}, Metadata: map[string]any{"thinking": data.Message.Thinking}}
 	// Whitelist native reasons: an unexpected provider string is not safe
 	// diagnostic text and must never escape into an owner-visible error.
@@ -249,5 +248,26 @@ func (p *OpenAIProvider) completeLocalOllama(ctx context.Context, req Request, i
 	for i, c := range data.Message.Calls {
 		result.Content = append(result.Content, ContentBlock{Type: ContentTypeToolUse, ToolUseID: fmt.Sprintf("bounded-%d-%d", time.Now().UnixNano(), i), ToolName: c.Function.Name, ToolInput: c.Function.Arguments})
 	}
+	// Bind native generated-token usage to the exact next serialized assistant
+	// message, not to caller-supplied metadata. Match the native request's JSON
+	// normalization of tool arguments; invalid arguments get no output credit.
+	observedMessage := map[string]any{"role": "assistant", "content": data.Message.Content, "thinking": data.Message.Thinking}
+	observedCalls := []map[string]any{}
+	for _, c := range data.Message.Calls {
+		var args map[string]any
+		if json.Unmarshal(c.Function.Arguments, &args) != nil {
+			observedMessage = nil
+			break
+		}
+		observedCalls = append(observedCalls, map[string]any{"function": map[string]any{"name": c.Function.Name, "arguments": args}})
+	}
+	var outputMessage []byte
+	if observedMessage != nil {
+		if len(observedCalls) > 0 {
+			observedMessage["tool_calls"] = observedCalls
+		}
+		outputMessage, _ = json.Marshal(observedMessage)
+	}
+	p.observeNativeContext(body, *data.Prompt, outputMessage, *data.Output)
 	return result, nil
 }

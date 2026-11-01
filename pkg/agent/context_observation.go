@@ -9,9 +9,11 @@ import (
 // hashes rather than another copy of owner text or tool results. Only native
 // successful usage can establish the baseline; estimates never become usage.
 type nativeContextObservation struct {
-	shape    [32]byte
-	messages [][32]byte
-	tokens   int
+	shape         [32]byte
+	messages      [][32]byte
+	tokens        int
+	outputMessage [32]byte
+	outputTokens  int
 }
 
 func nativeContextShape(body []byte) ([32]byte, []json.RawMessage, bool) {
@@ -34,12 +36,13 @@ func nativeContextShape(body []byte) ([32]byte, []json.RawMessage, bool) {
 	return sha256.Sum256(shape), messages, err == nil
 }
 
-func (p *OpenAIProvider) observeNativeContext(body []byte, tokens int) {
+func (p *OpenAIProvider) observeNativeContext(body []byte, tokens int, outputMessage []byte, outputTokens int) {
 	shape, messages, ok := nativeContextShape(body)
 	if !ok || tokens <= 0 {
 		return
 	}
-	o := &nativeContextObservation{shape: shape, tokens: tokens}
+	o := &nativeContextObservation{shape: shape, tokens: tokens,
+		outputMessage: sha256.Sum256(outputMessage), outputTokens: outputTokens}
 	for _, message := range messages {
 		o.messages = append(o.messages, sha256.Sum256(message))
 	}
@@ -66,11 +69,17 @@ func (p *OpenAIProvider) admitObservedContext(body []byte, inputCap, outputCap, 
 			}
 		}
 		if unchanged {
-			// The retained prefix has a native count. Charge every serialized
-			// added byte as a token, plus framing slack. This includes thinking,
-			// tool arguments/results and escaping; no content is discarded.
+			// The retained prefix has a native count. Only its exact returned
+			// assistant message may reuse the observed output count, including
+			// reasoning and tool calls. Edited/generated elsewhere messages and
+			// unique tool results retain the byte bound. Nothing is discarded.
 			appended := o.tokens + 256
-			for _, message := range wireMessages[len(o.messages):] {
+			added := wireMessages[len(o.messages):]
+			if o.outputTokens > 0 && sha256.Sum256(added[0]) == o.outputMessage {
+				appended += o.outputTokens + 32
+				added = added[1:]
+			}
+			for _, message := range added {
 				appended += len(message) + 32
 			}
 			if appended < estimate {
