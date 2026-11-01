@@ -4,6 +4,19 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Empty-response recovery prefix, 2026-11-01] Natural Solar cbb0308c failed
+  after a native reasoning-only response used 33573 input tokens. Its private
+  complete trace shows the recovery inserted a system instruction ahead of
+  the identical 77-message history, invalidating native prefix observation;
+  conservative admission then refused 83586 estimated tokens before HTTP.
+  Append the existing recovery instruction as a user message instead, retaining
+  system authority and reusing native append admission within the same grant.
+  Real serializer/limiter fixtures reproduce this refusal with the fix removed
+  and pass with it, including useful output, native accounting, second-empty
+  failure, private-reasoning exclusion and Stop. Captured text is private and
+  redacted; fixtures are synthetic, not original Solar recovery. No new state,
+  transitions, loops, owner decisions, model settings or resource grants.
+
 - [Local tool-history context boundary, 2026-10-28] Real Console run c691396f
   had a plain user query but failed in Ollama's chat template after its preceding
   request used 130275 of 131072 context tokens. A synthetic tool-history control
