@@ -13,6 +13,24 @@ import (
 	"github.com/openexec/openexec/pkg/agent"
 )
 
+// Reuse each call position's ID on later rounds, as compatible endpoints may.
+// Calls within the same round still have distinct IDs and can be associated.
+type reusedIDNativeAdapter struct{ *agent.OpenAIProvider }
+
+func (a *reusedIDNativeAdapter) CompleteBounded(ctx context.Context, req agent.Request, input, output int) (*agent.Response, error) {
+	response, err := a.OpenAIProvider.CompleteBounded(ctx, req, input, output)
+	if err == nil && response != nil {
+		index := 0
+		for i := range response.Content {
+			if response.Content[i].Type == agent.ContentTypeToolUse {
+				response.Content[i].ToolUseID = fmt.Sprintf("reused-%d", index)
+				index++
+			}
+		}
+	}
+	return response, err
+}
+
 // This is a synthetic control, not a replay of the truncated Solar capture.
 // It uses the real workspace search and native admission, with a scripted local
 // endpoint and synthetic, distinct files. It intentionally gives the current
@@ -49,17 +67,26 @@ func TestSearchHeavyNativeAdmissionRefusesWithoutSafeCompaction(t *testing.T) {
 		}
 		return map[string]any{"done": true, "prompt_eval_count": n * 7000, "eval_count": 100, "message": map[string]any{"tool_calls": toolCalls}}
 	})
-	p, err := NewAPIProvider(APIProviderConfig{Adapter: newNativeProvider(t, server.URL), ToolExecutor: NewWorkspaceToolExecutor(), Tools: WorkspaceTools(Sandbox{Mode: SandboxReadOnly}), MaxSteps: 6})
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: &reusedIDNativeAdapter{newNativeProvider(t, server.URL)}, ToolExecutor: NewWorkspaceToolExecutor(), Tools: WorkspaceTools(Sandbox{Mode: SandboxReadOnly}), MaxSteps: 6})
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := p.Execute(context.Background(), Request{ID: "synthetic-search", WorkingDir: root, Prompt: "Inspect the evidence and advance the original task.", System: "Owner: never deploy without review.", Model: "local", Sandbox: Sandbox{Mode: SandboxReadOnly}, TokenBudget: 250000, ContextTokenLimit: 32768}, nil)
+	ids := map[string]int{}
+	result, err := p.Execute(context.Background(), Request{ID: "synthetic-search", WorkingDir: root, Prompt: "Inspect the evidence and advance the original task.", System: "Owner: never deploy without review.", Model: "local", Sandbox: Sandbox{Mode: SandboxReadOnly}, TokenBudget: 250000, ContextTokenLimit: 32768}, func(e Event) error {
+		if e.Type == EventToolCompleted {
+			ids[e.CallID]++
+		}
+		return nil
+	})
 	var overflow *agent.ContextOverflowError
 	if !errors.As(err, &overflow) || overflow.Dispatched || result.Outcome != OutcomeFailed {
 		t.Fatalf("expected pre-dispatch context refusal: result=%+v err=%v", result, err)
 	}
 	if calls < 2 || len(*seen) != calls {
 		t.Fatalf("expected multiple admitted rounds: calls=%d seen=%d", calls, len(*seen))
+	}
+	if ids["reused-0"] < 2 {
+		t.Fatalf("expected a tool-call ID reused across rounds: %v", ids)
 	}
 	last, _ := json.Marshal((*seen)[len(*seen)-1])
 	if !strings.Contains(string(last), "Never deploy without review") || !strings.Contains(string(last), "needle Instruction: preserve the original authority") || !strings.Contains(string(last), "file-00") {
