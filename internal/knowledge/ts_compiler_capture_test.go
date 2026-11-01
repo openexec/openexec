@@ -13,6 +13,37 @@ import (
 	"time"
 )
 
+type compilerReplayIdentity struct {
+	Manifest ScanManifest `json:"source_manifest"`
+	Node     string       `json:"node_sha256"`
+	Compiler string       `json:"typescript_sha256"`
+}
+
+// Report every failed comparison, without filenames, paths, hashes or bodies.
+// This is the existing replay admission rule, split for diagnosis. It does not
+// establish the historical mismatches of an older, combined refusal.
+func compilerReplayIdentityDifferences(manifest ScanManifest, identity compilerReplayIdentity, r nativeChildRecord) []string {
+	var differences []string
+	for _, comparison := range []struct {
+		name string
+		same bool
+	}{
+		{"manifest.inputs", reflect.DeepEqual(manifest.Inputs, identity.Manifest.Inputs)},
+		{"manifest.manifest_hash", manifest.ManifestHash == identity.Manifest.ManifestHash},
+		{"manifest.worktree_state_hash", manifest.WorktreeStateHash == identity.Manifest.WorktreeStateHash},
+		{"manifest.configuration_digest", manifest.ConfigurationDigest == identity.Manifest.ConfigurationDigest},
+		{"identity.node_sha256/result.node_sha256", identity.Node == r.NodeSHA256},
+		{"identity.typescript_sha256/result.typescript_sha256", identity.Compiler == r.CompilerSHA256},
+		{"current.node_sha256/result.node_sha256", captureFileHash(r.Arguments[0]) == r.NodeSHA256},
+		{"current.typescript_sha256/result.typescript_sha256", captureFileHash(r.Arguments[2]) == r.CompilerSHA256},
+	} {
+		if !comparison.same {
+			differences = append(differences, comparison.name)
+		}
+	}
+	return differences
+}
+
 // Reuses the native driver's ONE identical-stdin replay. It never scans and
 // refuses a changed source/toolchain/script or an already attempted replay.
 func replayPrivateCompilerCapture(t *testing.T, dir string) nativeChildRecord {
@@ -36,11 +67,7 @@ func replayPrivateCompilerCapture(t *testing.T, dir string) nativeChildRecord {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var identity struct {
-		Manifest ScanManifest `json:"source_manifest"`
-		Node     string       `json:"node_sha256"`
-		Compiler string       `json:"typescript_sha256"`
-	}
+	var identity compilerReplayIdentity
 	b, err = os.ReadFile(filepath.Join(dir, "identity.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -55,8 +82,8 @@ func replayPrivateCompilerCapture(t *testing.T, dir string) nativeChildRecord {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(manifest, identity.Manifest) || identity.Node != r.NodeSHA256 || identity.Compiler != r.CompilerSHA256 || captureFileHash(r.Arguments[0]) != r.NodeSHA256 || captureFileHash(r.Arguments[2]) != r.CompilerSHA256 {
-		t.Fatal("source/configuration/toolchain changed; refusing misleading replay")
+	if differences := compilerReplayIdentityDifferences(manifest, identity, r); len(differences) != 0 {
+		t.Fatalf("source/configuration/toolchain changed (%s); refusing misleading replay", strings.Join(differences, ", "))
 	}
 	// Reserve before launching: a second invocation must not repeat the probe.
 	c := &compilerCapture{dir: dir}
@@ -330,4 +357,115 @@ cat >/dev/null; printf '{"configuration":"fixture","files":[]}'`)
 	if err == nil || !bytes.Contains(out, []byte("file exists")) {
 		t.Fatalf("repeated replay allowed: %v %s", err, out)
 	}
+}
+
+// Drive the public test executable entry point: each refusal must happen before
+// the exclusive replay reservation AND before executing the child. The fixture
+// is synthetic; none of these runs uses the retained natural Console capture.
+func TestCompilerPrivateCaptureReplayComparisonDetails(t *testing.T) {
+	root := fakeNodeExtractor(t, `if [ "$1" = "--version" ]; then echo v22; exit; fi
+if [ "$1" = "-p" ]; then echo 5.8.3; exit; fi
+cat >/dev/null; touch "$3/launched"; printf '{"configuration":"fixture","files":[]}'`)
+	writeTestFile(t, root, "PRIVATE_SOURCE.ts", "export const PRIVATE_BODY = 1\n")
+	writeTestFile(t, root, "tsconfig.json", `{"include":["PRIVATE_SOURCE.ts"]}`)
+	parent := privateCaptureParent(t)
+	t.Setenv(compilerCaptureEnv, parent)
+	if _, _, _, err := extractTypeScriptWithCompiler(t.Context(), root, []string{"PRIVATE_SOURCE.ts"}); err != nil {
+		t.Fatal(err)
+	}
+	dir, record := readPrivateCapture(t, parent)
+	if err := os.Remove(filepath.Join(root, "launched")); err != nil {
+		t.Fatal(err)
+	}
+	identityPath := filepath.Join(dir, "identity.json")
+	identityBytes, err := os.ReadFile(identityPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*testing.T, *compilerReplayIdentity)
+		want   []string
+	}{
+		{"inputs", func(t *testing.T, i *compilerReplayIdentity) { i.Manifest.Inputs[0].Size++ }, []string{"manifest.inputs"}},
+		{"manifest_hash", func(t *testing.T, i *compilerReplayIdentity) { i.Manifest.ManifestHash = "PRIVATE_HASH" }, []string{"manifest.manifest_hash"}},
+		{"worktree_state", func(t *testing.T, i *compilerReplayIdentity) { i.Manifest.WorktreeStateHash = "PRIVATE_HASH" }, []string{"manifest.worktree_state_hash"}},
+		{"configuration_digest", func(t *testing.T, i *compilerReplayIdentity) { i.Manifest.ConfigurationDigest = "PRIVATE_HASH" }, []string{"manifest.configuration_digest"}},
+		{"node_record", func(t *testing.T, i *compilerReplayIdentity) { i.Node = "PRIVATE_HASH" }, []string{"identity.node_sha256/result.node_sha256"}},
+		{"compiler_record", func(t *testing.T, i *compilerReplayIdentity) { i.Compiler = "PRIVATE_HASH" }, []string{"identity.typescript_sha256/result.typescript_sha256"}},
+		{"node_file", func(t *testing.T, i *compilerReplayIdentity) { appendReplayToolchainFixture(t, record.Arguments[0]) }, []string{"current.node_sha256/result.node_sha256"}},
+		{"compiler_file", func(t *testing.T, i *compilerReplayIdentity) { appendReplayToolchainFixture(t, record.Arguments[2]) }, []string{"current.typescript_sha256/result.typescript_sha256"}},
+		{"source_drift", func(t *testing.T, i *compilerReplayIdentity) {
+			writeTestFile(t, root, "PRIVATE_SOURCE.ts", "export const PRIVATE_BODY = 2\n")
+			t.Cleanup(func() { writeTestFile(t, root, "PRIVATE_SOURCE.ts", "export const PRIVATE_BODY = 1\n") })
+		}, []string{"manifest.inputs", "manifest.manifest_hash", "manifest.worktree_state_hash"}},
+		{"configuration_drift", func(t *testing.T, i *compilerReplayIdentity) {
+			writeTestFile(t, root, "tsconfig.json", `{"include":["PRIVATE_SOURCE.ts"],"compilerOptions":{"noEmit":true}}`)
+			t.Cleanup(func() { writeTestFile(t, root, "tsconfig.json", `{"include":["PRIVATE_SOURCE.ts"]}`) })
+		}, []string{"manifest.inputs", "manifest.manifest_hash", "manifest.worktree_state_hash", "manifest.configuration_digest"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var identity compilerReplayIdentity
+			if err := json.Unmarshal(identityBytes, &identity); err != nil {
+				t.Fatal(err)
+			}
+			tc.change(t, &identity)
+			b, err := json.Marshal(identity)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(identityPath, b, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := os.WriteFile(identityPath, identityBytes, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			})
+			out, err := exec.Command(executable, "-test.run=^TestConsoleNativeRequestCapture$", "-compiler-private-capture="+dir).CombinedOutput()
+			if err == nil || !strings.Contains(string(out), "changed ("+strings.Join(tc.want, ", ")+"); refusing misleading replay") {
+				t.Fatalf("missing exact comparison details: err=%v output=%s", err, out)
+			}
+			if bytes.Contains(out, []byte("PRIVATE_")) || bytes.Contains(out, []byte(root)) || bytes.Contains(out, []byte(record.NodeSHA256)) || bytes.Contains(out, []byte(record.CompilerSHA256)) {
+				t.Fatal("refusal leaked private identity values")
+			}
+			for _, name := range []string{filepath.Join(dir, "replay.json"), filepath.Join(root, "launched")} {
+				if _, err := os.Stat(name); !os.IsNotExist(err) {
+					t.Fatal("refused replay reserved or launched")
+				}
+			}
+		})
+	}
+	// Near miss: mtime alone is not an identity difference. Unchanged bytes
+	// must still reach the existing replay driver and decode its child response.
+	if err := os.Chtimes(filepath.Join(root, "PRIVATE_SOURCE.ts"), time.Now(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	r := replayPrivateCompilerCapture(t, dir)
+	if !r.ResponseDecoded || r.Ending != "exit_0" {
+		t.Fatal("unchanged content refused")
+	}
+	if _, err := os.Stat(filepath.Join(root, "launched")); err != nil {
+		t.Fatal("admitted child did not run")
+	}
+}
+
+func appendReplayToolchainFixture(t *testing.T, name string) {
+	t.Helper()
+	b, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(name, append(append([]byte(nil), b...), []byte("\n# PRIVATE_TOOLCHAIN\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.WriteFile(name, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	})
 }
