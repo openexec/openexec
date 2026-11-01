@@ -167,9 +167,24 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	started := time.Now().UTC()
-	run := p
+	// The native workspace executor owns per-run readable-root handles. Keep
+	// them alive until this invocation ends, including retries and synthesis.
+	copy := *p
+	run := &copy
+	if len(request.ReadableRoots) > 0 {
+		if pinner, ok := p.config.ToolExecutor.(interface {
+			pinReadableRoots([]string) (ToolExecutor, func(), error)
+		}); ok {
+			executor, closeRoots, err := pinner.pinReadableRoots(request.ReadableRoots)
+			if err != nil {
+				return Result{}, err
+			}
+			defer closeRoots()
+			run.config.ToolExecutor = executor
+		}
+	}
 	if trace := newRunTrace(); trace != nil {
-		traced := *p
+		traced := *run
 		traced.trace = trace
 		run = &traced
 		sink = trace.wrapSink(sink)

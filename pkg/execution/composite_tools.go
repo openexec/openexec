@@ -76,6 +76,22 @@ func (e *CompositeToolExecutor) safelyListsDirectories() bool {
 	return !e.forwarded["list_directory"] && ok && safe.safelyListsDirectories()
 }
 
+func (e *CompositeToolExecutor) pinReadableRoots(paths []string) (ToolExecutor, func(), error) {
+	pinner, ok := e.workspace.(interface {
+		pinReadableRoots([]string) (ToolExecutor, func(), error)
+	})
+	if !ok {
+		return nil, nil, fmt.Errorf("workspace executor cannot pin readable roots")
+	}
+	workspace, closeRoots, err := pinner.pinReadableRoots(paths)
+	if err != nil {
+		return nil, nil, err
+	}
+	copy := *e
+	copy.workspace = workspace
+	return &copy, closeRoots, nil
+}
+
 func (e *CompositeToolExecutor) servesGateway() bool { return true }
 
 // ValidateAccess is the workspace executor's answer alone.
