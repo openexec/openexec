@@ -3,6 +3,8 @@ package execution
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/openexec/openexec/pkg/agent"
@@ -12,6 +14,52 @@ type synthesisOverflow struct {
 	fakeAPIAdapter
 	calls      int
 	dispatched bool
+}
+
+type retainedSynthesisAdapter struct {
+	fakeAPIAdapter
+	seen   agent.Request
+	refuse bool
+}
+
+func (*retainedSynthesisAdapter) SupportsHardTokenBudget() bool { return true }
+func (a *retainedSynthesisAdapter) CompleteBounded(_ context.Context, r agent.Request, input, output int) (*agent.Response, error) {
+	a.seen = r
+	if a.refuse {
+		return nil, &agent.ContextOverflowError{EstimatedTokens: input + 1, ContextTokens: input}
+	}
+	return &agent.Response{Usage: agent.Usage{PromptTokens: 100, CompletionTokens: 20}}, nil
+}
+
+func TestFinalSynthesisRetainsOriginalEvidenceAfterContextRecovery(t *testing.T) {
+	for _, refuse := range []bool{false, true} {
+		t.Run(fmt.Sprint(refuse), func(t *testing.T) {
+			a := &retainedSynthesisAdapter{refuse: refuse}
+			meter := &boundedAPIAdapter{ProviderAdapter: a, remaining: 250000, prior: priorResults{"old": "saved"}}
+			r := agent.Request{System: "original authority", ToolChoice: "none", Tools: []agent.ToolDefinition{{Name: "list_directory"}}}
+			for i := 0; i < 3; i++ {
+				id := fmt.Sprintf("id-%d", i)
+				r.Messages = append(r.Messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: "list_directory"}}}, agent.NewToolResultMessage(id, fmt.Sprintf("evidence-%d ", i)+strings.Repeat("a", 2048), nil))
+			}
+			_, err := meter.Complete(context.Background(), r)
+			if refuse {
+				var overflow *agent.ContextOverflowError
+				if !errors.As(err, &overflow) || overflow.Dispatched {
+					t.Fatalf("expected pre-dispatch refusal: %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < 3; i++ {
+				if !strings.Contains(a.seen.Messages[2*i+1].Content[0].ToolOutput, fmt.Sprintf("evidence-%d", i)) {
+					t.Fatal("final synthesis lost original evidence")
+				}
+			}
+			if len(a.seen.Tools) != 2 || a.seen.Tools[1].Name != recallTool {
+				t.Fatal("prior recall tool declaration missing from final history")
+			}
+		})
+	}
 }
 
 func (a *synthesisOverflow) SupportsHardTokenBudget() bool { return true }

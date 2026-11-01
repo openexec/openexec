@@ -19,13 +19,15 @@ func supportsNativeNonThinking(p agent.ProviderAdapter) bool {
 
 type boundedAPIAdapter struct {
 	agent.ProviderAdapter
-	remaining     int64
-	input, output int64
-	unknown       bool
-	sink          EventSink
-	contextCap    int64
-	contextLimit  int64
-	nonThinking   bool
+	remaining               int64
+	input, output           int64
+	unknown                 bool
+	sink                    EventSink
+	contextCap              int64
+	contextLimit            int64
+	nonThinking             bool
+	prior                   priorResults
+	trustedDirectoryResults bool
 }
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
@@ -85,6 +87,13 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		}
 		return res, err
 	}
+	if p.prior != nil {
+		if compacted, changed := p.prior.compact(r); changed && r.ToolChoice != "none" {
+			r = compacted
+		} else {
+			r.Tools = append(append([]agent.ToolDefinition(nil), r.Tools...), recallDefinition())
+		}
+	}
 	res, err := prepare(r)
 	var overflow *agent.ContextOverflowError
 	if errors.As(err, &overflow) && !overflow.Dispatched {
@@ -92,6 +101,24 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		// duplicate results. Unique obligations and owner authority stay intact.
 		if compacted, changed := compactRepeatedResults(r); changed {
 			res, err = prepare(compacted)
+		}
+		overflow = nil
+		if errors.As(err, &overflow) && !overflow.Dispatched && p.prior == nil && p.trustedDirectoryResults && r.ToolChoice != "none" && len(r.Tools) > 0 {
+			collision := false
+			for _, tool := range r.Tools {
+				if tool.Name == recallTool {
+					collision = true
+				}
+			}
+			if !collision {
+				prior := priorResults{}
+				if compacted, changed := prior.compact(r); changed {
+					res, err = prepare(compacted)
+					if err == nil {
+						p.prior = prior
+					}
+				}
+			}
 		}
 		overflow = nil
 		if errors.As(err, &overflow) && !overflow.Dispatched {

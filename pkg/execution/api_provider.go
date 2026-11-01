@@ -207,6 +207,9 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 		// final synthesis. Never store a run budget on the shared provider.
 		bounded := *p
 		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink, contextLimit: request.ContextTokenLimit, nonThinking: request.NonThinking}
+		if safe, ok := p.config.ToolExecutor.(interface{ safelyListsDirectories() bool }); ok {
+			meter.trustedDirectoryResults = safe.safelyListsDirectories()
+		}
 		bounded.config.Adapter = meter
 		request.TokenBudget = 0
 		request.ContextTokenLimit = 0
@@ -368,12 +371,18 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 				finish()
 				return result, err
 			}
-			output, toolErr := p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
-				CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
-				WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
-				WritableRoots: append([]string(nil), request.WritableRoots...),
-				ReadableRoots: append([]string(nil), request.ReadableRoots...),
-			})
+			var output string
+			var toolErr error
+			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok && meter.prior != nil && call.ToolName == recallTool {
+				output, toolErr = meter.prior.read(call.ToolInput)
+			} else {
+				output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
+					CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
+					WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
+					WritableRoots: append([]string(nil), request.WritableRoots...),
+					ReadableRoots: append([]string(nil), request.ReadableRoots...),
+				})
+			}
 			event.Type, event.Text = EventToolCompleted, output
 			if toolErr != nil {
 				event.Text = toolErr.Error()
