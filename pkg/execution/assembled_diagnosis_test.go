@@ -60,12 +60,12 @@ func TestAssembledDiagnosisPreflightPersistence(t *testing.T) {
 					fmt.Fprint(w, `{"done":true,"prompt_eval_count":1000,"eval_count":10,"message":{"tool_calls":[{"function":{"name":"read","arguments":{}}},{"function":{"name":"read","arguments":{}}}]}}`)
 					return
 				}
-				if mode != "duplicate" {
-					t.Error("non-duplicate overflow or cancelled request dispatched")
+				if mode == "cancel" {
+					t.Error("cancelled request dispatched")
 				}
 				raw, _ := json.Marshal(wire)
-				if strings.Count(string(raw), "duplicateOfToolResult") != 1 || !strings.Contains(string(raw), strings.Repeat("e", 90000)) {
-					t.Error("exact duplicate compaction lost complete retained result")
+				if !strings.Contains(string(raw), strings.Repeat("e", 90000)) || mode == "duplicate" && strings.Count(string(raw), "duplicateOfToolResult") != 1 || mode == "near-duplicate" && !strings.Contains(string(raw), recallTool) {
+					t.Error("compaction lost the retained result or its recall route")
 				}
 				w.WriteHeader(400)
 				fmt.Fprint(w, `{"error":"synthetic-private-provider-text: context exceeded"}`)
@@ -98,14 +98,14 @@ func TestAssembledDiagnosisPreflightPersistence(t *testing.T) {
 				if !errors.Is(err, context.Canceled) || result.Outcome != OutcomeCancelled || calls != 1 {
 					t.Fatal("Stop at the tool boundary was not retained")
 				}
-			} else if !errors.As(err, &overflow) || overflow.Dispatched != (mode == "duplicate") || overflow.ContextTokens != 65536 || result.Outcome != OutcomeFailed {
+			} else if !errors.As(err, &overflow) || !overflow.Dispatched || overflow.ContextTokens != 65536 || result.Outcome != OutcomeFailed {
 				t.Fatal("preflight and dispatched refusal were conflated")
 			}
 			wantCalls := 1
-			if mode == "duplicate" {
+			if mode != "cancel" {
 				wantCalls = 2
 			}
-			if calls != wantCalls || executor.reads != 2 || usage.InputTokens != 1000 || usage.OutputTokens != 10 || usage.UsageFinal != (mode != "duplicate") {
+			if calls != wantCalls || executor.reads != 2 || usage.InputTokens != 1000 || usage.OutputTokens != 10 || usage.UsageFinal != (mode == "cancel") {
 				t.Fatal("retry, observed usage or uncertainty changed")
 			}
 			if err == nil || strings.Contains(err.Error(), fixtureSecret) || strings.Contains(err.Error(), "synthetic-private-provider-text") {
@@ -134,7 +134,7 @@ func TestAssembledDiagnosisPreflightPersistence(t *testing.T) {
 			assertDispatch(t, asMap(capture["dispatch"]), "POST", server.URL+"/api/chat")
 			messages := asList(asMap(capture["request"])["messages"])
 			wantMessages := 2 // Earlier successful dispatch, not refused assembly.
-			if mode == "duplicate" {
+			if mode != "cancel" {
 				wantMessages = 5
 			}
 			if len(messages) != wantMessages {
@@ -153,7 +153,7 @@ func TestAssembledDiagnosisPreflightPersistence(t *testing.T) {
 			last := asMap(entries[1])
 			_, hasWire := last["wire"]
 			_, hasDispatch := last["dispatch"]
-			if hasWire != (mode == "duplicate") || hasDispatch != hasWire || len(asList(asMap(last["request"])["messages"])) != 4 {
+			if !hasWire || hasDispatch != hasWire || len(asList(asMap(last["request"])["messages"])) != 4 {
 				t.Fatal("trace invented refused wire/dispatch or lost pre-compaction request")
 			}
 			if !strings.Contains(string(traceRaw), strings.Repeat("e", 90000)) {
