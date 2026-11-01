@@ -19,14 +19,15 @@ func supportsNativeNonThinking(p agent.ProviderAdapter) bool {
 
 type boundedAPIAdapter struct {
 	agent.ProviderAdapter
-	remaining     int64
-	input, output int64
-	unknown       bool
-	sink          EventSink
-	contextCap    int64
-	contextLimit  int64
-	nonThinking   bool
-	prior         priorResults
+	remaining               int64
+	input, output           int64
+	unknown                 bool
+	sink                    EventSink
+	contextCap              int64
+	contextLimit            int64
+	nonThinking             bool
+	prior                   priorResults
+	trustedDirectoryResults bool
 }
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
@@ -87,7 +88,7 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		return res, err
 	}
 	if p.prior != nil {
-		if compacted, changed := p.prior.compact(r); changed {
+		if compacted, changed := p.prior.compact(r); changed && r.ToolChoice != "none" {
 			r = compacted
 		} else {
 			r.Tools = append(append([]agent.ToolDefinition(nil), r.Tools...), recallDefinition())
@@ -102,7 +103,7 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 			res, err = prepare(compacted)
 		}
 		overflow = nil
-		if errors.As(err, &overflow) && !overflow.Dispatched && p.prior == nil && r.ToolChoice != "none" && len(r.Tools) > 0 {
+		if errors.As(err, &overflow) && !overflow.Dispatched && p.prior == nil && p.trustedDirectoryResults && r.ToolChoice != "none" && len(r.Tools) > 0 {
 			collision := false
 			for _, tool := range r.Tools {
 				if tool.Name == recallTool {

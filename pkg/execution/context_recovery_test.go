@@ -29,7 +29,10 @@ type distinctEvidenceTools struct {
 }
 
 func (e *distinctEvidenceTools) ExecuteTool(_ context.Context, r ToolRequest) (string, error) {
-	if r.Name == "read_record" {
+	if r.Name == "read_file" {
+		return "AGENTS.md: NEVER DEPLOY WITHOUT REVIEW " + strings.Repeat("safe instruction ", 90), nil
+	}
+	if r.Name == "list_directory" {
 		e.reads++
 		return fmt.Sprintf("record-%d ", e.reads) + strings.Repeat("distinct evidence ", 850), nil
 	}
@@ -38,6 +41,8 @@ func (e *distinctEvidenceTools) ExecuteTool(_ context.Context, r ToolRequest) (s
 	}
 	return "", fmt.Errorf("unexpected tool %s", r.Name)
 }
+
+func (e *distinctEvidenceTools) safelyListsDirectories() bool { return true }
 
 func TestDistinctPriorEvidenceCanBeRecalledAndOriginalTaskContinues(t *testing.T) {
 	calls := 0
@@ -54,20 +59,20 @@ func TestDistinctPriorEvidenceCanBeRecalledAndOriginalTaskContinues(t *testing.T
 		}
 		switch calls {
 		case 1:
-			list := []any{}
+			list := []any{call("read_file", map[string]any{"path": "AGENTS.md"})}
 			for i := 0; i < 6; i++ {
-				list = append(list, call("read_record", map[string]any{"id": i}))
+				list = append(list, call("list_directory", map[string]any{"id": i}))
 			}
 			message = map[string]any{"tool_calls": list}
 		case 2:
-			match := regexp.MustCompile(`Prior tool result retained as ([0-9a-f]{64})`).FindSubmatch(body)
-			if len(match) != 2 || !strings.Contains(string(body), "no deployment without review") {
+			match := regexp.MustCompile(`Prior directory listing retained as ([0-9a-f]{64})`).FindSubmatch(body)
+			if len(match) != 2 || !strings.Contains(string(body), "NEVER DEPLOY WITHOUT REVIEW") {
 				t.Error("compaction lost original authority or prior result reference")
 				return
 			}
 			message = map[string]any{"tool_calls": []any{call(recallTool, map[string]any{"id": string(match[1]), "offset": 0})}}
 		case 3:
-			if !strings.Contains(string(body), "record-1") {
+			if !strings.Contains(string(body), "record-1") || !strings.Contains(string(body), "NEVER DEPLOY WITHOUT REVIEW") {
 				t.Error("recalled evidence missing")
 			}
 			message = map[string]any{"tool_calls": []any{call("finish", map[string]any{})}}
@@ -81,7 +86,7 @@ func TestDistinctPriorEvidenceCanBeRecalledAndOriginalTaskContinues(t *testing.T
 	}
 	root := t.TempDir()
 	executor := &distinctEvidenceTools{root: root}
-	p, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, ToolExecutor: executor, Tools: []agent.ToolDefinition{{Name: "read_record", InputSchema: json.RawMessage(`{"type":"object"}`)}, {Name: "finish", InputSchema: json.RawMessage(`{"type":"object"}`)}}})
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, ToolExecutor: executor, Tools: []agent.ToolDefinition{{Name: "read_file", InputSchema: json.RawMessage(`{"type":"object"}`)}, {Name: "list_directory", InputSchema: json.RawMessage(`{"type":"object"}`)}, {Name: "finish", InputSchema: json.RawMessage(`{"type":"object"}`)}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +104,8 @@ func TestPriorResultRecallKeepsOriginalAndRejectsInvalidRequests(t *testing.T) {
 	results := priorResults{}
 	request := agent.Request{System: "authority", Messages: []agent.Message{agent.NewTextMessage(agent.RoleUser, "original request")}}
 	for i := 0; i < 6; i++ {
-		request.Messages = append(request.Messages, agent.NewToolResultMessage(fmt.Sprintf("call-%d", i), fmt.Sprintf("item-%d", i)+strings.Repeat("ä", 2500), nil))
+		id := fmt.Sprintf("call-%d", i)
+		request.Messages = append(request.Messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: "list_directory"}}}, agent.NewToolResultMessage(id, fmt.Sprintf("item-%d", i)+strings.Repeat("ä", 2500), nil))
 	}
 	original, _ := json.Marshal(request)
 	compacted, changed := results.compact(request)
@@ -120,6 +126,39 @@ func TestPriorResultRecallKeepsOriginalAndRejectsInvalidRequests(t *testing.T) {
 		if _, err := results.read(json.RawMessage(bad)); err == nil {
 			t.Fatalf("accepted invalid request %s", bad)
 		}
+	}
+}
+
+func TestContextRecoveryPreservesFileInstructionsAndUnknownTools(t *testing.T) {
+	r := agent.Request{}
+	for _, name := range []string{"read_file", "search_files", "unknown", "list_directory", "list_directory"} {
+		id := fmt.Sprintf("id-%d", len(r.Messages))
+		text := name + " AGENTS.md: NEVER DEPLOY " + strings.Repeat("authority ", 500)
+		r.Messages = append(r.Messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: name}}}, agent.NewToolResultMessage(id, text, nil))
+	}
+	compacted, changed := (priorResults{}).compact(r)
+	if !changed {
+		t.Fatal("directory listing was not compacted")
+	}
+	for _, index := range []int{1, 3, 5, 9} {
+		if compacted.Messages[index].Content[0].ToolOutput != r.Messages[index].Content[0].ToolOutput {
+			t.Fatalf("authority, unknown tool or most recent listing changed at %d", index)
+		}
+	}
+}
+
+func TestContextRecoveryPreservesInstructionsWhenCallIDsAreReused(t *testing.T) {
+	r := agent.Request{}
+	add := func(id, name, output string) {
+		r.Messages = append(r.Messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: name}}}, agent.NewToolResultMessage(id, output, nil))
+	}
+	policy := "AGENTS.md NEVER DEPLOY " + strings.Repeat("authority ", 400)
+	add("same", "read_file", policy)
+	add("same", "list_directory", strings.Repeat("dir-one\n", 200))
+	add("other", "list_directory", strings.Repeat("dir-two\n", 200))
+	compacted, changed := (priorResults{}).compact(r)
+	if !changed || compacted.Messages[1].Content[0].ToolOutput != policy {
+		t.Fatal("reused call ID hid the file instructions")
 	}
 }
 

@@ -207,6 +207,9 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 		// final synthesis. Never store a run budget on the shared provider.
 		bounded := *p
 		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink, contextLimit: request.ContextTokenLimit, nonThinking: request.NonThinking}
+		if safe, ok := p.config.ToolExecutor.(interface{ safelyListsDirectories() bool }); ok {
+			meter.trustedDirectoryResults = safe.safelyListsDirectories()
+		}
 		bounded.config.Adapter = meter
 		request.TokenBudget = 0
 		request.ContextTokenLimit = 0

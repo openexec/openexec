@@ -71,6 +71,11 @@ func (e *CompositeToolExecutor) SupportsWorkspaceWrite() bool {
 	return supportsWorkspaceWrite(e.workspace)
 }
 
+func (e *CompositeToolExecutor) safelyListsDirectories() bool {
+	safe, ok := e.workspace.(interface{ safelyListsDirectories() bool })
+	return !e.forwarded["list_directory"] && ok && safe.safelyListsDirectories()
+}
+
 func (e *CompositeToolExecutor) servesGateway() bool { return true }
 
 // ValidateAccess is the workspace executor's answer alone.
