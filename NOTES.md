@@ -4,6 +4,20 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Native generated-output observation, 2026-11-01] The next natural Solar
+  run retained its exact prompt prefix but refused after a native response
+  used 35003 input / 8022 output tokens: its generated assistant message was
+  38 KiB and input-only observation charged those bytes again. Extend the
+  existing disposable context observation with a hash of the exact normalized
+  returned assistant message and its native output count. Edited responses and
+  new tool results retain conservative admission; no content is dropped.
+  Synthetic native serializer and limiter regressions reproduce the old
+  refusal and cover exact text/reasoning/tool arguments, zero output counts,
+  unique oversized results, dispatched native refusal, Stop, grant exhaustion
+  and actual accounting. Private traces are not replayed or committed.
+  No new loop, persistent state, resource grant or owner decision. Publication,
+  independent review, installation and original useful recovery remain distinct.
+
 - [Empty-response recovery prefix, 2026-11-01] Natural Solar cbb0308c failed
   after a native reasoning-only response used 33573 input tokens. Its private
   complete trace shows the recovery inserted a system instruction ahead of

@@ -28,7 +28,7 @@ func TestNativeObservationAdmitsAppendOnlyToolResult(t *testing.T) {
 	if p.admitObservedContext(next, 32768, 2048, len(more), 0) == nil {
 		t.Fatal("unobserved prefix bypassed preflight")
 	}
-	p.observeNativeContext(first, 18000)
+	p.observeNativeContext(first, 18000, nil, 0)
 	if err := p.admitObservedContext(next, 32768, 2048, len(more), 0); err != nil {
 		t.Fatal("observed prefix and bounded append refused", err)
 	}
