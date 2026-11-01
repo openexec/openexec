@@ -1,5 +1,10 @@
 # Private capture at the CLI compiler boundary
 
+For the guarded-binary recurrence in Console run 41258644434, see
+[the finite diagnosis and next experiment](TS_COMPILER_RECURRENCE_DIAGNOSIS.md).
+That capture's replay refused before launch; it must not be retried under these
+general instructions.
+
 This is an evidence producer, not a repair for the recurring compiler deadline.
 The 45-second child deadline, output limits, corpus and lexical fallback remain
 unchanged. Do not repeat a warm Console scan to populate this evidence. Enable
@@ -100,6 +105,9 @@ it reads actual stdin/argv, checks the script, Node/TypeScript hashes and full
 source/configuration manifest, then reuses `replayNativeRequest` under the
 unchanged 45s bound. Run it on the same worker with the captured checkout and
 toolchain still present. Changed inputs or an existing `replay.json` are refused.
+Source/toolchain refusals now list each failed manifest or hash comparison by
+field name, without printing private values. Older combined refusals cannot be
+retroactively resolved by this reporting change.
 The original temporary script must be absent; replay restores identical bytes
 at its original pathname with exclusive creation and removes them afterward.
 The restored script has a new mtime, which is an instrumentation difference.
