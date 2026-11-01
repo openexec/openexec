@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.2",
+  "goals": [],
+  "stories": [
+    {
+      "id": "US-SOLAR-TAKEOVER",
+      "title": "Document and prepare the Solar system takeover",
+      "description": "Split the five supplied Solar outcome conditions into separately executable documentation tasks. This artifact prepares work; it does not establish that any Solar Ready condition is satisfied.",
+      "requirement_id": "solar-takeover",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "system-understanding: System architecture and communication are documented",
+        "environment-setup: Test and development setup is documented from zero",
+        "safe-operation: Safe operation has a clear documented plan",
+        "development-release: Development and releases have a clear documented process",
+        "takeover-plan: Takeover preserves service with [source text ends here; recover the full accepted condition before claiming Ready]"
+      ],
+      "contract": "Planning artifact for Solar, retained in OpenExec because this task is assigned here. Do not import into the OpenExec project backlog or execute against Solar under this request. Future execution requires Solar's own accepted context and repository authority and the existing native plan review. All five tasks produce documentation; they authorize no production changes, deployments, credential changes, payments or service handover. Preserve the existing accepted Goal and Ready. The supplied takeover-plan condition is truncated and must not be silently completed by inference.",
+      "tasks": [
+        {
+          "id": "system-understanding",
+          "title": "Document Solar architecture and communication",
+          "description": "Produce docs/solar/system-understanding.md from the authorized Solar sources. Document the component inventory, responsibilities, deployment topology, data stores, external dependencies and communication paths, including protocols and failure dependencies. Cite source locations and revisions and separate observations from unknowns. Completion evidence: trace one representative request or data flow end to end against the implementation; record discrepancies and unresolved gaps. A diagram alone is insufficient.",
+          "technical_strategy": "Inspect existing documentation and implementation first; reuse accurate material rather than reconstructing it. Keep credentials and sensitive payloads out of the document. This is a documentation task, not an architecture refactor.",
+          "depends_on": [],
+          "mode": "afk",
+          "verification_script": "test -s docs/solar/system-understanding.md"
+        },
+        {
+          "id": "environment-setup",
+          "title": "Document Solar test and development setup from zero",
+          "description": "Produce docs/solar/environment-setup.md with prerequisites and versions, repository setup, configuration names and authorized secret provisioning, isolated test data, dependency installation, startup, health checks, tests and cleanup. Completion evidence: follow the instructions in a clean disposable environment, record the exact revisions, commands and results, restart and verify persisted test state. Exercise a missing prerequisite or invalid configuration and document the expected diagnostic. Mark unavailable steps unverified; never use production data to make the setup pass.",
+          "technical_strategy": "Use the existing Solar development and test tooling. Document a complete path from no local setup to a working isolated test instance; do not invent an alternative deployment platform.",
+          "depends_on": [],
+          "mode": "afk",
+          "verification_script": "test -s docs/solar/environment-setup.md"
+        },
+        {
+          "id": "safe-operation",
+          "title": "Document a safe Solar operation plan",
+          "description": "Produce docs/solar/safe-operation.md covering service health, monitoring and alerts, access boundaries, backup and restore, routine maintenance, incident response, escalation, rollback and recovery. Identify evidence-backed procedures and unknowns without inventing service targets or on-call commitments. Completion evidence: validate read-only health checks and a backup/restore or recovery exercise in the isolated environment; record results and any procedures that require separate authority. No production restore, failover or access change is part of this task.",
+          "technical_strategy": "Build on the architecture and reproducible test environment. Keep operator actions distinct from automated checks and identify the exact existing authority required for consequential actions.",
+          "depends_on": ["system-understanding", "environment-setup"],
+          "mode": "afk",
+          "verification_script": "test -s docs/solar/safe-operation.md"
+        },
+        {
+          "id": "development-release",
+          "title": "Document Solar development and release process",
+          "description": "Produce docs/solar/development-release.md describing a small change from checkout through verification, review, versioning, artifact creation, release approval, deployment, running revision verification and rollback. Identify the actual repositories, existing checks and delivery boundaries. Completion evidence: rehearse a small reversible change through the available isolated build and release path and demonstrate a failing check blocks it; record exact results. Document production deployment and approval steps without performing them under this task.",
+          "technical_strategy": "Reuse Solar's existing CI and release tooling. Cross-reference the environment and operation documents; report absent tooling as a gap rather than declaring a documented command verified.",
+          "depends_on": ["system-understanding", "environment-setup"],
+          "mode": "afk",
+          "verification_script": "test -s docs/solar/development-release.md"
+        },
+        {
+          "id": "takeover-plan",
+          "title": "Prepare a Solar takeover plan that preserves service",
+          "description": "Produce docs/solar/takeover-plan.md integrating the four documents into a phased handover plan with prerequisites, responsibility transfer, service continuity checks, go/no-go evidence, fallback and rollback, escalation and unresolved risks. Recover and quote the complete accepted takeover-plan condition from Solar's durable owner context: the supplied text stops at 'Takeover preserves service with'. Do not infer its ending or claim Ready while that requirement remains incomplete. Completion evidence: walk through the handover and an aborted handover as isolated tabletop exercises, trace every prerequisite to evidence, and record gaps. Planning does not perform or accept the handover.",
+          "technical_strategy": "Use the existing accepted Solar destination, not a newly invented service target. Assemble a reviewable plan from the preceding evidence; leave consequential execution and acceptance at their existing authority boundaries.",
+          "depends_on": ["system-understanding", "environment-setup", "safe-operation", "development-release"],
+          "mode": "afk",
+          "verification_script": "test -s docs/solar/takeover-plan.md"
+        }
+      ]
+    }
+  ]
+}
