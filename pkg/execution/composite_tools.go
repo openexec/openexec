@@ -76,14 +76,14 @@ func (e *CompositeToolExecutor) safelyListsDirectories() bool {
 	return !e.forwarded["list_directory"] && ok && safe.safelyListsDirectories()
 }
 
-func (e *CompositeToolExecutor) pinReadableRoots(paths []string) (ToolExecutor, func(), error) {
+func (e *CompositeToolExecutor) pinReadableRoots(paths []string, identities []ReadableRootIdentity) (ToolExecutor, func(), error) {
 	pinner, ok := e.workspace.(interface {
-		pinReadableRoots([]string) (ToolExecutor, func(), error)
+		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
 	})
 	if !ok {
 		return nil, nil, fmt.Errorf("workspace executor cannot pin readable roots")
 	}
-	workspace, closeRoots, err := pinner.pinReadableRoots(paths)
+	workspace, closeRoots, err := pinner.pinReadableRoots(paths, identities)
 	if err != nil {
 		return nil, nil, err
 	}

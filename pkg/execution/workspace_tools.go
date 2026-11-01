@@ -73,8 +73,18 @@ func NewWorkspaceToolExecutor() *WorkspaceToolExecutor { return &WorkspaceToolEx
 
 // pinReadableRoots holds the directories themselves, not just their names,
 // until the execution ends. A swapped checkout cannot redirect a later read.
-func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string) (ToolExecutor, func(), error) {
+func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string, identities []ReadableRootIdentity) (ToolExecutor, func(), error) {
 	pinned := &WorkspaceToolExecutor{pinnedReads: make(map[string]*os.Root)}
+	expected := make(map[string]ReadableRootIdentity, len(identities))
+	for _, identity := range identities {
+		if _, duplicate := expected[identity.Path]; duplicate {
+			return nil, nil, errors.New("duplicate readable root identity")
+		}
+		expected[identity.Path] = identity
+	}
+	if len(identities) > 0 && len(expected) != len(paths) {
+		return nil, nil, errors.New("readable root identities do not match roots")
+	}
 	closeRoots := func() {
 		for _, root := range pinned.pinnedReads {
 			_ = root.Close()
@@ -100,6 +110,15 @@ func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string) (ToolExecutor, 
 			_ = root.Close()
 			closeRoots()
 			return nil, nil, fmt.Errorf("readable root %q changed during admission", path)
+		}
+		if len(identities) > 0 {
+			want, ok := expected[path]
+			actual, identityErr := ReadableRootIdentityOf(path, opened)
+			if !ok || identityErr != nil || actual != want {
+				_ = root.Close()
+				closeRoots()
+				return nil, nil, fmt.Errorf("readable root %q changed since caller admission", path)
+			}
 		}
 		pinned.pinnedReads[path] = root
 	}
