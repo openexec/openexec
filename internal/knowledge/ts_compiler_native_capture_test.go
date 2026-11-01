@@ -88,6 +88,12 @@ func writeCapture(t *testing.T, dir, name string, data []byte) {
 // there is no retry, reduction, provider call or changed compiler budget. Only
 // a disposable, clean, explicitly supplied public checkout may be used.
 func TestConsoleNativeRequestCapture(t *testing.T) {
+	if *compilerPhaseOutput != "" || *compilerPhaseContext != "" {
+		if err := runCompilerPhaseExperiment(*compilerPrivateCapture, *compilerPhaseContext, *compilerPhaseOutput); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
 	if *compilerPrivateCapture != "" {
 		replayPrivateCompilerCapture(t, *compilerPrivateCapture)
 		return
