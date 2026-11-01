@@ -62,11 +62,49 @@ var deniedComponents = map[string]bool{
 //     path a patch header can name; whole-file writes are containable in a way
 //     patches are not, and small local models produce better whole files than
 //     diffs anyway.
-type WorkspaceToolExecutor struct{}
+type WorkspaceToolExecutor struct {
+	// Per-execution descriptors. Nil on a standalone executor.
+	pinnedReads map[string]*os.Root
+}
 
 var _ ToolExecutor = (*WorkspaceToolExecutor)(nil)
 
 func NewWorkspaceToolExecutor() *WorkspaceToolExecutor { return &WorkspaceToolExecutor{} }
+
+// pinReadableRoots holds the directories themselves, not just their names,
+// until the execution ends. A swapped checkout cannot redirect a later read.
+func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string) (ToolExecutor, func(), error) {
+	pinned := &WorkspaceToolExecutor{pinnedReads: make(map[string]*os.Root)}
+	closeRoots := func() {
+		for _, root := range pinned.pinnedReads {
+			_ = root.Close()
+		}
+	}
+	for _, path := range paths {
+		if _, ok := pinned.pinnedReads[path]; ok {
+			continue
+		}
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil || !filepath.IsAbs(path) || resolved != filepath.Clean(path) {
+			closeRoots()
+			return nil, nil, fmt.Errorf("readable root %q is not a stable canonical directory", path)
+		}
+		root, err := os.OpenRoot(path)
+		if err != nil {
+			closeRoots()
+			return nil, nil, fmt.Errorf("readable root %q: %w", path, err)
+		}
+		opened, openErr := root.Stat(".")
+		named, nameErr := os.Lstat(path)
+		if openErr != nil || nameErr != nil || !os.SameFile(opened, named) {
+			_ = root.Close()
+			closeRoots()
+			return nil, nil, fmt.Errorf("readable root %q changed during admission", path)
+		}
+		pinned.pinnedReads[path] = root
+	}
+	return pinned, closeRoots, nil
+}
 
 // SupportsWorkspaceWrite is true: this executor owns files, and editing them
 // under a granted root is what it is for.
@@ -212,7 +250,7 @@ func (e *WorkspaceToolExecutor) readFile(ctx context.Context, request ToolReques
 	if offset < 0 || limit < 1 || limit > maxReadFileBytes {
 		return "", fmt.Errorf("offset_bytes must be nonnegative and limit_bytes must be between 1 and %d", maxReadFileBytes)
 	}
-	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		file, err := root.Open(relative)
 		if err != nil {
 			return "", fmt.Errorf("read file: %w", err)
@@ -295,7 +333,7 @@ func (e *WorkspaceToolExecutor) listDirectory(request ToolRequest) (string, erro
 	if input.Path == "" {
 		input.Path = "."
 	}
-	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		directory, err := root.Open(relative)
 		if err != nil {
 			return "", fmt.Errorf("list directory: %w", err)
@@ -340,7 +378,7 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 	// Writes are contained by the writable roots alone. The working directory
 	// is readable by virtue of being where the run happens; that does not make
 	// it writable.
-	return withinRoots(input.Path, request.WorkingDir, request.WritableRoots, "write", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, request.WritableRoots, "write", func(root *os.Root, relative string) (string, error) {
 		// Decide before creating either parents or the file. The descriptor check
 		// below remains the final authority after open, but it is too late to be
 		// the first check: O_CREATE and MkdirAll are themselves side effects.
@@ -499,7 +537,7 @@ func readableRoots(request ToolRequest) []string {
 // resolved by the kernel beneath that descriptor. A path naming a denied
 // component is refused before any of that: those files are inside the roots by
 // construction, so containment is not what keeps them out.
-func withinRoots(argument, workingDir string, roots []string, action string, run func(*os.Root, string) (string, error)) (string, error) {
+func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots []string, action string, run func(*os.Root, string) (string, error)) (string, error) {
 	if strings.TrimSpace(argument) == "" {
 		return "", errors.New("path is required")
 	}
@@ -515,17 +553,25 @@ func withinRoots(argument, workingDir string, roots []string, action string, run
 		if path == "" {
 			continue
 		}
-		root, err := os.OpenRoot(path)
-		if err != nil {
-			continue
+		root, pinned := e.pinnedReads[path]
+		if !pinned {
+			var err error
+			root, err = os.OpenRoot(path)
+			if err != nil {
+				continue
+			}
 		}
 		relative, ok := relativeTo(root.Name(), workingDir, argument)
 		if !ok {
-			_ = root.Close()
+			if !pinned {
+				_ = root.Close()
+			}
 			continue
 		}
 		output, err := run(root, relative)
-		_ = root.Close()
+		if !pinned {
+			_ = root.Close()
+		}
 		if err == nil {
 			return output, nil
 		}
