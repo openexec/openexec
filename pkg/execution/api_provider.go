@@ -467,7 +467,11 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 	}
 	reasoningOnly := responseHasReasoning(response)
 	firstObservation := nativeCompletionEvidence(response)
-	request.System = appendSystemInstruction(request.System, emptyCompletionRecoveryInstruction)
+	// Preserve the observed native prompt prefix. Inserting a system message
+	// invalidates its token observation and can refuse an otherwise admissible
+	// recovery before HTTP. The existing admission charges this appended message
+	// in full, within the same context and remaining token grant.
+	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, emptyCompletionRecoveryInstruction))
 	response, err = p.completeChecked(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider empty-response recovery failed%s: %w", firstObservation, err)

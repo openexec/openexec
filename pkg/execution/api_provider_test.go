@@ -148,7 +148,8 @@ func TestAPIProviderRejectsEmptyToolResponse(t *testing.T) {
 	if len(events) != 2 || events[0].Type != EventStarted || events[1].Type != EventFailed || events[1].Text != err.Error() {
 		t.Fatalf("events = %#v", events)
 	}
-	if len(adapter.requests) != 2 || !strings.Contains(adapter.requests[1].System, emptyCompletionRecoveryInstruction) {
+	if len(adapter.requests) != 2 || adapter.requests[1].System != adapter.requests[0].System ||
+		adapter.requests[1].Messages[len(adapter.requests[1].Messages)-1].GetText() != emptyCompletionRecoveryInstruction {
 		t.Fatalf("recovery requests = %#v", adapter.requests)
 	}
 }
@@ -181,8 +182,8 @@ func TestAPIProviderRecoversReasoningOnlyToolResponse(t *testing.T) {
 	if result.Outcome != OutcomeSucceeded || result.FinalText != "visible answer" {
 		t.Fatalf("result = %+v", result)
 	}
-	if len(adapter.requests) != 2 || !strings.Contains(adapter.requests[1].System, "standing context") ||
-		!strings.Contains(adapter.requests[1].System, emptyCompletionRecoveryInstruction) {
+	if len(adapter.requests) != 2 || adapter.requests[1].System != "standing context" ||
+		adapter.requests[1].Messages[len(adapter.requests[1].Messages)-1].GetText() != emptyCompletionRecoveryInstruction {
 		t.Fatalf("recovery requests = %#v", adapter.requests)
 	}
 	if len(events) != 3 || events[1].Type != EventAssistantDelta || events[1].Text != "visible answer" ||
