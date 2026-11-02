@@ -24,17 +24,25 @@ const (
 // searchFiles reuses the workspace read boundary; it cannot execute commands,
 // follow links during traversal, or turn a readable root into a writable one.
 func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolRequest) (string, error) {
+	output, _, err := e.searchFilesWithProvenance(ctx, request)
+	return output, err
+}
+
+// searchFilesWithProvenance reports completeness from the scan itself, never
+// by interpreting a potentially adversarial result string.
+func (e *WorkspaceToolExecutor) searchFilesWithProvenance(ctx context.Context, request ToolRequest) (string, bool, error) {
 	var input struct {
 		Path string `json:"path"`
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(request.Input, &input); err != nil {
-		return "", fmt.Errorf("invalid input: %w", err)
+		return "", false, fmt.Errorf("invalid input: %w", err)
 	}
 	if input.Text == "" || strings.ContainsAny(input.Text, "\r\n") {
-		return "", errors.New("text must be a non-empty single-line literal")
+		return "", false, errors.New("text must be a non-empty single-line literal")
 	}
-	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	complete := false
+	output, err := withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		var out strings.Builder
 		entries, remaining := 0, maxSearchBytes
 		incomplete := false
@@ -129,6 +137,8 @@ func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolReq
 		} else if out.Len() == 0 {
 			out.WriteString("No matches in regular text files (symbolic links and private configuration directories skipped).\n")
 		}
+		complete = !incomplete
 		return out.String(), nil
 	})
+	return output, complete && err == nil, err
 }
