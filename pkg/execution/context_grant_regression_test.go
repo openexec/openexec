@@ -115,3 +115,21 @@ func TestContextMetadataAndDispatchedRefusal(t *testing.T) {
 		t.Fatalf("dispatched accounting: %v %+v model=%s", err, meter, gotModel)
 	}
 }
+
+// A provider that continues to refuse preflight must not cause unbounded
+// context growth or consume a grant when no inference was dispatched.
+type repeatedPreflightOverflow struct{ boundedFake }
+
+func (a *repeatedPreflightOverflow) CompleteBounded(_ context.Context, _ agent.Request, input, _ int) (*agent.Response, error) {
+	a.calls++
+	return nil, &agent.ContextOverflowError{RequestBytes: 10000, EstimatedTokens: input, ContextTokens: input}
+}
+
+func TestContextResizeRetriesOnlyOnce(t *testing.T) {
+	a := &repeatedPreflightOverflow{}
+	meter := &boundedAPIAdapter{ProviderAdapter: a, remaining: 65536}
+	_, err := meter.Complete(context.Background(), agent.Request{})
+	if err == nil || a.calls != 2 || meter.remaining != 65536 || meter.unknown {
+		t.Fatalf("repeated preflight: calls=%d remaining=%d unknown=%t err=%v", a.calls, meter.remaining, meter.unknown, err)
+	}
+}

@@ -42,6 +42,10 @@ func (e *contextGrantError) Error() string {
 func (e *contextGrantError) Unwrap() error { return errHardTokenGrantExhausted }
 
 func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*agent.Response, error) {
+	return p.complete(ctx, r, true)
+}
+
+func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allowResize bool) (*agent.Response, error) {
 	r.NonThinking = p.nonThinking
 	original := r
 	// Ollama may raise vision-capable model contexts to 2048 even for text.
@@ -147,11 +151,11 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 			// a small serialization margin, still within every ceiling and the
 			// original grant. Never retry a dispatched request.
 			required := int64(overflow.EstimatedTokens) + minimumOutput + 16
-			if required > input && required <= p.contextTarget && required+minimumOutput <= p.remaining {
+			if allowResize && p.input == 0 && p.output == 0 && overflow.RequestBytes > 0 && required > input && required <= p.contextTarget && required+minimumOutput <= p.remaining {
 				p.contextCap = required
-				return p.Complete(ctx, original)
+				return p.complete(ctx, original, false)
 			}
-			if input < p.contextTarget && int64(overflow.EstimatedTokens)+minimumOutput <= p.contextTarget {
+			if p.input == 0 && p.output == 0 && overflow.RequestBytes > 0 && input < p.contextTarget && int64(overflow.EstimatedTokens)+minimumOutput <= p.contextTarget {
 				return nil, &contextGrantError{remaining: p.remaining, selected: input, ceiling: minNonzero(p.providerContext, p.contextLimit, MaxAPIContextTokens)}
 			}
 			// Only diagnose provider configuration when it is the binding
