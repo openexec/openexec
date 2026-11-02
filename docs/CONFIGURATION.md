@@ -55,6 +55,46 @@ grant can therefore still admit only 32K or less. This does not increase the
 total grant or the output allowance. Native requests keep `truncate=false`,
 and oversized input is refused before inference rather than silently cut.
 
+## Context discipline: checkpoints and the handover document
+
+A small local model fails on size, not reasoning, so every API provider keeps its
+request chain inside its window (`pkg/execution/context_policy.go`,
+`handover.go`). Optional fields of the same provider entry:
+
+```json
+"qwen-27b": {
+  "context_tokens": 131072,
+  "checkpoint_soft": 0.5,
+  "checkpoint_hard": 0.7,
+  "prompt_tokens_per_second": 100
+}
+```
+
+- `context_tokens`: the model's real window. Default 65,536 for a loopback
+  endpoint (what the bounded path sends), 128,000 otherwise. The bounded path
+  never sends more than its 65,536 ceiling, so the effective window is the
+  smaller of the two.
+- Past `checkpoint_soft` (default 0.5 of the window) the model is asked once to
+  call `update_handover` (done, next steps, decisions, open questions). Past
+  `checkpoint_hard` (default 0.7), or when the request is larger than the
+  byte bound (2.5 bytes per hard-threshold token), or when
+  `tokens / prompt_tokens_per_second` exceeds 80% of the request timeout, the
+  chain ends and the next request is built from the system prompt, the task and
+  `HANDOVER.md` only. A hosted model with a bigger window checkpoints later.
+- `HANDOVER.md` (mode 0600, directory 0700) lives in `<capture path without
+  .json>.run/` next to the run's request capture. The harness writes the task,
+  constraints, files touched (`git status`/`diff --stat`), commands with exit
+  codes, test status and the saved-output index itself; an empty model section
+  is filled from that log and flagged `FLAG:`.
+- A tool result larger than 12 KiB enters the request as a head, a tail and a
+  pointer; the full text is `out-NNNN.txt` in the run directory, read by line
+  range with `read_saved_output`.
+- Checkpoints and handover updates are not tool rounds. A pass that cannot
+  continue in-process (chain cap, or a request that still does not fit) ends
+  `inconclusive: context_checkpoint`; the next pass of the same job resumes from
+  the handover. Final synthesis from an oversized conversation is built from the
+  handover and offers no tools.
+
 The provider configuration is re-read for each new run. Editing this value needs
 no Console restart and does not change runs already in flight. For isolated
 task worktrees, edit the registered project's configuration, which the Console

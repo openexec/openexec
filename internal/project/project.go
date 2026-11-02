@@ -223,6 +223,14 @@ type ProviderConfig struct {
 	Model   string `json:"model"`
 	// MaxTurns bounds API tool rounds. Zero uses the executor default.
 	MaxTurns int `json:"max_turns,omitempty"`
+	// ContextTokens is the model's real context window (131072 for the local
+	// Qwen). Zero uses the default for the endpoint kind. The thresholds below
+	// are shares of it (execution.ContextPolicy): a request chain asks the model
+	// to update its handover at CheckpointSoft and ends at CheckpointHard.
+	ContextTokens         int64   `json:"context_tokens,omitempty"`
+	CheckpointSoft        float64 `json:"checkpoint_soft,omitempty"`
+	CheckpointHard        float64 `json:"checkpoint_hard,omitempty"`
+	PromptTokensPerSecond float64 `json:"prompt_tokens_per_second,omitempty"`
 }
 
 // ActiveAPI resolves the currently active API endpoint. It returns the

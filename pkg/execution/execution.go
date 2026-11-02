@@ -177,6 +177,10 @@ const (
 	ReasonBudgetExhausted = "budget_exhausted"
 	ReasonRouteFalsified  = "route_falsified"
 	ReasonProtocolError   = "protocol_error"
+	// ReasonContextCheckpoint ends a pass whose request chain reached its
+	// context limit and could not go on in-process. It is progress, not a
+	// failure: the handover is on disk and the next pass continues from it.
+	ReasonContextCheckpoint = "context_checkpoint"
 )
 
 // Sandbox modes. The strings are the wire values and predate these names;
@@ -304,6 +308,9 @@ const (
 	EventCancelled      = "execution.cancelled"
 	EventCompleted      = "execution.completed"
 	EventInconclusive   = "execution.inconclusive"
+	// EventCheckpoint reports a context checkpoint or a request chain restart.
+	// Older consumers ignore event types they do not know.
+	EventCheckpoint = "execution.checkpoint"
 )
 
 type EventSink func(Event) error

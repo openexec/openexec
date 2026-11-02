@@ -155,7 +155,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 			return nil, err
 		}
 		return execution.NewAPIProvider(execution.APIProviderConfig{
-			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor, MaxSteps: entry.MaxTurns,
+			Adapter: adapter, Context: contextPolicyOf(entry), Tools: executor.Tools(), ToolExecutor: executor, MaxSteps: entry.MaxTurns,
 		})
 	}
 	// The caller's execution verbs beside the workspace tools: an agent that
@@ -191,7 +191,7 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 			return nil, err
 		}
 		return execution.NewAPIProvider(execution.APIProviderConfig{
-			Adapter: adapter, Tools: executor.Tools(), ToolExecutor: executor, MaxSteps: entry.MaxTurns,
+			Adapter: adapter, Context: contextPolicyOf(entry), Tools: executor.Tools(), ToolExecutor: executor, MaxSteps: entry.MaxTurns,
 		})
 	}
 	// Tools in both modes, filtered by the sandbox: a read-only reviewer that
@@ -200,10 +200,25 @@ func newConfiguredAPIProvider(ctx context.Context, directory, name string, sandb
 	// separate.
 	return execution.NewAPIProvider(execution.APIProviderConfig{
 		Adapter:      adapter,
+		Context:      contextPolicyOf(entry),
 		Tools:        execution.WorkspaceTools(sandbox),
 		ToolExecutor: execution.NewWorkspaceToolExecutor(),
 		MaxSteps:     entry.MaxTurns,
 	})
+}
+
+// contextPolicyOf is the provider's context discipline from its configuration:
+// the window, the checkpoint thresholds and the prompt speed. Unset values take
+// the default for the endpoint kind (a loopback model gets the 64k the bounded
+// path sends; its speed is only used when configured, never guessed).
+func contextPolicyOf(entry project.ProviderConfig) execution.ContextPolicy {
+	policy := execution.ContextPolicy{
+		ContextTokens: entry.ContextTokens, SoftRatio: entry.CheckpointSoft, HardRatio: entry.CheckpointHard,
+		PromptTokensPerSecond: entry.PromptTokensPerSecond,
+	}
+	budget := loopbackRequestBudget(entry.BaseURL)
+	policy.RequestTimeout = budget
+	return policy.WithDefaults(budget > 0)
 }
 
 func requiresReasoningContentReplay(model string) bool {
@@ -403,7 +418,7 @@ func terminalMatchesResult(event execution.Event, result execution.Result, execu
 func validInconclusiveReason(reason string) bool {
 	switch reason {
 	case execution.ReasonMaxTurns, execution.ReasonBudgetExhausted,
-		execution.ReasonRouteFalsified, execution.ReasonProtocolError:
+		execution.ReasonRouteFalsified, execution.ReasonProtocolError, execution.ReasonContextCheckpoint:
 		return true
 	default:
 		return false

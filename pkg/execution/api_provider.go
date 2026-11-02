@@ -50,6 +50,8 @@ type ToolExecutor interface {
 }
 
 type APIProviderConfig struct {
+	// Context bounds each request chain by the provider's window (context_policy.go).
+	Context      ContextPolicy
 	Adapter      agent.ProviderAdapter
 	Tools        []agent.ToolDefinition
 	ToolExecutor ToolExecutor
@@ -114,7 +116,30 @@ func NewAPIProvider(config APIProviderConfig) (*APIProvider, error) {
 	if config.MaxSteps == 0 {
 		config.MaxSteps = DefaultAPIMaxTurns
 	}
+	// A policy is on when the caller resolved one (ContextPolicy.WithDefaults);
+	// the zero value leaves the chain unbounded, as before.
+	if timed, ok := config.Adapter.(interface{ RequestTimeout() time.Duration }); ok && config.Context.ContextTokens > 0 && config.Context.RequestTimeout == 0 {
+		config.Context.RequestTimeout = timed.RequestTimeout()
+	}
 	return &APIProvider{config: config, gateway: gateway}, nil
+}
+
+// contextPolicy is the provider's policy narrowed to what this run may send:
+// the hard-token path never sends more than MaxAPIContextTokens (or the
+// caller's ceiling), whatever the model's window.
+func (p *APIProvider) contextPolicy() ContextPolicy {
+	policy := p.config.Context
+	if policy.ContextTokens <= 0 {
+		policy.Disabled = true
+	}
+	if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok {
+		limit := MaxAPIContextTokens
+		if meter.contextLimit > 0 && meter.contextLimit < limit {
+			limit = meter.contextLimit
+		}
+		policy = policy.effective(limit)
+	}
+	return policy
 }
 
 func (p *APIProvider) Descriptor() ProviderDescriptor {
@@ -313,22 +338,120 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 		}
 		return result, nil
 	}
-	for step := 0; step < p.config.MaxSteps; step++ {
+	return p.runToolLoop(ctx, request, messages, &result, sink, finish)
+}
+
+const checkpointInstruction = "Context checkpoint: this conversation is getting long. Before you continue, call " + updateHandoverTool + " with done (what is finished), next_steps (ordered), decisions (and why) and open_questions. The harness records files, commands and test results itself. Then carry on with the task."
+
+// sizeFailure says an endpoint refused or abandoned a request because of its
+// size: an overflow the guard let through (dispatched), the endpoint's own
+// context error, or a timeout of a request that was already large. A timeout of
+// a small request is a different failure and is not hidden here.
+func sizeFailure(err error, tokens int64, policy ContextPolicy) bool {
+	var overflow *agent.ContextOverflowError
+	if errors.As(err, &overflow) {
+		return true
+	}
+	text := strings.ToLower(err.Error())
+	if strings.Contains(text, "context") && (strings.Contains(text, "exceed") || strings.Contains(text, "too long") || strings.Contains(text, "length")) {
+		return true
+	}
+	if strings.Contains(text, "timeout") || strings.Contains(text, "deadline exceeded") || strings.Contains(text, "awaiting headers") {
+		return tokens > policy.softTokens()/2
+	}
+	return false
+}
+
+// runToolLoop is the tool loop of Execute: rounds of model request and tool
+// calls inside request chains. A chain ends at the policy's hard threshold and
+// the next starts from the handover alone; a checkpoint is progress, never a
+// failure, and does not count as a tool round.
+func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages []agent.Message, result *Result, sink EventSink, finish func()) (Result, error) {
+	var state *runState
+	policy := p.contextPolicy()
+	if !policy.Disabled {
+		state = newRunState(request, policy)
+		if state.load() {
+			messages = state.freshMessages(false)
+			_ = sink(Event{Type: EventCheckpoint, Text: "resumed from the handover of an earlier pass: " + state.path()})
+		}
+	}
+	askedHandover, askedCheckpoint, fresh := false, false, state != nil && len(messages) == 1 && state.data.Chains > 0
+	toolsNow := func() []agent.ToolDefinition {
+		tools := p.config.Tools
+		if state != nil && askedHandover {
+			tools = append(append([]agent.ToolDefinition(nil), tools...), handoverToolDefinition())
+		}
+		if state != nil && len(state.data.Outputs) > 0 {
+			tools = append(append([]agent.ToolDefinition(nil), tools...), readSavedDefinition())
+		}
+		return tools
+	}
+	endCheckpoint := func(why string) (Result, error) {
+		message := fmt.Sprintf("Context checkpoint (%s). The handover is saved at %s; the next pass continues from it.", why, state.path())
+		_ = state.save("checkpointed")
+		result.FinalText += message
+		result.Outcome, result.Reason = OutcomeInconclusive, ReasonContextCheckpoint
+		finish()
+		_ = sink(Event{Type: EventInconclusive, Text: message, Reason: ReasonContextCheckpoint})
+		return *result, nil
+	}
+	restart := func(why string) bool {
+		if fresh || state.data.Chains >= policy.MaxChains {
+			return false
+		}
+		messages = state.freshMessages(false)
+		askedCheckpoint, fresh = false, true
+		_ = sink(Event{Type: EventCheckpoint, Text: "request chain ended (" + why + "); continuing from " + state.path()})
+		return true
+	}
+	rounds, localOnly := 0, 0
+	for rounds < p.config.MaxSteps {
 		if err := ctx.Err(); err != nil {
 			result.Outcome = OutcomeCancelled
 			finish()
 			_ = sink(Event{Type: EventCancelled})
-			return result, err
+			return *result, err
+		}
+		var tokens int64
+		if state != nil {
+			var size int64
+			tokens, size = estimateRequest(agent.Request{Model: request.Model, Messages: messages, System: request.System, Tools: toolsNow()})
+			verdict, why := state.policy.admit(tokens, size)
+			if verdict == admitHard {
+				// Never dispatch a request that cannot finish: restart from the
+				// handover, or end the pass cleanly when that is already the request.
+				if !restart(why) {
+					return endCheckpoint(why)
+				}
+				continue
+			}
+			if verdict == admitSoft && !askedCheckpoint {
+				askedCheckpoint, askedHandover = true, true
+				state.mu.Lock()
+				state.data.Checkpoints++
+				_ = state.save("")
+				state.mu.Unlock()
+				messages = append(messages, agent.NewTextMessage(agent.RoleUser, checkpointInstruction))
+				_ = sink(Event{Type: EventCheckpoint, Text: "checkpoint (" + why + "); handover at " + state.path()})
+			}
 		}
 		response, err := p.completeWithEmptyRecovery(ctx, agent.Request{
 			Model: request.Model, Messages: messages, System: request.System,
-			Tools: p.config.Tools, ToolChoice: "auto",
+			Tools: toolsNow(), ToolChoice: "auto",
 		})
 		if err != nil {
+			if state != nil && ctx.Err() == nil && sizeFailure(err, tokens, state.policy) {
+				if !restart("the endpoint refused or abandoned the request for its size") {
+					return endCheckpoint("the endpoint refused the request for its size")
+				}
+				continue
+			}
 			finish()
 			_ = sink(Event{Type: EventFailed, Text: err.Error()})
-			return result, err
+			return *result, err
 		}
+		fresh = false
 		assistant := agent.Message{Role: agent.RoleAssistant, Content: response.Content, Metadata: response.Metadata}
 		messages = append(messages, assistant)
 		wroteText := false
@@ -336,11 +459,14 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 			if block.Type == agent.ContentTypeText && block.Text != "" {
 				if strings.TrimSpace(block.Text) != "" {
 					wroteText = true
+					if state != nil {
+						state.noteText(block.Text)
+					}
 				}
 				result.FinalText += block.Text
 				if err := sink(Event{Type: EventAssistantDelta, Text: block.Text}); err != nil {
 					finish()
-					return result, err
+					return *result, err
 				}
 			}
 		}
@@ -350,32 +476,41 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 				finish()
 				err := errors.New("API provider returned neither assistant text nor tool calls")
 				_ = sink(Event{Type: EventFailed, Text: err.Error()})
-				return result, err
+				return *result, err
 			}
 			result.Outcome = OutcomeSucceeded
 			finish()
+			state.closeOut("complete")
 			if err := sink(Event{Type: EventCompleted}); err != nil {
-				return result, err
+				return *result, err
 			}
-			return result, nil
+			return *result, nil
 		}
+		external := false
 		for _, call := range calls {
 			event := Event{CallID: call.ToolUseID, ToolName: call.ToolName, Data: call.ToolInput}
 			event.Type = EventToolProposed
 			if err := sink(event); err != nil {
 				finish()
-				return result, err
+				return *result, err
 			}
 			event.Type = EventToolStarted
 			if err := sink(event); err != nil {
 				finish()
-				return result, err
+				return *result, err
 			}
 			var output string
 			var toolErr error
-			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok && meter.prior != nil && call.ToolName == recallTool {
+			switch meter, bounded := p.config.Adapter.(*boundedAPIAdapter); {
+			case state != nil && call.ToolName == updateHandoverTool:
+				output, toolErr = state.update(call.ToolInput)
+			case state != nil && call.ToolName == readSavedTool:
+				output, toolErr = state.readSaved(call.ToolInput)
+			case bounded && meter.prior != nil && call.ToolName == recallTool:
 				output, toolErr = meter.prior.read(call.ToolInput)
-			} else {
+				external = true
+			default:
+				external = true
 				output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
 					CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
 					WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
@@ -389,33 +524,66 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 			}
 			if err := sink(event); err != nil {
 				finish()
-				return result, err
+				return *result, err
 			}
-			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, output, toolErr))
+			inRequest := output
+			if state != nil {
+				state.recordCall(call.ToolName, call.ToolInput, output, toolErr)
+				if toolErr == nil {
+					inRequest = state.compactResult(call.ToolName, call.ToolInput, output)
+				}
+			}
+			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr))
+		}
+		// Updating the handover or reading a saved output is not a tool round;
+		// a model that does only that for long is, so the allowance still ends.
+		if external {
+			rounds, localOnly = rounds+1, 0
+		} else if localOnly++; localOnly > 8 {
+			rounds, localOnly = rounds+1, 0
 		}
 	}
 	// Reaching the tool budget means research must stop, not that the work the
-	// model already did should be discarded. The old path failed the whole run
-	// here, leaving the owner with tool cards and a few transitional sentences
-	// but no answer. Ask once more with tool choice disabled so the model must
-	// synthesize the evidence already in the conversation. Definitions remain
-	// present because strict compatible endpoints validate historical tool calls
-	// against the request's tools array even when no new call is permitted.
+	// model already did should be discarded. Ask once more with tool choice
+	// disabled so the model must synthesize the evidence it has. Definitions
+	// stay present while the conversation holds tool calls, because strict
+	// compatible endpoints validate historical tool calls against the tools
+	// array; a conversation rebuilt from the handover holds none and offers
+	// no tools at all.
 	if err := ctx.Err(); err != nil {
 		result.Outcome = OutcomeCancelled
 		finish()
 		_ = sink(Event{Type: EventCancelled})
-		return result, err
+		return *result, err
 	}
 	system := strings.TrimSpace(request.System)
 	if system != "" {
 		system += "\n\n"
 	}
 	system += finalSynthesisInstruction
+	synthTools := p.config.Tools
+	rebuilt := false
+	rebuild := func() {
+		messages, synthTools, rebuilt = state.freshMessages(true), nil, true
+		_ = sink(Event{Type: EventCheckpoint, Text: "final synthesis from the handover: " + state.path()})
+	}
+	if state != nil {
+		tokens, size := estimateRequest(agent.Request{Messages: messages, System: system, Tools: synthTools})
+		if verdict, _ := state.policy.admit(tokens, size); verdict != admitOK {
+			rebuild()
+		}
+	}
+	choice := "none"
 	response, err := p.completeFinalSynthesis(ctx, agent.Request{
 		Model: request.Model, Messages: messages, System: system,
-		Tools: p.config.Tools, ToolChoice: "none",
+		Tools: synthTools, ToolChoice: choice,
 	})
+	if err != nil && state != nil && !rebuilt && ctx.Err() == nil && sizeFailure(err, 1<<40, state.policy) {
+		rebuild()
+		response, err = p.completeFinalSynthesis(ctx, agent.Request{
+			Model: request.Model, Messages: messages, System: system, Tools: synthTools, ToolChoice: choice,
+		})
+	}
 	if err != nil {
 		var contextOverflow *agent.ContextOverflowError
 		if errors.Is(err, errHardTokenGrantExhausted) || errors.As(err, &contextOverflow) {
@@ -425,14 +593,15 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 			result.Outcome = OutcomeFailed
 			finish()
 			_ = sink(Event{Type: EventFailed, Text: err.Error()})
-			return result, err
+			return *result, err
 		}
 		message := fmt.Sprintf("API tool loop reached %d rounds and final synthesis failed: %v", p.config.MaxSteps, err)
 		result.FinalText += message
 		result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
 		finish()
+		state.closeOut("complete")
 		_ = sink(Event{Type: EventInconclusive, Text: message, Reason: ReasonMaxTurns})
-		return result, nil
+		return *result, nil
 	}
 	wroteText := false
 	for _, block := range response.Content {
@@ -443,23 +612,24 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 		result.FinalText += block.Text
 		if err := sink(Event{Type: EventAssistantDelta, Text: block.Text}); err != nil {
 			finish()
-			return result, err
+			return *result, err
 		}
 	}
+	state.closeOut("complete")
 	if !wroteText {
 		message := fmt.Sprintf("API tool loop reached %d rounds and final synthesis returned no text", p.config.MaxSteps)
 		result.FinalText += message
 		result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
 		finish()
 		_ = sink(Event{Type: EventInconclusive, Text: message, Reason: ReasonMaxTurns})
-		return result, nil
+		return *result, nil
 	}
 	result.Outcome, result.Reason = OutcomeInconclusive, ReasonMaxTurns
 	finish()
 	if err := sink(Event{Type: EventInconclusive, Reason: ReasonMaxTurns}); err != nil {
-		return result, err
+		return *result, err
 	}
-	return result, nil
+	return *result, nil
 }
 
 // completeWithEmptyRecovery gives an OpenAI-compatible model one bounded
