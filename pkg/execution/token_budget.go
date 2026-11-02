@@ -43,6 +43,7 @@ func (e *contextGrantError) Unwrap() error { return errHardTokenGrantExhausted }
 
 func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*agent.Response, error) {
 	r.NonThinking = p.nonThinking
+	original := r
 	// Ollama may raise vision-capable model contexts to 2048 even for text.
 	// Keep the input reservation above that native floor before any inference.
 	if p.remaining < 4096 {
@@ -141,8 +142,28 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		overflow = nil
 		if errors.As(err, &overflow) && !overflow.Dispatched {
 			p.remaining += input + output
+			// Power-of-two selection can leave usable grant stranded. On a
+			// preflight refusal only, reserve the actual required context plus
+			// a small serialization margin, still within every ceiling and the
+			// original grant. Never retry a dispatched request.
+			required := int64(overflow.EstimatedTokens) + minimumOutput + 16
+			if required > input && required <= p.contextTarget && required+minimumOutput <= p.remaining {
+				p.contextCap = required
+				return p.Complete(ctx, original)
+			}
 			if input < p.contextTarget && int64(overflow.EstimatedTokens)+minimumOutput <= p.contextTarget {
 				return nil, &contextGrantError{remaining: p.remaining, selected: input, ceiling: minNonzero(p.providerContext, p.contextLimit, MaxAPIContextTokens)}
+			}
+			// Only diagnose provider configuration when it is the binding
+			// ceiling. An explicit caller limit is an intentional restriction.
+			if p.providerContext > 0 && p.providerContext <= MaxAPIContextTokens && (p.contextLimit == 0 || p.providerContext < p.contextLimit) {
+				if metadata, ok := p.ProviderAdapter.(interface {
+					NativeContextWindow(context.Context, string) (int64, error)
+				}); ok {
+					if window, e := metadata.NativeContextWindow(ctx, r.Model); e == nil && p.providerContext <= window/4 && int64(overflow.EstimatedTokens)+minimumOutput <= window {
+						return nil, fmt.Errorf("context_misconfiguration: provider context_tokens=%d is materially below model metadata window=%d (model=%s)", p.providerContext, window, r.Model)
+					}
+				}
 			}
 			return nil, err
 		}
