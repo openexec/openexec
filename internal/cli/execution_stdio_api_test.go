@@ -12,8 +12,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openexec/openexec/internal/project"
 	"github.com/openexec/openexec/pkg/execution"
 )
+
+func TestContextPolicyProviderAndLoopbackDefault(t *testing.T) {
+	for _, tc := range []struct {
+		name, url        string
+		configured, want int64
+	}{
+		{"loopback default", "http://127.0.0.1:11434/v1", 0, 65536},
+		{"configured window", "http://127.0.0.1:11434/v1", 131072, 131072},
+		{"configured small", "http://127.0.0.1:11434/v1", 4096, 4096},
+		{"hosted default", "https://example.com/v1", 0, 128000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := contextPolicyOf(project.ProviderConfig{BaseURL: tc.url, ContextTokens: tc.configured})
+			if got.ContextTokens != tc.want {
+				t.Fatalf("context = %d, want %d", got.ContextTokens, tc.want)
+			}
+		})
+	}
+}
 
 const (
 	liveOllamaAddress = "127.0.0.1:11436"

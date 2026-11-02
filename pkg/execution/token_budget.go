@@ -25,6 +25,8 @@ type boundedAPIAdapter struct {
 	sink                    EventSink
 	contextCap              int64
 	contextLimit            int64
+	providerContext         int64
+	contextTarget           int64
 	nonThinking             bool
 	prior                   priorResults
 	trustedDirectoryResults bool
@@ -32,8 +34,20 @@ type boundedAPIAdapter struct {
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
 
+type contextGrantError struct{ remaining, selected, ceiling int64 }
+
+func (e *contextGrantError) Error() string {
+	return fmt.Sprintf("hard token grant cannot admit inference: remaining grant=%d selected context=%d provider/request ceiling=%d", e.remaining, e.selected, e.ceiling)
+}
+func (e *contextGrantError) Unwrap() error { return errHardTokenGrantExhausted }
+
 func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*agent.Response, error) {
+	return p.complete(ctx, r, true)
+}
+
+func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allowResize bool) (*agent.Response, error) {
 	r.NonThinking = p.nonThinking
+	original := r
 	// Ollama may raise vision-capable model contexts to 2048 even for text.
 	// Keep the input reservation above that native floor before any inference.
 	if p.remaining < 4096 {
@@ -46,12 +60,21 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		// that made a valid 23K prompt reach a newly reduced 16K context.
 		p.contextCap = 2048
 		ceiling := MaxAPIContextTokens
+		if p.providerContext > 0 && p.providerContext < ceiling {
+			ceiling = p.providerContext
+		}
 		if p.contextLimit > 0 && p.contextLimit < ceiling {
 			ceiling = p.contextLimit
 		}
 		for next := p.contextCap * 2; next <= ceiling && next <= p.remaining-minimumOutput; next *= 2 {
 			p.contextCap = next
 		}
+		// Compare against the same native power-of-two selection without a grant.
+		target := int64(2048)
+		for target*2 <= ceiling {
+			target *= 2
+		}
+		p.contextTarget = target
 	}
 	input := p.contextCap
 	if p.remaining < input+minimumOutput {
@@ -123,6 +146,29 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		overflow = nil
 		if errors.As(err, &overflow) && !overflow.Dispatched {
 			p.remaining += input + output
+			// Power-of-two selection can leave usable grant stranded. On a
+			// preflight refusal only, reserve the actual required context plus
+			// a small serialization margin, still within every ceiling and the
+			// original grant. Never retry a dispatched request.
+			required := int64(overflow.EstimatedTokens) + minimumOutput + 16
+			if allowResize && p.input == 0 && p.output == 0 && overflow.RequestBytes > 0 && required > input && required <= p.contextTarget && required+minimumOutput <= p.remaining {
+				p.contextCap = required
+				return p.complete(ctx, original, false)
+			}
+			if p.input == 0 && p.output == 0 && overflow.RequestBytes > 0 && input < p.contextTarget && int64(overflow.EstimatedTokens)+minimumOutput <= p.contextTarget {
+				return nil, &contextGrantError{remaining: p.remaining, selected: input, ceiling: minNonzero(p.providerContext, p.contextLimit, MaxAPIContextTokens)}
+			}
+			// Only diagnose provider configuration when it is the binding
+			// ceiling. An explicit caller limit is an intentional restriction.
+			if p.providerContext > 0 && p.providerContext <= MaxAPIContextTokens && (p.contextLimit == 0 || p.providerContext < p.contextLimit) {
+				if metadata, ok := p.ProviderAdapter.(interface {
+					NativeContextWindow(context.Context, string) (int64, error)
+				}); ok {
+					if window, e := metadata.NativeContextWindow(ctx, r.Model); e == nil && p.providerContext <= window/4 && int64(overflow.EstimatedTokens)+minimumOutput <= window {
+						return nil, fmt.Errorf("context_misconfiguration: provider context_tokens=%d is materially below model metadata window=%d (model=%s)", p.providerContext, window, r.Model)
+					}
+				}
+			}
 			return nil, err
 		}
 	}
@@ -151,6 +197,16 @@ func (p *boundedAPIAdapter) Complete(ctx context.Context, r agent.Request) (*age
 		}
 	}
 	return res, nil
+}
+
+func minNonzero(values ...int64) int64 {
+	var result int64
+	for _, v := range values {
+		if v > 0 && (result == 0 || v < result) {
+			result = v
+		}
+	}
+	return result
 }
 func (p *boundedAPIAdapter) Stream(ctx context.Context, r agent.Request) (<-chan agent.StreamEvent, error) {
 	res, err := p.Complete(ctx, r)
