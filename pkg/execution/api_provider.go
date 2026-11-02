@@ -231,7 +231,7 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 		// Each Execute owns its limiter, including all empty-response retries and
 		// final synthesis. Never store a run budget on the shared provider.
 		bounded := *p
-		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink, contextLimit: request.ContextTokenLimit, nonThinking: request.NonThinking}
+		meter := &boundedAPIAdapter{ProviderAdapter: p.config.Adapter, remaining: request.TokenBudget, sink: sink, contextLimit: request.ContextTokenLimit, providerContext: p.config.Context.ContextTokens, nonThinking: request.NonThinking}
 		if safe, ok := p.config.ToolExecutor.(interface{ safelyListsDirectories() bool }); ok {
 			meter.trustedDirectoryResults = safe.safelyListsDirectories()
 		}
@@ -240,7 +240,8 @@ func (p *APIProvider) execute(ctx context.Context, request Request, sink EventSi
 		request.ContextTokenLimit = 0
 		request.NonThinking = false // The run-local adapter retains it for every call/retry.
 		result, err := bounded.execute(ctx, request, sink)
-		if errors.Is(err, errHardTokenGrantExhausted) {
+		var grantContext *contextGrantError
+		if errors.Is(err, errHardTokenGrantExhausted) && !errors.As(err, &grantContext) {
 			// Empty-response/final-synthesis recovery may wrap this refusal.
 			// Preserve the existing typed transport spelling for Console's
 			// per-run yield, without normalizing unrelated provider failures.
