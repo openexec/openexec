@@ -14,7 +14,10 @@ env:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    # The Linux leg's runner comes from the repo variable OPENEXEC_LINUX_RUNNER
+    # (e.g. namespace-profile-openexec); unset or deleted means ubuntu-latest.
+    # The matrix keeps the stable os name so check names do not change.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.OPENEXEC_LINUX_RUNNER || 'ubuntu-latest') || matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
