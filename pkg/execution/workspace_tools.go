@@ -170,26 +170,6 @@ func (e *WorkspaceToolExecutor) ValidateAccess(workingDir string, sandbox Sandbo
 	}
 }
 
-// scanReportingExecutor is the optional capability of reporting, from the tool
-// itself, whether a search scan finished completely.
-type scanReportingExecutor interface {
-	executeToolScan(context.Context, ToolRequest) (output string, complete bool, err error)
-}
-
-// executeToolScan is ExecuteTool plus authoritative scan provenance: complete
-// is true only for a search_files call whose scan finished without limits,
-// truncation or unreadable entries. Every other tool reports false.
-func (e *WorkspaceToolExecutor) executeToolScan(ctx context.Context, request ToolRequest) (string, bool, error) {
-	if request.Name != "search_files" {
-		output, err := e.ExecuteTool(ctx, request)
-		return output, false, err
-	}
-	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
-		return "", false, err
-	}
-	return e.searchFilesWithProvenance(ctx, request)
-}
-
 func (e *WorkspaceToolExecutor) ExecuteTool(ctx context.Context, request ToolRequest) (string, error) {
 	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
 		return "", err

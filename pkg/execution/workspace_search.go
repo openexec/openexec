@@ -21,19 +21,6 @@ const (
 	searchIncomplete   = "[incomplete search: limits, truncated lines or unreadable entries; narrow the path or text]\n"
 )
 
-// governingInstructionFiles are the files agents are told to obey. A search
-// that matched inside one carries instructions, so its result must stay in the
-// prompt. This is decided by the file the scan itself matched in, never by
-// guessing at result text.
-var governingInstructionFiles = map[string]bool{
-	"agents.md": true, "agents.local.md": true, "claude.md": true, "gemini.md": true,
-	".cursorrules": true, "copilot-instructions.md": true,
-}
-
-func isGoverningInstructionFile(path string) bool {
-	return governingInstructionFiles[strings.ToLower(filepath.Base(path))]
-}
-
 // searchFiles reuses the workspace read boundary; it cannot execute commands,
 // follow links during traversal, or turn a readable root into a writable one.
 func (e *WorkspaceToolExecutor) searchFiles(ctx context.Context, request ToolRequest) (string, error) {
@@ -59,7 +46,6 @@ func (e *WorkspaceToolExecutor) searchFilesWithProvenance(ctx context.Context, r
 		var out strings.Builder
 		entries, remaining := 0, maxSearchBytes
 		incomplete := false
-		governed := false
 		err := fs.WalkDir(root.FS(), filepath.ToSlash(relative), func(path string, entry fs.DirEntry, walkErr error) error {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -140,9 +126,6 @@ func (e *WorkspaceToolExecutor) searchFilesWithProvenance(ctx context.Context, r
 					return fs.SkipAll
 				}
 				out.WriteString(match)
-				if isGoverningInstructionFile(path) {
-					governed = true
-				}
 			}
 			return nil
 		})
@@ -154,9 +137,7 @@ func (e *WorkspaceToolExecutor) searchFilesWithProvenance(ctx context.Context, r
 		} else if out.Len() == 0 {
 			out.WriteString("No matches in regular text files (symbolic links and private configuration directories skipped).\n")
 		}
-		// Complete means safe to omit from a prompt: the scan finished, matched
-		// in no governing instruction file, and is faithfully recallable as text.
-		complete = !incomplete && !governed && utf8.ValidString(out.String())
+		complete = !incomplete
 		return out.String(), nil
 	})
 	return output, complete && err == nil, err

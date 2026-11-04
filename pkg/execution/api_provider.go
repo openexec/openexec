@@ -511,7 +511,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			}
 			var output string
 			var toolErr error
-			scanComplete, recallFailed := false, false
+			recallFailed := false
 			switch meter, bounded := p.config.Adapter.(*boundedAPIAdapter); {
 			case state != nil && call.ToolName == updateHandoverTool:
 				output, toolErr = state.update(call.ToolInput)
@@ -534,17 +534,12 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				external = true
 			default:
 				external = true
-				toolRequest := ToolRequest{
+				output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
 					CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
 					WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
 					WritableRoots: append([]string(nil), request.WritableRoots...),
 					ReadableRoots: append([]string(nil), request.ReadableRoots...),
-				}
-				if scanner, ok := p.config.ToolExecutor.(scanReportingExecutor); ok {
-					output, scanComplete, toolErr = scanner.executeToolScan(ctx, toolRequest)
-				} else {
-					output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, toolRequest)
-				}
+				})
 			}
 			event.Type, event.Text = EventToolCompleted, output
 			if toolErr != nil {
@@ -569,11 +564,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 					inRequest = state.compactResult(call.ToolName, call.ToolInput, output)
 				}
 			}
-			resultMessage := agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr)
-			// The mark travels with this exact result. A handover-compacted
-			// result no longer holds the full scan, so it never carries it.
-			resultMessage.Content[0].ScanComplete = scanComplete && toolErr == nil && inRequest == output
-			messages = append(messages, resultMessage)
+			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr))
 		}
 		// Updating the handover or reading a saved output is not a tool round;
 		// a model that does only that for long is, so the allowance still ends.

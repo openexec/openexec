@@ -103,20 +103,3 @@ func (e *CompositeToolExecutor) ExecuteTool(ctx context.Context, request ToolReq
 	}
 	return e.workspace.ExecuteTool(ctx, request)
 }
-
-// executeToolScan carries the workspace half's scan provenance through the
-// composite. Forwarded gateway verbs never claim a complete scan.
-func (e *CompositeToolExecutor) executeToolScan(ctx context.Context, request ToolRequest) (string, bool, error) {
-	if e.forwarded[request.Name] {
-		output, err := e.ExecuteTool(ctx, request)
-		return output, false, err
-	}
-	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
-		return "", false, err
-	}
-	if scanner, ok := e.workspace.(scanReportingExecutor); ok {
-		return scanner.executeToolScan(ctx, request)
-	}
-	output, err := e.workspace.ExecuteTool(ctx, request)
-	return output, false, err
-}

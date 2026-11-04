@@ -58,9 +58,10 @@ type pendingCall struct {
 
 // compactWith omits a result only by structured provenance, never by what its
 // text says (and never one that is not valid UTF-8, which recall's JSON pages
-// could not return byte-for-byte): a directory listing from a trusted executor (names alone), or a
-// search whose own scan reported complete. File reads, failed results, partial
-// scans and unknown tools can hold governing instructions and stay verbatim.
+// could not return byte-for-byte): a directory listing from a trusted executor (names alone, no file text).
+// Search results carry file text, which can quote governing instructions, so
+// they stay verbatim however complete the scan. File reads, failed results,
+// partial scans and unknown tools stay verbatim too.
 func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent.Request, bool) {
 	copyRequest := r
 	copyRequest.Messages = append([]agent.Message(nil), r.Messages...)
@@ -68,11 +69,7 @@ func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent
 	seenCalls := map[string]int{}
 	ambiguous := map[string]bool{}
 	eligible := map[[2]int]pendingCall{}
-	lastAssistant := -1
 	for i, message := range r.Messages {
-		if message.Role == agent.RoleAssistant {
-			lastAssistant = i
-		}
 		for j, block := range message.Content {
 			switch block.Type {
 			case agent.ContentTypeToolUse:
@@ -114,14 +111,6 @@ func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent
 				id := hex.EncodeToString(hash[:])
 				p[id] = b.ToolOutput
 				b.ToolOutput = fmt.Sprintf("Prior directory listing retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", id, len(b.ToolOutput), recallTool)
-			case call.name == "search_files" && b.ScanComplete && i < lastAssistant:
-				// Results the model has not yet answered stay in view. The id
-				// binds this exact call position and result, so a reused call
-				// ID or an identical output elsewhere cannot stand in for it.
-				hash := sha256.Sum256([]byte(fmt.Sprintf("search\x00%d\x00%s\x00%s\x00%s", call.occurrence, b.ToolResultID, call.input, b.ToolOutput)))
-				id := hex.EncodeToString(hash[:])
-				p[id] = b.ToolOutput
-				b.ToolOutput = fmt.Sprintf("Omitted complete search_files result for call %q (use #%d, %d bytes) retained as %s. It has NOT been inspected in this context: use %s with this id and offset 0, then each nextOffset, before relying on it.", b.ToolResultID, call.occurrence, len(b.ToolOutput), id, recallTool)
 			default:
 				continue
 			}

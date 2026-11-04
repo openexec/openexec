@@ -58,11 +58,6 @@ type ContentBlock struct {
 	ToolResultID string `json:"tool_result_id,omitempty"`
 	ToolOutput   string `json:"tool_output,omitempty"`
 	ToolError    string `json:"tool_error,omitempty"`
-
-	// ScanComplete is set only by the executing harness, from the scan itself,
-	// on a tool result whose search covered everything it was asked to. It is
-	// never serialized, so neither a model nor a replayed history can assert it.
-	ScanComplete bool `json:"-"`
 }
 
 // Message represents a single turn in a conversation.

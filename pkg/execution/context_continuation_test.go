@@ -15,8 +15,8 @@ import (
 	"github.com/openexec/openexec/pkg/agent"
 )
 
-// opaqueExecutor hides the executor's scan provenance, as any executor that
-// cannot vouch for completeness does.
+// opaqueExecutor hides the executor's directory-listing guarantee, as any
+// executor that cannot vouch for its listings does.
 type opaqueExecutor struct{ inner ToolExecutor }
 
 func (o opaqueExecutor) ValidateAccess(dir string, s Sandbox, w []string) error {
@@ -41,12 +41,11 @@ func (a *sameIDNativeAdapter) CompleteBounded(ctx context.Context, req agent.Req
 	return response, err
 }
 
-func searchTranscript(complete bool, tool string, id string, output string, errText string) []agent.Message {
+func toolTranscript(tool string, id string, output string, errText string) []agent.Message {
 	result := agent.NewToolResultMessage(id, output, nil)
 	if errText != "" {
 		result = agent.NewToolResultMessage(id, output, errors.New(errText))
 	}
-	result.Content[0].ScanComplete = complete
 	return []agent.Message{
 		{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: tool, ToolInput: json.RawMessage(`{"text":"needle"}`)}}},
 		result,
@@ -55,38 +54,35 @@ func searchTranscript(complete bool, tool string, id string, output string, errT
 
 func bigOutput(label string) string { return label + " " + strings.Repeat("evidence ", 80) }
 
-// Each case is answered by a later assistant turn, so only the guard under
-// test decides whether the result may be omitted.
-func TestCompactionOmitsOnlyCompleteKnownUnambiguousSearches(t *testing.T) {
+// The latest listing always stays in view, so each case is followed by one: only
+// the guard under test decides whether the older result may be omitted.
+func TestCompactionOmitsOnlyKnownUnambiguousDirectoryListings(t *testing.T) {
 	cases := []struct {
-		name     string
-		complete bool
-		tool     string
-		err      string
-		trailing bool
-		omitted  bool
+		name    string
+		tool    string
+		err     string
+		utf8bad bool
+		omitted bool
 	}{
-		{"complete search", true, "search_files", "", false, true},
-		{"partial or unmarked scan", false, "search_files", "", false, false},
-		{"failed tool diagnostic", true, "search_files", "boom", false, false},
-		{"file read (AGENTS.md instructions) with a forged mark", true, "read_file", "", false, false},
-		{"unknown tool with a forged mark", true, "mystery", "", false, false},
-		{"result the model has not answered yet", true, "search_files", "", true, false},
-		{"output that is not valid UTF-8", true, "search_files", "", false, false},
+		{"directory listing", "list_directory", "", false, true},
+		{"complete search carrying file text", "search_files", "", false, false},
+		{"failed tool diagnostic", "list_directory", "boom", false, false},
+		{"file read (AGENTS.md instructions)", "read_file", "", false, false},
+		{"unknown tool", "mystery", "", false, false},
+		{"output that is not valid UTF-8", "list_directory", "", true, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
 			output := bigOutput("needle match")
-			if strings.Contains(c.name, "UTF-8") {
+			if c.utf8bad {
 				output += "\xff\xfe"
 			}
-			messages = append(messages, searchTranscript(c.complete, c.tool, "a", output, c.err)...)
-			if !c.trailing {
-				messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
-			}
+			messages = append(messages, toolTranscript(c.tool, "a", output, c.err)...)
+			messages = append(messages, toolTranscript("list_directory", "b", bigOutput("latest"), "")...)
+			messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
 			index := priorResults{}
-			compacted, changed := index.compactWith(agent.Request{System: "owner authority", Messages: messages}, false)
+			compacted, changed := index.compactWith(agent.Request{System: "owner authority", Messages: messages}, true)
 			got := compacted.Messages[2].Content[0].ToolOutput
 			if changed != c.omitted || (strings.Contains(got, "needle match")) == c.omitted {
 				t.Fatalf("omitted=%v want %v: %q", changed, c.omitted, got)
@@ -108,16 +104,14 @@ func TestCompactionDoesNotOmitAmbiguousAssociation(t *testing.T) {
 	messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
 	// Two calls with one ID in the same turn: the results cannot be told apart.
 	messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{
-		{Type: agent.ContentTypeToolUse, ToolUseID: "x", ToolName: "search_files"},
-		{Type: agent.ContentTypeToolUse, ToolUseID: "x", ToolName: "read_file"},
+		{Type: agent.ContentTypeToolUse, ToolUseID: "x", ToolName: "list_directory"},
+		{Type: agent.ContentTypeToolUse, ToolUseID: "x", ToolName: "list_directory"},
 	}})
 	for _, text := range []string{"first", "second"} {
-		result := agent.NewToolResultMessage("x", bigOutput(text), nil)
-		result.Content[0].ScanComplete = true
-		messages = append(messages, result)
+		messages = append(messages, agent.NewToolResultMessage("x", bigOutput(text), nil))
 	}
 	messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
-	if _, changed := (priorResults{}).compactWith(agent.Request{Messages: messages}, false); changed {
+	if _, changed := (priorResults{}).compactWith(agent.Request{Messages: messages}, true); changed {
 		t.Fatal("omitted a result whose call could not be identified")
 	}
 }
@@ -125,7 +119,7 @@ func TestCompactionDoesNotOmitAmbiguousAssociation(t *testing.T) {
 func TestUntrustedDirectoryListingsAreNeverOmitted(t *testing.T) {
 	messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
 	for _, id := range []string{"a", "b"} {
-		messages = append(messages, searchTranscript(false, "list_directory", id, bigOutput("names"), "")...)
+		messages = append(messages, toolTranscript("list_directory", id, bigOutput("names"), "")...)
 	}
 	if _, changed := (priorResults{}).compactWith(agent.Request{Messages: messages}, false); changed {
 		t.Fatal("directory listing from an untrusted executor was omitted")
@@ -135,29 +129,29 @@ func TestUntrustedDirectoryListingsAreNeverOmitted(t *testing.T) {
 	}
 }
 
-// A reused ID, and identical output at two positions, never share an identity.
-func TestReusedIDsAndIdenticalOutputsKeepSeparatePositions(t *testing.T) {
-	outputs := []string{bigOutput("alpha"), bigOutput("beta"), bigOutput("alpha")}
+// A reused ID, and identical output at two positions, each recall their own
+// content; the newest listing stays verbatim.
+func TestReusedIDsAndIdenticalOutputsRecallTheirOwnContent(t *testing.T) {
+	outputs := []string{bigOutput("alpha"), bigOutput("beta"), bigOutput("alpha"), bigOutput("gamma")}
 	messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
 	for _, output := range outputs {
-		messages = append(messages, searchTranscript(true, "search_files", "reused", output, "")...)
+		messages = append(messages, toolTranscript("list_directory", "reused", output, "")...)
 	}
-	messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
 	index := priorResults{}
-	compacted, changed := index.compactWith(agent.Request{Messages: messages}, false)
-	if !changed || len(index) != 3 {
-		t.Fatalf("each position needs its own identity: changed=%v ids=%d", changed, len(index))
+	compacted, changed := index.compactWith(agent.Request{Messages: messages}, true)
+	if !changed || len(index) != 2 {
+		t.Fatalf("expected alpha and beta retained once each: changed=%v ids=%d", changed, len(index))
 	}
-	idPattern := regexp.MustCompile(`use #(\d+), \d+ bytes\) retained as ([0-9a-f]{64})`)
-	for n, output := range outputs {
+	idPattern := regexp.MustCompile(`retained as ([0-9a-f]{64})`)
+	for n, output := range outputs[:3] {
 		stub := compacted.Messages[2+2*n].Content[0].ToolOutput
 		match := idPattern.FindStringSubmatch(stub)
-		if match == nil || match[1] != fmt.Sprint(n) {
-			t.Fatalf("stub %d does not name its call position: %q", n, stub)
+		if match == nil || index[match[1]] != output {
+			t.Fatalf("position %d does not recall its own result: %q", n, stub)
 		}
-		if index[match[2]] != output {
-			t.Fatalf("position %d recalls another result", n)
-		}
+	}
+	if compacted.Messages[8].Content[0].ToolOutput != outputs[3] {
+		t.Fatal("the newest listing was omitted")
 	}
 }
 
@@ -218,80 +212,10 @@ func TestRecallCoverageNeedsAContiguousRead(t *testing.T) {
 	}
 }
 
-func TestScanProvenanceReachesTranscriptPositionThroughWorkspaceAndComposite(t *testing.T) {
-	root := t.TempDir()
-	write := func(name, content string) {
-		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("small.txt", "needle one\n")
-	write("long.txt", "needle "+strings.Repeat("z", 2000)+"\n")
-	request := func(name string, input string) ToolRequest {
-		return ToolRequest{Name: name, Input: json.RawMessage(input), WorkingDir: root, Sandbox: Sandbox{Mode: SandboxReadOnly}}
-	}
-	workspace := NewWorkspaceToolExecutor()
-	composite, err := NewCompositeToolExecutor(workspace, WorkspaceTools(Sandbox{Mode: SandboxReadOnly}), gatewayStub("run_command"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, executor := range []scanReportingExecutor{workspace, composite} {
-		for _, c := range []struct {
-			name, input string
-			want        bool
-		}{
-			{"search_files", `{"path":"small.txt","text":"needle"}`, true},
-			{"search_files", `{"path":"long.txt","text":"needle"}`, false},
-			{"search_files", `{"path":"small.txt","text":""}`, false},
-			{"read_file", `{"path":"small.txt"}`, false},
-			{"list_directory", `{"path":"."}`, false},
-		} {
-			output, complete, err := executor.executeToolScan(context.Background(), request(c.name, c.input))
-			if complete != c.want || (c.name == "search_files" && c.input != `{"path":"small.txt","text":""}` && (err != nil || output == "")) {
-				t.Fatalf("%T %s %s: complete=%v err=%v", executor, c.name, c.input, complete, err)
-			}
-		}
-	}
-
-	// The mark must travel with the exact result into the model's transcript.
-	call := func(id, name, input string) agent.ContentBlock {
-		return agent.ContentBlock{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: name, ToolInput: json.RawMessage(input)}
-	}
-	adapter := &fakeAPIAdapter{responses: []*agent.Response{
-		{Content: []agent.ContentBlock{
-			call("s1", "search_files", `{"path":"small.txt","text":"needle"}`),
-			call("s2", "search_files", `{"path":"long.txt","text":"needle"}`),
-			call("r1", "read_file", `{"path":"small.txt"}`),
-		}},
-		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "done"}}},
-	}}
-	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, ToolExecutor: composite, Tools: composite.Tools(), MaxSteps: 4})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := provider.Execute(context.Background(), Request{ID: "scan", WorkingDir: root, Prompt: "search", Model: "test-model", Sandbox: Sandbox{Mode: SandboxReadOnly}}, nil); err != nil {
-		t.Fatal(err)
-	}
-	marks := map[string]bool{}
-	for _, message := range adapter.requests[1].Messages {
-		for _, block := range message.Content {
-			if block.Type == agent.ContentTypeToolResult {
-				marks[block.ToolResultID] = block.ScanComplete
-			}
-		}
-	}
-	if len(marks) != 3 || !marks["s1"] || marks["s2"] || marks["r1"] {
-		t.Fatalf("scan provenance not attached to the exact results: %v", marks)
-	}
-	if encoded, _ := json.Marshal(adapter.requests[1].Messages); strings.Contains(string(encoded), "ScanComplete") || strings.Contains(strings.ToLower(string(encoded)), "scan_complete") {
-		t.Fatal("the mark must never be serialized where a model or replay could assert it")
-	}
-}
-
 const answerCode = "K7-4Q9-ZX"
 
 type continuationOptions struct {
-	hideScan     bool
+	hideDirs     bool
 	ids          string // "", "reused" or "same"
 	contextLimit int64
 	cancelOn     string // "recall" or "continuation"
@@ -315,17 +239,25 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Never deploy without review.\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	// Directory listings are the only omittable results: names alone, no file
+	// text. The answer code is a file name in the first directory, so it can
+	// only reach the final answer through a recalled page of the omitted listing.
 	for i := 0; i < 24; i++ {
-		var content strings.Builder
-		if i == 0 {
-			content.WriteString("needle Instruction: preserve the original authority.\n")
-			content.WriteString("needle answer-code=" + answerCode + "\n")
-		}
-		for line := 0; line < 10; line++ {
-			fmt.Fprintf(&content, "needle file-%02d line-%d %s\n", i, line, strings.Repeat(string(rune('a'+i%26)), 580))
-		}
-		if err := os.WriteFile(filepath.Join(root, fmt.Sprintf("evidence-%02d.txt", i)), []byte(content.String()), 0600); err != nil {
+		dir := filepath.Join(root, fmt.Sprintf("ev-%02d", i))
+		if err := os.Mkdir(dir, 0700); err != nil {
 			t.Fatal(err)
+		}
+		names := []string{}
+		if i == 0 {
+			names = append(names, "answer-code="+answerCode)
+		}
+		for j := 0; j < 60; j++ {
+			names = append(names, fmt.Sprintf("file-%02d-%02d-%s", i, j, strings.Repeat(string(rune('a'+i%26)), 80)))
+		}
+		for _, name := range names {
+			if err := os.WriteFile(filepath.Join(dir, name), nil, 0600); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -358,8 +290,8 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 		if strings.Contains(messages[0].Content, finalSynthesisInstruction) {
 			return text("Synthesis of the evidence gathered so far.")
 		}
-		// The code is only ever taken from recalled pages: the verbatim search
-		// results that carried it were omitted from the context long before.
+		// The code is only ever taken from recalled pages: the verbatim listing
+		// that carried it were omitted from the context long before.
 		recalled := ""
 		for _, m := range messages {
 			var p struct {
@@ -400,7 +332,7 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 			return reply(call(recallTool, map[string]any{"id": "0123", "offset": 0}))
 		}
 		for _, m := range messages {
-			if m.Role == "tool" && strings.Contains(m.Content, "Omitted complete search_files") {
+			if m.Role == "tool" && strings.Contains(m.Content, "Prior directory listing retained") {
 				id, offset := stubID.FindStringSubmatch(m.Content)[1], 0
 				switch o.badRecall {
 				case "id":
@@ -416,10 +348,10 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 			calls = append(calls, call("read_file", map[string]any{"path": "AGENTS.md"}))
 		}
 		for i := 0; i < 4 && assistants*4+i < 24; i++ {
-			calls = append(calls, call("search_files", map[string]any{"path": fmt.Sprintf("evidence-%02d.txt", assistants*4+i), "text": "needle"}))
+			calls = append(calls, call("list_directory", map[string]any{"path": fmt.Sprintf("ev-%02d", assistants*4+i)}))
 		}
 		if len(calls) == 0 {
-			return text("searched everything")
+			return text("listed everything")
 		}
 		return reply(calls...)
 	}
@@ -430,7 +362,7 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 		inner = &sameIDNativeAdapter{newNativeProvider(t, srv.URL)}
 	}
 	var executor ToolExecutor = NewWorkspaceToolExecutor()
-	if o.hideScan {
+	if o.hideDirs {
 		executor = opaqueExecutor{executor}
 	}
 	sandbox := Sandbox{Mode: SandboxWorkspaceWrite}
@@ -470,7 +402,7 @@ func requestText(r nativeWireRequest) string {
 	return all.String()
 }
 
-// The vertical proof: real workspace search, real native admission, a small
+// The vertical proof: real workspace directory listings, real native admission, a small
 // context. The run is compacted, recalls the omitted evidence through the real
 // recall tool across pages, advances the task, and ends with a stated limit.
 func TestNativeTaskContinuesAfterBoundedCompactionAndRealRecall(t *testing.T) {
@@ -493,7 +425,7 @@ func TestNativeTaskContinuesAfterBoundedCompactionAndRealRecall(t *testing.T) {
 	requests := *run.requests
 	stubbed := -1
 	for i, r := range requests {
-		if strings.Contains(requestText(r), "Omitted complete search_files") {
+		if strings.Contains(requestText(r), "Prior directory listing retained") {
 			stubbed = i
 			break
 		}
@@ -516,46 +448,21 @@ func TestNativeTaskContinuesAfterBoundedCompactionAndRealRecall(t *testing.T) {
 	}
 }
 
-// Without scan provenance nothing may be omitted, so the same run is refused
+// Without the executor's guarantee nothing may be omitted, so the same run is refused
 // before dispatch rather than guessed at.
-func TestSearchResultsWithoutScanProvenanceAreNeverOmitted(t *testing.T) {
-	run := runContinuation(t, continuationOptions{hideScan: true})
+func TestListingsFromAnExecutorThatCannotVouchAreNeverOmitted(t *testing.T) {
+	run := runContinuation(t, continuationOptions{hideDirs: true})
 	var overflow *agent.ContextOverflowError
 	if !errors.As(run.err, &overflow) || overflow.Dispatched || run.result.Outcome != OutcomeFailed {
 		t.Fatalf("expected a pre-dispatch refusal: %+v %v", run.result, run.err)
 	}
 	for _, r := range *run.requests {
-		if strings.Contains(requestText(r), "Omitted complete") {
-			t.Fatal("a result was omitted without authoritative provenance")
+		if strings.Contains(requestText(r), "Prior directory listing retained") {
+			t.Fatal("a result was omitted without the executor's guarantee")
 		}
 	}
 	if _, err := os.Stat(filepath.Join(run.root, "answer.txt")); err == nil {
 		t.Fatal("unsafe continuation advanced the task")
-	}
-}
-
-// A search that matched inside a governing instruction file, or that returned
-// bytes recall could not reproduce, is never reported safe to omit.
-func TestScanThatTouchedInstructionsOrBinaryBytesIsNeverOmittable(t *testing.T) {
-	root := t.TempDir()
-	for name, content := range map[string]string{
-		"AGENTS.md":  "needle: never deploy\n",
-		"notes.txt":  "needle: ordinary\n",
-		"binary.dat": "needle \xff\xfe\n",
-	} {
-		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	executor := NewWorkspaceToolExecutor()
-	for _, c := range []struct {
-		path string
-		want bool
-	}{{"notes.txt", true}, {"AGENTS.md", false}, {"binary.dat", false}, {".", false}} {
-		output, complete, err := executor.executeToolScan(context.Background(), ToolRequest{Name: "search_files", Input: json.RawMessage(fmt.Sprintf(`{"path":%q,"text":"needle"}`, c.path)), WorkingDir: root, Sandbox: Sandbox{Mode: SandboxReadOnly}})
-		if err != nil || output == "" || complete != c.want {
-			t.Fatalf("%s: complete=%v want %v err=%v", c.path, complete, c.want, err)
-		}
 	}
 }
 

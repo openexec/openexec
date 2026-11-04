@@ -27,13 +27,12 @@ func call(tool, id, input string) agent.Message {
 	return agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: id, ToolName: tool, ToolInput: json.RawMessage(input)}}}
 }
 
-func result(id, output string, complete bool, errText string) agent.Message {
+func result(id, output, errText string) agent.Message {
 	var err error
 	if errText != "" {
 		err = &testErr{errText}
 	}
 	m := agent.NewToolResultMessage(id, output, err)
-	m.Content[0].ScanComplete = complete
 	return m
 }
 
@@ -51,9 +50,15 @@ func requestBytes(t *testing.T, r agent.Request) string {
 }
 
 // assertPreserved fails unless compaction changed nothing at all, under both
-// trust settings for directory listings.
+// trust settings for directory listings. A newer, trusted directory listing is
+// appended to the request: compaction keeps the newest listing and omits older
+// eligible ones, so a result under test that a broken guard wrongly treats as
+// eligible would be stubbed here instead of passing because nothing was newer.
 func assertPreserved(t *testing.T, r agent.Request) {
 	t.Helper()
+	r.Messages = append(append([]agent.Message(nil), r.Messages...),
+		call("list_directory", "newest", `{"path":"."}`), result("newest", bigOutput("newest listing"), ""),
+		agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "after"}}})
 	before := requestBytes(t, r)
 	for _, trust := range []bool{true, false} {
 		index := priorResults{}
@@ -67,13 +72,17 @@ func assertPreserved(t *testing.T, r agent.Request) {
 	}
 }
 
-// eligiblePair is a complete, answered, unambiguous search: the one shape that
-// may be omitted. It is the positive control and the companion of each class.
+// eligiblePair is two answered, unambiguous directory listings: the older one
+// is the only shape that may be omitted. It is the positive control and the
+// companion of each class.
 func eligiblePair() []agent.Message {
-	return []agent.Message{call("search_files", "ctl", `{"text":"needle"}`), result("ctl", bigOutput("control match"), true, "")}
+	return []agent.Message{
+		call("list_directory", "ctl", `{"path":"."}`), result("ctl", bigOutput("control match"), ""),
+		call("list_directory", "ctl2", `{"path":"."}`), result("ctl2", bigOutput("newest listing"), ""),
+	}
 }
 
-func TestPositiveControlEligibleSearchIsStubbed(t *testing.T) {
+func TestPositiveControlOlderDirectoryListingIsStubbed(t *testing.T) {
 	r := agent.Request{Messages: answered(append([]agent.Message{agent.NewTextMessage(agent.RoleUser, "task")}, eligiblePair()...)...)}
 	index := priorResults{}
 	got, changed := index.compactWith(r, true)
@@ -105,14 +114,14 @@ func TestSystemAndOwnerInstructionsAreNeverStubbed(t *testing.T) {
 	assertPreserved(t, agent.Request{System: r.System, Messages: answered(messages[:2]...)})
 }
 
-// Guard: only list_directory / a marked complete search_files is eligible.
+// Guard: only a call named list_directory is eligible.
 func TestFileReadsIncludingAgentsMdAreNeverStubbed(t *testing.T) {
 	for _, path := range []string{"AGENTS.md", "docs/notes.txt", "main.go"} {
-		for _, complete := range []bool{false, true} { // a forged mark must not matter
+		{
 			r := agent.Request{Messages: answered(
 				agent.NewTextMessage(agent.RoleUser, "task"),
 				call("read_file", "r", `{"path":"`+path+`"}`),
-				result("r", longText("# Rules\n"+quotedInstruction), complete, ""),
+				result("r", longText("# Rules\n"+quotedInstruction), ""),
 			)}
 			assertPreserved(t, r)
 		}
@@ -121,11 +130,11 @@ func TestFileReadsIncludingAgentsMdAreNeverStubbed(t *testing.T) {
 
 func TestUnknownToolResultsAreNeverStubbed(t *testing.T) {
 	for _, tool := range []string{"mystery", "run_shell_command", "List_Directory", "search_files_v2", ""} {
-		for _, complete := range []bool{false, true} {
+		{
 			r := agent.Request{Messages: answered(
 				agent.NewTextMessage(agent.RoleUser, "task"),
 				call(tool, "u", `{}`),
-				result("u", longText(quotedInstruction), complete, ""),
+				result("u", longText(quotedInstruction), ""),
 			)}
 			assertPreserved(t, r)
 		}
@@ -138,26 +147,27 @@ func TestFailedToolResultsAreNeverStubbed(t *testing.T) {
 		r := agent.Request{Messages: answered(
 			agent.NewTextMessage(agent.RoleUser, "task"),
 			call(tool, "f", `{"text":"needle","path":"."}`),
-			result("f", longText("partial output before failure"), true, "permission denied: "+quotedInstruction),
+			result("f", longText("partial output before failure"), "permission denied: "+quotedInstruction),
 		)}
 		assertPreserved(t, r)
 	}
 }
 
-// Guards: the scan's own mark (search) and the executor's trust (listings).
+// Guards: search results are never eligible, and a listing needs the
+// executor's trust.
 func TestPartialOrUnmarkedScansAreNeverStubbed(t *testing.T) {
-	// Unmarked or partial search: ScanComplete is false.
+	// A partial search, and a complete-looking one, both carry file text.
 	assertPreserved(t, agent.Request{Messages: answered(
 		agent.NewTextMessage(agent.RoleUser, "task"),
 		call("search_files", "s", `{"text":"needle"}`),
-		result("s", bigOutput("needle match")+"[incomplete search: limits]\n", false, ""),
+		result("s", bigOutput("needle match")+"[incomplete search: limits]\n", ""),
 	)})
 	// A listing from an executor that cannot vouch for it is kept under
 	// compactWith(…, false) even when well formed and complete-looking.
 	listing := agent.Request{Messages: answered(
 		agent.NewTextMessage(agent.RoleUser, "task"),
-		call("list_directory", "l1", `{"path":"."}`), result("l1", bigOutput("a.txt b.txt"), true, ""),
-		call("list_directory", "l2", `{"path":"."}`), result("l2", bigOutput("c.txt d.txt"), true, ""),
+		call("list_directory", "l1", `{"path":"."}`), result("l1", bigOutput("a.txt b.txt"), ""),
+		call("list_directory", "l2", `{"path":"."}`), result("l2", bigOutput("c.txt d.txt"), ""),
 	)}
 	// Control: a trusted executor omits the older of the two listings.
 	if _, changed := (priorResults{}).compactWith(listing, true); !changed {
@@ -177,7 +187,7 @@ func TestQuotedInstructionInsideNonEligibleResultsIsPreserved(t *testing.T) {
 	messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "task")}
 	for i, tool := range []string{"mystery", "read_file", "web_fetch"} {
 		id := string(rune('a' + i))
-		messages = append(messages, call(tool, id, `{}`), result(id, longText("quoted: "+quotedInstruction), true, ""))
+		messages = append(messages, call(tool, id, `{}`), result(id, longText("quoted: "+quotedInstruction), ""))
 	}
 	assertPreserved(t, agent.Request{Messages: answered(messages...)})
 
@@ -194,5 +204,21 @@ func TestQuotedInstructionInsideNonEligibleResultsIsPreserved(t *testing.T) {
 		if got.Messages[idx].Content[0].ToolOutput != mixed[idx].Content[0].ToolOutput {
 			t.Fatalf("quoted instruction at message %d was altered", idx)
 		}
+	}
+}
+
+// The owner's decision: a search result carries file text, which may quote a
+// governing instruction in any file, so none is ever omitted however complete
+// the scan was or whatever file it matched in. No file name or content decides.
+func TestSearchResultsCarryingFileTextAreNeverStubbed(t *testing.T) {
+	for _, file := range []string{"AGENTS.md", "NOTES.md", "docs/design.txt", "main.go", "notes.rst"} {
+		r := agent.Request{Messages: answered(
+			agent.NewTextMessage(agent.RoleUser, "task"),
+			call("search_files", "s", `{"text":"deploy"}`),
+			result("s", longText(file+":3: "+quotedInstruction), ""),
+			call("search_files", "s2", `{"text":"deploy"}`),
+			result("s2", longText("other.txt:1: nothing relevant"), ""),
+		)}
+		assertPreserved(t, r)
 	}
 }

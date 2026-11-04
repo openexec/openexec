@@ -1,54 +1,71 @@
-# Omission eligibility: preservation classes, delta and one open conflict
+# Omission eligibility: preservation classes, guard receipts and delta
 
-Applies to `priorResults.compactWith` (`pkg/execution/context_recovery.go`) on
-the PR204 tree. This pass adds tests and this record only; no product code,
-model, grant, allowance, Stop, accounting or refusal behaviour changed.
+Applies to `priorResults.compactWith` (`pkg/execution/context_recovery.go`),
+built on the PR204 tree. Eligibility for omission is **positive and
+structural**; no file name, tool-output text or completeness mark can make a
+result eligible. Owner decision of 2026-11-04 (answer to
+`search-omission-vs-quoted-instruction`): search results carrying file text are
+never omitted. The model, grant, allowance, Stop, accounting and refusal
+behaviour are unchanged.
 
-Architecture complexity delta: **zero** new concepts, persistent state,
-transitions, owner decisions or runtime failure modes; no existing machinery
-replaced. Added: `pkg/execution/context_preservation_test.go` (198 test lines,
-8 tests) and this document. Product code added: 0 lines.
+## Architecture complexity delta
 
-## Guard inventory (what makes a result omittable)
+**Architecture n: zero.** New concepts: 0. New persistent state, transitions,
+owner decisions or runtime failure modes: 0. Concepts removed: 3 (the
+`ContentBlock.ScanComplete` mark, `scanReportingExecutor`, and the
+`governingInstructionFiles` name denylist, plus the position-bound search recall
+id that existed only for search).
 
-A tool result is omitted only if all of these hold, each a structural fact:
+Lines against PR204 head `a149fceb`: product code `context_recovery.go`
++4/-15 (net -11), `api_provider.go` -13 net (scan plumbing removed),
+`workspace_search.go`, `composite_tools.go`, `workspace_tools.go`,
+`agent/provider.go` restored to main (the PR204 additions are gone). Tests:
+`context_preservation_test.go` 224 lines (9 tests); `context_continuation_test.go`
+rebuilt on directory listings. Docs: this file and `NATIVE_SEARCH_CONTINUATION.md`.
 
-| Guard (in `compactWith`) | Keeps verbatim | Test |
+## Guard inventory (a result is omitted only if every one holds)
+
+| Guard in `compactWith` | Keeps verbatim | Test |
 | --- | --- | --- |
-| block is a `tool_result` paired to exactly one `tool_use` (`!ok`, `ambiguous`) | system/owner text, ambiguous pairs | `TestSystemAndOwnerInstructionsAreNeverStubbed`, `TestAmbiguousCallIDs…` |
+| block is a `tool_result` paired to exactly one `tool_use` (`eligible` map; `!ok`) | system and owner text, anything not a paired result | `TestSystemAndOwnerInstructionsAreNeverStubbed` |
+| no ambiguous call ID (`ambiguous`) | ambiguous pairs | `TestCompactionDoesNotOmitAmbiguousAssociation` |
 | `b.ToolError == ""` | failed-tool results | `TestFailedToolResultsAreNeverStubbed` |
-| tool name is exactly `list_directory` or `search_files` | file reads (incl. `AGENTS.md`), unknown tools | `TestFileReadsIncludingAgentsMdAreNeverStubbed`, `TestUnknownToolResultsAreNeverStubbed`, `TestQuotedInstructionInsideNonEligibleResultsIsPreserved` |
-| `b.ScanComplete` (set only by the executing harness) | partial or unmarked scans | `TestPartialOrUnmarkedScansAreNeverStubbed` |
-| `trustDirectories` (executor vouches for listings) | listings from untrusted executors | `TestPartialOrUnmarkedScansAreNeverStubbed` |
+| tool name is exactly `list_directory` | search results, file reads incl. `AGENTS.md`, unknown tools, quoted instructions | `TestFileReadsIncludingAgentsMdAreNeverStubbed`, `TestUnknownToolResultsAreNeverStubbed`, `TestSearchResultsCarryingFileTextAreNeverStubbed`, `TestQuotedInstructionInsideNonEligibleResultsIsPreserved` |
+| `trustDirectories` (executor vouches for listings) | listings from untrusted executors; unmarked/partial output | `TestPartialOrUnmarkedScansAreNeverStubbed`, `TestUntrustedDirectoryListingsAreNeverOmitted` |
+| at least 256 bytes and valid UTF-8 | small and non-round-trippable output | `TestCompactionOmitsOnlyKnownUnambiguousDirectoryListings` |
+| only the older listings (the newest is kept) | the newest listing | `TestReusedIDsAndIdenticalOutputsRecallTheirOwnContent` |
 
-## Guard-removal receipts (each mutation compiled; `go test ./pkg/execution -run <the eight tests>`)
+`assertPreserved` appends a newer trusted listing to every request under test, so
+a result a broken guard wrongly treats as eligible would be stubbed instead of
+passing because nothing newer existed.
 
-| Mutation | Result |
+## Guard-removal receipts
+
+Each mutation compiled (`go test ./pkg/execution/`), went red, and was restored
+to green (`ok pkg/execution`).
+
+| Mutation (guard removed) | Red tests |
 | --- | --- |
-| delete `b.ToolError != ""` | RED: `TestFailedToolResultsAreNeverStubbed` only; restored → green |
-| delete `b.ScanComplete &&` | RED: `TestPartialOrUnmarkedScansAreNeverStubbed`; restored → green |
-| `call.name != "list_directory" && b.ScanComplete` (any tool eligible) | RED: file-read, unknown-tool and quoted-instruction tests; restored → green |
-| delete `&& trustDirectories` | RED: `TestPartialOrUnmarkedScansAreNeverStubbed`; restored → green |
+| `call.name == "list_directory"` replaced by always-true (any tool eligible) | file reads/`AGENTS.md`, unknown tools, search-with-file-text, quoted-instruction, partial/unmarked, `TestCompactionOmitsOnlyKnownUnambiguousDirectoryListings`, plus the older recovery/discipline tests |
+| `b.ToolError != ""` deleted | `TestFailedToolResultsAreNeverStubbed`, `TestCompactionOmitsOnlyKnownUnambiguousDirectoryListings` |
+| `&& trustDirectories` deleted | `TestUntrustedDirectoryListingsAreNeverOmitted`, `TestListingsFromAnExecutorThatCannotVouchAreNeverOmitted`, `TestPartialOrUnmarkedScansAreNeverStubbed` |
+| tool-result type and pairing guard replaced by always-eligible (so system/owner text blocks are rewritten) | `TestSystemAndOwnerInstructionsAreNeverStubbed` and 16 others |
+| `!ambiguous[...]` replaced by always-true | `TestCompactionDoesNotOmitAmbiguousAssociation` |
 
-System/owner instructions have no removable guard of their own: compaction
-only ever rewrites `ToolOutput` of paired tool-result blocks, so a text or
-system block cannot be stubbed. That test is a construction check with a
-positive control (it ran compaction and the companion search was stubbed);
-a mutation removing the type/pairing guard did not make it fail for the right
-reason, so it is **not** claimed mutation-proven.
+An earlier attempt that did not compile (an unused variable) was discarded, not counted.
 
-## Open conflict: search results quoting an instruction outside the allowlist
+## Verification
 
-`workspace_search.go` marks a scan non-complete when it matched in a file named
-in `governingInstructionFiles` (`AGENTS.md`, `CLAUDE.md`, …). That is a name
-denylist: an instruction quoted in any other file (a doc, `NOTES.md`, a code
-comment) still yields `ScanComplete=true` and the result is omitted (with
-byte-exact recall). The review asked for this to be repaired without any name
-or content heuristic. The only structural repair is that a `search_files`
-result carrying matched file text is never omitted, which removes search
-omission altogether and makes the retained native vertical proof
-(`TestNativeTaskContinuesAfterBoundedCompactionAndRealRecall`: multi-round
-search, compaction, real paged recall) vacuous. Keeping both is not possible
-without a classifier, which the task forbids guessing, so this pass keeps the
-retained behaviour and does not claim the quoted-in-search case is fixed.
-It is an owner decision (below).
+`go test ./pkg/execution/ ./pkg/agent/` ok; `go vet ./...` printed nothing;
+`make compat-test` passed. The real native vertical test
+`TestNativeTaskContinuesAfterBoundedCompactionAndRealRecall` (multi-round listings,
+bounded compaction, real multi-page position-checked `recall_prior_tool_result`,
+answer written and read back) passes; Stop, insufficient-context, unsafe-recall and
+ambiguous-ID tests pass on the same path.
+
+## What is not retained from PR204
+
+Search-result omission and its byte-exact paged recall are gone by owner decision;
+the vertical proof now runs on directory listings. The paged recall, reused
+call IDs, Stop and refusal proofs are retained. A search-heavy task that
+overflows is refused before dispatch rather than compacted.
