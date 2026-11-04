@@ -300,3 +300,136 @@ func TestHardBudgetFinalSynthesisPreservesGrantYield(t *testing.T) {
 		})
 	}
 }
+
+// overflowAdapter stubs a HardTokenAdapter whose assembled-request preflight
+// reports a fixed estimate (never dispatched) until a call's input fits it.
+type overflowAdapter struct {
+	fakeAPIAdapter
+	estimate int
+	always   bool // overflow at every context, to isolate the grant branches
+	calls    int
+	limits   [][2]int
+}
+
+func (*overflowAdapter) SupportsHardTokenBudget() bool { return true }
+func (a *overflowAdapter) CompleteBounded(_ context.Context, _ agent.Request, input, output int) (*agent.Response, error) {
+	a.calls++
+	a.limits = append(a.limits, [2]int{input, output})
+	if a.always || a.estimate+2048 > input {
+		return nil, &agent.ContextOverflowError{EstimatedTokens: a.estimate, ContextTokens: input, RequestBytes: a.estimate * 3, Dispatched: false}
+	}
+	return &agent.Response{Usage: agent.Usage{PromptTokens: a.estimate, CompletionTokens: 1}}, nil
+}
+
+// Solar run ea7471ef: grant 9556, ceiling 65536 selects a 4096 context. The
+// resize needs estimate+2048+16+2048 <= 9556, i.e. estimate <= 5444.
+func TestHardGrantAdmissionBoundaryGrant9556(t *testing.T) {
+	const grant = 9556
+	newMeter := func(a *overflowAdapter) *boundedAPIAdapter {
+		return &boundedAPIAdapter{ProviderAdapter: a, remaining: grant, providerContext: 65536, contextLimit: 65536}
+	}
+	t.Run("5445 refused with diagnostics and no dispatch", func(t *testing.T) {
+		a := &overflowAdapter{estimate: 5445}
+		m := newMeter(a)
+		_, err := m.Complete(context.Background(), agent.Request{})
+		var ge *contextGrantError
+		if !errors.As(err, &ge) || !errors.Is(err, errHardTokenGrantExhausted) {
+			t.Fatalf("want contextGrantError, got %v", err)
+		}
+		if !strings.HasPrefix(err.Error(), "hard token grant cannot admit inference: remaining grant=9556 selected context=4096 provider/request ceiling=65536") {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"estimated_tokens=5445", "request_bytes=16335", "required_context=7509", "output_reserve=2048", "required_grant=9557", "original_grant=9556"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("missing %q in %v", want, err)
+			}
+		}
+		if a.calls != 1 || a.limits[0] != [2]int{4096, 4096} || m.remaining != grant || m.input != 0 || m.output != 0 || m.unknown {
+			t.Fatalf("preflight-only refusal or accounting changed: calls=%d limits=%v remaining=%d", a.calls, a.limits, m.remaining)
+		}
+	})
+	t.Run("5444 resizes within the grant", func(t *testing.T) {
+		a := &overflowAdapter{estimate: 5444}
+		m := newMeter(a)
+		res, err := m.Complete(context.Background(), agent.Request{})
+		if err != nil || res == nil {
+			t.Fatal(err)
+		}
+		// required context 7508 + output reserve 2048 == 9556 exactly.
+		if a.calls != 2 || a.limits[1] != [2]int{7508, 2048} || m.contextCap != 7508 || m.remaining != grant-5444-1 {
+			t.Fatalf("resize wrong: calls=%d limits=%v cap=%d remaining=%d", a.calls, a.limits, m.contextCap, m.remaining)
+		}
+	})
+	t.Run("estimate that fits the initial 4096 context is admitted without resize", func(t *testing.T) {
+		a := &overflowAdapter{estimate: 2048}
+		m := newMeter(a)
+		if _, err := m.Complete(context.Background(), agent.Request{}); err != nil || a.calls != 1 || a.limits[0] != [2]int{4096, 4096} {
+			t.Fatal(err, a.limits)
+		}
+	})
+	t.Run("estimate just above initial fit resizes (not refused)", func(t *testing.T) {
+		a := &overflowAdapter{estimate: 2049}
+		m := newMeter(a)
+		if _, err := m.Complete(context.Background(), agent.Request{}); err != nil || a.calls != 2 || a.limits[1][0] != 4113 {
+			t.Fatal(err, a.limits)
+		}
+	})
+	t.Run("overflow above the ceiling is not a grant refusal", func(t *testing.T) {
+		a := &overflowAdapter{estimate: 65536}
+		m := newMeter(a)
+		_, err := m.Complete(context.Background(), agent.Request{})
+		var ge *contextGrantError
+		var ov *agent.ContextOverflowError
+		if errors.As(err, &ge) || !errors.As(err, &ov) {
+			t.Fatalf("native overflow must surface unchanged: %v", err)
+		}
+	})
+}
+
+// Each case drives one condition of the resize (:154) or refusal (:158) branch
+// so that removing that condition changes the outcome.
+func TestHardGrantAdmissionBranchConditions(t *testing.T) {
+	run := func(grant int64, estimate int) (*overflowAdapter, error) {
+		// prepare may retry once with a smaller output reserve; a resize would
+		// instead change the input context, which every call here must keep.
+		a := &overflowAdapter{estimate: estimate, always: true}
+		m := &boundedAPIAdapter{ProviderAdapter: a, remaining: grant, providerContext: 65536, contextLimit: 65536}
+		_, err := m.Complete(context.Background(), agent.Request{})
+		return a, err
+	}
+	nativeOverflow := func(t *testing.T, a *overflowAdapter, err error) {
+		t.Helper()
+		var ge *contextGrantError
+		var ov *agent.ContextOverflowError
+		if errors.As(err, &ge) || !errors.As(err, &ov) {
+			t.Fatalf("want unchanged native overflow, calls=%d limits=%v err=%v", a.calls, a.limits, err)
+		}
+		for _, l := range a.limits {
+			if l[0] != a.limits[0][0] {
+				t.Fatalf("input context was resized: %v", a.limits)
+			}
+		}
+	}
+	t.Run("selected context at the target is not a grant refusal and not resized (input < target)", func(t *testing.T) {
+		// grant 200000 selects 65536 == target; estimate+2048 fits, required<=input.
+		a, err := run(200000, 1000)
+		nativeOverflow(t, a, err)
+	})
+	t.Run("required above the target is not resized (required <= target)", func(t *testing.T) {
+		// required = 63480+2064 = 65544 > 65536 while the grant is ample.
+		a, err := run(200000, 63480)
+		nativeOverflow(t, a, err)
+	})
+	t.Run("estimate plus output reserve above the target is not a grant refusal", func(t *testing.T) {
+		// 63489+2048 = 65537 > 65536; selected 4096 < target, grant too small to resize.
+		a, err := run(9556, 63489)
+		nativeOverflow(t, a, err)
+	})
+	t.Run("estimate whose reserve exactly fits the target is a grant refusal", func(t *testing.T) {
+		a, err := run(9556, 63488)
+		var ge *contextGrantError
+		if !errors.As(err, &ge) || a.calls != 1 {
+			t.Fatalf("calls=%d err=%v", a.calls, err)
+		}
+	})
+}

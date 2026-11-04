@@ -34,10 +34,19 @@ type boundedAPIAdapter struct {
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
 
-type contextGrantError struct{ remaining, selected, ceiling int64 }
+// contextGrantError records the admission inputs next to the refusal. The
+// leading text is parsed by consumers and must not change; the diagnostic
+// suffix is observability only (estimated prompt, serialized size, required
+// context = estimate + output floor + margin, and why no resize happened).
+type contextGrantError struct {
+	remaining, selected, ceiling   int64
+	estimatedTokens, requestBytes  int64
+	requiredContext, outputReserve int64
+}
 
 func (e *contextGrantError) Error() string {
-	return fmt.Sprintf("hard token grant cannot admit inference: remaining grant=%d selected context=%d provider/request ceiling=%d", e.remaining, e.selected, e.ceiling)
+	return fmt.Sprintf("hard token grant cannot admit inference: remaining grant=%d selected context=%d provider/request ceiling=%d (estimated_tokens=%d request_bytes=%d required_context=%d output_reserve=%d required_grant=%d original_grant=%d branch=preflight_overflow_resize_declined)",
+		e.remaining, e.selected, e.ceiling, e.estimatedTokens, e.requestBytes, e.requiredContext, e.outputReserve, e.requiredContext+e.outputReserve, e.remaining)
 }
 func (e *contextGrantError) Unwrap() error { return errHardTokenGrantExhausted }
 
@@ -156,7 +165,8 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 				return p.complete(ctx, original, false)
 			}
 			if p.input == 0 && p.output == 0 && overflow.RequestBytes > 0 && input < p.contextTarget && int64(overflow.EstimatedTokens)+minimumOutput <= p.contextTarget {
-				return nil, &contextGrantError{remaining: p.remaining, selected: input, ceiling: minNonzero(p.providerContext, p.contextLimit, MaxAPIContextTokens)}
+				return nil, &contextGrantError{remaining: p.remaining, selected: input, ceiling: minNonzero(p.providerContext, p.contextLimit, MaxAPIContextTokens),
+					estimatedTokens: int64(overflow.EstimatedTokens), requestBytes: int64(overflow.RequestBytes), requiredContext: required, outputReserve: minimumOutput}
 			}
 			// Only diagnose provider configuration when it is the binding
 			// ceiling. An explicit caller limit is an intentional restriction.
