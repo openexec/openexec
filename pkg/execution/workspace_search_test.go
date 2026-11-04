@@ -13,6 +13,29 @@ import (
 	"github.com/openexec/openexec/pkg/agent"
 )
 
+func TestSearchCompletenessComesFromScanNotOutput(t *testing.T) {
+	root := t.TempDir()
+	searchFile(t, root, "complete.txt", "needle "+searchIncomplete)
+	searchFile(t, root, "partial.txt", "needle "+strings.Repeat("x", maxSearchLineBytes+1))
+	executor := NewWorkspaceToolExecutor()
+	for _, tc := range []struct {
+		path     string
+		complete bool
+		wantErr  bool
+	}{
+		{"complete.txt", true, false},
+		{"partial.txt", false, false},
+		{"missing.txt", false, true},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			_, complete, err := executor.searchFilesWithProvenance(context.Background(), searchRequest(root, tc.path, "needle"))
+			if complete != tc.complete || (err != nil) != tc.wantErr {
+				t.Fatalf("complete=%v err=%v", complete, err)
+			}
+		})
+	}
+}
+
 func searchRequest(root, path, text string) ToolRequest {
 	input, _ := json.Marshal(map[string]string{"path": path, "text": text})
 	return ToolRequest{Name: "search_files", Input: input, WorkingDir: root, Sandbox: Sandbox{Mode: SandboxReadOnly}}
