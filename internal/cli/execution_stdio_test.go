@@ -218,6 +218,12 @@ func TestExecutionProtocolBoundRootsRequiresNewVersionAndProvider(t *testing.T) 
 		{"missing identities", 4, nil, boundProtocolProvider{}, false},
 		{"provider without enforcement", 4, ids, protocolProvider{}, false},
 		{"legacy without requirement", 3, nil, protocolProvider{}, true},
+		{"v2 without identities", 2, nil, protocolProvider{}, true},
+		{"v1 without identities", 1, nil, protocolProvider{}, true},
+		{"v2 cannot carry identity", 2, ids, boundProtocolProvider{}, false},
+		{"v1 cannot carry identity", 1, ids, boundProtocolProvider{}, false},
+		{"v4 identity count mismatch", 4, append(append([]execution.ReadableRootIdentity{}, ids...), execution.ReadableRootIdentity{Path: "/other", Device: 1, Inode: 3}), boundProtocolProvider{}, false},
+		{"future version refused like an old runtime refuses v4", 5, ids, boundProtocolProvider{}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out bytes.Buffer
