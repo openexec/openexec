@@ -20,11 +20,6 @@ var falseGreenPatterns = []struct {
 		regexp.MustCompile(`(?i)(vitest|jest|pytest|\bnpm test\b|\bgo test\b|\bgrep\b)[^\n|]*\|\|`), true},
 	{"hides errors: `2>/dev/null` on the checked command",
 		regexp.MustCompile(`2>\s*/dev/null`), false},
-	// A pipe is one `|`; `grep -q x || exit 1` keeps the exit status. The
-	// pipe must belong to the grep's own command: `&&` and `;` end it, so
-	// `grep -q x f && go tool cover -func=p | python3 ...` pipes only cover.
-	{"discards exit status: a quiet grep (`grep -q`) piped into another command",
-		regexp.MustCompile(`grep\s+-\w*q\w*\b[^\n|&;]*\|(?:[^|]|\z)`), false},
 	{"masks failure: assertions chained as `A && B || C` (C passing hides an A/B failure)",
 		regexp.MustCompile(`&&[^\n|]*\|\|`), true},
 }
@@ -34,6 +29,8 @@ var falseGreenPatterns = []struct {
 // `cmd || { echo "missing $k"; exit 1; }` reports the failure loudly; it is
 // the idiom the lint asks for, not a mask.
 var failingFallback = regexp.MustCompile(`^\s*(?:\{(?:[^{}\n]*?;)?\s*` + failCommand + `\s*;?\s*\}|` + failCommand + `\s*(?:;|\)|\n|\z))`)
+
+var quietGrepFlag = regexp.MustCompile(`^-\w*q\w*$`)
 
 const failCommand = `(?:exit\s+[1-9][0-9]*|false|return\s+[1-9][0-9]*)`
 
@@ -160,12 +157,33 @@ func revisionEndpoints(rev string) []string {
 // whose contents run. It is not a full shell parser (no heredocs or
 // expansion); it only has to find git's argv reliably.
 func shellCommands(script string) [][]string {
+	var commands [][]string
+	for _, command := range parseShellCommands(script) {
+		commands = append(commands, command.argv)
+	}
+	return commands
+}
+
+// Keep the executable pipe boundary alongside the argv already parsed for git
+// refs. A pipe in a quoted grep pattern is data, not a pipeline.
+type shellCommand struct {
+	argv  []string
+	piped bool
+}
+
+func parseShellCommands(script string) []shellCommand {
 	type frame struct {
 		backtick bool // opened by a backtick rather than `$(` or `(`
 		inDQ     bool // the enclosing context was inside double quotes
+		argv     []string
+		word     string
+		inWord   bool
+		skipNext bool
+		group    bool // a subshell group, rather than a command substitution
+		start    int
 	}
 	var (
-		cmds     [][]string
+		cmds     []shellCommand
 		argv     []string
 		word     strings.Builder
 		inWord   bool // a word is open, possibly empty (`''`)
@@ -184,23 +202,34 @@ func shellCommands(script string) [][]string {
 		word.Reset()
 		inWord = false
 	}
-	endCommand := func() {
+	endCommand := func(piped bool) {
 		endWord()
 		skipNext = false
 		if len(argv) > 0 {
-			cmds = append(cmds, argv)
+			cmds = append(cmds, shellCommand{argv: argv, piped: piped})
 		}
 		argv = nil
 	}
-	openSub := func(backtick bool) {
-		endCommand()
-		stack = append(stack, frame{backtick: backtick, inDQ: inDQ})
+	openSub := func(backtick, group bool) {
+		stack = append(stack, frame{backtick: backtick, inDQ: inDQ,
+			argv: argv, word: word.String(), inWord: true, skipNext: skipNext,
+			group: group, start: len(cmds)})
+		argv = nil
+		word.Reset()
+		inWord, skipNext = false, false
 		inDQ = false
 	}
-	closeSub := func() {
-		endCommand()
+	closeSub := func(piped bool) {
+		endCommand(false)
 		if n := len(stack); n > 0 {
-			inDQ = stack[n-1].inDQ
+			outer := stack[n-1]
+			if outer.group && piped {
+				for j := outer.start; j < len(cmds); j++ {
+					cmds[j].piped = true
+				}
+			}
+			inDQ, argv, inWord, skipNext = outer.inDQ, outer.argv, outer.inWord, outer.skipNext
+			word.WriteString(outer.word)
 			stack = stack[:n-1]
 		}
 	}
@@ -223,12 +252,12 @@ func shellCommands(script string) [][]string {
 			inWord = true
 		case c == '$' && i+1 < len(script) && script[i+1] == '(':
 			i++
-			openSub(false)
+			openSub(false, false)
 		case c == '`':
 			if n := len(stack); n > 0 && stack[n-1].backtick && !inDQ {
-				closeSub()
+				closeSub(false)
 			} else {
-				openSub(true)
+				openSub(true, false)
 			}
 		case inDQ:
 			if c == '"' {
@@ -252,11 +281,19 @@ func shellCommands(script string) [][]string {
 		case c == ' ' || c == '\t' || c == '\r':
 			endWord()
 		case c == '\n' || c == ';' || c == '&' || c == '|':
-			endCommand()
+			piped := c == '|' && (i+1 == len(script) || script[i+1] != '|')
+			endCommand(piped)
+			if i+1 < len(script) && (c == '|' || c == '&') && script[i+1] == c {
+				i++ // || and && are list operators, not pipelines.
+			}
 		case c == '(':
-			openSub(false)
+			openSub(false, true)
 		case c == ')':
-			closeSub()
+			j := i + 1
+			for j < len(script) && (script[j] == ' ' || script[j] == '\t') {
+				j++
+			}
+			closeSub(j < len(script) && script[j] == '|' && (j+1 == len(script) || script[j+1] != '|'))
 		case c == '<' || c == '>':
 			if isFileDescriptor(word.String()) {
 				word.Reset()
@@ -273,7 +310,7 @@ func shellCommands(script string) [][]string {
 			inWord = true
 		}
 	}
-	endCommand()
+	endCommand(false)
 	return cmds
 }
 
@@ -304,6 +341,19 @@ func LintVerificationScript(script string) []string {
 				continue
 			}
 			issues = append(issues, p.name)
+			break
+		}
+	}
+	for _, command := range parseShellCommands(script) {
+		if !command.piped {
+			continue
+		}
+		argv := command.argv
+		for len(argv) > 0 && (shellCommandPrefixes[argv[0]] || isShellAssignment(argv[0])) {
+			argv = argv[1:]
+		}
+		if len(argv) > 1 && (argv[0] == "grep" || strings.HasSuffix(argv[0], "/grep")) && quietGrepFlag.MatchString(argv[1]) {
+			issues = append(issues, "discards exit status: a quiet grep (`grep -q`) piped into another command")
 			break
 		}
 	}
