@@ -480,7 +480,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				return *result, err
 			}
 			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok {
-				if note := meter.omissionLimitation(); note != "" {
+				if note := meter.omissionLimitation(false); note != "" {
 					result.FinalText += note
 					if err := sink(Event{Type: EventAssistantDelta, Text: note}); err != nil {
 						finish()
@@ -511,18 +511,26 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			}
 			var output string
 			var toolErr error
-			scanComplete := false
+			scanComplete, recallFailed := false, false
 			switch meter, bounded := p.config.Adapter.(*boundedAPIAdapter); {
 			case state != nil && call.ToolName == updateHandoverTool:
 				output, toolErr = state.update(call.ToolInput)
 			case state != nil && call.ToolName == readSavedTool:
 				output, toolErr = state.readSaved(call.ToolInput)
-			case bounded && meter.prior != nil && call.ToolName == recallTool:
-				var page recalledPage
-				output, page, toolErr = meter.prior.page(call.ToolInput)
-				if toolErr == nil {
-					meter.noteRecall(page)
+			case call.ToolName == recallTool:
+				// Recall is the only way omitted evidence is read back; a failed
+				// or unavailable one ends the run instead of letting the model
+				// carry on as if it had seen that evidence.
+				if bounded && meter.prior != nil {
+					var page recalledPage
+					output, page, toolErr = meter.prior.page(call.ToolInput)
+					if toolErr == nil {
+						meter.noteRecall(page)
+					}
+				} else {
+					toolErr = errors.New("recall unavailable: no omitted result is retained in this run")
 				}
+				recallFailed = toolErr != nil
 				external = true
 			default:
 				external = true
@@ -545,6 +553,14 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			if err := sink(event); err != nil {
 				finish()
 				return *result, err
+			}
+			if recallFailed {
+				message := "Stopped: recall of omitted tool-result evidence failed (" + toolErr.Error() + "); no further request was dispatched."
+				result.FinalText += message
+				result.Outcome = OutcomeFailed
+				finish()
+				_ = sink(Event{Type: EventFailed, Text: message})
+				return *result, errors.New(message)
 			}
 			inRequest := output
 			if state != nil {
@@ -637,6 +653,18 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 		if err := sink(Event{Type: EventAssistantDelta, Text: block.Text}); err != nil {
 			finish()
 			return *result, err
+		}
+	}
+	if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok && wroteText && rebuilt {
+		// Final synthesis is never compacted, so an unrebuilt one holds the
+		// whole transcript. One rebuilt from the handover holds neither the
+		// omitted results nor any recalled page: every omission is unread there.
+		if note := meter.omissionLimitation(true); note != "" {
+			result.FinalText += note
+			if err := sink(Event{Type: EventAssistantDelta, Text: note}); err != nil {
+				finish()
+				return *result, err
+			}
 		}
 	}
 	state.closeOut("complete")

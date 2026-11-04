@@ -244,11 +244,12 @@ func (p *boundedAPIAdapter) noteRecall(page recalledPage) {
 	}
 }
 
-// unreadOmissions counts omitted results the model has not read to the end.
-func (p *boundedAPIAdapter) unreadOmissions() int {
+// unreadOmissions counts omitted results the model has not read to the end, or
+// all of them when the pages it read are no longer in view (a rebuilt request).
+func (p *boundedAPIAdapter) unreadOmissions(outOfView bool) int {
 	n := 0
 	for id, content := range p.prior {
-		if p.covered[id] < len(content) {
+		if outOfView || p.covered[id] < len(content) {
 			n++
 		}
 	}
@@ -257,8 +258,8 @@ func (p *boundedAPIAdapter) unreadOmissions() int {
 
 // omissionLimitation is the explicit statement an answer must carry when
 // evidence was left out of the context and never read back.
-func (p *boundedAPIAdapter) omissionLimitation() string {
-	n := p.unreadOmissions()
+func (p *boundedAPIAdapter) omissionLimitation(outOfView bool) string {
+	n := p.unreadOmissions(outOfView)
 	if n == 0 {
 		return ""
 	}

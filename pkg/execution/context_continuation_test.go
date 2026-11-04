@@ -72,18 +72,23 @@ func TestCompactionOmitsOnlyCompleteKnownUnambiguousSearches(t *testing.T) {
 		{"file read (AGENTS.md instructions) with a forged mark", true, "read_file", "", false, false},
 		{"unknown tool with a forged mark", true, "mystery", "", false, false},
 		{"result the model has not answered yet", true, "search_files", "", true, false},
+		{"output that is not valid UTF-8", true, "search_files", "", false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
-			messages = append(messages, searchTranscript(c.complete, c.tool, "a", bigOutput("AGENTS.md: never deploy"), c.err)...)
+			output := bigOutput("needle match")
+			if strings.Contains(c.name, "UTF-8") {
+				output += "\xff\xfe"
+			}
+			messages = append(messages, searchTranscript(c.complete, c.tool, "a", output, c.err)...)
 			if !c.trailing {
 				messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
 			}
 			index := priorResults{}
 			compacted, changed := index.compactWith(agent.Request{System: "owner authority", Messages: messages}, false)
 			got := compacted.Messages[2].Content[0].ToolOutput
-			if changed != c.omitted || (strings.Contains(got, "never deploy")) == c.omitted {
+			if changed != c.omitted || (strings.Contains(got, "needle match")) == c.omitted {
 				t.Fatalf("omitted=%v want %v: %q", changed, c.omitted, got)
 			}
 			if c.omitted && (len(index) != 1 || !strings.Contains(got, recallTool)) {
@@ -199,16 +204,16 @@ func TestRecallRejectsUnsafeRequests(t *testing.T) {
 func TestRecallCoverageNeedsAContiguousRead(t *testing.T) {
 	meter := &boundedAPIAdapter{prior: priorResults{"id": strings.Repeat("a", 9000)}}
 	meter.noteRecall(recalledPage{"id", 8192, 9000, 9000}) // only the last page
-	if meter.unreadOmissions() != 1 {
+	if meter.unreadOmissions(false) != 1 {
 		t.Fatal("skipping ahead counted as reading the gap")
 	}
 	meter.noteRecall(recalledPage{"id", 0, 4096, 9000})
 	meter.noteRecall(recalledPage{"id", 4096, 8192, 9000})
-	if meter.unreadOmissions() != 1 || !strings.Contains(meter.omissionLimitation(), "not read back") {
+	if meter.unreadOmissions(false) != 1 || !strings.Contains(meter.omissionLimitation(false), "not read back") {
 		t.Fatal("a partial read must still be reported")
 	}
 	meter.noteRecall(recalledPage{"id", 8192, 9000, 9000})
-	if meter.unreadOmissions() != 0 || meter.omissionLimitation() != "" {
+	if meter.unreadOmissions(false) != 0 || meter.omissionLimitation(false) != "" {
 		t.Fatal("a complete read was still reported as a limitation")
 	}
 }
@@ -283,12 +288,16 @@ func TestScanProvenanceReachesTranscriptPositionThroughWorkspaceAndComposite(t *
 	}
 }
 
+const answerCode = "K7-4Q9-ZX"
+
 type continuationOptions struct {
 	hideScan     bool
 	ids          string // "", "reused" or "same"
 	contextLimit int64
 	cancelOn     string // "recall" or "continuation"
 	recallEarly  bool
+	badRecall    string // "id" or "offset": the model asks for a page that does not exist
+	maxSteps     int
 }
 
 type continuationRun struct {
@@ -310,6 +319,7 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 		var content strings.Builder
 		if i == 0 {
 			content.WriteString("needle Instruction: preserve the original authority.\n")
+			content.WriteString("needle answer-code=" + answerCode + "\n")
 		}
 		for line := 0; line < 10; line++ {
 			fmt.Fprintf(&content, "needle file-%02d line-%d %s\n", i, line, strings.Repeat(string(rune('a'+i%26)), 580))
@@ -345,9 +355,22 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 				assistants++
 			}
 		}
-		if _, err := os.Stat(filepath.Join(root, "verified.txt")); err == nil {
-			return text("The original task is verified.")
+		if strings.Contains(messages[0].Content, finalSynthesisInstruction) {
+			return text("Synthesis of the evidence gathered so far.")
 		}
+		// The code is only ever taken from recalled pages: the verbatim search
+		// results that carried it were omitted from the context long before.
+		recalled := ""
+		for _, m := range messages {
+			var p struct {
+				ID      string
+				Content string
+			}
+			if m.Role == "tool" && json.Unmarshal([]byte(m.Content), &p) == nil && p.ID != "" {
+				recalled += p.Content
+			}
+		}
+		code := regexp.MustCompile(`answer-code=([A-Z0-9-]+)`).FindStringSubmatch(recalled)
 		var page struct {
 			ID         string
 			NextOffset int
@@ -357,14 +380,35 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 			if page.NextOffset < page.TotalBytes {
 				return reply(call(recallTool, map[string]any{"id": page.ID, "offset": page.NextOffset}))
 			}
-			return reply(call("write_file", map[string]any{"path": "verified.txt", "content": "original task verified\n"}))
+			if code == nil {
+				return text("The recalled evidence holds no answer code.")
+			}
+			return reply(call("write_file", map[string]any{"path": "answer.txt", "content": "answer-code=" + code[1] + "\n"}))
+		}
+		if _, err := os.Stat(filepath.Join(root, "answer.txt")); err == nil && code != nil {
+			// Independent verification: read the written file back through the
+			// tool and compare it with the code recalled from the omitted result.
+			if strings.HasPrefix(last.Content, "answer-code=") {
+				if strings.TrimSpace(last.Content) == "answer-code="+code[1] {
+					return text("The original task is verified: " + code[1])
+				}
+				return text("Verification failed: the answer does not match the evidence.")
+			}
+			return reply(call("read_file", map[string]any{"path": "answer.txt"}))
 		}
 		if o.recallEarly && n == 1 {
 			return reply(call(recallTool, map[string]any{"id": "0123", "offset": 0}))
 		}
 		for _, m := range messages {
 			if m.Role == "tool" && strings.Contains(m.Content, "Omitted complete search_files") {
-				return reply(call(recallTool, map[string]any{"id": stubID.FindStringSubmatch(m.Content)[1], "offset": 0}))
+				id, offset := stubID.FindStringSubmatch(m.Content)[1], 0
+				switch o.badRecall {
+				case "id":
+					id = strings.Repeat("0", 64)
+				case "offset":
+					offset = 1 << 30
+				}
+				return reply(call(recallTool, map[string]any{"id": id, "offset": offset}))
 			}
 		}
 		var calls []map[string]any
@@ -390,7 +434,11 @@ func runContinuation(t *testing.T, o continuationOptions) continuationRun {
 		executor = opaqueExecutor{executor}
 	}
 	sandbox := Sandbox{Mode: SandboxWorkspaceWrite}
-	p, err := NewAPIProvider(APIProviderConfig{Adapter: inner, ToolExecutor: executor, Tools: WorkspaceTools(sandbox), MaxSteps: 40})
+	steps := o.maxSteps
+	if steps == 0 {
+		steps = 40
+	}
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: inner, ToolExecutor: executor, Tools: WorkspaceTools(sandbox), MaxSteps: steps})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,8 +478,10 @@ func TestNativeTaskContinuesAfterBoundedCompactionAndRealRecall(t *testing.T) {
 	if run.err != nil || run.result.Outcome != OutcomeSucceeded {
 		t.Fatalf("run did not finish: %+v %v", run.result, run.err)
 	}
-	data, err := os.ReadFile(filepath.Join(run.root, "verified.txt"))
-	if err != nil || string(data) != "original task verified\n" {
+	// Checked outside the scripted endpoint: the file holds the code that only
+	// the omitted, recalled result contained, and the run reports it verified.
+	data, err := os.ReadFile(filepath.Join(run.root, "answer.txt"))
+	if err != nil || string(data) != "answer-code="+answerCode+"\n" || !strings.Contains(run.result.FinalText, "The original task is verified: "+answerCode) {
 		t.Fatalf("original task was not advanced: %q %v", data, err)
 	}
 	if run.recalls < 2 {
@@ -479,8 +529,33 @@ func TestSearchResultsWithoutScanProvenanceAreNeverOmitted(t *testing.T) {
 			t.Fatal("a result was omitted without authoritative provenance")
 		}
 	}
-	if _, err := os.Stat(filepath.Join(run.root, "verified.txt")); err == nil {
+	if _, err := os.Stat(filepath.Join(run.root, "answer.txt")); err == nil {
 		t.Fatal("unsafe continuation advanced the task")
+	}
+}
+
+// A search that matched inside a governing instruction file, or that returned
+// bytes recall could not reproduce, is never reported safe to omit.
+func TestScanThatTouchedInstructionsOrBinaryBytesIsNeverOmittable(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"AGENTS.md":  "needle: never deploy\n",
+		"notes.txt":  "needle: ordinary\n",
+		"binary.dat": "needle \xff\xfe\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	executor := NewWorkspaceToolExecutor()
+	for _, c := range []struct {
+		path string
+		want bool
+	}{{"notes.txt", true}, {"AGENTS.md", false}, {"binary.dat", false}, {".", false}} {
+		output, complete, err := executor.executeToolScan(context.Background(), ToolRequest{Name: "search_files", Input: json.RawMessage(fmt.Sprintf(`{"path":%q,"text":"needle"}`, c.path)), WorkingDir: root, Sandbox: Sandbox{Mode: SandboxReadOnly}})
+		if err != nil || output == "" || complete != c.want {
+			t.Fatalf("%s: complete=%v want %v err=%v", c.path, complete, c.want, err)
+		}
 	}
 }
 
@@ -505,14 +580,63 @@ func TestInsufficientContextAfterCompactionFailsBeforeDispatch(t *testing.T) {
 	}
 }
 
-func TestRecallBeforeAnyOmissionIsUnavailable(t *testing.T) {
-	run := runContinuation(t, continuationOptions{recallEarly: true})
-	requests := *run.requests
-	if len(requests) < 2 || !strings.Contains(requestText(requests[1]), "recall_prior_tool_result") && !strings.Contains(requestText(requests[1]), "unknown tool") {
-		t.Fatalf("an unavailable recall was not reported to the model")
+// An invalid, unknown or unavailable recall ends the run: the model must not
+// carry on as if it had read evidence it was refused.
+func TestUnsafeRecallFailsTruthfullyWithoutAnotherDispatch(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		o    continuationOptions
+	}{
+		{"unavailable before any omission", continuationOptions{recallEarly: true}},
+		{"unknown id", continuationOptions{badRecall: "id"}},
+		{"invalid offset", continuationOptions{badRecall: "offset"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			run := runContinuation(t, c.o)
+			if run.err == nil || run.result.Outcome != OutcomeFailed || !strings.Contains(run.err.Error(), "recall") || !strings.Contains(run.result.FinalText, "recall") {
+				t.Fatalf("expected a truthful failure: %+v %v", run.result, run.err)
+			}
+			requests := *run.requests
+			if strings.Contains(requestText(requests[len(requests)-1]), "unknown result") || strings.Contains(requestText(requests[len(requests)-1]), "recall unavailable") {
+				t.Fatal("the recall failure was fed back to the model and dispatched")
+			}
+			if _, err := os.Stat(filepath.Join(run.root, "answer.txt")); err == nil {
+				t.Fatal("the task advanced past a refused recall")
+			}
+			if run.recalls != 1 {
+				t.Fatalf("expected exactly the refused recall, got %d", run.recalls)
+			}
+		})
 	}
-	if strings.Contains(requestText(requests[1]), `"content"`) {
-		t.Fatal("unavailable recall returned content")
+}
+
+// Final synthesis is never compacted (its stubs would point at a recall tool it
+// cannot call). A run that ends on the tool-round limit with a transcript that
+// no longer fits is therefore refused before dispatch, not answered from stubs.
+func TestMaxRoundSynthesisIsRefusedNotAnsweredFromStubs(t *testing.T) {
+	run := runContinuation(t, continuationOptions{maxSteps: 7})
+	var overflow *agent.ContextOverflowError
+	if !errors.As(run.err, &overflow) || overflow.Dispatched || run.result.Outcome != OutcomeFailed {
+		t.Fatalf("expected a pre-dispatch refusal: %+v %v", run.result, run.err)
+	}
+	for _, r := range *run.requests {
+		if strings.Contains(r.Messages[0].Content, finalSynthesisInstruction) {
+			t.Fatal("a synthesis request was dispatched")
+		}
+	}
+	if strings.Contains(run.result.FinalText, "verified") {
+		t.Fatalf("a claim was made without the evidence: %q", run.result.FinalText)
+	}
+}
+
+func TestOmissionLimitationCountsEverythingWhenRecalledPagesAreOutOfView(t *testing.T) {
+	meter := &boundedAPIAdapter{prior: priorResults{"id": "abc"}}
+	meter.noteRecall(recalledPage{"id", 0, 3, 3})
+	if meter.omissionLimitation(false) != "" {
+		t.Fatal("a fully read result in view is not a limitation")
+	}
+	if !strings.Contains(meter.omissionLimitation(true), "Limitation:") {
+		t.Fatal("a rebuilt request holds no recalled page; the read must not count")
 	}
 }
 
@@ -523,7 +647,7 @@ func TestStopHaltsContinuationAndRecall(t *testing.T) {
 			if !errors.Is(run.err, context.Canceled) {
 				t.Fatalf("stop was not honoured: %+v %v", run.result, run.err)
 			}
-			if _, err := os.Stat(filepath.Join(run.root, "verified.txt")); err == nil {
+			if _, err := os.Stat(filepath.Join(run.root, "answer.txt")); err == nil {
 				t.Fatal("work continued after Stop")
 			}
 			if point == "recall" && (run.result.Outcome != OutcomeCancelled || run.recalls != 1) {

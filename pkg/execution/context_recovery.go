@@ -57,7 +57,8 @@ type pendingCall struct {
 }
 
 // compactWith omits a result only by structured provenance, never by what its
-// text says: a directory listing from a trusted executor (names alone), or a
+// text says (and never one that is not valid UTF-8, which recall's JSON pages
+// could not return byte-for-byte): a directory listing from a trusted executor (names alone), or a
 // search whose own scan reported complete. File reads, failed results, partial
 // scans and unknown tools can hold governing instructions and stay verbatim.
 func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent.Request, bool) {
@@ -100,7 +101,7 @@ func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent
 		for j := len(r.Messages[i].Content) - 1; j >= 0; j-- {
 			b := &copyRequest.Messages[i].Content[j]
 			call, ok := eligible[[2]int{i, j}]
-			if b.Type != agent.ContentTypeToolResult || !ok || b.ToolError != "" || len(b.ToolOutput) < 256 {
+			if b.Type != agent.ContentTypeToolResult || !ok || b.ToolError != "" || len(b.ToolOutput) < 256 || !utf8.ValidString(b.ToolOutput) {
 				continue
 			}
 			switch {
