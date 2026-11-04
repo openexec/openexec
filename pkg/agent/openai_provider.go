@@ -162,9 +162,6 @@ func NewOpenAIProvider(config OpenAIProviderConfig) (*OpenAIProvider, error) {
 	if config.BaseURL == "" {
 		config.BaseURL = DefaultOpenAIBaseURL
 	}
-	if isGitHubCopilotBaseURL(config.BaseURL) {
-		withGitHubCopilotAuth(&config)
-	}
 
 	if config.Timeout == 0 {
 		config.Timeout = DefaultOpenAITimeout

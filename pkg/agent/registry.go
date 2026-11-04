@@ -19,67 +19,11 @@ import (
 type ProviderName string
 
 const (
-	ProviderOpenAI     ProviderName = "openai"
-	ProviderAnthropic  ProviderName = "anthropic"
-	ProviderGemini     ProviderName = "gemini"
+	ProviderOpenAI      ProviderName = "openai"
+	ProviderAnthropic   ProviderName = "anthropic"
+	ProviderGemini      ProviderName = "gemini"
 	ProviderAgenticsNZ ProviderName = "agenticsnz"
-	// ProviderGitHubCopilot is the GitHub Copilot chat API (OpenAI-compatible).
-	ProviderGitHubCopilot ProviderName = "githubcopilot"
 )
-
-// GitHubCopilotBaseURL is the GitHub Copilot OpenAI-compatible endpoint.
-const GitHubCopilotBaseURL = "https://api.githubcopilot.com"
-
-// GitHubCopilotAPIKeyEnv is the environment variable holding the Copilot token.
-const GitHubCopilotAPIKeyEnv = "GITHUB_COPILOT_API_KEY"
-
-// GitHubCopilotModels lists the model IDs offered through GitHub Copilot.
-var GitHubCopilotModels = []string{"gpt-4.1", "claude-sonnet-4", "gemini-2.5-pro"}
-
-// NewGitHubCopilotProvider builds the Copilot provider over the OpenAI-compatible
-// adapter. The token is a GitHub OAuth token from a Copilot sign-in; each
-// request authenticates with a Copilot session token exchanged from it (see
-// copilotTransport). It must come from GITHUB_COPILOT_API_KEY (or config.APIKey):
-// the adapter's generic OPENAI_API_KEY fallback is refused so an OpenAI
-// credential is never sent to GitHub.
-func NewGitHubCopilotProvider(config OpenAIProviderConfig) (*OpenAIProvider, error) {
-	if config.APIKey == "" {
-		config.APIKey = os.Getenv(GitHubCopilotAPIKeyEnv)
-	}
-	if config.APIKey == "" {
-		return nil, &ProviderError{
-			Code:    ErrCodeAuthentication,
-			Message: fmt.Sprintf("%s API key is required (set %s environment variable or provide in config)", ProviderGitHubCopilot, GitHubCopilotAPIKeyEnv),
-		}
-	}
-	config.Name = string(ProviderGitHubCopilot)
-	if config.BaseURL == "" {
-		config.BaseURL = GitHubCopilotBaseURL
-	}
-	if config.Models == nil {
-		config.Models = GitHubCopilotModels
-	}
-	if config.ModelInfo == nil {
-		config.ModelInfo = make(map[string]*ModelInfo, len(config.Models))
-		for _, id := range config.Models {
-			config.ModelInfo[id] = &ModelInfo{
-				ID:       id,
-				Name:     id + " (GitHub Copilot)",
-				Provider: string(ProviderGitHubCopilot),
-				Capabilities: ProviderCapabilities{
-					Streaming:        true,
-					ToolUse:          true,
-					SystemPrompt:     true,
-					MultiTurn:        true,
-					MaxContextTokens: 128000,
-					MaxOutputTokens:  16384,
-				},
-			}
-		}
-	}
-	withGitHubCopilotAuth(&config)
-	return NewOpenAIProvider(config)
-}
 
 // ProviderFactory is a function that creates a new provider instance.
 type ProviderFactory func() (ProviderAdapter, error)
@@ -433,11 +377,6 @@ func RegisterDefaultFactories(registry *ProviderRegistry) {
 		return NewGeminiProviderFromEnv()
 	})
 
-	// GitHub Copilot factory
-	registry.RegisterFactory(ProviderGitHubCopilot, func() (ProviderAdapter, error) {
-		return NewGitHubCopilotProvider(OpenAIProviderConfig{})
-	})
-
 	// AgenticsNZ factory
 	registry.RegisterFactory(ProviderAgenticsNZ, func() (ProviderAdapter, error) {
 		models := []string{
@@ -510,11 +449,10 @@ func GetProviderForModel(modelID string) (ProviderAdapter, error) {
 // RequiredEnvVars returns the environment variable names required for each provider.
 func RequiredEnvVars() map[ProviderName][]string {
 	return map[ProviderName][]string{
-		ProviderOpenAI:        {"OPENAI_API_KEY"},
-		ProviderAnthropic:     {"ANTHROPIC_API_KEY"},
-		ProviderGemini:        {"GEMINI_API_KEY", "GOOGLE_API_KEY"}, // Either one works
-		ProviderAgenticsNZ:    {"AGENTICSNZ_API_KEY"},
-		ProviderGitHubCopilot: {GitHubCopilotAPIKeyEnv},
+		ProviderOpenAI:      {"OPENAI_API_KEY"},
+		ProviderAnthropic:   {"ANTHROPIC_API_KEY"},
+		ProviderGemini:      {"GEMINI_API_KEY", "GOOGLE_API_KEY"}, // Either one works
+		ProviderAgenticsNZ: {"AGENTICSNZ_API_KEY"},
 	}
 }
 
@@ -526,7 +464,6 @@ func CheckEnvVars() map[ProviderName]bool {
 	result[ProviderAnthropic] = os.Getenv("ANTHROPIC_API_KEY") != ""
 	result[ProviderGemini] = os.Getenv("GEMINI_API_KEY") != "" || os.Getenv("GOOGLE_API_KEY") != ""
 	result[ProviderAgenticsNZ] = os.Getenv("AGENTICSNZ_API_KEY") != ""
-	result[ProviderGitHubCopilot] = os.Getenv(GitHubCopilotAPIKeyEnv) != ""
 
 	return result
 }

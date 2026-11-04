@@ -48,10 +48,6 @@ var availableModels = []struct {
 	// AgenticsNZ
 	{"agenticsnz", "bartowski/google_gemma-4-31B-it-GGUF", "Gemma 4 31B (AgenticsNZ)"},
 	{"agenticsnz", "unsloth/Qwen3.6-35B-A3B-GGUF", "Qwen 3.6 35B (AgenticsNZ)"},
-	// GitHub Copilot
-	{"githubcopilot", "gpt-4.1", "GPT-4.1 (GitHub Copilot)"},
-	{"githubcopilot", "claude-sonnet-4", "Claude Sonnet 4 (GitHub Copilot)"},
-	{"githubcopilot", "gemini-2.5-pro", "Gemini 2.5 Pro (GitHub Copilot)"},
 }
 
 // providerPreset describes a preconfigured OpenAI-compatible endpoint that
@@ -80,13 +76,6 @@ var providerPresets = []providerPreset{
 			"bartowski/google_gemma-4-31B-it-GGUF",
 			"unsloth/Qwen3.6-35B-A3B-GGUF",
 		},
-	},
-	{
-		Key:     "githubcopilot",
-		Label:   "GitHub Copilot (OAuth token from GITHUB_COPILOT_API_KEY)",
-		BaseURL: "https://api.githubcopilot.com",
-		EnvVar:  "GITHUB_COPILOT_API_KEY",
-		Models:  []string{"gpt-4.1", "claude-sonnet-4", "gemini-2.5-pro"},
 	},
 }
 

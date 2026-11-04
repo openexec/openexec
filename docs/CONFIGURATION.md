@@ -100,6 +100,45 @@ no Console restart and does not change runs already in flight. For isolated
 task worktrees, edit the registered project's configuration, which the Console
 supplies through `ConfigDir`, rather than a temporary task checkout.
 
+## GitHub Copilot (CLI host provider)
+
+OpenExec runs GitHub Copilot through GitHub's own `copilot` CLI
+(`openexec execution-stdio --provider copilot`). It does not call
+`api.githubcopilot.com`: GitHub's documentation ([Copilot SDK
+authentication](https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate),
+[running the CLI programmatically](https://docs.github.com/en/copilot/how-tos/copilot-cli/automate-copilot-cli/run-cli-programmatically))
+describes the CLI/SDK and BYOK as the supported routes and documents no direct
+chat-completions HTTP API for Copilot subscriptions. The
+`copilot_internal/v2/token` session-token exchange used by editor clients is
+undocumented, so OpenExec deliberately does not use it.
+
+Credential, in the order GitHub documents:
+
+1. Interactive sign-in: run `copilot` and `/login` (GitHub OAuth device flow;
+   stored in the system keychain). OpenExec cannot verify this without
+   inference, so `Probe` reports `unknown` rather than `ready`.
+2. Headless: set `COPILOT_GITHUB_TOKEN` (or `GH_TOKEN`, `GITHUB_TOKEN`) to an
+   OAuth user token (`gho_`), GitHub App user token (`ghu_`) or fine-grained PAT
+   (`github_pat_`) of an account with a Copilot subscription. Classic `ghp_`
+   tokens are refused by GitHub and by OpenExec before the CLI starts.
+
+Only these variables (and `COPILOT_HOME`) are passed to the Copilot CLI, and
+they are not passed to the claude or codex CLIs. An `OPENAI_API_KEY` is never
+sent to GitHub.
+
+Behaviour and limits: each request runs `copilot -p <prompt> -s --no-ask-user
+[--model <m>]`; `workspace-write` adds `--allow-tool=write`, `read-only` grants
+no tool (unattended runs deny anything not pre-approved). The CLI cannot
+enforce writable roots, a command-network policy, a hard token grant or session
+resume in this mode, so requests that need those are refused. Model IDs are
+whatever the installed CLI accepts for `--model`; OpenExec carries no list. The
+legacy loop runner (`internal/runner`) has no Copilot mapping; use
+`execution-stdio`. `openexec doctor` prints the sign-in hint when the runner is
+a `copilot` binary.
+
+Not exercised: a real Copilot-entitled run. The tests use a fixture binary that
+follows the documented command line and token rules.
+
 ## Configuration File
 
 Configuration is stored in `openexec.yaml` in your project root. Environment variables can override any setting using the `OPENEXEC_*` prefix.
