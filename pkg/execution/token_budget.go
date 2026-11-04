@@ -30,6 +30,9 @@ type boundedAPIAdapter struct {
 	nonThinking             bool
 	prior                   priorResults
 	trustedDirectoryResults bool
+	// covered is how far recall has read, contiguously from byte 0, into each
+	// omitted result; the final answer may rely only on what reached the end.
+	covered map[string]int
 }
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
@@ -120,7 +123,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 		return res, err
 	}
 	if p.prior != nil {
-		if compacted, changed := p.prior.compact(r); changed && r.ToolChoice != "none" {
+		if compacted, changed := p.prior.compactWith(r, p.trustedDirectoryResults); changed && r.ToolChoice != "none" {
 			r = compacted
 		} else {
 			r.Tools = append(append([]agent.ToolDefinition(nil), r.Tools...), recallDefinition())
@@ -135,7 +138,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 			res, err = prepare(compacted)
 		}
 		overflow = nil
-		if errors.As(err, &overflow) && !overflow.Dispatched && p.prior == nil && p.trustedDirectoryResults && r.ToolChoice != "none" && len(r.Tools) > 0 {
+		if errors.As(err, &overflow) && !overflow.Dispatched && p.prior == nil && r.ToolChoice != "none" && len(r.Tools) > 0 {
 			collision := false
 			for _, tool := range r.Tools {
 				if tool.Name == recallTool {
@@ -144,7 +147,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 			}
 			if !collision {
 				prior := priorResults{}
-				if compacted, changed := prior.compact(r); changed {
+				if compacted, changed := prior.compactWith(r, p.trustedDirectoryResults); changed {
 					res, err = prepare(compacted)
 					if err == nil {
 						p.prior = prior
@@ -227,4 +230,37 @@ func (p *boundedAPIAdapter) Stream(ctx context.Context, r agent.Request) (<-chan
 	ch <- agent.StreamEvent{Type: agent.StreamEventContentDelta, Delta: &agent.StreamDelta{Text: res.GetText()}}
 	close(ch)
 	return ch, nil
+}
+
+// noteRecall records a page read from an omitted result. Coverage only grows
+// from a page that starts inside what was already read, so skipping ahead never
+// counts as having read the gap.
+func (p *boundedAPIAdapter) noteRecall(page recalledPage) {
+	if p.covered == nil {
+		p.covered = map[string]int{}
+	}
+	if page.offset <= p.covered[page.id] && page.next > p.covered[page.id] {
+		p.covered[page.id] = page.next
+	}
+}
+
+// unreadOmissions counts omitted results the model has not read to the end.
+func (p *boundedAPIAdapter) unreadOmissions() int {
+	n := 0
+	for id, content := range p.prior {
+		if p.covered[id] < len(content) {
+			n++
+		}
+	}
+	return n
+}
+
+// omissionLimitation is the explicit statement an answer must carry when
+// evidence was left out of the context and never read back.
+func (p *boundedAPIAdapter) omissionLimitation() string {
+	n := p.unreadOmissions()
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("\n\nLimitation: %d earlier tool result(s) were omitted from the context to fit it and were not read back in full with %s. This answer does not establish anything those results contain.", n, recallTool)
 }
