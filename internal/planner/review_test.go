@@ -26,6 +26,31 @@ func TestReviewPlanUsesExistingDiscipline(t *testing.T) {
 	}
 }
 
+func TestReviewPlanQuotedCausePattern(t *testing.T) {
+	for _, level := range []string{"story", "task"} {
+		for _, piped := range []bool{false, true} {
+			provider := &mockProvider{response: `{"approved":true,"assessment":"Verified diagnosis"}`}
+			script := `grep -Eq '^Cause class: (code|non-code)' "$ev"`
+			if piped {
+				script += " | cat"
+			}
+			story := Story{ID: "US-001", Title: "Diagnose lane", Tasks: []Task{{ID: "T-US-001-001"}}}
+			if level == "story" {
+				story.VerificationScript = script
+			} else {
+				story.Tasks[0].VerificationScript = script
+			}
+			review, err := New(provider).ReviewPlan(context.Background(), "Diagnose lane", &ProjectPlan{Stories: []Story{story}})
+			if err != nil || review.Approved == piped {
+				t.Fatalf("%s piped=%v: approval must distinguish pattern data from a pipe: %#v %v", level, piped, review, err)
+			}
+			if piped && !strings.Contains(review.Assessment, "quiet grep") {
+				t.Fatalf("%s: lost deterministic refusal: %s", level, review.Assessment)
+			}
+		}
+	}
+}
+
 func TestReviewPlanRefusesStaleBaseRefDespiteApproval(t *testing.T) {
 	provider := &mockProvider{response: `{"approved":true,"assessment":"Verification compares against the default branch"}`}
 	for _, level := range []string{"story", "task"} {

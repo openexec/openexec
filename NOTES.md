@@ -4,6 +4,19 @@ Raw capture. One line per thought, any grammar.
 
 ## Now
 
+- [Quoted verification patterns, 2026-11-04] Signal run 6a827a78 failed two
+  plan-check repairs because the quiet-grep linter read the quoted alternation
+  in `grep -Eq '^Cause class: (code|non-code)' "$ev"` as a shell pipe. Reuse
+  the existing shell tokenizer to attach executable pipe boundaries to parsed
+  commands, retaining enclosing commands across substitutions. Quoted/escaped
+  pattern data and comments pass; actual quiet-grep pipelines, substitutions,
+  subshell groups, binary paths and assignment prefixes remain refused.
+  Story/task plan-review regressions fail against original production source;
+  removing the pipeline guard fails the negative review assertion. Planner and
+  public runtime suites, vet and runtime build pass. No compatibility/loading,
+  persistence, grants, task state, model or loop changes. Console dependency
+  adoption, hosted verification and a useful original run remain owed.
+
 - [Native generated-output observation, 2026-11-01] The next natural Solar
   run retained its exact prompt prefix but refused after a native response
   used 35003 input / 8022 output tokens: its generated assistant message was
