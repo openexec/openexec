@@ -148,6 +148,23 @@ func TestPinReadableRootsRefusesBadIdentities(t *testing.T) {
 	}
 }
 
+// A root reached through a symlinked parent still names the same directory
+// (so SameFile alone passes), but its path is not canonical and must be refused.
+func TestPinReadableRootsRefusesSymlinkedParent(t *testing.T) {
+	f := newIdentityFixture(t)
+	alias := filepath.Join(filepath.Dir(f.selected), "alias")
+	if err := os.Symlink(filepath.Dir(f.selected), alias); err != nil {
+		t.Fatal(err)
+	}
+	viaAlias := filepath.Join(alias, filepath.Base(f.selected))
+	identity := f.identity
+	identity.Path = viaAlias
+	_, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{viaAlias}, []ReadableRootIdentity{identity})
+	if err == nil || !strings.Contains(err.Error(), "not a stable canonical directory") || closeRoots != nil {
+		t.Fatalf("err=%v", err)
+	}
+}
+
 // Near miss: a correct identity for the exact root pins cleanly.
 func TestPinReadableRootsAcceptsMatchingIdentity(t *testing.T) {
 	f := newIdentityFixture(t)
@@ -182,6 +199,27 @@ func TestAPIProviderRefusesIdentitiesItCannotBind(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "without roots") {
 		t.Fatalf("err=%v", err)
 	}
+}
+
+// A composite whose workspace cannot pin refuses; a pinning one is the near miss.
+func TestCompositeRefusesWorkspaceThatCannotPin(t *testing.T) {
+	f := newIdentityFixture(t)
+	build := func(workspace ToolExecutor) *CompositeToolExecutor {
+		composite, err := NewCompositeToolExecutor(workspace, WorkspaceTools(Sandbox{Mode: SandboxReadOnly}), &GatewayToolExecutor{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return composite
+	}
+	_, closeRoots, err := build(unpinnedExecutor{}).pinReadableRoots([]string{f.selected}, []ReadableRootIdentity{f.identity})
+	if err == nil || !strings.Contains(err.Error(), "cannot pin") || closeRoots != nil {
+		t.Fatalf("err=%v", err)
+	}
+	_, closeRoots, err = build(NewWorkspaceToolExecutor()).pinReadableRoots([]string{f.selected}, []ReadableRootIdentity{f.identity})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeRoots()
 }
 
 type unpinnedExecutor struct{}

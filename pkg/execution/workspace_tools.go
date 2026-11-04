@@ -105,8 +105,7 @@ func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string, identities []Re
 			return nil, nil, fmt.Errorf("readable root %q: %w", path, err)
 		}
 		opened, openErr := root.Stat(".")
-		named, nameErr := os.Lstat(path)
-		if openErr != nil || nameErr != nil || !os.SameFile(opened, named) {
+		if openErr != nil {
 			_ = root.Close()
 			closeRoots()
 			return nil, nil, fmt.Errorf("readable root %q changed during admission", path)
