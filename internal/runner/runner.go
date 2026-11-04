@@ -15,7 +15,27 @@ var (
 	}
 	CodexDefaultArgs  = []string{"--prompt", "-"}
 	GeminiDefaultArgs = []string{"--prompt", "-"}
+	// CopilotDefaultArgs is GitHub's documented non-interactive form; the
+	// loop adds -p <prompt>, --model and --allow-tool.
+	CopilotDefaultArgs = []string{"-s", "--no-ask-user"}
 )
+
+// IsCopilotModel reports whether a model name selects the GitHub Copilot CLI:
+// "copilot" (the CLI's default model) or "copilot:<model>".
+func IsCopilotModel(model string) bool {
+	m := strings.ToLower(model)
+	return m == "copilot" || strings.HasPrefix(m, "copilot:")
+}
+
+// CopilotCLIModel returns the value for `copilot --model`, or "" for the CLI
+// default.
+func CopilotCLIModel(model string) string {
+	if !IsCopilotModel(model) {
+		return ""
+	}
+	_, name, _ := strings.Cut(model, ":")
+	return strings.TrimSpace(name)
+}
 
 // Resolve maps a model name to a local CLI command and its default arguments.
 // It prioritizes explicit overrides from the project configuration.
@@ -31,6 +51,9 @@ func Resolve(model string, overrideCmd string, overrideArgs []string) (string, [
 		// 2. Map model family to default CLI
 		m := strings.ToLower(model)
 		switch {
+		case IsCopilotModel(m):
+			cmd = "copilot"
+			args = append([]string{}, CopilotDefaultArgs...)
 		case m == "", strings.Contains(m, "claude"), strings.Contains(m, "sonnet"), strings.Contains(m, "opus"), strings.Contains(m, "haiku"):
 			cmd = "claude"
 			args = append([]string{}, ClaudeDefaultArgs...)

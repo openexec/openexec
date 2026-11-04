@@ -132,9 +132,20 @@ no tool (unattended runs deny anything not pre-approved). The CLI cannot
 enforce writable roots, a command-network policy, a hard token grant or session
 resume in this mode, so requests that need those are refused. Model IDs are
 whatever the installed CLI accepts for `--model`; OpenExec carries no list. The
-legacy loop runner (`internal/runner`) has no Copilot mapping; use
-`execution-stdio`. `openexec doctor` prints the sign-in hint when the runner is
-a `copilot` binary.
+`openexec init` offers "GitHub Copilot CLI" (executor model `copilot`; set
+`copilot:<model>` to pass `<model>` to `--model`). `internal/runner` maps that
+model to the `copilot` binary and the loop runs
+`copilot -p <prompt> -s --no-ask-user [--model m] [--allow-tool=write]`,
+with OpenAI/Anthropic/Codex/Gemini keys removed from its environment and a
+classic `ghp_` token refused before it starts. `openexec doctor` prints the
+sign-in hint when the runner is a `copilot` binary.
+
+Refresh and expiry are the CLI's: OpenExec never stores, reads or renews the
+Copilot credential. It passes `COPILOT_HOME` and the token variables through,
+so a stored sign-in is renewed by the CLI itself; if renewal fails or a token
+has expired, the CLI's own message (for example "run /login") becomes the
+failed outcome. Fixtures in `pkg/execution/agent_cli_copilot_test.go` cover
+both cases against the documented command line, not the CLI's real wording.
 
 Not exercised: a real Copilot-entitled run. The tests use a fixture binary that
 follows the documented command line and token rules.
