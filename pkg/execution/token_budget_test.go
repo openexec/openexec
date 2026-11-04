@@ -306,6 +306,7 @@ func TestHardBudgetFinalSynthesisPreservesGrantYield(t *testing.T) {
 type overflowAdapter struct {
 	fakeAPIAdapter
 	estimate int
+	always   bool // overflow at every context, to isolate the grant branches
 	calls    int
 	limits   [][2]int
 }
@@ -314,7 +315,7 @@ func (*overflowAdapter) SupportsHardTokenBudget() bool { return true }
 func (a *overflowAdapter) CompleteBounded(_ context.Context, _ agent.Request, input, output int) (*agent.Response, error) {
 	a.calls++
 	a.limits = append(a.limits, [2]int{input, output})
-	if a.estimate+2048 > input {
+	if a.always || a.estimate+2048 > input {
 		return nil, &agent.ContextOverflowError{EstimatedTokens: a.estimate, ContextTokens: input, RequestBytes: a.estimate * 3, Dispatched: false}
 	}
 	return &agent.Response{Usage: agent.Usage{PromptTokens: a.estimate, CompletionTokens: 1}}, nil
@@ -381,6 +382,54 @@ func TestHardGrantAdmissionBoundaryGrant9556(t *testing.T) {
 		var ov *agent.ContextOverflowError
 		if errors.As(err, &ge) || !errors.As(err, &ov) {
 			t.Fatalf("native overflow must surface unchanged: %v", err)
+		}
+	})
+}
+
+// Each case drives one condition of the resize (:154) or refusal (:158) branch
+// so that removing that condition changes the outcome.
+func TestHardGrantAdmissionBranchConditions(t *testing.T) {
+	run := func(grant int64, estimate int) (*overflowAdapter, error) {
+		// prepare may retry once with a smaller output reserve; a resize would
+		// instead change the input context, which every call here must keep.
+		a := &overflowAdapter{estimate: estimate, always: true}
+		m := &boundedAPIAdapter{ProviderAdapter: a, remaining: grant, providerContext: 65536, contextLimit: 65536}
+		_, err := m.Complete(context.Background(), agent.Request{})
+		return a, err
+	}
+	nativeOverflow := func(t *testing.T, a *overflowAdapter, err error) {
+		t.Helper()
+		var ge *contextGrantError
+		var ov *agent.ContextOverflowError
+		if errors.As(err, &ge) || !errors.As(err, &ov) {
+			t.Fatalf("want unchanged native overflow, calls=%d limits=%v err=%v", a.calls, a.limits, err)
+		}
+		for _, l := range a.limits {
+			if l[0] != a.limits[0][0] {
+				t.Fatalf("input context was resized: %v", a.limits)
+			}
+		}
+	}
+	t.Run("selected context at the target is not a grant refusal and not resized (input < target)", func(t *testing.T) {
+		// grant 200000 selects 65536 == target; estimate+2048 fits, required<=input.
+		a, err := run(200000, 1000)
+		nativeOverflow(t, a, err)
+	})
+	t.Run("required above the target is not resized (required <= target)", func(t *testing.T) {
+		// required = 63480+2064 = 65544 > 65536 while the grant is ample.
+		a, err := run(200000, 63480)
+		nativeOverflow(t, a, err)
+	})
+	t.Run("estimate plus output reserve above the target is not a grant refusal", func(t *testing.T) {
+		// 63489+2048 = 65537 > 65536; selected 4096 < target, grant too small to resize.
+		a, err := run(9556, 63489)
+		nativeOverflow(t, a, err)
+	})
+	t.Run("estimate whose reserve exactly fits the target is a grant refusal", func(t *testing.T) {
+		a, err := run(9556, 63488)
+		var ge *contextGrantError
+		if !errors.As(err, &ge) || a.calls != 1 {
+			t.Fatalf("calls=%d err=%v", a.calls, err)
 		}
 	})
 }
