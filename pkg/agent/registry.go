@@ -37,7 +37,9 @@ const GitHubCopilotAPIKeyEnv = "GITHUB_COPILOT_API_KEY"
 var GitHubCopilotModels = []string{"gpt-4.1", "claude-sonnet-4", "gemini-2.5-pro"}
 
 // NewGitHubCopilotProvider builds the Copilot provider over the OpenAI-compatible
-// adapter. The token must come from GITHUB_COPILOT_API_KEY (or config.APIKey):
+// adapter. The token is a GitHub OAuth token from a Copilot sign-in; each
+// request authenticates with a Copilot session token exchanged from it (see
+// copilotTransport). It must come from GITHUB_COPILOT_API_KEY (or config.APIKey):
 // the adapter's generic OPENAI_API_KEY fallback is refused so an OpenAI
 // credential is never sent to GitHub.
 func NewGitHubCopilotProvider(config OpenAIProviderConfig) (*OpenAIProvider, error) {
@@ -75,6 +77,7 @@ func NewGitHubCopilotProvider(config OpenAIProviderConfig) (*OpenAIProvider, err
 			}
 		}
 	}
+	withGitHubCopilotAuth(&config)
 	return NewOpenAIProvider(config)
 }
 

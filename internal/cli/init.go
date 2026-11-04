@@ -83,7 +83,7 @@ var providerPresets = []providerPreset{
 	},
 	{
 		Key:     "githubcopilot",
-		Label:   "GitHub Copilot (token from GITHUB_COPILOT_API_KEY)",
+		Label:   "GitHub Copilot (OAuth token from GITHUB_COPILOT_API_KEY)",
 		BaseURL: "https://api.githubcopilot.com",
 		EnvVar:  "GITHUB_COPILOT_API_KEY",
 		Models:  []string{"gpt-4.1", "claude-sonnet-4", "gemini-2.5-pro"},
