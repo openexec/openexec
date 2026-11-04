@@ -194,3 +194,37 @@ func TestExecutionProtocolRefusesReplayOnTheOlderVersion(t *testing.T) {
 		t.Fatalf("error = %v, want a refusal naming the version", err)
 	}
 }
+
+type boundProtocolProvider struct{ protocolProvider }
+
+func (boundProtocolProvider) BoundReadableRootsAvailable() bool { return true }
+
+func TestExecutionProtocolBoundRootsRequiresNewVersionAndProvider(t *testing.T) {
+	makeRequest := func(version int, identities []execution.ReadableRootIdentity) []byte {
+		request := executionEnvelope{Version: version, Operation: "execute", Request: &execution.Request{ID: "one", WorkingDir: "/candidate", Prompt: "work", Sandbox: execution.Sandbox{Mode: "read-only"}, ReadableRoots: []string{"/selected"}, ReadableRootIdentities: identities}}
+		data, _ := json.Marshal(request)
+		return data
+	}
+	ids := []execution.ReadableRootIdentity{{Path: "/selected", Device: 1, Inode: 2}}
+	for _, tc := range []struct {
+		name     string
+		version  int
+		ids      []execution.ReadableRootIdentity
+		provider execution.Provider
+		succeeds bool
+	}{
+		{"new protocol and bound provider", 4, ids, boundProtocolProvider{}, true},
+		{"old protocol cannot carry identity", 3, ids, boundProtocolProvider{}, false},
+		{"missing identities", 4, nil, boundProtocolProvider{}, false},
+		{"provider without enforcement", 4, ids, protocolProvider{}, false},
+		{"legacy without requirement", 3, nil, protocolProvider{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := serveExecutionProtocol(context.Background(), bytes.NewReader(makeRequest(tc.version, tc.ids)), &out, staticProvider(tc.provider))
+			if (err == nil) != tc.succeeds {
+				t.Fatalf("err=%v output=%s", err, out.String())
+			}
+		})
+	}
+}
