@@ -171,7 +171,7 @@ func (p *APIProvider) BoundReadableRootsAvailable() bool {
 	_, ok := p.config.ToolExecutor.(interface {
 		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
 	})
-	return ok && ReadableRootIdentitySupported()
+	return ok && readableRootIdentitySupported()
 }
 
 func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {

@@ -113,7 +113,7 @@ func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string, identities []Re
 		}
 		if len(identities) > 0 {
 			want, ok := expected[path]
-			actual, identityErr := ReadableRootIdentityOf(path, opened)
+			actual, identityErr := readableRootIdentityOf(path, opened)
 			if !ok || identityErr != nil || actual != want {
 				_ = root.Close()
 				closeRoots()

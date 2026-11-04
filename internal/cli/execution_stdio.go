@@ -237,6 +237,13 @@ func resolveAPIKeyReference(key string) string {
 }
 
 func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
+	return serveExecutionProtocolUpTo(ctx, executionProtocolBoundRoots, input, output, providerFor)
+}
+
+// serveExecutionProtocolUpTo is the reader itself, parameterised by the newest
+// version it understands. Production always passes the newest; a test passes 3
+// to run the same reader as a runtime that predates version 4.
+func serveExecutionProtocolUpTo(ctx context.Context, newest int, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
 	decoder := json.NewDecoder(io.LimitReader(input, 1<<20))
 	writer := bufio.NewWriter(output)
 	defer writer.Flush()
@@ -256,9 +263,7 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	if err := decoder.Decode(&request); err != nil {
 		return fmt.Errorf("decode execution request: %w", err)
 	}
-	switch request.Version {
-	case executionProtocolBoundRoots, executionProtocolVersion, executionProtocolVersionReplay, executionProtocolVersionLegacy:
-	default:
+	if request.Version < executionProtocolVersionLegacy || request.Version > newest {
 		return fmt.Errorf("unsupported execution protocol version %d", request.Version)
 	}
 	if request.Operation == "execute" && request.Request != nil {

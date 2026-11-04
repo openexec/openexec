@@ -2,14 +2,11 @@
 
 package execution
 
-import (
-	"fmt"
-	"os"
-)
+import "os"
 
 func ReadableRootIdentitySupported() bool { return false }
 
 // Other platforms must not pretend a path is a verified directory identity.
-func ReadableRootIdentityOf(path string, _ os.FileInfo) (ReadableRootIdentity, error) {
-	return ReadableRootIdentity{}, fmt.Errorf("readable root identity is unsupported for %q", path)
+func ReadableRootIdentityOf(path string, info os.FileInfo) (ReadableRootIdentity, error) {
+	return unsupportedReadableRootIdentity(path, info)
 }
