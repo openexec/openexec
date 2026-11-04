@@ -50,6 +50,48 @@ func TestLintVerificationScript(t *testing.T) {
 	}
 }
 
+func TestQuietGrepDistinguishesPatternFromPipeline(t *testing.T) {
+	for _, script := range []string{
+		// Signal run 6a827a78 was refused after two repairs for this sound check.
+		`grep -Eq '^Cause class: (code|non-code)' "$ev"`,
+		`grep -Eq "^Cause class: (code|non-code)" "$ev"`,
+		`grep -Eq code\|non-code "$ev"`,
+		`grep -Eq '(code|non-code)' "$ev" || exit 1`,
+		`grep -Eq '(code|non-code)' "$ev" && cat "$ev" | head -1`,
+		`echo 'grep -q x f | head -1'`,
+		"# grep -q x f | head -1\ngrep -q x f",
+	} {
+		t.Run("sound/"+script, func(t *testing.T) {
+			if issues := LintVerificationScript(script); len(issues) != 0 {
+				t.Fatalf("quoted pattern or data refused as a pipeline: %v", issues)
+			}
+		})
+	}
+	for _, script := range []string{
+		`grep -q missing f | head -1`,
+		`grep -Eq '(code|non-code)' "$ev" | cat`,
+		`grep -Eq "(code|non-code)" "$ev" | cat`,
+		`grep -q missing f | cat || exit 1`,
+		`/usr/bin/grep -q missing f | cat`,
+		`LC_ALL=C grep -q missing f | cat`,
+		`(grep -q missing f) | cat`,
+		`(printf start; grep -q missing f) | cat`,
+		`grep -q "$(printf missing)" f | cat`,
+		`grep -q missing "$(printf f)" | cat`,
+		`if grep -q missing f | cat; then echo ok; fi`,
+		`echo "$(grep -q missing f | cat)"`,
+		"echo `grep -q missing f | cat`",
+		"grep -q missing f \\\n | cat",
+	} {
+		t.Run("discarded/"+script, func(t *testing.T) {
+			issues := strings.Join(LintVerificationScript(script), "\n")
+			if !strings.Contains(issues, "quiet grep") {
+				t.Fatalf("real quiet-grep pipeline escaped the guard: %s", issues)
+			}
+		})
+	}
+}
+
 func TestStaleBaseRefIssue(t *testing.T) {
 	// Templates use REF for the default-branch name; each runs for main and master.
 	stale := []string{
@@ -132,10 +174,10 @@ func TestShellCommands(t *testing.T) {
 		{`a;b&&c||d|e&f`, [][]string{{"a"}, {"b"}, {"c"}, {"d"}, {"e"}, {"f"}}},
 		{"a # b c\nd", [][]string{{"a"}, {"d"}}},
 		{`a#b`, [][]string{{"a#b"}}},
-		// The quoted word around a substitution splits into empty halves; only
-		// the substitution's own argv matters.
-		{`x "$(y 'z')" w`, [][]string{{"x", ""}, {"y", "z"}, {"", "w"}}},
-		{"x `y z` w", [][]string{{"x"}, {"y", "z"}, {"w"}}},
+		// The substitution runs independently; retain its enclosing command
+		// with an unknown (empty) expansion, so its pipeline stays attributable.
+		{`x "$(y 'z')" w`, [][]string{{"y", "z"}, {"x", "", "w"}}},
+		{"x `y z` w", [][]string{{"y", "z"}, {"x", "", "w"}}},
 		{`a '' b`, [][]string{{"a", "", "b"}}},
 		{`a 2>&1 > out b`, [][]string{{"a", "b"}}},
 		{`"a\"b\$c\d"`, [][]string{{`a"b$c\d`}}},
