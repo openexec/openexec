@@ -99,7 +99,7 @@ func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string, identities []Re
 			closeRoots()
 			return nil, nil, fmt.Errorf("readable root %q is not a stable canonical directory", path)
 		}
-		root, err := os.OpenRoot(path)
+		root, err := openReadableRoot(path)
 		if err != nil {
 			closeRoots()
 			return nil, nil, fmt.Errorf("readable root %q: %w", path, err)
@@ -444,7 +444,7 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 // the name. That fallback is best-effort for the denied-subtree decision;
 // os.Root still owns containment of the actual operation.
 func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument string) error {
-	resolvedRoot, err := filepath.EvalSymlinks(root.Name())
+	resolvedRoot, err := resolveRootDescriptor(root)
 	if err != nil {
 		return fmt.Errorf("verify workspace root for %q: %w", argument, err)
 	}
@@ -468,6 +468,24 @@ func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument s
 			argument, component)
 	}
 	return nil
+}
+
+// resolveRootDescriptor names the directory the descriptor holds, not whatever
+// the root's path names now. For a pinned root the two differ once the checkout
+// is swapped; comparing a file opened beneath the descriptor with the path's
+// current target would refuse the original or, worse, bless the replacement.
+// Without /proc the name is all there is.
+func resolveRootDescriptor(root *os.Root) (string, error) {
+	if runtime.GOOS == "linux" {
+		if directory, err := root.Open("."); err == nil {
+			defer directory.Close()
+			target, err := os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(directory.Fd()), 10)))
+			if err == nil && filepath.IsAbs(target) {
+				return strings.TrimSuffix(target, " (deleted)"), nil
+			}
+		}
+	}
+	return filepath.EvalSymlinks(root.Name())
 }
 
 // refuseDeniedProspectiveTarget resolves every existing prefix, then appends

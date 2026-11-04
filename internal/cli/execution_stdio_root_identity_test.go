@@ -238,13 +238,11 @@ func TestConnectedValidRootServesReadListSearchThroughPinnedDescriptor(t *testin
 					if tool == "list_directory" {
 						want = "witness"
 					}
-					// Unswapped, the descriptor serves the original. Swapped, the pinned
-					// descriptor still names the original directory, which is no longer
-					// at the path: the call is served from it or refused, and the
-					// outside directory now at the path is never read.
-					served := strings.Contains(run.toolOutput, want)
-					refused := strings.Contains(run.toolOutput, "outside the workspace root")
-					if swap == "" && !served || swap != "" && !served && !refused {
+					// Swapped or not, the answer is the original directory's content.
+					// After the swap the path names the outside directory, so only the
+					// descriptor held since admission can produce it. A refusal is not
+					// accepted: it would not show which object served.
+					if !strings.Contains(run.toolOutput, want) {
 						t.Fatalf("%s output %q (calls=%d)", tool, run.toolOutput, adapter.calls)
 					}
 					if swap != "" {
@@ -362,6 +360,10 @@ func TestConnectedRuntimeWithoutV4RefusesV4Request(t *testing.T) {
 	run := f.serve(t, executionProtocolVersion, 4, []string{f.selected}, []execution.ReadableRootIdentity{id}, adapter, f.executor(t, false))
 	if run.err == nil || !strings.Contains(run.err.Error(), "unsupported execution protocol version 4") {
 		t.Fatalf("old runtime did not refuse v4: %v", run.err)
+	}
+	var refusal *unsupportedProtocolVersionError
+	if !errors.As(run.err, &refusal) || refusal.Version != 4 {
+		t.Fatalf("refusal is not typed: %T %v", run.err, run.err)
 	}
 	if run.providerBuilt || adapter.calls != 0 || run.stdout != "" {
 		t.Fatalf("old runtime did work for a v4 request: built=%v calls=%d out=%q", run.providerBuilt, adapter.calls, run.stdout)

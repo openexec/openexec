@@ -11,6 +11,7 @@ import (
 var (
 	readableRootIdentitySupported = ReadableRootIdentitySupported
 	readableRootIdentityOf        = ReadableRootIdentityOf
+	openReadableRoot              = os.OpenRoot
 )
 
 // unsupportedReadableRootIdentity is the refusal for platforms without a

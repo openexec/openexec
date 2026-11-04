@@ -236,6 +236,14 @@ func resolveAPIKeyReference(key string) string {
 	return key
 }
 
+// unsupportedProtocolVersionError is the refusal for a version outside what this
+// reader speaks, so a caller can tell it from a failed run.
+type unsupportedProtocolVersionError struct{ Version int }
+
+func (e *unsupportedProtocolVersionError) Error() string {
+	return fmt.Sprintf("unsupported execution protocol version %d", e.Version)
+}
+
 func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
 	return serveExecutionProtocolUpTo(ctx, executionProtocolBoundRoots, input, output, providerFor)
 }
@@ -264,7 +272,7 @@ func serveExecutionProtocolUpTo(ctx context.Context, newest int, input io.Reader
 		return fmt.Errorf("decode execution request: %w", err)
 	}
 	if request.Version < executionProtocolVersionLegacy || request.Version > newest {
-		return fmt.Errorf("unsupported execution protocol version %d", request.Version)
+		return &unsupportedProtocolVersionError{Version: request.Version}
 	}
 	if request.Operation == "execute" && request.Request != nil {
 		roots := request.Request.ReadableRoots

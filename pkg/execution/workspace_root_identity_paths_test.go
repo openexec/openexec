@@ -5,6 +5,7 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,28 +161,71 @@ func TestPinReadableRootsAcceptsMatchingIdentity(t *testing.T) {
 
 func TestAPIProviderRefusesIdentitiesItCannotBind(t *testing.T) {
 	f := newIdentityFixture(t)
-	p, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{}, ToolExecutor: unpinnedExecutor{}})
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{err: errors.New("model endpoint reached")}, ToolExecutor: unpinnedExecutor{}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if p.BoundReadableRootsAvailable() {
 		t.Fatal("executor without pinning reported bound-root support")
 	}
-	_, err = p.Execute(context.Background(), Request{WorkingDir: f.working, Prompt: "x", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{f.selected}, ReadableRootIdentities: []ReadableRootIdentity{f.identity}}, nil)
+	_, err = p.Execute(context.Background(), Request{ID: "bind", WorkingDir: f.working, Prompt: "x", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{f.selected}, ReadableRootIdentities: []ReadableRootIdentity{f.identity}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "cannot bind") {
 		t.Fatalf("err=%v", err)
 	}
-	pinning, err := NewAPIProvider(APIProviderConfig{Adapter: &fakeAPIAdapter{}, ToolExecutor: NewWorkspaceToolExecutor()})
+	adapter := &fakeAPIAdapter{err: errors.New("model endpoint reached")}
+	pinning, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, ToolExecutor: NewWorkspaceToolExecutor()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !pinning.BoundReadableRootsAvailable() {
 		t.Fatal("workspace executor should support bound roots")
 	}
-	_, err = pinning.Execute(context.Background(), Request{WorkingDir: f.working, Prompt: "x", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRootIdentities: []ReadableRootIdentity{f.identity}}, nil)
-	if err == nil || !strings.Contains(err.Error(), "without roots") {
-		t.Fatalf("err=%v", err)
+	_, err = pinning.Execute(context.Background(), Request{ID: "bind", WorkingDir: f.working, Prompt: "x", Model: "test", Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRootIdentities: []ReadableRootIdentity{f.identity}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "without roots") || len(adapter.requests) != 0 {
+		t.Fatalf("err=%v inference requests=%d", err, len(adapter.requests))
 	}
+}
+
+// The caller's identity must be checked against one computed now. When the
+// platform cannot compute it, a zero identity from the caller must not match
+// the zero value the failed computation returns.
+func TestPinReadableRootsRefusesWhenIdentityCannotBeComputed(t *testing.T) {
+	f := newIdentityFixture(t)
+	identityOf := readableRootIdentityOf
+	t.Cleanup(func() { readableRootIdentityOf = identityOf })
+	// A failed computation that still echoes the path: the value alone would
+	// equal a caller identity carrying only the path.
+	readableRootIdentityOf = func(path string, _ os.FileInfo) (ReadableRootIdentity, error) {
+		return ReadableRootIdentity{Path: path}, errors.New("identity unavailable")
+	}
+	zero := []ReadableRootIdentity{{Path: f.selected}}
+	_, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, zero)
+	if err == nil || !strings.Contains(err.Error(), "changed since caller admission") || closeRoots != nil {
+		t.Fatalf("zero identity admitted when identity is uncomputable: err=%v", err)
+	}
+}
+
+// A directory swapped in between resolving the name and opening it is not the
+// root that was resolved. Without identities this comparison is the only guard.
+func TestPinReadableRootsRefusesRootSwappedDuringAdmission(t *testing.T) {
+	f := newIdentityFixture(t)
+	opener := openReadableRoot
+	t.Cleanup(func() { openReadableRoot = opener })
+	openReadableRoot = func(string) (*os.Root, error) { return os.OpenRoot(f.outside) }
+	_, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, nil)
+	if err == nil || !strings.Contains(err.Error(), "changed during admission") || closeRoots != nil {
+		t.Fatalf("swapped root admitted: err=%v", err)
+	}
+	if strings.Contains(err.Error(), f.outside) {
+		t.Fatalf("refusal disclosed the outside path: %v", err)
+	}
+	// Near miss: the honest opener is admitted.
+	openReadableRoot = opener
+	_, closeRoots, err = NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeRoots()
 }
 
 type unpinnedExecutor struct{}

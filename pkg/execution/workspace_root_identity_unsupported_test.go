@@ -73,8 +73,13 @@ func TestPinnedRootDoesNotFollowSymlinkToOutside(t *testing.T) {
 		}
 		out, err := pinned.ExecuteTool(t.Context(), ToolRequest{Name: "read_file", Input: []byte(`{"path":"` + filepath.Join(f.selected, "escape") + `"}`), WorkingDir: f.working, Sandbox: Sandbox{Mode: SandboxReadOnly}, ReadableRoots: []string{f.selected}})
 		closeRoots()
-		if err == nil || strings.Contains(out+err.Error(), "outside-secret") {
-			t.Fatalf("composite=%v symlink escape: out=%q err=%v", composite, out, err)
+		if err == nil {
+			t.Fatalf("composite=%v symlink escape was followed: out=%q", composite, out)
+		}
+		for _, leak := range []string{"outside-secret", f.outside} {
+			if strings.Contains(out, leak) || strings.Contains(err.Error(), leak) {
+				t.Fatalf("composite=%v symlink escape disclosed %q: out=%q err=%v", composite, leak, out, err)
+			}
 		}
 	}
 }

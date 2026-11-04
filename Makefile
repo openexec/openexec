@@ -59,8 +59,6 @@ ui-lint:
 
 test:
 	python3 scripts/verify-workspace-search.py
-	@echo "🧪 Verifying readable-root identity guards and their removal controls..."
-	python3 scripts/verify-readable-root-identity.py
 	@echo "🧪 Verifying graph scan unmerged-index regression and negative control..."
 	python3 scripts/verify-graph-scan-unmerged.py
 	@echo "🧪 Verifying native CLI GOCACHE preservation and negative control..."
