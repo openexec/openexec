@@ -110,6 +110,11 @@ func TestGrantBoundaryAdmissionGuards(t *testing.T) {
 	if err := complete(meter); err != errHardTokenGrantExhausted || len(stub.limits) != 0 || meter.remaining != 4095 {
 		t.Fatalf("remaining 4095: err=%v limits=%v remaining=%d", err, stub.limits, meter.remaining)
 	}
+	// The later input+2048 guard also refuses 4095, so observe the first guard
+	// through its own effect: no context may have been selected.
+	if meter.contextCap != 0 || meter.contextTarget != 0 {
+		t.Fatalf("remaining 4095 selected a context before refusing: contextCap=%d contextTarget=%d", meter.contextCap, meter.contextTarget)
+	}
 	// A stable 4096 context admitted earlier cannot be served by a grant
 	// below input+2048, even though remaining is at least 4096.
 	stub = &boundaryStub{estimate: 10}
