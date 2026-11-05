@@ -133,7 +133,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 		return res, err
 	}
 	if p.prior != nil {
-		if compacted, changed := p.prior.compactWith(r, p.completeScans); changed && r.ToolChoice != "none" {
+		if compacted, changed := p.prior.compactWith(r, p.completeScans, p.trustedDirectoryResults); changed && r.ToolChoice != "none" {
 			r = compacted
 		} else {
 			r.Tools = append(append([]agent.ToolDefinition(nil), r.Tools...), recallDefinition())
@@ -157,7 +157,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 			}
 			if !collision {
 				prior := priorResults{}
-				if compacted, changed := prior.compactWith(r, p.completeScans); changed {
+				if compacted, changed := prior.compactWith(r, p.completeScans, p.trustedDirectoryResults); changed {
 					res, err = prepare(compacted)
 					if err == nil {
 						p.prior = prior

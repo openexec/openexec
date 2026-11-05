@@ -51,12 +51,18 @@ func sha256Hex(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (p priorResults) compact(r agent.Request) (agent.Request, bool) { return p.compactWith(r, nil) }
+// compact is the view of a run whose executor vouches for its listings and
+// has no scan provenance. The adapter always calls compactWith.
+func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
+	return p.compactWith(r, nil, true)
+}
 
-// compactWith omits only results eligible by structure: a listing tool, or a
-// search whose scan reported complete for this exact message position and
-// text (completeScans). Pairing and error facts apply to both.
-func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string) (agent.Request, bool) {
+// compactWith omits only results eligible by structure: a listing from an
+// executor that vouches for its listings (listingsTrusted, a run-level fact),
+// or a search whose scan reported complete for this exact message position and
+// text (completeScans). Pairing and error facts apply to both. No branch reads
+// a filename or output text; an unmarked search is never eligible.
+func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string, listingsTrusted bool) (agent.Request, bool) {
 	copyRequest := r
 	copyRequest.Messages = append([]agent.Message(nil), r.Messages...)
 	// Only a known workspace directory listing or a scan-proven complete search
@@ -76,7 +82,7 @@ func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]stri
 				calls := pending[block.ToolResultID]
 				if len(calls) > 0 {
 					position := [2]int{i, j}
-					known := calls[0] == "list_directory" || (calls[0] == "search_files" && completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput))
+					known := (calls[0] == "list_directory" && listingsTrusted) || (calls[0] == "search_files" && completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput))
 					eligible[position] = !ambiguous[block.ToolResultID] && known
 					pending[block.ToolResultID] = calls[1:]
 					if len(calls) == 1 {

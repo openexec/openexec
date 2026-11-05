@@ -122,7 +122,7 @@ func TestSearchOmissionRequiresPositionBoundScanProvenance(t *testing.T) {
 	unchanged := func(name string, request agent.Request, scans map[[2]int]string) {
 		t.Helper()
 		before, _ := json.Marshal(request)
-		compacted, changed := (priorResults{}).compactWith(request, scans)
+		compacted, changed := (priorResults{}).compactWith(request, scans, true)
 		after, _ := json.Marshal(compacted)
 		if changed || string(before) != string(after) {
 			t.Fatalf("%s: result was omitted or request altered", name)
@@ -130,7 +130,7 @@ func TestSearchOmissionRequiresPositionBoundScanProvenance(t *testing.T) {
 	}
 	proof := recordFor(map[int]string{2: old, 4: newest})
 
-	compacted, changed := (priorResults{}).compactWith(r, proof)
+	compacted, changed := (priorResults{}).compactWith(r, proof, true)
 	if !changed || compacted.Messages[2].Content[0].ToolOutput == old || compacted.Messages[4].Content[0].ToolOutput != newest {
 		t.Fatal("complete scans with provenance: older omitted, newest kept")
 	}
