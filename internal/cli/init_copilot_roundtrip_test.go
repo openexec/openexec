@@ -127,10 +127,23 @@ func TestInitCopilotConfigThroughFactoryToCLI(t *testing.T) {
 	t.Run("nonzero exit carries stderr and re-login hint, ignores OpenAI key", func(t *testing.T) {
 		clean(t)
 		t.Setenv("OPENAI_API_KEY", "sk-must-not-rescue-auth")
-		install("echo 'fixture-cli-refused' >&2\nexit 1\n")
+		install("cat >&2 <<'EOF'\n" + copilotCLI1_0_105NoAuth + "EOF\nexit 1\n")
 		_, err := complete(t)
-		if err == nil || !strings.Contains(err.Error(), "fixture-cli-refused") || !strings.Contains(err.Error(), "/login") {
+		if err == nil || !strings.Contains(err.Error(), "No authentication information found") ||
+			!strings.Contains(err.Error(), "Run 'gh auth login'") || !strings.Contains(err.Error(), "/login") {
 			t.Fatalf("err = %v", err)
 		}
 	})
 }
+
+// copilotCLI1_0_105NoAuth is the verbatim stderr+stdout (exit status 1) of
+// `copilot -p hi -s --no-ask-user` from GitHub Copilot CLI 1.0.105 (output of
+// `copilot --version`: "GitHub Copilot CLI 1.0.105.") run with an empty
+// HOME/COPILOT_HOME and no token variables. It was captured on 2026-11-05 by
+// executing /usr/local/bin/copilot from a go test; no model call was made.
+const copilotCLI1_0_105NoAuth = "Error: No authentication information found.\n\n" +
+	"Copilot can be authenticated with GitHub using an OAuth Token or a Fine-Grained Personal Access Token.\n\n" +
+	"To authenticate, you can use any of the following methods:\n" +
+	"  \u2022 Start 'copilot' and run the '/login' command\n" +
+	"  \u2022 Set the COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN environment variable\n" +
+	"  \u2022 Run 'gh auth login' to authenticate with the GitHub CLI\n"
