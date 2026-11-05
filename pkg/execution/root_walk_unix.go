@@ -18,7 +18,7 @@ import (
 // symlink or a replacement directory swapped in after admission is refused
 // instead of being answered from the old descriptor.
 func pinnedRootStillNamed(root *os.Root, path string) error {
-	stale := errors.New("the readable root changed after admission")
+	stale := errPinnedRootChanged
 	if !filepath.IsAbs(path) {
 		return stale
 	}
@@ -116,6 +116,13 @@ func openedFileByDescriptorWalk(root *os.Root, file *os.File, cleaned string) er
 	return nil
 }
 
+// rootWatch reports whether the watched root directory was renamed, removed or
+// had its attributes changed since the watch was made.
+type rootWatch interface {
+	changed() bool
+	close()
+}
+
 // pinnedRootChangeStamp is the status-change time of the directory the root
 // descriptor holds. Renaming the directory (the first half of a swap) changes
 // it, and restoring the name changes it again, so a swap that is undone before
@@ -125,11 +132,11 @@ func openedFileByDescriptorWalk(root *os.Root, file *os.File, cleaned string) er
 func pinnedRootChangeStamp(root *os.Root) (int64, error) {
 	info, err := root.Stat(".")
 	if err != nil {
-		return 0, errors.New("the readable root changed after admission")
+		return 0, errPinnedRootChanged
 	}
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
-		return 0, errors.New("the readable root changed after admission")
+		return 0, errPinnedRootChanged
 	}
 	return statChangeStamp(stat), nil
 }

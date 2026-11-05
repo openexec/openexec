@@ -3,6 +3,7 @@
 package execution
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,52 +59,61 @@ func TestPinnedRootSwappedAfterNameCheckIsRefused(t *testing.T) {
 	}
 }
 
-// A swap that is undone before the post-operation check cannot be seen by any
-// name check, and does not need to be: the operation runs against the
-// descriptor pinned at admission, whose identity the first check proved. The
-// served bytes therefore can only come from the admitted directory, never from
-// the directory the transient swap named.
+// A swap that is undone before the post-operation name check is refused by the
+// identity watch bound at the descriptor operation, with the typed refusal and
+// no bytes or paths. "no-wait" restores the name inside one kernel timestamp
+// tick, which a change-time comparison cannot see; "cross-tick" holds the swap
+// open across a tick.
 func TestPinnedRootTransientSwapServesOnlyAdmittedDirectory(t *testing.T) {
-	prev := afterPinnedRootCheckHook
-	t.Cleanup(func() { afterPinnedRootCheckHook = prev })
-	f := newIdentityFixture(t)
-	calls := 0
-	afterPinnedRootCheckHook = func(string) {
-		calls++
-		f.swapToOutside(t)
-		// Read through the swapped name to prove the swap was live.
-		if data, err := os.ReadFile(filepath.Join(f.selected, "witness")); err != nil || string(data) != "outside-secret-needle" {
-			t.Errorf("swap was not live: %q %v", data, err)
+	for _, hold := range []time.Duration{0, 50 * time.Millisecond} {
+		name := "no-wait"
+		if hold > 0 {
+			name = "cross-tick"
 		}
-		if err := os.Remove(f.selected); err != nil {
-			t.Error(err)
-		}
-		// Filesystem change times have kernel-tick resolution; hold the swap
-		// open across one so the restore is observable to the stamp.
-		time.Sleep(50 * time.Millisecond)
-		if err := os.Rename(f.selected+"-old", f.selected); err != nil {
-			t.Error(err)
-		}
-	}
-	pinned, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, []ReadableRootIdentity{f.identity})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer closeRoots()
-	out, err := f.call(t, pinned, "read_file")
-	if calls == 0 {
-		t.Fatal("pinned boundary was never reached")
-	}
-	if err == nil {
-		t.Fatalf("transient swap-and-restore was served: out=%q", out)
-	}
-	if out != "" {
-		t.Fatalf("refusal still produced output %q", out)
-	}
-	for _, leak := range []string{"authorized-needle", "outside-secret-needle", f.outside, f.selected + "-old"} {
-		if strings.Contains(out, leak) || strings.Contains(err.Error(), leak) {
-			t.Fatalf("refusal disclosed %q: out=%q err=%v", leak, out, err)
-		}
+		t.Run(name, func(t *testing.T) {
+			prev := afterPinnedRootCheckHook
+			t.Cleanup(func() { afterPinnedRootCheckHook = prev })
+			f := newIdentityFixture(t)
+			calls := 0
+			afterPinnedRootCheckHook = func(string) {
+				calls++
+				f.swapToOutside(t)
+				// Read through the swapped name to prove the swap was live.
+				if data, err := os.ReadFile(filepath.Join(f.selected, "witness")); err != nil || string(data) != "outside-secret-needle" {
+					t.Errorf("swap was not live: %q %v", data, err)
+				}
+				if err := os.Remove(f.selected); err != nil {
+					t.Error(err)
+				}
+				time.Sleep(hold)
+				if err := os.Rename(f.selected+"-old", f.selected); err != nil {
+					t.Error(err)
+				}
+			}
+			pinned, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, []ReadableRootIdentity{f.identity})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer closeRoots()
+			out, err := f.call(t, pinned, "read_file")
+			if calls == 0 {
+				t.Fatal("pinned boundary was never reached")
+			}
+			if err == nil {
+				t.Fatalf("transient swap-and-restore was served: out=%q", out)
+			}
+			if !errors.Is(err, errPinnedRootChanged) {
+				t.Fatalf("refusal is not the typed root-changed refusal: %v", err)
+			}
+			if out != "" {
+				t.Fatalf("refusal still produced output %q", out)
+			}
+			for _, leak := range []string{"authorized-needle", "outside-secret-needle", f.outside, f.selected, f.selected + "-old"} {
+				if strings.Contains(out, leak) || strings.Contains(err.Error(), leak) {
+					t.Fatalf("refusal disclosed %q: out=%q err=%v", leak, out, err)
+				}
+			}
+		})
 	}
 }
 

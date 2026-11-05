@@ -608,6 +608,10 @@ func readableRoots(request ToolRequest) []string {
 // descriptor operation. Nil outside tests, which use it to interleave a swap.
 var afterPinnedRootCheckHook func(path string)
 
+// errPinnedRootChanged is the typed refusal for a pinned root that no longer
+// is the directory admitted. It names no path and carries no content.
+var errPinnedRootChanged = errors.New("the readable root changed after admission")
+
 // withinRoots runs an operation against the first authorized root that
 // contains the path, and refuses when none does.
 //
@@ -647,20 +651,28 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 			continue
 		}
 		stillNamed := func() error { return pinnedRootStillNamed(root, path) }
-		if pinned {
-			if err := stillNamed(); err != nil {
-				return "", err
-			}
-		}
-		// Reads bind the root's identity at the descriptor operation: the
-		// stamp taken with the name check must still hold afterwards, so a
-		// swap that is undone before the second name check is refused too.
-		// Writes change the root themselves and are covered by the name check.
+		// Reads bind the root's identity at the descriptor operation. The
+		// watch is made before the name check and read after the operation,
+		// so a swap undone before the second name check is refused too, with
+		// no clock involved. Where no watch can be made the change time
+		// stands in for it. Writes change the root themselves and are
+		// covered by the name check.
+		var watch rootWatch
 		var stamp int64
 		if pinned && action == "read" {
-			var stampErr error
-			if stamp, stampErr = pinnedRootChangeStamp(root); stampErr != nil {
-				return "", stampErr
+			if watch = watchPinnedRoot(root); watch == nil {
+				var stampErr error
+				if stamp, stampErr = pinnedRootChangeStamp(root); stampErr != nil {
+					return "", stampErr
+				}
+			}
+		}
+		if pinned {
+			if err := stillNamed(); err != nil {
+				if watch != nil {
+					watch.close()
+				}
+				return "", err
 			}
 		}
 		if pinned && afterPinnedRootCheckHook != nil {
@@ -672,13 +684,19 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 			// steps; a swap between them would otherwise be answered from the
 			// original directory. Re-prove the name after the operation and
 			// refuse, discarding whatever it produced.
+			moved := false
+			if watch != nil {
+				moved = watch.changed()
+				watch.close()
+			} else if action == "read" {
+				after, stampErr := pinnedRootChangeStamp(root)
+				moved = stampErr != nil || after != stamp
+			}
 			if stillErr := stillNamed(); stillErr != nil {
 				return "", stillErr
 			}
-			if action == "read" {
-				if after, stampErr := pinnedRootChangeStamp(root); stampErr != nil || after != stamp {
-					return "", errors.New("the readable root changed after admission")
-				}
+			if moved {
+				return "", errPinnedRootChanged
 			}
 		} else {
 			_ = root.Close()

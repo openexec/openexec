@@ -19,6 +19,13 @@ func pinnedRootChangeStamp(_ *os.Root) (int64, error) {
 	return 0, errors.New("cannot verify the readable root on this platform")
 }
 
+type rootWatch interface {
+	changed() bool
+	close()
+}
+
+func watchPinnedRoot(_ *os.Root) rootWatch { return nil }
+
 func pinnedRootStillNamed(_ *os.Root, _ string) error {
 	return errors.New("cannot verify the readable root on this platform")
 }
