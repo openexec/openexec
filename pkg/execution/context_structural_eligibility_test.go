@@ -186,6 +186,41 @@ func TestForwardedSearchIsNeverReportedComplete(t *testing.T) {
 	}
 }
 
+// Executable control for the one place "the original governing quote stays in
+// the request" and "eligibility is structural only" are in tension: a quote
+// that exists solely inside an OLDER, structurally complete scan result. The
+// instruction text is never read, so that older result is stubbed and the
+// quote is absent from the request until recalled. Every other carrier of the
+// same quote (system, user turns, file reads, the newest scan) is untouched,
+// and the stubbed quote is recoverable byte-for-byte through paged recall.
+// Neither assertion is weakened: the first half pins the structural-only
+// outcome, the second pins what stays preserved and what recall returns.
+func TestQuotedInstructionInCompleteOlderScanIsRecallableNotHeuristicallyKept(t *testing.T) {
+	quote := "AGENTS.md says: NEVER DEPLOY without review. " + strings.Repeat("authority ", 60)
+	older, newest := quote+"older", quote+"newest"
+	for _, tool := range []string{"list_directory", "search_files"} {
+		t.Run(tool, func(t *testing.T) {
+			r := structuralRequest([3]string{tool, older}, [3]string{tool, newest})
+			store := priorResults{}
+			compacted, changed := store.compactWith(r, recordFor(map[int]string{2: older, 4: newest}))
+			if !changed {
+				t.Fatal("a structurally complete older scan must be omitted whatever it quotes")
+			}
+			if strings.Contains(compacted.Messages[2].Content[0].ToolOutput, "NEVER DEPLOY") {
+				t.Fatal("omission kept the quote, so eligibility read the content")
+			}
+			if compacted.System != r.System || compacted.Messages[4].Content[0].ToolOutput != newest || compacted.Messages[0].Content[0].Text != "original request" {
+				t.Fatal("system, user turn or newest scan was altered")
+			}
+			raw, _ := json.Marshal(map[string]any{"id": sha256Hex(older), "offset": 0})
+			page, err := store.read(raw)
+			if err != nil || !strings.Contains(page, "NEVER DEPLOY without review") {
+				t.Fatalf("quote not recoverable by recall: %v", err)
+			}
+		})
+	}
+}
+
 // The recorder is fed by the scan's own flag, not by what the output says.
 func TestSearchScanProvenanceComesFromTheScanFlag(t *testing.T) {
 	root := t.TempDir()
