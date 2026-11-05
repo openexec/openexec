@@ -43,6 +43,7 @@ var guardCases = []guardCase{
 	{"G8 recorder: no tool error", "token_budget.go", "\tif toolErr != nil {\n\t\treturn\n\t}\n\tif (tool", "\tif (tool", []string{"TestOmissionPreservationClasses"}},
 	{"G9 recorder: scan-complete flag", "token_budget.go", `(tool == "search_files" && scanComplete)`, `(tool == "search_files")`, []string{"TestOmissionPreservationClasses"}},
 	{"G10 recorder: vouching executor", "token_budget.go", `(tool == "list_directory" && p.trustedDirectoryResults)`, `(tool == "list_directory")`, []string{"TestListingProvenanceComesFromVouchingExecutor"}},
+	{"G11 call/result pairing present", "context_recovery.go", "if len(calls) > 0 {", "if true {", []string{"TestOmissionEligibilityRequiresPairingNoErrorAndSize"}},
 }
 
 func goBinary() string {
@@ -100,10 +101,43 @@ func overlayFor(t *testing.T, file string, mutated []byte) string {
 	return of
 }
 
+// provenance logs where the receipts were taken: working directory, candidate
+// commit, its tree, a hash of the index (`git ls-files -s`) and the hashes of
+// the product files under test. Nothing is filtered; a git failure is logged
+// raw, not hidden.
+func provenance(t *testing.T, label string) {
+	t.Helper()
+	wd, _ := os.Getwd()
+	t.Logf("PROVENANCE %s\nworking directory: %s", label, wd)
+	git := func(args ...string) string {
+		cmd := exec.Command("git", args...)
+		var out bytes.Buffer
+		cmd.Stdout, cmd.Stderr = &out, &out
+		err := cmd.Run()
+		return fmt.Sprintf("git %s -> err=%v\n%s", strings.Join(args, " "), err, out.String())
+	}
+	t.Logf("%s%s", git("rev-parse", "HEAD", "HEAD^{tree}"), git("ls-files", "-s", "."))
+	idx := exec.Command("git", "ls-files", "-s", "--", ".")
+	if raw, err := idx.Output(); err == nil {
+		t.Logf("sha256(git ls-files -s -- pkg/execution)=%x", sha256.Sum256(raw))
+	}
+	for _, f := range []string{"context_recovery.go", "token_budget.go", "guard_receipts_test.go", "context_original_positive_test.go", "context_structural_eligibility_test.go", "context_preservation_test.go"} {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Logf("manifest %s: %v", f, err)
+			continue
+		}
+		t.Logf("manifest %s sha256=%x git-blob=%s bytes=%d", f, sha256.Sum256(b), gitBlob(b), len(b))
+	}
+}
+
 func TestGuardRemovalIsRedAndRestoredIsGreen(t *testing.T) {
 	if testing.Short() {
 		t.Skip("spawns go test subprocesses")
 	}
+	provenance(t, "before any receipt")
+	// P0 runs FIRST: the original positive assertion on the compiling tree.
+	t.Run("P0", func(t *testing.T) { originalPositiveReceipt(t) })
 	for _, g := range guardCases {
 		t.Run(strings.Fields(g.name)[0], func(t *testing.T) {
 			orig, err := os.ReadFile(g.file)
@@ -123,6 +157,7 @@ func TestGuardRemovalIsRedAndRestoredIsGreen(t *testing.T) {
 				t.Fatalf("baseline not green (exit %d): %s", code, out)
 			}
 			overlay := overlayFor(t, g.file, mutated)
+			t.Logf("mutation: replace exactly one occurrence of\n%s\nwith\n%s\noverlay file: %s", g.old, g.new, overlay)
 			if out, code := runGo(t, g.name+": mutated tree compiles", "test", "-overlay", overlay, "-count=1", "-run", "^$", "."); code != 0 || strings.Contains(out, "build failed") {
 				t.Fatalf("mutated tree must compile; a compile failure is not red (exit %d)", code)
 			}
@@ -146,6 +181,7 @@ func TestGuardRemovalIsRedAndRestoredIsGreen(t *testing.T) {
 			}
 		})
 	}
+	provenance(t, "after all receipts (final restored source and index)")
 }
 
 // Near miss: a semantically inert edit is not "red", so the harness does not
@@ -169,10 +205,8 @@ func TestGuardHarnessInertEditStaysGreen(t *testing.T) {
 // recall") is run for real, on the compiling tree, under the originalpositive
 // build tag. It is expected to FAIL; the failure is the preserved executable
 // contradiction with structural-only eligibility, with raw output logged.
-func TestOriginalPositiveAssertionContradiction(t *testing.T) {
-	if testing.Short() {
-		t.Skip("spawns go test subprocesses")
-	}
+func originalPositiveReceipt(t *testing.T) {
+	t.Helper()
 	src, err := os.ReadFile("context_recovery.go")
 	if err != nil {
 		t.Fatal(err)

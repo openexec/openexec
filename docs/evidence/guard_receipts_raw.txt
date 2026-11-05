@@ -1,410 +1,88 @@
 === RUN   TestGuardRemovalIsRedAndRestoredIsGreen
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G1
-    guard_receipts_test.go:120: GUARD G1 position+hash binding | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=650cfba19e51a48c1ea15109a33d1a3970d3c0f92c5b0a874a80b3cd9e44800c
-    guard_receipts_test.go:122: --- G1 position+hash binding: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s
-    guard_receipts_test.go:126: --- G1 position+hash binding: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG14219439754/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
-    guard_receipts_test.go:129: --- G1 position+hash binding: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG14219439754/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:72: listing provenance for other text: changed=true, request not byte-identical
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-            context_structural_eligibility_test.go:145: different text at the position: result was omitted or request altered
-        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
-        FAIL
-    guard_receipts_test.go:140: --- G1 position+hash binding: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.005s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G2
-    guard_receipts_test.go:120: GUARD G2 provenance required | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=e6d0e5b92b676ac3ca4ab21b4cfacc47e0a5e9fba08f3d2fb0ac258f84ba9795
-    guard_receipts_test.go:122: --- G2 provenance required: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.005s
-    guard_receipts_test.go:126: --- G2 provenance required: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG22813106724/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
-    guard_receipts_test.go:129: --- G2 provenance required: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG22813106724/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:69: unmarked listing: changed=true, request not byte-identical
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-            context_structural_eligibility_test.go:142: no provenance: result was omitted or request altered
-        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
-        FAIL
-    guard_receipts_test.go:140: --- G2 provenance required: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.011s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G3
-    guard_receipts_test.go:120: GUARD G3 unambiguous call-ID pairing | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=b4831c206965a255e825d2af72894efffb3d658fad8a0bc9a6a42e35c498a72f
-    guard_receipts_test.go:122: --- G3 unambiguous call-ID pairing: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance)$ .
-        exit=0
-        raw output:
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s
-    guard_receipts_test.go:126: --- G3 unambiguous call-ID pairing: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG3820482/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.010s [no tests to run]
-    guard_receipts_test.go:129: --- G3 unambiguous call-ID pairing: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG3820482/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance)$ .
-        exit=1
-        raw output:
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-            context_structural_eligibility_test.go:165: ambiguous reused id: result was omitted or request altered
-        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.006s
-        FAIL
-    guard_receipts_test.go:140: --- G3 unambiguous call-ID pairing: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance)$ .
-        exit=0
-        raw output:
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.014s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G4
-    guard_receipts_test.go:120: GUARD G4 only list_directory/search_files | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=92f386883bc7836677067439ee340555702c832e0d56026f01fac7e3fcc7a495
-    guard_receipts_test.go:122: --- G4 only list_directory/search_files: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.005s
-    guard_receipts_test.go:126: --- G4 only list_directory/search_files: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG42974882075/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.011s [no tests to run]
-    guard_receipts_test.go:129: --- G4 only list_directory/search_files: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG42974882075/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:52: file reads including AGENTS.md: changed=true, request not byte-identical
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-            context_structural_eligibility_test.go:170: read_file: result was omitted or request altered
-        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.013s
-        FAIL
-    guard_receipts_test.go:140: --- G4 only list_directory/search_files: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G5
-    guard_receipts_test.go:120: GUARD G5 no tool error | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=3e3a9b83ca5d28e18c0cdb78547825843c53b01f1c1e6de18491f8e12973596a
-    guard_receipts_test.go:122: --- G5 no tool error: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.005s
-    guard_receipts_test.go:126: --- G5 no tool error: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG53065938028/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
-    guard_receipts_test.go:129: --- G5 no tool error: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG53065938028/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:60: failed-tool results: changed=true, request not byte-identical
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-            context_structural_eligibility_test.go:150: errored result with provenance: result was omitted or request altered
-        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
-        FAIL
-    guard_receipts_test.go:140: --- G5 no tool error: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.11s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.111s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G6
-    guard_receipts_test.go:120: GUARD G6 minimum size 256 | file context_recovery.go | tests [TestOmissionEligibilityRequiresPairingNoErrorAndSize]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=31dd053b2aa16588736dcb9e813fa413df3f1e0781303ce5d33d661619f5770a
-    guard_receipts_test.go:122: --- G6 minimum size 256: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
-        --- PASS: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s
-    guard_receipts_test.go:126: --- G6 minimum size 256: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG6120391572/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
-    guard_receipts_test.go:129: --- G6 minimum size 256: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG6120391572/001/overlay.json -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
-            context_structural_eligibility_test.go:84: short listing was omitted
-        --- FAIL: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
-        FAIL
-    guard_receipts_test.go:140: --- G6 minimum size 256: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
-        --- PASS: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.005s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G7
-    guard_receipts_test.go:120: GUARD G7 newest result kept | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
-        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-        sha256(mutated)=89df5b44d248984857b8dfb218850bfe974b18fe5ef7a8eb5825e77c823a5850
-    guard_receipts_test.go:122: --- G7 newest result kept: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.011s
-    guard_receipts_test.go:126: --- G7 newest result kept: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG71524710717/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.007s [no tests to run]
-    guard_receipts_test.go:129: --- G7 newest result kept: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG71524710717/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:60: failed-tool results: changed=true, request not byte-identical
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-            context_structural_eligibility_test.go:136: complete scans with provenance: older omitted, newest kept
-        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.006s
-        FAIL
-    guard_receipts_test.go:140: --- G7 newest result kept: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
-        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.015s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G8
-    guard_receipts_test.go:120: GUARD G8 recorder: no tool error | file token_budget.go | tests [TestOmissionPreservationClasses]
-        sha256(original)=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob(original)=bbe77c61872720dabb03da6dcc15d8f4f321da7e
-        sha256(mutated)=cc8e5bd748b587479b5d1a4e972e4974a7431fc4d6d230b01e72e5ae0a43a354
-    guard_receipts_test.go:122: --- G8 recorder: no tool error: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s
-    guard_receipts_test.go:126: --- G8 recorder: no tool error: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG82310062839/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.006s [no tests to run]
-    guard_receipts_test.go:129: --- G8 recorder: no tool error: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG82310062839/001/overlay.json -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:64: a failed listing was recorded
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
-        FAIL
-    guard_receipts_test.go:140: --- G8 recorder: no tool error: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G9
-    guard_receipts_test.go:120: GUARD G9 recorder: scan-complete flag | file token_budget.go | tests [TestOmissionPreservationClasses]
-        sha256(original)=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob(original)=bbe77c61872720dabb03da6dcc15d8f4f321da7e
-        sha256(mutated)=2bd7a2fdcd7755fcca404f2411545bb21349c03b64154217267243e1f77ef25d
-    guard_receipts_test.go:122: --- G9 recorder: scan-complete flag: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s
-    guard_receipts_test.go:126: --- G9 recorder: scan-complete flag: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG91514349751/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
-    guard_receipts_test.go:129: --- G9 recorder: scan-complete flag: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG91514349751/001/overlay.json -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
-        exit=1
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-            context_preservation_test.go:88: an incomplete scan was recorded
-        --- FAIL: TestOmissionPreservationClasses (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.007s
-        FAIL
-    guard_receipts_test.go:140: --- G9 recorder: scan-complete flag: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        === RUN   TestOmissionPreservationClasses
-        --- PASS: TestOmissionPreservationClasses (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.007s
-=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G10
-    guard_receipts_test.go:120: GUARD G10 recorder: vouching executor | file token_budget.go | tests [TestListingProvenanceComesFromVouchingExecutor]
-        sha256(original)=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob(original)=bbe77c61872720dabb03da6dcc15d8f4f321da7e
-        sha256(mutated)=12c5692e0868de6efaf39b3dbb07e7850d6e936bed2d3ec4d3c0550da09e5d77
-    guard_receipts_test.go:122: --- G10 recorder: vouching executor: baseline (guard present)
-        command: go test -count=1 -v -run ^(TestListingProvenanceComesFromVouchingExecutor)$ .
-        exit=0
-        raw output:
-        === RUN   TestListingProvenanceComesFromVouchingExecutor
-        --- PASS: TestListingProvenanceComesFromVouchingExecutor (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.002s
-    guard_receipts_test.go:126: --- G10 recorder: vouching executor: mutated tree compiles
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG101770537461/001/overlay.json -count=1 -run ^$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s [no tests to run]
-    guard_receipts_test.go:129: --- G10 recorder: vouching executor: RED (guard removed)
-        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG101770537461/001/overlay.json -count=1 -v -run ^(TestListingProvenanceComesFromVouchingExecutor)$ .
-        exit=1
-        raw output:
-        === RUN   TestListingProvenanceComesFromVouchingExecutor
-            context_preservation_test.go:123: unvouched listing was recorded
-        --- FAIL: TestListingProvenanceComesFromVouchingExecutor (0.00s)
-        FAIL
-        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
-        FAIL
-    guard_receipts_test.go:140: --- G10 recorder: vouching executor: GREEN (guard restored, same tests)
-        command: go test -count=1 -v -run ^(TestListingProvenanceComesFromVouchingExecutor)$ .
-        exit=0
-        raw output:
-        === RUN   TestListingProvenanceComesFromVouchingExecutor
-        --- PASS: TestListingProvenanceComesFromVouchingExecutor (0.00s)
-        PASS
-        ok  	github.com/openexec/openexec/pkg/execution	0.004s
---- PASS: TestGuardRemovalIsRedAndRestoredIsGreen (22.14s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G1 (1.55s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G2 (2.12s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G3 (3.27s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G4 (2.69s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G5 (1.76s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G6 (2.11s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G7 (3.28s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G8 (2.17s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G9 (1.61s)
-    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G10 (1.59s)
-=== RUN   TestGuardHarnessInertEditStaysGreen
-    guard_receipts_test.go:163: --- inert edit
-        command: go test -overlay /tmp/TestGuardHarnessInertEditStaysGreen1417373946/001/overlay.json -count=1 -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
-        exit=0
-        raw output:
-        ok  	github.com/openexec/openexec/pkg/execution	0.006s
---- PASS: TestGuardHarnessInertEditStaysGreen (0.60s)
-=== RUN   TestOriginalPositiveAssertionContradiction
-    guard_receipts_test.go:180: tree: context_recovery.go sha256=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
-    guard_receipts_test.go:181: --- ORIGINAL POSITIVE: quote present before recall
+    guard_receipts_test.go:138: PROVENANCE before any receipt
+        working directory: /home/perttu/.agent-console/worktrees/bff2eb46f4a1a799701158ddfb1eba8d/pkg/execution
+    guard_receipts_test.go:138: git rev-parse HEAD HEAD^{tree} -> err=<nil>
+        c9868cd594724ecbb339594300a512bd7ab14911
+        3ec9d6ef6ef4cbb0428d3691d0b508beb8af0e69
+        git ls-files -s . -> err=<nil>
+        100644 169a14c45924d321cde188e5b6cfa4c90777836d 0	agent_cli_copilot_test.go
+        100644 a48e323de8cb28cc0b21b5afbced4e3ca4ab9eb7 0	agent_cli_provider.go
+        100644 b2ed4ebdc5cc230889a7572081e5881d24735026 0	agent_cli_provider_test.go
+        100644 733165c72d343c28beb3c4ee13b8fe57bbcfc439 0	api_provider.go
+        100644 f57a6e73bcbffd2a70a3a676595dd7b2f92156cb 0	api_provider_test.go
+        100644 56c1153bad306379da4a1367aceaa05a420a4aad 0	api_required_content_test.go
+        100644 c09b9492f45b6d36155c91f4b644d66190a108c4 0	assembled_diagnosis_test.go
+        100644 010d72be5fda90328731efda55d1cd1ffc8660f3 0	bounded_wire_test.go
+        100644 9761ebdfa4b91ea6abe614abfd736f6eb5106daf 0	caller_deadline_boundary_test.go
+        100644 8a71543c4da599a07e48f5392970039da9ceb410 0	cancel_witness_test.go
+        100644 fc7006ec6a21ec7dea403c39cf76c8d581480aeb 0	capture_fidelity_test.go
+        100644 0e718caa3be6c40c2692b8aa7c2e2aa079d085e3 0	cli.go
+        100644 2e051e14e9f6809426b3b528cb39d1b5d8b2bb9d 0	cli_test.go
+        100644 1310970aaa549d521d1763cd030dfe3dd5874b07 0	composite_tools.go
+        100644 6e0e51a485669afbf4fbb57243a3fffa6b9fe3bc 0	composite_tools_test.go
+        100644 d3baa76ee8fef8ae39321d4257fa56fa7e78acf4 0	context_discipline_test.go
+        100644 f858f32f622c77f65a3d74cfc62c7d93c2f1d144 0	context_grant_regression_test.go
+        100644 35bab953d8fa0337e627c6c302b3990483d904a0 0	context_original_positive_test.go
+        100644 af811f61b499aa9a38c6a25d9d611329da6aaed8 0	context_policy.go
+        100644 811f7c932ad03a8af3298e1aa0b442177be86819 0	context_preservation_test.go
+        100644 a841bcf4a0c1567e1f8258df910f4cba6dd450ee 0	context_recovery.go
+        100644 af407f5ec4c6c5df1f7f311866379904c28b7657 0	context_recovery_test.go
+        100644 51326e8940fb54ac32326012ee857a23c00146c2 0	context_structural_eligibility_test.go
+        100644 0cbe16aefb6f640d3ccf3920cb79b160c2c26cc6 0	context_synthesis_test.go
+        100644 21642118594ce4d9e04f8977c625166fe48a97ce 0	d26_diagnosis_test.go
+        100644 842a18ce3d218d6ea7675f265cdcd4bd32ce8ea6 0	d26_evidence_test.go
+        100644 2d46f2e52727e1a85eb0ea10a1170e0dd4061a2f 0	dispatch_provenance_test.go
+        100644 1e078b18c0fecae4bf827611e22c51084608d8d1 0	empty_recovery_prefix_test.go
+        100644 8405e38ce52f71d7391839b969d39d39d507db8e 0	execution.go
+        100644 94c0c2012095d521f2fb8d1a4ce979374467d5f7 0	file_page_wire_test.go
+        100644 59499ed11ec67428e8cfe9f16ac6729c84a8a762 0	gateway.go
+        100644 6c19e057f05d7f04208f355c024f8ab57f5f74c0 0	gateway_test.go
+        100644 963fcf9050ed4d29ebf51bf9b1cd1477a39ec170 0	grant_boundary_test.go
+        100644 92df387d42feea663a5d8b367f6e136f5e04b776 0	guard_receipts_test.go
+        100644 e06da7dd716cdc9bdbf9bbbeed4a09c604cec404 0	handover.go
+        100644 f2a56bbee0d0a3ac6fa0621933c564ea87167baf 0	lumi_signature_diagnosis_test.go
+        100644 ce28f0f940c7a961a4d32a7d2ea166e338f227bf 0	native_completion_evidence_test.go
+        100644 faf656c11269e928a4bf927219da265db940eb9b 0	native_output_observation_test.go
+        100644 37ca2ffa11700b9e319fe00fa5cf030ef030385e 0	nonthinking_test.go
+        100644 cafc6705a8b0392c6380c7d5adf3183ddb81e7e2 0	outcome_navigator_contract_test.go
+        100644 eb38de2cc12b9db32801ff4c005a9fe0f8e2f42a 0	planning_output_test.go
+        100644 b030f34228813c09dbdfd98846c24a413ba1f47e 0	readiness_test.go
+        100644 cf4874e14377ce1a149ba5c358553d82aabdc92a 0	replay_test.go
+        100644 eb8720a5c05cbfeaf223eb257a4139e9b14d240f 0	reply_observation_journey_test.go
+        100644 f4c2e9c5a2f387d8a30462e2230ec95a0fe6673d 0	request_capture.go
+        100644 f723b5b9e6e4560ad9c6c092ca7c578be22b49fe 0	request_capture_test.go
+        100644 f3c2d5515de5a18ed037762515ae5e9d940ca225 0	request_trace.go
+        100644 b0c13c328838691df7974d1bbb53cd9d45788e11 0	request_trace_test.go
+        100644 07ac0c1bdfea0f0a6709e7da051fa35df7c6081d 0	search_context_control_test.go
+        100644 f8e02df33305b1e9bb35039d91c0187c733264d4 0	sequence_7a722_test.go
+        100644 4f33852ee5528c0b9322b6f7428fe2c701ff0f2c 0	solar_preflight_evidence_test.go
+        100644 cde8a2b23890addd258a9b6a6a6f101d96644630 0	terminal_draft_boundary_test.go
+        100644 771b9ca7137dcf531ea704b47e422f2575556612 0	testdata/capture-fidelity-compatible.json
+        100644 283872aa4b4ca08c27dc2ea0210b62c78fb2705c 0	testdata/capture-fidelity-native.json
+        100644 4f8b885d20a8cbb990e317727c86651ea5b9cb5a 0	testdata/d26-structure.json
+        100644 528406e5e63107f5834fa54107aa3dc05f76b994 0	testdata/lumi-signature/console_signature_excerpt.py
+        100644 17e6b3ee06ff9258b9207bd03491f8c6e4b991c9 0	testdata/lumi-signature/control.py
+        100644 bbe77c61872720dabb03da6dcc15d8f4f321da7e 0	token_budget.go
+        100644 86feacf508cbb1316d92fd9fe39f9b0af0fcd52b 0	token_budget_test.go
+        100644 c3c2acdf7ec65ee667b6dcfb417b81d66eb60d7b 0	trace_structure_test.go
+        100644 cd093a4c846188228982606e829cb79648c64727 0	transport_history_test.go
+        100644 2de1b0a9bef1b82cb6c15fabcd6d5e7eb43cc71b 0	workspace_file_lines_test.go
+        100644 948ac0c43b968cd7385b907f3e4c3ea04b343faa 0	workspace_file_pages_test.go
+        100644 5e0d938f47bf008f3ae05f68ca82684b970a088f 0	workspace_search.go
+        100644 dae9c5eb4752a8dfd57d64dccef79bb92f819dd3 0	workspace_search_test.go
+        100644 71bf88988851dd1090748b2af9bf111dd417dcc4 0	workspace_tools.go
+        100644 6cbca8cc88e296a46a1ef9389240d1dd8ff353cc 0	workspace_tools_race_test.go
+        100644 621ddf51f9a3aee29b2f3db38916f39e6e63a3a0 0	workspace_tools_test.go
+    guard_receipts_test.go:138: sha256(git ls-files -s -- pkg/execution)=d6b3629b07fd0d32a915d0aacf416ea4a626ce255b4adcacebd714be0b84e4e0
+    guard_receipts_test.go:138: manifest context_recovery.go sha256=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob=a841bcf4a0c1567e1f8258df910f4cba6dd450ee bytes=5553
+    guard_receipts_test.go:138: manifest token_budget.go sha256=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob=bbe77c61872720dabb03da6dcc15d8f4f321da7e bytes=10581
+    guard_receipts_test.go:138: manifest guard_receipts_test.go sha256=92af1bd3876e96d0db5819351fa8f10fc5729de2d676851813e2d47aabf4be18 git-blob=d5966cbda9d66849bea4470fe4ead2e6c4bd3a49 bytes=10488
+    guard_receipts_test.go:138: manifest context_original_positive_test.go sha256=69ba8a44d5789bdd85dd81fc83f784419f8796b5f0180b220223ded96e84873b git-blob=35bab953d8fa0337e627c6c302b3990483d904a0 bytes=1336
+    guard_receipts_test.go:138: manifest context_structural_eligibility_test.go sha256=3f27498e73b3c08304c79f70dcb467d64706c1cfb12bfd11599108c949013f73 git-blob=51326e8940fb54ac32326012ee857a23c00146c2 bytes=12330
+    guard_receipts_test.go:138: manifest context_preservation_test.go sha256=760621c277eb1e4e70a95e75fd2e7d61bcffd9208cf8aa62b36ed95382d901bc git-blob=811f7c932ad03a8af3298e1aa0b442177be86819 bytes=6696
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/P0
+    guard_receipts_test.go:140: tree: context_recovery.go sha256=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+    guard_receipts_test.go:140: --- ORIGINAL POSITIVE: quote present before recall
         command: go test -tags originalpositive -count=1 -v -run ^TestOriginalPositiveQuoteRemainsBeforeRecall$ .
         exit=1
         raw output:
@@ -417,8 +95,610 @@
             --- FAIL: TestOriginalPositiveQuoteRemainsBeforeRecall/list_directory (0.00s)
             --- FAIL: TestOriginalPositiveQuoteRemainsBeforeRecall/search_files (0.00s)
         FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.004s
+        FAIL
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G1
+    guard_receipts_test.go:154: GUARD G1 position+hash binding | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=650cfba19e51a48c1ea15109a33d1a3970d3c0f92c5b0a874a80b3cd9e44800c
+    guard_receipts_test.go:156: --- G1 position+hash binding: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        complete := completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput)
+        with
+        complete := completeScans[position] != ""
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG1632040577/001/overlay.json
+    guard_receipts_test.go:161: --- G1 position+hash binding: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG1632040577/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s [no tests to run]
+    guard_receipts_test.go:164: --- G1 position+hash binding: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG1632040577/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:72: listing provenance for other text: changed=true, request not byte-identical
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+            context_structural_eligibility_test.go:145: different text at the position: result was omitted or request altered
+        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.002s
+        FAIL
+    guard_receipts_test.go:175: --- G1 position+hash binding: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G2
+    guard_receipts_test.go:154: GUARD G2 provenance required | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=e6d0e5b92b676ac3ca4ab21b4cfacc47e0a5e9fba08f3d2fb0ac258f84ba9795
+    guard_receipts_test.go:156: --- G2 provenance required: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        complete := completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput)
+        with
+        complete := true
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG21505933350/001/overlay.json
+    guard_receipts_test.go:161: --- G2 provenance required: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG21505933350/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
+    guard_receipts_test.go:164: --- G2 provenance required: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG21505933350/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:69: unmarked listing: changed=true, request not byte-identical
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+            context_structural_eligibility_test.go:142: no provenance: result was omitted or request altered
+        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.004s
+        FAIL
+    guard_receipts_test.go:175: --- G2 provenance required: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G3
+    guard_receipts_test.go:154: GUARD G3 unambiguous call-ID pairing | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=b4831c206965a255e825d2af72894efffb3d658fad8a0bc9a6a42e35c498a72f
+    guard_receipts_test.go:156: --- G3 unambiguous call-ID pairing: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance)$ .
+        exit=0
+        raw output:
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        complete && !ambiguous[block.ToolResultID]
+        with
+        complete
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG3483869089/001/overlay.json
+    guard_receipts_test.go:161: --- G3 unambiguous call-ID pairing: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG3483869089/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s [no tests to run]
+    guard_receipts_test.go:164: --- G3 unambiguous call-ID pairing: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG3483869089/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance)$ .
+        exit=1
+        raw output:
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+            context_structural_eligibility_test.go:165: ambiguous reused id: result was omitted or request altered
+        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        FAIL
         FAIL	github.com/openexec/openexec/pkg/execution	0.003s
         FAIL
---- PASS: TestOriginalPositiveAssertionContradiction (0.36s)
+    guard_receipts_test.go:175: --- G3 unambiguous call-ID pairing: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance)$ .
+        exit=0
+        raw output:
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G4
+    guard_receipts_test.go:154: GUARD G4 only list_directory/search_files | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=92f386883bc7836677067439ee340555702c832e0d56026f01fac7e3fcc7a495
+    guard_receipts_test.go:156: --- G4 only list_directory/search_files: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        						case "search_files":
+        							labels[position] = "complete search result"
+        
+        with
+        						case "search_files":
+        							labels[position] = "complete search result"
+        						default:
+        							labels[position] = "result"
+        
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG43559181565/001/overlay.json
+    guard_receipts_test.go:161: --- G4 only list_directory/search_files: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG43559181565/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
+    guard_receipts_test.go:164: --- G4 only list_directory/search_files: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG43559181565/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:52: file reads including AGENTS.md: changed=true, request not byte-identical
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+            context_structural_eligibility_test.go:170: read_file: result was omitted or request altered
+        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
+        FAIL
+    guard_receipts_test.go:175: --- G4 only list_directory/search_files: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G5
+    guard_receipts_test.go:154: GUARD G5 no tool error | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=3e3a9b83ca5d28e18c0cdb78547825843c53b01f1c1e6de18491f8e12973596a
+    guard_receipts_test.go:156: --- G5 no tool error: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        labels[[2]int{i, j}] == "" || b.ToolError != ""
+        with
+        labels[[2]int{i, j}] == ""
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG51288013636/001/overlay.json
+    guard_receipts_test.go:161: --- G5 no tool error: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG51288013636/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
+    guard_receipts_test.go:164: --- G5 no tool error: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG51288013636/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:60: failed-tool results: changed=true, request not byte-identical
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+            context_structural_eligibility_test.go:150: errored result with provenance: result was omitted or request altered
+        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
+        FAIL
+    guard_receipts_test.go:175: --- G5 no tool error: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G6
+    guard_receipts_test.go:154: GUARD G6 minimum size 256 | file context_recovery.go | tests [TestOmissionEligibilityRequiresPairingNoErrorAndSize]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=31dd053b2aa16588736dcb9e813fa413df3f1e0781303ce5d33d661619f5770a
+    guard_receipts_test.go:156: --- G6 minimum size 256: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
+        --- PASS: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        b.ToolError != "" || len(b.ToolOutput) < 256
+        with
+        b.ToolError != ""
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG63489604018/001/overlay.json
+    guard_receipts_test.go:161: --- G6 minimum size 256: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG63489604018/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s [no tests to run]
+    guard_receipts_test.go:164: --- G6 minimum size 256: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG63489604018/001/overlay.json -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
+            context_structural_eligibility_test.go:84: short listing was omitted
+        --- FAIL: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
+        FAIL
+    guard_receipts_test.go:175: --- G6 minimum size 256: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
+        --- PASS: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G7
+    guard_receipts_test.go:154: GUARD G7 newest result kept | file context_recovery.go | tests [TestSearchOmissionRequiresPositionBoundScanProvenance TestOmissionPreservationClasses]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=89df5b44d248984857b8dfb218850bfe974b18fe5ef7a8eb5825e77c823a5850
+    guard_receipts_test.go:156: --- G7 newest result kept: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        if kept <= 1 {
+        with
+        if kept <= 0 {
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG73571688468/001/overlay.json
+    guard_receipts_test.go:161: --- G7 newest result kept: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG73571688468/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
+    guard_receipts_test.go:164: --- G7 newest result kept: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG73571688468/001/overlay.json -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:60: failed-tool results: changed=true, request not byte-identical
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+            context_structural_eligibility_test.go:136: complete scans with provenance: older omitted, newest kept
+        --- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.005s
+        FAIL
+    guard_receipts_test.go:175: --- G7 newest result kept: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        === RUN   TestSearchOmissionRequiresPositionBoundScanProvenance
+        --- PASS: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.006s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G8
+    guard_receipts_test.go:154: GUARD G8 recorder: no tool error | file token_budget.go | tests [TestOmissionPreservationClasses]
+        sha256(original)=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob(original)=bbe77c61872720dabb03da6dcc15d8f4f321da7e
+        sha256(mutated)=cc8e5bd748b587479b5d1a4e972e4974a7431fc4d6d230b01e72e5ae0a43a354
+    guard_receipts_test.go:156: --- G8 recorder: no tool error: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        	if toolErr != nil {
+        		return
+        	}
+        	if (tool
+        with
+        	if (tool
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG82543117267/001/overlay.json
+    guard_receipts_test.go:161: --- G8 recorder: no tool error: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG82543117267/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s [no tests to run]
+    guard_receipts_test.go:164: --- G8 recorder: no tool error: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG82543117267/001/overlay.json -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:64: a failed listing was recorded
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.004s
+        FAIL
+    guard_receipts_test.go:175: --- G8 recorder: no tool error: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.005s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G9
+    guard_receipts_test.go:154: GUARD G9 recorder: scan-complete flag | file token_budget.go | tests [TestOmissionPreservationClasses]
+        sha256(original)=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob(original)=bbe77c61872720dabb03da6dcc15d8f4f321da7e
+        sha256(mutated)=2bd7a2fdcd7755fcca404f2411545bb21349c03b64154217267243e1f77ef25d
+    guard_receipts_test.go:156: --- G9 recorder: scan-complete flag: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        (tool == "search_files" && scanComplete)
+        with
+        (tool == "search_files")
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG93162578172/001/overlay.json
+    guard_receipts_test.go:161: --- G9 recorder: scan-complete flag: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG93162578172/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s [no tests to run]
+    guard_receipts_test.go:164: --- G9 recorder: scan-complete flag: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG93162578172/001/overlay.json -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+            context_preservation_test.go:88: an incomplete scan was recorded
+        --- FAIL: TestOmissionPreservationClasses (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.003s
+        FAIL
+    guard_receipts_test.go:175: --- G9 recorder: scan-complete flag: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionPreservationClasses
+        --- PASS: TestOmissionPreservationClasses (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.004s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G10
+    guard_receipts_test.go:154: GUARD G10 recorder: vouching executor | file token_budget.go | tests [TestListingProvenanceComesFromVouchingExecutor]
+        sha256(original)=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob(original)=bbe77c61872720dabb03da6dcc15d8f4f321da7e
+        sha256(mutated)=12c5692e0868de6efaf39b3dbb07e7850d6e936bed2d3ec4d3c0550da09e5d77
+    guard_receipts_test.go:156: --- G10 recorder: vouching executor: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestListingProvenanceComesFromVouchingExecutor)$ .
+        exit=0
+        raw output:
+        === RUN   TestListingProvenanceComesFromVouchingExecutor
+        --- PASS: TestListingProvenanceComesFromVouchingExecutor (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.005s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        (tool == "list_directory" && p.trustedDirectoryResults)
+        with
+        (tool == "list_directory")
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG102528097941/001/overlay.json
+    guard_receipts_test.go:161: --- G10 recorder: vouching executor: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG102528097941/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s [no tests to run]
+    guard_receipts_test.go:164: --- G10 recorder: vouching executor: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG102528097941/001/overlay.json -count=1 -v -run ^(TestListingProvenanceComesFromVouchingExecutor)$ .
+        exit=1
+        raw output:
+        === RUN   TestListingProvenanceComesFromVouchingExecutor
+            context_preservation_test.go:123: unvouched listing was recorded
+        --- FAIL: TestListingProvenanceComesFromVouchingExecutor (0.00s)
+        FAIL
+        FAIL	github.com/openexec/openexec/pkg/execution	0.002s
+        FAIL
+    guard_receipts_test.go:175: --- G10 recorder: vouching executor: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestListingProvenanceComesFromVouchingExecutor)$ .
+        exit=0
+        raw output:
+        === RUN   TestListingProvenanceComesFromVouchingExecutor
+        --- PASS: TestListingProvenanceComesFromVouchingExecutor (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s
+=== RUN   TestGuardRemovalIsRedAndRestoredIsGreen/G11
+    guard_receipts_test.go:154: GUARD G11 call/result pairing present | file context_recovery.go | tests [TestOmissionEligibilityRequiresPairingNoErrorAndSize]
+        sha256(original)=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob(original)=a841bcf4a0c1567e1f8258df910f4cba6dd450ee
+        sha256(mutated)=70ab1a124e864feb06262d9f17e37558f920e09106446aede6af4dbcd34c4daa
+    guard_receipts_test.go:156: --- G11 call/result pairing present: baseline (guard present)
+        command: go test -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
+        --- PASS: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s
+    guard_receipts_test.go:160: mutation: replace exactly one occurrence of
+        if len(calls) > 0 {
+        with
+        if true {
+        overlay file: /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG113792133410/001/overlay.json
+    guard_receipts_test.go:161: --- G11 call/result pairing present: mutated tree compiles
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG113792133410/001/overlay.json -count=1 -run ^$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.002s [no tests to run]
+    guard_receipts_test.go:164: --- G11 call/result pairing present: RED (guard removed)
+        command: go test -overlay /tmp/TestGuardRemovalIsRedAndRestoredIsGreenG113792133410/001/overlay.json -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
+        exit=1
+        raw output:
+        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
+        --- FAIL: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+        panic: runtime error: slice bounds out of range [1:0] [recovered, repanicked]
+        
+        goroutine 8 [running]:
+        testing.tRunner.func1.2({0x915840, 0x2bcf41cc2318})
+        	/usr/local/go/src/testing/testing.go:1974 +0x232
+        testing.tRunner.func1()
+        	/usr/local/go/src/testing/testing.go:1977 +0x349
+        panic({0x915840?, 0x2bcf41cc2318?})
+        	/usr/local/go/src/runtime/panic.go:860 +0x13a
+        github.com/openexec/openexec/pkg/execution.priorResults.compactWith(_, {0x0, {0x0, 0x0}, {0x2bcf41dbe480, 0x5, 0x6}, {0x95c1f8, 0x23}, {0x0, ...}, ...}, ...)
+        	/home/perttu/.agent-console/worktrees/bff2eb46f4a1a799701158ddfb1eba8d/pkg/execution/context_recovery.go:87 +0x116a
+        github.com/openexec/openexec/pkg/execution.priorResults.compact(_, {0x0, {0x0, 0x0}, {0x2bcf41dbe480, 0x5, 0x6}, {0x95c1f8, 0x23}, {0x0, ...}, ...})
+        	/home/perttu/.agent-console/worktrees/bff2eb46f4a1a799701158ddfb1eba8d/pkg/execution/context_preservation_test.go:143 +0xa53
+        github.com/openexec/openexec/pkg/execution.TestOmissionEligibilityRequiresPairingNoErrorAndSize(0x2bcf41dc6488)
+        	/home/perttu/.agent-console/worktrees/bff2eb46f4a1a799701158ddfb1eba8d/pkg/execution/context_structural_eligibility_test.go:88 +0x7d7
+        testing.tRunner(0x2bcf41dc6488, 0x97e678)
+        	/usr/local/go/src/testing/testing.go:2036 +0xea
+        created by testing.(*T).Run in goroutine 1
+        	/usr/local/go/src/testing/testing.go:2101 +0x4c5
+        FAIL	github.com/openexec/openexec/pkg/execution	0.005s
+        FAIL
+    guard_receipts_test.go:175: --- G11 call/result pairing present: GREEN (guard restored, same tests)
+        command: go test -count=1 -v -run ^(TestOmissionEligibilityRequiresPairingNoErrorAndSize)$ .
+        exit=0
+        raw output:
+        === RUN   TestOmissionEligibilityRequiresPairingNoErrorAndSize
+        --- PASS: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+        PASS
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+=== NAME  TestGuardRemovalIsRedAndRestoredIsGreen
+    guard_receipts_test.go:184: PROVENANCE after all receipts (final restored source and index)
+        working directory: /home/perttu/.agent-console/worktrees/bff2eb46f4a1a799701158ddfb1eba8d/pkg/execution
+    guard_receipts_test.go:184: git rev-parse HEAD HEAD^{tree} -> err=<nil>
+        c9868cd594724ecbb339594300a512bd7ab14911
+        3ec9d6ef6ef4cbb0428d3691d0b508beb8af0e69
+        git ls-files -s . -> err=<nil>
+        100644 169a14c45924d321cde188e5b6cfa4c90777836d 0	agent_cli_copilot_test.go
+        100644 a48e323de8cb28cc0b21b5afbced4e3ca4ab9eb7 0	agent_cli_provider.go
+        100644 b2ed4ebdc5cc230889a7572081e5881d24735026 0	agent_cli_provider_test.go
+        100644 733165c72d343c28beb3c4ee13b8fe57bbcfc439 0	api_provider.go
+        100644 f57a6e73bcbffd2a70a3a676595dd7b2f92156cb 0	api_provider_test.go
+        100644 56c1153bad306379da4a1367aceaa05a420a4aad 0	api_required_content_test.go
+        100644 c09b9492f45b6d36155c91f4b644d66190a108c4 0	assembled_diagnosis_test.go
+        100644 010d72be5fda90328731efda55d1cd1ffc8660f3 0	bounded_wire_test.go
+        100644 9761ebdfa4b91ea6abe614abfd736f6eb5106daf 0	caller_deadline_boundary_test.go
+        100644 8a71543c4da599a07e48f5392970039da9ceb410 0	cancel_witness_test.go
+        100644 fc7006ec6a21ec7dea403c39cf76c8d581480aeb 0	capture_fidelity_test.go
+        100644 0e718caa3be6c40c2692b8aa7c2e2aa079d085e3 0	cli.go
+        100644 2e051e14e9f6809426b3b528cb39d1b5d8b2bb9d 0	cli_test.go
+        100644 1310970aaa549d521d1763cd030dfe3dd5874b07 0	composite_tools.go
+        100644 6e0e51a485669afbf4fbb57243a3fffa6b9fe3bc 0	composite_tools_test.go
+        100644 d3baa76ee8fef8ae39321d4257fa56fa7e78acf4 0	context_discipline_test.go
+        100644 f858f32f622c77f65a3d74cfc62c7d93c2f1d144 0	context_grant_regression_test.go
+        100644 35bab953d8fa0337e627c6c302b3990483d904a0 0	context_original_positive_test.go
+        100644 af811f61b499aa9a38c6a25d9d611329da6aaed8 0	context_policy.go
+        100644 811f7c932ad03a8af3298e1aa0b442177be86819 0	context_preservation_test.go
+        100644 a841bcf4a0c1567e1f8258df910f4cba6dd450ee 0	context_recovery.go
+        100644 af407f5ec4c6c5df1f7f311866379904c28b7657 0	context_recovery_test.go
+        100644 51326e8940fb54ac32326012ee857a23c00146c2 0	context_structural_eligibility_test.go
+        100644 0cbe16aefb6f640d3ccf3920cb79b160c2c26cc6 0	context_synthesis_test.go
+        100644 21642118594ce4d9e04f8977c625166fe48a97ce 0	d26_diagnosis_test.go
+        100644 842a18ce3d218d6ea7675f265cdcd4bd32ce8ea6 0	d26_evidence_test.go
+        100644 2d46f2e52727e1a85eb0ea10a1170e0dd4061a2f 0	dispatch_provenance_test.go
+        100644 1e078b18c0fecae4bf827611e22c51084608d8d1 0	empty_recovery_prefix_test.go
+        100644 8405e38ce52f71d7391839b969d39d39d507db8e 0	execution.go
+        100644 94c0c2012095d521f2fb8d1a4ce979374467d5f7 0	file_page_wire_test.go
+        100644 59499ed11ec67428e8cfe9f16ac6729c84a8a762 0	gateway.go
+        100644 6c19e057f05d7f04208f355c024f8ab57f5f74c0 0	gateway_test.go
+        100644 963fcf9050ed4d29ebf51bf9b1cd1477a39ec170 0	grant_boundary_test.go
+        100644 92df387d42feea663a5d8b367f6e136f5e04b776 0	guard_receipts_test.go
+        100644 e06da7dd716cdc9bdbf9bbbeed4a09c604cec404 0	handover.go
+        100644 f2a56bbee0d0a3ac6fa0621933c564ea87167baf 0	lumi_signature_diagnosis_test.go
+        100644 ce28f0f940c7a961a4d32a7d2ea166e338f227bf 0	native_completion_evidence_test.go
+        100644 faf656c11269e928a4bf927219da265db940eb9b 0	native_output_observation_test.go
+        100644 37ca2ffa11700b9e319fe00fa5cf030ef030385e 0	nonthinking_test.go
+        100644 cafc6705a8b0392c6380c7d5adf3183ddb81e7e2 0	outcome_navigator_contract_test.go
+        100644 eb38de2cc12b9db32801ff4c005a9fe0f8e2f42a 0	planning_output_test.go
+        100644 b030f34228813c09dbdfd98846c24a413ba1f47e 0	readiness_test.go
+        100644 cf4874e14377ce1a149ba5c358553d82aabdc92a 0	replay_test.go
+        100644 eb8720a5c05cbfeaf223eb257a4139e9b14d240f 0	reply_observation_journey_test.go
+        100644 f4c2e9c5a2f387d8a30462e2230ec95a0fe6673d 0	request_capture.go
+        100644 f723b5b9e6e4560ad9c6c092ca7c578be22b49fe 0	request_capture_test.go
+        100644 f3c2d5515de5a18ed037762515ae5e9d940ca225 0	request_trace.go
+        100644 b0c13c328838691df7974d1bbb53cd9d45788e11 0	request_trace_test.go
+        100644 07ac0c1bdfea0f0a6709e7da051fa35df7c6081d 0	search_context_control_test.go
+        100644 f8e02df33305b1e9bb35039d91c0187c733264d4 0	sequence_7a722_test.go
+        100644 4f33852ee5528c0b9322b6f7428fe2c701ff0f2c 0	solar_preflight_evidence_test.go
+        100644 cde8a2b23890addd258a9b6a6a6f101d96644630 0	terminal_draft_boundary_test.go
+        100644 771b9ca7137dcf531ea704b47e422f2575556612 0	testdata/capture-fidelity-compatible.json
+        100644 283872aa4b4ca08c27dc2ea0210b62c78fb2705c 0	testdata/capture-fidelity-native.json
+        100644 4f8b885d20a8cbb990e317727c86651ea5b9cb5a 0	testdata/d26-structure.json
+        100644 528406e5e63107f5834fa54107aa3dc05f76b994 0	testdata/lumi-signature/console_signature_excerpt.py
+        100644 17e6b3ee06ff9258b9207bd03491f8c6e4b991c9 0	testdata/lumi-signature/control.py
+        100644 bbe77c61872720dabb03da6dcc15d8f4f321da7e 0	token_budget.go
+        100644 86feacf508cbb1316d92fd9fe39f9b0af0fcd52b 0	token_budget_test.go
+        100644 c3c2acdf7ec65ee667b6dcfb417b81d66eb60d7b 0	trace_structure_test.go
+        100644 cd093a4c846188228982606e829cb79648c64727 0	transport_history_test.go
+        100644 2de1b0a9bef1b82cb6c15fabcd6d5e7eb43cc71b 0	workspace_file_lines_test.go
+        100644 948ac0c43b968cd7385b907f3e4c3ea04b343faa 0	workspace_file_pages_test.go
+        100644 5e0d938f47bf008f3ae05f68ca82684b970a088f 0	workspace_search.go
+        100644 dae9c5eb4752a8dfd57d64dccef79bb92f819dd3 0	workspace_search_test.go
+        100644 71bf88988851dd1090748b2af9bf111dd417dcc4 0	workspace_tools.go
+        100644 6cbca8cc88e296a46a1ef9389240d1dd8ff353cc 0	workspace_tools_race_test.go
+        100644 621ddf51f9a3aee29b2f3db38916f39e6e63a3a0 0	workspace_tools_test.go
+    guard_receipts_test.go:184: sha256(git ls-files -s -- pkg/execution)=d6b3629b07fd0d32a915d0aacf416ea4a626ce255b4adcacebd714be0b84e4e0
+    guard_receipts_test.go:184: manifest context_recovery.go sha256=3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f git-blob=a841bcf4a0c1567e1f8258df910f4cba6dd450ee bytes=5553
+    guard_receipts_test.go:184: manifest token_budget.go sha256=06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9 git-blob=bbe77c61872720dabb03da6dcc15d8f4f321da7e bytes=10581
+    guard_receipts_test.go:184: manifest guard_receipts_test.go sha256=92af1bd3876e96d0db5819351fa8f10fc5729de2d676851813e2d47aabf4be18 git-blob=d5966cbda9d66849bea4470fe4ead2e6c4bd3a49 bytes=10488
+    guard_receipts_test.go:184: manifest context_original_positive_test.go sha256=69ba8a44d5789bdd85dd81fc83f784419f8796b5f0180b220223ded96e84873b git-blob=35bab953d8fa0337e627c6c302b3990483d904a0 bytes=1336
+    guard_receipts_test.go:184: manifest context_structural_eligibility_test.go sha256=3f27498e73b3c08304c79f70dcb467d64706c1cfb12bfd11599108c949013f73 git-blob=51326e8940fb54ac32326012ee857a23c00146c2 bytes=12330
+    guard_receipts_test.go:184: manifest context_preservation_test.go sha256=760621c277eb1e4e70a95e75fd2e7d61bcffd9208cf8aa62b36ed95382d901bc git-blob=811f7c932ad03a8af3298e1aa0b442177be86819 bytes=6696
+--- PASS: TestGuardRemovalIsRedAndRestoredIsGreen (25.98s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/P0 (1.19s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G1 (2.54s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G2 (2.07s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G3 (2.36s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G4 (2.26s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G5 (2.34s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G6 (2.00s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G7 (2.18s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G8 (2.28s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G9 (1.96s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G10 (2.45s)
+    --- PASS: TestGuardRemovalIsRedAndRestoredIsGreen/G11 (2.34s)
+=== RUN   TestGuardHarnessInertEditStaysGreen
+    guard_receipts_test.go:199: --- inert edit
+        command: go test -overlay /tmp/TestGuardHarnessInertEditStaysGreen2173611351/001/overlay.json -count=1 -run ^(TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses)$ .
+        exit=0
+        raw output:
+        ok  	github.com/openexec/openexec/pkg/execution	0.003s
+--- PASS: TestGuardHarnessInertEditStaysGreen (1.29s)
 PASS
-ok  	github.com/openexec/openexec/pkg/execution	23.117s
+ok  	github.com/openexec/openexec/pkg/execution	27.284s
