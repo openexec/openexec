@@ -22,6 +22,11 @@ func TestLegacyRuntimeRefusesV4Request(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The caller's bytes carry the identity fields; the old reader is handed them
+	// whole and refuses the version rather than dropping them.
+	if !bytes.Contains(data, []byte(`"ReadableRootIdentities":[{"path":"/synthetic/root","device":1,"inode":2}]`)) {
+		t.Fatalf("identity fields are not on the wire: %s", data)
+	}
 	built := false
 	var output bytes.Buffer
 	err = serveExecutionProtocol(context.Background(), bytes.NewReader(data), &output, func(context.Context, string, execution.Sandbox, toolGateway) (execution.Provider, error) {
@@ -30,6 +35,10 @@ func TestLegacyRuntimeRefusesV4Request(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "unsupported execution protocol version 4") {
 		t.Fatalf("legacy reader did not refuse v4: %v", err)
+	}
+	// The refusal names only the version: no root path or identity value.
+	if strings.Contains(err.Error(), "synthetic") || strings.Contains(err.Error(), "Inode") {
+		t.Fatalf("refusal echoes request content: %v", err)
 	}
 	if built || output.Len() != 0 {
 		t.Fatalf("legacy reader did work for a v4 request: built=%v output=%q", built, output.String())

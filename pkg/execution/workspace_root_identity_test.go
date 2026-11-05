@@ -77,6 +77,9 @@ func TestAPIWorkspaceReadableRootStaysBoundAfterAdmission(t *testing.T) {
 			if strings.Contains(toolOutput, "outside-secret") {
 				t.Fatalf("read escaped its admitted root: %q", toolOutput)
 			}
+			if scenario.swap && (strings.Contains(toolOutput, "authorized") || !strings.Contains(toolOutput, "changed after admission")) {
+				t.Fatalf("swap after admission was not refused: %q", toolOutput)
+			}
 			if !scenario.swap && toolOutput != "authorized" {
 				t.Fatalf("authorized read=%q", toolOutput)
 			}

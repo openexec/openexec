@@ -12,6 +12,47 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// pinnedRootStillNamed proves, at the moment of use, that the canonical
+// absolute path admitted for root still reaches the very directory the root
+// descriptor holds. It walks from "/" with O_NOFOLLOW at every component, so a
+// symlink or a replacement directory swapped in after admission is refused
+// instead of being answered from the old descriptor.
+func pinnedRootStillNamed(root *os.Root, path string) error {
+	stale := errors.New("the readable root changed after admission")
+	if !filepath.IsAbs(path) {
+		return stale
+	}
+	fd, err := unix.Open("/", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return stale
+	}
+	for _, component := range strings.Split(strings.Trim(filepath.Clean(path), "/"), "/") {
+		if component == "" {
+			continue
+		}
+		next, err := unix.Openat(fd, component, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+		_ = unix.Close(fd)
+		if err != nil {
+			return stale
+		}
+		fd = next
+	}
+	defer unix.Close(fd)
+	var walked unix.Stat_t
+	if unix.Fstat(fd, &walked) != nil {
+		return stale
+	}
+	info, err := root.Stat(".")
+	if err != nil {
+		return stale
+	}
+	held, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || uint64(held.Dev) != uint64(walked.Dev) || uint64(held.Ino) != uint64(walked.Ino) {
+		return stale
+	}
+	return nil
+}
+
 // noProcWalkHook is called immediately before each component is opened by
 // openedFileByDescriptorWalk. It is nil outside tests, which use it to
 // interleave a swap with the production traversal deterministically.

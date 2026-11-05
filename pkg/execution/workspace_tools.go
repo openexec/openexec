@@ -642,6 +642,11 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 			}
 			continue
 		}
+		if pinned {
+			if err := pinnedRootStillNamed(root, path); err != nil {
+				return "", err
+			}
+		}
 		output, err := run(root, relative)
 		if !pinned {
 			_ = root.Close()

@@ -227,6 +227,21 @@ func TestConnectedValidRootServesReadListSearchThroughPinnedDescriptor(t *testin
 						adapter.before = func() { f.replaceWithOutside(t) }
 					}
 					run := f.serve(t, executionProtocolBoundRoots, 4, []string{f.selected}, []execution.ReadableRootIdentity{identity}, adapter, f.executor(t, composite))
+					if swap != "" {
+						// A root swapped after admission is refused, not served from
+						// the old descriptor, and nothing outside reaches the caller.
+						f.noOutsideDisclosure(t, run)
+						if !strings.Contains(run.visible(), "readable root changed after admission") {
+							t.Fatalf("swap after admission was not refused: err=%v failure=%q stdout=%q", run.err, run.failure, run.stdout)
+						}
+						if strings.Contains(run.visible(), authorizedBytes) || strings.Contains(run.toolOutput, "witness") {
+							t.Fatalf("swapped root still served: %q", run.visible())
+						}
+						if _, err := os.Lstat(f.selected + "-old"); err != nil {
+							t.Fatalf("the swap did not happen, so the refusal is unproven: %v", err)
+						}
+						return
+					}
 					if run.err != nil || run.failure != "" {
 						t.Fatalf("valid root refused: %v %q", run.err, run.failure)
 					}
@@ -360,6 +375,12 @@ func TestConnectedRuntimeWithoutV4RefusesV4Request(t *testing.T) {
 	run := f.serve(t, executionProtocolVersion, 4, []string{f.selected}, []execution.ReadableRootIdentity{id}, adapter, f.executor(t, false))
 	if run.err == nil || !strings.Contains(run.err.Error(), "unsupported execution protocol version 4") {
 		t.Fatalf("old runtime did not refuse v4: %v", run.err)
+	}
+	// Same bytes-on-the-wire and same refusal wording as the pre-v4 reader in
+	// TestLegacyReaderRefusesV4Request: the identity fields were not stripped,
+	// and the refusal does not echo any root path.
+	if strings.Contains(run.err.Error(), f.selected) || strings.Contains(run.err.Error(), "Inode") {
+		t.Fatalf("refusal echoes request content: %v", run.err)
 	}
 	var refusal *unsupportedProtocolVersionError
 	if !errors.As(run.err, &refusal) || refusal.Version != 4 {
