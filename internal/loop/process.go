@@ -46,7 +46,7 @@ func StartProcess(ctx context.Context, cfg Config, stdoutW, stderrW io.Writer, m
 	env := os.Environ()
 	if runner.IsCopilotModel(cfg.ExecutorModel) && cfg.RunnerCommand == "" {
 		var err error
-		if env, err = copilotEnv(env); err != nil {
+		if env, err = runner.CopilotEnv(env); err != nil {
 			return nil, err
 		}
 	}
@@ -264,28 +264,6 @@ func buildCommand(cfg Config) (string, []string) {
 	}
 
 	return cliCmd, cmdArgs
-}
-
-// copilotEnv keeps other vendors' API keys away from GitHub and refuses a
-// classic personal access token (ghp_), which Copilot does not accept, before
-// the CLI starts. Sign-in and token refresh stay with the CLI.
-func copilotEnv(environ []string) ([]string, error) {
-	drop := map[string]bool{"OPENAI_API_KEY": true, "ANTHROPIC_API_KEY": true, "CODEX_API_KEY": true, "GEMINI_API_KEY": true}
-	out := make([]string, 0, len(environ))
-	for _, e := range environ {
-		name, value, _ := strings.Cut(e, "=")
-		if drop[name] {
-			continue
-		}
-		switch name {
-		case "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN":
-			if strings.HasPrefix(value, "ghp_") {
-				return nil, fmt.Errorf("%s: GitHub Copilot does not accept classic personal access tokens (ghp_); sign in with 'copilot' (/login) or use a gho_, ghu_ or github_pat_ token", name)
-			}
-		}
-		out = append(out, e)
-	}
-	return out, nil
 }
 
 func copilotArgs(cfg Config, base []string) []string {

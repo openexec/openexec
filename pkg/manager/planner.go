@@ -504,6 +504,13 @@ func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, e
 	if stdin != nil {
 		c.Stdin = stdin
 	}
+	if runner.IsCopilotModel(p.model) && os.Getenv("OPENEXEC_PLANNER_CLI") == "" {
+		env, err := runner.CopilotEnv(os.Environ())
+		if err != nil {
+			return "", err
+		}
+		c.Env = env
+	}
 
 	output, err := c.CombinedOutput()
 	if err != nil {

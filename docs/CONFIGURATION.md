@@ -154,6 +154,13 @@ boundary: a nonzero exit becomes a failed outcome carrying the CLI's own stderr
 verbatim, and the `pkg/agent` adapter appends a hint to run `copilot` and
 `/login`.
 
+Every OpenExec route that launches `copilot` (loop, planner, `pkg/agent`
+adapter, `execution-stdio`) drops `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`CODEX_API_KEY` and `GEMINI_API_KEY` from the child environment and refuses a
+`ghp_` token before launch. A real CLI auth-failure message was not captured:
+the CLI could not be run in the authoring sandbox, so no CLI-authored expiry or
+login text is claimed.
+
 Not exercised: a real Copilot-entitled run. The tests use a fixture binary that
 follows the documented command line and token rules.
 
