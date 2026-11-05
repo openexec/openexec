@@ -205,14 +205,69 @@ func captureTreeIdentity(t *testing.T, root string) treeIdentity {
 	return identity
 }
 
+func (i treeIdentity) summary(root string) string {
+	return fmt.Sprintf("git rev-parse HEAD HEAD^{tree}:\n%sindex entries=%d sha256(git -C %s ls-files -s)=%s\nmanifest entries=%d sha256(manifest)=%s\ntracked files whose bytes differ from the index:\n%s", i.head, strings.Count(i.listing, "\n"), root, i.indexSHA(), strings.Count(i.manifest, "\n"), i.manifestSHA(), i.dirty)
+}
+
+func gitRoot(t *testing.T, dir string) string {
+	t.Helper()
+	return strings.TrimSpace(string(gitOutput(t, dir, "rev-parse", "--show-toplevel")))
+}
+
+// The identity covers the whole repository from any package directory, stays
+// equal when nothing changed, and moves when a tracked file's bytes or the index
+// change, including a file outside the package directory.
+func TestTreeIdentityCoversWholeRepositoryAndDetectsChange(t *testing.T) {
+	repo := t.TempDir()
+	git := func(args ...string) { t.Helper(); gitOutput(t, repo, args...) }
+	git("init", "-q")
+	if err := os.MkdirAll(filepath.Join(repo, "pkg", "execution"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	outside, inside := filepath.Join(repo, "outside.txt"), filepath.Join(repo, "pkg", "execution", "inside.go")
+	for _, f := range []string{outside, inside} {
+		if err := os.WriteFile(f, []byte("original\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("add", ".")
+	git("-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "seed")
+
+	root := gitRoot(t, filepath.Join(repo, "pkg", "execution"))
+	before := captureTreeIdentity(t, root)
+	if strings.Count(before.listing, "\n") != 2 || !strings.Contains(before.listing, "outside.txt") || !strings.Contains(before.manifest, "outside.txt") {
+		t.Fatalf("identity from a package directory must cover the whole repository:\n%s\n%s", before.listing, before.manifest)
+	}
+	if captureTreeIdentity(t, root) != before || before.dirty != "" {
+		t.Fatalf("nothing changed, identity must stay equal and clean: %+v", before)
+	}
+
+	if err := os.WriteFile(outside, []byte("changed\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	edited := captureTreeIdentity(t, root)
+	if edited.manifestSHA() == before.manifestSHA() || edited.indexSHA() != before.indexSHA() || !strings.Contains(edited.dirty, "outside.txt") {
+		t.Fatalf("a byte edit must move the manifest only and be listed as differing: %+v", edited)
+	}
+
+	git("add", "outside.txt")
+	staged := captureTreeIdentity(t, root)
+	if staged.indexSHA() == before.indexSHA() || staged.dirty != "" {
+		t.Fatalf("staging must move the index: %+v", staged)
+	}
+}
+
 func TestGuardRemovalIsRedAndRestoredIsGreen(t *testing.T) {
 	if testing.Short() {
 		t.Skip("spawns go test subprocesses")
 	}
 	wd, _ := os.Getwd()
-	root := strings.TrimSpace(string(gitOutput(t, wd, "rev-parse", "--show-toplevel")))
+	root := gitRoot(t, wd)
 	before := captureTreeIdentity(t, root)
-	t.Logf("PROVENANCE before any receipt\nworking directory: %s\ngit root: %s\ngit rev-parse HEAD HEAD^{tree}:\n%sgit -C %s ls-files -s:\n%ssha256(git -C %s ls-files -s)=%s\ntracked file manifest (sha256 git-blob bytes path):\n%ssha256(manifest)=%s\ntracked files whose bytes differ from the index:\n%s", wd, root, before.head, root, before.listing, root, before.indexSHA(), before.manifest, before.manifestSHA(), before.dirty)
+	t.Logf("FULL INDEX AND MANIFEST before any receipt\ngit -C %s ls-files -s:\n%stracked file manifest (sha256 git-blob bytes path):\n%s", root, before.listing, before.manifest)
+	// The identity is logged after the long listing so it stays readable when a
+	// runner keeps only the tail of the output.
+	t.Logf("PROVENANCE before any receipt\nworking directory: %s\ngit root: %s\n%s", wd, root, before.summary(root))
 
 	// P0 runs FIRST: the original positive assertion on the compiling tree.
 	t.Run("P0", func(t *testing.T) { originalPositiveReceipt(t) })
@@ -248,7 +303,7 @@ func TestGuardRemovalIsRedAndRestoredIsGreen(t *testing.T) {
 	}
 
 	after := captureTreeIdentity(t, root)
-	t.Logf("PROVENANCE after all receipts (final restored source and index)\ngit rev-parse HEAD HEAD^{tree}:\n%ssha256(git -C %s ls-files -s)=%s\nsha256(manifest)=%s\ntracked files whose bytes differ from the index:\n%s", after.head, root, after.indexSHA(), after.manifestSHA(), after.dirty)
+	t.Logf("PROVENANCE after all receipts (final restored source and index)\nworking directory: %s\ngit root: %s\n%s", wd, root, after.summary(root))
 	if after != before {
 		t.Errorf("source or index identity changed during the receipts\nafter listing:\n%s\nafter manifest:\n%s", after.listing, after.manifest)
 	}
