@@ -197,7 +197,7 @@ func TestForwardedSearchIsNeverReportedComplete(t *testing.T) {
 // outcome, the second pins what stays preserved and what recall returns.
 func TestQuotedInstructionInCompleteOlderScanIsRecallableNotHeuristicallyKept(t *testing.T) {
 	quote := "AGENTS.md says: NEVER DEPLOY without review. " + strings.Repeat("authority ", 60)
-	older, newest := quote+"older", quote+"newest"
+	older, newest := quote+"older", strings.Repeat("plain listing line ", 40)+"newest"
 	for _, tool := range []string{"list_directory", "search_files"} {
 		t.Run(tool, func(t *testing.T) {
 			r := structuralRequest([3]string{tool, older}, [3]string{tool, newest})
@@ -206,7 +206,17 @@ func TestQuotedInstructionInCompleteOlderScanIsRecallableNotHeuristicallyKept(t 
 			if !changed {
 				t.Fatal("a structurally complete older scan must be omitted whatever it quotes")
 			}
-			if strings.Contains(compacted.Messages[2].Content[0].ToolOutput, "NEVER DEPLOY") {
+			// The unchanged requirement, evaluated over the whole request: the
+			// original quote is present BEFORE recall. It is false here, and
+			// must stay false: making it true would need a content read.
+			quotePresentBeforeRecall := false
+			for _, m := range compacted.Messages {
+				for _, b := range m.Content {
+					quotePresentBeforeRecall = quotePresentBeforeRecall || strings.Contains(b.ToolOutput, "NEVER DEPLOY") || strings.Contains(b.Text, "NEVER DEPLOY")
+				}
+			}
+			t.Logf("contradiction control: quote present before recall = %v, structurally eligible = %v", quotePresentBeforeRecall, changed)
+			if quotePresentBeforeRecall {
 				t.Fatal("omission kept the quote, so eligibility read the content")
 			}
 			if compacted.System != r.System || compacted.Messages[4].Content[0].ToolOutput != newest || compacted.Messages[0].Content[0].Text != "original request" {

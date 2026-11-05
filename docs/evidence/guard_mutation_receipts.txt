@@ -1,0 +1,160 @@
+=== GUARD G1 position+hash binding | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses
+sha256(mutated) 650cfba19e51a48c1ea15109a33d1a3970d3c0f92c5b0a874a80b3cd9e44800c
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:72: listing provenance for other text: changed=true, request not byte-identical
+--- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+    context_structural_eligibility_test.go:145: different text at the position: result was omitted or request altered
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.007s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.005s
+
+=== GUARD G2 provenance required | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses
+sha256(mutated) e6d0e5b92b676ac3ca4ab21b4cfacc47e0a5e9fba08f3d2fb0ac258f84ba9795
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:69: unmarked listing: changed=true, request not byte-identical
+--- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+    context_structural_eligibility_test.go:142: no provenance: result was omitted or request altered
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.005s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.011s
+
+=== GUARD G3 unambiguous call-ID pairing | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestSearchOmissionRequiresPositionBoundScanProvenance
+sha256(mutated) b4831c206965a255e825d2af72894efffb3d658fad8a0bc9a6a42e35c498a72f
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+    context_structural_eligibility_test.go:165: ambiguous reused id: result was omitted or request altered
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.002s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.003s
+
+=== GUARD G4 only list_directory/search_files | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses
+sha256(mutated) 92f386883bc7836677067439ee340555702c832e0d56026f01fac7e3fcc7a495
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:52: file reads including AGENTS.md: changed=true, request not byte-identical
+--- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+    context_structural_eligibility_test.go:170: read_file: result was omitted or request altered
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.005s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.005s
+
+=== GUARD G5 no tool error | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses
+sha256(mutated) 3e3a9b83ca5d28e18c0cdb78547825843c53b01f1c1e6de18491f8e12973596a
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:60: failed-tool results: changed=true, request not byte-identical
+--- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+    context_structural_eligibility_test.go:150: errored result with provenance: result was omitted or request altered
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.006s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.005s
+
+=== GUARD G6 minimum size 256 | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestOmissionEligibilityRequiresPairingNoErrorAndSize
+sha256(mutated) 31dd053b2aa16588736dcb9e813fa413df3f1e0781303ce5d33d661619f5770a
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionEligibilityRequiresPairingNoErrorAndSize (0.00s)
+    context_structural_eligibility_test.go:84: short listing was omitted
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.002s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.002s
+
+=== GUARD G7 newest result kept | file pkg/execution/context_recovery.go | sha256(original) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+tests: TestSearchOmissionRequiresPositionBoundScanProvenance|TestOmissionPreservationClasses
+sha256(mutated) 89df5b44d248984857b8dfb218850bfe974b18fe5ef7a8eb5825e77c823a5850
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:60: failed-tool results: changed=true, request not byte-identical
+--- FAIL: TestSearchOmissionRequiresPositionBoundScanProvenance (0.00s)
+    context_structural_eligibility_test.go:136: complete scans with provenance: older omitted, newest kept
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.006s
+FAIL
+
+sha256(restored) 3ddbc121d6cae228a4734b4aebf6803b47a35bfac772fd2aef3a7e6b9c9ad78f
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.004s
+
+=== GUARD G8 recorder: no tool error | file pkg/execution/token_budget.go | sha256(original) 06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9
+tests: TestOmissionPreservationClasses
+sha256(mutated) cc8e5bd748b587479b5d1a4e972e4974a7431fc4d6d230b01e72e5ae0a43a354
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:64: a failed listing was recorded
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.003s
+FAIL
+
+sha256(restored) 06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.004s
+
+=== GUARD G9 recorder: scan-complete flag | file pkg/execution/token_budget.go | sha256(original) 06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9
+tests: TestOmissionPreservationClasses
+sha256(mutated) 2bd7a2fdcd7755fcca404f2411545bb21349c03b64154217267243e1f77ef25d
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestOmissionPreservationClasses (0.00s)
+    context_preservation_test.go:88: an incomplete scan was recorded
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.004s
+FAIL
+
+sha256(restored) 06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.004s
+
+=== GUARD G10 recorder: vouching executor | file pkg/execution/token_budget.go | sha256(original) 06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9
+tests: TestListingProvenanceComesFromVouchingExecutor
+sha256(mutated) 12c5692e0868de6efaf39b3dbb07e7850d6e936bed2d3ec4d3c0550da09e5d77
+compile: BUILD_OK
+RED (guard removed):
+--- FAIL: TestListingProvenanceComesFromVouchingExecutor (0.00s)
+    context_preservation_test.go:123: unvouched listing was recorded
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	0.004s
+FAIL
+
+sha256(restored) 06029ca9941f245f575280fc6d46608a5950bd83a1b15212c5450e1ed82025a9
+GREEN (guard restored):
+ok  	github.com/openexec/openexec/pkg/execution	0.003s
+
