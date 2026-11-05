@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,7 +128,7 @@ func TestInitCopilotConfigThroughFactoryToCLI(t *testing.T) {
 	t.Run("nonzero exit carries stderr and re-login hint, ignores OpenAI key", func(t *testing.T) {
 		clean(t)
 		t.Setenv("OPENAI_API_KEY", "sk-must-not-rescue-auth")
-		install("cat >&2 <<'EOF'\n" + copilotCLI1_0_105NoAuth + "EOF\nexit 1\n")
+		install("cat >&2 <<'EOF'\n" + copilotCLI1_0_105NoAuth(t) + "EOF\nexit 1\n")
 		_, err := complete(t)
 		if err == nil || !strings.Contains(err.Error(), "No authentication information found") ||
 			!strings.Contains(err.Error(), "Run 'gh auth login'") || !strings.Contains(err.Error(), "/login") {
@@ -136,14 +137,47 @@ func TestInitCopilotConfigThroughFactoryToCLI(t *testing.T) {
 	})
 }
 
-// copilotCLI1_0_105NoAuth is the verbatim stderr+stdout (exit status 1) of
-// `copilot -p hi -s --no-ask-user` from GitHub Copilot CLI 1.0.105 (output of
-// `copilot --version`: "GitHub Copilot CLI 1.0.105.") run with an empty
-// HOME/COPILOT_HOME and no token variables. It was captured on 2026-11-05 by
-// executing /usr/local/bin/copilot from a go test; no model call was made.
-const copilotCLI1_0_105NoAuth = "Error: No authentication information found.\n\n" +
-	"Copilot can be authenticated with GitHub using an OAuth Token or a Fine-Grained Personal Access Token.\n\n" +
-	"To authenticate, you can use any of the following methods:\n" +
-	"  \u2022 Start 'copilot' and run the '/login' command\n" +
-	"  \u2022 Set the COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN environment variable\n" +
-	"  \u2022 Run 'gh auth login' to authenticate with the GitHub CLI\n"
+// testdataDir is absolute: the init journey changes the working directory.
+var testdataDir, _ = filepath.Abs(filepath.Join("testdata", "copilot-cli-1.0.105"))
+
+// copilotCLI1_0_105NoAuth returns the verbatim stderr (exit status 1, empty
+// stdout) of GitHub Copilot CLI 1.0.105 run without credentials in a network
+// namespace. The bytes and their provenance (argv, environment, binary hash)
+// are committed in testdata/copilot-cli-1.0.105/.
+func copilotCLI1_0_105NoAuth(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(testdataDir, "auth-no-network.stderr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestCopilotCLI1_0_105CaptureProvenance(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(testdataDir, "provenance.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p struct {
+		CLIVersionOutput string `json:"cliVersionOutput"`
+		BinarySha256     string `json:"binarySha256"`
+		Returncode       int    `json:"returncode"`
+		Stdout           string `json:"stdout"`
+		StderrFile       string `json:"stderrFile"`
+	}
+	if err := json.Unmarshal(raw, &p); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(p.CLIVersionOutput, "GitHub Copilot CLI 1.0.105.") || len(p.BinarySha256) != 64 ||
+		p.Returncode != 1 || p.Stdout != "" || p.StderrFile != "auth-no-network.stderr" {
+		t.Fatalf("provenance = %+v", p)
+	}
+	got := copilotCLI1_0_105NoAuth(t)
+	if !strings.HasPrefix(got, "Error: No authentication information found.\n") || !strings.Contains(got, "'/login'") {
+		t.Fatalf("capture = %q", got)
+	}
+	// Near miss: the earlier flag-validation failures are not authentication proof.
+	if strings.Contains(string(raw), "\"stderrFile\": \"Invalid") || strings.Contains(got, "Invalid value for --max-ai-credits") {
+		t.Fatal("flag-validation failure counted as auth proof")
+	}
+}

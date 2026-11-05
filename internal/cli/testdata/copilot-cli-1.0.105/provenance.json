@@ -1,0 +1,31 @@
+{
+  "description": "Real credential-free authentication refusal of GitHub Copilot CLI 1.0.105, captured offline. Sanitized copy of the supervisor capture (host paths under the capture directory removed). Raw bytes of stderr are auth-no-network.stderr in this directory.",
+  "capturedAt": "2026-11-05T13:01Z",
+  "cliVersionOutput": "GitHub Copilot CLI 1.0.105.\nRun 'copilot update' to check for updates.\n",
+  "binarySha256": "3bd8bdc75670d7b4ec445725f6a5b9af66ee7ec49e6194646e4a40a0bc09091c",
+  "argv": [
+    "unshare", "--user", "--map-root-user", "--net",
+    "/usr/local/bin/copilot",
+    "--no-auto-update", "--disable-client-telemetry", "--no-custom-instructions",
+    "--disable-builtin-mcps", "--no-ask-user",
+    "-p", "Credential-free authentication preflight only."
+  ],
+  "environment": {
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "HOME": "<empty directory>",
+    "XDG_CONFIG_HOME": "<empty directory>/config",
+    "XDG_CACHE_HOME": "<empty directory>/cache",
+    "COPILOT_HOME": "<empty directory>/copilot",
+    "LANG": "C.UTF-8",
+    "NO_COLOR": "1"
+  },
+  "networkNamespace": "unshare --user --map-root-user --net (no external connectivity)",
+  "returncode": 1,
+  "stdout": "",
+  "stderrFile": "auth-no-network.stderr",
+  "notCountedAsAuthProof": [
+    {"argvDifference": "--max-ai-credits 0 added", "returncode": 1, "stderr": "error: Invalid value for --max-ai-credits: \"0\". Use a positive number.\n"},
+    {"argvDifference": "--deny-tool * added", "returncode": 1, "stderr": "Invalid --deny-tool value. Error: Invalid rule format: *\n"}
+  ],
+  "limits": "No token, no model request, no network. Says nothing about token expiry or refresh, which the CLI owns."
+}

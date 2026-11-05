@@ -158,9 +158,14 @@ Every OpenExec route that launches `copilot` (loop, planner, `pkg/agent`
 adapter, `execution-stdio`) drops `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 `CODEX_API_KEY` and `GEMINI_API_KEY` from the child environment and refuses a
 `ghp_` token before launch. The unauthenticated failure fixture is the verbatim
-output of GitHub Copilot CLI 1.0.105 (`copilot -p hi -s --no-ask-user`, empty
-home, no tokens, exit 1: "Error: No authentication information found." plus
-the `/login`, token-variable and `gh auth login` options), captured 2026-11-05.
+output of GitHub Copilot CLI 1.0.105 (exit 1, empty stdout: "Error: No
+authentication information found." plus the `/login`, token-variable and
+`gh auth login` options), captured 2026-11-05 with no credentials inside a
+network namespace (`unshare --user --map-root-user --net`). The raw bytes,
+binary SHA-256 (`3bd8bdc7…c09091c`), exact argv and environment are committed in
+`internal/cli/testdata/copilot-cli-1.0.105/` (`auth-no-network.stderr`,
+`provenance.json`); two earlier flag-validation refusals are recorded there as
+not authentication proof.
 No CLI-authored token-expiry text was captured, so none is claimed.
 
 Not exercised: a real Copilot-entitled run. The tests use a fixture binary that
