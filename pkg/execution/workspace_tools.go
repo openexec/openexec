@@ -464,32 +464,18 @@ func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument s
 }
 
 // refuseDeniedOpenedTargetWithoutProc is the check for a platform that cannot
-// name an open descriptor. Every step goes through the root descriptor, so a
-// swap of the root's path cannot change the answer. Any symlink on the way
-// fails closed, because without a kernel name the target of a link cannot be
-// judged from the descriptor alone. For a path of plain components the opened
-// file must also be the object the root still names, which catches a link
-// replaced between open and check.
+// name an open descriptor. The relative path is walked component by component
+// from the root descriptor with no-follow opens (openedFileByDescriptorWalk),
+// so a swap of the root's path cannot change the answer and a symlink swapped
+// in or out between separate inspections cannot be missed: any symlink fails
+// closed, and the walked object must be the very file that was opened.
 func refuseDeniedOpenedTargetWithoutProc(root *os.Root, file *os.File, relative, argument string) error {
 	cleaned := filepath.Clean(relative)
 	if filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("verify opened path %q: resolved target is outside the workspace root", argument)
 	}
-	prefix := ""
-	for _, component := range strings.Split(cleaned, string(filepath.Separator)) {
-		prefix = filepath.Join(prefix, component)
-		info, err := root.Lstat(prefix)
-		if err != nil {
-			return fmt.Errorf("verify opened path %q: %w", argument, err)
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("verify opened path %q: cannot verify the target of a symbolic link on this platform", argument)
-		}
-	}
-	fileInfo, fileErr := file.Stat()
-	rootInfo, rootErr := root.Stat(cleaned)
-	if fileErr != nil || rootErr != nil || !os.SameFile(fileInfo, rootInfo) {
-		return fmt.Errorf("verify opened path %q: the path changed while it was being opened", argument)
+	if err := openedFileByDescriptorWalk(root, file, cleaned); err != nil {
+		return fmt.Errorf("verify opened path %q: %w", argument, err)
 	}
 	if component, denied := deniedComponent(cleaned); denied {
 		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
