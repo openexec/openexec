@@ -53,7 +53,26 @@ func searchFile(t *testing.T, root, path, content string) {
 
 // The real triage guessed store files for sixteen rounds looking for SplitTask.
 // Search must find its definition after the first 8 KiB without paging each file.
+// plainToolExecutor hides the executor's optional scan-reporting capability, so
+// the provider dispatches through ExecuteTool instead of executeToolScan.
+type plainToolExecutor struct{ ToolExecutor }
+
 func TestWorkspaceSearchFindsDefinitionAndCompletesTriage(t *testing.T) {
+	workspaceSearchTriage(t, NewWorkspaceToolExecutor())
+}
+
+// The ExecuteTool switch and the executeToolScan dispatch are separate routes
+// to search_files; each must serve triage on its own.
+func TestWorkspaceSearchFindsDefinitionAndCompletesTriageThroughExecuteTool(t *testing.T) {
+	executor := plainToolExecutor{NewWorkspaceToolExecutor()}
+	if _, scans := ToolExecutor(executor).(scanReportingExecutor); scans {
+		t.Fatal("wrapper still exposes executeToolScan, so ExecuteTool would not be the route taken")
+	}
+	workspaceSearchTriage(t, executor)
+}
+
+func workspaceSearchTriage(t *testing.T, executor ToolExecutor) {
+	t.Helper()
 	root := t.TempDir()
 	searchFile(t, root, "internal/store/blocked.go", strings.Repeat("// padding\n", 1000)+"func (s *Store) SplitTask() {}\n")
 	for i := 0; i < 20; i++ {
@@ -73,7 +92,7 @@ func TestWorkspaceSearchFindsDefinitionAndCompletesTriage(t *testing.T) {
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: "find", ToolName: "search_files", ToolInput: searchRequest(root, "internal/store", "SplitTask").Input}}},
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "Contract grounded in internal/store/blocked.go.\nREPOSITORY: agent-console"}}},
 	}}
-	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, Tools: tools, ToolExecutor: NewWorkspaceToolExecutor(), MaxSteps: 2})
+	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, Tools: tools, ToolExecutor: executor, MaxSteps: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
