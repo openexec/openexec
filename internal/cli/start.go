@@ -624,6 +624,8 @@ func preflightRunnerCheck(config *project.ProjectConfig) error {
 		} else if model != "" {
 			m := strings.ToLower(model)
 			switch {
+			case runner.IsCopilotModel(m):
+				cliName = "copilot"
 			case strings.HasPrefix(m, "gpt-") || strings.Contains(m, "codex") || strings.Contains(m, "openai"):
 				cliName = "codex"
 			case strings.HasPrefix(m, "gemini"):
@@ -640,7 +642,8 @@ func preflightRunnerCheck(config *project.ProjectConfig) error {
 			"  Supported runners:\n"+
 			"    claude  — Claude (Anthropic)    npm i -g @anthropic-ai/claude-code\n"+
 			"    codex   — Codex (OpenAI)        npm i -g @openai/codex\n"+
-			"    gemini  — Gemini (Google)        npm i -g @google/gemini-cli\n\n"+
+			"    gemini  — Gemini (Google)        npm i -g @google/gemini-cli\n"+
+			"    copilot — GitHub Copilot         npm i -g @github/copilot\n\n"+
 			"  Or reconfigure:  openexec init --force",
 			cliName, modelDisplay)
 	}
