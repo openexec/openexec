@@ -604,6 +604,10 @@ func readableRoots(request ToolRequest) []string {
 	return append(roots, request.WorkingDir)
 }
 
+// afterPinnedRootCheckHook runs between the pinned-root name check and the
+// descriptor operation. Nil outside tests, which use it to interleave a swap.
+var afterPinnedRootCheckHook func(path string)
+
 // withinRoots runs an operation against the first authorized root that
 // contains the path, and refuses when none does.
 //
@@ -642,13 +646,25 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 			}
 			continue
 		}
+		stillNamed := func() error { return pinnedRootStillNamed(root, path) }
 		if pinned {
-			if err := pinnedRootStillNamed(root, path); err != nil {
+			if err := stillNamed(); err != nil {
 				return "", err
 			}
 		}
+		if pinned && afterPinnedRootCheckHook != nil {
+			afterPinnedRootCheckHook(path)
+		}
 		output, err := run(root, relative)
-		if !pinned {
+		if pinned {
+			// The name check above and the descriptor operation are separate
+			// steps; a swap between them would otherwise be answered from the
+			// original directory. Re-prove the name after the operation and
+			// refuse, discarding whatever it produced.
+			if stillErr := stillNamed(); stillErr != nil {
+				return "", stillErr
+			}
+		} else {
 			_ = root.Close()
 		}
 		if err == nil {
