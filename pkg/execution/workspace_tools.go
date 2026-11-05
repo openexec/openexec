@@ -652,6 +652,17 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 				return "", err
 			}
 		}
+		// Reads bind the root's identity at the descriptor operation: the
+		// stamp taken with the name check must still hold afterwards, so a
+		// swap that is undone before the second name check is refused too.
+		// Writes change the root themselves and are covered by the name check.
+		var stamp int64
+		if pinned && action == "read" {
+			var stampErr error
+			if stamp, stampErr = pinnedRootChangeStamp(root); stampErr != nil {
+				return "", stampErr
+			}
+		}
 		if pinned && afterPinnedRootCheckHook != nil {
 			afterPinnedRootCheckHook(path)
 		}
@@ -663,6 +674,11 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 			// refuse, discarding whatever it produced.
 			if stillErr := stillNamed(); stillErr != nil {
 				return "", stillErr
+			}
+			if action == "read" {
+				if after, stampErr := pinnedRootChangeStamp(root); stampErr != nil || after != stamp {
+					return "", errors.New("the readable root changed after admission")
+				}
 			}
 		} else {
 			_ = root.Close()

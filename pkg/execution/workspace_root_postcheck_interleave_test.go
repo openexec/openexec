@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The root is swapped after the pinned-root name check passed and before the
@@ -77,6 +78,9 @@ func TestPinnedRootTransientSwapServesOnlyAdmittedDirectory(t *testing.T) {
 		if err := os.Remove(f.selected); err != nil {
 			t.Error(err)
 		}
+		// Filesystem change times have kernel-tick resolution; hold the swap
+		// open across one so the restore is observable to the stamp.
+		time.Sleep(50 * time.Millisecond)
 		if err := os.Rename(f.selected+"-old", f.selected); err != nil {
 			t.Error(err)
 		}
@@ -90,12 +94,37 @@ func TestPinnedRootTransientSwapServesOnlyAdmittedDirectory(t *testing.T) {
 	if calls == 0 {
 		t.Fatal("pinned boundary was never reached")
 	}
-	f.requireNoOutsideLeak(t, out)
-	if err != nil {
-		f.requireNoOutsideLeak(t, err.Error())
-		return
+	if err == nil {
+		t.Fatalf("transient swap-and-restore was served: out=%q", out)
 	}
-	if out != "authorized-needle" {
-		t.Fatalf("transient swap changed the answer: %q", out)
+	if out != "" {
+		t.Fatalf("refusal still produced output %q", out)
+	}
+	for _, leak := range []string{"authorized-needle", "outside-secret-needle", f.outside, f.selected + "-old"} {
+		if strings.Contains(out, leak) || strings.Contains(err.Error(), leak) {
+			t.Fatalf("refusal disclosed %q: out=%q err=%v", leak, out, err)
+		}
+	}
+}
+
+// Near miss: the same pinned read with no swap succeeds, including after
+// unrelated activity in the parent directory.
+func TestPinnedRootUnswappedReadSucceedsAfterSiblingActivity(t *testing.T) {
+	f := newIdentityFixture(t)
+	pinned, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, []ReadableRootIdentity{f.identity})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeRoots()
+	prev := afterPinnedRootCheckHook
+	t.Cleanup(func() { afterPinnedRootCheckHook = prev })
+	afterPinnedRootCheckHook = func(string) {
+		if err := os.WriteFile(f.selected+"-sibling", []byte("x"), 0600); err != nil {
+			t.Error(err)
+		}
+	}
+	out, err := f.call(t, pinned, "read_file")
+	if err != nil || out != "authorized-needle" {
+		t.Fatalf("unswapped read refused: out=%q err=%v", out, err)
 	}
 }
