@@ -202,12 +202,7 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	// For Claude, keep CommandName empty to use internal buildClaudeArgs defaults.
-	loopCmd := runnerCmd
-	loopArgs := runnerArgs
-	if strings.Contains(strings.ToLower(runnerCmd), "claude") {
-		loopCmd = ""
-		loopArgs = nil
-	}
+	loopCmd, loopArgs := loopRunner(modelUsed, projectRunnerCommand(cfg.ProjectsDir), runnerCmd, runnerArgs)
 
 	// CLI planning takes the reviewed, retained route: the configured runner
 	// generates the plan and, as a separate call, reviews it before import.
@@ -754,4 +749,25 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 		return nil
 	}
+}
+
+func projectRunnerCommand(dir string) string {
+	if pc, _ := project.LoadProjectConfig(dir); pc != nil {
+		return pc.Execution.RunnerCommand
+	}
+	return ""
+}
+
+// loopRunner returns the command the loop is pinned to. Claude and the
+// default Copilot route stay empty so the loop builds their own invocation
+// (prompt argument, environment scoping, plain-text parser); an explicit
+// runner override is always passed through.
+func loopRunner(model, override, cmd string, args []string) (string, []string) {
+	if override == "" && runner.IsCopilotModel(model) {
+		return "", nil
+	}
+	if strings.Contains(strings.ToLower(cmd), "claude") {
+		return "", nil
+	}
+	return cmd, args
 }

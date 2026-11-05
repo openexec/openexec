@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -493,8 +494,16 @@ func (p *cliLLMProvider) Complete(ctx context.Context, prompt string) (string, e
 		cmdArgs = []string{"--print"}
 	}
 
+	var stdin io.Reader = strings.NewReader(prompt)
+	if runner.IsCopilotModel(p.model) && os.Getenv("OPENEXEC_PLANNER_CLI") == "" {
+		// The Copilot CLI takes its prompt as -p <prompt>, not on stdin.
+		cmdArgs = append([]string{"-p", prompt}, cmdArgs...)
+		stdin = nil
+	}
 	c := exec.CommandContext(ctx, cliCmd, cmdArgs...)
-	c.Stdin = strings.NewReader(prompt)
+	if stdin != nil {
+		c.Stdin = stdin
+	}
 
 	output, err := c.CombinedOutput()
 	if err != nil {

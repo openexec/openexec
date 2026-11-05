@@ -131,68 +131,32 @@ func TestCopilotCLIRefusesClassicPAT(t *testing.T) {
 	}
 }
 
-func TestCopilotCLIAuthFailureSurfacesCLIMessage(t *testing.T) {
-	clearCopilotEnv(t)
-	t.Setenv("COPILOT_GITHUB_TOKEN", "gho_expired")
-	provider, dir := copilotFixture(t, `echo "Authentication failed: token expired, run /login" >&2; exit 1`)
-	var last Event
-	result, err := provider.Execute(context.Background(), Request{ID: "r", WorkingDir: dir, Prompt: "p", Sandbox: Sandbox{Mode: "read-only"}},
-		func(e Event) error { last = e; return nil })
-	if err == nil || !strings.Contains(err.Error(), "token expired") || result.Outcome != OutcomeFailed || last.Type != EventFailed {
-		t.Fatalf("result=%+v err=%v last=%+v", result, err, last)
-	}
-}
-
-// Refresh is delegated: with no token variable, the CLI uses its own stored
-// sign-in under COPILOT_HOME. The fixture models the CLI renewing an expired
-// session from its stored refresh credential; OpenExec must pass COPILOT_HOME
-// through, never touch the credential files, and report a successful result.
-const copilotStoredSignIn = `home="${COPILOT_HOME:?}"
-read -r state <"$home/session"
-if [ "$state" = "expired" ]; then
-  if [ -f "$home/refresh" ]; then echo fresh >"$home/session"; else
-    echo "Session expired and could not be refreshed; run /login" >&2; exit 1; fi
-fi
-echo ok`
-
-func TestCopilotCLIDelegatesRefreshToStoredSignIn(t *testing.T) {
+// Refresh and expiry belong to the external copilot CLI, and its wording is not
+// part of any contract this repository can cite, so nothing here claims it.
+// What OpenExec owns is the boundary: a nonzero exit becomes a failed outcome
+// carrying the CLI's own stderr verbatim, and COPILOT_HOME (the CLI's stored
+// sign-in location) is passed through untouched.
+func TestCopilotCLIFailurePropagatesStderrAndLeavesSignInToCLI(t *testing.T) {
 	clearCopilotEnv(t)
 	home := t.TempDir()
 	t.Setenv("COPILOT_HOME", home)
-	if err := os.WriteFile(filepath.Join(home, "session"), []byte("expired\n"), 0o600); err != nil {
-		t.Fatal(err)
+	provider, dir := copilotFixture(t, `printf '%s' "$COPILOT_HOME" >"$COPILOT_HOME/seen"; echo "cli-says-this-exact-text" >&2; exit 1`)
+	var last Event
+	result, err := provider.Execute(context.Background(), Request{ID: "r", WorkingDir: dir, Prompt: "p", Sandbox: Sandbox{Mode: "read-only"}},
+		func(e Event) error { last = e; return nil })
+	if err == nil || !strings.Contains(err.Error(), "cli-says-this-exact-text") || result.Outcome != OutcomeFailed || last.Type != EventFailed {
+		t.Fatalf("result=%+v err=%v last=%+v", result, err, last)
 	}
-	if err := os.WriteFile(filepath.Join(home, "refresh"), []byte("r"), 0o600); err != nil {
-		t.Fatal(err)
+	if got, _ := os.ReadFile(filepath.Join(home, "seen")); string(got) != home {
+		t.Fatalf("COPILOT_HOME not passed through: %q", got)
 	}
-	provider, dir := copilotFixture(t, copilotStoredSignIn)
-	result, err := provider.Execute(context.Background(), Request{ID: "r", WorkingDir: dir, Prompt: "p", Sandbox: Sandbox{Mode: "read-only"}}, nil)
-	if err != nil || result.Outcome != OutcomeSucceeded {
-		t.Fatalf("result=%+v err=%v", result, err)
-	}
-	if got, _ := os.ReadFile(filepath.Join(home, "session")); strings.TrimSpace(string(got)) != "fresh" {
-		t.Fatalf("session = %q: the CLI did not get to refresh its own sign-in", got)
+	entries, _ := os.ReadDir(home)
+	if len(entries) != 1 {
+		t.Fatalf("OpenExec wrote into the CLI's sign-in directory: %v", entries)
 	}
 	// The probe cannot see inside the CLI's sign-in: it must not claim ready.
 	if got := provider.Probe(context.Background(), dir); got.State != ReadinessUnknown {
 		t.Fatalf("readiness with stored sign-in only = %+v", got)
-	}
-}
-
-func TestCopilotCLIRefreshFailureReachesOpenExec(t *testing.T) {
-	clearCopilotEnv(t)
-	home := t.TempDir()
-	t.Setenv("COPILOT_HOME", home)
-	if err := os.WriteFile(filepath.Join(home, "session"), []byte("expired\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	provider, dir := copilotFixture(t, copilotStoredSignIn)
-	result, err := provider.Execute(context.Background(), Request{ID: "r", WorkingDir: dir, Prompt: "p", Sandbox: Sandbox{Mode: "read-only"}}, nil)
-	if err == nil || !strings.Contains(err.Error(), "run /login") || result.Outcome != OutcomeFailed {
-		t.Fatalf("result=%+v err=%v", result, err)
-	}
-	if got, _ := os.ReadFile(filepath.Join(home, "session")); strings.TrimSpace(string(got)) != "expired" {
-		t.Fatalf("OpenExec changed the CLI's credential state: %q", got)
 	}
 }
 

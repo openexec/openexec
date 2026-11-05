@@ -146,11 +146,13 @@ fallback to `claude`. The `pkg/agent` registry also registers `github-copilot`
 credential rules for API-style callers.
 
 Refresh and expiry are the CLI's: OpenExec never stores, reads or renews the
-Copilot credential. It passes `COPILOT_HOME` and the token variables through,
-so a stored sign-in is renewed by the CLI itself; if renewal fails or a token
-has expired, the CLI's own message (for example "run /login") becomes the
-failed outcome. Fixtures in `pkg/execution/agent_cli_copilot_test.go` cover
-both cases against the documented command line, not the CLI's real wording.
+Copilot credential and passes `COPILOT_HOME` and the token variables through.
+GitHub's documentation (linked above) exposes no refresh event and no expiry
+message that OpenExec could rely on, so this repository does not claim to test
+renewal or the CLI's expiry wording. What the tests prove is the OpenExec
+boundary: a nonzero exit becomes a failed outcome carrying the CLI's own stderr
+verbatim, and the `pkg/agent` adapter appends a hint to run `copilot` and
+`/login`.
 
 Not exercised: a real Copilot-entitled run. The tests use a fixture binary that
 follows the documented command line and token rules.
