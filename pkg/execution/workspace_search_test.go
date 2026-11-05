@@ -106,6 +106,20 @@ func workspaceSearchTriage(t *testing.T, executor ToolExecutor) {
 	if err != nil || result.Outcome != OutcomeSucceeded || !strings.Contains(evidence, "internal/store/blocked.go:1001:func (s *Store) SplitTask() {}") {
 		t.Fatalf("search-backed triage failed: outcome=%s evidence=%q err=%v", result.Outcome, evidence, err)
 	}
+	// Only the scan-reporting route marks a finished scan complete, so a guard
+	// that sends search_files around executeToolScan leaves this false.
+	_, wantComplete := executor.(scanReportingExecutor)
+	gotComplete := false
+	if len(adapter.requests) == 2 {
+		for _, m := range adapter.requests[1].Messages {
+			for _, b := range m.Content {
+				gotComplete = gotComplete || b.ScanComplete
+			}
+		}
+	}
+	if gotComplete != wantComplete {
+		t.Fatalf("search-backed triage failed: scan provenance complete=%v, want %v", gotComplete, wantComplete)
+	}
 	if len(adapter.requests) != 2 || !strings.Contains(fmt.Sprint(adapter.requests[1].Messages), "blocked.go:1001:") {
 		t.Fatal("search evidence did not reach the next native completion")
 	}
