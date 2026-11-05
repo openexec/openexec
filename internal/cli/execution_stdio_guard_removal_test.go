@@ -271,9 +271,10 @@ func TestLegacyReaderRefusesV4Request(t *testing.T) {
 		filepath.Join(root, cliPackage, "execution_stdio_test.go"):                   filepath.Join(legacy, "execution_stdio_test.go.txt"),
 		filepath.Join(root, cliPackage, "execution_stdio_root_identity_test.go"):     "",
 		filepath.Join(root, cliPackage, "execution_stdio_guard_removal_test.go"):     "",
+		filepath.Join(root, cliPackage, "execution_stdio_command_boundary_test.go"):  "",
 		filepath.Join(root, cliPackage, "execution_stdio_legacy_v4_refusal_test.go"): filepath.Join(legacy, "legacy_v4_refusal_test.go.txt"),
 	})
-	output, ok := nestedGoTest(t, root, overlay, cliPackage, []string{"TestLegacyRuntimeRefusesV4Request", "TestLegacyRuntimeStillServesV3"})
+	output, ok := nestedGoTest(t, root, overlay, cliPackage, []string{"TestLegacyRuntimeRefusesV4Request", "TestLegacyRuntimeCommandRefusesV4Request", "TestLegacyRuntimeStillServesV3"})
 	if !ok {
 		t.Fatalf("the legacy reader did not refuse the v4 request:\n%s", output)
 	}

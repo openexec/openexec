@@ -128,6 +128,17 @@ func TestPinnedReadableRootServesOriginalForReadListSearch(t *testing.T) {
 	}
 }
 
+// requireNoOutsideLeak fails when a refusal carries the outside file's bytes or
+// the outside directory's absolute path.
+func (f identityFixture) requireNoOutsideLeak(t *testing.T, text string) {
+	t.Helper()
+	for _, leak := range []string{"outside-secret-needle", f.outside} {
+		if strings.Contains(text, leak) {
+			t.Fatalf("refusal disclosed %q: %s", leak, text)
+		}
+	}
+}
+
 func TestPinReadableRootsRefusesBadIdentities(t *testing.T) {
 	f := newIdentityFixture(t)
 	wrongInode := f.identity
@@ -154,6 +165,7 @@ func TestPinReadableRootsRefusesBadIdentities(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err=%v want %q", err, tc.want)
 			}
+			f.requireNoOutsideLeak(t, err.Error())
 			if closeRoots != nil {
 				t.Fatal("close function returned alongside an error")
 			}
@@ -215,6 +227,7 @@ func TestPinReadableRootsRefusesWhenIdentityCannotBeComputed(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "changed since caller admission") || closeRoots != nil {
 		t.Fatalf("zero identity admitted when identity is uncomputable: err=%v", err)
 	}
+	f.requireNoOutsideLeak(t, err.Error())
 }
 
 // A directory swapped in between resolving the name and opening it is not the

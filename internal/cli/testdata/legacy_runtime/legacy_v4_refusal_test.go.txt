@@ -55,3 +55,21 @@ func TestLegacyRuntimeStillServesV3(t *testing.T) {
 		t.Fatalf("output = %s", output.String())
 	}
 }
+
+// The same refusal, reached through the real execution-stdio command the
+// connecting caller launches, not the reader function called directly.
+func TestLegacyRuntimeCommandRefusesV4Request(t *testing.T) {
+	request := `{"version":4,"operation":"execute","request":{"ID":"c","WorkingDir":"/synthetic/work","Prompt":"x","Sandbox":{"Mode":"read-only"},"ReadableRoots":["/synthetic/root"],"ReadableRootIdentities":[{"path":"/synthetic/root","device":1,"inode":2}]}}`
+	var out bytes.Buffer
+	executionStdioCmd.SetIn(strings.NewReader(request))
+	executionStdioCmd.SetOut(&out)
+	executionStdioCmd.SetContext(context.Background())
+	defer func() { executionStdioCmd.SetIn(nil); executionStdioCmd.SetOut(nil) }()
+	err := executionStdioCmd.RunE(executionStdioCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "unsupported execution protocol version 4") {
+		t.Fatalf("legacy command did not refuse v4: %v", err)
+	}
+	if strings.Contains(err.Error(), "synthetic") || strings.Contains(err.Error(), "inode") || out.Len() != 0 {
+		t.Fatalf("refusal echoes request content: err=%v out=%q", err, out.String())
+	}
+}
