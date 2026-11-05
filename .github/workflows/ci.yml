@@ -1,10 +1,37 @@
 name: CI
 
+# Hosted-minutes policy (see the PR that introduced it): the free GitHub
+# Actions quota is 2000 minutes a month and a macOS minute bills ten. The
+# macOS leg therefore never runs on pull requests: it runs after a push to
+# main, on a weekly schedule and on release tags, and only once the Linux leg
+# is green. Repo variables:
+#   OPENEXEC_LINUX_RUNNER  runner for the Linux leg (default ubuntu-latest)
+#   OPENEXEC_MACOS_RUNNER  runner for the macOS leg (default macos-latest);
+#                          the value `none` skips the leg.
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+  schedule:
+    - cron: '17 4 * * 1'
+
+# A newer push to the same pull request supersedes the older run. Pushes to
+# main, tags and the schedule are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # GitHub forces JS actions onto Node 24 on 2026-06-16; opt in now so any
 # breakage (golangci-lint-action@v8 still declares Node 20) surfaces while
@@ -14,63 +41,32 @@ env:
 
 jobs:
   build:
-    # The Linux leg's runner comes from the repo variable OPENEXEC_LINUX_RUNNER
-    # (e.g. namespace-profile-openexec); unset or deleted means ubuntu-latest.
-    # The matrix keeps the stable os name so check names do not change.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (vars.OPENEXEC_LINUX_RUNNER || 'ubuntu-latest') || matrix.os }}
+    # The check name stays `build (ubuntu-latest, 1.25)` whatever runner the
+    # variable selects.
+    runs-on: ${{ vars.OPENEXEC_LINUX_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: true
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         go-version: ['1.25']
-
     steps:
     - uses: actions/checkout@v5
-
-    - name: Set up Go
-      uses: actions/setup-go@v6
+    - uses: ./.github/actions/build-test
       with:
         go-version: ${{ matrix.go-version }}
-        cache: true
 
-    - name: Set up Node
-      uses: actions/setup-node@v5
+  # The job name is fixed to the old matrix check name so anything that
+  # resolves `build (macos-latest, 1.25)` still finds it. When the leg is not
+  # wanted it is reported as skipped, which satisfies a required check.
+  build-macos:
+    name: build (macos-latest, 1.25)
+    needs: build
+    if: github.event_name != 'pull_request' && (vars.OPENEXEC_MACOS_RUNNER || 'macos-latest') != 'none'
+    runs-on: ${{ vars.OPENEXEC_MACOS_RUNNER || 'macos-latest' }}
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v5
+    - uses: ./.github/actions/build-test
       with:
-        node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: ui/package-lock.json
-
-    # Release-style builds explicitly embed the generated UI. Ordinary module
-    # consumers use the tracked fallback and do not need Node artifacts.
-    - name: Build UI (embedded in binary)
-      run: npm ci && npm run build
-      working-directory: ui
-
-    - name: Test UI
-      run: npx vitest run --fileParallelism=false
-      working-directory: ui
-
-    - name: Install dependencies
-      run: go mod download
-
-    - name: Build
-      run: go build -tags ui_dist -v -o bin/openexec ./cmd/openexec
-
-    - name: Test
-      run: go test -v ./...
-
-    - name: Workspace search guard removals
-      run: python3 scripts/verify-workspace-search.py
-
-    - name: Compatibility Regression
-      run: make compat-test
-
-    # Advisory until the pre-existing backlog is cleared: golangci-lint
-    # reports 142 historical issues (errcheck/unused/staticcheck) that
-    # predate the lint gate ever running (CI previously failed at Build,
-    # so this step never executed). New code must keep
-    # `golangci-lint run` clean locally; do not add to the backlog.
-    - name: Lint
-      uses: golangci/golangci-lint-action@v8
-      continue-on-error: true
-      with:
-        version: latest
+        go-version: '1.25'
