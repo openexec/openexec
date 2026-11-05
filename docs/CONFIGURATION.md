@@ -138,7 +138,12 @@ model to the `copilot` binary and the loop runs
 `copilot -p <prompt> -s --no-ask-user [--model m] [--allow-tool=write]`,
 with OpenAI/Anthropic/Codex/Gemini keys removed from its environment and a
 classic `ghp_` token refused before it starts. `openexec doctor` prints the
-sign-in hint when the runner is a `copilot` binary.
+sign-in hint when the runner is a `copilot` binary. `-s` prints the answer as
+plain text, so the loop reads Copilot output with a plain-text parser (each line
+is an assistant message); a missing `copilot` binary is an error, never a
+fallback to `claude`. The `pkg/agent` registry also registers `github-copilot`
+(models `copilot` and `copilot:<model>`), which runs the same CLI with the same
+credential rules for API-style callers.
 
 Refresh and expiry are the CLI's: OpenExec never stores, reads or renews the
 Copilot credential. It passes `COPILOT_HOME` and the token variables through,

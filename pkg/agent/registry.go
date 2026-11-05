@@ -156,6 +156,9 @@ func (r *ProviderRegistry) GetForModel(modelID string) (ProviderAdapter, error) 
 					return provider, nil
 				}
 			}
+			if s, ok := provider.(interface{ SupportsModel(string) bool }); ok && s.SupportsModel(modelID) {
+				return provider, nil
+			}
 		}
 
 		return nil, &ProviderError{
@@ -375,6 +378,11 @@ func RegisterDefaultFactories(registry *ProviderRegistry) {
 	// Gemini factory
 	registry.RegisterFactory(ProviderGemini, func() (ProviderAdapter, error) {
 		return NewGeminiProviderFromEnv()
+	})
+
+	// GitHub Copilot factory (runs the copilot CLI; never uses OpenAI keys)
+	registry.RegisterFactory(ProviderGitHubCopilot, func() (ProviderAdapter, error) {
+		return NewGitHubCopilotProvider()
 	})
 
 	// AgenticsNZ factory

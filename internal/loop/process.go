@@ -32,6 +32,12 @@ type Process struct {
 // Optional writers can be provided to tee stdout and stderr.
 // Middleware wraps stdin/stdout/stderr for Deep-Trace interception if provided.
 func StartProcess(ctx context.Context, cfg Config, stdoutW, stderrW io.Writer, m Middleware) (*Process, error) {
+	if usesCopilotCLI(cfg) {
+		// A missing copilot binary must surface, never fall back to claude.
+		if _, _, err := runner.Resolve(cfg.ExecutorModel, cfg.RunnerCommand, cfg.RunnerArgs); err != nil {
+			return nil, err
+		}
+	}
 	name, args := buildCommand(cfg)
 	// name is either "claude" or a test-controlled override
 	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
@@ -197,6 +203,11 @@ var disabledTools = []string{
 	"EnterPlanMode",
 	"ExitPlanMode",
 	"AskUserQuestion",
+}
+
+// usesCopilotCLI reports whether the loop will spawn the default copilot CLI.
+func usesCopilotCLI(cfg Config) bool {
+	return cfg.CommandName == "" && cfg.RunnerCommand == "" && runner.IsCopilotModel(cfg.ExecutorModel)
 }
 
 func buildCommand(cfg Config) (string, []string) {

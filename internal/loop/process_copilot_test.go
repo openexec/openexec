@@ -93,3 +93,52 @@ func TestStartProcessCopilotRefusesClassicPAT(t *testing.T) {
 		t.Fatal("copilot started with a classic PAT")
 	}
 }
+
+// The init-selected model drives the real Loop: plain `-s` output must become
+// assistant text events instead of being dropped by the stream-json parser.
+func TestLoopRunCopilotPlainTextReachesEvents(t *testing.T) {
+	fakeCopilotOnPath(t)
+	t.Setenv("COPILOT_GITHUB_TOKEN", "gho_fixture")
+	l, events := New(Config{ExecutorModel: "copilot", ExecMode: "read-only", Prompt: "hi", WorkDir: t.TempDir()})
+	if err := l.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var texts []string
+	for e := range events {
+		if e.Type == EventAssistantText {
+			texts = append(texts, e.Text)
+		}
+	}
+	if len(texts) != 1 || texts[0] != "done" {
+		t.Fatalf("assistant texts = %q, want [done]", texts)
+	}
+}
+
+// Near miss: the stream-json parser (every other CLI) still skips plain text.
+func TestDefaultParserStillSkipsPlainText(t *testing.T) {
+	ch := make(chan Event, 4)
+	if err := NewParser(ch, 1).Parse(strings.NewReader("done\n")); err != nil {
+		t.Fatal(err)
+	}
+	close(ch)
+	for e := range ch {
+		t.Fatalf("unexpected event %+v", e)
+	}
+}
+
+// A missing copilot binary is reported as such, never replaced by claude.
+func TestStartProcessCopilotMissingBinaryDoesNotFallBackToClaude(t *testing.T) {
+	dir := t.TempDir()
+	// A claude on PATH would be the fallback target.
+	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte("#!/bin/sh\necho claude-ran >"+dir+"/ran\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	_, err := StartProcess(context.Background(), Config{ExecutorModel: "copilot", Prompt: "hi", WorkDir: t.TempDir()}, nil, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "copilot") {
+		t.Fatalf("err = %v, want copilot-not-found", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, "ran")); statErr == nil {
+		t.Fatal("fell back to claude")
+	}
+}
