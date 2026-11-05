@@ -57,13 +57,17 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
-        cache: true
+        # Actions storage is a 500 MB allowance and it ran out (11-05). The Go cache is 330 MB per
+        # OS, so it is not kept in GitHub storage at all. (A Namespace cache volume would carry it
+        # for the Namespace Linux leg: nscloud-cache-action, a follow-up.) The npm cache is 61 MB
+        # and only a push to main writes it, one key per lockfile hash.
+        cache: false
 
     - name: Set up Node
       uses: actions/setup-node@v5
       with:
         node-version: '22'
-        cache: 'npm'
+        cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'npm' || '' }}
         cache-dependency-path: ui/package-lock.json
 
     # Release-style builds explicitly embed the generated UI. Ordinary module
@@ -101,6 +105,7 @@ jobs:
       continue-on-error: true
       with:
         version: latest
+        skip-save-cache: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
   # Steps live in .github/actions/build-test, a copy of `build`'s steps (the
   # validation test needs those inline in `build`): change both together.

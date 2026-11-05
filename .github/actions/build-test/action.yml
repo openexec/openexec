@@ -11,14 +11,14 @@ runs:
       uses: actions/setup-go@v6
       with:
         go-version: ${{ inputs.go-version }}
-        cache: true
+        # never cached: the macOS Go cache alone was 351 MB of the 500 MB Actions storage allowance
+        cache: false
 
     - name: Set up Node
       uses: actions/setup-node@v5
       with:
         node-version: '22'
-        cache: 'npm'
-        cache-dependency-path: ui/package-lock.json
+        cache: ''
 
     # Release-style builds explicitly embed the generated UI. Ordinary module
     # consumers use the tracked fallback and do not need Node artifacts.
@@ -62,3 +62,4 @@ runs:
       continue-on-error: true
       with:
         version: latest
+        skip-cache: true
