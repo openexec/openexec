@@ -83,11 +83,34 @@ func TestOmissionEligibilityRequiresPairingNoErrorAndSize(t *testing.T) {
 	if _, changed := (priorResults{}).compact(r); changed {
 		t.Fatal("short listing was omitted")
 	}
-	r = structuralRequest([3]string{"list_directory", big}, [3]string{"list_directory", big + "x"})
+	// A result with no call: without provenance, and with provenance claiming
+	// its exact position and text. Both must leave the request byte-identical
+	// and must not panic; a panic is captured here so that it reports through
+	// this assertion instead of ending the test binary.
+	newest := big + "x"
+	r = structuralRequest([3]string{"list_directory", big}, [3]string{"list_directory", newest})
 	r.Messages[2].Content[0].ToolResultID = "orphan"
-	if _, changed := (priorResults{}).compact(r); changed {
-		t.Fatal("unpaired result was omitted")
+	before, _ := json.Marshal(r)
+	for _, c := range []struct {
+		name  string
+		scans map[[2]int]string
+	}{
+		{"no provenance", nil},
+		{"provenance at its position", recordFor(map[int]string{2: big, 4: newest})},
+	} {
+		compacted, changed, panicked := compactCapturingPanic(r, c.scans)
+		after, _ := json.Marshal(compacted)
+		if panicked != nil || changed || string(before) != string(after) {
+			t.Errorf("unpaired result must be preserved without panic (%s): recovered=%v changed=%v", c.name, panicked, changed)
+		}
 	}
+}
+
+// compactCapturingPanic is the test boundary for a missing call/result pairing.
+func compactCapturingPanic(r agent.Request, scans map[[2]int]string) (out agent.Request, changed bool, panicked any) {
+	defer func() { panicked = recover() }()
+	out, changed = (priorResults{}).compactWith(r, scans)
+	return out, changed, nil
 }
 
 // The executor-level fact: a forwarded (non-workspace) list_directory is
