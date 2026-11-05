@@ -73,3 +73,40 @@ func TestNoProcSwapPlusSymlinkDoesNotBlessProtectedTarget(t *testing.T) {
 		}
 	}
 }
+
+// Without /proc the opened file must still be the object the root names: a
+// plain file swapped for another after open is refused, and an unchanged one
+// is accepted (near miss).
+func TestNoProcRefusesFileReplacedAfterOpen(t *testing.T) {
+	prev := descriptorPath
+	t.Cleanup(func() { descriptorPath = prev })
+	descriptorPath = func(*os.File) (string, bool) { return "", false }
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "note"), []byte("original"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	file, err := root.Open("note")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	if err := refuseDeniedOpenedTarget(root, file, "note", "note"); err != nil {
+		t.Fatalf("unchanged plain file refused: %v", err)
+	}
+	if err := os.Remove(filepath.Join(dir, "note")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "note"), []byte("replacement"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	err = refuseDeniedOpenedTarget(root, file, "note", "note")
+	if err == nil || strings.Contains(err.Error(), dir) {
+		t.Fatalf("replaced file served or error leaks path: %v", err)
+	}
+}

@@ -103,13 +103,25 @@ func TestPinnedReadableRootServesOriginalForReadListSearch(t *testing.T) {
 				}
 				f.swapToOutside(t)
 				after, err := f.call(t, pinned, tool)
-				if strings.Contains(after, "outside-secret") {
-					t.Fatalf("%s disclosed outside data after swap: %q", tool, after)
+				// The refusal or the output must carry neither the outside bytes
+				// nor the outside path.
+				text := after
+				if err != nil {
+					text += err.Error()
 				}
-				// Either the original directory is served or the call is refused
-				// (the post-open path verification sees the swap); never other data.
+				for _, leak := range []string{"outside-secret", f.outside} {
+					if strings.Contains(text, leak) {
+						t.Fatalf("%s disclosed %q after swap: out=%q err=%v", tool, leak, after, err)
+					}
+				}
+				// The pinned descriptor serves the original; it never answers
+				// with different data. A refusal is the other safe outcome and
+				// is only permitted to be an error, not a changed success.
 				if err == nil && after != before {
 					t.Fatalf("pinned %s changed after swap: %q want %q", tool, after, before)
+				}
+				if err != nil && after != "" {
+					t.Fatalf("pinned %s refused after swap but still produced output %q", tool, after)
 				}
 			})
 		}

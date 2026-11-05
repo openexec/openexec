@@ -440,26 +440,58 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 // but cannot see `notes -> .openexec/config.json`.
 //
 // Linux exposes the stable target of an open descriptor through /proc. If proc
-// is unavailable, and on other platforms, the check falls back to resolving
-// the name. That fallback is best-effort for the denied-subtree decision;
-// os.Root still owns containment of the actual operation.
+// is unavailable, and on other platforms, the check never resolves a pathname:
+// it walks the relative path through the root descriptor and fails closed on
+// any symlink.
 func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument string) error {
+	resolved, ok := descriptorPath(file)
+	if !ok {
+		return refuseDeniedOpenedTargetWithoutProc(root, file, relative, argument)
+	}
 	resolvedRoot, err := resolveRootDescriptor(root)
 	if err != nil {
 		return fmt.Errorf("verify workspace root for %q: %w", argument, err)
-	}
-	resolved, ok := descriptorPath(file)
-	if !ok {
-		resolved, err = filepath.EvalSymlinks(filepath.Join(root.Name(), relative))
-	}
-	if err != nil {
-		return fmt.Errorf("verify opened path %q: %w", argument, err)
 	}
 	policyPath, err := filepath.Rel(resolvedRoot, resolved)
 	if err != nil || policyPath == ".." || strings.HasPrefix(policyPath, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("verify opened path %q: resolved target is outside the workspace root", argument)
 	}
 	if component, denied := deniedComponent(policyPath); denied {
+		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
+			argument, component)
+	}
+	return nil
+}
+
+// refuseDeniedOpenedTargetWithoutProc is the check for a platform that cannot
+// name an open descriptor. Every step goes through the root descriptor, so a
+// swap of the root's path cannot change the answer. Any symlink on the way
+// fails closed, because without a kernel name the target of a link cannot be
+// judged from the descriptor alone. For a path of plain components the opened
+// file must also be the object the root still names, which catches a link
+// replaced between open and check.
+func refuseDeniedOpenedTargetWithoutProc(root *os.Root, file *os.File, relative, argument string) error {
+	cleaned := filepath.Clean(relative)
+	if filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("verify opened path %q: resolved target is outside the workspace root", argument)
+	}
+	prefix := ""
+	for _, component := range strings.Split(cleaned, string(filepath.Separator)) {
+		prefix = filepath.Join(prefix, component)
+		info, err := root.Lstat(prefix)
+		if err != nil {
+			return fmt.Errorf("verify opened path %q: %w", argument, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("verify opened path %q: cannot verify the target of a symbolic link on this platform", argument)
+		}
+	}
+	fileInfo, fileErr := file.Stat()
+	rootInfo, rootErr := root.Stat(cleaned)
+	if fileErr != nil || rootErr != nil || !os.SameFile(fileInfo, rootInfo) {
+		return fmt.Errorf("verify opened path %q: the path changed while it was being opened", argument)
+	}
+	if component, denied := deniedComponent(cleaned); denied {
 		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
 			argument, component)
 	}
