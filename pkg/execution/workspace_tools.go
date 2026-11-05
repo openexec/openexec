@@ -448,12 +448,8 @@ func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument s
 	if err != nil {
 		return fmt.Errorf("verify workspace root for %q: %w", argument, err)
 	}
-	resolved := ""
-	if runtime.GOOS == "linux" {
-		resolved, err = os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(file.Fd()), 10)))
-		resolved = strings.TrimSuffix(resolved, " (deleted)")
-	}
-	if resolved == "" || err != nil {
+	resolved, ok := descriptorPath(file)
+	if !ok {
 		resolved, err = filepath.EvalSymlinks(filepath.Join(root.Name(), relative))
 	}
 	if err != nil {
@@ -474,18 +470,41 @@ func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument s
 // the root's path names now. For a pinned root the two differ once the checkout
 // is swapped; comparing a file opened beneath the descriptor with the path's
 // current target would refuse the original or, worse, bless the replacement.
-// Without /proc the name is all there is.
+// Without a descriptor name the path is all there is, so it is accepted only
+// while it still names the very directory the descriptor holds; otherwise the
+// check fails closed instead of judging the original by the replacement.
 func resolveRootDescriptor(root *os.Root) (string, error) {
-	if runtime.GOOS == "linux" {
-		if directory, err := root.Open("."); err == nil {
-			defer directory.Close()
-			target, err := os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(directory.Fd()), 10)))
-			if err == nil && filepath.IsAbs(target) {
-				return strings.TrimSuffix(target, " (deleted)"), nil
-			}
+	if directory, err := root.Open("."); err == nil {
+		defer directory.Close()
+		if target, ok := descriptorPath(directory); ok {
+			return target, nil
 		}
 	}
-	return filepath.EvalSymlinks(root.Name())
+	resolved, err := filepath.EvalSymlinks(root.Name())
+	if err != nil {
+		return "", err
+	}
+	held, heldErr := root.Stat(".")
+	named, namedErr := os.Stat(resolved)
+	if heldErr != nil || namedErr != nil || !os.SameFile(held, named) {
+		return "", errors.New("workspace root no longer names the directory held open")
+	}
+	return resolved, nil
+}
+
+// descriptorPath is the kernel's name for an open descriptor. It is a variable
+// so tests can drive a platform without /proc (macOS, restricted containers).
+var descriptorPath = procDescriptorPath
+
+func procDescriptorPath(file *os.File) (string, bool) {
+	if runtime.GOOS != "linux" {
+		return "", false
+	}
+	target, err := os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(file.Fd()), 10)))
+	if err != nil || !filepath.IsAbs(target) {
+		return "", false
+	}
+	return strings.TrimSuffix(target, " (deleted)"), true
 }
 
 // refuseDeniedProspectiveTarget resolves every existing prefix, then appends
