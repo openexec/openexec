@@ -51,6 +51,9 @@ type Request struct {
 	// already tells the agent it can, so a contract that drops these turns
 	// that statement into a false one.
 	ReadableRoots []string
+	// ReadableRootIdentities binds each readable root to the directory the
+	// caller opened before dispatch. When supplied, every root must match.
+	ReadableRootIdentities []ReadableRootIdentity
 	// System is the standing context for this turn: who the agent is, what it
 	// may touch, what the project is for. Sent whole every turn for providers
 	// replayed from the console, because a replayed conversation has no memory
@@ -89,6 +92,15 @@ type Request struct {
 	// NetworkAccess and NativeSessionID keep their meaning.
 	NetworkAccess   bool
 	NativeSessionID string
+}
+
+// ReadableRootIdentity is a caller-observed filesystem identity, not a path
+// supplied by the model. Version 4 of execution-stdio requires these for all
+// extra readable roots; older protocols cannot express this boundary.
+type ReadableRootIdentity struct {
+	Path   string `json:"path"`
+	Device uint64 `json:"device"`
+	Inode  uint64 `json:"inode"`
 }
 
 // HistoryMessage is one prior turn, replayed.
