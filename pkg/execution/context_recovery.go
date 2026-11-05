@@ -51,25 +51,18 @@ func sha256Hex(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// compact is the view of a run whose executor vouches for its listings and
-// has no scan provenance. The adapter always calls compactWith.
-func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
-	return p.compactWith(r, nil, true)
-}
-
-// compactWith omits only results eligible by structure: a listing from an
-// executor that vouches for its listings (listingsTrusted, a run-level fact),
-// or a search whose scan reported complete for this exact message position and
-// text (completeScans). Pairing and error facts apply to both. No branch reads
-// a filename or output text; an unmarked search is never eligible.
-func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string, listingsTrusted bool) (agent.Request, bool) {
+// compactWith omits only results eligible by structure: a paired, successful
+// list_directory or search_files call whose result position and text hash are
+// in completeScans, which the executor path fills only from the scan itself.
+// No branch reads a filename or output text; an unmarked result is never
+// eligible.
+func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string) (agent.Request, bool) {
 	copyRequest := r
 	copyRequest.Messages = append([]agent.Message(nil), r.Messages...)
-	// Only a known workspace directory listing or a scan-proven complete search
-	// is omittable. File reads and unknown tools can contain governing instructions.
+	// File reads and unknown tools can contain governing instructions.
 	pending := map[string][]string{}
 	ambiguous := map[string]bool{}
-	eligible := map[[2]int]bool{}
+	labels := map[[2]int]string{}
 	for i, message := range r.Messages {
 		for j, block := range message.Content {
 			switch block.Type {
@@ -82,8 +75,15 @@ func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]stri
 				calls := pending[block.ToolResultID]
 				if len(calls) > 0 {
 					position := [2]int{i, j}
-					known := (calls[0] == "list_directory" && listingsTrusted) || (calls[0] == "search_files" && completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput))
-					eligible[position] = !ambiguous[block.ToolResultID] && known
+					complete := completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput)
+					if complete && !ambiguous[block.ToolResultID] {
+						switch calls[0] {
+						case "list_directory":
+							labels[position] = "directory listing"
+						case "search_files":
+							labels[position] = "complete search result"
+						}
+					}
 					pending[block.ToolResultID] = calls[1:]
 					if len(calls) == 1 {
 						delete(ambiguous, block.ToolResultID)
@@ -97,7 +97,7 @@ func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]stri
 		copyRequest.Messages[i].Content = append([]agent.ContentBlock(nil), r.Messages[i].Content...)
 		for j := len(r.Messages[i].Content) - 1; j >= 0; j-- {
 			b := &copyRequest.Messages[i].Content[j]
-			if b.Type != agent.ContentTypeToolResult || !eligible[[2]int{i, j}] || b.ToolError != "" || len(b.ToolOutput) < 256 {
+			if b.Type != agent.ContentTypeToolResult || labels[[2]int{i, j}] == "" || b.ToolError != "" || len(b.ToolOutput) < 256 {
 				continue
 			}
 			kept++
@@ -106,10 +106,7 @@ func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]stri
 			}
 			id := sha256Hex(b.ToolOutput)
 			p[id] = b.ToolOutput
-			label := "directory listing"
-			if scans := completeScans[[2]int{i, j}]; scans != "" {
-				label = "complete search result"
-			}
+			label := labels[[2]int{i, j}]
 			b.ToolOutput = fmt.Sprintf("Prior %s retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", label, id, len(b.ToolOutput), recallTool)
 			changed = true
 		}

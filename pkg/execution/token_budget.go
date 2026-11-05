@@ -30,12 +30,25 @@ type boundedAPIAdapter struct {
 	nonThinking             bool
 	prior                   priorResults
 	trustedDirectoryResults bool
-	completeScans           map[[2]int]string // result position -> sha256 of its text, set only from scan provenance
+	completeScans           map[[2]int]string // result position -> sha256 of its text, set only from the executing scan or successful listing
 }
 
 // searchProvenanceExecutor reports completeness from the scan itself.
 type searchProvenanceExecutor interface {
 	executeSearchWithProvenance(context.Context, ToolRequest) (string, bool, error)
+}
+
+// recordProvenance marks a result complete only from facts of its execution: a
+// search whose scan ended complete, or a successful listing from an executor
+// that vouches for listings (ReadDir(-1) returns every entry or errors).
+// A failed or unmarked result records nothing.
+func (p *boundedAPIAdapter) recordProvenance(tool string, message int, output string, scanComplete bool, toolErr error) {
+	if toolErr != nil {
+		return
+	}
+	if (tool == "search_files" && scanComplete) || (tool == "list_directory" && p.trustedDirectoryResults) {
+		p.recordCompleteScan(message, output)
+	}
 }
 
 func (p *boundedAPIAdapter) recordCompleteScan(message int, output string) {
@@ -133,7 +146,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 		return res, err
 	}
 	if p.prior != nil {
-		if compacted, changed := p.prior.compactWith(r, p.completeScans, p.trustedDirectoryResults); changed && r.ToolChoice != "none" {
+		if compacted, changed := p.prior.compactWith(r, p.completeScans); changed && r.ToolChoice != "none" {
 			r = compacted
 		} else {
 			r.Tools = append(append([]agent.ToolDefinition(nil), r.Tools...), recallDefinition())
@@ -157,7 +170,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 			}
 			if !collision {
 				prior := priorResults{}
-				if compacted, changed := prior.compactWith(r, p.completeScans, p.trustedDirectoryResults); changed {
+				if compacted, changed := prior.compactWith(r, p.completeScans); changed {
 					res, err = prepare(compacted)
 					if err == nil {
 						p.prior = prior

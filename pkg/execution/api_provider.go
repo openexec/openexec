@@ -542,8 +542,8 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			}
 			// The scan's own completeness, bound to this result's position and
 			// exact text. Nothing is recorded for a failed or unmarked result.
-			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok && scanComplete && toolErr == nil {
-				meter.recordCompleteScan(len(messages), output)
+			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok {
+				meter.recordProvenance(call.ToolName, len(messages), output, scanComplete, toolErr)
 			}
 			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr))
 		}
