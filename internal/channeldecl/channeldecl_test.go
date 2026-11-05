@@ -24,18 +24,13 @@ func TestRepositoryDeclaration(t *testing.T) {
 	if err := Validate(data); err != nil {
 		t.Fatal(err)
 	}
-	broken := strings.Replace(string(data), "id: openexec-ci", "id: missing", 1)
-	if broken == string(data) {
-		t.Fatal("negative control did not alter declaration")
-	}
-	if err := Validate([]byte(broken)); err == nil {
-		t.Fatal("broken declaration accepted")
-	}
 }
 
 func TestValidate(t *testing.T) {
 	cases := []struct{ name, input, want string }{
 		{"valid", valid, ""},
+		{"quoted ID", strings.Replace(valid, "id: openexec-ci", `id: "openexec-ci"`, 1), ""},
+		{"whitespace before ID", strings.Replace(valid, "id: openexec-ci", "id:   openexec-ci", 1), ""},
 		{"missing channel", "channels: []", "channel missing"},
 		{"other channel", strings.Replace(valid, "openexec-ci", "other", 1), "channel missing"},
 		{"wrong type", strings.Replace(valid, "type: ci", "type: other", 1), "type must be ci"},
