@@ -46,11 +46,21 @@ const recallTool = "recall_prior_tool_result"
 // original messages remain intact; only the provider's request is compacted.
 type priorResults map[string]string
 
-func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+func (p priorResults) compact(r agent.Request) (agent.Request, bool) { return p.compactWith(r, nil) }
+
+// compactWith omits only results eligible by structure: a listing tool, or a
+// search whose scan reported complete for this exact message position and
+// text (completeScans). Pairing and error facts apply to both.
+func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string) (agent.Request, bool) {
 	copyRequest := r
 	copyRequest.Messages = append([]agent.Message(nil), r.Messages...)
-	// Only a known workspace directory listing contains names alone. File
-	// reads, searches and unknown tools can contain governing instructions.
+	// Only a known workspace directory listing or a scan-proven complete search
+	// is omittable. File reads and unknown tools can contain governing instructions.
 	pending := map[string][]string{}
 	ambiguous := map[string]bool{}
 	eligible := map[[2]int]bool{}
@@ -65,7 +75,9 @@ func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
 			case agent.ContentTypeToolResult:
 				calls := pending[block.ToolResultID]
 				if len(calls) > 0 {
-					eligible[[2]int{i, j}] = !ambiguous[block.ToolResultID] && calls[0] == "list_directory"
+					position := [2]int{i, j}
+					known := calls[0] == "list_directory" || (calls[0] == "search_files" && completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput))
+					eligible[position] = !ambiguous[block.ToolResultID] && known
 					pending[block.ToolResultID] = calls[1:]
 					if len(calls) == 1 {
 						delete(ambiguous, block.ToolResultID)
@@ -86,10 +98,13 @@ func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
 			if kept <= 1 {
 				continue
 			}
-			hash := sha256.Sum256([]byte(b.ToolOutput))
-			id := hex.EncodeToString(hash[:])
+			id := sha256Hex(b.ToolOutput)
 			p[id] = b.ToolOutput
-			b.ToolOutput = fmt.Sprintf("Prior directory listing retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", id, len(b.ToolOutput), recallTool)
+			label := "directory listing"
+			if scans := completeScans[[2]int{i, j}]; scans != "" {
+				label = "complete search result"
+			}
+			b.ToolOutput = fmt.Sprintf("Prior %s retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", label, id, len(b.ToolOutput), recallTool)
 			changed = true
 		}
 	}

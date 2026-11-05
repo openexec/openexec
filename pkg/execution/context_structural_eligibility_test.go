@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,5 +98,112 @@ func TestForwardedListingIsNotTrustedForOmission(t *testing.T) {
 	}
 	if (&CompositeToolExecutor{workspace: workspace, forwarded: map[string]bool{"list_directory": true}}).safelyListsDirectories() {
 		t.Fatal("forwarded listing was trusted")
+	}
+}
+
+func provenRequest(tool string) (agent.Request, string, string) {
+	old := "older " + strings.Repeat("evidence ", 60)
+	newest := "newest " + strings.Repeat("evidence ", 60)
+	return structuralRequest([3]string{tool, old}, [3]string{tool, newest}), old, newest
+}
+
+func recordFor(positions map[int]string) map[[2]int]string {
+	out := map[[2]int]string{}
+	for message, text := range positions {
+		out[[2]int{message, 0}] = sha256Hex(text)
+	}
+	return out
+}
+
+// A search is omittable only when scan provenance names its exact position and
+// text. Every other combination keeps the request byte-identical.
+func TestSearchOmissionRequiresPositionBoundScanProvenance(t *testing.T) {
+	r, old, newest := provenRequest("search_files")
+	unchanged := func(name string, request agent.Request, scans map[[2]int]string) {
+		t.Helper()
+		before, _ := json.Marshal(request)
+		compacted, changed := (priorResults{}).compactWith(request, scans)
+		after, _ := json.Marshal(compacted)
+		if changed || string(before) != string(after) {
+			t.Fatalf("%s: result was omitted or request altered", name)
+		}
+	}
+	proof := recordFor(map[int]string{2: old, 4: newest})
+
+	compacted, changed := (priorResults{}).compactWith(r, proof)
+	if !changed || compacted.Messages[2].Content[0].ToolOutput == old || compacted.Messages[4].Content[0].ToolOutput != newest {
+		t.Fatal("complete scans with provenance: older omitted, newest kept")
+	}
+	if !strings.Contains(compacted.Messages[2].Content[0].ToolOutput, "complete search result") {
+		t.Fatal("stub should name a search result")
+	}
+
+	unchanged("no provenance", r, nil)
+	unchanged("empty provenance", r, map[[2]int]string{})
+	unchanged("wrong position", r, recordFor(map[int]string{1: old, 3: newest}))
+	unchanged("different text at the position", r, recordFor(map[int]string{2: old + "x", 4: newest + "x"}))
+	unchanged("only the newest proven", r, recordFor(map[int]string{4: newest}))
+
+	failed, _, _ := provenRequest("search_files")
+	failed.Messages[2].Content[0].ToolError = "denied"
+	unchanged("errored result with provenance", failed, proof)
+
+	orphan, _, _ := provenRequest("search_files")
+	orphan.Messages[2].Content[0].ToolResultID = "orphan"
+	unchanged("unpaired result with provenance", orphan, proof)
+
+	// A reused call ID makes pairing ambiguous even with provenance.
+	ambiguous := agent.Request{System: r.System, Messages: []agent.Message{
+		r.Messages[0],
+		{Role: agent.RoleAssistant, Content: []agent.ContentBlock{
+			{Type: agent.ContentTypeToolUse, ToolUseID: "dup", ToolName: "search_files"},
+			{Type: agent.ContentTypeToolUse, ToolUseID: "dup", ToolName: "search_files"}}},
+		agent.NewToolResultMessage("dup", old, nil),
+		agent.NewToolResultMessage("dup", newest, nil),
+	}}
+	unchanged("ambiguous reused id", ambiguous, recordFor(map[int]string{2: old, 3: newest}))
+
+	// Provenance recorded at a position never makes a non-search eligible.
+	for _, tool := range []string{"read_file", "some_unknown_tool", "run_command"} {
+		other, o, n := provenRequest(tool)
+		unchanged(tool, other, recordFor(map[int]string{2: o, 4: n}))
+	}
+}
+
+// A search_files answered by a forwarded gateway has no scan provenance, even
+// when the gateway's text is a successful result.
+func TestForwardedSearchIsNeverReportedComplete(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"a.txt:1:needle\n"}]}}`)
+	}))
+	defer server.Close()
+	gateway := &GatewayToolExecutor{endpoint: server.URL, client: server.Client(), tools: []agent.ToolDefinition{{Name: "search_files"}}}
+	composite := &CompositeToolExecutor{workspace: NewWorkspaceToolExecutor(), gateway: gateway, forwarded: map[string]bool{"search_files": true}}
+	output, complete, err := composite.executeSearchWithProvenance(context.Background(), searchRequest(t.TempDir(), "a.txt", "needle"))
+	if err != nil || complete || output != "a.txt:1:needle\n" {
+		t.Fatalf("forwarded search: output=%q complete=%v err=%v", output, complete, err)
+	}
+}
+
+// The recorder is fed by the scan's own flag, not by what the output says.
+func TestSearchScanProvenanceComesFromTheScanFlag(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("needle\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "b.txt"), []byte("needle "+strings.Repeat("y", 2000)+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	e := NewWorkspaceToolExecutor()
+	composite := &CompositeToolExecutor{workspace: e, forwarded: map[string]bool{}}
+	for path, want := range map[string]bool{"a.txt": true, "b.txt": false} {
+		request := searchRequest(root, path, "needle")
+		request.Sandbox = Sandbox{Mode: SandboxReadOnly}
+		for name, executor := range map[string]searchProvenanceExecutor{"workspace": e, "composite": composite} {
+			_, complete, err := executor.executeSearchWithProvenance(context.Background(), request)
+			if err != nil || complete != want {
+				t.Fatalf("%s %s: complete=%v want %v err=%v", name, path, complete, want, err)
+			}
+		}
 	}
 }
