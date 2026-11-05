@@ -76,6 +76,24 @@ func (e *CompositeToolExecutor) safelyListsDirectories() bool {
 	return !e.forwarded["list_directory"] && ok && safe.safelyListsDirectories()
 }
 
+// executeSearchWithProvenance answers only for the workspace half. A forwarded
+// search_files carries no scan provenance and is never reported complete.
+func (e *CompositeToolExecutor) executeSearchWithProvenance(ctx context.Context, request ToolRequest) (string, bool, error) {
+	if e.forwarded[request.Name] {
+		output, err := e.ExecuteTool(ctx, request)
+		return output, false, err
+	}
+	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
+		return "", false, err
+	}
+	scanner, ok := e.workspace.(searchProvenanceExecutor)
+	if !ok {
+		output, err := e.workspace.ExecuteTool(ctx, request)
+		return output, false, err
+	}
+	return scanner.executeSearchWithProvenance(ctx, request)
+}
+
 func (e *CompositeToolExecutor) servesGateway() bool { return true }
 
 // ValidateAccess is the workspace executor's answer alone.
