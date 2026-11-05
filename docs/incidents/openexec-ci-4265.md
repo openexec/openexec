@@ -8,7 +8,7 @@ The captured reading at 2026-11-05 19:19:43 UTC reported `JSON observation faile
 
 The local `origin/main` history has #216 (`8a64631f`, 18:24:03 UTC) and #217 (`cdeff8d9`, 18:44:11 UTC), both before the reading. #216 separated and sequenced macOS, changed trigger paths and preserved Linux build steps; #217 changed cache policy. Neither diff establishes why the observer returned -1. Git history does not contain Actions run results. `gh run list --branch main` could not run: the configured CLI path was invalid, and with a clean temporary config the CLI reported no authentication. A direct GitHub API request was blocked by the sandbox network policy. Thus the default branch's hosted CI state at the incident is unverified.
 
-Bare `go build ./...` and `go vet ./...` exited 0 in the candidate. Bare `go test ./...` could not complete in the sandbox because a provider request to api.anthropic.com was blocked. The declared host `go-vet` check exited 0; the declared host `test` check had not returned when this note was recorded. These checks cannot establish the state of the incident's hosted run or the Console observer.
+Bare `go build ./...` and `go vet ./...` exited 0 in the candidate. Bare `go test ./...` could not complete in the sandbox because a provider request to api.anthropic.com was blocked. The declared host `go-vet` check exited 0; the declared host `go-test` check with `./...` subsequently exited 0 (some packages used cached results). These checks cannot establish the state of the incident's hosted run or the Console observer.
 
 ## Cause and follow-up
 
