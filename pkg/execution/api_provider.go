@@ -502,6 +502,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			}
 			var output string
 			var toolErr error
+			scanComplete := false
 			switch meter, bounded := p.config.Adapter.(*boundedAPIAdapter); {
 			case state != nil && call.ToolName == updateHandoverTool:
 				output, toolErr = state.update(call.ToolInput)
@@ -512,12 +513,17 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				external = true
 			default:
 				external = true
-				output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
+				toolRequest := ToolRequest{
 					CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
 					WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
 					WritableRoots: append([]string(nil), request.WritableRoots...),
 					ReadableRoots: append([]string(nil), request.ReadableRoots...),
-				})
+				}
+				if scanner, ok := p.config.ToolExecutor.(searchProvenanceExecutor); ok && call.ToolName == "search_files" {
+					output, scanComplete, toolErr = scanner.executeSearchWithProvenance(ctx, toolRequest)
+				} else {
+					output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, toolRequest)
+				}
 			}
 			event.Type, event.Text = EventToolCompleted, output
 			if toolErr != nil {
@@ -533,6 +539,11 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				if toolErr == nil {
 					inRequest = state.compactResult(call.ToolName, call.ToolInput, output)
 				}
+			}
+			// The scan's own completeness, bound to this result's position and
+			// exact text. Nothing is recorded for a failed or unmarked result.
+			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok && scanComplete && toolErr == nil {
+				meter.recordCompleteScan(len(messages), output)
 			}
 			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr))
 		}
