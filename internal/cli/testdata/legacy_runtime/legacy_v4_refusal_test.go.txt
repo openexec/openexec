@@ -1,0 +1,75 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/openexec/openexec/pkg/execution"
+)
+
+// Runs in the overlay that swaps in the reader as it was on main before version
+// 4 existed (see execution_stdio_legacy_test.go). The reader is the old code; the
+// request is the new caller's, identities included.
+func TestLegacyRuntimeRefusesV4Request(t *testing.T) {
+	data, err := json.Marshal(executionEnvelope{Version: 4, Operation: "execute", Request: &execution.Request{
+		ID: "legacy", WorkingDir: t.TempDir(), Prompt: "read it", Sandbox: execution.Sandbox{Mode: execution.SandboxReadOnly},
+		ReadableRoots:          []string{"/synthetic/root"},
+		ReadableRootIdentities: []execution.ReadableRootIdentity{{Path: "/synthetic/root", Device: 1, Inode: 2}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The caller's bytes carry the identity fields; the old reader is handed them
+	// whole and refuses the version rather than dropping them.
+	if !bytes.Contains(data, []byte(`"ReadableRootIdentities":[{"path":"/synthetic/root","device":1,"inode":2}]`)) {
+		t.Fatalf("identity fields are not on the wire: %s", data)
+	}
+	built := false
+	var output bytes.Buffer
+	err = serveExecutionProtocol(context.Background(), bytes.NewReader(data), &output, func(context.Context, string, execution.Sandbox, toolGateway) (execution.Provider, error) {
+		built = true
+		return protocolProvider{}, nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported execution protocol version 4") {
+		t.Fatalf("legacy reader did not refuse v4: %v", err)
+	}
+	// The refusal names only the version: no root path or identity value.
+	if strings.Contains(err.Error(), "synthetic") || strings.Contains(err.Error(), "Inode") {
+		t.Fatalf("refusal echoes request content: %v", err)
+	}
+	if built || output.Len() != 0 {
+		t.Fatalf("legacy reader did work for a v4 request: built=%v output=%q", built, output.String())
+	}
+}
+
+// Near miss: the same legacy reader still serves the version it understands.
+func TestLegacyRuntimeStillServesV3(t *testing.T) {
+	var output bytes.Buffer
+	if err := serveExecutionProtocol(context.Background(), strings.NewReader(`{"version":3,"operation":"describe"}`), &output, staticProvider(protocolProvider{})); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), `"operation":"describe"`) {
+		t.Fatalf("output = %s", output.String())
+	}
+}
+
+// The same refusal, reached through the real execution-stdio command the
+// connecting caller launches, not the reader function called directly.
+func TestLegacyRuntimeCommandRefusesV4Request(t *testing.T) {
+	request := `{"version":4,"operation":"execute","request":{"ID":"c","WorkingDir":"/synthetic/work","Prompt":"x","Sandbox":{"Mode":"read-only"},"ReadableRoots":["/synthetic/root"],"ReadableRootIdentities":[{"path":"/synthetic/root","device":1,"inode":2}]}}`
+	var out bytes.Buffer
+	executionStdioCmd.SetIn(strings.NewReader(request))
+	executionStdioCmd.SetOut(&out)
+	executionStdioCmd.SetContext(context.Background())
+	defer func() { executionStdioCmd.SetIn(nil); executionStdioCmd.SetOut(nil) }()
+	err := executionStdioCmd.RunE(executionStdioCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "unsupported execution protocol version 4") {
+		t.Fatalf("legacy command did not refuse v4: %v", err)
+	}
+	if strings.Contains(err.Error(), "synthetic") || strings.Contains(err.Error(), "inode") || out.Len() != 0 {
+		t.Fatalf("refusal echoes request content: err=%v out=%q", err, out.String())
+	}
+}

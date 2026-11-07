@@ -42,7 +42,7 @@ func (e *WorkspaceToolExecutor) searchFilesWithProvenance(ctx context.Context, r
 		return "", false, errors.New("text must be a non-empty single-line literal")
 	}
 	complete := false
-	output, err := withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	output, err := e.withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		var out strings.Builder
 		entries, remaining := 0, maxSearchBytes
 		incomplete := false
