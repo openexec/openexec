@@ -138,3 +138,52 @@ func TestPinnedRootUnswappedReadSucceedsAfterSiblingActivity(t *testing.T) {
 		t.Fatalf("unswapped read refused: out=%q err=%v", out, err)
 	}
 }
+
+// Where no reliable identity watch can be made (watch creation fails, or there
+// is no /proc), a pinned read is refused before the descriptor operation runs,
+// with the typed refusal and no bytes or paths. The no-wait swap-and-restore a
+// change-time fallback would miss is exercised too: it must still be refused.
+// The near miss is the same read with the watch available, which succeeds
+// (TestPinnedRootUnswappedReadSucceedsAfterSiblingActivity).
+func TestPinnedRootReadRefusedWhenNoWatchCanBeMade(t *testing.T) {
+	for _, swap := range []bool{false, true} {
+		name := "no-swap"
+		if swap {
+			name = "no-wait-swap"
+		}
+		t.Run(name, func(t *testing.T) {
+			prevWatch, prevHook := newPinnedRootWatch, afterPinnedRootCheckHook
+			t.Cleanup(func() { newPinnedRootWatch, afterPinnedRootCheckHook = prevWatch, prevHook })
+			newPinnedRootWatch = func(*os.Root) rootWatch { return nil }
+			f := newIdentityFixture(t)
+			afterPinnedRootCheckHook = func(string) {
+				if swap {
+					f.swapToOutside(t)
+					if err := os.Remove(f.selected); err != nil {
+						t.Error(err)
+					}
+					if err := os.Rename(f.selected+"-old", f.selected); err != nil {
+						t.Error(err)
+					}
+				}
+			}
+			pinned, closeRoots, err := NewWorkspaceToolExecutor().pinReadableRoots([]string{f.selected}, []ReadableRootIdentity{f.identity})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer closeRoots()
+			out, err := f.call(t, pinned, "read_file")
+			if err == nil || !errors.Is(err, errPinnedRootUnwatched) {
+				t.Fatalf("read was not refused as unwatched: out=%q err=%v", out, err)
+			}
+			if out != "" {
+				t.Fatalf("refusal still produced output %q", out)
+			}
+			for _, leak := range []string{"authorized-needle", "outside-secret-needle", f.outside, f.selected, f.selected + "-old"} {
+				if strings.Contains(out, leak) || strings.Contains(err.Error(), leak) {
+					t.Fatalf("refusal disclosed %q: out=%q err=%v", leak, out, err)
+				}
+			}
+		})
+	}
+}

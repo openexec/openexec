@@ -122,21 +122,3 @@ type rootWatch interface {
 	changed() bool
 	close()
 }
-
-// pinnedRootChangeStamp is the status-change time of the directory the root
-// descriptor holds. Renaming the directory (the first half of a swap) changes
-// it, and restoring the name changes it again, so a swap that is undone before
-// any name check can still be seen: the stamp taken at the name check no
-// longer matches the stamp after the descriptor operation. Sibling activity in
-// the parent directory does not touch it.
-func pinnedRootChangeStamp(root *os.Root) (int64, error) {
-	info, err := root.Stat(".")
-	if err != nil {
-		return 0, errPinnedRootChanged
-	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return 0, errPinnedRootChanged
-	}
-	return statChangeStamp(stat), nil
-}

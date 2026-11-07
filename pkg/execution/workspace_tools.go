@@ -612,6 +612,15 @@ var afterPinnedRootCheckHook func(path string)
 // is the directory admitted. It names no path and carries no content.
 var errPinnedRootChanged = errors.New("the readable root changed after admission")
 
+// errPinnedRootUnwatched is the typed refusal for a pinned read whose root
+// identity cannot be reliably bound at the descriptor operation. It names no
+// path and carries no content.
+var errPinnedRootUnwatched = errors.New("the readable root cannot be verified on this host")
+
+// newPinnedRootWatch makes the identity watch for a pinned read. Tests replace
+// it to force watch-creation failure.
+var newPinnedRootWatch = watchPinnedRoot
+
 // withinRoots runs an operation against the first authorized root that
 // contains the path, and refuses when none does.
 //
@@ -654,17 +663,17 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 		// Reads bind the root's identity at the descriptor operation. The
 		// watch is made before the name check and read after the operation,
 		// so a swap undone before the second name check is refused too, with
-		// no clock involved. Where no watch can be made the change time
-		// stands in for it. Writes change the root themselves and are
+		// no clock involved. Where no watch can be made the read is refused.
+		// Writes change the root themselves and are
 		// covered by the name check.
 		var watch rootWatch
-		var stamp int64
 		if pinned && action == "read" {
-			if watch = watchPinnedRoot(root); watch == nil {
-				var stampErr error
-				if stamp, stampErr = pinnedRootChangeStamp(root); stampErr != nil {
-					return "", stampErr
-				}
+			if watch = newPinnedRootWatch(root); watch == nil {
+				// No reliable identity binding can be made (no /proc, watch
+				// creation failed, unsupported platform): admit nothing
+				// rather than fall back to a clock comparison that misses a
+				// swap undone within one tick.
+				return "", errPinnedRootUnwatched
 			}
 		}
 		if pinned {
@@ -688,9 +697,6 @@ func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots [
 			if watch != nil {
 				moved = watch.changed()
 				watch.close()
-			} else if action == "read" {
-				after, stampErr := pinnedRootChangeStamp(root)
-				moved = stampErr != nil || after != stamp
 			}
 			if stillErr := stillNamed(); stillErr != nil {
 				return "", stillErr

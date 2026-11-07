@@ -15,10 +15,6 @@ func openedFileByDescriptorWalk(_ *os.Root, _ *os.File, _ string) error {
 	return errors.New("cannot verify the opened path on this platform")
 }
 
-func pinnedRootChangeStamp(_ *os.Root) (int64, error) {
-	return 0, errors.New("cannot verify the readable root on this platform")
-}
-
 type rootWatch interface {
 	changed() bool
 	close()
