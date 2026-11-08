@@ -35,14 +35,21 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 	}
 	// Missing approval is not a rejection that a fix loop can blindly retry;
 	// it is malformed evidence. Never interpret prose or an empty object as pass.
-	var wire struct {
-		Approved *bool `json:"approved"`
-		PlanReview
+	prompt := fmt.Sprintf(StoryReviewPrompt, intent, data)
+	wire, found, sawObject := extractPlanVerdict(response)
+	if !found && !sawObject {
+		// A reviewer that answered in prose gets one strict request for the
+		// verdict only; prose itself is never read as approval.
+		repaired, rerr := p.provider.Complete(ctx, prompt+planReviewRepairSuffix)
+		if rerr != nil {
+			return nil, fmt.Errorf("invalid plan review: no JSON verdict (%s); repair request: %w", clipReview(response), rerr)
+		}
+		wire, found, sawObject = extractPlanVerdict(repaired)
+		if !found && !sawObject {
+			return nil, fmt.Errorf("invalid plan review: no JSON verdict after one repair request (%s)", clipReview(repaired))
+		}
 	}
-	if err := json.Unmarshal([]byte(response), &wire); err != nil {
-		return nil, fmt.Errorf("invalid plan review: %w", err)
-	}
-	if wire.Approved == nil || strings.TrimSpace(wire.Assessment) == "" {
+	if !found {
 		return nil, fmt.Errorf("plan review requires explicit approved and assessment")
 	}
 	wire.PlanReview.Approved = *wire.Approved
@@ -75,6 +82,49 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 		}
 	}
 	return &wire.PlanReview, nil
+}
+
+const planReviewRepairSuffix = "\n\nYour previous reply was not usable. Reply with exactly ONE JSON object and nothing else, no prose, no markdown fence: {\"approved\": true or false, \"assessment\": \"one sentence\", \"key_issues\": []}"
+
+type planVerdictWire struct {
+	Approved *bool `json:"approved"`
+	PlanReview
+}
+
+func clipReview(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > 160 {
+		return s[:160] + "..."
+	}
+	return s
+}
+
+// extractPlanVerdict finds the first JSON object in a reviewer reply (bare, in
+// a code fence, or surrounded by prose) with an explicit approved and a
+// non-empty assessment. sawObject reports that some JSON object parsed even
+// though none was a complete verdict: that is malformed evidence, not prose.
+func extractPlanVerdict(text string) (w planVerdictWire, found, sawObject bool) {
+	for at := 0; at < len(text); {
+		i := strings.IndexByte(text[at:], '{')
+		if i < 0 {
+			break
+		}
+		start := at + i
+		var raw json.RawMessage
+		if err := json.NewDecoder(strings.NewReader(text[start:])).Decode(&raw); err != nil {
+			at = start + 1
+			continue
+		}
+		var cand planVerdictWire
+		if json.Unmarshal(raw, &cand) == nil {
+			sawObject = true
+			if cand.Approved != nil && strings.TrimSpace(cand.Assessment) != "" {
+				return cand, true, true
+			}
+		}
+		at = start + len(raw)
+	}
+	return planVerdictWire{}, false, sawObject
 }
 
 // RefinePlan reuses the existing repair prompt. The changed plan still needs
