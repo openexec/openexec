@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -9,6 +10,20 @@ import (
 // realExampleRunes bounds a real_example reference. It names the input; a
 // longer value is the input pasted into the plan artifact.
 const realExampleRunes = 300
+
+// referenceLengthMarker is in every reference-length issue and only there: it
+// is how RepairablePlanIssues and CheckRepairInstruction tell this one
+// repairable shape failure from the structural ones, which stay refused.
+const referenceLengthMarker = "real_example must reference the input, not contain it"
+
+func referenceLengthIssue(storyID string, runes int, multiline bool) string {
+	found := fmt.Sprintf("it is %d runes", runes)
+	if multiline {
+		found += " with a line break"
+	}
+	return fmt.Sprintf("%s: %s: %s, but a reference is at most %d runes on a single line. Shorten it to the path, URL or name of the input and move any description of the input into the story's description or tasks",
+		storyID, referenceLengthMarker, found, realExampleRunes)
+}
 
 // preOutcomeShapeVersions are the schema versions plans carried before the
 // outcome shape existed. Their persisted plans replay as they were judged.
@@ -92,7 +107,7 @@ func LintOutcomeShape(plan *ProjectPlan) []string {
 	case ref == "":
 		issues = append(issues, skeleton.ID+": skeleton names no real_example input")
 	case utf8.RuneCountInString(ref) > realExampleRunes || strings.Contains(ref, "\n"):
-		issues = append(issues, skeleton.ID+": real_example must reference the input, not contain it")
+		issues = append(issues, referenceLengthIssue(skeleton.ID, utf8.RuneCountInString(ref), strings.Contains(ref, "\n")))
 	}
 	for _, dep := range skeleton.DependsOn {
 		if role, planned := roles[dep]; planned && role != RoleStudy && role != RolePrerequisite {

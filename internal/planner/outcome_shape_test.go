@@ -229,10 +229,45 @@ func TestRefinementKeepsOrReplacesTheBaseline(t *testing.T) {
 	}
 }
 
+func TestReferenceLengthIssueNamesTheBoundAndTheFix(t *testing.T) {
+	skeleton := func(example string) *ProjectPlan {
+		return &ProjectPlan{SchemaVersion: PlanSchemaVersion,
+			Baseline: &Baseline{Approach: "a", Result: "r", Bar: "b", Verdict: VerdictBuild, Source: "s"},
+			Stories: []Story{
+				{ID: "US-001", Role: RoleSkeleton, RealExample: example},
+				{ID: "US-002", Role: RoleCore},
+			}}
+	}
+	// Multi-byte runes are counted as runes, not bytes; 300 is allowed.
+	if issues := LintOutcomeShape(skeleton(strings.Repeat("ä", realExampleRunes))); len(issues) != 0 {
+		t.Fatalf("a reference at the bound was refused: %v", issues)
+	}
+	issues := LintOutcomeShape(skeleton(strings.Repeat("ä", realExampleRunes+1)))
+	if len(issues) != 1 || !IsReferenceLengthIssue(issues[0]) {
+		t.Fatalf("issues = %v", issues)
+	}
+	for _, want := range []string{"US-001", "301 runes", "at most 300 runes", "single line", "Shorten it to the path, URL or name"} {
+		if !strings.Contains(issues[0], want) {
+			t.Fatalf("issue lacks %q: %s", want, issues[0])
+		}
+	}
+	if issues := LintOutcomeShape(skeleton("a\nb")); len(issues) != 1 || !strings.Contains(issues[0], "line break") {
+		t.Fatalf("multi-line issue = %v", issues)
+	}
+	if got := CheckRepairInstruction([]string{"verification lint refused: x"}); strings.Contains(got, "real_example") {
+		t.Fatalf("reference guidance on an unrelated repair: %s", got)
+	}
+}
+
 func TestPlanningPromptsCarryOutcomeShapeRules(t *testing.T) {
 	for _, rule := range []string{"BASELINE FIRST", "WALKING SKELETON FIRST", "CORE BEFORE INFRASTRUCTURE", `"real_example"`, `"role_reason"`, "never call an external or billed model"} {
 		if !strings.Contains(OutcomeShapeRule, rule) {
 			t.Fatalf("outcome shape rule lacks %q", rule)
+		}
+	}
+	for name, prompt := range map[string]string{"generation": OutcomeShapeRule, "refinement": StoryFixPrompt} {
+		if !strings.Contains(prompt, "300 runes") {
+			t.Fatalf("%s prompt omits the real_example bound", name)
 		}
 	}
 	for name, prompt := range map[string]string{"generation": StoryGenerationPrompt, "review": StoryReviewPrompt, "refinement": StoryFixPrompt} {
