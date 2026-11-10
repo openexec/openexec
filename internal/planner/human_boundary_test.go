@@ -246,6 +246,89 @@ func TestHumanBoundaryRefinementMayRenumberTheBoundaryStory(t *testing.T) {
 	}
 }
 
+func TestHumanBoundaryRuleForbidsReviewDeletingRetainedHumanTasks(t *testing.T) {
+	for _, prompt := range []string{StoryReviewPrompt, StoryFixPrompt} {
+		if !strings.Contains(prompt, "never to delete it") || !strings.Contains(prompt, "refinement keeps every retained HITL task") {
+			t.Fatal("prompt lacks the no-deletion instruction for retained human tasks")
+		}
+	}
+}
+
+// Goal 09a204a4, run f22b8c26: human tasks moved to US-016 while the automatic
+// neighbour stayed in US-009; the guard reported the neighbour removed.
+func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) {
+	const r3, r4 = "Owner runs the user study", "Owner records the study result"
+	original := func() *ProjectPlan {
+		return &ProjectPlan{Stories: []Story{
+			{ID: "US-009", Title: "Study", Tasks: []Task{
+				{ID: "T-US-009-001", Mode: TaskModeAFK},
+				{ID: "T-US-009-002", Mode: TaskModeAFK, DependsOn: []string{"T-US-009-001", "T-US-009-003"}},
+				{ID: "T-US-009-003", Mode: TaskModeHITL, DecisionReason: r3, DecisionRef: "decision:study", Description: "Run study", DependsOn: []string{"T-US-009-001"}},
+				{ID: "T-US-009-004", Mode: TaskModeHITL, DecisionReason: r4, Description: "Record result", DependsOn: []string{"T-US-009-003"}},
+			}},
+			{ID: "US-013", Title: "Other", Tasks: []Task{
+				{ID: "T-US-013-001", Mode: TaskModeAFK},
+				{ID: "T-US-013-004", Mode: TaskModeHITL, DecisionReason: "Owner accepts", DependsOn: []string{"T-US-013-001"}},
+			}},
+		}}
+	}
+	split := func() *ProjectPlan {
+		p := original()
+		hum := append([]Task(nil), p.Stories[0].Tasks[2:]...)
+		p.Stories[0].Tasks = p.Stories[0].Tasks[:2]
+		p.Stories = append(p.Stories, Story{ID: "US-016", Title: "Human study", DependsOn: []string{"US-009"}, Tasks: hum})
+		return p
+	}
+	refine := func(next *ProjectPlan) (*ProjectPlan, error) {
+		raw, _ := json.Marshal(next)
+		return New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", original(), &PlanReview{Assessment: "split the human work"})
+	}
+
+	next := split()
+	// Reworded / detached metadata must be restored on the moved tasks.
+	h := &next.Stories[2].Tasks[0]
+	h.Description, h.DecisionRef = "x", ""
+	next.Stories[2].Tasks[1].DependsOn = nil
+	next.Stories[0].Tasks[1].DependsOn = []string{"T-US-009-001"}
+	got, err := refine(next)
+	if err != nil {
+		t.Fatalf("split refused: %v", err)
+	}
+	if len(got.Stories[0].Tasks) != 2 || got.Stories[0].Tasks[1].ID != "T-US-009-002" {
+		t.Fatalf("automatic neighbour not retained in US-009: %+v", got.Stories[0].Tasks)
+	}
+	if !reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003"}) {
+		t.Fatalf("neighbour dependency on human task lost: %v", got.Stories[0].Tasks[1].DependsOn)
+	}
+	want := original().Stories[0].Tasks[2:]
+	if !reflect.DeepEqual(got.Stories[2].Tasks, want) {
+		t.Fatalf("moved human tasks not restored:\n got %+v\nwant %+v", got.Stories[2].Tasks, want)
+	}
+
+	// Real deletions and unsafe changes stay refused.
+	cases := map[string]func(p *ProjectPlan){
+		"delete human task":          func(p *ProjectPlan) { p.Stories[2].Tasks = p.Stories[2].Tasks[:1] },
+		"delete automatic neighbour": func(p *ProjectPlan) { p.Stories[0].Tasks = p.Stories[0].Tasks[:1] },
+		"delete T-US-013-004":        func(p *ProjectPlan) { p.Stories[1].Tasks = p.Stories[1].Tasks[:1] },
+		"remove story with retained": func(p *ProjectPlan) { p.Stories = p.Stories[1:] },
+		"ambiguous duplicate id": func(p *ProjectPlan) {
+			p.Stories[0].Tasks = append(p.Stories[0].Tasks, p.Stories[2].Tasks[0])
+		},
+		"changed identity": func(p *ProjectPlan) {
+			p.Stories[2].Tasks[0].ID, p.Stories[2].Tasks[0].DecisionReason = "T-US-016-001", "Something else"
+		},
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			p := split()
+			mutate(p)
+			if got, err := refine(p); err == nil {
+				t.Fatalf("accepted: %+v", got)
+			}
+		})
+	}
+}
+
 func TestRequirementIdentityRuleSharedAcrossPlannerPrompts(t *testing.T) {
 	// Without it the planner invents REQ aliases for the intent's condition
 	// ids and the reviewer rejects every refinement for a mapping the story

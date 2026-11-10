@@ -131,11 +131,12 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			if !retained[t.ID] {
 				continue
 			}
-			i := slices.IndexFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == taskID(t.ID) })
-			if i < 0 {
+			// A story split may move the task to another story. Resolve by
+			// identity across the plan; an id held twice is ambiguous.
+			next := findTaskAnywhere(refined, taskID(t.ID))
+			if next == nil {
 				return fmt.Errorf("refinement removed task %s around a retained human boundary", t.ID)
 			}
-			next := &nextStory.Tasks[i]
 			if t.Mode == TaskModeHITL {
 				// What the owner is asked stays; how the agent carries it out
 				// is the refinement's to correct. Restoring the strategy too
@@ -158,6 +159,27 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 	return nil
 }
 
+func findTask(s *Story, id string) *Task {
+	if i := slices.IndexFunc(s.Tasks, func(c Task) bool { return c.ID == id }); i >= 0 {
+		return &s.Tasks[i]
+	}
+	return nil
+}
+
+// findTaskAnywhere returns the task only when exactly one story holds the id.
+func findTaskAnywhere(p *ProjectPlan, id string) *Task {
+	var found *Task
+	for i := range p.Stories {
+		if t := findTask(&p.Stories[i], id); t != nil {
+			if found != nil {
+				return nil
+			}
+			found = t
+		}
+	}
+	return found
+}
+
 // renumbering finds a retained boundary that refinement only renumbered. A
 // review may ask for new ids, for instance when the plan reuses story ids
 // already committed on the branch for different work, and renaming the story
@@ -168,6 +190,10 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 // less certain stays a removal.
 func renumbering(original, refined *ProjectPlan, present map[string]bool) (stories, tasks map[string]string) {
 	stories, tasks = map[string]string{}, map[string]string{}
+	keptStories := map[string]bool{}
+	for _, rs := range refined.Stories {
+		keptStories[rs.ID] = true
+	}
 	known := map[string]bool{}
 	for _, s := range original.Stories {
 		for _, t := range s.Tasks {
@@ -184,6 +210,10 @@ func renumbering(original, refined *ProjectPlan, present map[string]bool) (stori
 			// ("refinement removed story US-009" for a plan that returned
 			// T-US-009-003 unchanged inside US-019).
 			if present[t.ID] {
+				// A story that still exists was split, not renumbered.
+				if keptStories[s.ID] {
+					continue
+				}
 				for _, ns := range refined.Stories {
 					if ns.ID != s.ID && slices.ContainsFunc(ns.Tasks, func(nt Task) bool { return nt.ID == t.ID }) {
 						stories[s.ID] = ns.ID
@@ -203,7 +233,7 @@ func renumbering(original, refined *ProjectPlan, present map[string]bool) (stori
 				continue
 			}
 			tasks[t.ID] = matches[0][1]
-			if matches[0][0] != s.ID {
+			if matches[0][0] != s.ID && !keptStories[s.ID] {
 				stories[s.ID] = matches[0][0]
 			}
 		}
