@@ -314,6 +314,18 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		"ambiguous duplicate id": func(p *ProjectPlan) {
 			p.Stories[0].Tasks = append(p.Stories[0].Tasks, p.Stories[2].Tasks[0])
 		},
+		"duplicate id inside one story": func(p *ProjectPlan) {
+			p.Stories[2].Tasks = append(p.Stories[2].Tasks, p.Stories[2].Tasks[0])
+		},
+		"moved into unrelated existing story": func(p *ProjectPlan) {
+			p.Stories[1].Tasks = append(p.Stories[1].Tasks, p.Stories[2].Tasks[1])
+			p.Stories[2].Tasks = p.Stories[2].Tasks[:1]
+		},
+		"changed identity with two candidates": func(p *ProjectPlan) {
+			a, b := p.Stories[2].Tasks[0], p.Stories[2].Tasks[0]
+			a.ID, b.ID = "T-US-016-001", "T-US-016-002"
+			p.Stories[2].Tasks = []Task{a, b, p.Stories[2].Tasks[1]}
+		},
 		"changed identity": func(p *ProjectPlan) {
 			p.Stories[2].Tasks[0].ID, p.Stories[2].Tasks[0].DecisionReason = "T-US-016-001", "Something else"
 		},

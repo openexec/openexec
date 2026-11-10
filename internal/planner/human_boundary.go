@@ -113,6 +113,10 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 		}
 		return id
 	}
+	originalStories := map[string]bool{}
+	for _, s := range original.Stories {
+		originalStories[s.ID] = true
+	}
 	for _, s := range original.Stories {
 		if !slices.ContainsFunc(s.Tasks, func(task Task) bool { return retained[task.ID] }) {
 			continue
@@ -133,9 +137,18 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			}
 			// A story split may move the task to another story. Resolve by
 			// identity across the plan; an id held twice is ambiguous.
-			next := findTaskAnywhere(refined, taskID(t.ID))
+			next, home, count := findTaskAnywhere(refined, taskID(t.ID))
+			if count > 1 {
+				return fmt.Errorf("refinement left task %s ambiguous across the plan", t.ID)
+			}
 			if next == nil {
 				return fmt.Errorf("refinement removed task %s around a retained human boundary", t.ID)
+			}
+			// Only the task's own story, its renumber target or a story the
+			// split created may hold it; another existing story is an
+			// unrelated move.
+			if home != nextStory.ID && originalStories[home] {
+				return fmt.Errorf("refinement moved task %s into unrelated story %s", t.ID, home)
 			}
 			if t.Mode == TaskModeHITL {
 				// What the owner is asked stays; how the agent carries it out
@@ -166,18 +179,20 @@ func findTask(s *Story, id string) *Task {
 	return nil
 }
 
-// findTaskAnywhere returns the task only when exactly one story holds the id.
-func findTaskAnywhere(p *ProjectPlan, id string) *Task {
-	var found *Task
+// findTaskAnywhere returns the first task with the id, its story id and how
+// many tasks in the whole plan carry that id.
+func findTaskAnywhere(p *ProjectPlan, id string) (task *Task, storyID string, count int) {
 	for i := range p.Stories {
-		if t := findTask(&p.Stories[i], id); t != nil {
-			if found != nil {
-				return nil
+		for j := range p.Stories[i].Tasks {
+			if p.Stories[i].Tasks[j].ID == id {
+				if task == nil {
+					task, storyID = &p.Stories[i].Tasks[j], p.Stories[i].ID
+				}
+				count++
 			}
-			found = t
 		}
 	}
-	return found
+	return task, storyID, count
 }
 
 // renumbering finds a retained boundary that refinement only renumbered. A
