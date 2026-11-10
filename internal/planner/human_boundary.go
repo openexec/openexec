@@ -113,6 +113,15 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 		}
 		return id
 	}
+	// Edges as the refinement proposed them: restoring edges below must not
+	// make a story look tied to the original one.
+	proposed := map[string][]string{}
+	for _, rs := range refined.Stories {
+		proposed[rs.ID] = append([]string(nil), rs.DependsOn...)
+		for _, rt := range rs.Tasks {
+			proposed[rt.ID] = append(proposed[rt.ID], rt.DependsOn...)
+		}
+	}
 	originalStories := map[string]bool{}
 	for _, s := range original.Stories {
 		originalStories[s.ID] = true
@@ -147,8 +156,16 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			// Only the task's own story, its renumber target or a story the
 			// split created may hold it; another existing story is an
 			// unrelated move.
-			if home != nextStory.ID && originalStories[home] {
-				return fmt.Errorf("refinement moved task %s into unrelated story %s", t.ID, home)
+			if home != nextStory.ID {
+				if originalStories[home] {
+					return fmt.Errorf("refinement moved task %s into unrelated story %s", t.ID, home)
+				}
+				// A task that kept its id into a new story is a split only if
+				// that story is tied to the original one; a task renumbered by
+				// its exact decision_reason is its own evidence.
+				if _, renumbered := taskIDs[t.ID]; !renumbered && !splitFrom(refined, proposed, home, s) {
+					return fmt.Errorf("refinement moved task %s into unrelated new story %s", t.ID, home)
+				}
 			}
 			if t.Mode == TaskModeHITL {
 				// What the owner is asked stays; how the agent carries it out
@@ -170,6 +187,27 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 		}
 	}
 	return nil
+}
+
+// splitFrom reports whether story home is tied to the original story: it
+// depends on it, or one of its tasks depends on one of the original's tasks.
+func splitFrom(refined *ProjectPlan, proposed map[string][]string, home string, orig Story) bool {
+	for _, hs := range refined.Stories {
+		if hs.ID != home {
+			continue
+		}
+		if slices.Contains(proposed[hs.ID], orig.ID) {
+			return true
+		}
+		for _, ht := range hs.Tasks {
+			for _, ot := range orig.Tasks {
+				if slices.Contains(proposed[ht.ID], ot.ID) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func findTask(s *Story, id string) *Task {

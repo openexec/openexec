@@ -305,6 +305,13 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		t.Fatalf("moved human tasks not restored:\n got %+v\nwant %+v", got.Stories[2].Tasks, want)
 	}
 
+	// Near miss: a new story tied only through a task edge is still a split.
+	tied := split()
+	tied.Stories[2].DependsOn = nil
+	if _, err := refine(tied); err != nil {
+		t.Fatalf("split tied by a task edge refused: %v", err)
+	}
+
 	// Real deletions and unsafe changes stay refused.
 	cases := map[string]func(p *ProjectPlan){
 		"delete human task":          func(p *ProjectPlan) { p.Stories[2].Tasks = p.Stories[2].Tasks[:1] },
@@ -320,6 +327,12 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		"moved into unrelated existing story": func(p *ProjectPlan) {
 			p.Stories[1].Tasks = append(p.Stories[1].Tasks, p.Stories[2].Tasks[1])
 			p.Stories[2].Tasks = p.Stories[2].Tasks[:1]
+		},
+		"moved into unrelated new story": func(p *ProjectPlan) {
+			p.Stories[2].DependsOn = nil
+			p.Stories[2].ID = "US-017"
+			p.Stories[2].Tasks[0].DependsOn = nil
+			p.Stories[2].Tasks[1].DependsOn = nil
 		},
 		"changed identity with two candidates": func(p *ProjectPlan) {
 			a, b := p.Stories[2].Tasks[0], p.Stories[2].Tasks[0]
