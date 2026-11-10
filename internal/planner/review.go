@@ -242,8 +242,9 @@ func carryGoals(original, refined *ProjectPlan) {
 func DeterministicPlanIssues(plan *ProjectPlan) []string {
 	issues := append(VerificationPlanIssues(plan), boundaryPlanIssues(plan)...)
 	var structural []string
-	for _, issue := range LintOutcomeShape(plan) {
-		if IsReferenceLengthIssue(issue) {
+	shape, isReference := lintOutcomeShape(plan)
+	for i, issue := range shape {
+		if isReference[i] {
 			// Repairable: shortening one reference changes no story, task or
 			// criterion (RepairablePlanIssues).
 			issues = append(issues, "outcome shape lint refused: "+issue)
@@ -259,8 +260,11 @@ func DeterministicPlanIssues(plan *ProjectPlan) []string {
 	return issues
 }
 
-// IsReferenceLengthIssue reports whether an issue is the over-long or
-// multi-line real_example failure.
+// IsReferenceLengthIssue reports whether an issue text carries the marker of
+// the over-long or multi-line real_example failure. It only selects the repair
+// wording for issues RepairablePlanIssues already admitted; whether an issue
+// is repairable is decided where it is raised (lintOutcomeShape), never by
+// this text match.
 func IsReferenceLengthIssue(issue string) bool {
 	return strings.Contains(issue, referenceLengthMarker)
 }
@@ -270,8 +274,9 @@ func IsReferenceLengthIssue(issue string) bool {
 // failure and every boundary failure is refused.
 func RepairablePlanIssues(plan *ProjectPlan) []string {
 	issues := VerificationPlanIssues(plan)
-	for _, issue := range LintOutcomeShape(plan) {
-		if IsReferenceLengthIssue(issue) {
+	shape, isReference := lintOutcomeShape(plan)
+	for i, issue := range shape {
+		if isReference[i] {
 			issues = append(issues, "outcome shape lint refused: "+issue)
 		}
 	}

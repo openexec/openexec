@@ -288,3 +288,31 @@ func TestPlanningPromptsCarryOutcomeShapeRules(t *testing.T) {
 		t.Fatalf("generation example omits the outcome shape: %+v", example)
 	}
 }
+
+// A planner-controlled value that quotes the reference-length wording must not
+// make a structural failure repairable: the kind is decided where the issue is
+// raised, not by matching its text.
+func TestQuotedMarkerInAStructuralIssueStaysRefused(t *testing.T) {
+	plan := &ProjectPlan{SchemaVersion: "2.0",
+		Baseline: &Baseline{Approach: "a", Result: "r", Bar: "b", Verdict: VerdictBuild, Source: "s"},
+		Stories: []Story{
+			{ID: "US-001", Role: RoleSkeleton, RealExample: "testdata/input.mp4"},
+			{ID: "US-002", Role: "feature: " + referenceLengthMarker},
+		}}
+	issues := LintOutcomeShape(plan)
+	if len(issues) != 1 || !strings.Contains(issues[0], "unknown role") {
+		t.Fatalf("issues = %v", issues)
+	}
+	if got := RepairablePlanIssues(plan); len(got) != 0 {
+		t.Fatalf("a structural failure quoting the marker was made repairable: %v", got)
+	}
+	if got := DeterministicPlanIssues(plan); len(got) != 1 || !strings.Contains(got[0], "outcome shape lint refused: [") {
+		t.Fatalf("deterministic issues = %v", got)
+	}
+	// Near miss: a genuinely overlong reference is repairable.
+	plan.Stories[1].Role = RoleCore
+	plan.Stories[0].RealExample = strings.Repeat("x", realExampleRunes+1)
+	if got := RepairablePlanIssues(plan); len(got) != 1 {
+		t.Fatalf("overlong reference not repairable: %v", got)
+	}
+}

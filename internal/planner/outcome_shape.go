@@ -37,8 +37,17 @@ var preOutcomeShapeVersions = []string{"", "legacy", "1.0", "1.0.0", "1.1"}
 // Plans persisted under an earlier schema, single-story plans and the
 // persisted stories a re-plan continues are not checked.
 func LintOutcomeShape(plan *ProjectPlan) []string {
+	issues, _ := lintOutcomeShape(plan)
+	return issues
+}
+
+// lintOutcomeShape returns the issues and, parallel to them, whether each is
+// the reference-length failure. The kind is recorded where the issue is
+// raised, never recovered by matching its text, because the text embeds
+// planner-controlled values (a role, a story ID).
+func lintOutcomeShape(plan *ProjectPlan) (issues []string, referenceLength []bool) {
 	if plan == nil || slices.Contains(preOutcomeShapeVersions, plan.SchemaVersion) {
-		return nil
+		return nil, nil
 	}
 	roles := map[string]string{}
 	var implementation []Story
@@ -52,10 +61,9 @@ func LintOutcomeShape(plan *ProjectPlan) []string {
 		}
 	}
 	if len(implementation) < 2 {
-		return nil
+		return nil, nil
 	}
 
-	var issues []string
 	switch b := plan.Baseline; {
 	case b == nil:
 		issues = append(issues, "plan records no baseline: state what the cheapest approach gives on the real example and how this plan beats it")
@@ -101,13 +109,16 @@ func LintOutcomeShape(plan *ProjectPlan) []string {
 		}
 	}
 	if skeleton == nil {
-		return append(issues, "plan has no walking skeleton story")
+		issues = append(issues, "plan has no walking skeleton story")
+		return issues, make([]bool, len(issues))
 	}
+	referenceIndex := -1
 	switch ref := strings.TrimSpace(skeleton.RealExample); {
 	case ref == "":
 		issues = append(issues, skeleton.ID+": skeleton names no real_example input")
 	case utf8.RuneCountInString(ref) > realExampleRunes || strings.Contains(ref, "\n"):
 		issues = append(issues, referenceLengthIssue(skeleton.ID, utf8.RuneCountInString(ref), strings.Contains(ref, "\n")))
+		referenceIndex = len(issues) - 1
 	}
 	for _, dep := range skeleton.DependsOn {
 		if role, planned := roles[dep]; planned && role != RoleStudy && role != RolePrerequisite {
@@ -119,7 +130,11 @@ func LintOutcomeShape(plan *ProjectPlan) []string {
 			issues = append(issues, s.ID+": infrastructure story does not depend on skeleton "+skeleton.ID)
 		}
 	}
-	return issues
+	referenceLength = make([]bool, len(issues))
+	if referenceIndex >= 0 {
+		referenceLength[referenceIndex] = true
+	}
+	return issues, referenceLength
 }
 
 func roleName(role string) string {
