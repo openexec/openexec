@@ -241,10 +241,44 @@ func carryGoals(original, refined *ProjectPlan) {
 // its own.
 func DeterministicPlanIssues(plan *ProjectPlan) []string {
 	issues := append(VerificationPlanIssues(plan), boundaryPlanIssues(plan)...)
-	if shape := LintOutcomeShape(plan); len(shape) != 0 {
+	var structural []string
+	shape, isReference := lintOutcomeShape(plan)
+	for i, issue := range shape {
+		if isReference[i] {
+			// Repairable: shortening one reference changes no story, task or
+			// criterion (RepairablePlanIssues).
+			issues = append(issues, "outcome shape lint refused: "+issue)
+		} else {
+			structural = append(structural, issue)
+		}
+	}
+	if len(structural) != 0 {
 		// Refused, not check-repaired: putting the skeleton first changes
 		// what the plan does, which a check repair may not do.
-		issues = append(issues, fmt.Sprintf("outcome shape lint refused: %v", shape))
+		issues = append(issues, fmt.Sprintf("outcome shape lint refused: %v", structural))
+	}
+	return issues
+}
+
+// IsReferenceLengthIssue reports whether an issue text carries the marker of
+// the over-long or multi-line real_example failure. It only selects the repair
+// wording for issues RepairablePlanIssues already admitted; whether an issue
+// is repairable is decided where it is raised (lintOutcomeShape), never by
+// this text match.
+func IsReferenceLengthIssue(issue string) bool {
+	return strings.Contains(issue, referenceLengthMarker)
+}
+
+// RepairablePlanIssues are the deterministic failures a planner may repair:
+// the verification failures and an over-long real_example. Every other shape
+// failure and every boundary failure is refused.
+func RepairablePlanIssues(plan *ProjectPlan) []string {
+	issues := VerificationPlanIssues(plan)
+	shape, isReference := lintOutcomeShape(plan)
+	for i, issue := range shape {
+		if isReference[i] {
+			issues = append(issues, "outcome shape lint refused: "+issue)
+		}
 	}
 	return issues
 }
@@ -288,8 +322,16 @@ func boundaryPlanIssues(plan *ProjectPlan) []string {
 // the deterministic failures, the idioms that pass them, and an instruction to
 // change nothing else.
 func CheckRepairInstruction(issues []string) string {
+	reference := ""
+	for _, issue := range issues {
+		if IsReferenceLengthIssue(issue) {
+			reference = fmt.Sprintf("\n\nA real_example is the path, URL or name of the real input, at most %d runes on a single line. To repair one: change only that story's real_example, keeping the real input reference (shorten the wording, never cut the path, URL or name); move descriptive prose into the story's description or tasks. Keep every other story, task, acceptance criterion, perturbation and negative-control story exactly as it is.", realExampleRunes)
+			break
+		}
+	}
 	return "Required deterministic plan checks refused this plan. Fix only what they name and change nothing else: keep every story, task, ID, requirement_id, dependency and description as it is.\n\nFailures:\n- " +
 		strings.Join(issues, "\n- ") +
+		reference +
 		"\n\nA verification command must fail the script when its check fails:\n" +
 		"- instead of `cmd || other`, write `cmd || { echo \"what failed\"; exit 1; }`;\n" +
 		"- never pipe `grep -q` into another command: write `grep -q PATTERN FILE || { echo \"missing PATTERN\"; exit 1; }`;\n" +
