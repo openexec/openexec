@@ -30,6 +30,19 @@ type boundedAPIAdapter struct {
 	nonThinking             bool
 	prior                   priorResults
 	trustedDirectoryResults bool
+	completeScans           map[[2]int]string // result position -> sha256 of its text, set only from scan provenance
+}
+
+// searchProvenanceExecutor reports completeness from the scan itself.
+type searchProvenanceExecutor interface {
+	executeSearchWithProvenance(context.Context, ToolRequest) (string, bool, error)
+}
+
+func (p *boundedAPIAdapter) recordCompleteScan(message int, output string) {
+	if p.completeScans == nil {
+		p.completeScans = map[[2]int]string{}
+	}
+	p.completeScans[[2]int{message, 0}] = sha256Hex(output)
 }
 
 var errHardTokenGrantExhausted = errors.New("hard token grant cannot admit another inference")
@@ -120,7 +133,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 		return res, err
 	}
 	if p.prior != nil {
-		if compacted, changed := p.prior.compact(r); changed && r.ToolChoice != "none" {
+		if compacted, changed := p.prior.compactWith(r, p.completeScans); changed && r.ToolChoice != "none" {
 			r = compacted
 		} else {
 			r.Tools = append(append([]agent.ToolDefinition(nil), r.Tools...), recallDefinition())
@@ -144,7 +157,7 @@ func (p *boundedAPIAdapter) complete(ctx context.Context, r agent.Request, allow
 			}
 			if !collision {
 				prior := priorResults{}
-				if compacted, changed := prior.compact(r); changed {
+				if compacted, changed := prior.compactWith(r, p.completeScans); changed {
 					res, err = prepare(compacted)
 					if err == nil {
 						p.prior = prior
