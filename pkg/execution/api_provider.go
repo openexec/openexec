@@ -378,6 +378,16 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 		}
 	}
 	askedHandover, askedCheckpoint, fresh := false, false, state != nil && len(messages) == 1 && state.data.Chains > 0
+	// MaxChains bounds the restarts of this Execute. The handover carries the
+	// run's chain count across passes, so the bound is read from where this
+	// pass began: compared with the run's total, every pass after the first
+	// got one chain and ended at its first hard threshold (Solar df74566c
+	// T-US-CS29AB35C-001-002, 11-12: pass 1 nine chains in 45 min, passes 2
+	// to 4 one chain each, about a minute apart, then the task failed).
+	passChains := 0
+	if state != nil {
+		passChains = state.data.Chains
+	}
 	toolsNow := func() []agent.ToolDefinition {
 		tools := p.config.Tools
 		if state != nil && askedHandover {
@@ -398,7 +408,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 		return *result, nil
 	}
 	restart := func(why string) bool {
-		if fresh || state.data.Chains >= policy.MaxChains {
+		if fresh || state.data.Chains-passChains >= policy.MaxChains {
 			return false
 		}
 		messages = state.freshMessages(false)
