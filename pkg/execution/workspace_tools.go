@@ -188,6 +188,15 @@ func (e *WorkspaceToolExecutor) ExecuteTool(ctx context.Context, request ToolReq
 	}
 }
 
+// executeSearchWithProvenance runs search_files through the same access check
+// as ExecuteTool and also reports whether the scan itself ended complete.
+func (e *WorkspaceToolExecutor) executeSearchWithProvenance(ctx context.Context, request ToolRequest) (string, bool, error) {
+	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
+		return "", false, err
+	}
+	return e.searchFilesWithProvenance(ctx, request)
+}
+
 func (e *WorkspaceToolExecutor) readFile(ctx context.Context, request ToolRequest) (string, error) {
 	var input struct {
 		Path      string `json:"path"`
