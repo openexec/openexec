@@ -661,7 +661,16 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 	// invalidates its token observation and can refuse an otherwise admissible
 	// recovery before HTTP. The existing admission charges this appended message
 	// in full, within the same context and remaining token grant.
-	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, emptyCompletionRecoveryInstruction))
+	// A Qwen model that spent the whole output allowance on private reasoning
+	// does it again when asked the same way: on 11-12 Solar's T-US-CS29AB35C-001-013
+	// spent 48,379 and then 50,221 reasoning tokens (47 min) and kept nothing.
+	// The final-synthesis recovery already turns its thinking off for this
+	// retry with /no_think; the empty-response recovery does the same.
+	recovery := emptyCompletionRecoveryInstruction
+	if reasoningOnly && strings.Contains(strings.ToLower(request.Model), "qwen") {
+		recovery = "/no_think\n" + recovery
+	}
+	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, recovery))
 	response, err = p.completeChecked(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider empty-response recovery failed%s: %w", firstObservation, err)
