@@ -89,7 +89,7 @@ require (
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.47.0
 	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	modernc.org/libc v1.67.6 // indirect
