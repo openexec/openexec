@@ -62,11 +62,68 @@ var deniedComponents = map[string]bool{
 //     path a patch header can name; whole-file writes are containable in a way
 //     patches are not, and small local models produce better whole files than
 //     diffs anyway.
-type WorkspaceToolExecutor struct{}
+type WorkspaceToolExecutor struct {
+	// Per-execution descriptors. Nil on a standalone executor.
+	pinnedReads map[string]*os.Root
+}
 
 var _ ToolExecutor = (*WorkspaceToolExecutor)(nil)
 
 func NewWorkspaceToolExecutor() *WorkspaceToolExecutor { return &WorkspaceToolExecutor{} }
+
+// pinReadableRoots holds the directories themselves, not just their names,
+// until the execution ends. A swapped checkout cannot redirect a later read.
+func (e *WorkspaceToolExecutor) pinReadableRoots(paths []string, identities []ReadableRootIdentity) (ToolExecutor, func(), error) {
+	pinned := &WorkspaceToolExecutor{pinnedReads: make(map[string]*os.Root)}
+	expected := make(map[string]ReadableRootIdentity, len(identities))
+	for _, identity := range identities {
+		if _, duplicate := expected[identity.Path]; duplicate {
+			return nil, nil, errors.New("duplicate readable root identity")
+		}
+		expected[identity.Path] = identity
+	}
+	if len(identities) > 0 && len(expected) != len(paths) {
+		return nil, nil, errors.New("readable root identities do not match roots")
+	}
+	closeRoots := func() {
+		for _, root := range pinned.pinnedReads {
+			_ = root.Close()
+		}
+	}
+	for _, path := range paths {
+		if _, ok := pinned.pinnedReads[path]; ok {
+			continue
+		}
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil || !filepath.IsAbs(path) || resolved != filepath.Clean(path) {
+			closeRoots()
+			return nil, nil, fmt.Errorf("readable root %q is not a stable canonical directory", path)
+		}
+		root, err := openReadableRoot(path)
+		if err != nil {
+			closeRoots()
+			return nil, nil, fmt.Errorf("readable root %q: %w", path, err)
+		}
+		opened, openErr := root.Stat(".")
+		named, nameErr := os.Lstat(path)
+		if openErr != nil || nameErr != nil || !os.SameFile(opened, named) {
+			_ = root.Close()
+			closeRoots()
+			return nil, nil, fmt.Errorf("readable root %q changed during admission", path)
+		}
+		if len(identities) > 0 {
+			want, ok := expected[path]
+			actual, identityErr := readableRootIdentityOf(path, opened)
+			if !ok || identityErr != nil || actual != want {
+				_ = root.Close()
+				closeRoots()
+				return nil, nil, fmt.Errorf("readable root %q changed since caller admission", path)
+			}
+		}
+		pinned.pinnedReads[path] = root
+	}
+	return pinned, closeRoots, nil
+}
 
 // SupportsWorkspaceWrite is true: this executor owns files, and editing them
 // under a granted root is what it is for.
@@ -212,7 +269,7 @@ func (e *WorkspaceToolExecutor) readFile(ctx context.Context, request ToolReques
 	if offset < 0 || limit < 1 || limit > maxReadFileBytes {
 		return "", fmt.Errorf("offset_bytes must be nonnegative and limit_bytes must be between 1 and %d", maxReadFileBytes)
 	}
-	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		file, err := root.Open(relative)
 		if err != nil {
 			return "", fmt.Errorf("read file: %w", err)
@@ -295,7 +352,7 @@ func (e *WorkspaceToolExecutor) listDirectory(request ToolRequest) (string, erro
 	if input.Path == "" {
 		input.Path = "."
 	}
-	return withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, readableRoots(request), "read", func(root *os.Root, relative string) (string, error) {
 		directory, err := root.Open(relative)
 		if err != nil {
 			return "", fmt.Errorf("list directory: %w", err)
@@ -340,7 +397,7 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 	// Writes are contained by the writable roots alone. The working directory
 	// is readable by virtue of being where the run happens; that does not make
 	// it writable.
-	return withinRoots(input.Path, request.WorkingDir, request.WritableRoots, "write", func(root *os.Root, relative string) (string, error) {
+	return e.withinRoots(input.Path, request.WorkingDir, request.WritableRoots, "write", func(root *os.Root, relative string) (string, error) {
 		// Decide before creating either parents or the file. The descriptor check
 		// below remains the final authority after open, but it is too late to be
 		// the first check: O_CREATE and MkdirAll are themselves side effects.
@@ -383,24 +440,17 @@ func (e *WorkspaceToolExecutor) writeFile(request ToolRequest) (string, error) {
 // but cannot see `notes -> .openexec/config.json`.
 //
 // Linux exposes the stable target of an open descriptor through /proc. If proc
-// is unavailable, and on other platforms, the check falls back to resolving
-// the name. That fallback is best-effort for the denied-subtree decision;
-// os.Root still owns containment of the actual operation.
+// is unavailable, and on other platforms, the check never resolves a pathname:
+// it walks the relative path through the root descriptor and fails closed on
+// any symlink.
 func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument string) error {
-	resolvedRoot, err := filepath.EvalSymlinks(root.Name())
+	resolved, ok := descriptorPath(file)
+	if !ok {
+		return refuseDeniedOpenedTargetWithoutProc(root, file, relative, argument)
+	}
+	resolvedRoot, err := resolveRootDescriptor(root)
 	if err != nil {
 		return fmt.Errorf("verify workspace root for %q: %w", argument, err)
-	}
-	resolved := ""
-	if runtime.GOOS == "linux" {
-		resolved, err = os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(file.Fd()), 10)))
-		resolved = strings.TrimSuffix(resolved, " (deleted)")
-	}
-	if resolved == "" || err != nil {
-		resolved, err = filepath.EvalSymlinks(filepath.Join(root.Name(), relative))
-	}
-	if err != nil {
-		return fmt.Errorf("verify opened path %q: %w", argument, err)
 	}
 	policyPath, err := filepath.Rel(resolvedRoot, resolved)
 	if err != nil || policyPath == ".." || strings.HasPrefix(policyPath, ".."+string(filepath.Separator)) {
@@ -411,6 +461,68 @@ func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument s
 			argument, component)
 	}
 	return nil
+}
+
+// refuseDeniedOpenedTargetWithoutProc is the check for a platform that cannot
+// name an open descriptor. The relative path is walked component by component
+// from the root descriptor with no-follow opens (openedFileByDescriptorWalk),
+// so a swap of the root's path cannot change the answer and a symlink swapped
+// in or out between separate inspections cannot be missed: any symlink fails
+// closed, and the walked object must be the very file that was opened.
+func refuseDeniedOpenedTargetWithoutProc(root *os.Root, file *os.File, relative, argument string) error {
+	cleaned := filepath.Clean(relative)
+	if filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("verify opened path %q: resolved target is outside the workspace root", argument)
+	}
+	if err := openedFileByDescriptorWalk(root, file, cleaned); err != nil {
+		return fmt.Errorf("verify opened path %q: %w", argument, err)
+	}
+	if component, denied := deniedComponent(cleaned); denied {
+		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
+			argument, component)
+	}
+	return nil
+}
+
+// resolveRootDescriptor names the directory the descriptor holds, not whatever
+// the root's path names now. For a pinned root the two differ once the checkout
+// is swapped; comparing a file opened beneath the descriptor with the path's
+// current target would refuse the original or, worse, bless the replacement.
+// Without a descriptor name the path is all there is, so it is accepted only
+// while it still names the very directory the descriptor holds; otherwise the
+// check fails closed instead of judging the original by the replacement.
+func resolveRootDescriptor(root *os.Root) (string, error) {
+	if directory, err := root.Open("."); err == nil {
+		defer directory.Close()
+		if target, ok := descriptorPath(directory); ok {
+			return target, nil
+		}
+	}
+	resolved, err := filepath.EvalSymlinks(root.Name())
+	if err != nil {
+		return "", err
+	}
+	held, heldErr := root.Stat(".")
+	named, namedErr := os.Stat(resolved)
+	if heldErr != nil || namedErr != nil || !os.SameFile(held, named) {
+		return "", errors.New("workspace root no longer names the directory held open")
+	}
+	return resolved, nil
+}
+
+// descriptorPath is the kernel's name for an open descriptor. It is a variable
+// so tests can drive a platform without /proc (macOS, restricted containers).
+var descriptorPath = procDescriptorPath
+
+func procDescriptorPath(file *os.File) (string, bool) {
+	if runtime.GOOS != "linux" {
+		return "", false
+	}
+	target, err := os.Readlink(filepath.Join("/proc/self/fd", strconv.FormatUint(uint64(file.Fd()), 10)))
+	if err != nil || !filepath.IsAbs(target) {
+		return "", false
+	}
+	return strings.TrimSuffix(target, " (deleted)"), true
 }
 
 // refuseDeniedProspectiveTarget resolves every existing prefix, then appends
@@ -499,7 +611,7 @@ func readableRoots(request ToolRequest) []string {
 // resolved by the kernel beneath that descriptor. A path naming a denied
 // component is refused before any of that: those files are inside the roots by
 // construction, so containment is not what keeps them out.
-func withinRoots(argument, workingDir string, roots []string, action string, run func(*os.Root, string) (string, error)) (string, error) {
+func (e *WorkspaceToolExecutor) withinRoots(argument, workingDir string, roots []string, action string, run func(*os.Root, string) (string, error)) (string, error) {
 	if strings.TrimSpace(argument) == "" {
 		return "", errors.New("path is required")
 	}
@@ -515,17 +627,30 @@ func withinRoots(argument, workingDir string, roots []string, action string, run
 		if path == "" {
 			continue
 		}
-		root, err := os.OpenRoot(path)
-		if err != nil {
-			continue
+		root, pinned := e.pinnedReads[path]
+		if !pinned {
+			var err error
+			root, err = os.OpenRoot(path)
+			if err != nil {
+				continue
+			}
 		}
 		relative, ok := relativeTo(root.Name(), workingDir, argument)
 		if !ok {
-			_ = root.Close()
+			if !pinned {
+				_ = root.Close()
+			}
 			continue
 		}
+		if pinned {
+			if err := pinnedRootStillNamed(root, path); err != nil {
+				return "", err
+			}
+		}
 		output, err := run(root, relative)
-		_ = root.Close()
+		if !pinned {
+			_ = root.Close()
+		}
 		if err == nil {
 			return output, nil
 		}
