@@ -83,3 +83,29 @@ incident-time resolved repository and branch, the deployed observer revision,
 an authenticated sanitized CI response and the matching Actions run, then
 record the live `openexec-ci` reading. Merging #206 is deliberately not the
 next step: it is forbidden for now, and a docs note would not repair the signal.
+
+## Refresh 2026-11-13 (retained-entry reconciliation)
+
+Read-only. No merge, deploy, new review, allowance change or push to #206.
+
+- **PR #206, re-read with `gh pr view 206` on 2026-11-13**: state OPEN, head
+  `89c8311497cc7d15da7c2fb8e7fc33173dec84ad`, one commit, `updatedAt`
+  2026-11-04T15:54:12Z (unchanged since publication, so nothing was pushed).
+  Body is exactly the original text quoted above. `reviews: []`, `comments: []`.
+- **Review 6116e3bd**: GitHub holds no review object and the body does not cite
+  the id, so it is not attached on GitHub. The authoritative record is the
+  console's review store, which this lane pass cannot read (the console refused
+  filesystem access outside the checkout and `observe_current_outcome`
+  refused). Exactly what is missing: the console review record for 6116e3bd
+  (reviewed head, verdict, timestamp). Status stays **unverified from here**;
+  it is not recreated.
+- **Goal Stop and accounting before/after**: the before reference is Goal
+  2836bee8, head `89c83114`, decision bcdff55d appliedAt 2026-11-07T20:06:55Z.
+  After reference: this pass only edits this file on the task branch; it holds
+  no write path to Goal, Stop or accounting records. The row-level comparison
+  needs the console store and is **unproven here**.
+- **Observer criterion**: delivered by PR #227 at `3a4d8c48`
+  (`openexec-ci-signal-health-2026-11-11.md`); cited, not re-derived.
+- **Next step (unchanged)**: operator runs the incident 4265 observer
+  diagnostics; additionally the console owner can attach the 6116e3bd record
+  and Stop/accounting rows to this task.
