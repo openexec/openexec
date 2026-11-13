@@ -46,14 +46,23 @@ const recallTool = "recall_prior_tool_result"
 // original messages remain intact; only the provider's request is compacted.
 type priorResults map[string]string
 
-func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+// compactWith omits only results eligible by structure: a paired, successful
+// list_directory or search_files call whose result position and text hash are
+// in completeScans, which the executor path fills only from the scan itself.
+// No branch reads a filename or output text; an unmarked result is never
+// eligible.
+func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string) (agent.Request, bool) {
 	copyRequest := r
 	copyRequest.Messages = append([]agent.Message(nil), r.Messages...)
-	// Only a known workspace directory listing contains names alone. File
-	// reads, searches and unknown tools can contain governing instructions.
+	// File reads and unknown tools can contain governing instructions.
 	pending := map[string][]string{}
 	ambiguous := map[string]bool{}
-	eligible := map[[2]int]bool{}
+	labels := map[[2]int]string{}
 	for i, message := range r.Messages {
 		for j, block := range message.Content {
 			switch block.Type {
@@ -65,7 +74,16 @@ func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
 			case agent.ContentTypeToolResult:
 				calls := pending[block.ToolResultID]
 				if len(calls) > 0 {
-					eligible[[2]int{i, j}] = !ambiguous[block.ToolResultID] && calls[0] == "list_directory"
+					position := [2]int{i, j}
+					complete := completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput)
+					if complete && !ambiguous[block.ToolResultID] {
+						switch calls[0] {
+						case "list_directory":
+							labels[position] = "directory listing"
+						case "search_files":
+							labels[position] = "complete search result"
+						}
+					}
 					pending[block.ToolResultID] = calls[1:]
 					if len(calls) == 1 {
 						delete(ambiguous, block.ToolResultID)
@@ -79,17 +97,17 @@ func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
 		copyRequest.Messages[i].Content = append([]agent.ContentBlock(nil), r.Messages[i].Content...)
 		for j := len(r.Messages[i].Content) - 1; j >= 0; j-- {
 			b := &copyRequest.Messages[i].Content[j]
-			if b.Type != agent.ContentTypeToolResult || !eligible[[2]int{i, j}] || b.ToolError != "" || len(b.ToolOutput) < 256 {
+			if b.Type != agent.ContentTypeToolResult || labels[[2]int{i, j}] == "" || b.ToolError != "" || len(b.ToolOutput) < 256 {
 				continue
 			}
 			kept++
 			if kept <= 1 {
 				continue
 			}
-			hash := sha256.Sum256([]byte(b.ToolOutput))
-			id := hex.EncodeToString(hash[:])
+			id := sha256Hex(b.ToolOutput)
 			p[id] = b.ToolOutput
-			b.ToolOutput = fmt.Sprintf("Prior directory listing retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", id, len(b.ToolOutput), recallTool)
+			label := labels[[2]int{i, j}]
+			b.ToolOutput = fmt.Sprintf("Prior %s retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", label, id, len(b.ToolOutput), recallTool)
 			changed = true
 		}
 	}
