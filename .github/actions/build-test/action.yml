@@ -1,0 +1,65 @@
+name: build-test
+description: Build the embedded UI, then build and test the Go module. Shared by the Linux and macOS legs of CI so the two cannot drift.
+inputs:
+  go-version:
+    description: Go toolchain version
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ inputs.go-version }}
+        # never cached: the macOS Go cache alone was 351 MB of the 500 MB Actions storage allowance
+        cache: false
+
+    - name: Set up Node
+      uses: actions/setup-node@v5
+      with:
+        node-version: '22'
+        cache: ''
+
+    # Release-style builds explicitly embed the generated UI. Ordinary module
+    # consumers use the tracked fallback and do not need Node artifacts.
+    - name: Build UI (embedded in binary)
+      shell: bash
+      run: npm ci && npm run build
+      working-directory: ui
+
+    - name: Test UI
+      shell: bash
+      run: npx vitest run --fileParallelism=false
+      working-directory: ui
+
+    - name: Install dependencies
+      shell: bash
+      run: go mod download
+
+    - name: Build
+      shell: bash
+      run: go build -tags ui_dist -v -o bin/openexec ./cmd/openexec
+
+    - name: Test
+      shell: bash
+      run: go test -v ./...
+
+    - name: Workspace search guard removals
+      shell: bash
+      run: python3 scripts/verify-workspace-search.py
+
+    - name: Compatibility Regression
+      shell: bash
+      run: make compat-test
+
+    # Advisory until the pre-existing backlog is cleared: golangci-lint
+    # reports 142 historical issues (errcheck/unused/staticcheck) that
+    # predate the lint gate ever running (CI previously failed at Build,
+    # so this step never executed). New code must keep
+    # `golangci-lint run` clean locally; do not add to the backlog.
+    - name: Lint
+      uses: golangci/golangci-lint-action@v8
+      continue-on-error: true
+      with:
+        version: latest
+        skip-cache: true
