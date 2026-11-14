@@ -238,7 +238,7 @@ func TestNativeCaptureObservesConsumedRequestAndPersistedFallback(t *testing.T) 
 	}{
 		{"success", `cat > "$3/consumed.json"; printf '{"configuration":"fixture","files":[],"diagnostics":[]}'`, "exit_0", false, 5 * time.Second, true},
 		{"deadline", `cat > "$3/consumed.json"; exec sleep 30`, "extractor_deadline", false, 200 * time.Millisecond, false},
-		{"caller", `cat > "$3/consumed.json"; exec sleep 30`, "caller_cancellation", true, 5 * time.Second, false},
+		{"caller", `cat > "$3/consumed.json"; touch "$3/ready"; exec sleep 30`, "caller_cancellation", true, 30 * time.Second, false},
 		{"signal", `cat > "$3/consumed.json"; kill -9 $$`, "external_signal", false, 5 * time.Second, false},
 		{"ordinary", `cat > "$3/consumed.json"; echo PRIVATE_STDERR >&2; exit 3`, "ordinary_nonzero_exit", false, 5 * time.Second, false},
 		{"malformed success", `cat > "$3/consumed.json"; printf PRIVATE_STDOUT`, "exit_0", false, 5 * time.Second, false},
@@ -255,7 +255,24 @@ func TestNativeCaptureObservesConsumedRequestAndPersistedFallback(t *testing.T) 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			if tc.cancel {
-				time.AfterFunc(500*time.Millisecond, cancel)
+				// Cancel only after the child consumed the request. A timer started
+				// before store setup can expire before the extractor is launched.
+				done := ctx.Done()
+				go func() {
+					ticker := time.NewTicker(10 * time.Millisecond)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-done:
+							return
+						case <-ticker.C:
+							if _, err := os.Stat(filepath.Join(root, "ready")); err == nil {
+								cancel()
+								return
+							}
+						}
+					}
+				}()
 			}
 			var captured compilerObservation
 			var record nativeChildRecord
