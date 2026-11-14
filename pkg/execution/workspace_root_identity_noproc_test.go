@@ -9,15 +9,20 @@ import (
 	"testing"
 )
 
+func noProc(t *testing.T) {
+	t.Helper()
+	prev := descriptorPath
+	t.Cleanup(func() { descriptorPath = prev })
+	descriptorPath = func(*os.File) (string, bool) { return "", false }
+}
+
 // Without /proc (macOS, restricted containers) the denied-component check has
 // no kernel name for the pinned directory. A swap must not let the check judge
 // the original by the replacement: the original holds `link -> .openexec/...`
 // and the replacement holds an innocent file of the same name. Reading `link`
 // through the pinned descriptor opens the protected file, so it must be refused.
 func TestNoProcSwapPlusSymlinkDoesNotBlessProtectedTarget(t *testing.T) {
-	prev := descriptorPath
-	t.Cleanup(func() { descriptorPath = prev })
-	descriptorPath = func(*os.File) (string, bool) { return "", false }
+	noProc(t)
 
 	f := newIdentityFixture(t)
 	protected := filepath.Join(f.selected, ".openexec")
@@ -74,16 +79,25 @@ func TestNoProcSwapPlusSymlinkDoesNotBlessProtectedTarget(t *testing.T) {
 	}
 }
 
-// Without /proc the opened file must still be the object the root names: a
-// plain file swapped for another after open is refused, and an unchanged one
-// is accepted (near miss).
-func TestNoProcRefusesFileReplacedAfterOpen(t *testing.T) {
-	prev := descriptorPath
-	t.Cleanup(func() { descriptorPath = prev })
-	descriptorPath = func(*os.File) (string, bool) { return "", false }
+// The race the Lstat/Stat pairing could not close: the descriptor is opened on a
+// symlink that reaches the protected file, and the name is then flipped between
+// an ordinary file and the symlink around the check. The decision rests on the
+// descriptor's identity, so it is refused in every state of the name, and a
+// plain file (near miss) is still accepted.
+func TestNoProcRefusesProtectedDescriptorWhateverTheNameNowIs(t *testing.T) {
+	noProc(t)
 
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "note"), []byte("original"), 0600); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, ".openexec"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".openexec", "config"), []byte("protected-needle"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plain"), []byte("ok"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(".openexec", "config"), filepath.Join(dir, "link")); err != nil {
 		t.Fatal(err)
 	}
 	root, err := os.OpenRoot(dir)
@@ -91,22 +105,80 @@ func TestNoProcRefusesFileReplacedAfterOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer root.Close()
-	file, err := root.Open("note")
+
+	plain, err := root.Open("plain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer plain.Close()
+	if err := refuseDeniedOpenedTarget(root, plain, "plain", "plain"); err != nil {
+		t.Fatalf("plain file refused: %v", err)
+	}
+
+	file, err := root.Open("link")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	if err := refuseDeniedOpenedTarget(root, file, "note", "note"); err != nil {
-		t.Fatalf("unchanged plain file refused: %v", err)
+	check := func(state string) {
+		t.Helper()
+		err := refuseDeniedOpenedTarget(root, file, "link", "link")
+		if err == nil {
+			t.Fatalf("protected descriptor served while name is %s", state)
+		}
+		if strings.Contains(err.Error(), dir) || strings.Contains(err.Error(), "protected-needle") {
+			t.Fatalf("refusal discloses data in state %s: %v", state, err)
+		}
 	}
-	if err := os.Remove(filepath.Join(dir, "note")); err != nil {
+	check("the symlink")
+	if err := os.Remove(filepath.Join(dir, "link")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "note"), []byte("replacement"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "link"), []byte("ordinary"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	err = refuseDeniedOpenedTarget(root, file, "note", "note")
-	if err == nil || strings.Contains(err.Error(), dir) {
-		t.Fatalf("replaced file served or error leaks path: %v", err)
+	check("an ordinary file")
+	if err := os.Remove(filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(".openexec", "config"), filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	check("the symlink again")
+}
+
+// A symlink carrying a protected name cannot be judged without /proc, so the
+// check fails closed; an ordinary symlink elsewhere is a near miss and does
+// not stop an unrelated plain file.
+func TestNoProcFailsClosedOnProtectedNameSymlink(t *testing.T) {
+	noProc(t)
+
+	dir := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "plain"), []byte("ok"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, "harmless")); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	file, err := root.Open("plain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	if err := refuseDeniedOpenedTarget(root, file, "plain", "plain"); err != nil {
+		t.Fatalf("near miss refused: %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(dir, ".git")); err != nil {
+		t.Fatal(err)
+	}
+	err = refuseDeniedOpenedTarget(root, file, "plain", "plain")
+	if err == nil || strings.Contains(err.Error(), outside) {
+		t.Fatalf("protected-name symlink accepted or error leaks path: %v", err)
 	}
 }

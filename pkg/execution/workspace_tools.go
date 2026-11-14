@@ -464,38 +464,81 @@ func refuseDeniedOpenedTarget(root *os.Root, file *os.File, relative, argument s
 }
 
 // refuseDeniedOpenedTargetWithoutProc is the check for a platform that cannot
-// name an open descriptor. Every step goes through the root descriptor, so a
-// swap of the root's path cannot change the answer. Any symlink on the way
-// fails closed, because without a kernel name the target of a link cannot be
-// judged from the descriptor alone. For a path of plain components the opened
-// file must also be the object the root still names, which catches a link
-// replaced between open and check.
+// name an open descriptor. No pathname is trusted to name the opened object: a
+// swap between any two path operations could make "what does the name resolve
+// to now" approve a protected file. Instead the descriptor's own identity
+// (device and inode, which no swap can change) is compared with every object
+// under a denied directory reachable through the root descriptor. A match, or
+// a walk that cannot complete, refuses the open.
 func refuseDeniedOpenedTargetWithoutProc(root *os.Root, file *os.File, relative, argument string) error {
 	cleaned := filepath.Clean(relative)
 	if filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
 		return fmt.Errorf("verify opened path %q: resolved target is outside the workspace root", argument)
 	}
-	prefix := ""
-	for _, component := range strings.Split(cleaned, string(filepath.Separator)) {
-		prefix = filepath.Join(prefix, component)
-		info, err := root.Lstat(prefix)
-		if err != nil {
-			return fmt.Errorf("verify opened path %q: %w", argument, err)
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("verify opened path %q: cannot verify the target of a symbolic link on this platform", argument)
-		}
+	opened, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("verify opened path %q: %w", argument, err)
 	}
-	fileInfo, fileErr := file.Stat()
-	rootInfo, rootErr := root.Stat(cleaned)
-	if fileErr != nil || rootErr != nil || !os.SameFile(fileInfo, rootInfo) {
-		return fmt.Errorf("verify opened path %q: the path changed while it was being opened", argument)
+	budget := maxDeniedWalkEntries
+	protected, err := walkForProtectedIdentity(root, ".", false, opened, &budget)
+	if err != nil {
+		return fmt.Errorf("verify opened path %q: %w", argument, err)
+	}
+	if protected {
+		return fmt.Errorf("%q is not readable or writable: its resolved target is inside a directory which holds configuration and credentials for this workspace",
+			argument)
 	}
 	if component, denied := deniedComponent(cleaned); denied {
 		return fmt.Errorf("%q is not readable or writable: its resolved target enters %s, which holds configuration and credentials for this workspace",
 			argument, component)
 	}
 	return nil
+}
+
+// maxDeniedWalkEntries bounds the fallback walk; past it the check fails closed.
+const maxDeniedWalkEntries = 200000
+
+// walkForProtectedIdentity reports whether the opened object is the same
+// device/inode as anything beneath a denied-named directory. Symlinks are never
+// followed; a symlink carrying a denied name fails closed.
+func walkForProtectedIdentity(root *os.Root, dirPath string, inDenied bool, opened os.FileInfo, budget *int) (bool, error) {
+	dir, err := root.Open(dirPath)
+	if err != nil {
+		return false, err
+	}
+	entries, err := dir.ReadDir(-1)
+	dir.Close()
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		*budget--
+		if *budget < 0 {
+			return false, errors.New("workspace too large to verify without /proc")
+		}
+		child := filepath.Join(dirPath, entry.Name())
+		info, err := root.Lstat(child)
+		if err != nil {
+			return false, err
+		}
+		denied := inDenied || deniedComponents[entry.Name()]
+		if info.Mode()&os.ModeSymlink != 0 {
+			if deniedComponents[entry.Name()] {
+				return false, errors.New("cannot verify a symbolic link with a protected name on this platform")
+			}
+			continue
+		}
+		if denied && os.SameFile(opened, info) {
+			return true, nil
+		}
+		if info.IsDir() {
+			found, err := walkForProtectedIdentity(root, child, denied, opened, budget)
+			if err != nil || found {
+				return found, err
+			}
+		}
+	}
+	return false, nil
 }
 
 // resolveRootDescriptor names the directory the descriptor holds, not whatever
