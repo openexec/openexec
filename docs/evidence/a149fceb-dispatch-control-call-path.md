@@ -8,20 +8,19 @@ where the same names still exist at different lines (`executeToolScan`:
 earlier version of this record wrongly said it no longer exists). `a149fceb` is
 not an ancestor of main `15791724`; it was read from this checkout's object store.
 
-## 1. Raw job 126662911673 — still UNPROVABLE by this pass, with reasons
-- `grep -rlI 126662911673 /mnt/data1/projects/owner-model` (job runner project):
-  no file contains the id (command ran, empty output).
-- The live Agent Console data directory is `/home/perttu/.agent-console` (an
-  earlier version of this record searched `/mnt/data1/projects/agent-console/data`,
-  the wrong place). This pass could NOT search it: the sandbox refused `grep` and
-  `run_command` on that path ("outside the task's checkout"). `Read` reaches
-  `state.json` but it is one ~MB-scale line that cannot be read or searched
-  here. A reviewer reported the id appears in `state.json` and in
-  `watch-snapshot-*` files only as task/session titles quoting it, not as a raw
-  log; this pass could not confirm or refute that. Directories `checks`, `chat`,
-  `deploy-evidence` there were not searched by anyone.
-- Conclusion: the raw log contents are unprovable from this sandbox. This is a
-  limit of access, not a finding that the log does not exist.
+## 1. Raw job 126662911673 — UNAVAILABLE (no raw log retained)
+Basis: a search by the supervisor outside the lane sandbox (addendum 1, ~13:55Z
+2026-11-14) of the live data directory `/home/perttu/.agent-console`. This pass
+did not repeat it (the lane sandbox refuses `grep`/`run_command` there); it is
+the supervisor's reported result, not something this pass observed.
+- `checks/`, `chat/` and `deploy-evidence/`: no file mentions the id.
+- `state.json`: mentions it once, as a task/session title quoting the id, not a log.
+- `watch-snapshot-*`: title references only (matches the reviewer's reading).
+- `grep -rlI 126662911673 /mnt/data1/projects/owner-model`: no file (this pass ran it).
+- Earlier versions of this record searched `/mnt/data1/projects/agent-console/data`,
+  the wrong place; that search is void.
+- Conclusion: no raw log for job 126662911673 is retained. Its contents were not
+  read and are not invented here.
 
 ## 2. Material actually read (via `inspect_repository`, local branches)
 - `a149fceb` (17da source merge) and parents `0bbd3f2d`, `d4e65423`; at that
@@ -85,8 +84,16 @@ Consistent with test line 56 and with the observed exit 0.
 ## 6. Cleanliness
 Temporary checkout `.tmp-a149` (detached at `a149fceb`) showed no changes under
 `pkg/` or `scripts/` after the run; its directory was deleted with `rm -rf`.
-`git worktree prune` and `git worktree list` are refused by this sandbox, so the
-removal of the `.git/worktrees/.tmp-a149` admin entry could not be shown; a
-reviewer saw it listed as `prunable`. Pruning it is unprovable here and harmless
-(it needs `git worktree prune` by the owner or console). This pass changed only
-this document; no `pkg/` or `scripts/` file.
+Its stale admin entry was still listed as `prunable` in this worktree. This pass
+ran:
+
+```
+$ git worktree prune -v
+Removing worktrees/-tmp-a149: gitdir file points to non-existent location
+$ git worktree list | grep -c a149
+0
+```
+
+The supervisor also reports 0 matches for `a149` in the main checkout's
+`git worktree list`. This pass changed only this document; no `pkg/` or
+`scripts/` file.
