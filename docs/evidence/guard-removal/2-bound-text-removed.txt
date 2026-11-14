@@ -1,0 +1,225 @@
+2026/11/10 05:21:50 [StateStore] Initialized: path=/tmp/TestOverlongRealExampleIsRepairedOnceWithTheBound1690517097/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:50 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+--- FAIL: TestOverlongRealExampleIsRepairedOnceWithTheBound (0.20s)
+    planner_reference_length_test.go:97: repair instruction lacks "change only that story's real_example": You are a software architect fixing user stories based on detailed reviewer feedback.
+        
+        The reviewer has analyzed the stories and provided a refactoring plan. Follow it within the accepted goal and retained authority boundaries.
+        
+        EXECUTION AND HUMAN BOUNDARIES:
+        For each implementation task, supply allowed_paths: an array of exact repository-relative files or explicit directory prefixes ending in /. Include bounded implementation and repair files within the accepted contract. These paths do not grant effects or owner authority. Never use missing scope, dot paths, absolute paths or wildcards to mean the whole repository. The independent plan reviewer must check the scope against the task and accepted outcome.
+        Use mode "afk" for planning, ordering, implementation, automated QA, independent
+        agent review, ordinary repairs and bounded experiments within the accepted goal.
+        Use mode "hitl" only for an unresolved owner preference, a material goal or
+        completion-criteria change, missing authority or resources, credentials/access,
+        or an action only the human can perform. Planning and QA are not inherently HITL.
+        For each HITL task, supply decision_reason explaining the specific unresolved
+        boundary and decision_ref if an existing request is known. Never invent approval,
+        credentials or a decision reference. Keep preparation runnable before the boundary;
+        make only work requiring the answer depend on the HITL task. Preserve existing
+        HITL task identity, reason, decision reference and dependencies during refinement,
+        including legacy HITL without metadata. An agent cannot reconcile away a human
+        boundary. Goal acceptance does not authorize arbitrary spend, publication,
+        messages, destructive actions or privilege expansion. Check actual effect authority.
+        Do not include secrets in decision reasons or references.
+        
+        REQUIREMENT IDENTITY:
+        requirement_id MUST be a scalar JSON string, never an array, even when reviewer
+        prose requests multiple structured references. The declared schema takes
+        precedence. Preserve every requirement's coverage in the stories and their
+        acceptance criteria; do not drop mappings or concatenate IDs into a fake ID.
+        Split stories where necessary to represent distinct requirement identities.
+        A story's "requirement_id" is the identifier the intent itself gives that
+        requirement, copied verbatim: a REQ-XXX where the intent numbers requirements,
+        otherwise its accepted condition id (for example "routing"). Never invent
+        REQ-XXX aliases for identifiers the intent already has, and never add fields
+        the output format does not list (an alias table, "maps_to"): they are dropped
+        before review. A requirement_id equal to the intent's identifier IS the
+        structured mapping; do not ask for another.
+        For an enabling story with no accepted requirement of its own, use the empty
+        string "". The schema normalizes null and an omitted requirement_id to "" before
+        review and persistence. These mean the same absence of a requirement mapping;
+        do not reject an enabling story merely because null became "", and do not
+        request JSON null as a correction to that canonical empty string. Keep the
+        story's contract consistent with this representation. Real accepted requirement
+        identifiers must still be preserved and covered.
+        
+        REPOSITORY SCOPE:
+        Every task changes and verifies files in THIS repository only; its
+        verification_script reads nothing from another checkout. Work the intent
+        needs in another repository is not a task here: name it in the owning story's
+        contract as a follow-up for that repository, and plan this repository's side
+        so it is complete and verifiable on its own. Reject any task that edits,
+        builds or verifies another repository.
+        
+        DELIVERY-ORDERED EVIDENCE:
+        Tasks finish before the coordinator publishes, merges, deploys or restarts the
+        candidate, and no task can perform those effects. Evidence that only the
+        delivered, running candidate can produce (its served revision, live or
+        production behaviour, a restart of the serving system, dogfood records made by
+        the new code) is never a task's acceptance criterion or verification. Tasks
+        implement the change and prove it against the candidate with executable
+        regressions, and may build the export or check that will gather the live
+        evidence. Name the live evidence in the owning story's contract as verified by
+        the coordinator's Goal review after delivery; that review plans any remaining
+        gap. Evidence the running system already holds may be read by a task through
+        an authorized read-only route. Do not reject a plan for leaving
+        delivery-ordered evidence to the Goal review, and do not admit only a
+        discovery story while every implementation story waits for evidence that
+        cannot exist before delivery.
+        
+        CANDIDATE COMMIT OWNERSHIP:
+        Follow the commit policy of the supplied intent and execution workflow. When
+        Agent Console or another coordinator owns candidate commits, tasks implement
+        and verify changes and leave candidate commits to that coordinator. Do not
+        instruct those tasks to call safe_commit or make any other commit, including
+        preparation commits. When the workflow delegates task commits and safe_commit
+        is available, use it with the actual owning story_id and task_id for verified
+        changes. Never invent commit authority or an owning story. Complete autonomous
+        preparation before a retained human acceptance boundary; the acceptance task
+        must not mutate or commit the exact candidate it asks the owner to accept.
+        
+        OUTCOME SHAPE (plans with two or more implementation stories):
+        1. BASELINE FIRST: Before planning a build, record in the plan's "baseline"
+           object what the cheapest approach gives on the real example: "approach"
+           (for example one chat with a current frontier model, an existing tool or a
+           short script), "result" (what it produces), "bar" (how this plan beats that
+           result, measurably), "verdict" ("build", "build_on_baseline" or
+           "do_not_build") and "source" (where in the intent or repository the
+           evidence comes from). Use only evidence the intent or repository supplies;
+           never call an external or billed model to produce it. When the baseline is
+           good enough, recommend "do_not_build" or "build_on_baseline" instead of a
+           plan that only re-creates it. Write it so the owner can read it as one short
+           paragraph. The baseline records reasoning; it does not prove usefulness.
+        2. WALKING SKELETON FIRST: Give every story a "role": "study", "skeleton",
+           "core", "infrastructure", "prerequisite" or "validation". The first
+           implementation story is the "skeleton": the thinnest end-to-end slice that
+           runs on the real example input (input -> result -> preview or deployed
+           candidate), however crude. Its "real_example" names that input by path,
+           URL or name and never contains it: at most 300 runes on a single line
+           (describe the input in the story's contract, not in "real_example"). If the intent names no real example,
+           reference the most realistic input it or the repository supplies and say so
+           in the story's contract. The skeleton depends only on study or prerequisite
+           stories. Never start a plan with layers (models, storage, accounts) that
+           have no end-to-end slice before them.
+        3. CORE BEFORE INFRASTRUCTURE: Billing, accounts or tenancy hardening,
+           commercial work and production operations are "infrastructure": they
+           depend, directly or through other stories, on the skeleton, and carry a
+           "role_reason". Work the skeleton itself needs, such as tenant isolation
+           for a private real example, or an order the owner stated, is a
+           "prerequisite" with a "role_reason" naming why; keep owner-stated tasks and
+           dependencies as stated. Cut stories by outcome, not by brief section: each
+           one measurably improves the end-to-end result, or is infrastructure with
+           its reason.
+        Roles are declared, not inferred from titles; the reviewer judges whether
+        each role and reason is honest, and refuses a plan that mislabels work to
+        satisfy this shape.
+        
+        ORIGINAL INTENT:
+        # Kanavat takeoff
+        
+        Real example: drawings/G3022.pdf (owner-held, not committed).
+        
+        ## Data models
+        Equipment, drawing and takeoff models.
+        
+        ## Storage
+        Persist drawings and takeoffs.
+        
+        ## Accounts and tenancy
+        Per-customer accounts; drawings are private.
+        
+        ## Billing
+        Charge per takeoff.
+        
+        ## Production operations
+        Monitoring and backups.
+        
+        ## Upload and result
+        Upload a drawing and get an equipment takeoff.
+        
+        
+        CURRENT STORIES (problematic):
+        {"schema_version":"1.2","baseline":{"approach":"Open the captures by hand","result":"A visual check","bar":"An automatic check","verdict":"build","source":"intent"},"goals":[{"id":"G-001","title":"Cards","description":"Card editor","success_criteria":"","verification_method":""}],"stories":[{"id":"US-001","title":"Tenant isolation for private captures","description":"","requirement_id":"","goal_id":"G-001","depends_on":null,"acceptance_criteria":null,"verification_script":"go test ./...","contract":"","tasks":[{"id":"T-US-001-001","title":"Tenant isolation for private captures","description":"Implement and verify Tenant isolation for private captures","technical_strategy":"","depends_on":null,"mode":"afk","verification_script":""}],"role":"prerequisite","role_reason":"The captures are private"},{"id":"US-002","title":"Render the seed-art captures","description":"Run the editor on the seed-art captures end to end.","requirement_id":"","goal_id":"G-001","depends_on":["US-001"],"acceptance_criteria":null,"verification_script":"go test ./...","contract":"","tasks":[{"id":"T-US-002-001","title":"Render the seed-art captures","description":"Implement and verify Render the seed-art captures","technical_strategy":"","depends_on":null,"mode":"afk","verification_script":""}],"role":"skeleton","real_example":"Captured seed-art screenshots of the card editor at three zoom levels, each capture is a PNG of the rendered card with its bleed area and safe margin overlaid; each capture is a PNG of the rendered card with its bleed area and safe margin overlaid; each capture is a PNG of the rendered card with its bleed area and safe margin overlaid; each capture is a PNG of the rendered card with its bleed area and safe margin overlaid; the captures are described here so the skeleton can run on them."},{"id":"US-003","title":"Perturbation: rotated and cropped captures","description":"","requirement_id":"","goal_id":"G-001","depends_on":["US-002"],"acceptance_criteria":["A capture rotated by 90 degrees renders the same card"],"verification_script":"go test ./...","contract":"","tasks":[{"id":"T-US-003-001","title":"Perturbation: rotated and cropped captures","description":"Implement and verify Perturbation: rotated and cropped captures","technical_strategy":"","depends_on":null,"mode":"afk","verification_script":""}],"role":"core"},{"id":"US-004","title":"Negative control: blank capture is refused","description":"","requirement_id":"","goal_id":"G-001","depends_on":["US-002"],"acceptance_criteria":["A blank capture is rejected with a message"],"verification_script":"go test ./...","contract":"","tasks":[{"id":"T-US-004-001","title":"Negative control: blank capture is refused","description":"Implement and verify Negative control: blank capture is refused","technical_strategy":"","depends_on":null,"mode":"afk","verification_script":""}],"role":"core"}]}
+        
+        REVIEWER ANALYSIS AND REFACTORING PLAN:
+        {"approved":false,"assessment":"Required deterministic plan checks refused this plan. Fix only what they name and change nothing else: keep every story, task, ID, requirement_id, dependency and description as it is.\n\nFailures:\n- outcome shape lint refused: US-002: real_example must reference the input, not contain it: it is 491 runes, but a reference is at most 300 runes on a single line. Shorten it to the path, URL or name of the input and move any description of the input into the story's description or tasks\n\nA verification command must fail the script when its check fails:\n- instead of `cmd || other`, write `cmd || { echo \"what failed\"; exit 1; }`;\n- never pipe `grep -q` into another command: write `grep -q PATTERN FILE || { echo \"missing PATTERN\"; exit 1; }`;\n- never chain `A \u0026\u0026 B || C`: write separate checks, each ending in `|| { echo ...; exit 1; }`;\n- never send the checked command's errors to /dev/null;\n- never diff against a bare local main or master: use origin/main or the task's base revision."}
+        
+        YOUR TASK:
+        Follow the reviewer's refactoring_plan exactly. Generate the proposed stories with:
+        1. One story per requirement as specified
+        2. Specific, technical tasks as listed in the plan
+        3. Acceptance criteria extracted from the intent document
+        4. Proper IDs: US-001, US-002, etc. and T-US-001-001, T-US-001-002, etc.
+        5. DEPENDENCIES: Model dependencies via "depends_on" lists for stories and tasks.
+        6. GOALS: A story's "goal_id" names a goal in CURRENT STORIES' "goals" or
+           "persisted_goals". You cannot create goals; never cite any other goal id.
+        7. OUTCOME SHAPE: Keep every story's "role", "role_reason" and
+           "real_example" as OUTCOME SHAPE requires ("real_example" stays a path, URL
+           or name of at most 300 runes on one line). The plan's current "baseline" is
+           kept. To supply a missing baseline or correct it, return a JSON object
+           instead of the array: {"baseline": {"approach": "...", "result": "...",
+           "bar": "...", "verdict": "build", "source": "..."}, "stories": [the array]}.
+        
+        OUTPUT FORMAT - JSON array:
+        [
+          {
+            "id": "US-001",
+            "title": "Story title from refactoring plan",
+            "description": "As a developer, I want...",
+            "requirement_id": "REQ-001",
+            "role": "skeleton",
+            "real_example": "path, URL or name of the real input",
+            "depends_on": [],
+            "acceptance_criteria": ["Specific criteria from intent"],
+            "verification_script": "npm test",
+            "contract": "",
+            "tasks": [
+              {
+                "id": "T-US-001-001",
+                "title": "Specific task from plan",
+                "description": "Technical details",
+                "depends_on": [],
+                "verification_script": "pytest test_file.py"
+              }
+            ]
+          }
+        ]
+        
+        Output ONLY valid JSON, no markdown or explanations.
+2026/11/10 05:21:50 [StateStore] Initialized: path=/tmp/TestUnrepairedOverlongRealExampleStopsAfterBoundedRepairs175003490/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:50 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:51 [StateStore] Initialized: path=/tmp/TestOverlongRealExampleWithStructuralFailureIsRefused3365087335/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:51 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	1.259s
+FAIL

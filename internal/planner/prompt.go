@@ -133,7 +133,7 @@ credentials or a decision reference. Keep preparation runnable before the bounda
 make only work requiring the answer depend on the HITL task. Preserve existing
 HITL task identity, reason, decision reference and dependencies during refinement,
 including legacy HITL without metadata. An agent cannot reconcile away a human
-boundary. Goal acceptance does not authorize arbitrary spend, publication,
+boundary. A review may ask to move, re-scope or better justify a retained HITL task, but never to delete it, and never to drop the human work it stands for or narrow the accepted scope; refinement keeps every retained HITL task. Goal acceptance does not authorize arbitrary spend, publication,
 messages, destructive actions or privilege expansion. Check actual effect authority.
 Do not include secrets in decision reasons or references.
 `
@@ -161,7 +161,8 @@ const OutcomeShapeRule = `OUTCOME SHAPE (plans with two or more implementation s
    implementation story is the "skeleton": the thinnest end-to-end slice that
    runs on the real example input (input -> result -> preview or deployed
    candidate), however crude. Its "real_example" names that input by path,
-   URL or name and never contains it. If the intent names no real example,
+   URL or name and never contains it: at most 300 runes on a single line
+   (describe the input in the story's contract, not in "real_example"). If the intent names no real example,
    reference the most realistic input it or the repository supplies and say so
    in the story's contract. The skeleton depends only on study or prerequisite
    stories. Never start a plan with layers (models, storage, accounts) that
@@ -456,7 +457,8 @@ Follow the reviewer's refactoring_plan exactly. Generate the proposed stories wi
 6. GOALS: A story's "goal_id" names a goal in CURRENT STORIES' "goals" or
    "persisted_goals". You cannot create goals; never cite any other goal id.
 7. OUTCOME SHAPE: Keep every story's "role", "role_reason" and
-   "real_example" as OUTCOME SHAPE requires. The plan's current "baseline" is
+   "real_example" as OUTCOME SHAPE requires ("real_example" stays a path, URL
+   or name of at most 300 runes on one line). The plan's current "baseline" is
    kept. To supply a missing baseline or correct it, return a JSON object
    instead of the array: {"baseline": {"approach": "...", "result": "...",
    "bar": "...", "verdict": "build", "source": "..."}, "stories": [the array]}.

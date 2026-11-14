@@ -1,0 +1,7 @@
+diff --git a/pkg/manager/planner_replay.go b/pkg/manager/planner_replay.go
+index c3d22d11..ef4b4180 100644
+--- a/pkg/manager/planner_replay.go
++++ b/pkg/manager/planner_replay.go
+@@ -294 +294 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
+-					if repairable := planner.RepairablePlanIssues(result.Plan); len(repairable) != len(issues) {
++					if repairable := planner.VerificationPlanIssues(result.Plan); len(repairable) != len(issues) {
