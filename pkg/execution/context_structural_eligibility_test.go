@@ -206,18 +206,22 @@ func TestQuotedInstructionInCompleteOlderScanIsRecallableNotHeuristicallyKept(t 
 			if !changed {
 				t.Fatal("a structurally complete older scan must be omitted whatever it quotes")
 			}
-			// The unchanged requirement, evaluated over the whole request: the
-			// original quote is present BEFORE recall. It is false here, and
-			// must stay false: making it true would need a content read.
-			quotePresentBeforeRecall := false
-			for _, m := range compacted.Messages {
-				for _, b := range m.Content {
-					quotePresentBeforeRecall = quotePresentBeforeRecall || strings.Contains(b.ToolOutput, "NEVER DEPLOY") || strings.Contains(b.Text, "NEVER DEPLOY")
-				}
+			// The ORIGINAL, unchanged positive requirement, run for real through
+			// a recording tb: the quote must be present in the request BEFORE
+			// recall. Its failure is captured, not waived: it is the executable
+			// contradiction with structural-only eligibility.
+			var rec recordingTB
+			requireQuotePresentBeforeRecall(&rec, compacted, "NEVER DEPLOY without review")
+			t.Logf("original positive assertion on compacted request: failed=%v msg=%q", rec.failed, rec.msg)
+			if !rec.failed {
+				t.Fatal("quote survived omission, so eligibility must have read content")
 			}
-			t.Logf("contradiction control: quote present before recall = %v, structurally eligible = %v", quotePresentBeforeRecall, changed)
-			if quotePresentBeforeRecall {
-				t.Fatal("omission kept the quote, so eligibility read the content")
+			// Discriminating control: the same assertion PASSES on the uncompacted
+			// request, so a failure above means absence, not a broken assertion.
+			var ok recordingTB
+			requireQuotePresentBeforeRecall(&ok, r, "NEVER DEPLOY without review")
+			if ok.failed {
+				t.Fatalf("positive assertion fails on the uncompacted request: %s", ok.msg)
 			}
 			if compacted.System != r.System || compacted.Messages[4].Content[0].ToolOutput != newest || compacted.Messages[0].Content[0].Text != "original request" {
 				t.Fatal("system, user turn or newest scan was altered")
@@ -251,5 +255,36 @@ func TestSearchScanProvenanceComesFromTheScanFlag(t *testing.T) {
 				t.Fatalf("%s %s: complete=%v want %v err=%v", name, path, complete, want, err)
 			}
 		}
+	}
+}
+
+// recordingTB captures a failure of the original positive assertion without
+// failing the suite, so the contradiction stays executable and visible.
+type recordingTB struct {
+	failed bool
+	msg    string
+}
+
+func (r *recordingTB) Helper() {}
+func (r *recordingTB) Errorf(format string, args ...any) {
+	r.failed = true
+	r.msg = fmt.Sprintf(format, args...)
+}
+
+// requireQuotePresentBeforeRecall is the unchanged requirement: the original
+// quoted governing instruction is present in the request before any recall.
+func requireQuotePresentBeforeRecall(tb interface {
+	Helper()
+	Errorf(string, ...any)
+}, req agent.Request, quote string) {
+	tb.Helper()
+	found := strings.Contains(req.System, quote)
+	for _, m := range req.Messages {
+		for _, b := range m.Content {
+			found = found || strings.Contains(b.ToolOutput, quote) || strings.Contains(b.Text, quote)
+		}
+	}
+	if !found {
+		tb.Errorf("quote %q absent from request before recall", quote)
 	}
 }
