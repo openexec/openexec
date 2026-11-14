@@ -60,6 +60,10 @@ func (unpinnedExecutor) ValidateAccess(string, execution.Sandbox, []string) erro
 const (
 	authorizedBytes = "authorized-needle"
 	outsideBytes    = "outside-secret-needle"
+	// Entries that exist in only one of the two directories, so a listing says
+	// which directory served it.
+	originalEntry = "original-only-entry"
+	outsideEntry  = "outside-only-entry"
 )
 
 type rootFixture struct {
@@ -80,6 +84,11 @@ func newRootFixture(t *testing.T) rootFixture {
 	}
 	for dir, text := range map[string]string{f.selected: authorizedBytes, f.outside: outsideBytes} {
 		if err := os.WriteFile(filepath.Join(dir, "witness"), []byte(text), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for dir, name := range map[string]string{f.selected: originalEntry, f.outside: outsideEntry} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -197,7 +206,7 @@ func (f rootFixture) serve(t *testing.T, newest, version int, roots []string, id
 
 func (f rootFixture) noOutsideDisclosure(t *testing.T, run stdioRun) {
 	t.Helper()
-	for _, secret := range []string{outsideBytes, "outside-secret", f.outside} {
+	for _, secret := range []string{outsideBytes, "outside-secret", outsideEntry, f.outside} {
 		if strings.Contains(run.visible(), secret) {
 			t.Fatalf("outside data %q reached the caller: %s", secret, run.visible())
 		}
@@ -236,7 +245,7 @@ func TestConnectedValidRootServesReadListSearchThroughPinnedDescriptor(t *testin
 					// original data.
 					want := authorizedBytes
 					if tool == "list_directory" {
-						want = "witness"
+						want = originalEntry
 					}
 					// Swapped or not, the answer is the original directory's content.
 					// After the swap the path names the outside directory, so only the
