@@ -166,6 +166,14 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	}
 }
 
+// BoundReadableRootsAvailable is the protocol's fail-closed feature check.
+func (p *APIProvider) BoundReadableRootsAvailable() bool {
+	_, ok := p.config.ToolExecutor.(interface {
+		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+	})
+	return ok && ReadableRootIdentitySupported()
+}
+
 func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 	models := p.config.Adapter.GetModels()
 	if len(models) == 0 {
@@ -192,9 +200,28 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	started := time.Now().UTC()
-	run := p
+	// The native workspace executor owns per-run readable-root handles. Keep
+	// them alive until this invocation ends, including retries and synthesis.
+	copy := *p
+	run := &copy
+	if len(request.ReadableRootIdentities) > 0 && len(request.ReadableRoots) > 0 {
+		if pinner, ok := p.config.ToolExecutor.(interface {
+			pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+		}); ok {
+			executor, closeRoots, err := pinner.pinReadableRoots(request.ReadableRoots, request.ReadableRootIdentities)
+			if err != nil {
+				return Result{}, err
+			}
+			defer closeRoots()
+			run.config.ToolExecutor = executor
+		} else if len(request.ReadableRootIdentities) > 0 {
+			return Result{}, errors.New("tool executor cannot bind readable root identities")
+		}
+	} else if len(request.ReadableRootIdentities) > 0 {
+		return Result{}, errors.New("readable root identities without roots")
+	}
 	if trace := newRunTrace(); trace != nil {
-		traced := *p
+		traced := *run
 		traced.trace = trace
 		run = &traced
 		sink = trace.wrapSink(sink)
@@ -378,6 +405,16 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 		}
 	}
 	askedHandover, askedCheckpoint, fresh := false, false, state != nil && len(messages) == 1 && state.data.Chains > 0
+	// MaxChains bounds the restarts of this Execute. The handover carries the
+	// run's chain count across passes, so the bound is read from where this
+	// pass began: compared with the run's total, every pass after the first
+	// got one chain and ended at its first hard threshold (Solar df74566c
+	// T-US-CS29AB35C-001-002, 11-12: pass 1 nine chains in 45 min, passes 2
+	// to 4 one chain each, about a minute apart, then the task failed).
+	passChains := 0
+	if state != nil {
+		passChains = state.data.Chains
+	}
 	toolsNow := func() []agent.ToolDefinition {
 		tools := p.config.Tools
 		if state != nil && askedHandover {
@@ -398,7 +435,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 		return *result, nil
 	}
 	restart := func(why string) bool {
-		if fresh || state.data.Chains >= policy.MaxChains {
+		if fresh || state.data.Chains-passChains >= policy.MaxChains {
 			return false
 		}
 		messages = state.freshMessages(false)
@@ -651,7 +688,16 @@ func (p *APIProvider) completeWithEmptyRecovery(ctx context.Context, request age
 	// invalidates its token observation and can refuse an otherwise admissible
 	// recovery before HTTP. The existing admission charges this appended message
 	// in full, within the same context and remaining token grant.
-	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, emptyCompletionRecoveryInstruction))
+	// A Qwen model that spent the whole output allowance on private reasoning
+	// does it again when asked the same way: on 11-12 Solar's T-US-CS29AB35C-001-013
+	// spent 48,379 and then 50,221 reasoning tokens (47 min) and kept nothing.
+	// The final-synthesis recovery already turns its thinking off for this
+	// retry with /no_think; the empty-response recovery does the same.
+	recovery := emptyCompletionRecoveryInstruction
+	if reasoningOnly && strings.Contains(strings.ToLower(request.Model), "qwen") {
+		recovery = "/no_think\n" + recovery
+	}
+	request.Messages = append(request.Messages, agent.NewTextMessage(agent.RoleUser, recovery))
 	response, err = p.completeChecked(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("API provider empty-response recovery failed%s: %w", firstObservation, err)
