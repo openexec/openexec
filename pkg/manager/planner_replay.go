@@ -291,7 +291,7 @@ func (m *Manager) replayReviewedPlan(ctx context.Context, req PlanRequest) (*Pla
 					// Who decides and what a task may touch are refused, never
 					// repaired: a repair could satisfy the lint by dropping the
 					// owner's decision.
-					if verification := planner.VerificationPlanIssues(result.Plan); len(verification) != len(issues) {
+					if repairable := planner.RepairablePlanIssues(result.Plan); len(repairable) != len(issues) {
 						return nil, fmt.Errorf("the plan fixed after its review still fails required checks: %s", strings.Join(issues, "; "))
 					}
 					// The checks are deterministic and name what to change, so

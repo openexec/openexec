@@ -1,0 +1,41 @@
+--- FAIL: TestReferenceLengthIssueNamesTheBoundAndTheFix (0.00s)
+    outcome_shape_test.go:247: issues = []
+FAIL
+FAIL	github.com/openexec/openexec/internal/planner	0.004s
+2026/11/10 05:21:57 [StateStore] Initialized: path=/tmp/TestOverlongRealExampleIsRepairedOnceWithTheBound3175696359/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:57 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+--- FAIL: TestOverlongRealExampleIsRepairedOnceWithTheBound (0.80s)
+    planner_reference_length_test.go:92: want plan, fix and exactly one check repair: generated=2 valid=true
+2026/11/10 05:21:57 [StateStore] Initialized: path=/tmp/TestUnrepairedOverlongRealExampleStopsAfterBoundedRepairs419715682/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:57 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+--- FAIL: TestUnrepairedOverlongRealExampleStopsAfterBoundedRepairs (0.16s)
+    planner_reference_length_test.go:131: unrepaired reference not stopped with its issue: <nil>
+2026/11/10 05:21:57 [StateStore] Initialized: path=/tmp/TestOverlongRealExampleWithStructuralFailureIsRefused3830388098/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:57 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	1.130s
+FAIL

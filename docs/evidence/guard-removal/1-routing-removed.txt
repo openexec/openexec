@@ -1,0 +1,37 @@
+2026/11/10 05:21:41 [StateStore] Initialized: path=/tmp/TestOverlongRealExampleIsRepairedOnceWithTheBound3629347961/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:41 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+--- FAIL: TestOverlongRealExampleIsRepairedOnceWithTheBound (0.18s)
+    planner_reference_length_test.go:89: overlong reference was not repaired: the plan fixed after its review still fails required checks: outcome shape lint refused: US-002: real_example must reference the input, not contain it: it is 491 runes, but a reference is at most 300 runes on a single line. Shorten it to the path, URL or name of the input and move any description of the input into the story's description or tasks
+2026/11/10 05:21:41 [StateStore] Initialized: path=/tmp/TestUnrepairedOverlongRealExampleStopsAfterBoundedRepairs1563333442/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:41 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+--- FAIL: TestUnrepairedOverlongRealExampleStopsAfterBoundedRepairs (0.20s)
+    planner_reference_length_test.go:131: unrepaired reference not stopped with its issue: the plan fixed after its review still fails required checks: outcome shape lint refused: US-002: real_example must reference the input, not contain it: it is 491 runes, but a reference is at most 300 runes on a single line. Shorten it to the path, URL or name of the input and move any description of the input into the story's description or tasks
+2026/11/10 05:21:42 [StateStore] Initialized: path=/tmp/TestOverlongRealExampleWithStructuralFailureIsRefused4108680465/002/state.db, schema=v1, async_queue_size=1000
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+2026/11/10 05:21:42 [Watchdog] Started monitoring with stall threshold 5m0s
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+[MIGRATION] Bootstrapping from JSON files into SQLite (one-time only)
+[MIGRATION] Bootstrap complete. SQLite is now the canonical source.
+FAIL
+FAIL	github.com/openexec/openexec/pkg/manager	0.549s
+FAIL
