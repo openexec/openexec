@@ -284,74 +284,147 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		return New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", original(), &PlanReview{Assessment: "split the human work"})
 	}
 
-	next := split()
-	// Reworded / detached metadata must be restored on the moved tasks.
-	h := &next.Stories[2].Tasks[0]
-	h.Description, h.DecisionRef = "x", ""
-	next.Stories[2].Tasks[1].DependsOn = nil
-	next.Stories[0].Tasks[1].DependsOn = []string{"T-US-009-001"}
-	got, err := refine(next)
-	if err != nil {
-		t.Fatalf("split refused: %v", err)
-	}
-	if len(got.Stories[0].Tasks) != 2 || got.Stories[0].Tasks[1].ID != "T-US-009-002" {
-		t.Fatalf("automatic neighbour not retained in US-009: %+v", got.Stories[0].Tasks)
-	}
-	if !reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003"}) {
-		t.Fatalf("neighbour dependency on human task lost: %v", got.Stories[0].Tasks[1].DependsOn)
-	}
-	want := original().Stories[0].Tasks[2:]
-	if !reflect.DeepEqual(got.Stories[2].Tasks, want) {
-		t.Fatalf("moved human tasks not restored:\n got %+v\nwant %+v", got.Stories[2].Tasks, want)
-	}
+	t.Run("split accepted and restored", func(t *testing.T) {
+		next := split()
+		// Reworded / detached metadata must be restored on the moved tasks.
+		h := &next.Stories[2].Tasks[0]
+		h.Description, h.DecisionRef = "x", ""
+		next.Stories[2].Tasks[1].DependsOn = nil
+		next.Stories[0].Tasks[1].DependsOn = []string{"T-US-009-001"}
+		got, err := refine(next)
+		if err != nil {
+			t.Fatalf("split refused: %v", err)
+		}
+		if len(got.Stories[0].Tasks) != 2 || got.Stories[0].Tasks[1].ID != "T-US-009-002" {
+			t.Fatalf("automatic neighbour not retained in US-009: %+v", got.Stories[0].Tasks)
+		}
+		if !reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003"}) {
+			t.Fatalf("neighbour dependency on human task lost: %v", got.Stories[0].Tasks[1].DependsOn)
+		}
+		want := original().Stories[0].Tasks[2:]
+		if !reflect.DeepEqual(got.Stories[2].Tasks, want) {
+			t.Fatalf("moved human tasks not restored:\n got %+v\nwant %+v", got.Stories[2].Tasks, want)
+		}
+	})
 
 	// Near miss: a new story tied only through a task edge is still a split.
-	tied := split()
-	tied.Stories[2].DependsOn = nil
-	if _, err := refine(tied); err != nil {
-		t.Fatalf("split tied by a task edge refused: %v", err)
-	}
+	t.Run("split tied by a task edge only", func(t *testing.T) {
+		tied := split()
+		tied.Stories[2].DependsOn = nil
+		if _, err := refine(tied); err != nil {
+			t.Fatalf("split tied by a task edge refused: %v", err)
+		}
+	})
 
-	// Real deletions and unsafe changes stay refused.
-	cases := map[string]func(p *ProjectPlan){
-		"delete human task":          func(p *ProjectPlan) { p.Stories[2].Tasks = p.Stories[2].Tasks[:1] },
-		"delete automatic neighbour": func(p *ProjectPlan) { p.Stories[0].Tasks = p.Stories[0].Tasks[:1] },
-		"delete T-US-013-004":        func(p *ProjectPlan) { p.Stories[1].Tasks = p.Stories[1].Tasks[:1] },
-		"remove story with retained": func(p *ProjectPlan) { p.Stories = p.Stories[1:] },
-		"ambiguous duplicate id": func(p *ProjectPlan) {
+	// Real deletions and unsafe changes stay refused. Each case names the
+	// error its own guard raises, so removing that guard fails that case even
+	// when another guard would still refuse the plan.
+	cases := map[string]struct {
+		mutate func(p *ProjectPlan)
+		want   string
+	}{
+		"delete human task":             {func(p *ProjectPlan) { p.Stories[2].Tasks = p.Stories[2].Tasks[:1] }, "refinement removed task T-US-009-004"},
+		"delete automatic neighbour":    {func(p *ProjectPlan) { p.Stories[0].Tasks = p.Stories[0].Tasks[:1] }, "refinement removed task T-US-009-002"},
+		"delete T-US-013-004":           {func(p *ProjectPlan) { p.Stories[1].Tasks = p.Stories[1].Tasks[:1] }, "refinement removed task T-US-013-004"},
+		"remove story with retained":    {func(p *ProjectPlan) { p.Stories = p.Stories[1:] }, "refinement removed task T-US-009-001"},
+		"remove story holding retained": {func(p *ProjectPlan) { p.Stories = append(p.Stories[:1], p.Stories[2:]...) }, "refinement removed story US-013"},
+		"ambiguous duplicate id": {func(p *ProjectPlan) {
 			p.Stories[0].Tasks = append(p.Stories[0].Tasks, p.Stories[2].Tasks[0])
-		},
-		"duplicate id inside one story": func(p *ProjectPlan) {
+		}, "ambiguous across the plan"},
+		"duplicate id inside one story": {func(p *ProjectPlan) {
 			p.Stories[2].Tasks = append(p.Stories[2].Tasks, p.Stories[2].Tasks[0])
-		},
-		"moved into unrelated existing story": func(p *ProjectPlan) {
+		}, "ambiguous across the plan"},
+		"moved into unrelated existing story": {func(p *ProjectPlan) {
 			p.Stories[1].Tasks = append(p.Stories[1].Tasks, p.Stories[2].Tasks[1])
 			p.Stories[2].Tasks = p.Stories[2].Tasks[:1]
-		},
-		"moved into unrelated new story": func(p *ProjectPlan) {
+		}, "into unrelated story US-013"},
+		"moved into unrelated new story": {func(p *ProjectPlan) {
 			p.Stories[2].DependsOn = nil
 			p.Stories[2].ID = "US-017"
 			p.Stories[2].Tasks[0].DependsOn = nil
 			p.Stories[2].Tasks[1].DependsOn = nil
-		},
-		"changed identity with two candidates": func(p *ProjectPlan) {
+		}, "into unrelated new story US-017"},
+		"changed identity with two candidates": {func(p *ProjectPlan) {
 			a, b := p.Stories[2].Tasks[0], p.Stories[2].Tasks[0]
 			a.ID, b.ID = "T-US-016-001", "T-US-016-002"
 			p.Stories[2].Tasks = []Task{a, b, p.Stories[2].Tasks[1]}
-		},
-		"changed identity": func(p *ProjectPlan) {
+		}, "refinement removed task T-US-009-003"},
+		"changed identity": {func(p *ProjectPlan) {
 			p.Stories[2].Tasks[0].ID, p.Stories[2].Tasks[0].DecisionReason = "T-US-016-001", "Something else"
-		},
+		}, "refinement removed task T-US-009-003"},
 	}
-	for name, mutate := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			p := split()
-			mutate(p)
-			if got, err := refine(p); err == nil {
+			c.mutate(p)
+			got, err := refine(p)
+			if err == nil {
 				t.Fatalf("accepted: %+v", got)
+			}
+			if !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("refused for another reason: %v (want %q)", err, c.want)
 			}
 		})
 	}
+}
+
+// Rahoitettava run 53fff42c (supervisor addendum 0, events 32/40/43). The
+// original US-016 holds AFK T-US-016-001 and HITL T-US-016-002; US-017 holds
+// AFK T-US-017-001 and HITL T-US-017-002.
+func TestHumanBoundaryRefinementRahoitettava53fff42cShapes(t *testing.T) {
+	const r16, r17 = "Owner runs user sessions", "Owner confirms the pricing sheet"
+	original := func() *ProjectPlan {
+		return &ProjectPlan{Stories: []Story{
+			{ID: "US-016", Title: "A", Tasks: []Task{
+				{ID: "T-US-016-001", Mode: TaskModeAFK},
+				{ID: "T-US-016-002", Mode: TaskModeHITL, DecisionReason: r16, Description: "Sessions", DependsOn: []string{"T-US-016-001"}},
+			}},
+			{ID: "US-017", Title: "B", Tasks: []Task{
+				{ID: "T-US-017-001", Mode: TaskModeAFK},
+				{ID: "T-US-017-002", Mode: TaskModeHITL, DecisionReason: r17, DependsOn: []string{"T-US-017-001"}},
+			}},
+		}}
+	}
+	refine := func(next *ProjectPlan) (*ProjectPlan, error) {
+		raw, _ := json.Marshal(next)
+		return New(&mockProvider{response: string(raw)}).RefinePlan(context.Background(), "intent", original(), &PlanReview{Assessment: "separate the human work"})
+	}
+
+	t.Run("US-016 human task renumbered to US-020 by exact reason while US-016 survives", func(t *testing.T) {
+		p := original()
+		p.Stories[0].Tasks = p.Stories[0].Tasks[:1]
+		p.Stories = append(p.Stories, Story{ID: "US-020", Title: "C", Tasks: []Task{
+			{ID: "T-US-020-001", Mode: TaskModeHITL, DecisionReason: r16, Description: "reworded"},
+			{ID: "T-US-020-002", Mode: TaskModeAFK, DependsOn: []string{"T-US-020-001"}},
+		}})
+		got, err := refine(p)
+		if err != nil {
+			t.Fatalf("refused: %v", err)
+		}
+		hum := got.Stories[2].Tasks[0]
+		if hum.Mode != TaskModeHITL || hum.DecisionReason != r16 || hum.Description != "Sessions" ||
+			!reflect.DeepEqual(hum.DependsOn, []string{"T-US-016-001"}) {
+			t.Fatalf("renumbered boundary not restored: %+v", hum)
+		}
+		if !reflect.DeepEqual(got.Stories[2].Tasks[1].DependsOn, []string{"T-US-020-001"}) {
+			t.Fatalf("dependent lost its edge: %+v", got.Stories[2].Tasks[1])
+		}
+	})
+
+	// A distinct cause, not covered by this fix: reworded reason text means the
+	// exact-reason match cannot identify the moved boundary, so it is refused as
+	// removed rather than guessed. Filed as separate work; pinned here.
+	t.Run("US-017 human task with reworded reason is refused, not guessed", func(t *testing.T) {
+		p := original()
+		p.Stories[1].Tasks = p.Stories[1].Tasks[:1]
+		p.Stories = append(p.Stories, Story{ID: "US-021", Title: "D", Tasks: []Task{
+			{ID: "T-US-021-001", Mode: TaskModeHITL, DecisionReason: "Owner signs off pricing"},
+		}})
+		_, err := refine(p)
+		if err == nil || !strings.Contains(err.Error(), "refinement removed task T-US-017-002") {
+			t.Fatalf("want removal refusal, got %v", err)
+		}
+	})
 }
 
 func TestRequirementIdentityRuleSharedAcrossPlannerPrompts(t *testing.T) {
