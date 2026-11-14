@@ -6,6 +6,7 @@ env=dict(os.environ,GOWORK='off')
 cases=[
  ('advertisement','workspace_tools.go','Name:        "search_files",','Name:        "unavailable_search",','TestWorkspaceSearchFindsDefinitionAndCompletesTriage','read-only triage was not offered'),
  ('dispatch','workspace_tools.go','case "search_files":','case "unavailable_search":','TestWorkspaceSearchFindsDefinitionAndCompletesTriage','search-backed triage failed'),
+ ('dispatch-scan','workspace_tools.go','return e.searchFilesWithProvenance(ctx, request)','return "", false, fmt.Errorf("unknown tool %q", request.Name)','TestWorkspaceSearchFindsDefinitionAndCompletesTriage$','search-backed triage failed'),
  ('private-subtree','workspace_search.go','if _, denied := deniedComponent(path); denied {','if _, denied := deniedComponent(path); denied && false {','TestWorkspaceSearchContainsReadsAndSkipsPrivateFiles','search leaked or missed'),
  ('opened-target','workspace_search.go','if err := refuseDeniedOpenedTarget(root, file, path, input.Path); err != nil {','if err := refuseDeniedOpenedTarget(root, file, path, input.Path); err != nil && false {','TestWorkspaceSearchContainsReadsAndSkipsPrivateFiles','search escaped'),
  ('symlink','workspace_search.go','if !entry.Type().IsRegular() {','if false && !entry.Type().IsRegular() {','TestWorkspaceSearchContainsReadsAndSkipsPrivateFiles','search leaked or missed'),
