@@ -540,7 +540,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				} else {
 					toolErr = errors.New("recall unavailable: no omitted result is retained in this run")
 				}
-				recallFailed = toolErr != nil
+				recallFailed = toolErr != nil && guardOn("recall-failure")
 				external = true
 			default:
 				external = true

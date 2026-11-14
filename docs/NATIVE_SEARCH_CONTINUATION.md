@@ -50,6 +50,18 @@ when directory listings are trusted.
   are untouched; an oversized request after compaction is refused before
   dispatch (`TestInsufficientContextAfterCompactionFailsBeforeDispatch`).
 
+## Guard-removal controls
+
+`guardsOff` / `guardOn` (`context_recovery.go`) is a test-only switch: nothing
+but tests writes it, so every guard is on in production. Each
+`TestGuardRemoval*` test in `context_continuation_test.go` switches one guard
+off inside the declared suite and asserts the unsafe outcome appears
+(`ambiguity`, `scan-complete`, `utf8`, `recall-failure` for unavailable, unknown
+id and invalid offset); the guarded tests assert the safe outcome. Switching
+every guard off at once makes the guarded tests fail (recorded in the PR).
+Insufficient-context refusal is the existing `pkg/agent` admission, covered by
+its own tests there; it is not switchable from this package.
+
 ## Limits
 
 The Solar request is not replayed. The runs here are synthetic: a scripted
