@@ -456,7 +456,7 @@ func validInconclusiveReason(reason string) bool {
 }
 
 func init() {
-	executionStdioCmd.Flags().StringVar(&executionProviderKind, "provider", "", "provider kind: claude, codex, or api")
+	executionStdioCmd.Flags().StringVar(&executionProviderKind, "provider", "", "provider kind: claude, codex, copilot, or api")
 	executionStdioCmd.Flags().StringVar(&executionProviderBin, "binary", "", "provider executable")
 	executionStdioCmd.Flags().StringVar(&executionSearchPath, "search-path", "", "sanitized provider executable path")
 	executionStdioCmd.Flags().StringVar(&executionAPIProvider, "api-provider", "",

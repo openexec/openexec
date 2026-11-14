@@ -35,14 +35,21 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 	}
 	// Missing approval is not a rejection that a fix loop can blindly retry;
 	// it is malformed evidence. Never interpret prose or an empty object as pass.
-	var wire struct {
-		Approved *bool `json:"approved"`
-		PlanReview
+	prompt := fmt.Sprintf(StoryReviewPrompt, intent, data)
+	wire, found, sawObject := extractPlanVerdict(response)
+	if !found && !sawObject {
+		// A reviewer that answered in prose gets one strict request for the
+		// verdict only; prose itself is never read as approval.
+		repaired, rerr := p.provider.Complete(ctx, prompt+planReviewRepairSuffix)
+		if rerr != nil {
+			return nil, fmt.Errorf("invalid plan review: no JSON verdict (%s); repair request: %w", clipReview(response), rerr)
+		}
+		wire, found, sawObject = extractPlanVerdict(repaired)
+		if !found && !sawObject {
+			return nil, fmt.Errorf("invalid plan review: no JSON verdict after one repair request (%s)", clipReview(repaired))
+		}
 	}
-	if err := json.Unmarshal([]byte(response), &wire); err != nil {
-		return nil, fmt.Errorf("invalid plan review: %w", err)
-	}
-	if wire.Approved == nil || strings.TrimSpace(wire.Assessment) == "" {
+	if !found {
 		return nil, fmt.Errorf("plan review requires explicit approved and assessment")
 	}
 	wire.PlanReview.Approved = *wire.Approved
@@ -75,6 +82,49 @@ func (p *Planner) ReviewPlan(ctx context.Context, intent string, plan *ProjectPl
 		}
 	}
 	return &wire.PlanReview, nil
+}
+
+const planReviewRepairSuffix = "\n\nYour previous reply was not usable. Reply with exactly ONE JSON object and nothing else, no prose, no markdown fence: {\"approved\": true or false, \"assessment\": \"one sentence\", \"key_issues\": []}"
+
+type planVerdictWire struct {
+	Approved *bool `json:"approved"`
+	PlanReview
+}
+
+func clipReview(s string) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > 160 {
+		return s[:160] + "..."
+	}
+	return s
+}
+
+// extractPlanVerdict finds the first JSON object in a reviewer reply (bare, in
+// a code fence, or surrounded by prose) with an explicit approved and a
+// non-empty assessment. sawObject reports that some JSON object parsed even
+// though none was a complete verdict: that is malformed evidence, not prose.
+func extractPlanVerdict(text string) (w planVerdictWire, found, sawObject bool) {
+	for at := 0; at < len(text); {
+		i := strings.IndexByte(text[at:], '{')
+		if i < 0 {
+			break
+		}
+		start := at + i
+		var raw json.RawMessage
+		if err := json.NewDecoder(strings.NewReader(text[start:])).Decode(&raw); err != nil {
+			at = start + 1
+			continue
+		}
+		var cand planVerdictWire
+		if json.Unmarshal(raw, &cand) == nil {
+			sawObject = true
+			if cand.Approved != nil && strings.TrimSpace(cand.Assessment) != "" {
+				return cand, true, true
+			}
+		}
+		at = start + len(raw)
+	}
+	return planVerdictWire{}, false, sawObject
 }
 
 // RefinePlan reuses the existing repair prompt. The changed plan still needs
@@ -191,10 +241,44 @@ func carryGoals(original, refined *ProjectPlan) {
 // its own.
 func DeterministicPlanIssues(plan *ProjectPlan) []string {
 	issues := append(VerificationPlanIssues(plan), boundaryPlanIssues(plan)...)
-	if shape := LintOutcomeShape(plan); len(shape) != 0 {
+	var structural []string
+	shape, isReference := lintOutcomeShape(plan)
+	for i, issue := range shape {
+		if isReference[i] {
+			// Repairable: shortening one reference changes no story, task or
+			// criterion (RepairablePlanIssues).
+			issues = append(issues, "outcome shape lint refused: "+issue)
+		} else {
+			structural = append(structural, issue)
+		}
+	}
+	if len(structural) != 0 {
 		// Refused, not check-repaired: putting the skeleton first changes
 		// what the plan does, which a check repair may not do.
-		issues = append(issues, fmt.Sprintf("outcome shape lint refused: %v", shape))
+		issues = append(issues, fmt.Sprintf("outcome shape lint refused: %v", structural))
+	}
+	return issues
+}
+
+// IsReferenceLengthIssue reports whether an issue text carries the marker of
+// the over-long or multi-line real_example failure. It only selects the repair
+// wording for issues RepairablePlanIssues already admitted; whether an issue
+// is repairable is decided where it is raised (lintOutcomeShape), never by
+// this text match.
+func IsReferenceLengthIssue(issue string) bool {
+	return strings.Contains(issue, referenceLengthMarker)
+}
+
+// RepairablePlanIssues are the deterministic failures a planner may repair:
+// the verification failures and an over-long real_example. Every other shape
+// failure and every boundary failure is refused.
+func RepairablePlanIssues(plan *ProjectPlan) []string {
+	issues := VerificationPlanIssues(plan)
+	shape, isReference := lintOutcomeShape(plan)
+	for i, issue := range shape {
+		if isReference[i] {
+			issues = append(issues, "outcome shape lint refused: "+issue)
+		}
 	}
 	return issues
 }
@@ -238,8 +322,16 @@ func boundaryPlanIssues(plan *ProjectPlan) []string {
 // the deterministic failures, the idioms that pass them, and an instruction to
 // change nothing else.
 func CheckRepairInstruction(issues []string) string {
+	reference := ""
+	for _, issue := range issues {
+		if IsReferenceLengthIssue(issue) {
+			reference = fmt.Sprintf("\n\nA real_example is the path, URL or name of the real input, at most %d runes on a single line. To repair one: change only that story's real_example, keeping the real input reference (shorten the wording, never cut the path, URL or name); move descriptive prose into the story's description or tasks. Keep every other story, task, acceptance criterion, perturbation and negative-control story exactly as it is.", realExampleRunes)
+			break
+		}
+	}
 	return "Required deterministic plan checks refused this plan. Fix only what they name and change nothing else: keep every story, task, ID, requirement_id, dependency and description as it is.\n\nFailures:\n- " +
 		strings.Join(issues, "\n- ") +
+		reference +
 		"\n\nA verification command must fail the script when its check fails:\n" +
 		"- instead of `cmd || other`, write `cmd || { echo \"what failed\"; exit 1; }`;\n" +
 		"- never pipe `grep -q` into another command: write `grep -q PATTERN FILE || { echo \"missing PATTERN\"; exit 1; }`;\n" +

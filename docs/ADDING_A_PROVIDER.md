@@ -14,6 +14,11 @@ decision only when step 1 has a real fork.
 | Direct API provider | The vendor has a documented HTTP API with a stable credential | `pkg/agent/<name>_provider.go` implementing `ProviderAdapter`, registered in `pkg/agent/registry.go` (`ProviderName`, factory) |
 | API with a token exchange | A long-lived credential is traded for short-lived tokens (for example an OAuth device flow, then a session token) | the direct route plus an explicit refresh step, expiry handling and a readiness probe that distinguishes missing login from expired token |
 
+Worked example, GitHub Copilot: CLI host provider (`copilot`, kind
+`execution.CopilotKind`). GitHub documents the Copilot CLI/SDK and BYOK, not a
+direct chat API, so the undocumented `copilot_internal` token exchange was
+rejected as unsupported. Setup and limits: `docs/CONFIGURATION.md`.
+
 State the recommendation and why. The choices differ in who owns login, token
 storage, rate limits and terms of service, so a documented-API route is not
 assumed to exist: confirm the vendor documents it for this use.

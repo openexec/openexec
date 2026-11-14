@@ -18,6 +18,43 @@ import (
 
 const maxCLIEventBytes = 16 << 20
 
+// CopilotKind is the GitHub Copilot CLI (`copilot`). GitHub documents no direct
+// chat-completions HTTP API for Copilot subscriptions: the supported routes are
+// the Copilot CLI/SDK (sign-in, or a token in COPILOT_GITHUB_TOKEN, GH_TOKEN or
+// GITHUB_TOKEN) and BYOK. The api.githubcopilot.com session-token exchange is
+// an undocumented editor-client endpoint and is deliberately not used.
+// See docs/ADDING_A_PROVIDER.md and docs/CONFIGURATION.md.
+const CopilotKind = "copilot"
+
+// copilotTokenEnv lists the token variables the Copilot CLI documents, in its
+// priority order.
+var copilotTokenEnv = []string{"COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"}
+
+// classifyCopilotToken applies GitHub's documented prefix list: gho_ (OAuth
+// user token), ghu_ (GitHub App user token) and github_pat_ (fine-grained PAT)
+// are supported; ghp_ (classic PAT) is not.
+func classifyCopilotToken(token string) (supported, known bool) {
+	switch {
+	case strings.HasPrefix(token, "gho_"), strings.HasPrefix(token, "ghu_"), strings.HasPrefix(token, "github_pat_"):
+		return true, true
+	case strings.HasPrefix(token, "ghp_"):
+		return false, true
+	}
+	return false, false
+}
+
+// copilotEnvToken returns the first documented token variable that is set.
+func copilotEnvToken() (name, value string) {
+	for _, n := range copilotTokenEnv {
+		if v := strings.TrimSpace(os.Getenv(n)); v != "" {
+			return n, v
+		}
+	}
+	return "", ""
+}
+
+const copilotClassicPATProblem = "GitHub Copilot does not accept classic personal access tokens (ghp_); sign in with 'copilot' (/login) or set COPILOT_GITHUB_TOKEN to an OAuth (gho_), GitHub App user (ghu_) or fine-grained (github_pat_) token"
+
 type AgentCLIConfig struct {
 	Kind       string
 	Binary     string
@@ -32,7 +69,7 @@ type AgentCLIProvider struct {
 }
 
 func NewAgentCLIProvider(config AgentCLIConfig) (*AgentCLIProvider, error) {
-	if config.Kind != "claude" && config.Kind != "codex" {
+	if config.Kind != "claude" && config.Kind != "codex" && config.Kind != CopilotKind {
 		return nil, fmt.Errorf("unsupported agent CLI kind %q", config.Kind)
 	}
 	if strings.TrimSpace(config.Binary) == "" {
@@ -46,7 +83,7 @@ func (p *AgentCLIProvider) Descriptor() ProviderDescriptor {
 		ID: p.config.Kind, Runtime: "cli", Models: append([]string(nil), p.config.Models...),
 		Capabilities: Capability{
 			NonInferenceReadiness: true,
-			Streaming:             true, Resume: true, Cancellation: true, ReadOnly: true,
+			Streaming:             true, Resume: p.config.Kind != CopilotKind, Cancellation: true, ReadOnly: true,
 			WorkspaceWrite: true, CommandNetwork: p.config.Kind == "codex", ToolCalling: true,
 		},
 	}
@@ -57,6 +94,9 @@ func (p *AgentCLIProvider) Probe(ctx context.Context, dir string) Readiness {
 	if err != nil {
 		return Readiness{State: ReadinessNotInstalled, Problem: err.Error()}
 	}
+	if p.config.Kind == CopilotKind {
+		return probeCopilotCredential()
+	}
 	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var args []string
@@ -66,7 +106,7 @@ func (p *AgentCLIProvider) Probe(ctx context.Context, dir string) Readiness {
 		args = []string{"login", "status"}
 	}
 	cmd := exec.CommandContext(probeCtx, bin, args...)
-	cmd.Dir, cmd.Env = dir, safeCLIEnv(p.config.SearchPath)
+	cmd.Dir, cmd.Env = dir, safeCLIEnv(p.config.Kind, p.config.SearchPath)
 	var output bytes.Buffer
 	capture := &boundedWriter{writer: &output, remaining: 8192}
 	cmd.Stdout, cmd.Stderr = capture, capture
@@ -102,6 +142,26 @@ func (p *AgentCLIProvider) Probe(ctx context.Context, dir string) Readiness {
 	return Readiness{State: ReadinessUnknown, Check: "authentication-status", Problem: "authentication status unavailable; inference not tested"}
 }
 
+// probeCopilotCredential reports readiness without inference. The Copilot CLI
+// documents no authentication-status command and keeps an interactive sign-in
+// in the system keychain, which cannot be inspected from here; only a token in
+// the documented environment variables can be judged.
+func probeCopilotCredential() Readiness {
+	name, token := copilotEnvToken()
+	if token == "" {
+		return Readiness{State: ReadinessUnknown, Check: "credential-environment",
+			Problem: "no COPILOT_GITHUB_TOKEN, GH_TOKEN or GITHUB_TOKEN set; an interactive 'copilot' sign-in cannot be checked without inference"}
+	}
+	supported, known := classifyCopilotToken(token)
+	switch {
+	case known && !supported:
+		return Readiness{State: ReadinessNeedsLogin, Check: "credential-environment", Problem: name + ": " + copilotClassicPATProblem}
+	case supported:
+		return Readiness{State: ReadinessReady, Check: "credential-environment"}
+	}
+	return Readiness{State: ReadinessUnknown, Check: "credential-environment", Problem: name + " has an unrecognised token prefix; inference not tested"}
+}
+
 func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventSink) (Result, error) {
 	if req.NonThinking {
 		return Result{}, fmt.Errorf("CLI cannot select validated native non-thinking mode")
@@ -111,6 +171,22 @@ func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventS
 	}
 	if req.TokenBudget != 0 {
 		return Result{}, fmt.Errorf("CLI cannot enforce a hard total-token grant")
+	}
+	if p.config.Kind == CopilotKind {
+		if len(req.WritableRoots) != 0 {
+			return Result{}, fmt.Errorf("copilot CLI cannot enforce writable roots")
+		}
+		if req.NetworkAccess {
+			return Result{}, fmt.Errorf("copilot CLI cannot enforce command network policy")
+		}
+		if req.NativeSessionID != "" {
+			return Result{}, fmt.Errorf("copilot CLI non-interactive mode cannot resume a session")
+		}
+		if name, token := copilotEnvToken(); token != "" {
+			if supported, known := classifyCopilotToken(token); known && !supported {
+				return Result{}, fmt.Errorf("%s: %s", name, copilotClassicPATProblem)
+			}
+		}
 	}
 	started := time.Now().UTC()
 	result := Result{Executor: p.config.Kind, Model: req.Model, Sandbox: req.Sandbox, StartedAt: started, Outcome: OutcomeFailed}
@@ -130,7 +206,7 @@ func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventS
 	result.Executor = bin
 	args := p.arguments(req)
 	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Dir, cmd.Env = req.WorkingDir, safeCLIEnv(p.config.SearchPath)
+	cmd.Dir, cmd.Env = req.WorkingDir, safeCLIEnv(p.config.Kind, p.config.SearchPath)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		finish()
@@ -192,6 +268,20 @@ func (p *AgentCLIProvider) Execute(ctx context.Context, req Request, sink EventS
 }
 
 func (p *AgentCLIProvider) arguments(req Request) []string {
+	if p.config.Kind == CopilotKind {
+		// -p runs one prompt non-interactively, -s prints only the answer and
+		// --no-ask-user stops clarifying questions. Unattended runs deny any
+		// tool that was not pre-approved, so read-only grants none and
+		// workspace-write grants only file writes (no shell, no URLs).
+		args := []string{"-p", req.Prompt, "-s", "--no-ask-user"}
+		if req.Model != "" && req.Model != "default" {
+			args = append(args, "--model", req.Model)
+		}
+		if req.Sandbox.Mode == "workspace-write" {
+			args = append(args, "--allow-tool=write")
+		}
+		return args
+	}
 	if p.config.Kind == "claude" {
 		args := []string{"-p", req.Prompt, "--output-format", "stream-json", "--verbose"}
 		if req.NativeSessionID == "" {
@@ -256,6 +346,11 @@ func validateProviderRequest(req Request) error {
 }
 
 func parseCLIEvent(kind string, line []byte) (Event, string, bool) {
+	if kind == CopilotKind {
+		// Silent mode prints plain answer text; there is no session id.
+		text := string(line) + "\n"
+		return Event{Type: EventAssistantDelta, Text: text}, "", len(strings.TrimSpace(text)) > 0
+	}
 	if kind == "codex" {
 		var value struct {
 			Type     string `json:"type"`
@@ -308,8 +403,15 @@ func executable(binary, searchPath string) (string, error) {
 	return "", fmt.Errorf("provider executable %q was not found", binary)
 }
 
-func safeCLIEnv(path string) []string {
+func safeCLIEnv(kind, path string) []string {
 	allowed := map[string]bool{"HOME": true, "USER": true, "LOGNAME": true, "TMPDIR": true, "LANG": true, "LC_ALL": true, "TERM": true, "XDG_CONFIG_HOME": true, "XDG_DATA_HOME": true, "CODEX_HOME": true, "CLAUDE_CONFIG_DIR": true}
+	if kind == CopilotKind {
+		// Only the Copilot CLI receives its documented credential variables;
+		// claude and codex runs keep a GitHub token out of their environment.
+		for _, name := range append([]string{"COPILOT_HOME"}, copilotTokenEnv...) {
+			allowed[name] = true
+		}
+	}
 	out := []string{"PATH=" + path, "NO_COLOR=1"}
 	for _, entry := range os.Environ() {
 		name, value, ok := strings.Cut(entry, "=")
