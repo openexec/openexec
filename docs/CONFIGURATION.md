@@ -100,6 +100,77 @@ no Console restart and does not change runs already in flight. For isolated
 task worktrees, edit the registered project's configuration, which the Console
 supplies through `ConfigDir`, rather than a temporary task checkout.
 
+## GitHub Copilot (CLI host provider)
+
+OpenExec runs GitHub Copilot through GitHub's own `copilot` CLI
+(`openexec execution-stdio --provider copilot`). It does not call
+`api.githubcopilot.com`: GitHub's documentation ([Copilot SDK
+authentication](https://docs.github.com/en/copilot/how-tos/copilot-sdk/auth/authenticate),
+[running the CLI programmatically](https://docs.github.com/en/copilot/how-tos/copilot-cli/automate-copilot-cli/run-cli-programmatically))
+describes the CLI/SDK and BYOK as the supported routes and documents no direct
+chat-completions HTTP API for Copilot subscriptions. The
+`copilot_internal/v2/token` session-token exchange used by editor clients is
+undocumented, so OpenExec deliberately does not use it.
+
+Credential, in the order GitHub documents:
+
+1. Interactive sign-in: run `copilot` and `/login` (GitHub OAuth device flow;
+   stored in the system keychain). OpenExec cannot verify this without
+   inference, so `Probe` reports `unknown` rather than `ready`.
+2. Headless: set `COPILOT_GITHUB_TOKEN` (or `GH_TOKEN`, `GITHUB_TOKEN`) to an
+   OAuth user token (`gho_`), GitHub App user token (`ghu_`) or fine-grained PAT
+   (`github_pat_`) of an account with a Copilot subscription. Classic `ghp_`
+   tokens are refused by GitHub and by OpenExec before the CLI starts.
+
+Only these variables (and `COPILOT_HOME`) are passed to the Copilot CLI, and
+they are not passed to the claude or codex CLIs. An `OPENAI_API_KEY` is never
+sent to GitHub.
+
+Behaviour and limits: each request runs `copilot -p <prompt> -s --no-ask-user
+[--model <m>]`; `workspace-write` adds `--allow-tool=write`, `read-only` grants
+no tool (unattended runs deny anything not pre-approved). The CLI cannot
+enforce writable roots, a command-network policy, a hard token grant or session
+resume in this mode, so requests that need those are refused. Model IDs are
+whatever the installed CLI accepts for `--model`; OpenExec carries no list. The
+`openexec init` offers "GitHub Copilot CLI" (executor model `copilot`; set
+`copilot:<model>` to pass `<model>` to `--model`). `internal/runner` maps that
+model to the `copilot` binary and the loop runs
+`copilot -p <prompt> -s --no-ask-user [--model m] [--allow-tool=write]`,
+with OpenAI/Anthropic/Codex/Gemini keys removed from its environment and a
+classic `ghp_` token refused before it starts. `openexec doctor` prints the
+sign-in hint when the runner is a `copilot` binary. `-s` prints the answer as
+plain text, so the loop reads Copilot output with a plain-text parser (each line
+is an assistant message); a missing `copilot` binary is an error, never a
+fallback to `claude`. The `pkg/agent` registry also registers `github-copilot`
+(models `copilot` and `copilot:<model>`), which runs the same CLI with the same
+credential rules for API-style callers.
+
+Refresh and expiry are the CLI's: OpenExec never stores, reads or renews the
+Copilot credential and passes `COPILOT_HOME` and the token variables through.
+GitHub's documentation (linked above) exposes no refresh event and no expiry
+message that OpenExec could rely on, so this repository does not claim to test
+renewal or the CLI's expiry wording. What the tests prove is the OpenExec
+boundary: a nonzero exit becomes a failed outcome carrying the CLI's own stderr
+verbatim, and the `pkg/agent` adapter appends a hint to run `copilot` and
+`/login`.
+
+Every OpenExec route that launches `copilot` (loop, planner, `pkg/agent`
+adapter, `execution-stdio`) drops `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`CODEX_API_KEY` and `GEMINI_API_KEY` from the child environment and refuses a
+`ghp_` token before launch. The unauthenticated failure fixture is the verbatim
+output of GitHub Copilot CLI 1.0.105 (exit 1, empty stdout: "Error: No
+authentication information found." plus the `/login`, token-variable and
+`gh auth login` options), captured 2026-11-05 with no credentials inside a
+network namespace (`unshare --user --map-root-user --net`). The raw bytes,
+binary SHA-256 (`3bd8bdc7…c09091c`), exact argv and environment are committed in
+`internal/cli/testdata/copilot-cli-1.0.105/` (`auth-no-network.stderr`,
+`provenance.json`); two earlier flag-validation refusals are recorded there as
+not authentication proof.
+No CLI-authored token-expiry text was captured, so none is claimed.
+
+Not exercised: a real Copilot-entitled run. The tests use a fixture binary that
+follows the documented command line and token rules.
+
 ## Configuration File
 
 Configuration is stored in `openexec.yaml` in your project root. Environment variables can override any setting using the `OPENEXEC_*` prefix.
