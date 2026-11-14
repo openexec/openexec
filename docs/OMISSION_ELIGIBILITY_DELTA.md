@@ -14,14 +14,27 @@ behaviour are unchanged.
 owner decisions or runtime failure modes: 0. Concepts removed: 3 (the
 `ContentBlock.ScanComplete` mark, `scanReportingExecutor`, and the
 `governingInstructionFiles` name denylist, plus the position-bound search recall
-id that existed only for search).
+id that existed only for search). Concepts removed are not counted as new.
 
-Lines against PR204 head `a149fceb`: product code `context_recovery.go`
-+4/-15 (net -11), `api_provider.go` -13 net (scan plumbing removed),
-`workspace_search.go`, `composite_tools.go`, `workspace_tools.go`,
-`agent/provider.go` restored to main (the PR204 additions are gone). Tests:
-`context_preservation_test.go` 224 lines (9 tests); `context_continuation_test.go`
-rebuilt on directory listings. Docs: this file and `NATIVE_SEARCH_CONTINUATION.md`.
+Lines against PR204 head `a149fceb` (`git diff --numstat a149fceb 5b7b1bcd`,
+the repair commit; later main merges are excluded):
+
+| File | Added | Removed | Net |
+| --- | --- | --- | --- |
+| `pkg/execution/context_recovery.go` | 4 | 15 | -11 |
+| `pkg/execution/api_provider.go` | 4 | 13 | -9 |
+| `pkg/execution/workspace_search.go` | 1 | 20 | -19 |
+| `pkg/execution/composite_tools.go` | 0 | 17 | -17 |
+| `pkg/execution/workspace_tools.go` | 0 | 20 | -20 |
+| `pkg/agent/provider.go` | 0 | 5 | -5 |
+| **Product code total** | **9** | **90** | **-81** |
+| `pkg/execution/context_preservation_test.go` (new, 9 tests) | 224 | 0 | +224 |
+| `pkg/execution/context_continuation_test.go` (rebuilt on listings) | 71 | 164 | -93 |
+| **Test total** | **295** | **164** | **+131** |
+| Docs (`NATIVE_SEARCH_CONTINUATION.md` +25/-27, this file new) | | | |
+
+`workspace_search.go`, `composite_tools.go`, `workspace_tools.go` and
+`agent/provider.go` carry only the PR204 scan additions removed.
 
 ## Guard inventory (a result is omitted only if every one holds)
 
