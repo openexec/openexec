@@ -28,6 +28,7 @@ import (
 // answering as though the conversation had just begun.
 const (
 	executionProtocolVersion       = 3
+	executionProtocolBoundRoots    = 4
 	executionProtocolVersionReplay = 2
 	executionProtocolVersionLegacy = 1
 )
@@ -235,7 +236,29 @@ func resolveAPIKeyReference(key string) string {
 	return key
 }
 
+// unsupportedProtocolVersionError is the refusal for a version outside what this
+// reader speaks, so a caller can tell it from a failed run.
+type unsupportedProtocolVersionError struct{ Version int }
+
+func (e *unsupportedProtocolVersionError) Error() string {
+	return fmt.Sprintf("unsupported execution protocol version %d", e.Version)
+}
+
+// boundRootsRefusalError is the typed refusal for a request that carries, or
+// should carry, version 4 readable-root identities and cannot be served as sent.
+// It names a reason only: never a root path or an identity value.
+type boundRootsRefusalError struct{ Reason string }
+
+func (e *boundRootsRefusalError) Error() string { return e.Reason }
+
 func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
+	return serveExecutionProtocolUpTo(ctx, executionProtocolBoundRoots, input, output, providerFor)
+}
+
+// serveExecutionProtocolUpTo is the reader itself, parameterised by the newest
+// version it understands. Production always passes the newest; a test passes 3
+// to run the same reader as a runtime that predates version 4.
+func serveExecutionProtocolUpTo(ctx context.Context, newest int, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
 	decoder := json.NewDecoder(io.LimitReader(input, 1<<20))
 	writer := bufio.NewWriter(output)
 	defer writer.Flush()
@@ -255,10 +278,18 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 	if err := decoder.Decode(&request); err != nil {
 		return fmt.Errorf("decode execution request: %w", err)
 	}
-	switch request.Version {
-	case executionProtocolVersion, executionProtocolVersionReplay, executionProtocolVersionLegacy:
-	default:
-		return fmt.Errorf("unsupported execution protocol version %d", request.Version)
+	if request.Version < executionProtocolVersionLegacy || request.Version > newest {
+		return &unsupportedProtocolVersionError{Version: request.Version}
+	}
+	if request.Operation == "execute" && request.Request != nil {
+		roots := request.Request.ReadableRoots
+		identities := request.Request.ReadableRootIdentities
+		if request.Version == executionProtocolBoundRoots && (len(roots) == 0 || len(roots) != len(identities)) {
+			return &boundRootsRefusalError{Reason: "protocol version 4 requires an identity for every readable root"}
+		}
+		if request.Version != executionProtocolBoundRoots && len(identities) > 0 {
+			return &boundRootsRefusalError{Reason: "readable root identities require protocol version 4"}
+		}
 	}
 	// Reply in the requester's version. This lets v1/v2 callers keep working
 	// while a v3 caller can require the new capability contract. Unknown fields
@@ -298,6 +329,12 @@ func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writ
 		return err
 	}
 	descriptor := provider.Descriptor()
+	if request.Version == executionProtocolBoundRoots && request.Operation == "execute" {
+		bound, ok := provider.(interface{ BoundReadableRootsAvailable() bool })
+		if !ok || !bound.BoundReadableRootsAvailable() {
+			return &boundRootsRefusalError{Reason: "provider cannot enforce bound readable roots"}
+		}
+	}
 	switch request.Operation {
 	case "describe":
 		// The terminal contract belongs to this v3 transport, not to a provider
