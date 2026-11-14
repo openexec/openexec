@@ -244,6 +244,13 @@ func (e *unsupportedProtocolVersionError) Error() string {
 	return fmt.Sprintf("unsupported execution protocol version %d", e.Version)
 }
 
+// boundRootsRefusalError is the typed refusal for a request that carries, or
+// should carry, version 4 readable-root identities and cannot be served as sent.
+// It names a reason only: never a root path or an identity value.
+type boundRootsRefusalError struct{ Reason string }
+
+func (e *boundRootsRefusalError) Error() string { return e.Reason }
+
 func serveExecutionProtocol(ctx context.Context, input io.Reader, output io.Writer, providerFor func(ctx context.Context, directory string, sandbox execution.Sandbox, gateway toolGateway) (execution.Provider, error)) error {
 	return serveExecutionProtocolUpTo(ctx, executionProtocolBoundRoots, input, output, providerFor)
 }
@@ -278,10 +285,10 @@ func serveExecutionProtocolUpTo(ctx context.Context, newest int, input io.Reader
 		roots := request.Request.ReadableRoots
 		identities := request.Request.ReadableRootIdentities
 		if request.Version == executionProtocolBoundRoots && (len(roots) == 0 || len(roots) != len(identities)) {
-			return fmt.Errorf("protocol version 4 requires an identity for every readable root")
+			return &boundRootsRefusalError{Reason: "protocol version 4 requires an identity for every readable root"}
 		}
 		if request.Version != executionProtocolBoundRoots && len(identities) > 0 {
-			return fmt.Errorf("readable root identities require protocol version 4")
+			return &boundRootsRefusalError{Reason: "readable root identities require protocol version 4"}
 		}
 	}
 	// Reply in the requester's version. This lets v1/v2 callers keep working
@@ -325,7 +332,7 @@ func serveExecutionProtocolUpTo(ctx context.Context, newest int, input io.Reader
 	if request.Version == executionProtocolBoundRoots && request.Operation == "execute" {
 		bound, ok := provider.(interface{ BoundReadableRootsAvailable() bool })
 		if !ok || !bound.BoundReadableRootsAvailable() {
-			return fmt.Errorf("provider cannot enforce bound readable roots")
+			return &boundRootsRefusalError{Reason: "provider cannot enforce bound readable roots"}
 		}
 	}
 	switch request.Operation {

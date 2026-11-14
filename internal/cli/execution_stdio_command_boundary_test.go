@@ -36,28 +36,36 @@ func TestExecutionStdioCommandRefusesUnknownVersionTyped(t *testing.T) {
 	}
 }
 
-// A version the reader speaks gets past the version gate and is judged on its
-// identities, which it has read rather than dropped.
-func TestExecutionStdioCommandDoesNotDropIdentities(t *testing.T) {
-	// v3 carrying identities: refused, not served with the identities ignored.
-	_, err := runStdioCommand(t, strings.Replace(boundaryRequest, "%V%", "3", 1))
-	if err == nil || !strings.Contains(err.Error(), "require protocol version 4") {
-		t.Fatalf("v3 with identities: %v", err)
+// requireBoundRootsRefusal asserts the typed v4 refusal came out of the real
+// command with the wanted reason, no output, and neither the root path nor an
+// identity value in the error.
+func requireBoundRootsRefusal(t *testing.T, out string, err error, reason string) {
+	t.Helper()
+	var refusal *boundRootsRefusalError
+	if !errors.As(err, &refusal) || !strings.Contains(refusal.Reason, reason) {
+		t.Fatalf("refusal is not the typed bound-roots refusal %q: %T %v", reason, err, err)
 	}
+	if out != "" || strings.Contains(err.Error(), "synthetic") || strings.Contains(err.Error(), "inode") {
+		t.Fatalf("refusal echoes request content or wrote output: err=%v out=%q", err, out)
+	}
+}
+
+// Every v4 gate, reached through the real command, refuses with the typed error
+// rather than dropping the identity fields or serving the request.
+func TestExecutionStdioCommandRefusesV4TypedAtEveryGate(t *testing.T) {
+	// v3 carrying identities: refused, not served with the identities ignored.
+	out, err := runStdioCommand(t, strings.Replace(boundaryRequest, "%V%", "3", 1))
+	requireBoundRootsRefusal(t, out, err, "require protocol version 4")
 	// v4 with roots but no identities: refused.
 	noIdentities := strings.Replace(strings.Replace(boundaryRequest, "%V%", "4", 1), `,"ReadableRootIdentities":[{"path":"/synthetic/root","device":1,"inode":2}]`, "", 1)
-	_, err = runStdioCommand(t, noIdentities)
-	if err == nil || !strings.Contains(err.Error(), "requires an identity for every readable root") {
-		t.Fatalf("v4 without identities: %v", err)
-	}
-	if strings.Contains(err.Error(), "synthetic") {
-		t.Fatalf("refusal echoes root: %v", err)
-	}
-	// Near miss: v4 with a matching identity is not refused at the version or
-	// identity-count gate; any refusal comes from later.
-	_, err = runStdioCommand(t, strings.Replace(boundaryRequest, "%V%", "4", 1))
-	var refusal *unsupportedProtocolVersionError
-	if errors.As(err, &refusal) || (err != nil && strings.Contains(err.Error(), "requires an identity")) {
-		t.Fatalf("v4 with matching identities was refused at the gate: %v", err)
-	}
+	out, err = runStdioCommand(t, noIdentities)
+	requireBoundRootsRefusal(t, out, err, "requires an identity for every readable root")
+	// v4 with matching identities passes both request gates and is judged on the
+	// provider: a CLI provider cannot enforce bound roots, so it is refused
+	// typed, and nothing is run.
+	prevKind := executionProviderKind
+	executionProviderKind = "claude"
+	t.Cleanup(func() { executionProviderKind = prevKind })
+	out, err = runStdioCommand(t, strings.Replace(boundaryRequest, "%V%", "4", 1))
+	requireBoundRootsRefusal(t, out, err, "provider cannot enforce bound readable roots")
 }
