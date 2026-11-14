@@ -307,6 +307,23 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		}
 	})
 
+	t.Run("clean split keeps human tasks and neighbour edges and validates", func(t *testing.T) {
+		got, err := refine(split())
+		if err != nil {
+			t.Fatalf("split refused: %v", err)
+		}
+		if !reflect.DeepEqual(got.Stories[2].Tasks, original().Stories[0].Tasks[2:]) {
+			t.Fatalf("human tasks changed: %+v", got.Stories[2].Tasks)
+		}
+		if got.Stories[0].Tasks[1].ID != "T-US-009-002" ||
+			!reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003"}) {
+			t.Fatalf("neighbour not retained with its human edge: %+v", got.Stories[0].Tasks)
+		}
+		if err := got.Validate(); err != nil {
+			t.Fatalf("refined plan invalid: %v", err)
+		}
+	})
+
 	// Near miss: a new story tied only through a task edge is still a split.
 	t.Run("split tied by a task edge only", func(t *testing.T) {
 		tied := split()
