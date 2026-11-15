@@ -1,0 +1,96 @@
+Source clone and target
+Cloning into '/home/perttu/.agent-console/watch-jobs/75d7-go-20261115/clone'...
+done.
+Preparing worktree (detached HEAD a149fceb)
+Updating files:  39% (615/1554)
+Updating files:  40% (622/1554)
+Updating files:  41% (638/1554)
+Updating files:  42% (653/1554)
+Updating files:  43% (669/1554)
+Updating files:  44% (684/1554)
+Updating files:  45% (700/1554)
+Updating files:  46% (715/1554)
+Updating files:  47% (731/1554)
+Updating files:  48% (746/1554)
+Updating files:  49% (762/1554)
+Updating files:  50% (777/1554)
+Updating files:  51% (793/1554)
+Updating files:  52% (809/1554)
+Updating files:  53% (824/1554)
+Updating files:  54% (840/1554)
+Updating files:  55% (855/1554)
+Updating files:  56% (871/1554)
+Updating files:  57% (886/1554)
+Updating files:  58% (902/1554)
+Updating files:  59% (917/1554)
+Updating files:  60% (933/1554)
+Updating files:  61% (948/1554)
+Updating files:  62% (964/1554)
+Updating files:  63% (980/1554)
+Updating files:  64% (995/1554)
+Updating files:  65% (1011/1554)
+Updating files:  66% (1026/1554)
+Updating files:  67% (1042/1554)
+Updating files:  68% (1057/1554)
+Updating files:  69% (1073/1554)
+Updating files:  70% (1088/1554)
+Updating files:  71% (1104/1554)
+Updating files:  72% (1119/1554)
+Updating files:  73% (1135/1554)
+Updating files:  74% (1150/1554)
+Updating files:  75% (1166/1554)
+Updating files:  76% (1182/1554)
+Updating files:  77% (1197/1554)
+Updating files:  78% (1213/1554)
+Updating files:  79% (1228/1554)
+Updating files:  80% (1244/1554)
+Updating files:  81% (1259/1554)
+Updating files:  82% (1275/1554)
+Updating files:  83% (1290/1554)
+Updating files:  84% (1306/1554)
+Updating files:  85% (1321/1554)
+Updating files:  86% (1337/1554)
+Updating files:  87% (1352/1554)
+Updating files:  88% (1368/1554)
+Updating files:  89% (1384/1554)
+Updating files:  90% (1399/1554)
+Updating files:  91% (1415/1554)
+Updating files:  92% (1430/1554)
+Updating files:  93% (1446/1554)
+Updating files:  94% (1461/1554)
+Updating files:  95% (1477/1554)
+Updating files:  96% (1492/1554)
+Updating files:  97% (1508/1554)
+Updating files:  98% (1523/1554)
+Updating files:  99% (1539/1554)
+Updating files: 100% (1554/1554)
+Updating files: 100% (1554/1554), done.
+HEAD is now at a149fceb Merge remote-tracking branch 'origin/main' into agent-console/task-17da07171611-split-the-same-task-passes-through-the-n
+a149fceb90b9265ecad4c4d33a624cc946f1fac0
+worktree /home/perttu/.agent-console/watch-jobs/75d7-go-20261115/clone
+HEAD 186646ee320886726512b6468f229d53da1d7714
+branch refs/heads/main
+
+worktree /home/perttu/.agent-console/watch-jobs/75d7-go-20261115/historical
+HEAD a149fceb90b9265ecad4c4d33a624cc946f1fac0
+detached
+
+Before status and diff
+script exit: 1
+stdout:
+advertisement EXPECTED RUNTIME FAILURE
+
+stderr:
+Traceback (most recent call last):
+  File "/home/perttu/.agent-console/watch-jobs/75d7-go-20261115/historical/scripts/verify-workspace-search.py", line 30, in <module>
+    assert run.returncode!=0 and assertion in run.stdout,(label,run.returncode,run.stdout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('dispatch', 0, 'ok  \tgithub.com/openexec/openexec/pkg/execution\t0.003s\n')
+
+After status and diff
+Removal status: 0
+worktree /home/perttu/.agent-console/watch-jobs/75d7-go-20261115/clone
+HEAD 186646ee320886726512b6468f229d53da1d7714
+branch refs/heads/main
+
+Historical path absent
