@@ -49,3 +49,59 @@ Run duration reported: 573ms. Exit status: **1**.
 ## Removal
 
 `rm -rf .base`, then `ls -d .base` -> `ls: cannot access '.base': No such file or directory` (exit 2).
+
+## Supervisor independent run at a registered detached worktree (exact `a149fceb` HEAD)
+
+This section supersedes the clone-based run above for criteria 1, 3, 4 and 5.
+It was NOT executed by the task agent (the agent could not create a worktree);
+it was executed by the supervisor as systemd unit `ac-watch-75d7-go-20261115`
+(receipt `/mnt/data1/projects/owner-model/.jobs/watch-75d7-go-20261115.json`,
+raw files under `/home/perttu/.agent-console/watch-jobs/75d7-go-20261115/`,
+which this task agent cannot read). The text below is copied verbatim from the
+supervisor's addendum to this task (2026-11-15 06:32Z); the agent did not
+re-run or alter it. The first attempt omitted Go from the systemd PATH and
+failed with `FileNotFoundError`; the second added `/usr/local/go/bin`.
+Parent task 9672102c is not claimed delivered by this record.
+
+```
+HEAD is now at a149fceb Merge remote-tracking branch 'origin/main' into agent-console/task-17da07171611-split-the-same-task-passes-through-the-n
+a149fceb90b9265ecad4c4d33a624cc946f1fac0
+worktree /home/perttu/.agent-console/watch-jobs/75d7-go-20261115/clone
+HEAD 186646ee320886726512b6468f229d53da1d7714
+branch refs/heads/main
+
+worktree /home/perttu/.agent-console/watch-jobs/75d7-go-20261115/historical
+HEAD a149fceb90b9265ecad4c4d33a624cc946f1fac0
+detached
+
+Before status and diff
+script exit: 1
+stdout:
+advertisement EXPECTED RUNTIME FAILURE
+
+stderr:
+Traceback (most recent call last):
+  File "/home/perttu/.agent-console/watch-jobs/75d7-go-20261115/historical/scripts/verify-workspace-search.py", line 30, in <module>
+    assert run.returncode!=0 and assertion in run.stdout,(label,run.returncode,run.stdout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('dispatch', 0, 'ok  \tgithub.com/openexec/openexec/pkg/execution\t0.003s\n')
+
+After status and diff
+Removal status: 0
+worktree /home/perttu/.agent-console/watch-jobs/75d7-go-20261115/clone
+HEAD 186646ee320886726512b6468f229d53da1d7714
+branch refs/heads/main
+
+Historical path absent
+```
+
+Reading of that record:
+
+- **Checkout identity:** `git worktree list` shows the `historical` worktree at detached HEAD `a149fceb90b9265ecad4c4d33a624cc946f1fac0`. The "Before status and diff" and "After status and diff" headings carry no lines beneath them, i.e. empty (the supervisor's addendum shows no output for them; it does not name the paths, so it is not path-scoped to `pkg/` and `scripts/`).
+- **Exit status:** script exit 1.
+- **stdout (separate):** exactly one line, `advertisement EXPECTED RUNTIME FAILURE`. No `dispatch EXPECTED RUNTIME FAILURE` line was printed, because the script aborted at the `dispatch` control.
+- **stderr (separate):** the traceback above.
+- **Tuple `('dispatch', 0, 'ok …')`:** it does NOT appear on stdout. It appears on stderr, as the `AssertionError` message from the assert at `scripts/verify-workspace-search.py:30`, which formats `(label, run.returncode, run.stdout)`. Its `go test` stdout field is `ok  \tgithub.com/openexec/openexec/pkg/execution\t0.003s` (the earlier clone run gave `0.004s`; the difference is timing only).
+- **Removal:** the second `git worktree list` no longer lists `historical`, and the record prints `Removal status: 0` and `Historical path absent`.
+- **Correction to the section above:** the earlier statement that the tuple was on "the failure stream (split unavailable)" is now resolved: it is stderr.
+- **Still unproven:** why the mutated `dispatch` still passed `go test`. Not investigated.
