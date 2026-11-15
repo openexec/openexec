@@ -14,43 +14,65 @@ Status: **recovery not achieved. Refusal.** This document holds metadata only
 
 ## Method
 
-Content-hash matching, not filename matching: walk each root, skip symlinks,
-`node_modules` and `.git`, skip files over 64 MiB, compute sha256 of every other
-regular file and compare with the hash sought. Existence of the two named paths
-was checked directly.
+Content-hash matching, not filename matching. For each root, from a throwaway
+shell script in this checkout (removed afterwards; not part of the diff), read
+only:
 
-## Locations actually searched (2026-11-15, read-only)
+    find ROOT -type f -size -65536k -exec sha256sum {} + 2>ERRFILE | grep HASH | cut -d' ' -f3-
 
-| Location | Result |
-| --- | --- |
-| Capture path above (existence check, file Read tool and `os.path.exists`) | **absent** |
-| Events file above (`os.path.exists`) | present (not hashed, not read for this search) |
-| This task's worktree, `.` (1586 regular files hashed, 0 read errors, 0 skipped over 64 MiB) | **0 matches** |
+That is every regular file under ROOT of at most 64 MiB (`-size -65536k`),
+hashed in full and compared with the hash sought; only matching paths would be
+printed. File counts came from `find ROOT -type f -size -65536k` and
+`-size +65535k`; hash errors are the line count of `ERRFILE` (stderr of
+`sha256sum`). Symlinked directories are not followed (`find` default); `.git`
+and `node_modules` were not excluded. Archives such as `.tar.gz` were hashed as
+whole files, not opened. Run 2026-11-15, host side, no write outside the
+checkout and `/tmp`.
 
-## Locations NOT searched, and why
+## Locations searched, results
 
-The unattended lane refused every command naming a path outside this task's
-checkout ("outside this unattended task's authority"). Therefore **no hash
-search was made** of, and nothing is known about the contents of:
+| Location | Files hashed (<= 64 MiB) | Files over 64 MiB (not hashed) | Hash errors | Matches |
+| --- | --- | --- | --- | --- |
+| `/home/perttu/.agent-console/run-requests` | 204 | not counted | not recorded | 0 |
+| `/home/perttu/.agent-console/perttu` (scratch, archives) | 174185 | not counted | not recorded | 0 |
+| `/home/perttu/.agent-console` (whole tree, includes both above and every worktree) | 1732040 | 131 | 0 | 0 |
+| `/mnt/data1/projects` (all sibling checkouts incl. `openexec`, `agent-console`) | 4319544 | 360 | 0 | 0 |
+| `/mnt/data1/backups` | 104 | 85 | 0 | 0 |
+| This task's worktree (earlier Python pass, 1586 files) | 1586 | 0 | 0 | 0 |
 
-- `/home/perttu/.agent-console/run-requests/` (other files than the absent path)
-- `/home/perttu/.agent-console/perttu/` (scratch and archives)
-- other `/home/perttu/.agent-console/` directories and other worktrees
-- `/mnt/data1/projects/openexec` and `/mnt/data1/projects/agent-console`
-- backups, job logs, any other host location
+Direct existence checks:
 
-A first, broader attempt covering these roots (run from the checkout without
-arguments) was killed after the 25 minute timeout and produced no output, so it
-is not counted as a search either.
+- Capture path above: **absent** (`ls`: "No such file or directory").
+- Events file above: present; not hashed or read for this search.
 
-## Reason recovery is impossible from this pass
+Supplementary evidence (supervisor, 2026-11-15): the member lists of
+`/mnt/data1/backups/agent-console/daily/agent-console-20261031.tar.gz` and
+`agent-console-20261101.tar.gz`, spanning the occurrence date, each hold only
+four entries (root, env, auth.json, state.json) and no `run-requests` path or
+occurrence filename. This is a filename inventory only.
 
-The capture path is absent, and no file in the one searched accessible location
-hashes to the sought value. The capture's hash is not recorded in the test, so
-the follow-up's hash is the only identity available, and a file can only be
-recognised by hashing it. The remaining locations could not be reached by this
-lane. Absence there is **unknown**, not established. No claim of host-wide
-absence is made.
+## Not searched, therefore unknown
+
+- Files over 64 MiB (131 + 360 + 85 across the roots above), not hashed.
+- The *contents* of archives: a capture embedded in a compressed archive (other
+  than the two inventoried above, by name only) would not match a whole-file
+  hash. Not extracted, not searched.
+- Anything outside the roots above: other mounts, other hosts, remote storage,
+  other users' home directories, `/tmp`, job-runner log stores not under these
+  roots, cloud or off-host backups.
+- Files unreadable to the searching user would appear as hash errors; the
+  whole-tree runs reported 0, but the two narrower first-pass rows did not
+  record errors.
+
+## Reason recovery is impossible from this search
+
+The capture path is absent and no regular file of at most 64 MiB in the
+searched roots hashes to the sought value. The capture's hash is not recorded
+in the test, so the follow-up's hash is the only identity available and a file
+is recognised only by hashing it. Absence beyond the searched, bounded set is
+**unknown**; no claim of host-wide or off-host absence is made. Without an
+authentic copy the capture cannot be provisioned, and the capture must not be
+synthesized.
 
 ## Position
 
@@ -59,7 +81,7 @@ absence is made.
 - **Nothing was synthesized or reconstructed.**
 - No change was made to `d26_evidence_test.go`, `testdata/d26-structure.json` or
   any hash.
-- A host-side search by hash of the unsearched locations above, run by someone
-  with access, would complete this record. If a file with the sought hash is
-  found, this refusal is withdrawn and the parent task's provisioning criteria
-  apply. The keep-or-relax decision stays with the owner on the parent card.
+- If a file with the sought hash is found later (including inside an archive or
+  off-host), this refusal is withdrawn and the parent task's provisioning
+  criteria apply. The keep-or-relax decision stays with the owner on the parent
+  card.
