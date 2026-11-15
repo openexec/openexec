@@ -92,20 +92,37 @@ exited 2): the capture path is **absent**.
 
 ## Counts
 
-The numeric outputs (`files=`, `files_le64MiB=`, `files_over64MiB=`,
-`hash_errors=`) are in the run's result events, which this pass could not read,
-and the supervisor addendum did not transmit them. The earlier prose records on
-other branches report figures that are consistent in kind with these outputs
-(`docs/D26_CAPTURE_PROVENANCE_SEARCH.md` at commits `b425b32b`/`c1d65411` on
-branch `agent-console/task-25af4744676d-split-if-recovery-is-impossible-a-writte`:
-run-requests 204 files; `/home/perttu/.agent-console/perttu` 174185 files;
-whole tree 1732040 hashed and 131 over the bound; `/mnt/data1/projects` 4319544
-hashed and 360 over; `/mnt/data1/backups` 104 hashed and 85 over; 0 hash errors
-on the three script-2 roots). **They are not traceable to the transcript by this
-pass and are unverified here.** A different record (`7a2543ea`, supervisor
-searches) gives other figures for other bounds (for example 212 run-requests
-files up to 50 MB); that is a separate search and is not adopted. Any count
-should be confirmed against result events 11-12 and 16-17 before being relied on.
+Source: the supervisor's reading (addendum 2, 2026-11-15) of
+`GET /api/runs/4cd872d67fc61a6066e53d830b54bae5/events`, sequences 11-12 (first
+script) and 16-17 (second script). This pass transcribes those figures; it did
+not read the events itself. They are counts of what the scripts printed, not
+proof about unsearched data or archive contents.
+
+First script (`sh d26_search_tmp.sh`, exit 2 after 49.54 s; the exit status comes
+from the final `ls` failing):
+
+| Root | `files=` (`-size -65536k`) |
+| --- | --- |
+| `/home/perttu/.agent-console/run-requests` | 204 |
+| `/home/perttu/.agent-console/perttu` | 174185 |
+
+The final `ls -l` of the capture path returned "No such file or directory".
+
+Second script (exit 0 after 14 m 26.795 s):
+
+| Root | `files_le64MiB=` (`-size -65536k`) | `files_over64MiB=` (`-size +65535k`) | `hash_errors=` |
+| --- | --- | --- | --- |
+| `/home/perttu/.agent-console` | 1732040 | 131 | 0 |
+| `/mnt/data1/projects` | 4319544 | 360 | 0 |
+| `/mnt/data1/backups` | 104 | 85 | 0 |
+
+Reading these: the `files_over64MiB` column is the number of files the second
+script found but did **not** hash (literal predicate `-size +65535k`; the labels
+in the script's output are the script's own, and the predicates are not
+equivalent to an exact 64 MiB bound). `hash_errors=0` is a stderr line count for
+that script only. In the first script the `files=` count and the hash run use the
+same predicate, but its `sha256sum` errors were discarded, so no error count
+exists for it. No matching path was printed by either script.
 
 ## Archive inventory
 
@@ -114,8 +131,10 @@ archives adjacent to the occurrence date,
 `/mnt/data1/backups/agent-console/daily/agent-console-20261031.tar.gz` and
 `agent-console-20261101.tar.gz`, list only four members (root, env, auth.json,
 state.json) with no `run-requests` path, and that member searches found no
-match. Individual member hashes were not recorded by the supervisor, so none
-are given here and none are invented.
+match. **Individual member hashes were not recorded** (supervisor addendum 1), so the
+whole-member hash values requested by the task are **missing**: none are given
+here and none are invented. That part of the evidence remains unproven; the
+archive contents stay in the unknown list below.
 
 ## Not searched or not established: unknown
 
