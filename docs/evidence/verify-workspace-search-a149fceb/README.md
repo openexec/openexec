@@ -10,7 +10,7 @@ evidence. Nothing was rerun for this record.
 
 | File | What it is |
 | --- | --- |
-| `run.sh.txt` | The executed `run.sh` (stored with a `.txt` suffix so it is not executable). |
+| `run.sh.txt` | The executed `run.sh` (stored with a `.txt` suffix and Git mode 100644 so it is not executable). |
 | `receipt.json` | Runner receipt for job `watch-75d7-go-20261115`: command `/home/perttu/.agent-console/watch-jobs/75d7-go-20261115/run.sh`, pid 3195767, status `finished`, attempts 1. |
 | `record.txt` | The log `run.sh` wrote (`exec >"$log" 2>&1`). |
 
