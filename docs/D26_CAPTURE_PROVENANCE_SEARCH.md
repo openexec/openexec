@@ -12,6 +12,8 @@ or synthesized.
 - Capture path read by `TestD26PrivateOccurrenceEvidence`
   (`pkg/execution/d26_evidence_test.go`):
   `/home/perttu/.agent-console/run-requests/d26bd137975612543c90e5b983f60db8.json`
+- Events file read first by that test (from the earlier record; not hashed or read here):
+  `/home/perttu/.agent-console/perttu/scratch/20261031T163533Z/d26-events.json`
 
 ## Hash-matching method
 
@@ -84,6 +86,9 @@ Supervisor-recorded facts about these runs:
 2. `/home/perttu/.agent-console/perttu` (script 1)
 3. `/home/perttu/.agent-console` (whole tree, script 2)
 4. `/mnt/data1/projects` (script 2)
+6. This task's own worktree (an earlier Python pass, 1586 files hashed, 0 matches,
+   per the prior record; its script is not recorded here and is not among the
+   recovered commands).
 5. `/mnt/data1/backups` (script 2)
 
 Roots 1 and 2 are subsets of root 3 and were hashed again there. A direct
@@ -169,3 +174,4 @@ provisioned and must not be synthesized.
 - If a file with the sought hash is found (including inside an archive or
   off-host), this refusal is withdrawn and the parent task's provisioning
   criteria apply.
+  The keep-or-relax decision stays with the owner on the parent card.
