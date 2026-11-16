@@ -262,7 +262,7 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		return &ProjectPlan{Stories: []Story{
 			{ID: "US-009", Title: "Study", Tasks: []Task{
 				{ID: "T-US-009-001", Mode: TaskModeAFK},
-				{ID: "T-US-009-002", Mode: TaskModeAFK, DependsOn: []string{"T-US-009-001", "T-US-009-003"}},
+				{ID: "T-US-009-002", Mode: TaskModeAFK, DependsOn: []string{"T-US-009-001", "T-US-009-003", "T-US-009-004"}},
 				{ID: "T-US-009-003", Mode: TaskModeHITL, DecisionReason: r3, DecisionRef: "decision:study", Description: "Run study", DependsOn: []string{"T-US-009-001"}},
 				{ID: "T-US-009-004", Mode: TaskModeHITL, DecisionReason: r4, Description: "Record result", DependsOn: []string{"T-US-009-003"}},
 			}},
@@ -298,7 +298,7 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 		if len(got.Stories[0].Tasks) != 2 || got.Stories[0].Tasks[1].ID != "T-US-009-002" {
 			t.Fatalf("automatic neighbour not retained in US-009: %+v", got.Stories[0].Tasks)
 		}
-		if !reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003"}) {
+		if !reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003", "T-US-009-004"}) {
 			t.Fatalf("neighbour dependency on human task lost: %v", got.Stories[0].Tasks[1].DependsOn)
 		}
 		want := original().Stories[0].Tasks[2:]
@@ -316,7 +316,7 @@ func TestHumanBoundaryRefinementMayMoveHumanTasksOutOfASplitStory(t *testing.T) 
 			t.Fatalf("human tasks changed: %+v", got.Stories[2].Tasks)
 		}
 		if got.Stories[0].Tasks[1].ID != "T-US-009-002" ||
-			!reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003"}) {
+			!reflect.DeepEqual(got.Stories[0].Tasks[1].DependsOn, []string{"T-US-009-001", "T-US-009-003", "T-US-009-004"}) {
 			t.Fatalf("neighbour not retained with its human edge: %+v", got.Stories[0].Tasks)
 		}
 		if err := got.Validate(); err != nil {
