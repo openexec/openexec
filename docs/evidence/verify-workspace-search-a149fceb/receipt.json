@@ -1,0 +1,17 @@
+{
+  "slug": "watch-75d7-go-20261115",
+  "name": "watch-75d7-go-20261115",
+  "project": "openexec",
+  "command": [
+    "/home/perttu/.agent-console/watch-jobs/75d7-go-20261115/run.sh"
+  ],
+  "pid": 3195767,
+  "started": 1794724270.2559032,
+  "process_identity": "0d7426eb-9fdd-419c-a538-3cb691fbc428:172862681",
+  "status": "finished",
+  "attempts": 1,
+  "cwd": "/home/perttu/.agent-console/watch-jobs/75d7-go-20261115",
+  "seconds": 6.6128339767456055,
+  "ended": 1794724276.8817747,
+  "detail": ""
+}
