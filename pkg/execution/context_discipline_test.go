@@ -596,3 +596,45 @@ func TestNativeRouteDispatchedOverflowRestartsFromTheHandover(t *testing.T) {
 		})
 	}
 }
+
+// MaxChains bounds the chains of one Execute, not of the run. The handover
+// carries the chain count from pass to pass; read against the run's total, a
+// pass after the first got a single chain and ended at its first hard
+// threshold, so a task that needed one more pass of restarts failed instead
+// (Solar df74566c T-US-CS29AB35C-001-002, 11-12: passes 2 to 4 ended about a
+// minute apart, one chain each).
+func TestALaterPassGetsItsOwnChains(t *testing.T) {
+	fake := &fakeQwen{contextTokens: 32768, bytesPerToken: 3, steps: 400, writesHandover: true}
+	policy := localPolicy()
+	policy.MaxChains = 2
+	provider, closeServer := newFakeProvider(t, fake, policy, &inspectTools{size: 40 << 10}, 1000)
+	defer closeServer()
+	request, _ := runRequest(t)
+	opens := func(from int) int {
+		n := 0
+		for _, r := range fake.requests[from:] {
+			if r.messages == 1 && strings.Contains(r.firstUser, "Context checkpoint") {
+				n++
+			}
+		}
+		return n
+	}
+	result, err := provider.Execute(context.Background(), request, nil)
+	if err != nil || result.Reason != ReasonContextCheckpoint {
+		t.Fatalf("fixture: the first pass should end on the chain cap, got %s/%s err=%v", result.Outcome, result.Reason, err)
+	}
+	if got := opens(0); got != policy.MaxChains {
+		t.Fatalf("fixture: the first pass restarted %d times, want %d", got, policy.MaxChains)
+	}
+	for pass := 2; pass <= 3; pass++ {
+		from := len(fake.requests)
+		result, err = provider.Execute(context.Background(), request, nil)
+		if err != nil || result.Reason != ReasonContextCheckpoint {
+			t.Fatalf("pass %d: fixture should still end on the chain cap, got %s/%s err=%v", pass, result.Outcome, result.Reason, err)
+		}
+		// The resumed chain plus MaxChains restarts, as the first pass had.
+		if got := opens(from); got != policy.MaxChains+1 {
+			t.Fatalf("pass %d opened %d chains, want %d: the chain cap was read against the run's total, not this pass", pass, got, policy.MaxChains+1)
+		}
+	}
+}

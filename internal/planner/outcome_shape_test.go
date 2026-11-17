@@ -229,10 +229,45 @@ func TestRefinementKeepsOrReplacesTheBaseline(t *testing.T) {
 	}
 }
 
+func TestReferenceLengthIssueNamesTheBoundAndTheFix(t *testing.T) {
+	skeleton := func(example string) *ProjectPlan {
+		return &ProjectPlan{SchemaVersion: PlanSchemaVersion,
+			Baseline: &Baseline{Approach: "a", Result: "r", Bar: "b", Verdict: VerdictBuild, Source: "s"},
+			Stories: []Story{
+				{ID: "US-001", Role: RoleSkeleton, RealExample: example},
+				{ID: "US-002", Role: RoleCore},
+			}}
+	}
+	// Multi-byte runes are counted as runes, not bytes; 300 is allowed.
+	if issues := LintOutcomeShape(skeleton(strings.Repeat("ä", realExampleRunes))); len(issues) != 0 {
+		t.Fatalf("a reference at the bound was refused: %v", issues)
+	}
+	issues := LintOutcomeShape(skeleton(strings.Repeat("ä", realExampleRunes+1)))
+	if len(issues) != 1 || !IsReferenceLengthIssue(issues[0]) {
+		t.Fatalf("issues = %v", issues)
+	}
+	for _, want := range []string{"US-001", "301 runes", "at most 300 runes", "single line", "Shorten it to the path, URL or name"} {
+		if !strings.Contains(issues[0], want) {
+			t.Fatalf("issue lacks %q: %s", want, issues[0])
+		}
+	}
+	if issues := LintOutcomeShape(skeleton("a\nb")); len(issues) != 1 || !strings.Contains(issues[0], "line break") {
+		t.Fatalf("multi-line issue = %v", issues)
+	}
+	if got := CheckRepairInstruction([]string{"verification lint refused: x"}); strings.Contains(got, "real_example") {
+		t.Fatalf("reference guidance on an unrelated repair: %s", got)
+	}
+}
+
 func TestPlanningPromptsCarryOutcomeShapeRules(t *testing.T) {
 	for _, rule := range []string{"BASELINE FIRST", "WALKING SKELETON FIRST", "CORE BEFORE INFRASTRUCTURE", `"real_example"`, `"role_reason"`, "never call an external or billed model"} {
 		if !strings.Contains(OutcomeShapeRule, rule) {
 			t.Fatalf("outcome shape rule lacks %q", rule)
+		}
+	}
+	for name, prompt := range map[string]string{"generation": OutcomeShapeRule, "refinement": StoryFixPrompt} {
+		if !strings.Contains(prompt, "300 runes") {
+			t.Fatalf("%s prompt omits the real_example bound", name)
 		}
 	}
 	for name, prompt := range map[string]string{"generation": StoryGenerationPrompt, "review": StoryReviewPrompt, "refinement": StoryFixPrompt} {
@@ -251,5 +286,33 @@ func TestPlanningPromptsCarryOutcomeShapeRules(t *testing.T) {
 	}
 	if example.Baseline == nil || example.Stories[0].Role != RoleSkeleton || example.Stories[0].RealExample == "" {
 		t.Fatalf("generation example omits the outcome shape: %+v", example)
+	}
+}
+
+// A planner-controlled value that quotes the reference-length wording must not
+// make a structural failure repairable: the kind is decided where the issue is
+// raised, not by matching its text.
+func TestQuotedMarkerInAStructuralIssueStaysRefused(t *testing.T) {
+	plan := &ProjectPlan{SchemaVersion: "2.0",
+		Baseline: &Baseline{Approach: "a", Result: "r", Bar: "b", Verdict: VerdictBuild, Source: "s"},
+		Stories: []Story{
+			{ID: "US-001", Role: RoleSkeleton, RealExample: "testdata/input.mp4"},
+			{ID: "US-002", Role: "feature: " + referenceLengthMarker},
+		}}
+	issues := LintOutcomeShape(plan)
+	if len(issues) != 1 || !strings.Contains(issues[0], "unknown role") {
+		t.Fatalf("issues = %v", issues)
+	}
+	if got := RepairablePlanIssues(plan); len(got) != 0 {
+		t.Fatalf("a structural failure quoting the marker was made repairable: %v", got)
+	}
+	if got := DeterministicPlanIssues(plan); len(got) != 1 || !strings.Contains(got[0], "outcome shape lint refused: [") {
+		t.Fatalf("deterministic issues = %v", got)
+	}
+	// Near miss: a genuinely overlong reference is repairable.
+	plan.Stories[1].Role = RoleCore
+	plan.Stories[0].RealExample = strings.Repeat("x", realExampleRunes+1)
+	if got := RepairablePlanIssues(plan); len(got) != 1 {
+		t.Fatalf("overlong reference not repairable: %v", got)
 	}
 }

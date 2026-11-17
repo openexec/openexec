@@ -1,0 +1,6 @@
+diff --git a/internal/planner/review.go b/internal/planner/review.go
+index ba1cdc7f..5eb9c0cd 100644
+--- a/internal/planner/review.go
++++ b/internal/planner/review.go
+@@ -328,0 +329 @@ func CheckRepairInstruction(issues []string) string {
++			reference = ""

@@ -67,7 +67,7 @@ func TestSearchHeavyNativeAdmissionRefusesWithoutSafeCompaction(t *testing.T) {
 		}
 		return map[string]any{"done": true, "prompt_eval_count": n * 7000, "eval_count": 100, "message": map[string]any{"tool_calls": toolCalls}}
 	})
-	p, err := NewAPIProvider(APIProviderConfig{Adapter: &reusedIDNativeAdapter{newNativeProvider(t, server.URL)}, ToolExecutor: NewWorkspaceToolExecutor(), Tools: WorkspaceTools(Sandbox{Mode: SandboxReadOnly}), MaxSteps: 6})
+	p, err := NewAPIProvider(APIProviderConfig{Adapter: &reusedIDNativeAdapter{newNativeProvider(t, server.URL)}, ToolExecutor: opaqueExecutor{NewWorkspaceToolExecutor()}, Tools: WorkspaceTools(Sandbox{Mode: SandboxReadOnly}), MaxSteps: 6})
 	if err != nil {
 		t.Fatal(err)
 	}

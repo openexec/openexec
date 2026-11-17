@@ -1,0 +1,7 @@
+diff --git a/internal/planner/outcome_shape.go b/internal/planner/outcome_shape.go
+index 23b1bfe5..f544d4d6 100644
+--- a/internal/planner/outcome_shape.go
++++ b/internal/planner/outcome_shape.go
+@@ -119 +119 @@ func lintOutcomeShape(plan *ProjectPlan) (issues []string, referenceLength []boo
+-	case utf8.RuneCountInString(ref) > realExampleRunes || strings.Contains(ref, "\n"):
++	case false && (utf8.RuneCountInString(ref) > realExampleRunes || strings.Contains(ref, "\n")):
