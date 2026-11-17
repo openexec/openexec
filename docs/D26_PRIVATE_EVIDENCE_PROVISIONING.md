@@ -24,9 +24,12 @@ archive or backup):
 
 The script computes SHA-256 of `SRC`, refuses (exit 1, nothing written) unless it equals
 the required hash, then installs it at the capture path with mode 0600. Negative
-control, run on a scratch copy inside the checkout: a wrong file printed
-`refused: sha256 1f77f533… != required 0cbc9da8…0708` and a missing file printed
-`refused: … is not a file`; both exited 1 and created no output file.
+control is committed: `TestD26RestoreScriptFailsClosed`
+(`pkg/execution/d26_restore_script_test.go`) runs the real script on scratch wrong,
+empty, missing and directory inputs and requires exit non-zero, no output file, a
+`refused` message and no content in the output. (No positive case can exist without
+the authentic bytes.) The full search record and refusal are in
+`docs/D26_CAPTURE_PROVENANCE_SEARCH.md`.
 
 ## Recovery status: NOT RECOVERED
 
