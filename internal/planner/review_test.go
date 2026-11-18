@@ -167,3 +167,59 @@ func TestRefinedStoriesWithoutAGoalKeepTheGoalTheyServed(t *testing.T) {
 		t.Fatalf("story goals = %v", got)
 	}
 }
+
+type seqProvider struct {
+	replies []string
+	prompts []string
+}
+
+func (s *seqProvider) Complete(ctx context.Context, prompt string) (string, error) {
+	s.prompts = append(s.prompts, prompt)
+	i := len(s.prompts) - 1
+	if i >= len(s.replies) {
+		i = len(s.replies) - 1
+	}
+	return s.replies[i], nil
+}
+
+func TestReviewPlanProseTolerance(t *testing.T) {
+	plan := &ProjectPlan{Stories: []Story{{ID: "US-1", Title: "T", VerificationScript: "go test ./..."}}}
+	good := `{"approved":true,"assessment":"fine"}`
+	cases := []struct {
+		name    string
+		replies []string
+		calls   int
+		wantErr string
+	}{
+		{"fenced", []string{"```json\n" + good + "\n```"}, 1, ""},
+		{"prose then json", []string{"I reviewed {the plan}. Verdict: " + good + " done."}, 1, ""},
+		{"prose then repair", []string{"I think this is fine."}, 2, ""},
+		{"prose repair prose", []string{"I think this is fine.", "Still fine."}, 2, "invalid plan review"},
+		{"missing approved", []string{`{"assessment":"looks fine"}`}, 1, "requires explicit approved"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			replies := c.replies
+			if c.name == "prose then repair" {
+				replies = append(replies, good)
+			}
+			p := &seqProvider{replies: replies}
+			review, err := New(p).ReviewPlan(context.Background(), "intent", plan)
+			if len(p.prompts) != c.calls {
+				t.Fatalf("calls = %d, want %d", len(p.prompts), c.calls)
+			}
+			if c.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), c.wantErr) {
+					t.Fatalf("err = %v, want %q", err, c.wantErr)
+				}
+				return
+			}
+			if err != nil || !review.Approved {
+				t.Fatalf("review = %#v, %v", review, err)
+			}
+			if c.calls == 2 && !strings.Contains(p.prompts[1], "ONE JSON object") {
+				t.Fatal("repair prompt missing")
+			}
+		})
+	}
+}

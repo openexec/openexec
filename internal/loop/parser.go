@@ -39,6 +39,9 @@ type Parser struct {
 	// CLI tools buffer their results while executing. Correlate actual tool
 	// boundaries, including parallel calls, rather than guessing from command text.
 	pendingTools map[string]string
+
+	// plainText treats every stdout line as assistant text (see NewPlainTextParser).
+	plainText bool
 }
 
 // NewParser creates a Parser that sends events to ch.
@@ -107,7 +110,27 @@ type contentItem struct {
 	Input     map[string]interface{} `json:"input,omitempty"`
 }
 
+// NewPlainTextParser creates a Parser for CLIs whose silent mode prints the
+// answer as plain text (GitHub Copilot's `copilot -p ... -s`). Each non-empty
+// line becomes an assistant text event, so STEP_RESULT detection and activity
+// heartbeats work as for stream-json CLIs.
+func NewPlainTextParser(ch chan<- Event, iteration int) *Parser {
+	return &Parser{events: ch, iteration: iteration, plainText: true}
+}
+
+func (p *Parser) parsePlainLine(line []byte) {
+	data, err := json.Marshal(messageBody{Content: []contentItem{{Type: "text", Text: string(line)}}})
+	if err != nil {
+		return
+	}
+	p.parseAssistant(data)
+}
+
 func (p *Parser) parseLine(line []byte) {
+	if p.plainText {
+		p.parsePlainLine(line)
+		return
+	}
 	var raw rawMessage
 	if err := util.UnmarshalRobust(string(line), &raw); err != nil {
 		return // malformed JSON — skip

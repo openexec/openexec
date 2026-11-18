@@ -45,6 +45,9 @@ var availableModels = []struct {
 	// Gemini (Google)
 	{"gemini", "gemini-3.1-pro-preview", "Gemini 3.1 Pro"},
 	{"gemini", "gemini-3.1-flash-preview", "Gemini 3.1 Flash"},
+	// GitHub Copilot: runs GitHub's own `copilot` CLI. Set the executor model to
+	// "copilot:<model>" to pass <model> to the CLI's --model flag.
+	{"copilot", "copilot", "GitHub Copilot CLI (default model)"},
 	// AgenticsNZ
 	{"agenticsnz", "bartowski/google_gemma-4-31B-it-GGUF", "Gemma 4 31B (AgenticsNZ)"},
 	{"agenticsnz", "unsloth/Qwen3.6-35B-A3B-GGUF", "Qwen 3.6 35B (AgenticsNZ)"},

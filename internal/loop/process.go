@@ -32,12 +32,24 @@ type Process struct {
 // Optional writers can be provided to tee stdout and stderr.
 // Middleware wraps stdin/stdout/stderr for Deep-Trace interception if provided.
 func StartProcess(ctx context.Context, cfg Config, stdoutW, stderrW io.Writer, m Middleware) (*Process, error) {
+	if usesCopilotCLI(cfg) {
+		// A missing copilot binary must surface, never fall back to claude.
+		if _, _, err := runner.Resolve(cfg.ExecutorModel, cfg.RunnerCommand, cfg.RunnerArgs); err != nil {
+			return nil, err
+		}
+	}
 	name, args := buildCommand(cfg)
 	// name is either "claude" or a test-controlled override
 	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204
 	cmd.Dir = cfg.WorkDir
 	// Propagate execution mode and workspace root to the child process
 	env := os.Environ()
+	if runner.IsCopilotModel(cfg.ExecutorModel) && cfg.RunnerCommand == "" {
+		var err error
+		if env, err = runner.CopilotEnv(env); err != nil {
+			return nil, err
+		}
+	}
 	// Prefer typed Mode over legacy ExecMode string
 	if cfg.Mode != "" {
 		env = append(env, "OPENEXEC_MODE="+string(cfg.Mode))
@@ -193,6 +205,11 @@ var disabledTools = []string{
 	"AskUserQuestion",
 }
 
+// usesCopilotCLI reports whether the loop will spawn the default copilot CLI.
+func usesCopilotCLI(cfg Config) bool {
+	return cfg.CommandName == "" && cfg.RunnerCommand == "" && runner.IsCopilotModel(cfg.ExecutorModel)
+}
+
 func buildCommand(cfg Config) (string, []string) {
 	// If the server/caller already provided a command name and args, use them.
 	if cfg.CommandName != "" {
@@ -213,6 +230,12 @@ func buildCommand(cfg Config) (string, []string) {
 	// For Claude, ensuring we use our specific flags if it was using defaults.
 	if strings.Contains(strings.ToLower(cliCmd), "claude") {
 		return cliCmd, buildClaudeArgs(cfg)
+	}
+
+	// The Copilot CLI takes its prompt as -p <prompt> (no stdin) and gets file
+	// writes only when the execution mode allows them.
+	if runner.IsCopilotModel(cfg.ExecutorModel) && cfg.RunnerCommand == "" {
+		return cliCmd, copilotArgs(cfg, cmdArgs)
 	}
 
 	// For Gemini, gate --yolo by execution mode (danger only)
@@ -241,6 +264,21 @@ func buildCommand(cfg Config) (string, []string) {
 	}
 
 	return cliCmd, cmdArgs
+}
+
+func copilotArgs(cfg Config, base []string) []string {
+	args := append([]string{"-p", autonomousPreamble + cfg.Prompt}, base...)
+	if m := runner.CopilotCLIModel(cfg.ExecutorModel); m != "" {
+		args = append(args, "--model", m)
+	}
+	mode := cfg.ExecMode
+	if mode == "" {
+		mode = os.Getenv("OPENEXEC_MODE")
+	}
+	if mode == "workspace-write" || mode == "danger-full-access" {
+		args = append(args, "--allow-tool=write")
+	}
+	return args
 }
 
 func buildClaudeArgs(cfg Config) []string {

@@ -125,6 +125,8 @@ func runDoctor(cmd *cobra.Command) error {
 				}
 			} else if strings.Contains(base, "gemini") {
 				cmd.Printf("  %s Gemini CLI found. If authentication fails later, run 'gemini auth login' or visit https://ai.google.dev/gemini-api/docs/api-key\n", color.YellowString("!"))
+			} else if strings.Contains(base, "copilot") {
+				cmd.Printf("  %s Copilot CLI found. Sign in with 'copilot' (/login) or set COPILOT_GITHUB_TOKEN to a gho_, ghu_ or github_pat_ token (classic ghp_ tokens are not accepted).\n", color.YellowString("!"))
 			} else if strings.Contains(base, "codex") {
 				cmd.Printf("  %s Codex CLI found. Ensure you have set CODEX_API_KEY in your environment.\n", color.YellowString("!"))
 			}

@@ -8,7 +8,49 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/openexec/openexec/internal/runner"
 )
+
+func TestInitOffersCopilotAndSelectionReachesRunner(t *testing.T) {
+	found := false
+	for _, m := range availableModels {
+		if m.Provider == "copilot" {
+			found = true
+			if !runner.IsCopilotModel(m.Model) {
+				t.Fatalf("init offers %q for copilot but the runner does not route it to the copilot CLI", m.Model)
+			}
+		} else if runner.IsCopilotModel(m.Model) {
+			t.Fatalf("%s/%s must not route to the copilot CLI", m.Provider, m.Model)
+		}
+	}
+	if !found {
+		t.Fatal("init offers no GitHub Copilot choice")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "copilot"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	path, args, err := runner.Resolve("copilot", "", nil)
+	if err != nil || filepath.Base(path) != "copilot" || strings.Join(args, " ") != "-s --no-ask-user" {
+		t.Fatalf("Resolve = %q %q %v", path, args, err)
+	}
+	if got := runner.CopilotCLIModel("copilot:gpt-4.1"); got != "gpt-4.1" {
+		t.Fatalf("CopilotCLIModel = %q", got)
+	}
+	if got := runner.CopilotCLIModel("copilot"); got != "" {
+		t.Fatalf("default model = %q", got)
+	}
+	if got := runner.CopilotCLIModel("copilotx"); got != "" || runner.IsCopilotModel("copilotx") {
+		t.Fatal("near miss copilotx must not select the copilot CLI")
+	}
+	t.Setenv("PATH", t.TempDir())
+	if _, _, err := runner.Resolve("copilot", "", nil); err == nil {
+		t.Fatal("missing copilot binary must be reported, not fall back to claude")
+	}
+}
 
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()

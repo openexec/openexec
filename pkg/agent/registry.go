@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/openexec/openexec/pkg/telemetry"
@@ -146,9 +147,17 @@ func (r *ProviderRegistry) GetForModel(modelID string) (ProviderAdapter, error) 
 	if !exists {
 		// Model not in index - try to find it by checking all providers
 		providers := r.ListProviders()
+		family, _, _ := strings.Cut(modelID, ":")
+		var unavailable error
 		for _, name := range providers {
 			provider, err := r.Get(name)
 			if err != nil {
+				// Keep why a provider of the requested model's family is
+				// unavailable (missing binary, refused credential) instead of
+				// reporting only that no provider exists.
+				if unavailable == nil && family != "" && strings.Contains(string(name), family) {
+					unavailable = err
+				}
 				continue
 			}
 			for _, m := range provider.GetModels() {
@@ -156,12 +165,16 @@ func (r *ProviderRegistry) GetForModel(modelID string) (ProviderAdapter, error) 
 					return provider, nil
 				}
 			}
+			if s, ok := provider.(interface{ SupportsModel(string) bool }); ok && s.SupportsModel(modelID) {
+				return provider, nil
+			}
 		}
 
-		return nil, &ProviderError{
-			Code:    ErrCodeNotFound,
-			Message: fmt.Sprintf("no provider found for model %q", modelID),
+		msg := fmt.Sprintf("no provider found for model %q", modelID)
+		if unavailable != nil {
+			msg += ": " + unavailable.Error()
 		}
+		return nil, &ProviderError{Code: ErrCodeNotFound, Message: msg}
 	}
 
 	return r.Get(providerName)
@@ -375,6 +388,11 @@ func RegisterDefaultFactories(registry *ProviderRegistry) {
 	// Gemini factory
 	registry.RegisterFactory(ProviderGemini, func() (ProviderAdapter, error) {
 		return NewGeminiProviderFromEnv()
+	})
+
+	// GitHub Copilot factory (runs the copilot CLI; never uses OpenAI keys)
+	registry.RegisterFactory(ProviderGitHubCopilot, func() (ProviderAdapter, error) {
+		return NewGitHubCopilotProvider()
 	})
 
 	// AgenticsNZ factory

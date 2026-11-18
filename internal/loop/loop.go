@@ -113,6 +113,9 @@ func (l *Loop) runStandalone(ctx context.Context) error {
 
 	// Parse stdout events
 	parser := NewParser(l.events, 1)
+	if usesCopilotCLI(l.cfg) {
+		parser = NewPlainTextParser(l.events, 1)
+	}
 	parseErr := make(chan error, 1)
 	go func() {
 		parseErr <- parser.Parse(proc.Stdout)
