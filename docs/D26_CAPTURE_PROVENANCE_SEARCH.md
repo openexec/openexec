@@ -14,20 +14,23 @@ Status: **recovery not achieved. Refusal.** This document holds metadata only
 
 ## Method
 
-Content-hash matching, not filename matching. For each root, from a throwaway
-shell script in this checkout (removed afterwards; not part of the diff), read
-only:
+Content-hash matching, not filename matching: each regular file under a root
+is hashed in full and compared with the hash sought.
+
+**Executed commands: unrecoverable from the retained transcript.** The exact
+commands of run 4cd872d6 are not in this checkout and could not be recovered
+by this pass, so none is quoted verbatim here (supervisor answer to question
+d26-unrecoverable-commands: ship an explicit unrecoverable statement, invent
+nothing). The form below is an **illustration of the method, not the executed
+command**; its roots, flags and redirections are not claimed to match the run:
 
     find ROOT -type f -size -65536k -exec sha256sum {} + 2>ERRFILE | grep HASH | cut -d' ' -f3-
 
-That is every regular file under ROOT of at most 64 MiB (`-size -65536k`),
-hashed in full and compared with the hash sought; only matching paths would be
-printed. File counts came from `find ROOT -type f -size -65536k` and
-`-size +65535k`; hash errors are the line count of `ERRFILE` (stderr of
-`sha256sum`). Symlinked directories are not followed (`find` default); `.git`
-and `node_modules` were not excluded. Archives such as `.tar.gz` were hashed as
-whole files, not opened. Run 2026-11-15, host side, no write outside the
-checkout and `/tmp`.
+The `-size -65536k` bound (files of at most 64 MiB) is therefore **a bound this
+document cannot show the run used**; it is the bound the earlier accepted pass
+reported. Other details (whether symlinks were followed, whether `.git` or
+`node_modules` were excluded, whether archives were opened, run date and host)
+are **not recorded in the transcript available to this pass**.
 
 ## Locations searched, results
 
@@ -53,27 +56,23 @@ occurrence filename. This is a filename inventory only.
 
 ## Traceability of the figures
 
-- Source of every number in the table above: the outputs of the search run
-  4cd872d6 (the `find ... -size -65536k` / `-size +65535k` counts and the
-  `ERRFILE` line counts shown under Method), as accepted by review
-  8962116361a16eae28ba70168b9d1074 (acceptance entry 4, transcript-supported
-  counts). The rows map to those outputs as: "Files hashed" = the
-  `-size -65536k` count; "Files over 64 MiB" = the `-size +65535k` count; "Hash
-  errors" = the `ERRFILE` line count.
-- The transcript itself is **not in this checkout** and was not available to
-  this pass. This pass therefore did not re-derive or re-measure any figure and
-  adds none; it only marks what is and is not recorded. The command in Method
-  is the form given by that run; its character-for-character match to the
-  transcript is not independently reproducible from this checkout.
-- Cells reading "not counted" or "not recorded" mean the transcript records no
-  figure. No estimate is given. Result-event counts beyond those in the table
-  are **not recorded in the transcript** as far as this document can show.
-- The 64 MiB (`-size -65536k`) bound is a bound of the executed command, not a
-  claim about files above it; those are listed as unknown below.
+- The counts in the table are carried over from the earlier pass, which review
+  8962116361a16eae28ba70168b9d1074 accepted as transcript-supported. This pass
+  **could not open the run 4cd872d6 transcript** (not in this checkout; the
+  host directory holding it is outside this task's authority), so it did **not
+  verify any figure and quotes no output line**. Each number is "as carried,
+  unverified here"; none is re-measured or newly added.
+- Intended mapping, not a verified one: "Files hashed" = count of files at most
+  64 MiB; "Files over 64 MiB" = count of files above it; "Hash errors" = number
+  of stderr lines from hashing.
+- Cells reading "not counted" or "not recorded" mean no figure is available to
+  this document. No estimate is given. Result-event counts beyond the table are
+  **not recorded** here.
+- The 64 MiB bound says nothing about files above it; those are unknown below.
 - Fresh whole-member archive hashes (measured later by the supervisor) are new
-  measurements, not part of run 4cd872d6, and are not included here; two
-  archive members are credential files whose hashes and bytes are deliberately
-  not published.
+  measurements, not part of run 4cd872d6, and are not included; two archive
+  members are credential files whose hashes and bytes are deliberately not
+  published.
 
 ## Not searched, therefore unknown
 
@@ -84,9 +83,9 @@ occurrence filename. This is a filename inventory only.
 - Anything outside the roots above: other mounts, other hosts, remote storage,
   other users' home directories, `/tmp`, job-runner log stores not under these
   roots, cloud or off-host backups.
-- Files unreadable to the searching user would appear as hash errors; the
-  whole-tree runs reported 0, but the two narrower first-pass rows did not
-  record errors.
+- Files unreadable to the searching user: the table carries 0 hash errors for
+  the four wider rows (unverified here) and no error count for the two
+  narrower first-pass rows.
 
 ## Reason recovery is impossible from this search
 
