@@ -76,22 +76,20 @@ func (e *CompositeToolExecutor) safelyListsDirectories() bool {
 	return !e.forwarded["list_directory"] && ok && safe.safelyListsDirectories()
 }
 
-// executeSearchWithProvenance answers only for the workspace half. A forwarded
-// search_files carries no scan provenance and is never reported complete.
-func (e *CompositeToolExecutor) executeSearchWithProvenance(ctx context.Context, request ToolRequest) (string, bool, error) {
-	if e.forwarded[request.Name] {
-		output, err := e.ExecuteTool(ctx, request)
-		return output, false, err
-	}
-	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
-		return "", false, err
-	}
-	scanner, ok := e.workspace.(searchProvenanceExecutor)
+func (e *CompositeToolExecutor) pinReadableRoots(paths []string, identities []ReadableRootIdentity) (ToolExecutor, func(), error) {
+	pinner, ok := e.workspace.(interface {
+		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+	})
 	if !ok {
-		output, err := e.workspace.ExecuteTool(ctx, request)
-		return output, false, err
+		return nil, nil, fmt.Errorf("workspace executor cannot pin readable roots")
 	}
-	return scanner.executeSearchWithProvenance(ctx, request)
+	workspace, closeRoots, err := pinner.pinReadableRoots(paths, identities)
+	if err != nil {
+		return nil, nil, err
+	}
+	copy := *e
+	copy.workspace = workspace
+	return &copy, closeRoots, nil
 }
 
 func (e *CompositeToolExecutor) servesGateway() bool { return true }
@@ -120,4 +118,21 @@ func (e *CompositeToolExecutor) ExecuteTool(ctx context.Context, request ToolReq
 		return e.gateway.executeAuthorized(ctx, request)
 	}
 	return e.workspace.ExecuteTool(ctx, request)
+}
+
+// executeToolScan carries the workspace half's scan provenance through the
+// composite. Forwarded gateway verbs never claim a complete scan.
+func (e *CompositeToolExecutor) executeToolScan(ctx context.Context, request ToolRequest) (string, bool, error) {
+	if e.forwarded[request.Name] {
+		output, err := e.ExecuteTool(ctx, request)
+		return output, false, err
+	}
+	if err := e.ValidateAccess(request.WorkingDir, request.Sandbox, request.WritableRoots); err != nil {
+		return "", false, err
+	}
+	if scanner, ok := e.workspace.(scanReportingExecutor); ok {
+		return scanner.executeToolScan(ctx, request)
+	}
+	output, err := e.workspace.ExecuteTool(ctx, request)
+	return output, false, err
 }

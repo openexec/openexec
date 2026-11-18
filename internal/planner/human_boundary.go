@@ -113,6 +113,19 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 		}
 		return id
 	}
+	// Edges as the refinement proposed them: restoring edges below must not
+	// make a story look tied to the original one.
+	proposed := map[string][]string{}
+	for _, rs := range refined.Stories {
+		proposed[rs.ID] = append([]string(nil), rs.DependsOn...)
+		for _, rt := range rs.Tasks {
+			proposed[rt.ID] = append(proposed[rt.ID], rt.DependsOn...)
+		}
+	}
+	originalStories := map[string]bool{}
+	for _, s := range original.Stories {
+		originalStories[s.ID] = true
+	}
 	for _, s := range original.Stories {
 		if !slices.ContainsFunc(s.Tasks, func(task Task) bool { return retained[task.ID] }) {
 			continue
@@ -131,11 +144,29 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 			if !retained[t.ID] {
 				continue
 			}
-			i := slices.IndexFunc(nextStory.Tasks, func(candidate Task) bool { return candidate.ID == taskID(t.ID) })
-			if i < 0 {
+			// A story split may move the task to another story. Resolve by
+			// identity across the plan; an id held twice is ambiguous.
+			next, home, count := findTaskAnywhere(refined, taskID(t.ID))
+			if count > 1 {
+				return fmt.Errorf("refinement left task %s ambiguous across the plan", t.ID)
+			}
+			if next == nil {
 				return fmt.Errorf("refinement removed task %s around a retained human boundary", t.ID)
 			}
-			next := &nextStory.Tasks[i]
+			// Only the task's own story, its renumber target or a story the
+			// split created may hold it; another existing story is an
+			// unrelated move.
+			if home != nextStory.ID {
+				if originalStories[home] {
+					return fmt.Errorf("refinement moved task %s into unrelated story %s", t.ID, home)
+				}
+				// A task that kept its id into a new story is a split only if
+				// that story is tied to the original one; a task renumbered by
+				// its exact decision_reason is its own evidence.
+				if _, renumbered := taskIDs[t.ID]; !renumbered && !splitFrom(refined, proposed, home, s) {
+					return fmt.Errorf("refinement moved task %s into unrelated new story %s", t.ID, home)
+				}
+			}
 			if t.Mode == TaskModeHITL {
 				// What the owner is asked stays; how the agent carries it out
 				// is the refinement's to correct. Restoring the strategy too
@@ -158,6 +189,50 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 	return nil
 }
 
+// splitFrom reports whether story home is tied to the original story: it
+// depends on it, or one of its tasks depends on one of the original's tasks.
+func splitFrom(refined *ProjectPlan, proposed map[string][]string, home string, orig Story) bool {
+	for _, hs := range refined.Stories {
+		if hs.ID != home {
+			continue
+		}
+		if slices.Contains(proposed[hs.ID], orig.ID) {
+			return true
+		}
+		for _, ht := range hs.Tasks {
+			for _, ot := range orig.Tasks {
+				if slices.Contains(proposed[ht.ID], ot.ID) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func findTask(s *Story, id string) *Task {
+	if i := slices.IndexFunc(s.Tasks, func(c Task) bool { return c.ID == id }); i >= 0 {
+		return &s.Tasks[i]
+	}
+	return nil
+}
+
+// findTaskAnywhere returns the first task with the id, its story id and how
+// many tasks in the whole plan carry that id.
+func findTaskAnywhere(p *ProjectPlan, id string) (task *Task, storyID string, count int) {
+	for i := range p.Stories {
+		for j := range p.Stories[i].Tasks {
+			if p.Stories[i].Tasks[j].ID == id {
+				if task == nil {
+					task, storyID = &p.Stories[i].Tasks[j], p.Stories[i].ID
+				}
+				count++
+			}
+		}
+	}
+	return task, storyID, count
+}
+
 // renumbering finds a retained boundary that refinement only renumbered. A
 // review may ask for new ids, for instance when the plan reuses story ids
 // already committed on the branch for different work, and renaming the story
@@ -168,6 +243,10 @@ func preserveHumanBoundaries(original, refined *ProjectPlan) error {
 // less certain stays a removal.
 func renumbering(original, refined *ProjectPlan, present map[string]bool) (stories, tasks map[string]string) {
 	stories, tasks = map[string]string{}, map[string]string{}
+	keptStories := map[string]bool{}
+	for _, rs := range refined.Stories {
+		keptStories[rs.ID] = true
+	}
 	known := map[string]bool{}
 	for _, s := range original.Stories {
 		for _, t := range s.Tasks {
@@ -184,6 +263,10 @@ func renumbering(original, refined *ProjectPlan, present map[string]bool) (stori
 			// ("refinement removed story US-009" for a plan that returned
 			// T-US-009-003 unchanged inside US-019).
 			if present[t.ID] {
+				// A story that still exists was split, not renumbered.
+				if keptStories[s.ID] {
+					continue
+				}
 				for _, ns := range refined.Stories {
 					if ns.ID != s.ID && slices.ContainsFunc(ns.Tasks, func(nt Task) bool { return nt.ID == t.ID }) {
 						stories[s.ID] = ns.ID
@@ -203,7 +286,7 @@ func renumbering(original, refined *ProjectPlan, present map[string]bool) (stori
 				continue
 			}
 			tasks[t.ID] = matches[0][1]
-			if matches[0][0] != s.ID {
+			if matches[0][0] != s.ID && !keptStories[s.ID] {
 				stories[s.ID] = matches[0][0]
 			}
 		}
