@@ -166,6 +166,14 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	}
 }
 
+// BoundReadableRootsAvailable is the protocol's fail-closed feature check.
+func (p *APIProvider) BoundReadableRootsAvailable() bool {
+	_, ok := p.config.ToolExecutor.(interface {
+		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+	})
+	return ok && ReadableRootIdentitySupported()
+}
+
 func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 	models := p.config.Adapter.GetModels()
 	if len(models) == 0 {
@@ -192,9 +200,28 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	started := time.Now().UTC()
-	run := p
+	// The native workspace executor owns per-run readable-root handles. Keep
+	// them alive until this invocation ends, including retries and synthesis.
+	copy := *p
+	run := &copy
+	if len(request.ReadableRootIdentities) > 0 && len(request.ReadableRoots) > 0 {
+		if pinner, ok := p.config.ToolExecutor.(interface {
+			pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+		}); ok {
+			executor, closeRoots, err := pinner.pinReadableRoots(request.ReadableRoots, request.ReadableRootIdentities)
+			if err != nil {
+				return Result{}, err
+			}
+			defer closeRoots()
+			run.config.ToolExecutor = executor
+		} else if len(request.ReadableRootIdentities) > 0 {
+			return Result{}, errors.New("tool executor cannot bind readable root identities")
+		}
+	} else if len(request.ReadableRootIdentities) > 0 {
+		return Result{}, errors.New("readable root identities without roots")
+	}
 	if trace := newRunTrace(); trace != nil {
-		traced := *p
+		traced := *run
 		traced.trace = trace
 		run = &traced
 		sink = trace.wrapSink(sink)
@@ -489,6 +516,15 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				_ = sink(Event{Type: EventFailed, Text: err.Error()})
 				return *result, err
 			}
+			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok {
+				if note := meter.omissionLimitation(false); note != "" {
+					result.FinalText += note
+					if err := sink(Event{Type: EventAssistantDelta, Text: note}); err != nil {
+						finish()
+						return *result, err
+					}
+				}
+			}
 			result.Outcome = OutcomeSucceeded
 			finish()
 			state.closeOut("complete")
@@ -512,14 +548,26 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			}
 			var output string
 			var toolErr error
-			scanComplete := false
+			scanComplete, recallFailed := false, false
 			switch meter, bounded := p.config.Adapter.(*boundedAPIAdapter); {
 			case state != nil && call.ToolName == updateHandoverTool:
 				output, toolErr = state.update(call.ToolInput)
 			case state != nil && call.ToolName == readSavedTool:
 				output, toolErr = state.readSaved(call.ToolInput)
-			case bounded && meter.prior != nil && call.ToolName == recallTool:
-				output, toolErr = meter.prior.read(call.ToolInput)
+			case call.ToolName == recallTool:
+				// Recall is the only way omitted evidence is read back; a failed
+				// or unavailable one ends the run instead of letting the model
+				// carry on as if it had seen that evidence.
+				if bounded && meter.prior != nil {
+					var page recalledPage
+					output, page, toolErr = meter.prior.page(call.ToolInput)
+					if toolErr == nil {
+						meter.noteRecall(page)
+					}
+				} else {
+					toolErr = errors.New("recall unavailable: no omitted result is retained in this run")
+				}
+				recallFailed = toolErr != nil
 				external = true
 			default:
 				external = true
@@ -529,8 +577,8 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 					WritableRoots: append([]string(nil), request.WritableRoots...),
 					ReadableRoots: append([]string(nil), request.ReadableRoots...),
 				}
-				if scanner, ok := p.config.ToolExecutor.(searchProvenanceExecutor); ok && call.ToolName == "search_files" {
-					output, scanComplete, toolErr = scanner.executeSearchWithProvenance(ctx, toolRequest)
+				if scanner, ok := p.config.ToolExecutor.(scanReportingExecutor); ok {
+					output, scanComplete, toolErr = scanner.executeToolScan(ctx, toolRequest)
 				} else {
 					output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, toolRequest)
 				}
@@ -543,6 +591,14 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				finish()
 				return *result, err
 			}
+			if recallFailed {
+				message := "Stopped: recall of omitted tool-result evidence failed (" + toolErr.Error() + "); no further request was dispatched."
+				result.FinalText += message
+				result.Outcome = OutcomeFailed
+				finish()
+				_ = sink(Event{Type: EventFailed, Text: message})
+				return *result, errors.New(message)
+			}
 			inRequest := output
 			if state != nil {
 				state.recordCall(call.ToolName, call.ToolInput, output, toolErr)
@@ -550,12 +606,11 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 					inRequest = state.compactResult(call.ToolName, call.ToolInput, output)
 				}
 			}
-			// The scan's own completeness, bound to this result's position and
-			// exact text. Nothing is recorded for a failed or unmarked result.
-			if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok {
-				meter.recordProvenance(call.ToolName, len(messages), output, scanComplete, toolErr)
-			}
-			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr))
+			resultMessage := agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr)
+			// The mark travels with this exact result. A handover-compacted
+			// result no longer holds the full scan, so it never carries it.
+			resultMessage.Content[0].ScanComplete = scanComplete && toolErr == nil && inRequest == output
+			messages = append(messages, resultMessage)
 		}
 		// Updating the handover or reading a saved output is not a tool round;
 		// a model that does only that for long is, so the allowance still ends.
@@ -635,6 +690,18 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 		if err := sink(Event{Type: EventAssistantDelta, Text: block.Text}); err != nil {
 			finish()
 			return *result, err
+		}
+	}
+	if meter, ok := p.config.Adapter.(*boundedAPIAdapter); ok && wroteText && rebuilt {
+		// Final synthesis is never compacted, so an unrebuilt one holds the
+		// whole transcript. One rebuilt from the handover holds neither the
+		// omitted results nor any recalled page: every omission is unread there.
+		if note := meter.omissionLimitation(true); note != "" {
+			result.FinalText += note
+			if err := sink(Event{Type: EventAssistantDelta, Text: note}); err != nil {
+				finish()
+				return *result, err
+			}
 		}
 	}
 	state.closeOut("complete")

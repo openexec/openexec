@@ -46,43 +46,46 @@ const recallTool = "recall_prior_tool_result"
 // original messages remain intact; only the provider's request is compacted.
 type priorResults map[string]string
 
-func sha256Hex(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(sum[:])
+func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
+	return p.compactWith(r, true)
 }
 
-// compactWith omits only results eligible by structure: a paired, successful
-// list_directory or search_files call whose result position and text hash are
-// in completeScans, which the executor path fills only from the scan itself.
-// No branch reads a filename or output text; an unmarked result is never
-// eligible.
-func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]string) (agent.Request, bool) {
+type pendingCall struct {
+	name       string
+	input      json.RawMessage
+	occurrence int
+}
+
+// compactWith omits a result only by structured provenance, never by what its
+// text says (and never one that is not valid UTF-8, which recall's JSON pages
+// could not return byte-for-byte): a directory listing from a trusted executor (names alone), or a
+// search whose own scan reported complete. File reads, failed results, partial
+// scans and unknown tools can hold governing instructions and stay verbatim.
+func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent.Request, bool) {
 	copyRequest := r
 	copyRequest.Messages = append([]agent.Message(nil), r.Messages...)
-	// File reads and unknown tools can contain governing instructions.
-	pending := map[string][]string{}
+	pending := map[string][]pendingCall{}
+	seenCalls := map[string]int{}
 	ambiguous := map[string]bool{}
-	labels := map[[2]int]string{}
+	eligible := map[[2]int]pendingCall{}
+	lastAssistant := -1
 	for i, message := range r.Messages {
+		if message.Role == agent.RoleAssistant {
+			lastAssistant = i
+		}
 		for j, block := range message.Content {
 			switch block.Type {
 			case agent.ContentTypeToolUse:
 				if len(pending[block.ToolUseID]) > 0 {
 					ambiguous[block.ToolUseID] = true
 				}
-				pending[block.ToolUseID] = append(pending[block.ToolUseID], block.ToolName)
+				pending[block.ToolUseID] = append(pending[block.ToolUseID], pendingCall{block.ToolName, block.ToolInput, seenCalls[block.ToolUseID]})
+				seenCalls[block.ToolUseID]++
 			case agent.ContentTypeToolResult:
 				calls := pending[block.ToolResultID]
 				if len(calls) > 0 {
-					position := [2]int{i, j}
-					complete := completeScans[position] != "" && completeScans[position] == sha256Hex(block.ToolOutput)
-					if complete && !ambiguous[block.ToolResultID] {
-						switch calls[0] {
-						case "list_directory":
-							labels[position] = "directory listing"
-						case "search_files":
-							labels[position] = "complete search result"
-						}
+					if !ambiguous[block.ToolResultID] {
+						eligible[[2]int{i, j}] = calls[0]
 					}
 					pending[block.ToolResultID] = calls[1:]
 					if len(calls) == 1 {
@@ -97,17 +100,31 @@ func (p priorResults) compactWith(r agent.Request, completeScans map[[2]int]stri
 		copyRequest.Messages[i].Content = append([]agent.ContentBlock(nil), r.Messages[i].Content...)
 		for j := len(r.Messages[i].Content) - 1; j >= 0; j-- {
 			b := &copyRequest.Messages[i].Content[j]
-			if b.Type != agent.ContentTypeToolResult || labels[[2]int{i, j}] == "" || b.ToolError != "" || len(b.ToolOutput) < 256 {
+			call, ok := eligible[[2]int{i, j}]
+			if b.Type != agent.ContentTypeToolResult || !ok || b.ToolError != "" || len(b.ToolOutput) < 256 || !utf8.ValidString(b.ToolOutput) {
 				continue
 			}
-			kept++
-			if kept <= 1 {
+			switch {
+			case call.name == "list_directory" && trustDirectories:
+				kept++
+				if kept <= 1 {
+					continue
+				}
+				hash := sha256.Sum256([]byte(b.ToolOutput))
+				id := hex.EncodeToString(hash[:])
+				p[id] = b.ToolOutput
+				b.ToolOutput = fmt.Sprintf("Prior directory listing retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", id, len(b.ToolOutput), recallTool)
+			case call.name == "search_files" && b.ScanComplete && i < lastAssistant:
+				// Results the model has not yet answered stay in view. The id
+				// binds this exact call position and result, so a reused call
+				// ID or an identical output elsewhere cannot stand in for it.
+				hash := sha256.Sum256([]byte(fmt.Sprintf("search\x00%d\x00%s\x00%s\x00%s", call.occurrence, b.ToolResultID, call.input, b.ToolOutput)))
+				id := hex.EncodeToString(hash[:])
+				p[id] = b.ToolOutput
+				b.ToolOutput = fmt.Sprintf("Omitted complete search_files result for call %q (use #%d, %d bytes) retained as %s. It has NOT been inspected in this context: use %s with this id and offset 0, then each nextOffset, before relying on it.", b.ToolResultID, call.occurrence, len(b.ToolOutput), id, recallTool)
+			default:
 				continue
 			}
-			id := sha256Hex(b.ToolOutput)
-			p[id] = b.ToolOutput
-			label := labels[[2]int{i, j}]
-			b.ToolOutput = fmt.Sprintf("Prior %s retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", label, id, len(b.ToolOutput), recallTool)
 			changed = true
 		}
 	}
@@ -122,21 +139,33 @@ func recallDefinition() agent.ToolDefinition {
 }
 
 func (p priorResults) read(raw json.RawMessage) (string, error) {
+	output, _, err := p.page(raw)
+	return output, err
+}
+
+// recalledPage says how far into one omitted result a page reached.
+type recalledPage struct {
+	id         string
+	offset     int
+	next, size int
+}
+
+func (p priorResults) page(raw json.RawMessage) (string, recalledPage, error) {
 	var input struct {
 		ID     string `json:"id"`
 		Offset int    `json:"offset"`
 	}
 	if err := json.Unmarshal(raw, &input); err != nil {
-		return "", fmt.Errorf("invalid prior result request")
+		return "", recalledPage{}, fmt.Errorf("invalid prior result request")
 	}
 	content, ok := p[input.ID]
 	if !ok || input.Offset < 0 || input.Offset > len(content) || (input.Offset < len(content) && !utf8.RuneStart(content[input.Offset])) {
-		return "", fmt.Errorf("unknown result or invalid byte offset")
+		return "", recalledPage{}, fmt.Errorf("unknown result or invalid byte offset")
 	}
 	end := min(input.Offset+4096, len(content))
 	for end < len(content) && !utf8.RuneStart(content[end]) {
 		end--
 	}
 	page, _ := json.Marshal(map[string]any{"id": input.ID, "offset": input.Offset, "nextOffset": end, "totalBytes": len(content), "content": content[input.Offset:end]})
-	return string(page), nil
+	return string(page), recalledPage{input.ID, input.Offset, end, len(content)}, nil
 }
