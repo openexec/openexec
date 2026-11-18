@@ -51,6 +51,30 @@ Supplementary evidence (supervisor, 2026-11-15): the member lists of
 four entries (root, env, auth.json, state.json) and no `run-requests` path or
 occurrence filename. This is a filename inventory only.
 
+## Traceability of the figures
+
+- Source of every number in the table above: the outputs of the search run
+  4cd872d6 (the `find ... -size -65536k` / `-size +65535k` counts and the
+  `ERRFILE` line counts shown under Method), as accepted by review
+  8962116361a16eae28ba70168b9d1074 (acceptance entry 4, transcript-supported
+  counts). The rows map to those outputs as: "Files hashed" = the
+  `-size -65536k` count; "Files over 64 MiB" = the `-size +65535k` count; "Hash
+  errors" = the `ERRFILE` line count.
+- The transcript itself is **not in this checkout** and was not available to
+  this pass. This pass therefore did not re-derive or re-measure any figure and
+  adds none; it only marks what is and is not recorded. The command in Method
+  is the form given by that run; its character-for-character match to the
+  transcript is not independently reproducible from this checkout.
+- Cells reading "not counted" or "not recorded" mean the transcript records no
+  figure. No estimate is given. Result-event counts beyond those in the table
+  are **not recorded in the transcript** as far as this document can show.
+- The 64 MiB (`-size -65536k`) bound is a bound of the executed command, not a
+  claim about files above it; those are listed as unknown below.
+- Fresh whole-member archive hashes (measured later by the supervisor) are new
+  measurements, not part of run 4cd872d6, and are not included here; two
+  archive members are credential files whose hashes and bytes are deliberately
+  not published.
+
 ## Not searched, therefore unknown
 
 - Files over 64 MiB (131 + 360 + 85 across the roots above), not hashed.
