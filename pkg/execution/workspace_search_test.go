@@ -53,7 +53,26 @@ func searchFile(t *testing.T, root, path, content string) {
 
 // The real triage guessed store files for sixteen rounds looking for SplitTask.
 // Search must find its definition after the first 8 KiB without paging each file.
+// plainToolExecutor hides the executor's optional scan-reporting capability, so
+// the provider dispatches through ExecuteTool instead of executeToolScan.
+type plainToolExecutor struct{ ToolExecutor }
+
 func TestWorkspaceSearchFindsDefinitionAndCompletesTriage(t *testing.T) {
+	workspaceSearchTriage(t, NewWorkspaceToolExecutor())
+}
+
+// The ExecuteTool switch and the executeToolScan dispatch are separate routes
+// to search_files; each must serve triage on its own.
+func TestWorkspaceSearchFindsDefinitionAndCompletesTriageThroughExecuteTool(t *testing.T) {
+	executor := plainToolExecutor{NewWorkspaceToolExecutor()}
+	if _, scans := ToolExecutor(executor).(scanReportingExecutor); scans {
+		t.Fatal("wrapper still exposes executeToolScan, so ExecuteTool would not be the route taken")
+	}
+	workspaceSearchTriage(t, executor)
+}
+
+func workspaceSearchTriage(t *testing.T, executor ToolExecutor) {
+	t.Helper()
 	root := t.TempDir()
 	searchFile(t, root, "internal/store/blocked.go", strings.Repeat("// padding\n", 1000)+"func (s *Store) SplitTask() {}\n")
 	for i := 0; i < 20; i++ {
@@ -73,7 +92,7 @@ func TestWorkspaceSearchFindsDefinitionAndCompletesTriage(t *testing.T) {
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeToolUse, ToolUseID: "find", ToolName: "search_files", ToolInput: searchRequest(root, "internal/store", "SplitTask").Input}}},
 		{Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "Contract grounded in internal/store/blocked.go.\nREPOSITORY: agent-console"}}},
 	}}
-	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, Tools: tools, ToolExecutor: NewWorkspaceToolExecutor(), MaxSteps: 2})
+	provider, err := NewAPIProvider(APIProviderConfig{Adapter: adapter, Tools: tools, ToolExecutor: executor, MaxSteps: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,6 +105,20 @@ func TestWorkspaceSearchFindsDefinitionAndCompletesTriage(t *testing.T) {
 	})
 	if err != nil || result.Outcome != OutcomeSucceeded || !strings.Contains(evidence, "internal/store/blocked.go:1001:func (s *Store) SplitTask() {}") {
 		t.Fatalf("search-backed triage failed: outcome=%s evidence=%q err=%v", result.Outcome, evidence, err)
+	}
+	// Only the scan-reporting route marks a finished scan complete, so a guard
+	// that sends search_files around executeToolScan leaves this false.
+	_, wantComplete := executor.(scanReportingExecutor)
+	gotComplete := false
+	if len(adapter.requests) == 2 {
+		for _, m := range adapter.requests[1].Messages {
+			for _, b := range m.Content {
+				gotComplete = gotComplete || b.ScanComplete
+			}
+		}
+	}
+	if gotComplete != wantComplete {
+		t.Fatalf("search-backed triage failed: scan provenance complete=%v, want %v", gotComplete, wantComplete)
 	}
 	if len(adapter.requests) != 2 || !strings.Contains(fmt.Sprint(adapter.requests[1].Messages), "blocked.go:1001:") {
 		t.Fatal("search evidence did not reach the next native completion")

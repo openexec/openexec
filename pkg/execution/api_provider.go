@@ -166,6 +166,14 @@ func (p *APIProvider) Descriptor() ProviderDescriptor {
 	}
 }
 
+// BoundReadableRootsAvailable is the protocol's fail-closed feature check.
+func (p *APIProvider) BoundReadableRootsAvailable() bool {
+	_, ok := p.config.ToolExecutor.(interface {
+		pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+	})
+	return ok && ReadableRootIdentitySupported()
+}
+
 func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 	models := p.config.Adapter.GetModels()
 	if len(models) == 0 {
@@ -192,9 +200,28 @@ func (p *APIProvider) Probe(ctx context.Context, _ string) Readiness {
 
 func (p *APIProvider) Execute(ctx context.Context, request Request, sink EventSink) (Result, error) {
 	started := time.Now().UTC()
-	run := p
+	// The native workspace executor owns per-run readable-root handles. Keep
+	// them alive until this invocation ends, including retries and synthesis.
+	copy := *p
+	run := &copy
+	if len(request.ReadableRootIdentities) > 0 && len(request.ReadableRoots) > 0 {
+		if pinner, ok := p.config.ToolExecutor.(interface {
+			pinReadableRoots([]string, []ReadableRootIdentity) (ToolExecutor, func(), error)
+		}); ok {
+			executor, closeRoots, err := pinner.pinReadableRoots(request.ReadableRoots, request.ReadableRootIdentities)
+			if err != nil {
+				return Result{}, err
+			}
+			defer closeRoots()
+			run.config.ToolExecutor = executor
+		} else if len(request.ReadableRootIdentities) > 0 {
+			return Result{}, errors.New("tool executor cannot bind readable root identities")
+		}
+	} else if len(request.ReadableRootIdentities) > 0 {
+		return Result{}, errors.New("readable root identities without roots")
+	}
 	if trace := newRunTrace(); trace != nil {
-		traced := *p
+		traced := *run
 		traced.trace = trace
 		run = &traced
 		sink = trace.wrapSink(sink)
@@ -521,7 +548,7 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 			}
 			var output string
 			var toolErr error
-			recallFailed := false
+			scanComplete, recallFailed := false, false
 			switch meter, bounded := p.config.Adapter.(*boundedAPIAdapter); {
 			case state != nil && call.ToolName == updateHandoverTool:
 				output, toolErr = state.update(call.ToolInput)
@@ -544,12 +571,17 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 				external = true
 			default:
 				external = true
-				output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, ToolRequest{
+				toolRequest := ToolRequest{
 					CallID: call.ToolUseID, Name: call.ToolName, Input: call.ToolInput,
 					WorkingDir: request.WorkingDir, Sandbox: request.Sandbox,
 					WritableRoots: append([]string(nil), request.WritableRoots...),
 					ReadableRoots: append([]string(nil), request.ReadableRoots...),
-				})
+				}
+				if scanner, ok := p.config.ToolExecutor.(scanReportingExecutor); ok {
+					output, scanComplete, toolErr = scanner.executeToolScan(ctx, toolRequest)
+				} else {
+					output, toolErr = p.config.ToolExecutor.ExecuteTool(ctx, toolRequest)
+				}
 			}
 			event.Type, event.Text = EventToolCompleted, output
 			if toolErr != nil {
@@ -574,7 +606,11 @@ func (p *APIProvider) runToolLoop(ctx context.Context, request Request, messages
 					inRequest = state.compactResult(call.ToolName, call.ToolInput, output)
 				}
 			}
-			messages = append(messages, agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr))
+			resultMessage := agent.NewToolResultMessage(call.ToolUseID, inRequest, toolErr)
+			// The mark travels with this exact result. A handover-compacted
+			// result no longer holds the full scan, so it never carries it.
+			resultMessage.Content[0].ScanComplete = scanComplete && toolErr == nil && inRequest == output
+			messages = append(messages, resultMessage)
 		}
 		// Updating the handover or reading a saved output is not a tool round;
 		// a model that does only that for long is, so the allowance still ends.

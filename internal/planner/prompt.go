@@ -133,7 +133,7 @@ credentials or a decision reference. Keep preparation runnable before the bounda
 make only work requiring the answer depend on the HITL task. Preserve existing
 HITL task identity, reason, decision reference and dependencies during refinement,
 including legacy HITL without metadata. An agent cannot reconcile away a human
-boundary. Goal acceptance does not authorize arbitrary spend, publication,
+boundary. A review may ask to move, re-scope or better justify a retained HITL task, but never to delete it, and never to drop the human work it stands for or narrow the accepted scope; refinement keeps every retained HITL task. Goal acceptance does not authorize arbitrary spend, publication,
 messages, destructive actions or privilege expansion. Check actual effect authority.
 Do not include secrets in decision reasons or references.
 `

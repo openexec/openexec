@@ -1,0 +1,31 @@
+#!/bin/bash
+set -u
+export PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
+base=/home/perttu/.agent-console/watch-jobs/75d7-go-20261115
+repo="$base/clone"
+wt="$base/historical"
+log="$base/record.txt"
+exec >"$log" 2>&1
+printf 'Source clone and target\n'
+git clone --no-hardlinks --no-checkout /mnt/data1/projects/openexec "$repo" || exit 1
+git -C "$repo" worktree add --detach "$wt" a149fceb || exit 1
+git -C "$wt" rev-parse HEAD
+git -C "$repo" worktree list --porcelain
+printf 'Before status and diff\n'
+git -C "$wt" status --porcelain -- pkg scripts
+git -C "$wt" diff -- pkg scripts
+git -C "$wt" diff --cached -- pkg scripts
+(cd "$wt" && timeout 900 python3 scripts/verify-workspace-search.py >"$base/stdout.txt" 2>"$base/stderr.txt")
+status=$?
+printf 'script exit: %s\nstdout:\n' "$status"
+cat "$base/stdout.txt"
+printf '\nstderr:\n'
+cat "$base/stderr.txt"
+printf '\nAfter status and diff\n'
+git -C "$wt" status --porcelain -- pkg scripts
+git -C "$wt" diff -- pkg scripts
+git -C "$wt" diff --cached -- pkg scripts
+git -C "$repo" worktree remove "$wt"
+printf 'Removal status: %s\n' "$?"
+git -C "$repo" worktree list --porcelain
+if test -e "$wt"; then printf 'Historical path still exists\n'; else printf 'Historical path absent\n'; fi
