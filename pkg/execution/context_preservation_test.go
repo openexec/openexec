@@ -153,8 +153,8 @@ func TestFailedToolResultsAreNeverStubbed(t *testing.T) {
 	}
 }
 
-// Guards: search results are never eligible, and a listing needs the
-// executor's trust.
+// Guards: an unmarked or partial search is never eligible, and a listing
+// needs the executor's trust.
 func TestPartialOrUnmarkedScansAreNeverStubbed(t *testing.T) {
 	// A partial search, and a complete-looking one, both carry file text.
 	assertPreserved(t, agent.Request{Messages: answered(
@@ -207,10 +207,47 @@ func TestQuotedInstructionInsideNonEligibleResultsIsPreserved(t *testing.T) {
 	}
 }
 
-// The owner's decision: a search result carries file text, which may quote a
-// governing instruction in any file, so none is ever omitted however complete
-// the scan was or whatever file it matched in. No file name or content decides.
-func TestSearchResultsCarryingFileTextAreNeverStubbed(t *testing.T) {
+// Search results are eligible only when the executor's own scan marked them
+// complete and the model answered them later (main's structural rule). Any
+// other search result carries file text that may quote a governing
+// instruction in any file, so it stays verbatim whatever it says or matched.
+func TestUnmarkedUnansweredOrFailedSearchResultsAreNeverStubbed(t *testing.T) {
+	marked := func(id, text string) agent.Message {
+		m := result(id, text, "")
+		m.Content[0].ScanComplete = true
+		return m
+	}
+	// Control: a marked, answered search IS omitted and recallable, so the
+	// preserved cases below do not pass because compaction never ran.
+	index := priorResults{}
+	if _, changed := index.compactWith(agent.Request{Messages: answered(
+		agent.NewTextMessage(agent.RoleUser, "task"),
+		call("search_files", "m", `{"text":"deploy"}`), marked("m", longText(quotedInstruction)),
+	)}, false); !changed || len(index) != 1 {
+		t.Fatalf("control: marked answered search was not omitted: changed=%v index=%d", changed, len(index))
+	}
+	// Marked, but the model has not yet answered it: stays in view.
+	// (assertPreserved appends an assistant turn, so this one is checked directly.)
+	unanswered := agent.Request{Messages: []agent.Message{
+		agent.NewTextMessage(agent.RoleUser, "task"),
+		call("search_files", "m", `{"text":"deploy"}`), marked("m", longText(quotedInstruction)),
+	}}
+	idx := priorResults{}
+	if got, changed := idx.compactWith(unanswered, true); changed || len(idx) != 0 || requestBytes(t, got) != requestBytes(t, unanswered) {
+		t.Fatal("a marked search the model has not answered was stubbed")
+	}
+	// Marked, but the call failed: never omitted.
+	failed := marked("f", longText("partial"))
+	failed.Content[0].ToolError = "boom: " + quotedInstruction
+	assertPreserved(t, agent.Request{Messages: answered(
+		agent.NewTextMessage(agent.RoleUser, "task"),
+		call("search_files", "f", `{"text":"deploy"}`), failed,
+	)})
+	// A mark on a tool that is not a search does not make it eligible.
+	assertPreserved(t, agent.Request{Messages: answered(
+		agent.NewTextMessage(agent.RoleUser, "task"),
+		call("read_file", "r", `{"path":"AGENTS.md"}`), marked("r", longText(quotedInstruction)),
+	)})
 	for _, file := range []string{"AGENTS.md", "NOTES.md", "docs/design.txt", "main.go", "notes.rst"} {
 		r := agent.Request{Messages: answered(
 			agent.NewTextMessage(agent.RoleUser, "task"),
