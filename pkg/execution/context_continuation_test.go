@@ -640,6 +640,93 @@ func TestOmissionLimitationCountsEverythingWhenRecalledPagesAreOutOfView(t *test
 	}
 }
 
+// Guard-removal negative controls. Each switches exactly one guard off, in the
+// declared suite, and shows the unsafe outcome the guard exists to prevent; the
+// matching guarded test above shows the safe outcome with the guard restored.
+func withGuardOff(t *testing.T, name string) {
+	t.Helper()
+	guardsOff[name] = true
+	t.Cleanup(func() { delete(guardsOff, name) })
+}
+
+func TestGuardRemovalAmbiguousAssociationWouldBeOmitted(t *testing.T) {
+	withGuardOff(t, "ambiguity")
+	messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
+	messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{
+		{Type: agent.ContentTypeToolUse, ToolUseID: "x", ToolName: "search_files"},
+		{Type: agent.ContentTypeToolUse, ToolUseID: "x", ToolName: "search_files"},
+	}})
+	for _, text := range []string{"first", "second"} {
+		result := agent.NewToolResultMessage("x", bigOutput(text), nil)
+		result.Content[0].ScanComplete = true
+		messages = append(messages, result)
+	}
+	messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
+	if _, changed := (priorResults{}).compactWith(agent.Request{Messages: messages}, false); !changed {
+		t.Fatal("control is inert: without the ambiguity guard an unidentifiable pair should be omitted")
+	}
+}
+
+func TestGuardRemovalUnmarkedScanAndBinaryOutputWouldBeOmitted(t *testing.T) {
+	for _, c := range []struct {
+		guard, suffix string
+		complete      bool
+	}{
+		{"scan-complete", "", false},
+		{"utf8", "\xff\xfe", true},
+	} {
+		t.Run(c.guard, func(t *testing.T) {
+			withGuardOff(t, c.guard)
+			messages := []agent.Message{agent.NewTextMessage(agent.RoleUser, "original task")}
+			messages = append(messages, searchTranscript(c.complete, "search_files", "a", bigOutput("needle match")+c.suffix, "")...)
+			messages = append(messages, agent.Message{Role: agent.RoleAssistant, Content: []agent.ContentBlock{{Type: agent.ContentTypeText, Text: "next"}}})
+			if _, changed := (priorResults{}).compactWith(agent.Request{Messages: messages}, false); !changed {
+				t.Fatalf("control is inert: without the %s guard the result should be omitted", c.guard)
+			}
+		})
+	}
+}
+
+// Without the scan-complete guard the run that is refused above carries on by
+// omitting results nobody vouched for.
+func TestGuardRemovalUnvouchedSearchesWouldBeOmittedInTheNativeRun(t *testing.T) {
+	withGuardOff(t, "scan-complete")
+	run := runContinuation(t, continuationOptions{hideScan: true, maxSteps: 8})
+	omitted := false
+	for _, r := range *run.requests {
+		omitted = omitted || strings.Contains(requestText(r), "Omitted complete")
+	}
+	if !omitted {
+		t.Fatal("control is inert: results without provenance should be omitted once the guard is gone")
+	}
+}
+
+// Without the recall-failure guard a refused recall is handed back to the model
+// and another request is dispatched, which is what the guard forbids.
+func TestGuardRemovalRefusedRecallWouldBeFedBackAndDispatched(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		o    continuationOptions
+	}{
+		{"unavailable", continuationOptions{recallEarly: true, maxSteps: 6}},
+		{"unknown id", continuationOptions{badRecall: "id", maxSteps: 8}},
+		{"invalid offset", continuationOptions{badRecall: "offset", maxSteps: 8}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			withGuardOff(t, "recall-failure")
+			run := runContinuation(t, c.o)
+			fedBack := false
+			for _, r := range *run.requests {
+				text := requestText(r)
+				fedBack = fedBack || strings.Contains(text, "recall unavailable") || strings.Contains(text, "unknown result")
+			}
+			if !fedBack || run.recalls < 1 {
+				t.Fatalf("control is inert: the refused recall was not fed back (recalls=%d)", run.recalls)
+			}
+		})
+	}
+}
+
 func TestStopHaltsContinuationAndRecall(t *testing.T) {
 	for _, point := range []string{"continuation", "recall"} {
 		t.Run(point, func(t *testing.T) {
