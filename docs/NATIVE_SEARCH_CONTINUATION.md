@@ -61,6 +61,8 @@ id and invalid offset); the guarded tests assert the safe outcome. Switching
 every guard off at once makes the guarded tests fail (recorded in the PR).
 Insufficient-context refusal is the existing `pkg/agent` admission, covered by
 its own tests there; it is not switchable from this package.
+Main's mutation receipts for the eligibility guards are in
+`docs/OMISSION_ELIGIBILITY_DELTA.md`; these controls run inside the suite.
 
 ## Limits
 
