@@ -1,0 +1,34 @@
+=== RUN   TestD26DiagnosticNativeAssemblyAndRefusalBoundary
+=== RUN   TestD26DiagnosticNativeAssemblyAndRefusalBoundary/classified-refusal
+=== RUN   TestD26DiagnosticNativeAssemblyAndRefusalBoundary/different-400
+=== RUN   TestD26DiagnosticNativeAssemblyAndRefusalBoundary/different-status
+=== RUN   TestD26DiagnosticNativeAssemblyAndRefusalBoundary/success
+--- PASS: TestD26DiagnosticNativeAssemblyAndRefusalBoundary (1.17s)
+    --- PASS: TestD26DiagnosticNativeAssemblyAndRefusalBoundary/classified-refusal (0.34s)
+    --- PASS: TestD26DiagnosticNativeAssemblyAndRefusalBoundary/different-400 (0.27s)
+    --- PASS: TestD26DiagnosticNativeAssemblyAndRefusalBoundary/different-status (0.34s)
+    --- PASS: TestD26DiagnosticNativeAssemblyAndRefusalBoundary/success (0.22s)
+=== RUN   TestD26StructuralChronology
+    d26_evidence_test.go:117: 227 ordered events; 104 paired calls; 92060 retained output-tail bytes (not full request growth)
+--- PASS: TestD26StructuralChronology (0.00s)
+=== RUN   TestD26PrivateOccurrenceEvidence
+    d26_evidence_test.go:170: required private artifact unavailable or malformed
+--- FAIL: TestD26PrivateOccurrenceEvidence (0.00s)
+=== RUN   TestD26ProvisioningScript
+--- PASS: TestD26ProvisioningScript (0.01s)
+=== RUN   TestD26ScratchBadCapturesFailClosed
+=== RUN   TestD26ScratchBadCapturesFailClosed/wrong-bytes-not-json
+    d26_provisioning_test.go:216: scratch wrong-bytes-not-json: FAIL (not skip), go test exit non-zero, fixed message "required private artifact unavailable or malformed", no content leaked
+=== RUN   TestD26ScratchBadCapturesFailClosed/wrong-content-valid-json
+    d26_provisioning_test.go:216: scratch wrong-content-valid-json: FAIL (not skip), go test exit non-zero, fixed message "capture fidelity or dispatch facts changed", no content leaked
+=== RUN   TestD26ScratchBadCapturesFailClosed/missing-capture-events-present
+    d26_provisioning_test.go:216: scratch missing-capture-events-present: FAIL (not skip), go test exit non-zero, fixed message "required private artifact unavailable or malformed", no content leaked
+=== NAME  TestD26ScratchBadCapturesFailClosed
+    d26_provisioning_test.go:225: control: events file absent -> SKIP (not a failure), so the missing-capture case keeps events present
+--- PASS: TestD26ScratchBadCapturesFailClosed (0.67s)
+    --- PASS: TestD26ScratchBadCapturesFailClosed/wrong-bytes-not-json (0.19s)
+    --- PASS: TestD26ScratchBadCapturesFailClosed/wrong-content-valid-json (0.17s)
+    --- PASS: TestD26ScratchBadCapturesFailClosed/missing-capture-events-present (0.16s)
+FAIL
+FAIL	github.com/openexec/openexec/pkg/execution	1.863s
+FAIL
