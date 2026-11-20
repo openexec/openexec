@@ -1,0 +1,19 @@
+=== RUN   TestD26ProvisioningScript
+    d26_provisioning_test.go:60: script refusal on the shared bad file: exit=1, fixed message "refused: candidate sha256 does not match expected 0cbc9da8b5a6ed7d03db2b4a0a8ac16818f1c648f3db776090c83651bba20708; nothing installed", nothing installed, no content printed
+    d26_provisioning_test.go:117: scratch copy of script with hash rewritten: exact match installs identical bytes; near-miss hash refused
+--- PASS: TestD26ProvisioningScript (0.01s)
+=== RUN   TestD26ScratchBadCapturesFailClosed
+=== RUN   TestD26ScratchBadCapturesFailClosed/wrong-bytes-not-json
+    d26_provisioning_test.go:250: scratch wrong-bytes-not-json: FAIL (not skip), go test exit non-zero, fixed message "required private artifact unavailable or malformed", no content leaked
+=== RUN   TestD26ScratchBadCapturesFailClosed/wrong-content-valid-json
+    d26_provisioning_test.go:250: scratch wrong-content-valid-json: FAIL (not skip), go test exit non-zero, fixed message "capture fidelity or dispatch facts changed", no content leaked
+=== RUN   TestD26ScratchBadCapturesFailClosed/missing-capture-events-present
+    d26_provisioning_test.go:250: scratch missing-capture-events-present: FAIL (not skip), go test exit non-zero, fixed message "required private artifact unavailable or malformed", no content leaked
+=== NAME  TestD26ScratchBadCapturesFailClosed
+    d26_provisioning_test.go:259: control: events file absent -> SKIP (not a failure), so the missing-capture case keeps events present
+--- PASS: TestD26ScratchBadCapturesFailClosed (0.85s)
+    --- PASS: TestD26ScratchBadCapturesFailClosed/wrong-bytes-not-json (0.21s)
+    --- PASS: TestD26ScratchBadCapturesFailClosed/wrong-content-valid-json (0.19s)
+    --- PASS: TestD26ScratchBadCapturesFailClosed/missing-capture-events-present (0.22s)
+PASS
+ok  	github.com/openexec/openexec/pkg/execution	0.865s
