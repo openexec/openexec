@@ -2,9 +2,10 @@
 # Install the D26 private capture only if its SHA-256 matches the recorded hash.
 # Verify hash, then install; never synthesize. Never prints file contents.
 #
-# usage: provision-d26-capture.sh [--expected-sha256 HEX] [--dest PATH] CANDIDATE
-# The two flags exist so the refusal and install paths can be exercised against
-# throwaway files; real provisioning passes only CANDIDATE.
+# usage: provision-d26-capture.sh [--dest PATH] CANDIDATE
+# The expected hash is fixed in this file and cannot be overridden by a flag or
+# the environment. The positive path is exercised only against a scratch copy of
+# this script whose EXPECTED line is rewritten (see d26_provisioning_test.go).
 set -u
 
 EXPECTED=0cbc9da8b5a6ed7d03db2b4a0a8ac16818f1c648f3db776090c83651bba20708
@@ -12,11 +13,6 @@ DEST=/home/perttu/.agent-console/run-requests/d26bd137975612543c90e5b983f60db8.j
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-	--expected-sha256)
-		[ $# -ge 2 ] || { echo "refused: --expected-sha256 needs a value" >&2; exit 2; }
-		EXPECTED=$2
-		shift 2
-		;;
 	--dest)
 		[ $# -ge 2 ] || { echo "refused: --dest needs a value" >&2; exit 2; }
 		DEST=$2
@@ -33,7 +29,7 @@ while [ $# -gt 0 ]; do
 	*) break ;;
 	esac
 done
-[ $# -eq 1 ] || { echo "usage: provision-d26-capture.sh [--expected-sha256 HEX] [--dest PATH] CANDIDATE" >&2; exit 2; }
+[ $# -eq 1 ] || { echo "usage: provision-d26-capture.sh [--dest PATH] CANDIDATE" >&2; exit 2; }
 CAND=$1
 
 hash_of() { sha256sum "$1" | cut -d' ' -f1; }

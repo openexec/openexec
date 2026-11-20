@@ -17,12 +17,21 @@ const (
 	d26SentinelSecret = "SENTINEL-PRIVATE-CONTENT-9137"
 )
 
+// d26BadCapture is the one throwaway bad file used for both the script refusal
+// and the scratch-copy test failure, so the two demonstrations share one input.
+var d26BadCapture = []byte("not json " + d26SentinelSecret)
+
 func runProvision(t *testing.T, args ...string) (int, string) {
 	t.Helper()
 	script, err := filepath.Abs("../../scripts/provision-d26-capture.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
+	return runProvisionScript(t, script, args...)
+}
+
+func runProvisionScript(t *testing.T, script string, args ...string) (int, string) {
+	t.Helper()
 	out, err := exec.Command("sh", append([]string{script}, args...)...).CombinedOutput()
 	code := 0
 	if err != nil {
@@ -41,13 +50,14 @@ func TestD26ProvisioningScript(t *testing.T) {
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "out", "capture.json")
 	bad := filepath.Join(dir, "bad.json")
-	if err := os.WriteFile(bad, []byte(`{"x":"`+d26SentinelSecret+`"}`), 0o600); err != nil {
+	if err := os.WriteFile(bad, d26BadCapture, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	code, out := runProvision(t, "--dest", dest, bad)
 	if code == 0 || strings.Contains(out, d26SentinelSecret) || !strings.Contains(out, d26CaptureSHA) {
 		t.Fatalf("wrong file not refused cleanly: code=%d out=%q", code, out)
 	}
+	t.Logf("script refusal on the shared bad file: exit=%d, fixed message %q, nothing installed, no content printed", code, strings.TrimSpace(out))
 	if _, err := os.Stat(dest); err == nil {
 		t.Fatal("wrong file was installed")
 	}
@@ -57,30 +67,54 @@ func TestD26ProvisioningScript(t *testing.T) {
 	if _, err := os.Stat(dest); err == nil {
 		t.Fatal("missing candidate installed something")
 	}
-	// Near miss: expected hash differs from the file's by one character.
+	// The production script has no hash override: the flag is refused and
+	// installs nothing, even with the file's true hash supplied.
 	body := []byte("throwaway-provisioning-bytes")
 	good := filepath.Join(dir, "good.json")
 	if err := os.WriteFile(good, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	sum := fmt.Sprintf("%x", sha256.Sum256(body))
+	if code, _ := runProvision(t, "--expected-sha256", sum, "--dest", dest, good); code == 0 {
+		t.Fatal("production script accepted a hash override")
+	}
+	if _, err := os.Stat(dest); err == nil {
+		t.Fatal("hash override installed a file")
+	}
+	// Positive path only in a scratch copy of the script with the hash rewritten.
+	src, err := os.ReadFile("../../scripts/provision-d26-capture.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "EXPECTED="+d26CaptureSHA) {
+		t.Fatal("recorded hash line not found in script")
+	}
+	scratch := func(hash string) string {
+		p := filepath.Join(t.TempDir(), "provision.sh")
+		if err := os.WriteFile(p, []byte(strings.Replace(string(src), "EXPECTED="+d26CaptureSHA, "EXPECTED="+hash, 1)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	// Near miss: hash differs from the file's by one character.
 	last := "0"
 	if sum[63] == '0' {
 		last = "1"
 	}
-	if code, _ := runProvision(t, "--expected-sha256", sum[:63]+last, "--dest", dest, good); code == 0 {
+	if code, _ := runProvisionScript(t, scratch(sum[:63]+last), "--dest", dest, good); code == 0 {
 		t.Fatal("near-miss hash accepted")
 	}
 	if _, err := os.Stat(dest); err == nil {
 		t.Fatal("near-miss installed")
 	}
-	if code, out := runProvision(t, "--expected-sha256", sum, "--dest", dest, good); code != 0 {
+	if code, out := runProvisionScript(t, scratch(sum), "--dest", dest, good); code != 0 {
 		t.Fatalf("exact match refused: %q", out)
 	}
 	got, err := os.ReadFile(dest)
 	if err != nil || string(got) != string(body) {
 		t.Fatal("installed bytes differ")
 	}
+	t.Log("scratch copy of script with hash rewritten: exact match installs identical bytes; near-miss hash refused")
 }
 
 func d26GoBin(t *testing.T) string {
@@ -197,7 +231,7 @@ func TestD26ScratchBadCapturesFailClosed(t *testing.T) {
 		capture []byte
 		message string
 	}{
-		{"wrong-bytes-not-json", []byte("not json " + d26SentinelSecret), "required private artifact unavailable or malformed"},
+		{"wrong-bytes-not-json", d26BadCapture, "required private artifact unavailable or malformed"},
 		{"wrong-content-valid-json", []byte(`{"truncated":true,"note":"` + d26SentinelSecret + `"}`), "capture fidelity or dispatch facts changed"},
 		{"missing-capture-events-present", nil, "required private artifact unavailable or malformed"},
 	}
