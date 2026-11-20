@@ -50,6 +50,13 @@ func (p priorResults) compact(r agent.Request) (agent.Request, bool) {
 	return p.compactWith(r, true)
 }
 
+// guardsOff lets a test switch one named guard off to show, in the declared
+// suite, what that guard prevents (a guard-removal negative control). Nothing
+// outside tests ever writes to it, so every guard is on in production.
+var guardsOff = map[string]bool{}
+
+func guardOn(name string) bool { return !guardsOff[name] }
+
 type pendingCall struct {
 	name       string
 	input      json.RawMessage
@@ -84,7 +91,7 @@ func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent
 			case agent.ContentTypeToolResult:
 				calls := pending[block.ToolResultID]
 				if len(calls) > 0 {
-					if !ambiguous[block.ToolResultID] {
+					if !ambiguous[block.ToolResultID] || !guardOn("ambiguity") {
 						eligible[[2]int{i, j}] = calls[0]
 					}
 					pending[block.ToolResultID] = calls[1:]
@@ -101,7 +108,7 @@ func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent
 		for j := len(r.Messages[i].Content) - 1; j >= 0; j-- {
 			b := &copyRequest.Messages[i].Content[j]
 			call, ok := eligible[[2]int{i, j}]
-			if b.Type != agent.ContentTypeToolResult || !ok || b.ToolError != "" || len(b.ToolOutput) < 256 || !utf8.ValidString(b.ToolOutput) {
+			if b.Type != agent.ContentTypeToolResult || !ok || b.ToolError != "" || len(b.ToolOutput) < 256 || (!utf8.ValidString(b.ToolOutput) && guardOn("utf8")) {
 				continue
 			}
 			switch {
@@ -114,7 +121,7 @@ func (p priorResults) compactWith(r agent.Request, trustDirectories bool) (agent
 				id := hex.EncodeToString(hash[:])
 				p[id] = b.ToolOutput
 				b.ToolOutput = fmt.Sprintf("Prior directory listing retained as %s (%d bytes). Use %s with this id and an offset to inspect it.", id, len(b.ToolOutput), recallTool)
-			case call.name == "search_files" && b.ScanComplete && i < lastAssistant:
+			case call.name == "search_files" && (b.ScanComplete || !guardOn("scan-complete")) && i < lastAssistant:
 				// Results the model has not yet answered stay in view. The id
 				// binds this exact call position and result, so a reused call
 				// ID or an identical output elsewhere cannot stand in for it.
