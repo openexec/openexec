@@ -57,7 +57,6 @@ func TestD26ProvisioningScript(t *testing.T) {
 	if code == 0 || strings.Contains(out, d26SentinelSecret) || !strings.Contains(out, d26CaptureSHA) {
 		t.Fatalf("wrong file not refused cleanly: code=%d out=%q", code, out)
 	}
-	t.Logf("script refusal on the shared bad file: exit=%d, fixed message %q, nothing installed, no content printed", code, strings.TrimSpace(out))
 	if _, err := os.Stat(dest); err == nil {
 		t.Fatal("wrong file was installed")
 	}
@@ -179,11 +178,13 @@ func d26Throwaway(t *testing.T) []byte {
 // d26ScratchRun copies the unchanged D26 test into a scratch module, points its
 // absolute private paths at a temp tree, swaps in the throwaway events hash, and
 // runs it. The real paths and the real test are never touched.
-func d26ScratchRun(t *testing.T, withEvents bool, capture []byte) (string, bool) {
+func d26ScratchRun(t *testing.T, withEvents bool, capturePath string) (string, bool) {
 	t.Helper()
 	scratch := t.TempDir()
 	priv := filepath.Join(scratch, "private") + "/"
-	runReq := filepath.Join(scratch, "run-requests")
+	if capturePath == "" { // missing-capture case: a path that does not exist
+		capturePath = filepath.Join(scratch, "absent-capture.json")
+	}
 	pkg := filepath.Join(scratch, "pkg")
 	must := func(err error) {
 		t.Helper()
@@ -191,7 +192,7 @@ func d26ScratchRun(t *testing.T, withEvents bool, capture []byte) (string, bool)
 			t.Fatal(err)
 		}
 	}
-	for _, d := range []string{priv, runReq, filepath.Join(pkg, "testdata")} {
+	for _, d := range []string{priv, filepath.Join(pkg, "testdata")} {
 		must(os.MkdirAll(d, 0o755))
 	}
 	src, err := os.ReadFile("d26_evidence_test.go")
@@ -200,7 +201,7 @@ func d26ScratchRun(t *testing.T, withEvents bool, capture []byte) (string, bool)
 	text := string(src)
 	for _, r := range [][2]string{
 		{"/home/perttu/.agent-console/perttu/scratch/20261031T163533Z/", priv},
-		{"/home/perttu/.agent-console/run-requests/", runReq + "/"},
+		{"/home/perttu/.agent-console/run-requests/d26bd137975612543c90e5b983f60db8.json", capturePath},
 		{"b089c85d67c841d464a7e3a1f0eb199c1b9472682ddb75c683d4f86768260014", fmt.Sprintf("%x", sha256.Sum256(events))},
 	} {
 		if !strings.Contains(text, r[0]) {
@@ -216,24 +217,71 @@ func d26ScratchRun(t *testing.T, withEvents bool, capture []byte) (string, bool)
 	if withEvents {
 		must(os.WriteFile(priv+"d26-events.json", events, 0o600))
 	}
-	if capture != nil {
-		must(os.WriteFile(filepath.Join(runReq, "d26bd137975612543c90e5b983f60db8.json"), capture, 0o600))
-	}
 	cmd := exec.Command(d26GoBin(t), "test", "-count=1", "-v", "-run", "^TestD26PrivateOccurrenceEvidence$", "./pkg")
 	cmd.Dir = scratch
 	out, err := cmd.CombinedOutput()
 	return string(out), err == nil
 }
 
+func d26FileSHA(t *testing.T, p string) string {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(b))
+}
+
+// One throwaway bad file, one path: the unmodified script refuses it and the
+// scratch copy of the D26 test, pointed at that same path, fails on it.
+func TestD26SharedBadFileScriptAndScratchTest(t *testing.T) {
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared-bad.json")
+	if err := os.WriteFile(shared, d26BadCapture, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := d26FileSHA(t, shared)
+	dest := filepath.Join(dir, "out", "capture.json")
+
+	code, out := runProvision(t, "--dest", dest, shared)
+	wantMsg := "refused: candidate sha256 does not match expected " + d26CaptureSHA + "; nothing installed"
+	if code != 1 || strings.TrimSpace(out) != wantMsg || strings.Contains(out, d26SentinelSecret) {
+		t.Fatalf("script did not refuse the shared file with the fixed message: code=%d", code)
+	}
+	if _, err := os.Stat(dest); err == nil {
+		t.Fatal("script installed the shared bad file")
+	}
+	mid := d26FileSHA(t, shared)
+
+	sout, pass := d26ScratchRun(t, true, shared)
+	if pass || !strings.Contains(sout, "--- FAIL: TestD26PrivateOccurrenceEvidence") || strings.Contains(sout, "SKIP") {
+		t.Fatalf("scratch run on the shared file did not fail closed (pass=%v)", pass)
+	}
+	const msg = "required private artifact unavailable or malformed"
+	if !strings.Contains(sout, msg) || strings.Contains(sout, d26SentinelSecret) {
+		t.Fatalf("scratch output missing fixed message or leaked content")
+	}
+	after := d26FileSHA(t, shared)
+	if before != mid || mid != after {
+		t.Fatalf("shared file bytes changed between uses: %s %s %s", before, mid, after)
+	}
+	t.Logf("shared throwaway file sha256 %s (one temp path, same bytes before, between and after)", before)
+	t.Logf("use 1, unmodified script: exit=%d, message %q, nothing installed, no content printed", code, strings.TrimSpace(out))
+	t.Logf("use 2, scratch TestD26PrivateOccurrenceEvidence on the same path: FAIL (not skip), fixed message %q, no content leaked", msg)
+}
+
 func TestD26ScratchBadCapturesFailClosed(t *testing.T) {
+	validJSON := filepath.Join(t.TempDir(), "valid-wrong.json")
+	if err := os.WriteFile(validJSON, []byte(`{"truncated":true,"note":"`+d26SentinelSecret+`"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		name    string
-		capture []byte
+		capture string
 		message string
 	}{
-		{"wrong-bytes-not-json", d26BadCapture, "required private artifact unavailable or malformed"},
-		{"wrong-content-valid-json", []byte(`{"truncated":true,"note":"` + d26SentinelSecret + `"}`), "capture fidelity or dispatch facts changed"},
-		{"missing-capture-events-present", nil, "required private artifact unavailable or malformed"},
+		{"wrong-content-valid-json", validJSON, "capture fidelity or dispatch facts changed"},
+		{"missing-capture-events-present", "", "required private artifact unavailable or malformed"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -252,7 +300,7 @@ func TestD26ScratchBadCapturesFailClosed(t *testing.T) {
 	}
 	// Control: with the events file absent the same test skips, which is why the
 	// missing-capture demonstration keeps the events file present.
-	out, pass := d26ScratchRun(t, false, nil)
+	out, pass := d26ScratchRun(t, false, "")
 	if !pass || !strings.Contains(out, "--- SKIP: TestD26PrivateOccurrenceEvidence") {
 		t.Fatal("control: absent events file should skip")
 	}
