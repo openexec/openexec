@@ -80,6 +80,14 @@ Two sources per PR: (A) the GitHub review list, (B) the console review recorded 
   included; … gh is limited to reading pull requests, runs and issues". The `gh pr view` route above
   covers the same review list. No console task or review store was readable from this lane, so the
   console review of #194 is not cited and none is inferred.
+  (4) Console-side review store, queried through the console's OpenExec connector on 2026-11-21
+  (this pass): operation `list_advisory_reports(project="openexec")` returned
+  `{"authority":"external_non_authorizing","next_cursor":"","reports":[]}`; operation
+  `list_advisory_requests(project="openexec")` returned `{"requests":[]}`. Both are empty, not
+  refused. The connector lists only advisory reports submitted by that external principal, so an
+  empty result shows no such report exists there; it does not show the console's own task review
+  record (review `923a191c…`, task `fd066ea8…`) is absent. That record has no read operation
+  exposed to this lane (no refusal was returned because no such operation was attempted).
 
 **PR #205** (merged at `cb53f74239869fd4fb720122f64c9c58b93367c5`)
 
@@ -89,7 +97,8 @@ Two sources per PR: (A) the GitHub review list, (B) the console review recorded 
   `7cadaed3da24f94d5cb5662a4b75083d93968592`, retrieved 2026-11-21T02:59Z. Its only retrievable
   evidence remains the CI rollup in section 4 (Linux pass; macOS skipped).
 - (B) Console review recorded against #205: **not retrieved**, same attempts and refusal as for #194
-  (the `gh api .../pulls/205/reviews` call was refused identically). No review ID is cited.
+  (the `gh api .../pulls/205/reviews` call was refused identically; the connector queries in (4)
+  above are project-wide and also returned empty). No review ID is cited.
 
 **Other identifiers named by this task** (cited as given by the task contract; none was verified
 against a retrieved source here, so each is "not retrieved"): reviews
