@@ -62,14 +62,24 @@ No hunk was unclassifiable. Main additionally has
 
 ## 4. Reviews and evidence (retrievable references)
 
-- **#194 attached review:** `reviews: []` and `comments: []` from `gh pr view 194`.
-  GitHub holds no review for this head. The PR body itself says exact-head
-  review, full Go tests, `make test` and live verification "remain required".
-  The task's own console reviews are a separate source:
-  `9b2839bf3457367bc2f44f0a9ae794bd` and `c3c040f883700e0cf91a56065c4d9263`
-  (cited in this task's contract; not retrievable from GitHub, and their text is
-  not reproduced here). Their recorded finding: the candidate branch was
-  identical to main and lacked this record.
+- **#194 attached review:** none retrievable. Re-fetched 2026-11-21T02:30Z with
+  `gh pr view 194 -R openexec/openexec --json body,reviews,comments,latestReviews,headRefOid,state`:
+  `reviews: []`, `latestReviews: []`, `comments: []`, head still
+  `8b5333c243cf52f09031e998ad19810c2f9e076a`, state OPEN. GitHub holds no review
+  for this head. The PR body itself says exact-head review, full Go tests,
+  `make test` and live verification "remain required".
+- **Console review of #194 (parent task `0e65901e02d33f7805bf907a33715538`):**
+  not retrieved. This pass has no read access to the console's review store
+  (reads under `/home/perttu/.agent-console` are refused for this lane task, and
+  no repository file or commit message names a parent-task review ID:
+  `git grep` for `0e65901e` finds nothing). Its ID and contents are therefore
+  **unknown here** and are not stated. Gap: whoever holds console access should
+  add the review ID and its retrieval reference.
+- **Reviews of this follow-up (not of #194):** `9b2839bf3457367bc2f44f0a9ae794bd`
+  and `c3c040f883700e0cf91a56065c4d9263` are cited in this task's contract as
+  reviews of an earlier candidate of this record (branch identical to main, record
+  missing). They are not reviews of #194 and are not evidence about its code;
+  their text is not reproduced here.
 - **#205 review:** `reviews: []`, `comments: []`. **Evidence:** body (retrievable
   via `gh pr view 205 --json body`) records base-red/restored-green runs of
   `go test ./pkg/execution/ -run 'Identity|PinReadable|PinnedReadable|Bound'` and
