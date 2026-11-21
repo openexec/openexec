@@ -58,6 +58,45 @@ that cannot pin), which PR #194 does not have.
   SUCCESS (run 43578532323, job 132398043653); `build (macos-latest, 1.25)` SKIPPED
   (job 132399801509). So #205's retrievable evidence is a Linux pass only; macOS did not run.
 
+### 4a. Review and evidence citations (retrieved 2026-11-21T02:59Z, time-bound)
+
+Two sources per PR: (A) the GitHub review list, (B) the console review recorded for the task.
+
+**PR #194**
+
+- State, time-bound: on 2026-11-21 PR #194 was OPEN, draft, CONFLICTING at head
+  `8b5333c243cf52f09031e998ad19810c2f9e076a`. A later call returned `mergeable: UNKNOWN`
+  (GitHub recomputes it lazily); `updatedAt` stayed 2026-11-01T21:36:51Z. This is not a claim that
+  the parent is delivered; its hold, Stop and accounting are unchanged.
+- (A) GitHub review list: **empty**. Command
+  `gh pr view 194 -R openexec/openexec --json reviews,reviewDecision,headRefOid,state,isDraft,mergeable`
+  returned `"reviewDecision":""`, `"reviews":[]`, retrieved 2026-11-21T02:59Z. A second call with
+  `--json comments` returned `"comments":[]`. No review ID or URL exists to cite.
+- (B) Console review recorded against #194: **not retrieved**. Attempted: (1) `grep -rIl` for
+  `923a191c`, `402871c3`, `fd066ea8` over `/mnt/data1/projects/agent-console` (excluding
+  `node_modules`, `.git`): no matches (exit 1). (2) Same identifiers over this checkout: no matches.
+  (3) `gh api repos/openexec/openexec/pulls/194/reviews` was refused by the console:
+  "Refused: outside this unattended task's authority — gh api calls GitHub's API directly, writes
+  included; … gh is limited to reading pull requests, runs and issues". The `gh pr view` route above
+  covers the same review list. No console task or review store was readable from this lane, so the
+  console review of #194 is not cited and none is inferred.
+
+**PR #205** (merged at `cb53f74239869fd4fb720122f64c9c58b93367c5`)
+
+- (A) GitHub review list: **empty**. `gh pr view 205 -R openexec/openexec --json reviews,reviewDecision,headRefOid,state,mergeCommit,mergedAt`
+  returned `"reviews":[]`, `"reviewDecision":""`, `state` MERGED, `mergedAt` 2026-11-14T09:14:29Z,
+  `mergeCommit.oid` `cb53f74239869fd4fb720122f64c9c58b93367c5`, `headRefOid`
+  `7cadaed3da24f94d5cb5662a4b75083d93968592`, retrieved 2026-11-21T02:59Z. Its only retrievable
+  evidence remains the CI rollup in section 4 (Linux pass; macOS skipped).
+- (B) Console review recorded against #205: **not retrieved**, same attempts and refusal as for #194
+  (the `gh api .../pulls/205/reviews` call was refused identically). No review ID is cited.
+
+**Other identifiers named by this task** (cited as given by the task contract; none was verified
+against a retrieved source here, so each is "not retrieved"): reviews
+`402871c33fd5959ef2d10a2cf3028ce3` and `923a191c41644c297c7725e649bd6c1b`, PR #247 candidate
+`b5bd93b0843ba1eee326645fc7ca52c2dc220c3e`, implementation `fd066ea8dbb6343e6f44589e1414d3b1`.
+They concern the #247 record work, not an attached review of #194 or #205.
+
 ## 5. Discarded task outcomes
 
 Branches `agent-console/task-2ef0beb6a771-…` and `…task-16c3f057db4c-…` exist locally and on
