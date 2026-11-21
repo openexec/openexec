@@ -15,7 +15,7 @@ console's `run_command`), and read-only `git` in this checkout.
 | PR #194 | `OPEN`, `isDraft: true`, `mergeable: CONFLICTING`, base `main`, `mergedAt: null`, `updatedAt: 2026-11-01T21:36:51Z`, title "Pin native API readable roots during each run" | `gh pr view 194 --json state,isDraft,mergeable,baseRefName,mergedAt,updatedAt,title` |
 | PR #194 head | `8b5333c243cf52f09031e998ad19810c2f9e076a` — **identical** to the head named in the task; GitHub shows no different head | `headRefOid` |
 | PR #194 commits | `f9f5f06d6f9905e94fb6ea7e210dc7f6aa45e127` "fix: pin API readable roots for each execution"; `8b5333c243cf52f09031e998ad19810c2f9e076a` "fix: bind readable root identities across execution protocol"; merge base with main `776529df6f0382dcd2a1311cac87e936df4e46c3` | `gh pr view 194 --json commits`; `git merge-base 8b5333c2 origin/main` |
-| main | `6a217d09200f30202f6eac9622d1f6f3f811b4a7` — identical to the expected `6a217d09…` | console fetch at run start; `git rev-parse origin/main` |
+| main | `6a217d09200f30202f6eac9622d1f6f3f811b4a7` — identical to the expected `6a217d09…` (at retrieval; `origin/main` has since moved to `37b618f65dd3eb2dce24acb3d9d800fc918653b0` as this record was merged forward, and the classification below was not re-run against it) | console fetch at run start; `git rev-parse origin/main` |
 | PR #205 | `MERGED` 2026-11-14T09:14:29Z, merge commit `cb53f74239869fd4fb720122f64c9c58b93367c5`, PR head `7cadaed3da24f94d5cb5662a4b75083d93968592`, title "Reconcile the retained native read-root identity candidate before delivery" | `gh pr view 205 --json state,mergedAt,mergeCommit,headRefOid,title` |
 
 These values are a snapshot; re-run the commands above before relying on them later.
@@ -56,9 +56,12 @@ i.e. PR-side lines absent on main) per file, to find any PR line not on main;
 | `pkg/execution/workspace_tools.go`: `named, nameErr := os.Lstat(path)` + `os.SameFile(opened, named)` name comparison inside `pinReadableRoots` | **superseded** | removed in #205 ("drop redundant SameFile guard", #205 commit message); main now checks only `root.Stat(".")` error (`git diff 8b5333c2 origin/main`, hunk at line ~105). The caller identity compare plus canonical-path refusal remain; `TestPinReadableRootsRefusesSymlinkedParent` covers the symlinked-parent case the guard also touched |
 | `pkg/execution/workspace_search.go`: `withinRoots` → `e.withinRoots` (conflict) | delivered by #205 | main line 58; the conflict is against main's `searchFilesWithProvenance` rework |
 | Proof of the `!linux && !darwin` refusal | **missing** | not in #194 or main: `root_identity_unsupported.go` is not compiled on Linux and both identity test files are tagged `linux\|\|darwin`; `git grep` finds no test exercising `ReadableRootIdentitySupported() == false` |
+| Interleave test for a swap between the identity check and the open | **missing** | not in #194 or main (found absent by an earlier pass of this record on the same head); the discarded branches in section 5 attempted it |
 
 No hunk was unclassifiable. Main additionally has
-`workspace_root_identity_paths_test.go` (from #205), which #194 lacks.
+`workspace_root_identity_paths_test.go` (from #205: bad identities, symlinked
+parent, pinned read/list/search after swap, provider that cannot bind, composite
+that cannot pin), which #194 lacks.
 
 ## 4. Reviews and evidence (retrievable references)
 
@@ -115,11 +118,31 @@ either tip, did not run their tests, and adopts none of their code. Their
 unsupported-platform tests are a lead for the missing proof, not evidence that
 it exists on main or that the boundary holds under swap races.
 
-## 6. Preserved, and not established
+## 6. Route options (advisory input; not decided or executed here)
+
+An earlier pass of this record recommended **closing #194 as superseded by
+#205**. That is an owner/lane action, not done here, and the route decision
+stays with the parent task. Its reasoning, kept as an input:
+
+- Every functional hunk is delivered; the one intentional difference is a decided
+  removal (the `SameFile` name guard).
+- The residual proof is (a) the unsupported-platform refusal, which cannot execute
+  on the Linux gate and so cannot be shown red/green by a Linux test, and (b) an
+  interleave test that needs the discarded `workspace_tools.go` hardening to be
+  meaningful.
+- Rebasing #194 wholesale would reintroduce the removed `SameFile` guard and
+  fight main's provenance/search changes.
+- Same-PR continuation is technically possible (rebase #194 onto main keeping only
+  the missing tests, with normal independent review) if the owner prefers to keep
+  the PR identity.
+
+## 7. Preserved, and not established
 
 - Parent PR #194 identity (draft, `8b5333c2`, conflicting), hold, Stop and
   accounting: unchanged.
 - Route decision, implementation and platform tests belong to the parent task;
   this record only supplies its inputs.
-- Not established: macOS runtime behaviour (#205's macOS leg was skipped); that
-  the unsupported-platform refusal works (no test exists on main).
+- Not established: macOS runtime behaviour (#205's macOS leg was skipped; check a
+  `build-macos` push-to-main run and a real macOS native execution); that the
+  unsupported-platform refusal works (no test exists on main).
+- No test was run for this record (docs only); no source change.
